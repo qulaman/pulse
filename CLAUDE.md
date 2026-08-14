@@ -1,6 +1,6 @@
 # CLAUDE.md — WAG Pulse
 
-Инструкции для Claude Code. Прочти этот файл полностью перед любой задачей. Детали по слоям: `docs/FRONTEND.md`, `docs/BACKEND.md`, `docs/DATABASE.md`. Общая концепция продукта: `CONCEPT.md`.
+Инструкции для Claude Code. Прочти этот файл полностью перед любой задачей. Детали по слоям: `docs/FRONTEND.md`, `docs/BACKEND.md`, `docs/DATABASE.md`. Общая концепция продукта: `docs/CONCEPT.md`.
 
 ## Что это за проект
 
@@ -46,6 +46,8 @@
   /migrations           # SQL-миграции (единственный источник правды по схеме)
   /functions            # Edge Functions
 /docs                   # FRONTEND.md, BACKEND.md, DATABASE.md
+/tasks                  # рабочие приказы для агентов (одна задача = одна сессия)
+/tracker                # index.html — трекер «план/факт» по 12 неделям
 ```
 
 ## Статусы задач (enum, не расширять без причины)
