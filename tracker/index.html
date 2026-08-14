@@ -1,0 +1,752 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="WAG Pulse — трекер плана и факта по 12 неделям разработки">
+<title>WAG Pulse — Трекер</title>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ДАННЫЕ ТРЕКЕРА — единственное место в файле, которое нужно править.
+   Всё остальное (вёрстка, счётчики, прогресс, статусы недель) считается из
+   этого объекта автоматически. Никаких внешних файлов и зависимостей нет —
+   страница открывается двойным кликом с диска и работает офлайн.
+
+   КАК ОБНОВЛЯТЬ ФАКТ:
+   1. Статус задачи — поле `status` внутри weeks[].tasks[]. Ровно одно из:
+        "plan"        — ещё не начато
+        "in_progress" — в работе
+        "done"        — сделано
+        "dropped"     — снято/отменено (не попадает в знаменатель прогресса)
+      Обновление статуса = правка ОДНОЙ строки.
+   2. Итог недели — `factNote` (что реально вышло) и `closedAt` (дата закрытия,
+      ISO "ГГГГ-ММ-ДД"). null = прочерк.
+   3. Метрики пилота — metrics[].fact: число или строка, null = прочерк.
+   4. Журнал демо — добавить объект в demos[] после каждой пятницы (см. пример).
+   5. Б-трек — btrack[].status, те же четыре значения.
+   6. `startDate` — ISO-дата ПОНЕДЕЛЬНИКА недели 1, например "2026-08-17".
+      Пока null → в шапке «старт не назначен», текущая неделя не считается.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const DATA = {
+  project: "WAG Pulse",
+  subtitle: "West Arlan Group · внутренняя платформа",
+  startDate: null,           // ← поставить дату понедельника недели 1, напр. "2026-08-17"
+  horizonWeeks: 12,
+
+  // Фазы программы — только для группировки лент недель.
+  phases: [
+    { id: "mvp",    title: "MVP",                                        range: [1, 4]   },
+    { id: "pilot",  title: "Пилот на живых людях",                       range: [5, 6]   },
+    { id: "scale",  title: "Ассистент, геймификация, вся компания",      range: [7, 9]   },
+    { id: "pack",   title: "Магазин, ТВ, упаковка результатов",          range: [10, 12] }
+  ],
+
+  weeks: [
+    {
+      n: 1,
+      title: "Фундамент + главный гейт",
+      criterionLabel: "критерий недели",
+      criterion: "СТТ-гейт пройден, схема ядра в проде, логин работает.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w1t1", status: "plan", text: "Гейт СТТ (день 1–2): записать 30 реальных фраз директора (имена, смешанная речь, шум) → прогнать через Whisper → если точность имён <95%, тестировать Deepgram/gpt-4o-transcribe ДО написания UI. Это решение определяет весь стек.", gate: true },
+        { id: "w1t2", status: "plan", text: "Репозиторий, CLAUDE.md и доки внутрь, Supabase проект, Vercel." },
+        { id: "w1t3", status: "plan", text: "Миграции ядра: companies, profiles, tasks, task_messages + RLS + негативный тест «сотрудник не видит чужие задачи»." },
+        { id: "w1t4", status: "plan", text: "Auth + роли, справочник сотрудников с алиасами (заполнить реальными людьми WAG)." },
+        { id: "w1t5", status: "plan", track: "Б", text: "Финализация условий с инвестором (доли! см. риск 50/50), старт оформления ТОО." }
+      ]
+    },
+    {
+      n: 2,
+      title: "Личный канал и доставка",
+      criterionLabel: "критерий недели",
+      criterion: "Задача, созданная вручную в БД, доходит до телефона сотрудника пушем, он принимает, статус виден.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w2t1", status: "plan", text: "Лента диалога (feed): карточка задачи, 3 кнопки, композер (текст/фото/голосовое)." },
+        { id: "w2t2", status: "plan", text: "«Мои дела», статусная машина задач." },
+        { id: "w2t3", status: "plan", text: "Web Push (VAPID) + Telegram-fallback бот + индикатор недоставки у директора." }
+      ]
+    },
+    {
+      n: 3,
+      title: "Голосовой конвейер",
+      criterionLabel: "критерий недели",
+      criterion: "Сказал фразу → карточка на подтверждении → «Всё верно» → у сотрудника пуш. < 3 сек на распознавание.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w3t1", status: "plan", text: "/api/voice/transcribe (аудио в Storage до AI-вызовов), /parse (промпт + few-shot + телеграфный стиль), matchName с алиасами." },
+        { id: "w3t2", status: "plan", text: "Двухрежимная FAB (зажал — голос, тап — текст), экран подтверждения с чипами-правками." },
+        { id: "w3t3", status: "plan", text: "ai_logs с первого дня." }
+      ]
+    },
+    {
+      n: 4,
+      title: "Пульс + приёмка",
+      criterionLabel: "критерий недели",
+      criterion: "MVP готов. Полный цикл голос → задача → отчёт → приёмка работает end-to-end.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w4t1", status: "plan", text: "Пульс блоки 1–3 (вердикт, «Требует вас», живая лента Realtime), mv_pulse_summary." },
+        { id: "w4t2", status: "plan", text: "Приёмка задач (пока кнопками, свайпы позже), pending_review → done/rework." },
+        { id: "w4t3", status: "plan", text: "Блок «Люди» с точками загрузки." },
+        { id: "w4t4", status: "plan", track: "Б", text: "Документы в ТОО поданы; подготовка заявки Astana Hub." }
+      ]
+    },
+    {
+      n: 5,
+      title: "Пилот: директор + 5 лояльных сотрудников",
+      criterionLabel: "метрика недели",
+      criterion: "% поручений через систему (цель >80%), доля правок на подтверждении (высокая = дорабатывать промпт).",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w5t1", status: "plan", text: "Онбординг лично каждого (PWA на главный экран, push, первая задача)." },
+        { id: "w5t2", status: "plan", text: "Договорённость с директором: ВСЕ поручения этим 5 людям — только через систему, 30 дней." },
+        { id: "w5t3", status: "plan", text: "Ты — живая поддержка: реагируешь на любую проблему в тот же день." },
+        { id: "w5t4", status: "plan", text: "Ежедневно читать ai_logs: что директор говорит, что парсер понял, что правилось." }
+      ]
+    },
+    {
+      n: 6,
+      title: "Фиксы по пилоту + Эфир",
+      criterionLabel: "критерий недели",
+      criterion: "Утреннее голосовое директора разлетается на объявление + N задач одним подтверждением.",
+      note: "Наполовину буферная неделя (правило «буфер честности»).",
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w6t1", status: "plan", text: "Правки по реальному фидбеку (их будет много — это нормально, для этого неделя)." },
+        { id: "w6t2", status: "plan", text: "Эфир: объявления с аудио, «принял к сведению», мульти-сущности из одного голосового." },
+        { id: "w6t3", status: "plan", text: "Тихий режим + быстрые ответы-чипы." },
+        { id: "w6t4", status: "plan", track: "Б", text: "Заявка в Astana Hub подана." }
+      ]
+    },
+    {
+      n: 7,
+      title: "ИИ-ассистент директора",
+      criterionLabel: "критерий недели",
+      criterion: "Директор задал 5 разных вопросов — получил верные ответы с карточками. Это демо-момент №2, показать в пятницу обязательно.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w7t1", status: "plan", text: "Vercel AI SDK: streamText + tools (search_tasks, employee_tasks, who_not_reported, overdue_list, summary_today) + useChat." },
+        { id: "w7t2", status: "plan", text: "Вопросы голосом и текстом: «что там по Казхрому?», «кто не отчитался?»." }
+      ]
+    },
+    {
+      n: 8,
+      title: "Очки, реакции, game feel",
+      criterionLabel: "критерий недели",
+      criterion: "Начисление голосом «Ерлану плюс десять» работает; стрела летит; на Redmi-классе нет лагов.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w8t1", status: "plan", text: "point_transactions, авто-правила, ручные начисления (тапом и голосом), реакции с золотой обводкой." },
+        { id: "w8t2", status: "plan", text: "Рейтинг в Эфире, профиль с балансом и streak." },
+        { id: "w8t3", status: "plan", text: "EffectsLayer + первые эффекты: стрела отправки, частицы очков, вонзание карточки." }
+      ]
+    },
+    {
+      n: 9,
+      title: "Раскатка на всю компанию (~45 человек)",
+      criterionLabel: "метрика недели",
+      criterion: ">70% сотрудников приняли хотя бы одну задачу за неделю; push-доставляемость по устройствам (найти проблемные Xiaomi/Huawei — перевести на Telegram).",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w9t1", status: "plan", text: "Онбординг волнами по отделам (не всех в один день), памятка + помощь на местах." },
+        { id: "w9t2", status: "plan", text: "Свайп-приёмка (нагрузка на директора вырастет — теперь она нужна)." },
+        { id: "w9t3", status: "plan", text: "Согласия на обработку ПД и публичный рейтинг (закон РК) — собрать при онбординге." }
+      ]
+    },
+    {
+      n: 10,
+      title: "Магазин + мерч",
+      criterionLabel: "критерий недели",
+      criterion: "Первый реальный обмен очков на товар, событие в Эфире.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w10t1", status: "plan", text: "shop_items, orders, заморозка очков, роль завхоза, лут-дроп анимация." },
+        { id: "w10t2", status: "plan", track: "Б", text: "Закуп первой партии мерча (кружки, худи) ~200–300 тыс. ₸ — согласовать с директором." }
+      ]
+    },
+    {
+      n: 11,
+      title: "ТВ-режим + пульт",
+      criterionLabel: "критерий недели",
+      criterion: "Сцена «сотрудник зашёл — директор нажал — его дела на стене» работает вживую.",
+      note: null,
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w11t1", status: "plan", text: "/tv: лента + вердикт + карусель; ночной reload; реконнект." },
+        { id: "w11t2", status: "plan", text: "Пульт: employee_focus, task_focus, week_summary, «вернуть эфир», авто-возврат." },
+        { id: "w11t3", status: "plan", text: "Железо: ТВ + мини-ПК в кабинет, kiosk-режим." }
+      ]
+    },
+    {
+      n: 12,
+      title: "Полировка + отчёт инвестору",
+      criterionLabel: "критерий недели",
+      criterion: "Система живёт без твоего ежедневного участия; есть документ, обосновывающий следующий транш.",
+      note: "Наполовину буферная неделя (правило «буфер честности»).",
+      factNote: null,
+      closedAt: null,
+      tasks: [
+        { id: "w12t1", status: "plan", text: "Безопасность: биометрия входа директора, TTL сессий, RLS-аудит, гостевой режим ТВ." },
+        { id: "w12t2", status: "plan", text: "Производительность: холодный старт <2 сек, аудит на бюджетном Android." },
+        { id: "w12t3", status: "plan", text: "Отчёт по 12 неделям для инвестора: метрики использования (% поручений через систему, активные пользователи, время реакции сотрудников до/после), скринкаст демо, план следующих 12 недель (внешние клиенты)." },
+        { id: "w12t4", status: "plan", text: "Список из 5 потенциальных клиентов через сеть директора — договориться о первом внешнем демо." }
+      ]
+    }
+  ],
+
+  // Метрики пилота. fact: число/строка или null (→ прочерк).
+  metrics: [
+    { id: "m1", label: "Поручений через систему",   goal: "> 80 %",        unit: "%",   fact: null, week: 5,  hint: "Доля поручений директора, прошедших через Pulse, а не мимо." },
+    { id: "m2", label: "Правок на подтверждении",   goal: "снижается",     unit: "%",   fact: null, week: 5,  hint: "Высокая доля = дорабатывать промпт парсера." },
+    { id: "m3", label: "Сотрудников с ≥1 задачей",  goal: "> 70 %",        unit: "%",   fact: null, week: 9,  hint: "За неделю приняли хотя бы одну задачу." },
+    { id: "m4", label: "Push-доставляемость",       goal: "без проблемных устройств", unit: "%", fact: null, week: 9, hint: "Разрез по устройствам; проблемные Xiaomi/Huawei — на Telegram." },
+    { id: "m5", label: "Голосовое → карточка",      goal: "< 3 сек",       unit: "сек", fact: null, week: 3,  hint: "От конца записи до карточки на экране подтверждения." },
+    { id: "m6", label: "Холодный старт",            goal: "< 2 сек",       unit: "сек", fact: null, week: 12, hint: "Бюджетный Android, первый заход в PWA." }
+  ],
+
+  // Журнал пятничных демо (пятница 16:00, 30 минут, каждую неделю).
+  // Новую запись добавлять СВЕРХУ массива. Пример:
+  // { date: "2026-08-21", week: 1, shown: "СТТ-гейт: 30 фраз через Whisper, точность имён 96 %", reaction: "Одобрил; попросил добавить фразы со смешанной речью" },
+  demos: [],
+
+  // Вехи Б-трека (бизнес/оформление). Статусы те же четыре.
+  btrack: [
+    { id: "b1", status: "plan", week: 1,  title: "Условия с инвестором финализированы", note: "Доли — см. риск 50/50" },
+    { id: "b2", status: "plan", week: 1,  title: "Оформление ТОО начато",               note: null },
+    { id: "b3", status: "plan", week: 4,  title: "Документы в ТОО поданы",              note: null },
+    { id: "b4", status: "plan", week: 4,  title: "Заявка в Astana Hub подготовлена",    note: null },
+    { id: "b5", status: "plan", week: 6,  title: "Заявка в Astana Hub подана",          note: null },
+    { id: "b6", status: "plan", week: 10, title: "Закуп первой партии мерча",           note: "Кружки, худи, ~200–300 тыс. ₸ — согласовать с директором" },
+    { id: "b7", status: "plan", week: 12, title: "Отчёт инвестору → обоснование транша", note: null },
+    { id: "b8", status: "plan", week: 12, title: "5 потенциальных клиентов, первое внешнее демо", note: "Через сеть директора" }
+  ]
+};
+</script>
+
+<style>
+/* ── Токены ───────────────────────────────────────────────────────────── */
+:root{
+  --bg:#0B0F14;
+  --card:#131A22;
+  --card-sunk:#0E141B;
+  --line:rgba(255,255,255,.07);
+  --line-2:rgba(255,255,255,.12);
+
+  --fg:#E8EEF4;
+  --fg-2:#94A6B8;
+  --fg-3:#63748A;
+
+  /* Акцент — ЗАМЕНИТЬ на фирменный цвет WAG, когда он будет определён.
+     Используется только для прогресса, активных состояний и линий-указателей. */
+  --accent:#4FA8FF;
+  --accent-dim:rgba(79,168,255,.16);
+
+  /* Статусные цвета — ТОЛЬКО для состояний, больше нигде. */
+  --ok:#3ECF8E;
+  --warn:#E9B949;
+  --bad:#E5544B;
+
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Segoe UI Mono",Consolas,"Liberation Mono",monospace;
+  --sans:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,"Helvetica Neue","Noto Sans",Roboto,sans-serif;
+
+  --r:14px;
+  --pad:clamp(16px,4vw,36px);
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--fg);
+  font:16px/1.5 var(--sans);
+  letter-spacing:.005em;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:56px;
+}
+/* Едва заметное свечение сверху — глубина без шума */
+body::before{
+  content:"";position:fixed;inset:0 0 auto 0;height:420px;pointer-events:none;z-index:0;
+  background:radial-gradient(120% 100% at 50% -30%,rgba(79,168,255,.10),transparent 62%);
+}
+.wrap{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:0 var(--pad)}
+
+/* ── Типографика служебная ────────────────────────────────────────────── */
+.eyebrow{
+  font:600 11px/1 var(--mono);
+  letter-spacing:.18em;text-transform:uppercase;color:var(--fg-3);
+}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+
+/* ── Шапка ────────────────────────────────────────────────────────────── */
+header.top{padding:clamp(28px,6vw,64px) 0 0}
+.masthead{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  padding-bottom:14px;border-bottom:1px solid var(--line-2)}
+h1{margin:0;font-size:clamp(26px,5.2vw,40px);font-weight:650;letter-spacing:-.02em;line-height:1.05}
+h1 small{display:block;margin-top:8px;font:400 13px/1.4 var(--sans);color:var(--fg-3);letter-spacing:0}
+
+.stats{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-bottom:1px solid var(--line-2);
+}
+.stat{padding:22px 0 20px}
+.stat + .stat{border-left:1px solid var(--line);padding-left:clamp(14px,3vw,28px)}
+.stat .k{font-size:clamp(32px,7vw,54px);font-weight:600;line-height:1;color:var(--fg);display:block}
+.stat .k .sub{font-size:.42em;color:var(--fg-3);font-weight:500;letter-spacing:0}
+.stat .cap{display:block;margin-bottom:10px}
+.stat .foot{margin-top:8px;font-size:12.5px;color:var(--fg-3)}
+.stat.muted .k{color:var(--fg-3);font-size:clamp(17px,3.4vw,22px);letter-spacing:0}
+
+/* Прогресс-бар */
+.progress{margin:20px 0 0}
+.bar{height:8px;border-radius:99px;background:var(--card-sunk);overflow:hidden;display:flex;
+  box-shadow:inset 0 0 0 1px var(--line)}
+.bar i{display:block;height:100%;transition:width .6s cubic-bezier(.2,.7,.2,1)}
+.bar .done{background:var(--accent)}
+.bar .prog{background:var(--accent);opacity:.34}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px}
+.legend span{display:inline-flex;align-items:center;gap:7px;font:500 12.5px/1 var(--sans);color:var(--fg-2)}
+.legend b{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--fg)}
+.dot{width:8px;height:8px;border-radius:99px;background:var(--fg-3);flex:none}
+.dot.done{background:var(--ok)} .dot.in_progress{background:var(--warn)}
+.dot.dropped{background:var(--bad)} .dot.plan{background:#33404E}
+
+/* ── Секции ───────────────────────────────────────────────────────────── */
+section{margin-top:clamp(40px,7vw,72px)}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;
+  padding-bottom:12px;border-bottom:1px solid var(--line-2);margin-bottom:22px}
+.sec-head h2{margin:0;font-size:clamp(17px,3vw,21px);font-weight:600;letter-spacing:-.01em}
+.sec-head .eyebrow{white-space:nowrap}
+
+.phase{display:flex;align-items:center;gap:14px;margin:34px 0 16px}
+.phase:first-of-type{margin-top:0}
+.phase .eyebrow{color:var(--fg-2)}
+.phase i{flex:1;height:1px;background:var(--line)}
+
+/* ── Карточка недели ──────────────────────────────────────────────────── */
+.weeks{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(370px,1fr))}
+.week{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:18px 18px 16px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden;
+}
+.week::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:transparent}
+.week[data-status="in_progress"]::before{background:var(--warn)}
+.week[data-status="done"]::before{background:var(--ok)}
+.week[data-status="dropped"]::before{background:var(--bad)}
+.week.current{border-color:rgba(79,168,255,.45);box-shadow:0 0 0 1px rgba(79,168,255,.18),0 12px 40px -18px rgba(79,168,255,.5)}
+
+.w-head{display:flex;gap:14px;align-items:flex-start}
+.w-num{font:600 30px/0.9 var(--mono);letter-spacing:-.04em;color:var(--fg-3);flex:none;padding-top:2px;min-width:44px}
+.week[data-status="done"] .w-num{color:var(--ok)}
+.week[data-status="in_progress"] .w-num{color:var(--warn)}
+.w-title{margin:0;font-size:16.5px;font-weight:600;line-height:1.25;letter-spacing:-.01em}
+.w-meta{margin-top:5px;font:500 12px/1 var(--mono);color:var(--fg-3);letter-spacing:.02em}
+.badge{margin-left:auto;flex:none;font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;
+  padding:6px 8px;border-radius:6px;border:1px solid var(--line-2);color:var(--fg-3);white-space:nowrap}
+.badge[data-s="in_progress"]{color:var(--warn);border-color:rgba(233,185,73,.35);background:rgba(233,185,73,.08)}
+.badge[data-s="done"]{color:var(--ok);border-color:rgba(62,207,142,.35);background:rgba(62,207,142,.08)}
+.badge[data-s="dropped"]{color:var(--bad);border-color:rgba(229,84,75,.35);background:rgba(229,84,75,.08)}
+
+.w-note{font-size:12.5px;color:var(--fg-3);border-left:2px solid var(--line-2);padding-left:10px}
+
+ul.tasks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px}
+ul.tasks li{display:flex;gap:11px;align-items:flex-start;font-size:14.5px;line-height:1.45;color:var(--fg-2)}
+ul.tasks li .txt{flex:1}
+li[data-s="done"] .txt{color:var(--fg-3)}
+li[data-s="in_progress"] .txt{color:var(--fg)}
+li[data-s="dropped"] .txt{color:var(--fg-3);text-decoration:line-through;text-decoration-color:rgba(229,84,75,.6)}
+
+.box{flex:none;width:15px;height:15px;margin-top:2px;border-radius:4px;border:1.5px solid #35424F;position:relative}
+li[data-s="in_progress"] .box{border-color:var(--warn)}
+li[data-s="in_progress"] .box::after{content:"";position:absolute;inset:2.5px;border-radius:1.5px;background:var(--warn)}
+li[data-s="done"] .box{border-color:var(--ok);background:var(--ok)}
+li[data-s="done"] .box::after{content:"";position:absolute;left:4.2px;top:1.2px;width:4px;height:7.5px;
+  border:solid var(--card);border-width:0 2px 2px 0;transform:rotate(42deg)}
+li[data-s="dropped"] .box{border-color:var(--bad)}
+li[data-s="dropped"] .box::after{content:"";position:absolute;left:2px;right:2px;top:5.2px;height:1.5px;background:var(--bad)}
+
+.tag{display:inline-block;font:600 9.5px/1 var(--mono);letter-spacing:.12em;color:var(--fg-3);
+  border:1px solid var(--line-2);border-radius:4px;padding:3px 5px;margin-right:7px;vertical-align:1.5px}
+.tag.gate{color:var(--accent);border-color:rgba(79,168,255,.4)}
+
+.crit,.fact{background:var(--card-sunk);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+.crit{border-left:2px solid var(--accent)}
+.crit p,.fact p{margin:6px 0 0;font-size:13.5px;line-height:1.45;color:var(--fg-2)}
+.fact p.empty{color:var(--fg-3);font-family:var(--mono)}
+.fact .when{float:right;font:500 11px/1 var(--mono);color:var(--fg-3)}
+.w-foot{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+
+/* ── Метрики ──────────────────────────────────────────────────────────── */
+.metrics{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.metric{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 14px}
+.metric .cap{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:14px}
+.metric .name{font-size:14px;font-weight:600;line-height:1.3}
+.metric .w{font:600 10px/1 var(--mono);letter-spacing:.1em;color:var(--fg-3);white-space:nowrap}
+.metric .row{display:flex;align-items:flex-end;gap:16px}
+.metric .val{font:600 34px/1 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.metric .val.empty{color:#2E3A47}
+.metric .goal{font:500 13px/1.2 var(--mono);color:var(--fg-2);padding-bottom:4px}
+.metric .goal em{font-style:normal;color:var(--fg-3);display:block;font-family:var(--sans);font-size:10px;
+  letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.metric .hint{margin:12px 0 0;padding-top:11px;border-top:1px solid var(--line);
+  font-size:12.5px;line-height:1.4;color:var(--fg-3)}
+
+/* ── Демо / Б-трек ────────────────────────────────────────────────────── */
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font:600 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--fg-3);
+  padding:14px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:14px 16px;border-bottom:1px solid var(--line);color:var(--fg-2);vertical-align:top;line-height:1.45}
+tr:last-child td{border-bottom:0}
+td.d{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--fg);white-space:nowrap}
+.empty-state{padding:26px 16px;text-align:center;color:var(--fg-3);font-size:13.5px;line-height:1.5}
+.empty-state b{display:block;color:var(--fg-2);font-weight:600;margin-bottom:5px}
+
+.bt{display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--line)}
+.bt:last-child{border-bottom:0}
+.bt .box{margin-top:3px}
+.bt .t{flex:1;font-size:14.5px;line-height:1.4}
+.bt .t em{display:block;font-style:normal;font-size:12.5px;color:var(--fg-3);margin-top:3px}
+.bt .wk{flex:none;font:600 10.5px/1 var(--mono);letter-spacing:.1em;color:var(--fg-3);padding-top:4px}
+.bt[data-s="done"] .t{color:var(--fg-3)}
+.bt[data-s="dropped"] .t{color:var(--fg-3);text-decoration:line-through}
+
+footer{margin-top:56px;padding-top:18px;border-top:1px solid var(--line);
+  display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;color:var(--fg-3);font-size:12px}
+footer code{font-family:var(--mono);color:var(--fg-2)}
+
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* ── Мобильный ────────────────────────────────────────────────────────── */
+@media (max-width:720px){
+  .stats{grid-template-columns:1fr 1fr}
+  .stat:nth-child(3){grid-column:1/-1;border-left:0;padding-left:0;border-top:1px solid var(--line)}
+  .weeks{grid-template-columns:1fr}
+  .metrics{grid-template-columns:1fr 1fr}
+  .w-num{font-size:26px;min-width:38px}
+  th,td{padding:12px 13px}
+  .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .table-scroll table{min-width:560px}
+}
+@media (max-width:430px){
+  .metrics{grid-template-columns:1fr}
+  .masthead{flex-direction:column;align-items:flex-start;gap:10px}
+}
+
+/* ── Появление ────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion:no-preference){
+  .reveal{opacity:0;transform:translateY(8px);animation:in .5s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes in{to{opacity:1;transform:none}}
+}
+@media print{body::before{display:none}.week,.metric,.panel{break-inside:avoid}}
+</style>
+</head>
+
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="masthead">
+      <h1 id="title">WAG Pulse<small id="subtitle"></small></h1>
+      <div class="eyebrow">трекер · план / факт</div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <span class="eyebrow cap">текущая неделя</span>
+        <span class="k num" id="curWeek">—</span>
+        <span class="foot" id="curWeekFoot"></span>
+      </div>
+      <div class="stat">
+        <span class="eyebrow cap">задачи закрыты</span>
+        <span class="k num" id="doneCount">0<span class="sub" id="totalCount"></span></span>
+        <span class="foot" id="doneFoot"></span>
+      </div>
+      <div class="stat">
+        <span class="eyebrow cap">недели закрыты</span>
+        <span class="k num" id="weekDone">0<span class="sub" id="weekTotal"></span></span>
+        <span class="foot" id="weekFoot"></span>
+      </div>
+    </div>
+
+    <div class="progress">
+      <div class="bar" id="bar" role="progressbar" aria-label="Прогресс по задачам" aria-valuemin="0" aria-valuemax="100">
+        <i class="done" id="barDone" style="width:0"></i><i class="prog" id="barProg" style="width:0"></i>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+  </header>
+
+  <section id="weeksSection">
+    <div class="sec-head">
+      <h2>12 недель</h2>
+      <span class="eyebrow">план из PLAN_12_WEEKS.md</span>
+    </div>
+    <div id="weeks"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Метрики пилота</h2>
+      <span class="eyebrow">цель / факт</span>
+    </div>
+    <div class="metrics" id="metrics"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Журнал пятничных демо</h2>
+      <span class="eyebrow">пятница 16:00 · 30 мин</span>
+    </div>
+    <div class="panel" id="demos"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h2>Б-трек</h2>
+      <span class="eyebrow">ТОО · Astana Hub · транши · мерч</span>
+    </div>
+    <div class="panel" id="btrack"></div>
+  </section>
+
+  <footer>
+    <span>Обновление факта — правка объекта <code>DATA</code> в начале этого файла.</span>
+    <span id="genLine"></span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var LABEL = { plan:"план", in_progress:"в работе", done:"готово", dropped:"снято" };
+  var ORDER = ["plan","in_progress","done","dropped"];
+  var $ = function (id) { return document.getElementById(id); };
+
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var p = String(iso).split("-");
+    if (p.length !== 3) return String(iso);
+    return p[2] + "." + p[1] + "." + p[0];
+  }
+  function normStatus(s) { return ORDER.indexOf(s) === -1 ? "plan" : s; }
+
+  /* Статус недели выводится из статусов её задач. */
+  function weekStatus(w) {
+    var t = w.tasks.map(function (x) { return normStatus(x.status); });
+    var live = t.filter(function (s) { return s !== "dropped"; });
+    if (!t.length) return "plan";
+    if (!live.length) return "dropped";
+    if (live.every(function (s) { return s === "done"; })) return "done";
+    if (live.some(function (s) { return s === "in_progress" || s === "done"; })) return "in_progress";
+    return "plan";
+  }
+
+  /* Текущая неделя от startDate (ISO-понедельник недели 1). */
+  function currentWeek() {
+    if (!DATA.startDate) return null;
+    var p = String(DATA.startDate).split("-");
+    var start = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+    var now = new Date();
+    var today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.floor((today - start.getTime()) / 604800000) + 1;
+  }
+
+  /* ── Шапка ── */
+  function renderHead() {
+    document.title = DATA.project + " — Трекер";
+    $("title").firstChild.nodeValue = DATA.project;
+    $("subtitle").textContent = DATA.subtitle || "";
+
+    var counts = { plan:0, in_progress:0, done:0, dropped:0 };
+    DATA.weeks.forEach(function (w) {
+      w.tasks.forEach(function (t) { counts[normStatus(t.status)]++; });
+    });
+    var total = counts.plan + counts.in_progress + counts.done + counts.dropped;
+    var active = total - counts.dropped;
+    var pctDone = active ? counts.done / active * 100 : 0;
+    var pctProg = active ? counts.in_progress / active * 100 : 0;
+
+    $("doneCount").firstChild.nodeValue = String(counts.done);
+    $("totalCount").textContent = "/" + active;
+    $("doneFoot").textContent = counts.dropped
+      ? "из " + total + " задач плана, снято " + counts.dropped
+      : "задач во всех 12 неделях";
+
+    var wk = currentWeek();
+    var el = $("curWeek"), foot = $("curWeekFoot"), stat = el.parentNode;
+    if (wk === null) {
+      stat.classList.add("muted");
+      el.textContent = "старт не назначен";
+      foot.innerHTML = "задать <code>DATA.startDate</code> — понедельник недели 1";
+    } else if (wk < 1) {
+      stat.classList.add("muted");
+      el.textContent = "старт " + fmtDate(DATA.startDate);
+      foot.textContent = "до старта " + (1 - wk) + " нед.";
+    } else if (wk > DATA.horizonWeeks) {
+      stat.classList.add("muted");
+      el.textContent = "программа завершена";
+      foot.textContent = "прошло " + wk + " недель от " + fmtDate(DATA.startDate);
+    } else {
+      el.innerHTML = esc(wk) + '<span class="sub">/' + DATA.horizonWeeks + "</span>";
+      foot.textContent = "старт " + fmtDate(DATA.startDate);
+    }
+
+    var wDone = DATA.weeks.filter(function (w) { return weekStatus(w) === "done"; }).length;
+    var wProg = DATA.weeks.filter(function (w) { return weekStatus(w) === "in_progress"; }).length;
+    $("weekDone").firstChild.nodeValue = String(wDone);
+    $("weekTotal").textContent = "/" + DATA.weeks.length;
+    $("weekFoot").textContent = wProg ? "в работе: " + wProg : "критерий недели выполнен полностью";
+
+    $("barDone").style.width = pctDone + "%";
+    $("barProg").style.width = pctProg + "%";
+    $("bar").setAttribute("aria-valuenow", Math.round(pctDone));
+    $("bar").setAttribute("aria-valuetext", counts.done + " из " + active + " задач");
+
+    $("legend").innerHTML = ORDER.map(function (s) {
+      return '<span><i class="dot ' + s + '"></i>' + LABEL[s] + " <b>" + counts[s] + "</b></span>";
+    }).join("");
+  }
+
+  /* ── Недели ── */
+  function taskHtml(t) {
+    var s = normStatus(t.status);
+    var tag = "";
+    if (t.gate) tag += '<span class="tag gate">ГЕЙТ</span>';
+    if (t.track) tag += '<span class="tag">' + esc(t.track) + "</span>";
+    return '<li data-s="' + s + '"><span class="box" aria-hidden="true"></span>' +
+      '<span class="txt">' + tag + esc(t.text) +
+      '<span class="vh"> — ' + LABEL[s] + "</span></span></li>";
+  }
+
+  function weekHtml(w, cur, i) {
+    var s = weekStatus(w);
+    var live = w.tasks.filter(function (t) { return normStatus(t.status) !== "dropped"; });
+    var done = live.filter(function (t) { return normStatus(t.status) === "done"; }).length;
+    var isCur = cur === w.n;
+
+    return '<article class="week reveal' + (isCur ? " current" : "") + '" data-status="' + s +
+        '" style="animation-delay:' + Math.min(i * 35, 400) + 'ms">' +
+      '<div class="w-head">' +
+        '<span class="w-num" aria-hidden="true">' + (w.n < 10 ? "0" : "") + w.n + "</span>" +
+        "<div>" +
+          '<h3 class="w-title">' + esc(w.title) + "</h3>" +
+          '<div class="w-meta">неделя ' + w.n + " · " + done + " / " + live.length +
+            (isCur ? " · сейчас" : "") + "</div>" +
+        "</div>" +
+        '<span class="badge" data-s="' + s + '">' + LABEL[s] + "</span>" +
+      "</div>" +
+      (w.note ? '<div class="w-note">' + esc(w.note) + "</div>" : "") +
+      '<ul class="tasks">' + w.tasks.map(taskHtml).join("") + "</ul>" +
+      '<div class="w-foot">' +
+        '<div class="crit"><span class="eyebrow">✅ ' + esc(w.criterionLabel || "критерий недели") + "</span>" +
+          "<p>" + esc(w.criterion) + "</p></div>" +
+        '<div class="fact"><span class="eyebrow">факт</span>' +
+          (w.closedAt ? '<span class="when">закрыта ' + fmtDate(w.closedAt) + "</span>" : "") +
+          (w.factNote ? "<p>" + esc(w.factNote) + "</p>" : '<p class="empty">—</p>') +
+        "</div>" +
+      "</div>" +
+    "</article>";
+  }
+
+  function renderWeeks() {
+    var cur = currentWeek(), i = 0;
+    var phases = DATA.phases && DATA.phases.length
+      ? DATA.phases
+      : [{ title: "", range: [1, DATA.horizonWeeks] }];
+
+    $("weeks").innerHTML = phases.map(function (ph) {
+      var list = DATA.weeks.filter(function (w) { return w.n >= ph.range[0] && w.n <= ph.range[1]; });
+      if (!list.length) return "";
+      var cards = list.map(function (w) { return weekHtml(w, cur, i++); }).join("");
+      return '<div class="phase"><span class="eyebrow">недели ' + ph.range[0] + "–" + ph.range[1] +
+        (ph.title ? " · " + esc(ph.title) : "") + "</span><i></i></div>" +
+        '<div class="weeks">' + cards + "</div>";
+    }).join("");
+  }
+
+  /* ── Метрики ── */
+  function renderMetrics() {
+    $("metrics").innerHTML = DATA.metrics.map(function (m, i) {
+      var has = m.fact !== null && m.fact !== undefined && m.fact !== "";
+      var val = has ? esc(m.fact) + (typeof m.fact === "number" && m.unit ? " " + esc(m.unit) : "") : "—";
+      return '<div class="metric reveal" style="animation-delay:' + Math.min(i * 35, 300) + 'ms">' +
+        '<div class="cap"><span class="name">' + esc(m.label) + "</span>" +
+          '<span class="w">Н' + esc(m.week) + "</span></div>" +
+        '<div class="row"><span class="val' + (has ? "" : " empty") + '">' + val + "</span>" +
+          '<span class="goal"><em>цель</em>' + esc(m.goal) + "</span></div>" +
+        (m.hint ? '<p class="hint">' + esc(m.hint) + "</p>" : "") +
+      "</div>";
+    }).join("");
+  }
+
+  /* ── Демо ── */
+  function renderDemos() {
+    if (!DATA.demos.length) {
+      $("demos").innerHTML = '<div class="empty-state"><b>Пока ни одного демо</b>' +
+        "Первая запись появится после первой пятницы. Формат строки: дата · неделя · что показали · реакция директора." +
+        "</div>";
+      return;
+    }
+    var rows = DATA.demos.map(function (d) {
+      return "<tr><td class=\"d\">" + fmtDate(d.date) + '</td><td class="d">Н' + esc(d.week) + "</td><td>" +
+        esc(d.shown) + "</td><td>" + esc(d.reaction || "—") + "</td></tr>";
+    }).join("");
+    $("demos").innerHTML = '<div class="table-scroll"><table><thead><tr>' +
+      "<th>дата</th><th>неделя</th><th>что показали</th><th>реакция директора</th>" +
+      "</tr></thead><tbody>" + rows + "</tbody></table></div>";
+  }
+
+  /* ── Б-трек ── */
+  function renderBtrack() {
+    $("btrack").innerHTML = DATA.btrack.map(function (b) {
+      var s = normStatus(b.status);
+      return '<div class="bt" data-s="' + s + '">' +
+        '<span class="box" aria-hidden="true"></span>' +
+        '<span class="t">' + esc(b.title) + '<span class="vh"> — ' + LABEL[s] + "</span>" +
+          (b.note ? "<em>" + esc(b.note) + "</em>" : "") + "</span>" +
+        '<span class="wk">Н' + esc(b.week) + "</span>" +
+      "</div>";
+    }).join("");
+  }
+
+  renderHead();
+  renderWeeks();
+  renderMetrics();
+  renderDemos();
+  renderBtrack();
+  $("genLine").textContent = "открыто " + new Date().toLocaleDateString("ru-RU") +
+    " · Asia/Aqtobe (UTC+5)";
+})();
+</script>
+</body>
+</html>
