@@ -1,0 +1,52 @@
+# dependencies
+node_modules/
+.pnp/
+.pnp.js
+.yarn/cache
+.yarn/install-state.gz
+
+# next.js
+.next/
+out/
+build/
+dist/
+next-env.d.ts
+
+# production / deploy
+.vercel/
+
+# env — все секреты вне репозитория, кроме шаблона
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# testing / coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# typescript / tooling caches
+*.tsbuildinfo
+.eslintcache
+.turbo/
+
+# supabase local
+supabase/.temp/
+supabase/.branches/
+
+# os / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+
+# ВАЖНО: *.pdf НЕ игнорируем — презентация для инвестора должна быть в истории репозитория.
