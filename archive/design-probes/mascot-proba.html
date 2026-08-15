@@ -1,0 +1,263 @@
+<title>Маскот Pulse</title>
+<style>
+  /* Deliberately single-theme: the Pulse product world is dark-only in v1 (DESIGN.md §1.2). */
+  :root{
+    --bg:#0B0F14; --surface:#131A22; --surface-2:#1B242F; --border:#243040;
+    --text:#E8EEF4; --muted:#8C99A8;
+    --accent:#2ED3B7; --gold:#F0B24A; --warn:#FFB020; --warn-dim:#D89A2F; --danger-dim:#C9524C;
+    --hole:var(--surface);
+  }
+  *{box-sizing:border-box;margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,"SF Pro",Roboto,"Segoe UI",system-ui,sans-serif;
+    font-size:16px; line-height:1.45; padding:24px 16px 48px;
+  }
+  .wrap{max-width:960px;margin:0 auto}
+  .eyebrow{font-size:12px;letter-spacing:.14em;color:var(--accent);font-weight:600;text-transform:uppercase}
+  h1{font-size:28px;line-height:1.15;font-weight:700;margin:6px 0 8px;text-wrap:balance}
+  .lede{color:var(--muted);max-width:56ch;margin-bottom:20px}
+  .lede b{color:var(--text);font-weight:600}
+
+  /* mode tabs */
+  .tabs{display:flex;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:4px;width:max-content;margin-bottom:12px}
+  .tabs button{
+    border:0;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;
+    padding:8px 14px;border-radius:9px;cursor:pointer;transition:color .15s,background .15s;
+  }
+  .tabs button.on{background:var(--surface-2);color:var(--text)}
+  .tabs button:focus-visible,.chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+  /* state chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+  .chip{
+    display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--surface);
+    color:var(--muted);font:inherit;font-size:14px;font-weight:500;padding:8px 14px;border-radius:12px;cursor:pointer;
+    transition:border-color .15s,color .15s,transform .1s;
+  }
+  .chip:active{transform:scale(.97)}
+  .chip .dot{width:9px;height:9px;border-radius:50%;background:var(--c,var(--accent))}
+  .chip.on{border-color:var(--c,var(--accent));color:var(--text)}
+
+  /* cards */
+  .grid{display:grid;grid-template-columns:1fr;gap:14px}
+  @media(min-width:760px){.grid{grid-template-columns:1fr 1fr 1fr}}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  .card h2{font-size:16px;font-weight:600;display:flex;align-items:baseline;gap:8px}
+  .card h2 .tag{font-size:12px;color:var(--muted);font-weight:500}
+  .card .note{font-size:13px;color:var(--muted);line-height:1.5}
+
+  /* ————— mascot engine ————— */
+  .stage{height:168px;display:flex;align-items:center;justify-content:center;
+    --m:var(--accent); --dur:3.5s; --amp:.03;}
+  .mascot{position:relative;width:120px;height:120px;flex:none}
+  .layer{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .m-pose{position:absolute;inset:0;transition:transform .5s cubic-bezier(.34,1.4,.4,1)}
+  .m-pulse{position:absolute;inset:0;animation:pulse var(--dur) ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(calc(1 + var(--amp)))}}
+  .shape{transition:background .5s,opacity .5s,border-radius .5s,transform .5s}
+
+  /* poses (shared) */
+  .stage[data-state="dovolen"]     {--m:var(--gold);      --dur:2.4s; --amp:.06}
+  .stage[data-state="spokoen"]     {--m:var(--accent);    --dur:3.5s; --amp:.03}
+  .stage[data-state="zhdet"]       {--m:var(--warn-dim);  --dur:1.7s; --amp:.035}
+  .stage[data-state="vstrevozhen"] {--m:var(--warn);      --dur:.85s; --amp:.02}
+  .stage[data-state="nedovolen"]   {--m:var(--danger-dim);--dur:3.2s; --amp:.012}
+  .stage[data-state="slushaet"]    {--m:var(--accent);    --dur:.95s; --amp:.05}
+  .stage[data-state="dumaet"]      {--m:var(--accent);    --dur:2.6s; --amp:.02}
+  .stage[data-state="dokladyvaet"] {--m:var(--accent);    --dur:2.2s; --amp:.03}
+
+  .stage[data-state="dovolen"]     .m-pose{transform:scale(1.06)}
+  .stage[data-state="zhdet"]       .m-pose{transform:scaleY(1.09) scaleX(.97) translateY(-3%)}
+  .stage[data-state="vstrevozhen"] .m-pose{transform:scale(.92)}
+  .stage[data-state="nedovolen"]   .m-pose{transform:scaleY(.88) translateY(4%)}
+  .stage[data-state="dokladyvaet"] .m-pose{animation:nod 2.2s ease-in-out infinite}
+  @keyframes nod{0%,48%,100%{transform:translateY(0)}12%{transform:translateY(-5%)}24%{transform:translateY(0)}36%{transform:translateY(-3%)}}
+
+  /* echo ring (radar) — used by listening state and variant B identity */
+  .m-echo{position:absolute;inset:0;display:none;align-items:center;justify-content:center}
+  .m-echo i{width:74%;height:74%;border-radius:50%;box-shadow:0 0 0 2px var(--m);opacity:0;animation:echo var(--dur) ease-out infinite}
+  @keyframes echo{0%{transform:scale(.92);opacity:.45}100%{transform:scale(1.45);opacity:0}}
+  .stage[data-state="slushaet"] .m-echo{display:flex}
+
+  /* orbit satellite — "думает" */
+  .m-orbit{position:absolute;inset:0;display:none;animation:spin 1.8s linear infinite}
+  .m-orbit i{position:absolute;top:2%;left:50%;width:9%;height:9%;margin-left:-4.5%;border-radius:50%;background:var(--m)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .stage[data-state="dumaet"] .m-orbit{display:block}
+
+  /* — Variant A: Капля (blob with dot-eyes) — */
+  .a-round{width:72%;height:72%;border-radius:50%;background:var(--m)}
+  .stage[data-state="nedovolen"] .a-round{border-radius:48% 48% 46% 46% / 52% 52% 40% 40%}
+  .stage[data-state="dovolen"]  .a-round{border-radius:50% 50% 46% 46% / 54% 54% 44% 44%}
+  .a-eyes{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:14%}
+  .a-eyes i{width:8%;height:8%;border-radius:50%;background:var(--bg);transform:translateY(-14%);animation:blink 4.6s infinite}
+  @keyframes blink{0%,94%,100%{scale:1 1}96.5%{scale:1 .12}}
+  .stage[data-state="nedovolen"] .a-eyes i{scale:1 .45;animation:none}
+  .stage[data-state="dovolen"] .a-eyes i{scale:1 .55;translate:0 6%;animation:none;border-radius:50% 50% 20% 20%}
+
+  /* — Variant B: Кольцо (ring = disc + hole, scales at any size) — */
+  .b-ring{width:70%;height:70%;border-radius:50%;background:var(--m)}
+  .b-hole{position:absolute;width:46%;height:46%;border-radius:50%;background:var(--hole)}
+  .stage[data-state="nedovolen"] .b-hole{width:52%;height:44%}
+  .stage[data-state="dovolen"] .b-hole{width:40%;height:40%}
+  .stage-b .m-echo{display:flex}                       /* echo is B's identity… */
+  .stage-b[data-state="nedovolen"] .m-echo{display:none} /* …but stops when displeased */
+
+  /* — Variant C: Искра (faceted impulse) — */
+  .c-core{width:58%;height:58%;border-radius:26%;background:var(--m);transform:rotate(45deg)}
+  .stage[data-state="vstrevozhen"] .c-core{border-radius:20%}
+  .stage[data-state="nedovolen"] .c-core{border-radius:16%;transform:rotate(45deg) scale(.94)}
+  .stage[data-state="dovolen"] .c-core{border-radius:34%}
+
+  /* mini preview row — telegraph at real size */
+  .mini{display:flex;align-items:center;gap:10px;background:var(--surface-2);--hole:var(--surface-2);
+    border-radius:12px;padding:10px 12px}
+  .mini .stage{height:auto;flex:none}
+  .mini .mascot{width:24px;height:24px}
+  .mini .a-eyes i{animation:none}
+  .mini .name{font-size:14px;font-weight:600}
+  .mini .sub{font-size:12.5px;color:var(--muted)}
+
+  /* footer */
+  .contract{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px}
+  .contract span{font-size:12.5px;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:5px 10px}
+  .decide{margin-top:14px;font-size:13.5px;color:var(--muted);max-width:64ch}
+  .decide b{color:var(--text)}
+
+  @media (prefers-reduced-motion:reduce){
+    .m-pulse,.m-echo i,.m-orbit,.a-eyes i,.stage[data-state="dokladyvaet"] .m-pose{animation:none}
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Pulse · дизайн-проба</div>
+  <h1>Маскот: три формы, живьём</h1>
+  <p class="lede">Одна простая геометрическая фигура — <b>эмоциональный телеграф директора</b> (D-45). Эмоция кодируется тремя осями: частота пульса, форма, температура цвета. Переключайте состояния и сравнивайте формы; мини-строка под каждой — размер телеграфа в шапке канала сотрудника.</p>
+
+  <div class="tabs" role="tablist">
+    <button class="on" data-mode="telegraph">Телеграф · сотрудник</button>
+    <button data-mode="assistant">Ассистент · директор</button>
+  </div>
+  <div class="chips" id="chips"></div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>А — Капля <span class="tag">единственная с «лицом»</span></h2>
+      <div class="stage stage-a" data-state="spokoen">
+        <div class="mascot">
+          <div class="m-echo"><i></i></div>
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape a-round"></div></div>
+            <div class="a-eyes"><i></i><i></i></div>
+          </div></div>
+          <div class="m-orbit"><i></i></div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="stage stage-a" data-state="spokoen"><div class="mascot">
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape a-round"></div></div>
+            <div class="a-eyes"><i></i><i></i></div>
+          </div></div>
+        </div></div>
+        <div><div class="name">Директор</div><div class="sub" data-minisub>спокоен</div></div>
+      </div>
+      <p class="note">Теплее и ближе к персонажу: глаза-точки дают характер почти бесплатно. Риск — на 24px глаза почти не читаются.</p>
+    </div>
+
+    <div class="card">
+      <h2>Б — Кольцо <span class="tag">чистая абстракция</span></h2>
+      <div class="stage stage-b" data-state="spokoen">
+        <div class="mascot">
+          <div class="m-echo"><i></i></div>
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape b-ring"></div></div>
+            <div class="layer"><div class="shape b-hole"></div></div>
+          </div></div>
+          <div class="m-orbit"><i></i></div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="stage stage-b" data-state="spokoen"><div class="mascot">
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape b-ring"></div></div>
+            <div class="layer"><div class="shape b-hole"></div></div>
+          </div></div>
+        </div></div>
+        <div><div class="name">Директор</div><div class="sub" data-minisub>спокоен</div></div>
+      </div>
+      <p class="note">Самый строгий: эхо-пульс как радар — метафора «всё вижу». Без лица характер несёт только ритм. В «недоволен» эхо останавливается — тишина как сигнал.</p>
+    </div>
+
+    <div class="card">
+      <h2>В — Искра <span class="tag">гранёный импульс</span></h2>
+      <div class="stage stage-c" data-state="spokoen">
+        <div class="mascot">
+          <div class="m-echo"><i></i></div>
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape c-core"></div></div>
+          </div></div>
+          <div class="m-orbit"><i></i></div>
+        </div>
+      </div>
+      <div class="mini">
+        <div class="stage stage-c" data-state="spokoen"><div class="mascot">
+          <div class="m-pose"><div class="m-pulse">
+            <div class="layer"><div class="shape c-core"></div></div>
+          </div></div>
+        </div></div>
+        <div><div class="name">Директор</div><div class="sub" data-minisub>спокоен</div></div>
+      </div>
+      <p class="note">Энергия и импульс; в негативе грани заостряются — форма «твердеет». Средний по теплоте, хорошо держит малый размер.</p>
+    </div>
+  </div>
+
+  <div class="contract">
+    <span>только transform / opacity / цвет</span><span>CSS-анимации, JS лишь переключает состояние</span><span>уважает prefers-reduced-motion</span><span>каждая фигура &lt; 2 КБ разметки</span>
+  </div>
+  <p class="decide">Как выбирать: откройте с телефона, подержите каждое состояние 10–15 секунд и спросите себя — <b>понятно ли настроение директора без подписи?</b> Выбранная форма фиксируется в DECISIONS.md (D-45) пакетом с именем продукта и персонажа (D-20).</p>
+</div>
+
+<script>
+  const STATES = {
+    telegraph: [
+      ["dovolen","Доволен","var(--gold)"],
+      ["spokoen","Спокоен","var(--accent)"],
+      ["zhdet","Ждёт","var(--warn-dim)"],
+      ["vstrevozhen","Встревожен","var(--warn)"],
+      ["nedovolen","Недоволен","var(--danger-dim)"],
+    ],
+    assistant: [
+      ["slushaet","Слушает","var(--accent)"],
+      ["dumaet","Думает","var(--accent)"],
+      ["dokladyvaet","Докладывает","var(--accent)"],
+    ],
+  };
+  const chipsEl = document.getElementById("chips");
+  let mode = "telegraph";
+
+  function setState(key, label){
+    document.querySelectorAll(".stage").forEach(s => s.dataset.state = key);
+    document.querySelectorAll("[data-minisub]").forEach(el => el.textContent = label.toLowerCase());
+    chipsEl.querySelectorAll(".chip").forEach(c => c.classList.toggle("on", c.dataset.key === key));
+  }
+  function renderChips(){
+    chipsEl.innerHTML = "";
+    for (const [key,label,color] of STATES[mode]){
+      const b = document.createElement("button");
+      b.className = "chip"; b.dataset.key = key; b.style.setProperty("--c", color);
+      b.innerHTML = `<span class="dot"></span>${label}`;
+      b.onclick = () => setState(key,label);
+      chipsEl.appendChild(b);
+    }
+    const [k,l] = STATES[mode][mode === "telegraph" ? 1 : 0];
+    setState(k,l);
+  }
+  document.querySelectorAll(".tabs button").forEach(t => t.onclick = () => {
+    mode = t.dataset.mode;
+    document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === t));
+    renderChips();
+  });
+  renderChips();
+</script>
