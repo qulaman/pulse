@@ -1,6 +1,6 @@
 # AI.md — голосовой конвейер: STT, парсер, ассистент, evals
 
-Контракт AI-контура. Агент реализует по этому доку, не сочиняя ядро. Схема БД (`ai_logs`, `inbox_items`) — docs/DATABASE.md; эндпоинты — docs/BACKEND.md; UI-состояния — docs/FRONTEND.md; протокол выбора STT — docs/STT_GATE.md. Арбитр противоречий — DECISIONS.md.
+Что это: контракт AI-контура продукта (STT, парсер, ассистент, evals) — для агента, реализующего конвейер: ядро не сочиняется, а строится по этому доку. Арбитр — DECISIONS.md. Схема БД (`ai_logs`, `inbox_items`) — docs/DATABASE.md; эндпоинты — docs/BACKEND.md; UI-состояния — docs/FRONTEND.md; протокол выбора STT (гейт перед UI, этап 0) — docs/STT_GATE.md.
 
 ## 1. STT: `lib/ai/stt.ts`
 
@@ -247,7 +247,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
   - классификация query/command — отдельная accuracy (в фикстурах ≥5 вопросов).
 - Вывод: таблица метрик + **diff к прошлому прогону** (`tests/ai/results/*.json`): какие фразы сломались/починились.
 - **Гейты: assignee accuracy ≥ 97%, entity F1 ≥ 90%.** Правило CLAUDE.md: PR, трогающий промпт/схему/few-shot, обязан приложить результат `pnpm eval:parser`; без него не мержится.
-- Еженедельно на пилоте: выгрузка из `ai_logs` фраз с `was_edited=true` → новые фикстуры (диф parsed/confirmed — готовая разметка). Доля правок — стоп-сигналы по D-35 (<20% норма, >40% два дня — стоп-неделя).
+- Еженедельно на пилоте: выгрузка из `ai_logs` фраз с `was_edited=true` → новые фикстуры (диф parsed/confirmed — готовая разметка). Доля правок — стоп-сигналы по D-35 (<20% норма, >40% два дня подряд — стоп: работа только над промптом и корпусом).
 
 ## 7. `/api/voice/query` — вопросы к данным
 
@@ -274,7 +274,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ## 9. Prompt caching и экономика
 
 - Структура вызова парсера: `system` (статичный промпт + ростер, отсортированный по id) → few-shot пары → user-сообщение с датой и `<input>`. `cache_control: {type:"ephemeral"}` — на блоке ростера и на последнем few-shot сообщении. **Дата/время — только в user-сообщении**, ничего изменчивого в кэшируемых блоках. Минимум кэша Haiku 4.5 — 4096 токенов: ростер+few-shot дотягивают.
-- Экономика (~45 человек, из AI-ревью — бюджет НЕ аргумент в модельных решениях):
+- Экономика (ориентир — инстанс на ~45 сотрудников, масштаб клиента №1; бюджет — НЕ аргумент в модельных решениях):
 
 | Статья | Объём | ≈ $/мес |
 |---|---|---|
@@ -290,7 +290,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 - **`ai_logs`** — контракт полей в docs/DATABASE.md (kind, source, provider/model, transcript, raw_response, parsed_entities, confirmed_entities, was_edited, edit_fields, tool_calls, токены, latency с разбивкой stt_ms/parse_ms, status). Обязанности конвейера:
   - `/api/voice/parse` пишет `parsed_entities` (то, что показали);
-  - **`/api/voice/confirm` ОБЯЗАН дописать в ту же строку `confirmed_entities`, `was_edited` и `edit_fields`** (diff parsed↔confirmed) — без этого метрика «доля правок» недели 5 и петля evals (§6) не существуют;
+  - **`/api/voice/confirm` ОБЯЗАН дописать в ту же строку `confirmed_entities`, `was_edited` и `edit_fields`** (diff parsed↔confirmed) — без этого метрика «доля правок» этапа пилота и петля evals (§6) не существуют;
   - идемпотентность parse: `client_request_id` и здесь — двойной тап FAB не рождает два счёта за токены.
 - **`inbox_items`** (staging голосового, G.11, схема в DATABASE.md): `recorded → transcribed → parsed → confirmed | discarded`. Каждый этап конвейера продвигает статус; упавший этап оставляет item на прежнем статусе — «распознаю позже» работает с него; продукт сам копит датасет.
 
@@ -313,6 +313,6 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 Во всех состояниях аудио уже в Storage — голосовое не теряется ни при каком сбое (принцип 5).
 
-## 12. TTS-сводки [НЕДЕЛИ 10–12+]
+## 12. TTS-сводки [ПОСЛЕ МАСШТАБА]
 
-Кнопка «Послушать сводку» в Пульсе и вечерняя сводка — вне скоупа пилота. Выбор провайдера (OpenAI TTS / ElevenLabs) отложен до недели 10 — сравнить цену за символ и качество русского на тот момент; интерфейс — по образцу `stt.ts` (`lib/ai/tts.ts`, env `TTS_PROVIDER`). До этого никакого TTS-кода не писать.
+Кнопка «Послушать сводку» в Пульсе и вечерняя сводка — вне скоупа пилота и этапа масштаба. Выбор провайдера (OpenAI TTS / ElevenLabs) отложен до начала работ над TTS — сравнить цену за символ и качество русского на тот момент; интерфейс — по образцу `stt.ts` (`lib/ai/tts.ts`, env `TTS_PROVIDER`). До этого никакого TTS-кода не писать.

@@ -1,8 +1,8 @@
-# DATABASE.md — схема Supabase / Postgres (контракт)
+# DATABASE.md — схема данных Pulse (Supabase / Postgres)
 
-**Единственный источник правды по схеме — миграции в `/supabase/migrations`; этот документ — контракт для их создания. Арбитр решений — `DECISIONS.md`** (разделы G/H и V-02). При расхождении: DECISIONS.md > этот файл > остальные доки.
+Что это: контракт схемы БД Pulse (таблицы, RLS, функции, триггеры, индексы, cron) — для агентов, пишущих миграции. **Единственный источник правды по схеме — миграции в `/supabase/migrations`; этот документ — контракт для их создания. Арбитр — `DECISIONS.md`.** При расхождении: DECISIONS.md > этот файл > остальные доки.
 
-Модель SaaS — V-02: изолированный инстанс (свой Supabase-проект) на клиента. `company_id` и RLS при этом СОХРАНЯЮТСЯ во всех таблицах — как защита ролей внутри компании и страховка архитектуры. Кросс-клиентской логики нет.
+Модель SaaS — V-02: одна БД = один клиент, изолированный инстанс (свой Supabase-проект) на каждую компанию клиента. `company_id` и RLS при этом СОХРАНЯЮТСЯ во всех таблицах — как защита ролей внутри компании и страховка архитектуры. Кросс-клиентской логики нет; всё клиентское — в `company.settings`.
 
 ## Общие правила
 
@@ -13,7 +13,7 @@
 - Просрочка — **вычислимое свойство**, НЕ колонка: `deadline < now() and status in ('sent','accepted','in_progress','rework')`. Колонку `is_overdue` не добавлять.
 - Materialized views **не используем** — только обычные view `with (security_invoker = on)`; MV — лишь по факту измеренных медленных запросов.
 - Партиционирование **не нужно**; порог пересмотра — 10 млн строк в task_messages. `company_id` — первым столбцом составных индексов.
-- `point_balance_checkpoints (user_id, as_of, balance)` — зарезервировано, **в MVP не строить**.
+- `point_balance_checkpoints (user_id, as_of, balance)` — зарезервировано, **на этапе MVP-ядра не строить**.
 
 ## Enum-типы
 
@@ -75,7 +75,7 @@ seq bigserial,                         -- монотонный курсор: к�
 type message_type, content text null, file_path text null,
 meta jsonb not null default '{}'
 ```
-Всё происходящее с задачей — строка здесь; Пульс/лента/ТВ читают отсюда. `meta`: `status_change` → `{old_status,new_status}`; вопрос сотрудника → `meta.is_question=true`, `meta.answered_at` проставляет триггер при **первом** последующем сообщении директора (стопка «Вопросы» = is_question без answered_at, задача не терминальна); реакция → строка `type='system'`, `meta={kind:'reaction', emoji, message_id}` от триггера на reactions (типа `reaction_ref` в enum НЕТ). Таблицы `task_events`/`feed_items` **не вводить** — task_messages+seq и tv_events закрывают ленты (арбитраж окна 1).
+Всё происходящее с задачей — строка здесь; Пульс/лента/ТВ читают отсюда. `meta`: `status_change` → `{old_status,new_status}`; вопрос сотрудника → `meta.is_question=true`, `meta.answered_at` проставляет триггер при **первом** последующем сообщении директора (стопка «Вопросы» = is_question без answered_at, задача не терминальна); реакция → строка `type='system'`, `meta={kind:'reaction', emoji, message_id}` от триггера на reactions (типа `reaction_ref` в enum НЕТ). Таблицы `task_events`/`feed_items` **не вводить** — task_messages+seq и tv_events закрывают ленты (DECISIONS.md, раздел G).
 
 ### announcements (Эфир)
 `id, company_id, author_id, audio_path text null, transcript text, created_at`. Индекс `(company_id, created_at desc)`.
