@@ -1,0 +1,16 @@
+{
+  "_comment": "DEMO roster (fixtures). Replace with the real client-1 roster before the gate session (D-23). Aliases include short forms used in speech.",
+  "users": [
+    { "id": "u-001", "full_name": "Ерлан Байжанов", "aliases": ["Ерлан Б", "Ерлан Байжанов"] },
+    { "id": "u-002", "full_name": "Ерлан Досов", "aliases": ["Ерлан Д", "Ерлан Досов"] },
+    { "id": "u-003", "full_name": "Марат Оспанов", "aliases": ["Марат"] },
+    { "id": "u-004", "full_name": "Сәкен Жумабаев", "aliases": ["Сәкен", "Сакен"] },
+    { "id": "u-005", "full_name": "Айгуль Сапарова", "aliases": ["Айгуль"] },
+    { "id": "u-006", "full_name": "Динара Ахметова", "aliases": ["Динара"] },
+    { "id": "u-007", "full_name": "Бауыржан Кайратов", "aliases": ["Бауыржан", "Баке"] },
+    { "id": "u-008", "full_name": "Алия Нурланова", "aliases": ["Алия"] },
+    { "id": "u-009", "full_name": "Тимур Салимов", "aliases": ["Тимур"] },
+    { "id": "u-010", "full_name": "Жандос Ермеков", "aliases": ["Жандос"] }
+  ],
+  "counterparties": ["Казхром", "КазАзот", "ERG", "Полиграф", "Актобе-склад"]
+}

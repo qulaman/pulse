@@ -50,3 +50,7 @@ desktop.ini
 *.swp
 
 # ВАЖНО: *.pdf НЕ игнорируем — презентация для инвестора должна быть в истории репозитория.
+
+# STT gate: audio fixtures live in Storage (stt-fixtures bucket), run outputs are local
+tests/stt/fixtures/
+tests/stt/results/
