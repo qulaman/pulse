@@ -84,8 +84,9 @@
     <div class="row">
       <input type="password" id="key" placeholder="OPENAI_API_KEY (sk-...) — распознавание речи">
       <select id="model">
-        <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-        <option value="whisper-1">whisper-1</option>
+        <option value="gpt-4o-transcribe">gpt-4o-transcribe · $0.006/мин</option>
+        <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe · $0.003/мин</option>
+        <option value="whisper-1">whisper-1 · $0.006/мин</option>
       </select>
       <label class="chk"><input type="checkbox" id="useRoster" checked> prompt-ростер имён</label>
       <select id="langHint" title="language-хинт STT (лестница гейта, ступень 1)">
@@ -258,7 +259,7 @@ const $ = id => document.getElementById(id);
 let idx = 15; // start at №016 (multi-entity) — the most telling phrase
 let rec = null, chunks = [], blob = null, mime = "", startT = 0, timerInt = null, recDurS = 0;
 const log = [];
-const STT_PRICE_MIN = 0.006; // USD/min, gpt-4o-transcribe & whisper-1 estimate
+const STT_PRICE = { "gpt-4o-transcribe": 0.006, "whisper-1": 0.006, "gpt-4o-mini-transcribe": 0.003 }; // USD/min
 
 $("key").value = localStorage.getItem("pulse_stt_key") || "";
 $("key").addEventListener("change", () => localStorage.setItem("pulse_stt_key", $("key").value.trim()));
@@ -352,7 +353,7 @@ function renderResult(c, model, text, ms){
   log.push({ id:c.id, category:c.category, model, roster:$("useRoster").checked,
     lang: $("langHint").value || "auto", audioS: recDurS,
     transcript:text, reference:c.text, namesFound:found, namesTotal:c.names.length, wer:w, latencyMs:ms,
-    sttCost: recDurS / 60 * STT_PRICE_MIN });
+    sttCost: recDurS / 60 * (STT_PRICE[model] ?? 0.006) });
   renderLog();
 }
 
