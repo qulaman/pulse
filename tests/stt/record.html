@@ -361,7 +361,9 @@ $("antKey").value = localStorage.getItem("pulse_ant_key") || "";
 $("antKey").addEventListener("change", () => localStorage.setItem("pulse_ant_key", $("antKey").value.trim()));
 $("parseBtn").onclick = () => lastTranscript && parseTranscript(lastTranscript);
 
-const NULLSTR = { type: ["string", "null"] };
+// Anthropic structured-outputs validator rejects union types with enums — use anyOf for nullable fields.
+const NULLSTR = { anyOf: [{ type: "string" }, { type: "null" }] };
+const NULLNUM = { anyOf: [{ type: "number" }, { type: "null" }] };
 const ENTITY_SCHEMA = {
   type: "object", additionalProperties: false, required: ["entities"],
   properties: { entities: { type: "array", items: {
@@ -371,12 +373,12 @@ const ENTITY_SCHEMA = {
     properties: {
       kind: { type: "string", enum: ["task","announcement","points","reminder","recurrence","delegation","query"] },
       assignee_query: NULLSTR, assignee_id: NULLSTR,
-      assignee_confidence: { type: ["number","null"] },
+      assignee_confidence: NULLNUM,
       title: NULLSTR, deadline_iso: NULLSTR,
-      deadline_confidence: { type: ["number","null"] },
+      deadline_confidence: NULLNUM,
       deadline_source_text: NULLSTR,
-      priority: { type: ["string","null"], enum: ["low","normal","high",null] },
-      amount: { type: ["integer","null"] },
+      priority: { anyOf: [{ type: "string", enum: ["low","normal","high"] }, { type: "null" }] },
+      amount: { anyOf: [{ type: "integer" }, { type: "null" }] },
       text: NULLSTR, source_span: NULLSTR
     } } } }
 };
