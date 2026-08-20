@@ -149,8 +149,11 @@
 
   <div class="card">
     <h2>Журнал сессии</h2>
-    <table><thead><tr><th>№</th><th>Модель</th><th>Имена</th><th>WER</th><th>мс</th></tr></thead>
-    <tbody id="log"></tbody></table>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>№</th><th>STT</th><th>Имена</th><th>WER</th><th>мс</th>
+      <th>Парсер</th><th>Сущ.</th><th>мс</th><th>токены</th><th>$ прогона</th>
+    </tr></thead>
+    <tbody id="log"></tbody></table></div>
     <div class="stats" id="agg"></div>
     <div class="row"><button class="gold" id="dlLog" disabled>Скачать журнал JSON</button>
       <span class="hint">Файлы записей называйте как скачались — они годятся для полного гейта (run.mjs).</span></div>
@@ -253,8 +256,9 @@ const rosterPrompt = () => "Имена сотрудников: "+ROSTER.users.ma
 /* ---- state & els ---- */
 const $ = id => document.getElementById(id);
 let idx = 15; // start at №016 (multi-entity) — the most telling phrase
-let rec = null, chunks = [], blob = null, mime = "", startT = 0, timerInt = null;
+let rec = null, chunks = [], blob = null, mime = "", startT = 0, timerInt = null, recDurS = 0;
 const log = [];
+const STT_PRICE_MIN = 0.006; // USD/min, gpt-4o-transcribe & whisper-1 estimate
 
 $("key").value = localStorage.getItem("pulse_stt_key") || "";
 $("key").addEventListener("change", () => localStorage.setItem("pulse_stt_key", $("key").value.trim()));
@@ -285,6 +289,7 @@ async function toggleRec(){
     rec.ondataavailable = e => chunks.push(e.data);
     rec.onstop = () => {
       stream.getTracks().forEach(t=>t.stop());
+      recDurS = (Date.now() - startT) / 1000;
       blob = new Blob(chunks, { type: mime || "audio/webm" });
       $("player").src = URL.createObjectURL(blob); $("player").hidden = false;
       $("sttBtn").disabled = false; $("saveBtn").disabled = false;
@@ -345,15 +350,34 @@ function renderResult(c, model, text, ms){
     <span>WER: <b>${(w*100).toFixed(1)}%</b></span><span>Латентность: <b>${ms} мс</b></span>
     <span>Гейт-ориентир: имена ≥95%, WER ≤15%</span>`;
   log.push({ id:c.id, category:c.category, model, roster:$("useRoster").checked,
-    transcript:text, reference:c.text, namesFound:found, namesTotal:c.names.length, wer:w, latencyMs:ms });
-  const tr = document.createElement("tr");
-  tr.innerHTML = `<td>${c.id}</td><td>${model}${$("useRoster").checked?"":" (без ростера)"}</td>
-    <td class="num">${found}/${c.names.length}</td><td class="num">${(w*100).toFixed(0)}%</td><td class="num">${ms}</td>`;
-  $("log").appendChild(tr);
+    lang: $("langHint").value || "auto", audioS: recDurS,
+    transcript:text, reference:c.text, namesFound:found, namesTotal:c.names.length, wer:w, latencyMs:ms,
+    sttCost: recDurS / 60 * STT_PRICE_MIN });
+  renderLog();
+}
+
+function renderLog(){
+  $("log").innerHTML = "";
+  for (const e of log){
+    const cost = (e.sttCost ?? 0) + (e.parseCost ?? 0);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${e.id}</td><td>${e.model}${e.roster?"":" ·без ростера"}${e.lang==="auto"?" ·авто":""}</td>
+      <td class="num">${e.namesFound}/${e.namesTotal}</td><td class="num">${(e.wer*100).toFixed(0)}%</td><td class="num">${e.latencyMs}</td>
+      <td>${e.parser ?? "—"}</td><td class="num">${e.entities ?? "—"}</td><td class="num">${e.parseMs ?? "—"}</td>
+      <td class="num">${e.tokensIn ? `${e.tokensIn}→${e.tokensOut}` : "—"}</td><td class="num">$${cost.toFixed(4)}</td>`;
+    $("log").appendChild(tr);
+  }
   const nf = log.reduce((a,r)=>a+r.namesFound,0), nt = log.reduce((a,r)=>a+r.namesTotal,0);
   const aw = log.reduce((a,r)=>a+r.wer,0)/log.length;
-  $("agg").innerHTML = `<span>Сессия: <b>${log.length}</b> записей</span>
-    <span>NameRecall: <b>${nt?((nf/nt)*100).toFixed(1):"—"}%</b></span><span>средний WER: <b>${(aw*100).toFixed(1)}%</b></span>`;
+  const parsed = log.filter(r=>r.parseMs);
+  const avg = (arr,k)=>arr.length?Math.round(arr.reduce((a,r)=>a+r[k],0)/arr.length):null;
+  const total = log.reduce((a,r)=>a+(r.sttCost??0)+(r.parseCost??0),0);
+  $("agg").innerHTML = `<span>Сессия: <b>${log.length}</b></span>
+    <span>NameRecall: <b>${nt?((nf/nt)*100).toFixed(1):"—"}%</b></span>
+    <span>ср. WER: <b>${(aw*100).toFixed(1)}%</b></span>
+    <span>ср. STT: <b>${avg(log,"latencyMs")} мс</b></span>
+    ${parsed.length?`<span>ср. разбор: <b>${avg(parsed,"parseMs")} мс</b></span>`:""}
+    <span>Σ сессии: <b>≈$${total.toFixed(4)}</b></span>`;
   $("dlLog").disabled = false;
 }
 $("dlLog").onclick = () => {
@@ -445,6 +469,8 @@ async function parseTranscript(transcript){
     renderCards(ents);
     $("parseStats").textContent =
       `${ents.length} сущн. · ${ms} мс · ${j.usage.input_tokens}→${j.usage.output_tokens} ток. · ~$${cost.toFixed(4)} · ${model}`;
+    if (log.length){ Object.assign(log[log.length-1], { parser: model, entities: ents.length,
+      parseMs: ms, tokensIn: j.usage.input_tokens, tokensOut: j.usage.output_tokens, parseCost: cost }); renderLog(); }
   } catch(e){ showParseErr(e.message); $("parseStats").textContent = ""; }
   finally { $("parseBtn").disabled = !lastTranscript; }
 }
@@ -465,7 +491,8 @@ function renderCards(entities){
     if (["task","points","recurrence","delegation"].includes(e.kind)){
       const u = ROSTER.users.find(x => x.id === e.assignee_id);
       if (u) meta += `<span class="mchip ${ (e.assignee_confidence ?? 1) < 0.8 ? "low" : "" }">👤 ${u.full_name}${(e.assignee_confidence ?? 1) < 0.8 ? " · проверь" : ""}</span>`;
-      else meta += `<span class="mchip bad">Кому? · ${e.assignee_query ?? "не распознан"}</span>`;
+      else if (["task","points"].includes(e.kind)) meta += `<span class="mchip bad">Кому? · ${e.assignee_query ?? "не распознан"}</span>`;
+      else meta += `<span class="mchip grey">адресат не указан (себе/уточнить)</span>`;
     }
     if (e.kind === "task" || e.kind === "reminder"){
       if (e.deadline_iso) meta += `<span class="mchip ${ (e.deadline_confidence ?? 1) < 0.8 ? "low" : "" }">⏰ ${fmtDl(e.deadline_iso)}${e.deadline_source_text ? ` · «${e.deadline_source_text}»` : ""}</span>`;
