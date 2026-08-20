@@ -87,8 +87,10 @@ function wer(ref, hyp) {
 
 /* ---------- providers ---------- */
 
+// Include aliases ("Ерлан Б", "Ерлан Д"): spoken initials are acoustically fragile — hint the valid combinations.
 const rosterPrompt = () =>
-  "Имена сотрудников: " + ROSTER.users.map(u => u.full_name).join(", ") +
+  "Имена сотрудников: " +
+  ROSTER.users.map(u => [u.full_name, ...u.aliases.filter(a => a !== u.full_name)].join(" / ")).join(", ") +
   ". Контрагенты и объекты: " + ROSTER.counterparties.join(", ") + ".";
 
 const PRICE_PER_MIN = { gpt4o: 0.006, "gpt4o-noroster": 0.006, whisper: 0.006, deepgram: 0.0043, scribe: 0.0067 }; // estimates
