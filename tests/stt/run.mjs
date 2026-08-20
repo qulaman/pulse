@@ -23,17 +23,22 @@ const CORPUS = readFileSync(join(HERE, "corpus.jsonl"), "utf8").trim().split("\n
 /* ---------- text normalization & matching (deterministic, no LLM) ---------- */
 
 // Russian + Kazakh case endings, longest first (STT_GATE.md §4).
-const ENDINGS = ["нға","нге","ға","ге","қа","ке","ды","ді","ты","ті","ом","ой","ей","у","е","а","ы","ю","я"];
+const ENDINGS = ["ға","ге","қа","ке","ды","ді","ты","ті","ом","ой","ей","у","е","а","ы","ю","я"];
 
 const normalize = s => s.toLowerCase().replace(/ё/g, "е")
   .replace(/[^a-zа-яәғқңөұүһі0-9\s-]/gi, " ").replace(/\s+/g, " ").trim();
 
+const ENDINGS_SORTED = [...ENDINGS].sort((a, b) => b.length - a.length);
+// Recursive: "Алияға" → "алия" → "али" must meet transcript's "алия" → "али".
 function stem(word) {
-  if (word.length <= 3) return word;
-  for (const e of ENDINGS.sort((a, b) => b.length - a.length)) {
-    if (word.endsWith(e) && word.length - e.length >= 3) return word.slice(0, -e.length);
+  let s = word, again = true;
+  while (again && s.length > 3) {
+    again = false;
+    for (const e of ENDINGS_SORTED) {
+      if (s.endsWith(e) && s.length - e.length >= 3) { s = s.slice(0, -e.length); again = true; break; }
+    }
   }
-  return word;
+  return s;
 }
 const stems = text => normalize(text).split(" ").filter(Boolean).map(stem);
 

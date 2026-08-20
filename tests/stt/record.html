@@ -88,6 +88,10 @@
         <option value="whisper-1">whisper-1</option>
       </select>
       <label class="chk"><input type="checkbox" id="useRoster" checked> prompt-ростер имён</label>
+      <select id="langHint" title="language-хинт STT (лестница гейта, ступень 1)">
+        <option value="ru">язык: ru</option>
+        <option value="">язык: авто (без хинта)</option>
+      </select>
     </div>
     <div class="row">
       <input type="password" id="antKey" placeholder="ANTHROPIC_API_KEY (sk-ant-...) — разбор в карточки">
@@ -226,9 +230,13 @@ const CORPUS = [
 const CATS = {A:"одиночная",B:"мульти",C:"телеграф",D:"казахская",E:"шум",F:"вопрос"};
 
 /* ---- matching (mirror of run.mjs) ---- */
-const ENDINGS = ["нға","нге","ға","ге","қа","ке","ды","ді","ты","ті","ом","ой","ей","у","е","а","ы","ю","я"].sort((a,b)=>b.length-a.length);
+const ENDINGS = ["ға","ге","қа","ке","ды","ді","ты","ті","ом","ой","ей","у","е","а","ы","ю","я"].sort((a,b)=>b.length-a.length);
 const norm = s => s.toLowerCase().replace(/ё/g,"е").replace(/[^a-zа-яәғқңөұүһі0-9\s-]/gi," ").replace(/\s+/g," ").trim();
-const stem = w => { if (w.length<=3) return w; for (const e of ENDINGS) if (w.endsWith(e) && w.length-e.length>=3) return w.slice(0,-e.length); return w; };
+// Recursive: "Алияға" → "алия" → "али" must meet transcript's "алия" → "али".
+const stem = w => { let s = w, again = true;
+  while (again && s.length > 3){ again = false;
+    for (const e of ENDINGS) if (s.endsWith(e) && s.length - e.length >= 3){ s = s.slice(0, -e.length); again = true; break; } }
+  return s; };
 const surfaceFound = (surface,tS,tT) => norm(surface).split(" ").filter(Boolean)
   .every(tok => tok.length<=2 ? tT.includes(tok) : tS.includes(stem(tok)));
 function wer(ref,hyp){
@@ -305,7 +313,7 @@ $("sttBtn").onclick = async () => {
   const fd = new FormData();
   fd.append("file", blob, `rec.${ext()}`);
   fd.append("model", model);
-  fd.append("language", "ru");
+  if ($("langHint").value) fd.append("language", $("langHint").value);
   if ($("useRoster").checked) fd.append("prompt", rosterPrompt());
   const t0 = Date.now();
   try{
