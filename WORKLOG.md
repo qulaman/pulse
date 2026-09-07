@@ -256,3 +256,19 @@
 - Технические арбитражи архитектора, зафиксированы в нарядах (кандидаты в DECISIONS раздел G при приёмке): политика ретраев STT (primary 10 с → fallback 10 с → пауза 1 с → один повтор primary → `stt_failed`; 4xx без ретрая) — примиряет AI.md §1 и BACKEND.md §2; nullable в JSON Schema structured outputs — только `anyOf [type, null]` (ограничение валидатора Anthropic, подтверждено прототипом); схема сущностей — zod как единственный источник, `ENTITIES_JSON_SCHEMA` генерируется.
 - В seed DATABASE.md «7 профилей» на деле перечисляют 8 (1+1+1+1+4) — в наряде 005 указано 8; док поправить при приёмке.
 - Дальше: владелец отдаёт 001 исполнителю (Opus) → «проверь tasks/001» → 002…005.
+
+## 2026-09-07 — Исполнитель (Opus) — 001 bootstrap
+
+**Сделано.** Каркас Next.js в корне репозитория по наряду `tasks/001-bootstrap.md`. Версии, которые поставил `create-next-app@latest`: **Next 16.3.4, React 19.2.8, Tailwind 4.3.3, TypeScript 5.9.3, ESLint 9.39.5, eslint-config-next 16.3.4**; pnpm 12.3.4 (через `npm i -g pnpm` — `corepack enable pnpm` упал с EPERM на диске Z:), Node 24.13.0. Дополнительно поставлены `zod@4`, `server-only`, `vitest@5` (dev) и поднят `@types/node` до 24 (vitest 5 требует >=22).
+Стартовая страница — «Pulse» + «Каркас проекта. Интерфейс появится после СТТ-гейта.», тёмная палитра `#0B0F14`/`#E6EDF3`, `lang="ru"`, без упоминаний клиента; шаблонные SVG из `public/` удалены. `/api/health` → `{ ok, version, time }`, `dynamic = "force-dynamic"`. `lib/env.schema.ts` (zod, без `server-only` — тестируется без Next-рантайма) + `lib/env.ts` (`getServerEnv()`, `server-only`) + `lib/env.public.ts` (`getPublicEnv()`); ошибка валидации называет переменную. `.env.example` — все переменные SETUP.md §2 плюс STT-fallback, модели, `CRON_SECRET`. Vitest: `lib/**/*.test.ts` + `tests/**/*.test.ts`, node-окружение; `tests/stt/**` добавлен в `globalIgnores` eslint.
+
+**Проверки (все зелёные).** `pnpm install` · `pnpm typecheck` (tsc чисто) · `pnpm lint` (0 problems) · `pnpm test` (1 файл, 2 теста) · `pnpm build` (Next 16/Turbopack, роуты `/`, `/_not-found`, `ƒ /api/health`) · `node tests/stt/run.mjs` — штатное «нет каталога фикстур», без исключений · `git status --short` — ничего лишнего (ни `.next`, ни временного каталога).
+
+**Коммиты.** `chore(bootstrap)`, `feat(env)`, `feat(api)`, `docs(worklog)` в ветке `feat/001-bootstrap`.
+
+**Вопросы к архитектору (решения не выдумывал).**
+1. `create-next-app@latest` поставил **Next 16**, а не 15 — CLAUDE.md/D-39 говорят «Next.js 15+», формально это в рамках, но стек финализировался под 15. Нужно подтверждение (и проверка совместимости `@serwist/next` с 16 до наряда по PWA).
+2. Шаблон создал собственные `CLAUDE.md` и `AGENTS.md` (правила Next 16 для агентов). Копировать их в корень я не стал — они затёрли бы проектный `CLAUDE.md`, а сами файлы вне скоупа наряда. Решить, нужен ли `AGENTS.md` из шаблона отдельно.
+3. Шаблон Next 16 типизирует лейаут глобальным `LayoutProps<"/">`, который генерируется в `.next/types` — при чистом `tsc --noEmit` (скрипт `typecheck` из наряда) его ещё нет. Заменил на явный `{ children: React.ReactNode }`. Альтернатива — `typecheck` = `next typegen && tsc --noEmit`; выбор за архитектором.
+4. `vitest.config.ts` печатает предупреждение Vite о ESM-синтаксисе в файле, загружаемом как CJS (лечится `"type": "module"` в package.json или расширением `.mts`) — на результат не влияет, менять без решения не стал.
+5. `public/` после удаления шаблонных SVG пуст; чтобы каталог остался в git, добавлен `public/.gitkeep`.
