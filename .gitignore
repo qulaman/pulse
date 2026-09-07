@@ -54,3 +54,7 @@ desktop.ini
 # STT gate: audio fixtures live in Storage (stt-fixtures bucket), run outputs are local
 tests/stt/fixtures/
 tests/stt/results/
+
+# from create-next-app template
+*.pem
+.pnpm-debug.log*
