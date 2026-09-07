@@ -279,6 +279,8 @@ async function main(): Promise<void> {
       for (const f of score.failures) console.log(`       ${f}`);
     } catch (error) {
       const code = error instanceof ParseError ? error.code : "unknown";
+      const cause = (error as { cause?: unknown }).cause;
+      const detail = cause instanceof Error ? ` (${cause.name}: ${cause.message})` : "";
       results.push({
         id: c.id,
         ok: false,
@@ -295,9 +297,9 @@ async function main(): Promise<void> {
         splitOk: false,
         queryOk: false,
         failures: [],
-        error: `${code}: ${(error as Error).message}`,
+        error: `${code}: ${(error as Error).message}${detail}`,
       });
-      console.log(`ERR  ${c.id} — ${code}: ${(error as Error).message}`);
+      console.log(`ERR  ${c.id} — ${code}: ${(error as Error).message}${detail}`);
     }
   }
 
@@ -342,7 +344,11 @@ async function main(): Promise<void> {
   }
 
   mkdirSync(RESULTS_DIR, { recursive: true });
-  const outFile = join(RESULTS_DIR, `${stamp(new Date())}.json`);
+  // Minute-resolution stamps collide when two runs land in the same minute — never
+  // let a second run (a --filter probe, say) overwrite the run of record.
+  const base = stamp(new Date());
+  let outFile = join(RESULTS_DIR, `${base}.json`);
+  for (let n = 2; existsSync(outFile); n++) outFile = join(RESULTS_DIR, `${base}-${n}.json`);
   writeFileSync(
     outFile,
     JSON.stringify(
