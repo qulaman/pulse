@@ -396,3 +396,16 @@
 9. **Триггеры `trg_task_status_message` и `trg_question_answered` — `security definer`:** `task_messages` append-only и без update-политики, а системную строку пишет в том числе cron (без `auth.uid()`).
 10. **`.env.local` был перезаписан сессией 004** (там остался только `ANTHROPIC_API_KEY`) — переменные Supabase дописаны в конец, чужой ключ не тронут. Секретов в индексе нет — проверено `grep` по `supabase/`, `package.json`, `.env.example`.
 11. **Docker Desktop был выключен** — запущен вручную, образ `pg_prove:3.36` подтянут; на сами миграции и seed Docker не влияет (только предупреждение о кэше каталога).
+
+## 2026-09-07 — Окно 1 — Приёмка наряда 005: принято с фиксами (третья миграция), влито в main
+
+- Ветка `feat/005-db-foundation` отведена от старого `main`; влит актуальный `main` (конфликт только в WORKLOG, обе записи сохранены). После мержа: `tsc`, `eslint`, 69 юнитов — зелёные.
+- Ревью двух миграций, seed и четырёх pgTAP-файлов. Текст наряда выполнен точно; все 11 арбитражей исполнителя приняты (pgTAP из seed, `auth.identities`, 10 задач, `security definer` на триггерах 2–3, FK на `recurrence_rule_id` — с её миграцией).
+- **Найдено в семантике RLS и закрыто третьей миграцией `20260907150000_guards_and_tv_isolation.sql` (+ `supabase/tests/005_guards.test.sql`, 10 кейсов):**
+  1. Роль `tv` видела все профили и компанию — док требует «ничего, кроме tv_events». Теперь `tv` видит только собственную строку profiles (для layout-гарда) и не видит companies.
+  2. Исполнитель мог через `update tasks` менять заголовок, дедлайн, приоритет и даже `assignee_id` своей задачи — политика `tasks_update` ограничивала только видимость. Триггер `trg_tasks_field_guard`: не-директор и не-автор меняет только `status`.
+  3. Штампы `accepted_at/completed_at/closed_at` брались из клиента, если переданы — путь к фармингу «принял ≤10 мин». Теперь их ставит только status guard при переходе; `accepted_at` = первое принятие, переживает rework.
+  4. `profiles_guard` блокировал service role (у него `auth_role()` = null → «не директор») — оффбординг с сервера был невозможен. Добавлен bypass при `auth.uid() is null`; защищены также `manager_id`, `streak_count`, `streak_updated_at`.
+- Проверки на dev (`qobsbjugromdwfdodwwa`): `db reset --linked` — три миграции + seed (CLI 2.109 печатает ошибку pgdelta про сертификат после сброса — на результат не влияет, `migration list --linked` показывает все три), `test db --linked` — **5 файлов, 30 тестов, PASS**, `db lint --schema public` — чисто.
+- Доки: DATABASE.md — триггеры 9–10, матрица RLS для profiles/companies с исключением `tv`, seed (pgTAP, identities, пароль, две задачи в sent, lint с `--schema public`).
+- **В бэклог / владельцу:** (а) `pulse-prod` не заведён — по D-19 два проекта с первого дня, нужен до этапа «пилот» (сейчас не блокирует); (б) переход `declined → sent` («Настоять», CONCEPT §4) отсутствует в матрице BACKEND.md §7 и в триггере — добавить в наряд про RPC `transition_task`; (в) команда `db:reset` у CLI 2.109 шумит ошибкой pgdelta — обновить CLI до 2.116 при следующем наряде по БД; (г) порядок срабатывания триггеров на tasks опирается на алфавит имён (`trg_task_status_guard` < `trg_tasks_field_guard`) — зафиксировано комментарием, при добавлении триггеров на tasks именовать с учётом этого.

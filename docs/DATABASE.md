@@ -215,7 +215,7 @@ create policy tasks_insert on tasks for insert with check (
 ```
 
 Матрица по остальным таблицам:
-- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17); update — владелец (кроме role/company_id/is_active) + director.
+- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); update — владелец (защищённые поля — триггер 9) + director. **companies**: select — компания, кроме `tv`; write — только service role.
 - **task_messages / reactions**: участники задачи (author/assignee/директор/менеджер глубины 1); insert — участники; update/delete — нет (append-only, answered_at ставит триггер).
 - **point_transactions**: select — свои + director; insert — director только `source='manual'`; всё авто/магазинное — service role или security-definer-функции. Рейтинг клиентом из сырых транзакций НЕ читается — только `fn_rating()`.
 - **shop_items**: select — все компании; write — director/shopkeeper. **orders**: свои + director/shopkeeper; мутации — только RPC.
@@ -263,6 +263,8 @@ tv_summary(p_guest bool default false) returns jsonb
 6. `trg_tv_events_*` — денормализация в tv_events c payload_guest при записи.
 7. `trg_notify_outbox` — insert в notification_deliveries на событиях (переход в sent, вопрос, pending_review…).
 8. `moddatetime` (extension) — updated_at на tasks, orders, shop_items, inbox_items.
+9. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; service role (auth.uid() null) — без ограничений.
+10. `trg_tasks_field_guard` (before update on tasks) — не-директор и не-автор меняет ТОЛЬКО `status`; штампы `accepted_at/completed_at/closed_at` ставит только `trg_task_status_guard` при переходе (клиентское значение игнорируется — защита от фарминга «принял ≤10 мин»). `accepted_at` = первое принятие (переживает rework→accepted).
 
 ## Индексы (полный список; ставит миграция, не «агент по вкусу»)
 
@@ -305,7 +307,7 @@ announcements (company_id, created_at desc);  absences (company_id, user_id, sta
 
 ## seed.sql (dev-фикстуры; обязателен для RLS-тестов и Пульса)
 
-Демо-компания «Demo Group» + settings по D-13. 8 профилей: director, manager, shopkeeper, служебный tv и 4 employee — с алиасами-коллизиями: **«Ерлан Байжанов» (aliases: Ерлан, Ерлан Б.) и «Ерлан Досов» (aliases: Ерлан, Ерлан Д.)** — фикстура матчера; «Айгуль» в отпуске (absence + availability). Задачи во **всех** статусах enum (включая scheduled, revoked, rework), одна group_id-пара, один открытый вопрос, одна просрочка. Транзакции очков всех source; 2 товара; **1 заказ в pending с активным hold**. Согласия consents: у одного сотрудника отсутствует (проверка анонимизации).
+Демо-компания «Demo Group» + settings по D-13. pgTAP ставится здесь (`create extension pgtap with schema extensions`), а не миграцией — фреймворк тестов не должен уезжать в прод; `supabase db lint` гонять с `--schema public` (код pgTAP даёт ложные error в схеме `extensions`). Демо-пароль всех аккаунтов `demo1234`, строки `auth.identities` обязательны для входа по паролю. 8 профилей: director, manager, shopkeeper, служебный tv и 4 employee — с алиасами-коллизиями: **«Ерлан Байжанов» (aliases: Ерлан, Ерлан Б.) и «Ерлан Досов» (aliases: Ерлан, Ерлан Д.)** — фикстура матчера; «Айгуль» в отпуске (absence + availability). Задачи во **всех** статусах enum (включая scheduled, revoked, rework; в `sent` — две, они же group_id-пара: одна для теста принятия, вторая для отзыва), один открытый вопрос, одна просрочка. Транзакции очков всех source; 2 товара; **1 заказ в pending с активным hold**. Согласия consents: у одного сотрудника отсутствует (проверка анонимизации).
 
 ## RLS-тесты (pgTAP, `supabase/tests/`, запуск `supabase test db`)
 
