@@ -10,7 +10,10 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval:parser": "tsx tests/ai/eval.ts",
-    "test:stt": "node tests/stt/run.mjs"
+    "test:stt": "node tests/stt/run.mjs",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset --linked",
+    "test:rls": "supabase test db --linked"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
