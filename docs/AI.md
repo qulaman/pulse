@@ -146,13 +146,13 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 ## 4. Few-shot — `lib/ai/examples.ts` (полные примеры)
 
-6–8 пар user/assistant после system-промпта (кэшируются, §9). Ростер примеров — демо (в проде подменяется реальным): `u-001 Айгуль Нурланова (бухгалтер)`, `u-002 Ерлан Сапаров (снабженец)`, `u-003 Марат Досжанов (менеджер по продажам)`, `u-004 Сакен Абенов, алиасы [Сакен, Сәкен] (прораб)`. Контекст всех примеров: `Сейчас: четверг, 14.08.2026 16:32 (+05:00)`. JSON ниже сокращён по пробелам, в файле — полные объекты со ВСЕМИ полями схемы.
+6–8 пар user/assistant после system-промпта (кэшируются, §9). Ростер примеров — **единый демо-ростер `tests/stt/roster.json`** (тот же, что в seed.sql и корпусе гейта; в проде подменяется реальным). Имена в JSON ниже записаны по старому 4-персонному ростеру и в `examples.ts` отображаются так: Айгуль → `u-005` Айгуль Сапарова; Ерлан → `u-001` Ерлан Байжанов (в речи примеров — «Ерлану Б.», иначе двое Ерланов дают неоднозначность); Марат → `u-003` Марат Оспанов; Сакен → `u-004` Сәкен Жумабаев. Контекст всех примеров: `Сейчас: четверг, 13.08.2026 16:32 (+05:00)`. JSON ниже сокращён по пробелам, в файле — полные объекты со ВСЕМИ полями схемы.
 
 **П1. Одиночная задача, явный дедлайн.** Вход: «Марат, подготовь коммерческое предложение по Казхрому к пятнице к трём часам»
 ```json
 {"entities":[{"kind":"task","assignee_queries":["Марат"],"assignee_id":"u-003","assignee_confidence":0.98,
  "group_id":null,"title":"Подготовить КП по Казхрому","body":null,
- "deadline_iso":"2026-08-15T15:00:00+05:00","deadline_confidence":0.95,
+ "deadline_iso":"2026-08-14T15:00:00+05:00","deadline_confidence":0.95,
  "deadline_source_text":"к пятнице к трём часам","priority":"normal","scheduled_send_at":null,
  "source_span":"Марат, подготовь коммерческое предложение по Казхрому к пятнице к трём часам"}]}
 ```
@@ -162,11 +162,11 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 {"entities":[
  {"kind":"announcement","text":"Завтра в 10:00 общее собрание в офисе, не опаздывать","source_span":"всем: завтра в десять общее собрание в офисе, не опаздывать"},
  {"kind":"task","assignee_queries":["Айгуль"],"assignee_id":"u-001","assignee_confidence":0.97,"group_id":null,
-  "title":"Подготовить акт сверки по Казхрому","body":null,"deadline_iso":"2026-08-15T13:00:00+05:00",
+  "title":"Подготовить акт сверки по Казхрому","body":null,"deadline_iso":"2026-08-14T13:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"завтра до обеда","priority":"normal","scheduled_send_at":null,
   "source_span":"Айгуль, подготовь акт сверки по Казхрому завтра до обеда"},
  {"kind":"task","assignee_queries":["Сакен"],"assignee_id":"u-004","assignee_confidence":0.97,"group_id":null,
-  "title":"Закрыть наряды по третьему объекту","body":null,"deadline_iso":"2026-08-14T18:00:00+05:00",
+  "title":"Закрыть наряды по третьему объекту","body":null,"deadline_iso":"2026-08-13T18:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"сегодня до вечера","priority":"high","scheduled_send_at":null,
   "source_span":"Сакен, срочно закрой наряды по третьему объекту сегодня до вечера"},
  {"kind":"points","assignee_queries":["Ерлану"],"assignee_id":"u-002","assignee_confidence":0.97,
@@ -177,7 +177,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ```json
 {"entities":[
  {"kind":"task","assignee_queries":["марат"],"assignee_id":"u-003","assignee_confidence":0.95,"group_id":null,
-  "title":"КП по Казхрому","body":null,"deadline_iso":"2026-08-15T13:00:00+05:00","deadline_confidence":0.7,
+  "title":"КП по Казхрому","body":null,"deadline_iso":"2026-08-14T13:00:00+05:00","deadline_confidence":0.7,
   "deadline_source_text":"завтра до обеда","priority":"normal","scheduled_send_at":null,"source_span":"марат кп казхром завтра до обеда"},
  {"kind":"points","assignee_queries":["ерлану"],"assignee_id":"u-002","assignee_confidence":0.95,
   "amount":10,"reason":null,"source_span":"ерлану +10"}]}
@@ -187,7 +187,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ```json
 {"entities":[{"kind":"task","assignee_queries":[],"assignee_id":null,"assignee_confidence":0,
  "group_id":null,"title":"Заказать щебень на третий объект","body":null,
- "deadline_iso":"2026-08-15T18:00:00+05:00","deadline_confidence":0.6,"deadline_source_text":"до конца недели",
+ "deadline_iso":"2026-08-14T18:00:00+05:00","deadline_confidence":0.6,"deadline_source_text":"до конца недели",
  "priority":"normal","scheduled_send_at":null,"source_span":"Надо заказать щебень на третий объект до конца недели"}]}
 ```
 
@@ -195,7 +195,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ```json
 {"entities":[{"kind":"task","assignee_queries":["Айгуль"],"assignee_id":"u-001","assignee_confidence":0.97,
  "group_id":null,"title":"Закрыть отчёты по командировкам","body":null,
- "deadline_iso":"2026-08-15T18:00:00+05:00","deadline_confidence":0.5,"deadline_source_text":"на неделе",
+ "deadline_iso":"2026-08-14T18:00:00+05:00","deadline_confidence":0.5,"deadline_source_text":"на неделе",
  "priority":"normal","scheduled_send_at":null,"source_span":"Айгуль пусть на неделе закроет отчёты по командировкам"}]}
 ```
 
@@ -209,7 +209,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ```json
 {"entities":[
  {"kind":"task","assignee_queries":["Сәкенге"],"assignee_id":"u-004","assignee_confidence":0.95,"group_id":null,
-  "title":"Отправить фотоотчёт по объекту","body":null,"deadline_iso":"2026-08-14T18:00:00+05:00",
+  "title":"Отправить фотоотчёт по объекту","body":null,"deadline_iso":"2026-08-13T18:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"бүгін кешке","priority":"normal","scheduled_send_at":null,
   "source_span":"Сәкенге айт, объект бойынша фотоотчёт жіберсін бүгін кешке"},
  {"kind":"task","assignee_queries":["Маратқа"],"assignee_id":"u-003","assignee_confidence":0.95,"group_id":null,
