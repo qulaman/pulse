@@ -22,7 +22,7 @@ const RESULTS_DIR = join(HERE, "results");
 // Estimates in $ per million tokens; cache reads bill at 0.1x input (docs/AI.md §9).
 const PRICING: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
-  "claude-sonnet-5": { input: 3, output: 15 },
+  "claude-sonnet-5": { input: 2, output: 10 },
 };
 
 interface ExpectedEntity {

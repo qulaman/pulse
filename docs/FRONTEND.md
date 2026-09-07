@@ -91,7 +91,7 @@
 
 ## Экран подтверждения (/confirm) [ПИЛОТ]
 
-Список распознанных сущностей карточками: 📢 объявление / ✅ задача / ➕ очки [ПОСЛЕ ПИЛОТА] / 🔔 напоминание. Контракт данных — `lib/types/parse.ts` (единый для фронта и бэка): `entity.assignee: {status:'matched'|'ambiguous'|'unmatched', user_id?, candidates?:{user_id, full_name, score}[]}`.
+Список распознанных сущностей карточками: 📢 объявление / ✅ задача / ➕ очки [ПОСЛЕ ПИЛОТА] / 🔔 напоминание. Контракт данных (единый для фронта и бэка): сущности — `lib/ai/schema.ts` (`Entity`, zod), результат матчинга — `AssigneeMatch` из `lib/matchName.ts`: `entity.assignee: {status:'matched'|'ambiguous'|'unmatched', user_id: string|null, candidates:{user_id, full_name, score}[], flag:'ok'|'check'}`; блокировка сущности — `entity.blocked: 'points_blocked'|'assignee_unmatched'` из `lib/ai/postprocess.ts`.
 
 Правки:
 - **Тап по тексту карточки → инлайн-редактирование title** (клавиатура). Обязательно: удалять сущность и переговаривать всё голосовое из-за одной ошибки STT — недопустимо.

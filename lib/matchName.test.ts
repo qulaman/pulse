@@ -68,6 +68,15 @@ describe("matchName: model id", () => {
     ).toMatchObject({ status: "matched", flag: "ok" });
   });
 
+  it("overrides the model id when a bare first name has namesakes", () => {
+    expect(
+      matchName({ assignee_id: "u-001", assignee_queries: ["Ерлану"], assignee_confidence: 0.95 }, ROSTER),
+    ).toMatchObject({ status: "ambiguous", user_id: null });
+    expect(
+      matchName({ assignee_id: "u-001", assignee_queries: ["Ерлану Б."], assignee_confidence: 0.95 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-001" });
+  });
+
   it("falls back to fuzzy when the id is not in the roster", () => {
     expect(
       matchName(

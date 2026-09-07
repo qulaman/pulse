@@ -103,7 +103,9 @@ type JsonSchemaNode = Record<string, unknown>;
  * Deterministic post-processing of the generated JSON Schema for Anthropic structured
  * outputs: every object closed, every property required, and nullability expressed as
  * anyOf [type, null] — the union form `type: [..., "null"]` is rejected by the validator
- * (confirmed on the prototype).
+ * (confirmed on the prototype). This schema — not the SDK's zodOutputFormat() — is what
+ * goes to the API: the SDK helper turns z.literal("task") into a plain string, the model
+ * then mixes fields of different kinds (live failure r-024, 2026-09-07).
  */
 function harden(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(harden);
@@ -111,7 +113,15 @@ function harden(node: unknown): unknown {
 
   const out: JsonSchemaNode = {};
   for (const [key, value] of Object.entries(node as JsonSchemaNode)) {
+    if (key === "$schema") continue; // draft marker is noise for the API
     out[key] = key === "properties" || key === "$defs" ? hardenMap(value) : harden(value);
+  }
+
+  // The API supports anyOf but not oneOf; zod emits oneOf for discriminated unions.
+  // Variants are disjoint on `kind`, so the two are equivalent here.
+  if (Array.isArray(out.oneOf) && out.anyOf === undefined) {
+    out.anyOf = out.oneOf;
+    delete out.oneOf;
   }
 
   const type = out.type;

@@ -85,7 +85,7 @@ const deepgram: SttProvider = {
   name: "deepgram",
   async transcribe(audio, mime, opts) {
     const kw = keywordsFrom(opts.vocabularyHints ?? [])
-      .map((k) => "keywords=" + encodeURIComponent(k + ":2"))
+      .map((k) => "keyterm=" + encodeURIComponent(k)) // nova-3: keyterm prompting, not keywords
       .join("&");
     const url =
       `https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true` +
