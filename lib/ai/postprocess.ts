@@ -1,0 +1,85 @@
+import type { ParseSource } from "./prompt";
+import type { Entity } from "./schema";
+import { matchName, type AssigneeMatch, type RosterUser } from "../matchName";
+
+export type BlockedReason = "points_blocked" | "assignee_unmatched";
+
+export type PostprocessedEntity = Entity & {
+  assignee?: AssigneeMatch;
+  blocked?: BlockedReason;
+};
+
+const HAS_ASSIGNEE_FIELDS = new Set(["task", "points", "recurrence", "delegation"]);
+
+function isValidIso(value: string): boolean {
+  return !Number.isNaN(Date.parse(value));
+}
+
+/**
+ * Semantic validation on top of the schema (docs/AI.md §3). The API guarantees the
+ * shape; what it cannot guarantee is that ids exist, amounts are legal and dates parse.
+ */
+export function postprocess(
+  entities: Entity[],
+  roster: RosterUser[],
+  source: ParseSource,
+): PostprocessedEntity[] {
+  const activeIds = new Set(roster.filter((u) => u.is_active).map((u) => u.id));
+  const out: PostprocessedEntity[] = [];
+
+  for (const original of entities) {
+    const entity: PostprocessedEntity = { ...original };
+
+    // An id the model invented, or a user who has left, is worse than no id at all.
+    if ("assignee_id" in entity && entity.assignee_id !== null && !activeIds.has(entity.assignee_id)) {
+      entity.assignee_id = null;
+    }
+
+    for (const field of ["deadline_iso", "remind_at_iso", "scheduled_send_at"] as const) {
+      if (field in entity) {
+        const holder = entity as unknown as Record<string, unknown>;
+        const value = holder[field];
+        if (typeof value === "string" && !isValidIso(value)) {
+          holder[field] = null;
+          if (field === "deadline_iso" && "deadline_confidence" in entity) {
+            holder.deadline_confidence = null;
+          }
+        }
+      }
+    }
+
+    if (entity.kind === "points") {
+      if (entity.amount === 0) continue; // nothing to award, nothing to show
+      // Taking points away by voice is forbidden (D-30); shared text may not award any (D-36).
+      if (source === "shared" || entity.amount < 0) entity.blocked = "points_blocked";
+    }
+
+    if (HAS_ASSIGNEE_FIELDS.has(entity.kind)) {
+      const withAssignee = entity as PostprocessedEntity & {
+        assignee_id: string | null;
+        assignee_queries: string[];
+        assignee_confidence: number;
+      };
+      const assignee = matchName(
+        {
+          assignee_id: withAssignee.assignee_id,
+          assignee_queries: withAssignee.assignee_queries,
+          assignee_confidence: withAssignee.assignee_confidence,
+        },
+        roster,
+      );
+      entity.assignee = assignee;
+      if (
+        assignee.status !== "matched" &&
+        (entity.kind === "task" || entity.kind === "points") &&
+        entity.blocked === undefined
+      ) {
+        entity.blocked = "assignee_unmatched";
+      }
+    }
+
+    out.push(entity);
+  }
+
+  return out;
+}
