@@ -351,3 +351,33 @@
 7. **`tests/ai/results/*.json` могли затирать друг друга:** штамп имени — до минуты, два прогона в одну минуту дают один файл (так и произошло с отладочным прогоном). Добавил суффикс `-2`, `-3` при коллизии, формат `YYYY-MM-DD_HHmm` сохранён.
 8. **Предусловие «001–003 смержены» не выполнено:** `main` = `6a65c88`. Ветка отведена от `feat/003-schema-matchname-time`. Мержить 001 → 002 → 003 → 004.
 9. `ANTHROPIC_API_KEY` владелец передал в чате; лежит в `.env.local` (в .gitignore), в индекс не попадал — проверено `git grep`.
+
+## 2026-09-07 — Исполнитель (Opus) — 005 db-foundation
+
+**Сделано.** `supabase init` + линковка на облачный dev-проект (ref `qobsbjugromdwfdodwwa`, имя «Pulse», eu-central-1). Две миграции: `20260907120000_foundation.sql` (13 enum-типов дословно по доку без `shop_final`, `moddatetime`, `companies`, `profiles`, хелперы `auth_company_id/auth_role/subordinates`, `trg_profiles_guard`, RLS companies/profiles, индекс `profiles(company_id)`) и `20260907120100_tasks_and_messages.sql` (`tasks`, `task_messages` с `seq bigserial`, все 6 индексов раздела, триггеры `trg_task_status_guard` / `trg_task_status_message` / `trg_question_answered`, RLS обеих таблиц). `supabase/seed.sql` — Demo Group, 8 пользователей `auth.users` + профили (два Ерлана с коллизией алиасов, Марат под Динарой, Айгуль в отпуске), 10 задач (все 9 статусов, group-пара, просрочка, открытый вопрос). Четыре pgTAP-файла в `supabase/tests/`. Скрипты `db:push` / `db:reset` / `test:rls`, переменные `SUPABASE_ACCESS_TOKEN` и `SUPABASE_DB_PASSWORD` в `.env.example`. `full_name` и `role` в `profiles` сделаны `not null` (дефолты и состав полей — как в доке).
+
+**Проверки.**
+
+| Проверка | Результат |
+|---|---|
+| `supabase projects list` | `Pulse` (eu-central-1) — `linked: true`, остальные проекты не тронуты |
+| `pnpm db:reset` | dev пересобран с нуля: обе миграции + seed, без ошибок |
+| `supabase migration list --linked` | `20260907120000` и `20260907120100` — local = remote |
+| `pnpm test:rls` | Files=4, Tests=20, **All tests successful** |
+| `supabase db lint --linked` | `--schema public` — чисто; в схеме `extensions` error-уровень даёт сам pgTAP (см. вопрос 6) |
+| `pnpm typecheck` / `pnpm test` | чисто / 9 файлов, 66 тестов |
+
+**Коммиты.** `chore(supabase)`, `feat(db)` ×2, `test(db)`, `docs(worklog)` в ветке `feat/005-db-foundation`.
+
+**Вопросы и отступления.**
+1. **Проект называется «Pulse», а не `pulse-dev`, и он единственный** — STOP-условие наряда сработало, владелец подтвердил в чате: считать его dev, `db reset` разрешён. `pulse-prod` (SETUP §1 — два проекта с первого дня) ещё не заведён.
+2. **Предусловие «наряд 001 смержен» не выполнено:** в `main` только доки, ветки 001–004 идут стопкой. Ветка отведена от `feat/004-parser-evals` (там есть `package.json`), затем `merge main` ради актуального текста наряда. Порядок мержа: 001 → 002 → 003 → 004 → 005.
+3. **pgTAP ставится в `seed.sql`**, а не миграцией: `create extension if not exists pgtap with schema extensions` — иначе тестовый фреймворк уехал бы в прод (seed в прод не катится никогда).
+4. **В seed добавлены строки `auth.identities`** — без них GoTrue не пускает сид-пользователей по паролю, и смоук-чек-лист SETUP §3.10 (логин директором) не проходит. Пароль всех демо-аккаунтов — `demo1234`.
+5. **Профилей 8, а не 7** — как и сказано в наряде: в DATABASE.md написано «7», перечислено 1+1+1+1+4.
+6. **`supabase db lint --linked` без `--schema` даёт ошибки уровня `error`** — все внутри схемы `extensions` и все в коде самого pgTAP (`proisagg`, `spclocation`, `__tresults___numb_seq`, `row_eq`): расширение написано под старые версии Postgres. Нашего кода они не касаются, `--schema public` чист. Если хотим зелёный вывод без флага — pgTAP надо ставить не в общую БД, а иначе (или линтовать только public).
+7. **Задач в seed 10, а не 9.** Вторая задача в `sent` нужна тестам: одна уходит на `sent → accepted` исполнителем, вторая — на `sent → revoked` директором; она же образует group-пару с первой (мульти-исполнитель, D-02).
+8. **`tasks.recurrence_rule_id` без внешнего ключа** — таблицы `recurrence_rules` ещё нет; FK добавит её миграция.
+9. **Триггеры `trg_task_status_message` и `trg_question_answered` — `security definer`:** `task_messages` append-only и без update-политики, а системную строку пишет в том числе cron (без `auth.uid()`).
+10. **`.env.local` был перезаписан сессией 004** (там остался только `ANTHROPIC_API_KEY`) — переменные Supabase дописаны в конец, чужой ключ не тронут. Секретов в индексе нет — проверено `grep` по `supabase/`, `package.json`, `.env.example`.
+11. **Docker Desktop был выключен** — запущен вручную, образ `pg_prove:3.36` подтянут; на сами миграции и seed Docker не влияет (только предупреждение о кэше каталога).
