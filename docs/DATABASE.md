@@ -305,7 +305,7 @@ announcements (company_id, created_at desc);  absences (company_id, user_id, sta
 
 ## seed.sql (dev-фикстуры; обязателен для RLS-тестов и Пульса)
 
-Демо-компания «Demo Group» + settings по D-13. 7 профилей: director, manager, shopkeeper, служебный tv и 4 employee — с алиасами-коллизиями: **«Ерлан Байжанов» (aliases: Ерлан, Ерлан Б.) и «Ерлан Досов» (aliases: Ерлан, Ерлан Д.)** — фикстура матчера; «Айгуль» в отпуске (absence + availability). Задачи во **всех** статусах enum (включая scheduled, revoked, rework), одна group_id-пара, один открытый вопрос, одна просрочка. Транзакции очков всех source; 2 товара; **1 заказ в pending с активным hold**. Согласия consents: у одного сотрудника отсутствует (проверка анонимизации).
+Демо-компания «Demo Group» + settings по D-13. 8 профилей: director, manager, shopkeeper, служебный tv и 4 employee — с алиасами-коллизиями: **«Ерлан Байжанов» (aliases: Ерлан, Ерлан Б.) и «Ерлан Досов» (aliases: Ерлан, Ерлан Д.)** — фикстура матчера; «Айгуль» в отпуске (absence + availability). Задачи во **всех** статусах enum (включая scheduled, revoked, rework), одна group_id-пара, один открытый вопрос, одна просрочка. Транзакции очков всех source; 2 товара; **1 заказ в pending с активным hold**. Согласия consents: у одного сотрудника отсутствует (проверка анонимизации).
 
 ## RLS-тесты (pgTAP, `supabase/tests/`, запуск `supabase test db`)
 

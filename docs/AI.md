@@ -5,12 +5,12 @@
 ## 1. STT: `lib/ai/stt.ts`
 
 ```ts
-export interface SttOptions { language?: 'ru' | null; vocabularyHints?: string[] } // null = без language-hint
+export interface SttOptions { language?: 'ru' | null; vocabularyHints?: string[]; signal?: AbortSignal } // null = без language-hint; signal — таймаут/отмена от политики ретраев
 export interface SttResult  { text: string; durationMs: number; provider: string }
 export interface SttProvider { name: string; transcribe(audio: Buffer, mime: string, opts: SttOptions): Promise<SttResult> }
 ```
 
-- Реализации: `openai-4o` (`gpt-4o-transcribe`, `prompt` = vocabularyHints через запятую), `whisper1`, `deepgram` (keyterm), `elevenlabs`. Primary — `gpt-4o-transcribe` (D-39); выбор — env `STT_PROVIDER`, фолбэк — `STT_FALLBACK_PROVIDER`, авто-переключение при 5xx/timeout (>10 с)/сетевой ошибке; провайдер пишется в `ai_logs.provider`.
+- Реализации: `openai-4o` (`gpt-4o-transcribe`, `prompt` = vocabularyHints через запятую), `whisper1`, `deepgram` (keyterm), `elevenlabs`. Primary — `gpt-4o-transcribe` (D-39); выбор — env `STT_PROVIDER`, фолбэк — `STT_FALLBACK_PROVIDER`. **Политика ретраев (G.18, реализована в `transcribe()`):** primary с таймаутом 10 с → при 5xx / таймауте / сетевой ошибке fallback (если задан) с таймаутом 10 с → пауза 1 с → один повтор primary → `SttError('stt_failed')`; 4xx кроме 408/429 — без ретраев, сразу `stt_http`. Провайдер пишется в `ai_logs.provider`.
 - `vocabularyHints` — ростер имён (full_name + алиасы) + контрагенты из `company.settings.vocabulary` (лимит ~224 токена).
 - **Guard от галлюцинаций STT** (Whisper на тишине/непонятной речи сочиняет связный текст): (а) клиент не отправляет аудио < 1000 мс; (б) на сервере — отношение `chars(text)/durationSec > 30` → результат отбрасывается; (в) транскрипт из известных фантомов («Продолжение следует», «Субтитры сделал…», «Спасибо за просмотр») → отбрасывается; (г) транскрипт < 3 слов → фронту `empty_transcript`, Claude НЕ вызывается; (д) **эхо промпта** (подтверждено живым тестом 2026-08-20: whisper на казахской фразе вернул «Контрагенты и объекты» — дословный кусок vocabularyHints): нормализованный транскрипт содержит подстроку ≥4 слов из vocabularyHints-строки ИЛИ ≥60% его слов входят в словарь подсказки → отбрасывается; (е) **зацикливание**: одна и та же фраза повторена ≥2 раз подряд и составляет >70% транскрипта → отбрасывается; (ж) **аномально низкая плотность речи** (подтверждено живым тестом: в шуме STT возвращает обрывки и галлюцинированные имена из подсказки — «Ерлан Байжанов» вместо «Марат…» при 4–5 симв/сек против нормы 12–15): `chars(text)/durationSec < 6` при длительности >3 с → результат помечается подозрительным, сущности с исполнителем из такого транскрипта получают принудительный `assignee_confidence ≤ 0.5` (жёлтый чип «проверь» на /confirm), а при <4 симв/сек — отброс. Это единственный guard против самого опасного класса: галлюцинация ВАЛИДНОГО имени из vocabularyHints, которую матчер не ловит. Все guard-отбросы → фронту `empty_transcript` («Не расслышал, повторить?»), в ai_logs — `status='error'`, `error='stt_guard:<код>'` — без этого мусор становится объявлением «всем в Эфир».
 - **Голосовые сотрудников** (отчёты в task_messages): тот же `transcribe` с теми же vocabularyHints, но БЕЗ парсинга — только текст + аудио в сообщение. Через парсер сущностей их не гонять никогда.
@@ -91,10 +91,11 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
     НЕ реконструировать никогда — только как услышаны.
 ```
 
-**Шаблон user-сообщения** (дата здесь — ради кэша):
+**Шаблон user-сообщения** (дата и календарь здесь — ради кэша; строка «Ближайшие дни» — 7 дней вперёд из `upcomingDaysRu()`: без неё модель ошибалась в арифметике дней недели — живые провалы a-003/a-012, 2026-09-07):
 
 ```
 Сейчас: {день недели}, {DD.MM.YYYY HH:mm} (+05:00). Источник: {voice|typed|shared}.
+Ближайшие дни: {пт 14.08, сб 15.08, вс 16.08, пн 17.08, вт 18.08, ср 19.08, чт 20.08}.
 <input>
 {транскрипт или пересланный текст}
 </input>
@@ -102,7 +103,7 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
 
 ## 3. Схема сущностей — `lib/ai/schema.ts` (единственный источник)
 
-Файл содержит TS-типы (импортирует фронт) и константу `ENTITIES_JSON_SCHEMA` (JSON Schema для structured outputs, зеркало типов, `additionalProperties: false`, все поля в `required`, nullable через `type: [..., "null"]`). Расхождение типов и схемы — баг.
+Файл содержит zod-схемы (единственный источник: `z.strictObject` на вид сущности, `z.discriminatedUnion('kind')`), TS-типы через `z.infer` (импортирует фронт) и константу `ENTITIES_JSON_SCHEMA` — JSON Schema, сгенерированная из zod и «закалённая» пост-обработкой: `additionalProperties: false` на каждом объекте, все поля в `required`, nullable — **только `anyOf [{type}, {type:'null'}]`** (форму `type: [..., 'null']` валидатор Anthropic отвергает), объединение видов — **`anyOf`** (не `oneOf`), `kind` — `const`. **В API уходит именно `ENTITIES_JSON_SCHEMA`**, а не `zodOutputFormat()` из SDK: хелпер превращает `z.literal('task')` в простую строку, дискриминатор теряется, и модель смешивает поля разных видов (живой провал r-024, 2026-09-07). Ответ дополнительно проверяется `ParseResultSchema.safeParse` как типизированная граница.
 
 ```ts
 // lib/ai/schema.ts — single source of truth: parser output contract
@@ -140,7 +141,7 @@ export interface ParseResult { entities: Entity[] }
 export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, strict */ };
 ```
 
-**Вызов** — `@anthropic-ai/sdk`, structured outputs: `output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } }`. **Repair-retry не существует как явление** — невалидный JSON невозможен. Обрабатываются только: `stop_reason: "max_tokens"` → один повтор с лимитом ×2, затем ошибка `parse_failed`; refusal → `parse_refused` (§11). Форму ответа бэкенд не перевалидирует (гарантирована API); валидируется семантика: `assignee_id` существует и `is_active`, `amount ≠ 0`, ISO парсится, для `source='shared'` нет `points` (страховка к правилу 11).
+**Вызов** — `@anthropic-ai/sdk`, `client.messages.create` со structured outputs: `output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } }`; параметр `thinking` для Haiku не передаётся, для Sonnet-класса на эскалации — `{ type: "disabled" }` (извлечение с few-shot не требует рассуждений, а adaptive thinking давал 7–14 с против бюджета D-43). **Repair-retry не существует как явление** — невалидный JSON невозможен. Обрабатываются только: `stop_reason: "max_tokens"` → один повтор с лимитом ×2, затем ошибка `parse_failed`; refusal → `parse_refused` (§11). Форму ответа бэкенд не перевалидирует (гарантирована API); валидируется семантика: `assignee_id` существует и `is_active`, `amount ≠ 0`, ISO парсится, для `source='shared'` нет `points` (страховка к правилу 11).
 
 Правила поверх схемы: любое поле с confidence < 0.8 — жёлтый чип на /confirm; `deadline_iso` конвертируется в UTC перед insert; N сущностей task с одним `group_id` = N независимых задач (D-02); отрицательный `amount` из голоса блокируется на /confirm с подсказкой «снятие — только вручную с причиной» (D-30).
 
@@ -235,6 +236,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 Модель матчит сама (ростер в промпте, склонения — её сила). `matchName` — детерминированный слой поверх:
 
+0. **Тёзки**: если упоминание — одно слово (без фамилии/инициала) и его стем совпадает со стемом имени у ≥2 активных сотрудников («Ерлану» при двух Ерланах) → `ambiguous` с этими кандидатами, **даже если модель уверенно поставила id**. Ошибочный адресат — единственная недопустимая ошибка (STT_GATE §4); живой кейс r-024, 2026-09-07.
 1. **Валидация**: `assignee_id` существует в ростере и `is_active` — иначе id сбрасывается в null и вступает шаг 2.
 2. **Fuzzy-фолбэк** по `assignee_queries[0]`: нормализация (нижний регистр, ё→е) + усечение падежных окончаний (`-у, -е, -ом, -а, -ой, -ға, -ге, -қа, -ке`) → trigram similarity против full_name+aliases.
 3. Пороги (в `lib/ai/config.ts`, переопределяются `company.settings.matching`, НЕ хардкод):
@@ -275,7 +277,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ## 8. Эскалация модели парсера
 
 - Дефолт — `claude-haiku-4-5` (env `PARSER_MODEL`).
-- **Триггеры эскалации** (до показа /confirm, прозрачно для UI): транскрипт > 400 символов ИЛИ сущностей > 3 ИЛИ любой `*_confidence < 0.6` → повторный прогон Sonnet-класса (env `PARSER_ESCALATION_MODEL`), его результат и показывается; оба вызова в `ai_logs`.
+- **Триггеры эскалации** (до показа /confirm, прозрачно для UI): транскрипт > 400 символов ИЛИ сущностей > 3 ИЛИ `assignee_confidence < 0.6` ИЛИ `deadline_confidence < 0.5` (ниже пола таблицы конвенций — «на неделе» легитимно даёт ровно 0.5 и эскалировать не должна) → повторный прогон Sonnet-класса (без thinking, см. §3) (env `PARSER_ESCALATION_MODEL`), его результат и показывается; оба вызова в `ai_logs`.
 - **Порог смены базовой модели** (по evals, не по ощущениям): после двух итераций промпта Haiku даёт F1 < 90% или assignee < 97% → база становится Sonnet (≈ +$10/мес — приемлемо, решения из качества).
 
 ## 9. Prompt caching и экономика
