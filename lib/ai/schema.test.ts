@@ -52,6 +52,22 @@ describe("ENTITIES_JSON_SCHEMA", () => {
   });
 });
 
+describe("ENTITIES_JSON_SCHEMA: discriminator", () => {
+  it("(д) unions are anyOf and every variant pins `kind` with const", () => {
+    const text = JSON.stringify(ENTITIES_JSON_SCHEMA);
+    expect(text).not.toContain("oneOf");
+    expect(text).not.toContain("$schema");
+
+    const items = (ENTITIES_JSON_SCHEMA.properties as Node).entities as Node;
+    const variants = (items.items as Node).anyOf as Node[];
+    expect(variants).toHaveLength(7);
+    for (const variant of variants) {
+      const kind = (variant.properties as Node).kind as Node;
+      expect(typeof kind.const).toBe("string");
+    }
+  });
+});
+
 describe("ParseResultSchema", () => {
   it("(в) accepts a task with a null deadline", () => {
     expect(ParseResultSchema.parse({ entities: [TASK] })).toEqual({ entities: [TASK] });

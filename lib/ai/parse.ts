@@ -1,9 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
-import { ParseResultSchema, type Entity } from "./schema";
+import { ENTITIES_JSON_SCHEMA, ParseResultSchema, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 export type ParseErrorCode = "parse_refused" | "parse_failed";
@@ -48,7 +47,10 @@ export interface ParseInput {
 const MAX_TOKENS = 4096;
 const ESCALATION_TRANSCRIPT_CHARS = 400;
 const ESCALATION_ENTITY_COUNT = 3;
-const ESCALATION_CONFIDENCE = 0.6;
+const ESCALATION_ASSIGNEE_CONFIDENCE = 0.6;
+// Conventions from the table legitimately carry 0.5–0.6 («на неделе» = 0.5), so only a
+// deadline below the table's floor is a sign of a shaky parse.
+const ESCALATION_DEADLINE_CONFIDENCE = 0.5;
 
 export const DEFAULT_PARSER_MODEL = "claude-haiku-4-5";
 export const DEFAULT_ESCALATION_MODEL = "claude-sonnet-5";
@@ -96,10 +98,14 @@ function needsEscalation(transcript: string, entities: Entity[]): boolean {
   if (transcript.length > ESCALATION_TRANSCRIPT_CHARS) return true;
   if (entities.length > ESCALATION_ENTITY_COUNT) return true;
   return entities.some((entity) => {
-    const confidences: (number | null)[] = [];
-    if ("assignee_confidence" in entity) confidences.push(entity.assignee_confidence);
-    if ("deadline_confidence" in entity) confidences.push(entity.deadline_confidence);
-    return confidences.some((c) => c !== null && c < ESCALATION_CONFIDENCE);
+    if ("assignee_confidence" in entity && entity.assignee_confidence < ESCALATION_ASSIGNEE_CONFIDENCE) {
+      return true;
+    }
+    return (
+      "deadline_confidence" in entity &&
+      entity.deadline_confidence !== null &&
+      entity.deadline_confidence < ESCALATION_DEADLINE_CONFIDENCE
+    );
   });
 }
 
@@ -109,17 +115,23 @@ interface CallResult {
   raw: unknown;
 }
 
+/** Extraction with eight few-shot pairs needs no reasoning; thinking only adds seconds (D-43). */
+function thinkingFor(model: string): Anthropic.ThinkingConfigParam | undefined {
+  return model.includes("haiku-4-5") ? undefined : { type: "disabled" };
+}
+
 async function callModel(
   client: Anthropic,
   model: string,
   input: ParseInput,
   maxTokens: number,
 ): Promise<CallResult> {
-  let message;
+  let message: Anthropic.Message;
   try {
-    message = await client.messages.parse({
+    message = await client.messages.create({
       model,
       max_tokens: maxTokens,
+      thinking: thinkingFor(model),
       system: buildSystemBlocks(input.roster),
       messages: [
         ...fewShotMessages(),
@@ -132,7 +144,7 @@ async function callModel(
           }),
         },
       ],
-      output_config: { format: zodOutputFormat(ParseResultSchema) },
+      output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } },
     });
   } catch (cause) {
     throw new ParseError("parse_failed", `${model}: вызов парсера не удался`, { cause });
@@ -147,12 +159,25 @@ async function callModel(
     }
     return callModel(client, model, input, maxTokens * 2);
   }
-  if (message.parsed_output === null || message.parsed_output === undefined) {
-    throw new ParseError("parse_failed", `${model}: пустой structured output`);
+  const text = message.content.find((block) => block.type === "text")?.text ?? "";
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (cause) {
+    throw new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
+  }
+  // The API enforces the schema; this is the safety net and the typed boundary.
+  const parsed = ParseResultSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new ParseError(
+      "parse_failed",
+      `${model}: ответ не прошёл схему (${parsed.error.issues.length} issue(s))`,
+      { cause: parsed.error },
+    );
   }
 
   return {
-    entities: message.parsed_output.entities,
+    entities: parsed.data.entities,
     usage: readUsage(message.usage),
     raw: message,
   };

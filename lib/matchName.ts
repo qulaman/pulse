@@ -85,6 +85,24 @@ export function matchName(
 ): AssigneeMatch {
   const active = roster.filter((u) => u.is_active);
 
+  // 0. A bare first name shared by several people («Ерлану» with two Erlans) is ambiguous
+  // no matter how confidently the model picked one — wrong assignee is the one error we
+  // must never make (D-16, STT_GATE §4).
+  const bareQuery = stemmedTokens(input.assignee_queries[0] ?? "");
+  if (bareQuery.length === 1) {
+    const namesakes = active.filter((u) => stemmedTokens(u.full_name)[0] === bareQuery[0]);
+    if (namesakes.length >= 2) {
+      return {
+        status: "ambiguous",
+        user_id: null,
+        candidates: namesakes
+          .slice(0, MAX_CANDIDATES)
+          .map((u) => ({ user_id: u.id, full_name: u.full_name, score: 1 })),
+        flag: "check",
+      };
+    }
+  }
+
   // 1. The model's own id, if it points at an active roster member.
   if (input.assignee_id) {
     const user = active.find((u) => u.id === input.assignee_id);

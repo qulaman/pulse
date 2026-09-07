@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
-import { formatAqtobe, weekdayRu } from "./time";
+import { formatAqtobe, upcomingDaysRu, weekdayRu } from "./time";
 import type { RosterUser } from "../matchName";
 
 /**
@@ -124,6 +124,7 @@ export function buildUserMessage(input: {
   const { transcript, source, now } = input;
   return (
     `Сейчас: ${weekdayRu(now)}, ${formatAqtobe(now)} (+05:00). Источник: ${source}.\n` +
+    `Ближайшие дни: ${upcomingDaysRu(now)}.\n` +
     `<input>\n${escapeInput(transcript)}\n</input>`
   );
 }

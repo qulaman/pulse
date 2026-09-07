@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aqtobeIsoToUtc, formatAqtobe, resolveConvention, weekdayRu } from "./time";
+import { aqtobeIsoToUtc, formatAqtobe, resolveConvention, upcomingDaysRu, weekdayRu } from "./time";
 
 // Thursday, 13.08.2026, 10:00 Asia/Aqtobe.
 const NOW = new Date("2026-08-13T10:00:00+05:00");
@@ -39,5 +39,9 @@ describe("Aqtobe helpers", () => {
   it("formats and names the day in Russian", () => {
     expect(weekdayRu(NOW)).toBe("четверг");
     expect(formatAqtobe(NOW)).toBe("13.08.2026 10:00");
+  });
+
+  it("lists the next seven days for the prompt", () => {
+    expect(upcomingDaysRu(NOW)).toBe("пт 14.08, сб 15.08, вс 16.08, пн 17.08, вт 18.08, ср 19.08, чт 20.08");
   });
 });

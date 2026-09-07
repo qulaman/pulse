@@ -16,6 +16,8 @@ const WEEKDAYS_RU = [
   "суббота",
 ] as const;
 
+const WEEKDAYS_SHORT_RU = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"] as const;
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 /** Wall-clock view of an instant in Aqtobe, as a Date whose UTC fields are local fields. */
@@ -49,6 +51,19 @@ export function formatAqtobe(date: Date): string {
 
 export function weekdayRu(date: Date): string {
   return WEEKDAYS_RU[toWall(date).getUTCDay()];
+}
+
+/**
+ * "пт 14.08, сб 15.08, …" for the next `days` days — handed to the model so weekday
+ * arithmetic is a lookup, not a computation (live failures a-003/a-012, 2026-09-07).
+ */
+export function upcomingDaysRu(now: Date, days = 7): string {
+  const parts: string[] = [];
+  for (let i = 1; i <= days; i++) {
+    const w = toWall(atAqtobe(now, i, 0, 0));
+    parts.push(`${WEEKDAYS_SHORT_RU[w.getUTCDay()]} ${pad(w.getUTCDate())}.${pad(w.getUTCMonth() + 1)}`);
+  }
+  return parts.join(", ");
 }
 
 /** Builds an instant from Aqtobe wall-clock fields, shifting the day by `dayShift`. */
