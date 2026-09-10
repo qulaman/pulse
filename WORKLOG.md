@@ -417,3 +417,30 @@
 - Порядок строго последовательный 006 → 007 → 008 → 009 → 010 (каждый от актуального `main`; предусловие «влито» теперь проверяется командой в наряде). Приёмка после каждого; 009/010 требуют живой проверки владельцем на телефоне.
 - Новые решения: G.20 («Настоять» в матрице), G.21 (dev-вход email+пароль; QR+PIN — наряд онбординга), G.22 (очки не персистятся в пилоте), G.23 (blob целиком, timeslice позже). BACKEND §7 — строка `declined → sent`.
 - Бэклог, не в этой пятёрке: rate limiting (BACKEND §1), outbox доставки + push + Telegram, PWA/serwist (проверить совместимость с Next 16), стриминг чанков, фото/голос в отчёте сотрудника, view `v_pulse_summary`/`v_employee_load`, «Переназначить», Web Share Target, маскот, оффлайн-outbox, `pulse-prod`, обновление Supabase CLI.
+
+## 2026-09-10 — Исполнитель (Opus) — 007 db-voice-rpc
+
+**Сделано**
+
+- Миграция `20260910100000_voice_pipeline.sql`: таблицы `ingest_batches`, `ai_logs`, `inbox_items` (+ moddatetime), `announcements`, `announcement_acks`, `recurrence_rules`, `reminders`; FK `tasks.recurrence_rule_id → recurrence_rules`; индексы из DATABASE.md «Индексы» + `ai_logs (company_id, client_request_id, kind)`; RLS по матрице (ingest_batches/ai_logs — select только director, без insert/update-политик; inbox_items — director или автор, правка автором до `confirmed`; announcements/acks — компания без `tv`, insert объявления — director, ack — свой; reminders — свои; recurrence_rules — select компания, write director); bucket `voice` (private) и политики insert/select на `storage.objects` по сегментам пути `{company_id}/{owner_id}/…`; функция `confirm_voice_batch(payload, client_request_id, p_now)`.
+- `confirm_voice_batch`: только director (`forbidden`), идемпотентность через `ingest_batches` (дубль → сохранённый `result` + `duplicate:true`), тихие часы из `companies.settings->'delivery_window'` в Asia/Aqtobe с `force_now` (D-38), `task`/`delegation` → `tasks` (мапа строкового `group_id` → один uuid на батч, D-02; `assignee_required`), `announcement` → `announcements`, `reminder` → `reminders`, `recurrence` → `recurrence_rules`, `points`/`query` → `skipped` (G.22), дозапись `confirmed_entities/was_edited/edit_fields` в строку `ai_logs` того же батча (D-35), `inbox_id` → `status='confirmed'`.
+- Миграция `20260910100100_task_rpc.sql`: `task_status_guard()` переопределён — добавлен переход `declined → sent` для директора («Настоять», G.20) со сбросом `closed_at`; `transition_task(task_id, to_status, payload, client_request_id)` (идемпотентность, `task_not_found`, проброс `invalid_transition` из триггера, сообщение с `meta.decline_reason` / `meta.rework_comment`); `revoke_task(task_id, client_request_id)` (director-only, `scheduled` → физический delete, иначе `revoked`, D-01); гранты трём функциям.
+- `seed.sql`: `delivery_window` в `companies.settings`, объявление + ack, строка `ai_logs` (`kind='parse'`, crid `40000000-…-0001`), черновик `inbox_items` в `parsed`, объект `voice` в папке Айгуль (для теста чужого файла).
+- pgTAP `006_voice_pipeline.test.sql` (21 тест) и `007_task_rpc.test.sql` (12 тестов). `lib/supabase/types.ts` сгенерирован.
+
+**Проверки**: `db reset --linked` — 5 миграций + seed, `migration list --linked` — все 5; `test db --linked` — **7 файлов, 63 теста, PASS**; `db lint --linked --schema public` — чисто; `tsc --noEmit` — чисто; `vitest run` — 10 файлов, 85 тестов.
+
+**Коммиты**: `feat(db): voice pipeline tables, RLS and voice bucket` · `feat(db): transition_task/revoke_task, declined→sent` · `test(db): pgTAP 006-007 + seed fixtures` · `chore(db): regenerate types` · `docs(worklog)`.
+
+**Арбитражи и вопросы**
+
+1. **`pnpm db:types` в package.json ещё нет** — скрипт заводит наряд 006, который не влит. Типы сгенерированы напрямую (`supabase gen types typescript --linked --schema public > lib/supabase/types.ts`), `package.json` не тронут (вне скоупа). Файл `lib/supabase/types.ts` появился раньше 006 — при 006 просто перегенерируется.
+2. **`revoke execute` пришлось делать и от `public`**, не только от `anon`: execute на функции по умолчанию выдан роли PUBLIC, и revoke только у `anon` ничего не меняет (тест «anon не может звать RPC» падал бы). Гранты — `authenticated` и `service_role` (второй нужен серверным/cron-вызовам).
+3. **`on conflict on constraint ingest_batches_company_request_key`** вместо `on conflict (company_id, client_request_id)`: параметр функции `client_request_id` затеняет колонку, Postgres даёт 42702 (поймал `db lint`). Поэтому unique-ограничение названо явно.
+4. **`ai_logs.provider` и `model` — `not null`** (в DATABASE.md без пометки «null», в отличие от соседних полей). Если конвейер захочет логировать ошибку до выбора модели — понадобится либо nullable, либо заглушка; решение за наряд 008.
+5. **`recurrence_rules.assignee_id` — `not null`**, и `confirm_voice_batch` требует его так же, как для задачи (`assignee_required`). В доке и наряде явного требования нет — правило по аналогии с task, правило спавнит задачу.
+6. **Неизвестный `kind`** сущности не роняет батч, а уходит в `skipped` с причиной `unknown_kind` (в наряде не описано).
+7. **`announcement_acks` без `company_id`** — как в DATABASE.md; изоляция компании в RLS проверяется через join к `announcements`.
+8. **Строки `storage.objects` переживают `db reset --linked`** (сбрасывается public/auth, но не содержимое storage) — вставка фикстуры в seed сделана `on conflict do nothing`, иначе второй reset падает на `bucketid_objname`.
+9. **Нумерация RLS-кейсов**: наряд ссылается на кейсы 8 и 9 как на «чужой inbox_items» и «повторный confirm», в DATABASE.md 8 — двойной `create_shop_order`, 9 — повторный confirm. Тесты написаны по тексту наряда; расхождение нумерации — на усмотрение архитектора.
+10. **Docker Desktop был выключен** — запущен вручную ради `supabase test db` (как и в 005); на миграции/seed/lint не влияет.
