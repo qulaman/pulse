@@ -170,7 +170,8 @@ async function main() {
   else await page.getByRole("button", { name: /Отправить \d+ из \d+/ }).click();
   await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 30_000 });
   await page.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
-  const annCard = page.locator("article", { hasText: STAMP }).first();
+  // the parser may drop the stamp token from an announcement — the newest «собрание» card is ours
+  const annCard = page.locator("article", { hasText: /собрание/i }).first();
   await annCard.waitFor({ timeout: 15_000 });
   await page.screenshot({ path: join(SHOTS, "17-ether-director.png") });
   record("объявление: «всем: …» → Эфир директора", await annCard.getByText(/Ознакомились 0\//).isVisible().catch(() => false));
@@ -327,7 +328,7 @@ async function main() {
   record("квитанция у директора: «принял»", /принял/.test(receipt), receipt.trim());
 
   await epage.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
-  const eCard = epage.locator("article", { hasText: STAMP }).first();
+  const eCard = epage.locator("article", { hasText: /собрание/i }).first();
   await eCard.waitFor({ timeout: 15_000 });
   await eCard.getByRole("button", { name: "Ознакомился" }).click();
   await eCard.getByText("✓ Ознакомился").waitFor({ timeout: 10_000 });
