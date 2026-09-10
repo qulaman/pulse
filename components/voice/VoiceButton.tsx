@@ -126,10 +126,11 @@ export function VoiceButton() {
 
         <div className="pointer-events-auto relative flex h-16 w-16 items-center justify-center">
           {!recording && !busy ? (
+            // idle: a thin ring breathes outwards — a pulse, not a murky disc behind the button
             <span
               aria-hidden
               className="absolute inset-0 rounded-full"
-              style={{ background: "var(--accent)", animation: "fab-pulse 2.6s ease-out infinite" }}
+              style={{ border: "2px solid var(--accent)", animation: "fab-pulse 2.6s ease-out infinite" }}
             />
           ) : null}
           <span
