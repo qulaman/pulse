@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 
 import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import { VoiceButton } from "@/components/voice/VoiceButton";
-import { ToastHost } from "@/components/ui/Toast";
 
 /**
  * The director's input, present on every screen of the group (docs/FRONTEND.md "FAB").
@@ -17,7 +16,6 @@ export function DirectorFab() {
     <>
       {pathname === "/confirm" ? null : <VoiceButton />}
       <IngestOverlay />
-      <ToastHost />
     </>
   );
 }

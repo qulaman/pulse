@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { latestDeclineReason, TaskThread } from "@/components/tasks/TaskThread";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
-import { ToastHost } from "@/components/ui/Toast";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useTaskThread } from "@/lib/tasks/queries";
 
@@ -45,7 +44,6 @@ export default function TaskThreadPage() {
         <p className="text-[16px] leading-[22px] text-muted">Задача не найдена</p>
       )}
 
-      <ToastHost />
     </main>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -18,7 +19,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="ru">
       <body className="min-h-dvh bg-bg text-text antialiased">
-        <QueryProvider>{children}</QueryProvider>
+        <QueryProvider>
+          {children}
+          <ToastHost />
+        </QueryProvider>
       </body>
     </html>
   );

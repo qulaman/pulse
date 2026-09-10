@@ -26,6 +26,9 @@ export { lastSeqOf, mergeBySeq, type SeqRow } from "./mergeBySeq";
  * seq-carrying tables the snapshot is a cursor read — see ./mergeBySeq.
  */
 
+/** Delay of the post-subscribe snapshot; the WAL listener attaches within this window. */
+const SETTLE_MS = 2500;
+
 export type RealtimeEvent<TRow extends Record<string, unknown>> =
   RealtimePostgresChangesPayload<TRow>;
 
@@ -62,6 +65,8 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
     const supabase = createBrowserSupabase();
     let active: RealtimeChannel | null = null;
 
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
     const subscribe = () => {
       active = supabase
         .channel(`rtq:${table}:${filter ?? "all"}:${channelKey}`)
@@ -70,7 +75,14 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
           { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
           (payload) => onEventRef.current(payload as RealtimeEvent<TRow>),
         )
-        .subscribe();
+        .subscribe((status) => {
+          // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
+          // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
+          // One late snapshot closes that gap after every (re)subscribe.
+          if (status !== "SUBSCRIBED") return;
+          if (settleTimer !== null) clearTimeout(settleTimer);
+          settleTimer = setTimeout(() => onResyncRef.current(), SETTLE_MS);
+        });
     };
 
     const resync = () => {
@@ -90,6 +102,7 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("online", resync);
+      if (settleTimer !== null) clearTimeout(settleTimer);
       if (active) void supabase.removeChannel(active);
     };
   }, [enabled, table, filter, channelKey]);

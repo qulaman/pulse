@@ -2,7 +2,6 @@
 
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
-import { ToastHost } from "@/components/ui/Toast";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { activeOnly, useMe, useMyTasks } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
@@ -41,7 +40,6 @@ export default function TasksPage() {
         )}
       </div>
 
-      <ToastHost />
     </main>
   );
 }

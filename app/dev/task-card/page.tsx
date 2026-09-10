@@ -1,7 +1,6 @@
 "use client";
 
 import { TaskCard, type TaskCardVariant } from "@/components/tasks/TaskCard";
-import { ToastHost } from "@/components/ui/Toast";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
@@ -102,7 +101,6 @@ export default function TaskCardSandbox() {
         <Column variant="director" />
       </div>
 
-      <ToastHost />
     </main>
   );
 }

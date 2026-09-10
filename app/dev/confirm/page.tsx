@@ -2,7 +2,6 @@
 
 import { ConfirmScreen } from "@/components/confirm/ConfirmScreen";
 import { Button } from "@/components/ui/Button";
-import { ToastHost } from "@/components/ui/Toast";
 import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import { useIngestStore } from "@/lib/store/ingest";
@@ -139,7 +138,6 @@ export default function DevConfirmPage() {
 
       <ConfirmScreen sandbox />
       <IngestOverlay navigate={false} />
-      <ToastHost />
     </div>
   );
 }
