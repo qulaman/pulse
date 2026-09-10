@@ -3,10 +3,11 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 import { getPublicEnv } from "@/lib/env.public";
+import { homeForRole, type Role } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 
-export type Role = Database["public"]["Enums"]["user_role"];
+export { homeForRole, type Role };
 
 export type SessionProfile = {
   userId: string;
@@ -100,17 +101,6 @@ export async function getSessionProfile(req?: Request): Promise<SessionProfile> 
     isActive: profile.is_active,
     fullName: profile.full_name,
   };
-}
-
-/**
- * Landing route of a role. Mirrors homeForRole() in proxy.ts, which cannot
- * import this server-only module. Keeps role guards from bouncing a user
- * between two group layouts forever.
- */
-export function homeForRole(role: Role): string {
-  if (role === "director") return "/pulse";
-  if (role === "employee" || role === "manager") return "/feed";
-  return "/profile";
 }
 
 /** Throws 403 unless the profile carries one of the allowed roles. */

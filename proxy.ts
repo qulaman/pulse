@@ -2,14 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 import { getPublicEnv } from "@/lib/env.public";
+import { homeForRole } from "@/lib/routes";
 import type { Database } from "@/lib/supabase/types";
-
-/** Landing route per role. `/tv` does not exist yet (task 006 scope). */
-function homeForRole(role: Database["public"]["Enums"]["user_role"] | undefined): string {
-  if (role === "director") return "/pulse";
-  if (role === "tv") return "/profile";
-  return "/feed";
-}
 
 function isPublicPath(pathname: string): boolean {
   // Component sandboxes need no session; app/dev/layout.tsx 404s them in production.
@@ -73,7 +67,12 @@ export async function proxy(request: NextRequest) {
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
-    return redirectTo(request, response, homeForRole(profile?.role));
+    // An auth user without a profile (not onboarded yet) stays on /login instead of
+    // bouncing between /login -> home -> layout guard -> /login forever.
+    if (!profile) {
+      return pathname === "/login" ? response : redirectTo(request, response, "/login");
+    }
+    return redirectTo(request, response, homeForRole(profile.role));
   }
 
   return response;
@@ -92,5 +91,5 @@ function redirectTo(request: NextRequest, response: NextResponse, pathname: stri
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|api/|.*\.[\w]+$).*)"],
+  matcher: ["/((?!_next/static|_next/image|api/|.*\\.[\\w]+$).*)"],
 };
