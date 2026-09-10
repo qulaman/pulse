@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 
 /** Route-level error boundary: the assistant owns the failure, the director keeps the phone. */
 export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const router = useRouter();
   useEffect(() => {
     console.error("route error:", error.message, error.digest);
   }, [error]);
@@ -20,7 +22,7 @@ export default function RouteError({ error, reset }: { error: Error & { digest?:
       </p>
       <div className="mt-6 flex gap-2">
         <Button onClick={reset}>Повторить</Button>
-        <Button variant="secondary" onClick={() => (window.location.href = "/")}>
+        <Button variant="secondary" onClick={() => router.push("/")}>
           На главную
         </Button>
       </div>

@@ -120,7 +120,15 @@ async function main() {
     const sendButton = page.getByRole("button", { name: /Отправить \d+ из \d+/ });
     const label = await sendButton.textContent();
     record("кнопка «Отправить N из M»", (await sendButton.isEnabled()) === true, label ?? "");
-    await sendButton.click();
+    // Outside 08:00–21:00 Aqtobe the batch would wait for the morning (D-38) — the smoke
+    // needs the task delivered now, exactly like a director tapping «отправить сейчас».
+    const sendNow = page.getByRole("button", { name: "отправить сейчас" });
+    if (await sendNow.isVisible().catch(() => false)) {
+      await sendNow.click();
+      record("тихие часы: нажато «отправить сейчас»", true);
+    } else {
+      await sendButton.click();
+    }
     try {
       await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 30_000 });
       sent = true;

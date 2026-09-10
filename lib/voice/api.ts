@@ -98,7 +98,7 @@ async function post<T>(path: string, payload: unknown): Promise<T> {
   }
 
   const body = await readJson(res);
-  if (res.status === 401 && typeof window !== "undefined") window.location.assign("/login");
+  if (res.status === 401 && typeof window !== "undefined") window.location.assign(`${window.location.origin}/login`);
   if (!res.ok) throw new VoiceApiError(errorCodeOf(body, res.status), res.status, body);
   return body as T;
 }
