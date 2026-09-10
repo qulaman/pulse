@@ -187,6 +187,27 @@ async function main() {
   await page.getByText("Сохранил настройки").waitFor({ timeout: 10_000 });
   record("настройки: очки включены и сохранены", true);
 
+  // ---- points by text: two people, two cards with names, both sent ------------------
+  await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Записать голосовое|Идёт запись/ }).tap();
+  const pointsField = page.getByPlaceholder(/Ерлану подготовить/);
+  await pointsField.waitFor({ state: "visible", timeout: 5_000 });
+  await pointsField.fill("Динаре и Тимуру плюс десять баллов за скорость");
+  await page.getByRole("button", { name: "Отправить" }).click();
+  await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 40_000 });
+  await page.getByRole("heading", { name: /Понял так: 2 начисления/ }).waitFor({ timeout: 10_000 });
+  const namesShown =
+    (await page.getByText("Динара Ахметова").first().isVisible().catch(() => false)) &&
+    (await page.getByText("Тимур Салимов").first().isVisible().catch(() => false));
+  await page.screenshot({ path: join(SHOTS, "09b-points-confirm.png") });
+  record("очки текстом: две карточки с именами", namesShown);
+  const pointsSend = page.getByRole("button", { name: /Отправить \d+ из \d+/ });
+  record("очки текстом: «Отправить 2 из 2»", (await pointsSend.textContent())?.includes("2 из 2") === true, (await pointsSend.textContent()) ?? "");
+  const pointsNow = page.getByRole("button", { name: "отправить сейчас" });
+  if (await pointsNow.isVisible().catch(() => false)) await pointsNow.click();
+  else await pointsSend.click();
+  await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 30_000 });
+
   // ---- rating: +10 to Марат through the sheet ------------------------------------
   await page.goto(`${APP_URL}/rating`, { waitUntil: "networkidle" });
   const maratRow = page.locator("li", { hasText: "Марат Оспанов" }).first();

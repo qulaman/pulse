@@ -1,23 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
 import { RatingList } from "@/components/rating/RatingList";
-import { createBrowserSupabase } from "@/lib/supabase/client";
+import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
-
-/** points_enabled is readable by everyone: the company row is visible to its members. */
-function usePointsEnabled() {
-  return useQuery({
-    queryKey: ["company", "points_enabled"],
-    queryFn: async (): Promise<boolean> => {
-      const supabase = createBrowserSupabase();
-      const { data } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
-      const settings = data?.settings as { points_enabled?: boolean } | null;
-      return settings?.points_enabled === true;
-    },
-  });
-}
 
 /** Рейтинг: who earned what this week or month; the director awards from here (D-48). */
 export default function RatingPage() {

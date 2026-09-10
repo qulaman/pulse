@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Mascot } from "@/components/brand/Mascot";
 import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import { VoiceButton } from "@/components/voice/VoiceButton";
+import { usePointsEnabled } from "@/lib/points/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 
 /**
@@ -22,7 +23,8 @@ export function DirectorFab() {
 
   const onConfirm = pathname === "/confirm";
   const draft = stage === "confirm" && !onConfirm;
-  const count = entities.filter(isCountable).length;
+  const pointsEnabled = usePointsEnabled().data === true;
+  const count = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;
 
   return (
     <>

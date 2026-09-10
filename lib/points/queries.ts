@@ -1,5 +1,6 @@
 "use client";
 
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
@@ -99,6 +100,19 @@ export function useAwardPoints() {
     onError: (error) => {
       const message = error instanceof Error ? error.message : "";
       toast(message.includes("reason_required") ? "Снятие очков — только с причиной" : "Не получилось начислить");
+    },
+  });
+}
+
+/** points_enabled is readable by everyone: the company row is visible to its members (D-48). */
+export function usePointsEnabled() {
+  return useQuery({
+    queryKey: ["company", "points_enabled"],
+    queryFn: async (): Promise<boolean> => {
+      const supabase = createBrowserSupabase();
+      const { data } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
+      const settings = data?.settings as { points_enabled?: boolean } | null;
+      return settings?.points_enabled === true;
     },
   });
 }

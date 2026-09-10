@@ -10,13 +10,14 @@ type Props = {
   total: number;
   sending: boolean;
   onSend: (forceNow: boolean) => void;
+  onReset: () => void;
 };
 
 /**
  * "Отправить N из M" (D-36) plus the quiet-hours promise (D-38). The server decides
  * for real; this bar only tells the director what is about to happen.
  */
-export function SendBar({ sendable, total, sending, onSend }: Props) {
+export function SendBar({ sendable, total, sending, onSend, onReset }: Props) {
   // Read after hydration: the server renders "within the window" so both passes match.
   const quietHours = useSyncExternalStore(
     () => () => {},
@@ -33,6 +34,15 @@ export function SendBar({ sendable, total, sending, onSend }: Props) {
         <Button block disabled={sendable === 0 || sending} onClick={() => onSend(false)}>
           {sending ? "Отправляю…" : `Отправить ${sendable} из ${total}`}
         </Button>
+
+        {sendable === 0 && !sending ? (
+          <p className="mt-2 text-center text-[13px] leading-4 text-muted">
+            Отправлять нечего ·{" "}
+            <button type="button" className="underline" style={{ color: "var(--accent)" }} onClick={onReset}>
+              сбросить и вернуться
+            </button>
+          </p>
+        ) : null}
 
         {quietHours ? (
           <p className="mt-2 text-center text-[13px] leading-4 text-muted">

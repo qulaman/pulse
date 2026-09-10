@@ -117,7 +117,7 @@ type IngestActions = {
   retry: () => Promise<void>;
   editEntity: (index: number, patch: EntityPatch) => void;
   removeEntity: (index: number) => void;
-  send: (forceNow?: boolean) => Promise<ConfirmResponse | null>;
+  send: (forceNow?: boolean, pointsEnabled?: boolean) => Promise<ConfirmResponse | null>;
   reset: () => void;
 };
 
@@ -185,13 +185,15 @@ function toConfirmed(entity: PostprocessedEntity): Entity {
   return wire;
 }
 
-/** Points are off during the pilot (G.22) and questions go to the assistant, not the batch. */
-export function isCountable(entity: PostprocessedEntity): boolean {
-  return entity.kind !== "query" && entity.kind !== "points";
+/** Questions go to the assistant, not the batch; points count only once the company switched them on (D-48). */
+export function isCountable(entity: PostprocessedEntity, pointsEnabled = false): boolean {
+  if (entity.kind === "query") return false;
+  if (entity.kind === "points") return pointsEnabled;
+  return true;
 }
 
-export function isSendable(entity: PostprocessedEntity): boolean {
-  return isCountable(entity) && entity.blocked === undefined;
+export function isSendable(entity: PostprocessedEntity, pointsEnabled = false): boolean {
+  return isCountable(entity, pointsEnabled) && entity.blocked === undefined;
 }
 
 export const useIngestStore = create<IngestState & IngestActions>((set, get) => {
@@ -424,9 +426,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       set((state) => ({ entities: state.entities.filter((_, i) => i !== index) }));
     },
 
-    async send(forceNow = false) {
+    async send(forceNow = false, pointsEnabled = false) {
       const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId } = get();
-      const confirmed = entities.filter(isSendable).map(toConfirmed);
+      const confirmed = entities.filter((entity) => isSendable(entity, pointsEnabled)).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
       set({ stage: "sending", error: null, retryFrom: null });

@@ -13,6 +13,7 @@ import { useRoster } from "@/components/confirm/useRoster";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
+import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
 
 /** Five and up: the list turns into one-liners and the screen stops being a wall (FRONTEND). */
@@ -35,6 +36,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   // The task is clear but the person is not: the people are listed right on the card.
   const me = useMe();
   const myId = me.data?.userId;
+  const pointsEnabled = usePointsEnabled().data === true;
   const people = useMemo(
     () =>
       (roster.data ?? [])
@@ -66,8 +68,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
     return (id: string) => byId.get(id);
   }, [roster.data, entities]);
 
-  const countable = entities.filter(isCountable);
-  const sendableCount = entities.filter(isSendable).length;
+  const countable = entities.filter((entity) => isCountable(entity, pointsEnabled));
+  const sendableCount = entities.filter((entity) => isSendable(entity, pointsEnabled)).length;
   const compact = entities.length >= COMPACT_FROM;
 
   if (entities.length === 0) {
@@ -90,7 +92,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
       return;
     }
 
-    const sent = entities.filter(isSendable);
+    const sent = entities.filter((entity) => isSendable(entity, pointsEnabled));
     const names = [
       ...new Set(
         sent
@@ -101,7 +103,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
     ];
     const hasAnnouncement = sent.some((entity) => entity.kind === "announcement");
 
-    const result = await send(forceNow);
+    const result = await send(forceNow, pointsEnabled);
     if (!result) return; // the overlay owns the failure and the retry
 
     const parts = [...names];
@@ -144,6 +146,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
               onOpenAssignee={() => setAssigneeIndex(index)}
               onPickAssignee={(user) => pickAssignee(index, user)}
               people={people}
+              pointsEnabled={pointsEnabled}
               onOpenDeadline={() => setDeadlineIndex(index)}
               nameOf={nameOf}
             />
@@ -156,6 +159,10 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
         total={countable.length}
         sending={stage === "sending"}
         onSend={(forceNow) => void handleSend(forceNow)}
+        onReset={() => {
+          reset();
+          router.replace("/pulse");
+        }}
       />
 
       <AssigneePicker

@@ -62,7 +62,7 @@ function mainField(
 function hasAssignee(
   entity: PostprocessedEntity,
 ): entity is PostprocessedEntity & { assignee_id: string | null } {
-  return entity.kind === "task" || entity.kind === "delegation" || entity.kind === "recurrence";
+  return entity.kind === "task" || entity.kind === "delegation" || entity.kind === "recurrence" || entity.kind === "points";
 }
 
 /** D-16: what the chip says is exactly how sure the matcher is. */
@@ -104,6 +104,8 @@ type Props = {
   onPickAssignee: (user: { user_id: string; full_name: string }) => void;
   /** Active people of the company — shown inline when the matcher found nobody. */
   people: { user_id: string; full_name: string }[];
+  /** Company setting (D-48): off → the points card is dimmed and not sent. */
+  pointsEnabled: boolean;
   onOpenDeadline: () => void;
   nameOf: (id: string) => string | undefined;
 };
@@ -119,6 +121,7 @@ export function EntityCard({
   onOpenAssignee,
   onPickAssignee,
   people,
+  pointsEnabled,
   onOpenDeadline,
   nameOf,
 }: Props) {
@@ -143,7 +146,7 @@ export function EntityCard({
     else setDraft(field.value);
   };
 
-  const muted = entity.kind === "points" || entity.kind === "query";
+  const muted = entity.kind === "query" || (entity.kind === "points" && !pointsEnabled);
   const collapsed = compact && !expanded;
 
   const deadline =
@@ -197,7 +200,9 @@ export function EntityCard({
               onClick={() => (collapsed ? onToggle() : startEditing())}
               className={`block w-full text-left text-[16px] leading-[22px] ${collapsed ? "truncate" : ""}`}
             >
-              {field.value || <span className="text-muted">Без текста</span>}
+              {field.value || (
+                <span className="text-muted">{entity.kind === "points" ? "За что? (можно не писать)" : "Без текста"}</span>
+              )}
             </button>
           )}
 
@@ -261,12 +266,14 @@ export function EntityCard({
 
               {entity.kind === "points" ? (
                 <>
-                  <Chip tone="muted" interactive={false}>
+                  <Chip tone={pointsEnabled ? "accent" : "muted"} interactive={false}>
                     {entity.amount > 0 ? `+${entity.amount}` : entity.amount}
                   </Chip>
-                  <Chip tone="muted" interactive={false}>
-                    Очки включатся после пилота
-                  </Chip>
+                  {!pointsEnabled ? (
+                    <Chip tone="muted" interactive={false}>
+                      Очки выключены · Настройки
+                    </Chip>
+                  ) : null}
                 </>
               ) : null}
 
