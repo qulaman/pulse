@@ -1,0 +1,872 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      ai_logs: {
+        Row: {
+          cache_read_tokens: number | null
+          client_request_id: string | null
+          company_id: string
+          confirmed_entities: Json | null
+          created_at: string
+          edit_fields: string[] | null
+          id: string
+          input_tokens: number | null
+          kind: Database["public"]["Enums"]["ai_log_kind"]
+          latency_ms: number | null
+          model: string
+          output_tokens: number | null
+          parse_ms: number | null
+          parsed_entities: Json | null
+          provider: string
+          raw_response: Json | null
+          request_id: string | null
+          source: Database["public"]["Enums"]["ai_source"] | null
+          status: string
+          stt_ms: number | null
+          tool_calls: Json | null
+          transcript: string | null
+          user_id: string
+          was_edited: boolean | null
+        }
+        Insert: {
+          cache_read_tokens?: number | null
+          client_request_id?: string | null
+          company_id: string
+          confirmed_entities?: Json | null
+          created_at?: string
+          edit_fields?: string[] | null
+          id?: string
+          input_tokens?: number | null
+          kind: Database["public"]["Enums"]["ai_log_kind"]
+          latency_ms?: number | null
+          model: string
+          output_tokens?: number | null
+          parse_ms?: number | null
+          parsed_entities?: Json | null
+          provider: string
+          raw_response?: Json | null
+          request_id?: string | null
+          source?: Database["public"]["Enums"]["ai_source"] | null
+          status: string
+          stt_ms?: number | null
+          tool_calls?: Json | null
+          transcript?: string | null
+          user_id: string
+          was_edited?: boolean | null
+        }
+        Update: {
+          cache_read_tokens?: number | null
+          client_request_id?: string | null
+          company_id?: string
+          confirmed_entities?: Json | null
+          created_at?: string
+          edit_fields?: string[] | null
+          id?: string
+          input_tokens?: number | null
+          kind?: Database["public"]["Enums"]["ai_log_kind"]
+          latency_ms?: number | null
+          model?: string
+          output_tokens?: number | null
+          parse_ms?: number | null
+          parsed_entities?: Json | null
+          provider?: string
+          raw_response?: Json | null
+          request_id?: string | null
+          source?: Database["public"]["Enums"]["ai_source"] | null
+          status?: string
+          stt_ms?: number | null
+          tool_calls?: Json | null
+          transcript?: string | null
+          user_id?: string
+          was_edited?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcement_acks: {
+        Row: {
+          announcement_id: string
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          announcement_id: string
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          announcement_id?: string
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcement_acks_announcement_id_fkey"
+            columns: ["announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcement_acks_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      announcements: {
+        Row: {
+          audio_path: string | null
+          author_id: string
+          company_id: string
+          created_at: string
+          id: string
+          transcript: string
+        }
+        Insert: {
+          audio_path?: string | null
+          author_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          transcript: string
+        }
+        Update: {
+          audio_path?: string | null
+          author_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          transcript?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "announcements_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "announcements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          settings: Json
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          settings?: Json
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          settings?: Json
+        }
+        Relationships: []
+      }
+      inbox_items: {
+        Row: {
+          audio_path: string | null
+          client_request_id: string | null
+          company_id: string
+          created_at: string
+          entities: Json | null
+          id: string
+          status: Database["public"]["Enums"]["inbox_status"]
+          transcript: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_path?: string | null
+          client_request_id?: string | null
+          company_id: string
+          created_at?: string
+          entities?: Json | null
+          id?: string
+          status?: Database["public"]["Enums"]["inbox_status"]
+          transcript?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_path?: string | null
+          client_request_id?: string | null
+          company_id?: string
+          created_at?: string
+          entities?: Json | null
+          id?: string
+          status?: Database["public"]["Enums"]["inbox_status"]
+          transcript?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inbox_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inbox_items_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ingest_batches: {
+        Row: {
+          client_request_id: string
+          company_id: string
+          created_at: string
+          id: string
+          result: Json
+          user_id: string
+        }
+        Insert: {
+          client_request_id: string
+          company_id: string
+          created_at?: string
+          id?: string
+          result?: Json
+          user_id: string
+        }
+        Update: {
+          client_request_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          result?: Json
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingest_batches_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingest_batches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          aliases: string[]
+          availability: Database["public"]["Enums"]["availability_t"]
+          avatar_url: string | null
+          company_id: string
+          created_at: string
+          full_name: string
+          id: string
+          is_active: boolean
+          manager_id: string | null
+          position: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          settings: Json
+          streak_count: number
+          streak_updated_at: string | null
+          telegram_chat_id: number | null
+        }
+        Insert: {
+          aliases?: string[]
+          availability?: Database["public"]["Enums"]["availability_t"]
+          avatar_url?: string | null
+          company_id: string
+          created_at?: string
+          full_name: string
+          id: string
+          is_active?: boolean
+          manager_id?: string | null
+          position?: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          settings?: Json
+          streak_count?: number
+          streak_updated_at?: string | null
+          telegram_chat_id?: number | null
+        }
+        Update: {
+          aliases?: string[]
+          availability?: Database["public"]["Enums"]["availability_t"]
+          avatar_url?: string | null
+          company_id?: string
+          created_at?: string
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          manager_id?: string | null
+          position?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          settings?: Json
+          streak_count?: number
+          streak_updated_at?: string | null
+          telegram_chat_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      recurrence_rules: {
+        Row: {
+          assignee_id: string
+          author_id: string
+          body: string | null
+          company_id: string
+          id: string
+          is_active: boolean
+          next_run_at: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          rrule: string
+          title: string
+        }
+        Insert: {
+          assignee_id: string
+          author_id: string
+          body?: string | null
+          company_id: string
+          id?: string
+          is_active?: boolean
+          next_run_at?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          rrule: string
+          title: string
+        }
+        Update: {
+          assignee_id?: string
+          author_id?: string
+          body?: string | null
+          company_id?: string
+          id?: string
+          is_active?: boolean
+          next_run_at?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          rrule?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurrence_rules_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrence_rules_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurrence_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reminders: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          remind_at: string | null
+          sent: boolean
+          text: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          remind_at?: string | null
+          sent?: boolean
+          text: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          remind_at?: string | null
+          sent?: boolean
+          text?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_messages: {
+        Row: {
+          company_id: string
+          content: string | null
+          created_at: string
+          file_path: string | null
+          id: string
+          meta: Json
+          sender_id: string
+          seq: number
+          task_id: string
+          type: Database["public"]["Enums"]["message_type"]
+        }
+        Insert: {
+          company_id: string
+          content?: string | null
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          meta?: Json
+          sender_id: string
+          seq?: number
+          task_id: string
+          type: Database["public"]["Enums"]["message_type"]
+        }
+        Update: {
+          company_id?: string
+          content?: string | null
+          created_at?: string
+          file_path?: string | null
+          id?: string
+          meta?: Json
+          sender_id?: string
+          seq?: number
+          task_id?: string
+          type?: Database["public"]["Enums"]["message_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_messages_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          accepted_at: string | null
+          assignee_id: string
+          author_id: string
+          body: string | null
+          closed_at: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          deadline: string | null
+          group_id: string | null
+          id: string
+          parent_task_id: string | null
+          priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_rule_id: string | null
+          scheduled_send_at: string | null
+          source: Database["public"]["Enums"]["ai_source"] | null
+          source_audio_path: string | null
+          source_transcript: string | null
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          assignee_id: string
+          author_id: string
+          body?: string | null
+          closed_at?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          deadline?: string | null
+          group_id?: string | null
+          id?: string
+          parent_task_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_rule_id?: string | null
+          scheduled_send_at?: string | null
+          source?: Database["public"]["Enums"]["ai_source"] | null
+          source_audio_path?: string | null
+          source_transcript?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          assignee_id?: string
+          author_id?: string
+          body?: string | null
+          closed_at?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          deadline?: string | null
+          group_id?: string | null
+          id?: string
+          parent_task_id?: string | null
+          priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_rule_id?: string | null
+          scheduled_send_at?: string | null
+          source?: Database["public"]["Enums"]["ai_source"] | null
+          source_audio_path?: string | null
+          source_transcript?: string | null
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_recurrence_rule_fk"
+            columns: ["recurrence_rule_id"]
+            isOneToOne: false
+            referencedRelation: "recurrence_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      auth_company_id: { Args: never; Returns: string }
+      auth_role: { Args: never; Returns: string }
+      confirm_voice_batch: {
+        Args: { client_request_id: string; p_now?: string; payload: Json }
+        Returns: Json
+      }
+      revoke_task: {
+        Args: { client_request_id?: string; task_id: string }
+        Returns: Json
+      }
+      subordinates: { Args: { mgr: string }; Returns: string[] }
+      transition_task: {
+        Args: {
+          client_request_id?: string
+          payload?: Json
+          task_id: string
+          to_status: Database["public"]["Enums"]["task_status"]
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      absence_kind: "vacation" | "sick" | "other"
+      ai_log_kind: "stt" | "parse" | "query"
+      ai_source: "voice" | "typed" | "shared"
+      availability_t: "active" | "vacation" | "sick"
+      delivery_channel: "push" | "telegram" | "sms"
+      delivery_status: "queued" | "sent" | "failed"
+      inbox_status:
+        | "recorded"
+        | "transcribed"
+        | "parsed"
+        | "confirmed"
+        | "discarded"
+      message_type: "text" | "voice" | "photo" | "status_change" | "system"
+      order_status: "pending" | "approved" | "delivered" | "cancelled"
+      point_source:
+        | "manual"
+        | "auto_rule"
+        | "reaction"
+        | "shop_hold"
+        | "shop_release"
+      task_priority: "low" | "normal" | "high"
+      task_status:
+        | "scheduled"
+        | "sent"
+        | "accepted"
+        | "in_progress"
+        | "pending_review"
+        | "done"
+        | "rework"
+        | "declined"
+        | "revoked"
+      user_role: "director" | "manager" | "employee" | "shopkeeper" | "tv"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      absence_kind: ["vacation", "sick", "other"],
+      ai_log_kind: ["stt", "parse", "query"],
+      ai_source: ["voice", "typed", "shared"],
+      availability_t: ["active", "vacation", "sick"],
+      delivery_channel: ["push", "telegram", "sms"],
+      delivery_status: ["queued", "sent", "failed"],
+      inbox_status: [
+        "recorded",
+        "transcribed",
+        "parsed",
+        "confirmed",
+        "discarded",
+      ],
+      message_type: ["text", "voice", "photo", "status_change", "system"],
+      order_status: ["pending", "approved", "delivered", "cancelled"],
+      point_source: [
+        "manual",
+        "auto_rule",
+        "reaction",
+        "shop_hold",
+        "shop_release",
+      ],
+      task_priority: ["low", "normal", "high"],
+      task_status: [
+        "scheduled",
+        "sent",
+        "accepted",
+        "in_progress",
+        "pending_review",
+        "done",
+        "rework",
+        "declined",
+        "revoked",
+      ],
+      user_role: ["director", "manager", "employee", "shopkeeper", "tv"],
+    },
+  },
+} as const
