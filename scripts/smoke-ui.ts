@@ -194,6 +194,14 @@ async function main() {
   await page.getByText("в команде").waitFor({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "15-profile-director.png") });
 
+  await page.goto(`${APP_URL}/admin`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Данные" }).waitFor({ timeout: 10_000 });
+  await page.getByRole("button", { name: "AI-логи" }).click();
+  await page.getByText(/каждый вызов STT/).waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(1_000);
+  await page.screenshot({ path: join(SHOTS, "16-admin.png") });
+  record("админ-панель: таблицы открываются", true);
+
   await page.goto(`${APP_URL}/dev/mascot`, { waitUntil: "networkidle" });
   await page.screenshot({ path: join(SHOTS, "11-mascot.png"), fullPage: true });
 

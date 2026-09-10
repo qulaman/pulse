@@ -16,6 +16,13 @@ export default function SettingsPage() {
         Сотрудники
         <span className="text-[13px] leading-4 text-muted">карточки, алиасы, роли ›</span>
       </Link>
+      <Link
+        href="/admin"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+      >
+        Данные
+        <span className="text-[13px] leading-4 text-muted">таблицы компании как есть ›</span>
+      </Link>
       <div className="mt-4">
         <SettingsForm />
       </div>

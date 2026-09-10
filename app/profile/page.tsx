@@ -42,6 +42,7 @@ export default async function ProfilePage() {
             <Row href="/sent" title="Отправленные" hint="все поручения по дням" />
             <Row href="/people" title="Сотрудники" hint="карточки, алиасы, роли" />
             <Row href="/settings" title="Настройки" hint="распознавание, разбор, очки" />
+            <Row href="/admin" title="Данные" hint="таблицы компании" />
           </>
         ) : null}
         <Row href="/rating" title="Рейтинг" hint="очки за неделю и месяц" />
