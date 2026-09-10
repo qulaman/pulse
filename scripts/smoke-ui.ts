@@ -43,8 +43,24 @@ async function login(page: Page, email: string, password: string) {
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
 }
 
+/**
+ * Voice path with a fake microphone: Chrome plays FAKE_MIC_WAV into getUserMedia.
+ * Enabled only when the env var points at a WAV (System.Speech on Windows makes one).
+ */
+const FAKE_MIC_WAV = process.env.FAKE_MIC_WAV;
+
 async function main() {
-  const browser = await chromium.launch({ channel: "chrome", headless: true });
+  const browser = await chromium.launch({
+    channel: "chrome",
+    headless: true,
+    args: FAKE_MIC_WAV
+      ? [
+          "--use-fake-device-for-media-stream",
+          "--use-fake-ui-for-media-stream",
+          `--use-file-for-fake-audio-capture=${FAKE_MIC_WAV}`,
+        ]
+      : [],
+  });
   const iphone = {
     viewport: { width: 390, height: 844 },
     deviceScaleFactor: 2,
@@ -101,6 +117,34 @@ async function main() {
     }
     await page.screenshot({ path: join(SHOTS, "05-after-send.png") });
     record("отправка → /pulse", sent, page.url());
+  }
+
+  // ---- voice: hold the FAB for six seconds of the fake microphone ---------------
+  if (FAKE_MIC_WAV) {
+    await director.grantPermissions(["microphone"], { origin: APP_URL });
+    await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
+    const box = await fab.boundingBox();
+    if (!box) throw new Error("FAB has no box");
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(6_000);
+    await page.screenshot({ path: join(SHOTS, "07-recording.png") });
+    await page.mouse.up();
+
+    let voiceConfirm = false;
+    try {
+      await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 60_000 });
+      voiceConfirm = true;
+    } catch {
+      voiceConfirm = false;
+    }
+    await page.screenshot({ path: join(SHOTS, "08-voice-confirm.png") });
+    record("голос → /confirm (запись → STT → разбор)", voiceConfirm, page.url());
+    if (voiceConfirm) {
+      const heading = await page.getByRole("heading", { name: /Понял так/ }).textContent();
+      const hasMarat = await page.getByText(/Марат/).first().isVisible().catch(() => false);
+      record("голос: карточка с Маратом", hasMarat, heading ?? "");
+    }
   }
 
   // ---- employee -------------------------------------------------------------
