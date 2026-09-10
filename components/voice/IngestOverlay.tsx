@@ -29,7 +29,10 @@ type ErrorView = {
 
 const ERRORS: Record<IngestErrorCode, ErrorView> = {
   record_too_short: { line: "Слишком коротко" },
-  mic_denied: { line: "Не получил доступ к микрофону" },
+  mic_denied: { line: "Не получил доступ к микрофону. Разреши его в настройках браузера для этого сайта" },
+  mic_unavailable: {
+    line: "Микрофон здесь недоступен: браузер даёт его только по HTTPS или на localhost. Открой приложение по HTTPS-адресу",
+  },
   empty_transcript: { line: "Не понял, повторить?", action: "retry" },
   stt_failed: { line: "Не расслышал. Аудио сохранил — повторить?", action: "retry" },
   parse_failed: { line: "Распознал текст, но не разобрал", showTranscript: true, action: "retry" },

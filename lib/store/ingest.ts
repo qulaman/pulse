@@ -13,7 +13,13 @@ import type {
 } from "../ai/schema";
 import type { AssigneeMatch } from "../matchName";
 import { VoiceApiError, voiceApi, type ConfirmResponse, type IngestSource } from "../voice/api";
-import { createRecorder, extForMime, type RecordedAudio, type Recorder } from "../voice/recorder";
+import {
+  createRecorder,
+  extForMime,
+  MicUnavailableError,
+  type RecordedAudio,
+  type Recorder,
+} from "../voice/recorder";
 
 /**
  * The director's ingest pipeline as one state machine (docs/FRONTEND.md "FAB",
@@ -35,6 +41,7 @@ export type IngestStage =
 export type IngestErrorCode =
   | "record_too_short"
   | "mic_denied"
+  | "mic_unavailable"
   | "stt_failed"
   | "empty_transcript"
   | "parse_empty"
@@ -67,6 +74,7 @@ export const MIN_RECORDING_MS = 1000;
 const KNOWN_CODES = new Set<string>([
   "record_too_short",
   "mic_denied",
+  "mic_unavailable",
   "stt_failed",
   "empty_transcript",
   "parse_empty",
@@ -156,7 +164,7 @@ function retryTargetFor(code: IngestErrorCode, from: RetryFrom): RetryFrom | nul
   // Audio survives every failure (principle 5): STT retries off the stored path.
   if (code === "stt_failed") return "transcribe";
   // A guard-rejected transcript will not improve on a re-run — the fix is to speak again.
-  if (code === "empty_transcript" || code === "mic_denied") return null;
+  if (code === "empty_transcript" || code === "mic_denied" || code === "mic_unavailable") return null;
   return from;
 }
 
@@ -222,11 +230,11 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
 
       try {
         await recorder.start();
-      } catch {
+      } catch (cause) {
         activeRecorder = null;
         set({
           stage: "error",
-          error: { code: "mic_denied" },
+          error: { code: cause instanceof MicUnavailableError ? "mic_unavailable" : "mic_denied" },
           retryFrom: null,
           recordingStartedAt: null,
         });

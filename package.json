@@ -17,7 +17,8 @@
     "db:types": "supabase gen types typescript --linked --schema public > lib/supabase/types.ts",
     "smoke:auth": "tsx scripts/smoke-auth.ts",
     "smoke:voice": "tsx scripts/smoke-voice.ts",
-    "smoke:realtime": "tsx scripts/smoke-realtime.ts"
+    "smoke:realtime": "tsx scripts/smoke-realtime.ts",
+    "dev:https": "next dev --experimental-https"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

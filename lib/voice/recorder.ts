@@ -41,6 +41,14 @@ export function extForMime(mime: string): AudioExt {
   return mime.startsWith("audio/mp4") ? "m4a" : "webm";
 }
 
+/** Thrown by start() when the page cannot ask for a microphone at all. */
+export class MicUnavailableError extends Error {
+  constructor() {
+    super("microphone API is unavailable: insecure context or unsupported browser");
+    this.name = "MicUnavailableError";
+  }
+}
+
 export function createRecorder(): Recorder {
   let stream: MediaStream | null = null;
   let recorder: MediaRecorder | null = null;
@@ -85,6 +93,11 @@ export function createRecorder(): Recorder {
 
   return {
     async start() {
+      // getUserMedia exists only in a secure context: https:// or localhost. A phone
+      // opening the dev server by LAN IP over plain http has no microphone at all.
+      if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+        throw new MicUnavailableError();
+      }
       stream = await navigator.mediaDevices.getUserMedia({ audio: AUDIO_CONSTRAINTS });
       const mimeType = pickMimeType();
       recorder = new MediaRecorder(stream, {
