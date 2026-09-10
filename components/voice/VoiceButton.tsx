@@ -152,7 +152,7 @@ export function VoiceButton() {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
             onContextMenu={(event) => event.preventDefault()}
-            className="relative h-16 w-16 rounded-full text-[24px] disabled:opacity-40"
+            className="relative flex h-16 w-16 items-center justify-center rounded-full disabled:opacity-40"
             style={{
               background: cancelArmed ? "var(--danger)" : "var(--accent)",
               color: "var(--bg)",
