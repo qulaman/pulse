@@ -302,6 +302,77 @@ export type Database = {
           },
         ]
       }
+      point_transactions: {
+        Row: {
+          actor_id: string | null
+          amount: number
+          company_id: string
+          created_at: string
+          id: string
+          order_id: string | null
+          reason: string
+          rule_code: string | null
+          source: Database["public"]["Enums"]["point_source"]
+          task_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          amount: number
+          company_id: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          reason: string
+          rule_code?: string | null
+          source: Database["public"]["Enums"]["point_source"]
+          task_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          amount?: number
+          company_id?: string
+          created_at?: string
+          id?: string
+          order_id?: string | null
+          reason?: string
+          rule_code?: string | null
+          source?: Database["public"]["Enums"]["point_source"]
+          task_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_transactions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aliases: string[]
@@ -653,9 +724,30 @@ export type Database = {
     Functions: {
       auth_company_id: { Args: never; Returns: string }
       auth_role: { Args: never; Returns: string }
+      award_points: {
+        Args: {
+          client_request_id?: string
+          p_amount: number
+          p_reason: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       confirm_voice_batch: {
         Args: { client_request_id: string; p_now?: string; payload: Json }
         Returns: Json
+      }
+      fn_rating: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          delta_vs_prev: number
+          display_name: string
+          is_me: boolean
+          on_time_pct: number
+          points: number
+          rank: number
+          user_id: string
+        }[]
       }
       revoke_task: {
         Args: { client_request_id?: string; task_id: string }
@@ -671,6 +763,7 @@ export type Database = {
         }
         Returns: Json
       }
+      update_company_settings: { Args: { patch: Json }; Returns: Json }
     }
     Enums: {
       absence_kind: "vacation" | "sick" | "other"
