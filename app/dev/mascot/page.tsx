@@ -5,10 +5,10 @@ import { useEffect, useState } from "react";
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 
 const STATES: { state: MascotState; label: string }[] = [
-  { state: "calm", label: "Спокоен — дыхание 6 с, моргает" },
-  { state: "listening", label: "Слушает — быстрое дыхание, взгляд вверх, растёт от голоса" },
-  { state: "thinking", label: "Думает — жёлтый, взгляд в сторону" },
-  { state: "happy", label: "Доволен — золотой, прищур, подпрыгивает" },
+  { state: "calm", label: "Спокоен — дыхание, моргает, изредка косится" },
+  { state: "listening", label: "Слушает — покачивается, широкие глаза, кольца звука, растёт от голоса" },
+  { state: "thinking", label: "Разбирает — жёлтый, наклон, глаза бегают, три точки" },
+  { state: "happy", label: "Доволен — золотой, прищур и румянец, прыжок с искрами" },
 ];
 
 /** Sandbox for the mascot: every state side by side, a fake microphone level slider. */

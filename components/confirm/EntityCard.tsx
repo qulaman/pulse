@@ -100,6 +100,10 @@ type Props = {
   onPatch: (patch: EntityPatch) => void;
   onRemove: () => void;
   onOpenAssignee: () => void;
+  /** Inline pick of a matcher candidate — the shortlist under the card. */
+  onPickAssignee: (user: { user_id: string; full_name: string }) => void;
+  /** Active people of the company — shown inline when the matcher found nobody. */
+  people: { user_id: string; full_name: string }[];
   onOpenDeadline: () => void;
   nameOf: (id: string) => string | undefined;
 };
@@ -113,6 +117,8 @@ export function EntityCard({
   onPatch,
   onRemove,
   onOpenAssignee,
+  onPickAssignee,
+  people,
   onOpenDeadline,
   nameOf,
 }: Props) {
@@ -271,6 +277,31 @@ export function EntityCard({
               ) : null}
             </div>
           )}
+
+          {hasAssignee(entity) && entity.assignee?.status !== "matched" && !collapsed ? (
+            <div className="mt-3 rounded-[12px] border border-warn/40 bg-warn/10 px-3 py-2">
+              <p className="text-[13px] leading-4 text-warn">
+                {entity.assignee?.status === "ambiguous" ? "Не понял, кому из них:" : "Не понял, кому это. Выбери:"}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {((entity.assignee?.candidates.length ?? 0) > 0
+                  ? (entity.assignee?.candidates ?? []).slice(0, 4)
+                  : people.slice(0, 8)
+                ).map((candidate) => (
+                  <Chip
+                    key={candidate.user_id}
+                    tone="accent"
+                    onClick={() => onPickAssignee({ user_id: candidate.user_id, full_name: candidate.full_name })}
+                  >
+                    {candidate.full_name}
+                  </Chip>
+                ))}
+                <Chip tone="neutral" onClick={onOpenAssignee}>
+                  {(entity.assignee?.candidates.length ?? 0) > 0 ? "Другой…" : "Ещё…"}
+                </Chip>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 

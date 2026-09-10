@@ -1,5 +1,6 @@
 "use client";
 
+import { Mascot } from "@/components/brand/Mascot";
 import { Sheet } from "@/components/ui/Sheet";
 import { useRoster, type RosterEntry } from "@/components/confirm/useRoster";
 import type { AssigneeMatch } from "@/lib/matchName";
@@ -40,6 +41,12 @@ export function AssigneePicker({ open, onClose, candidates, onPick }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title="Кому?">
+      <div className="mb-2 flex items-center gap-3 px-1">
+        <Mascot state="thinking" size={36} />
+        <p className="text-[13px] leading-4 text-muted">
+          {candidates.length > 0 ? "Понял задачу, но имя подходит нескольким. Кому из них?" : "Понял задачу, но не понял, кому. Выбери человека"}
+        </p>
+      </div>
       <div className="max-h-[60vh] overflow-y-auto">
         {candidates.length > 0 ? (
           <div className="mb-2">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 
 import { TextSheet } from "@/components/voice/TextSheet";
 import { haptic } from "@/lib/haptics";
+import { useComposeStore } from "@/lib/store/compose";
 import { subscribeIngestLevel, useIngestStore } from "@/lib/store/ingest";
 
 /** Hold longer than this and it is speech, not a tap (docs/FRONTEND.md "FAB"). */
@@ -22,6 +23,14 @@ export function VoiceButton() {
   const cancelVoice = useIngestStore((state) => state.cancelVoice);
 
   const [textOpen, setTextOpen] = useState(false);
+  // «Дать задачу» on a person's card asks the FAB to open the typed input
+  useEffect(
+    () =>
+      useComposeStore.subscribe((state, previous) => {
+        if (state.requestId !== previous.requestId) setTextOpen(true);
+      }),
+    [],
+  );
   const [cancelArmed, setCancelArmed] = useState(false);
   const ringRef = useRef<HTMLSpanElement>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);

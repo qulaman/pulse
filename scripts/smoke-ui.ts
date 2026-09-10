@@ -211,6 +211,11 @@ async function main() {
   await page.getByRole("button", { name: "Добавить сотрудника" }).click();
   await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}$/.test(url.pathname), { timeout: 20_000 });
   record("сотрудник создан → карточка", true, page.url());
+  await page.getByRole("heading", { name: "Смоук Тестов" }).waitFor({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Дать задачу" }).waitFor({ timeout: 5_000 });
+  await page.screenshot({ path: join(SHOTS, "13b-person-card.png"), fullPage: true });
+  await page.getByRole("link", { name: "Редактировать" }).click();
+  await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}\/edit$/.test(url.pathname), { timeout: 10_000 });
   await page.getByLabel("Должность").fill("Старший испытатель");
   await page.getByRole("button", { name: "Сохранить" }).click();
   await page.getByText("Сохранил").waitFor({ timeout: 10_000 });

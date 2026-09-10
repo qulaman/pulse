@@ -20,6 +20,8 @@ export function useRoster() {
         .from("profiles")
         .select("id, full_name, position")
         .eq("is_active", true)
+        // a task goes to a person, never to the TV kiosk
+        .neq("role", "tv")
         .order("full_name");
       if (error) throw error;
       return data ?? [];

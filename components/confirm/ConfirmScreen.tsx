@@ -13,6 +13,7 @@ import { useRoster } from "@/components/confirm/useRoster";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
+import { useMe } from "@/lib/tasks/queries";
 
 /** Five and up: the list turns into one-liners and the screen stops being a wall (FRONTEND). */
 const COMPACT_FROM = 5;
@@ -30,6 +31,29 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [assigneeIndex, setAssigneeIndex] = useState<number | null>(null);
   const [deadlineIndex, setDeadlineIndex] = useState<number | null>(null);
+
+  // The task is clear but the person is not: the people are listed right on the card.
+  const me = useMe();
+  const myId = me.data?.userId;
+  const people = useMemo(
+    () =>
+      (roster.data ?? [])
+        .filter((user) => user.id !== myId)
+        .map((user) => ({ user_id: user.id, full_name: user.full_name })),
+    [roster.data, myId],
+  );
+
+  const pickAssignee = (index: number, user: { user_id: string; full_name: string }) =>
+    editEntity(index, {
+      assignee_id: user.user_id,
+      assignee: {
+        status: "matched",
+        user_id: user.user_id,
+        candidates: [{ user_id: user.user_id, full_name: user.full_name, score: 1 }],
+        flag: "ok",
+      },
+      blocked: undefined,
+    });
 
   const nameOf = useMemo(() => {
     const byId = new Map<string, string>();
@@ -102,7 +126,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5">
         <div className="flex items-center gap-3">
-          <Mascot state="calm" size={44} />
+          <Mascot state={sendableCount === countable.length && countable.length > 0 ? "happy" : "thinking"} size={44} />
           <h1 className="text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
         </div>
 
@@ -118,6 +142,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
               onPatch={(patch) => editEntity(index, patch)}
               onRemove={() => removeEntity(index)}
               onOpenAssignee={() => setAssigneeIndex(index)}
+              onPickAssignee={(user) => pickAssignee(index, user)}
+              people={people}
               onOpenDeadline={() => setDeadlineIndex(index)}
               nameOf={nameOf}
             />
@@ -137,17 +163,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
         onClose={() => setAssigneeIndex(null)}
         candidates={openAssignee?.assignee?.candidates ?? []}
         onPick={(user) => {
-          if (assigneeIndex === null) return;
-          editEntity(assigneeIndex, {
-            assignee_id: user.user_id,
-            assignee: {
-              status: "matched",
-              user_id: user.user_id,
-              candidates: [{ user_id: user.user_id, full_name: user.full_name, score: 1 }],
-              flag: "ok",
-            },
-            blocked: undefined,
-          });
+          if (assigneeIndex !== null) pickAssignee(assigneeIndex, user);
         }}
       />
 

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
+import { useComposeStore } from "@/lib/store/compose";
 import { useIngestStore } from "@/lib/store/ingest";
 
 /**
@@ -15,9 +16,17 @@ export function TextSheet({ open, onClose }: { open: boolean; onClose: () => voi
   const [value, setValue] = useState("");
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
+  const consumePrefill = useComposeStore((state) => state.consume);
+
   useEffect(() => {
-    if (open) fieldRef.current?.focus();
-  }, [open]);
+    if (!open) return;
+    const timer = setTimeout(() => {
+      const prefill = consumePrefill();
+      if (prefill) setValue(prefill);
+      fieldRef.current?.focus();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [open, consumePrefill]);
 
   const close = () => {
     setValue("");

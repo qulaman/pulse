@@ -46,6 +46,28 @@ export function usePeople() {
   });
 }
 
+export type PersonMessage = Database["public"]["Tables"]["task_messages"]["Row"] & {
+  task: { id: string; title: string } | null;
+};
+
+/** The last things this person said in task threads — the director's «Что писал». */
+export function usePersonMessages(id: string) {
+  return useQuery({
+    queryKey: ["people", id, "messages"],
+    queryFn: async (): Promise<PersonMessage[]> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("task_messages")
+        .select("*, task:tasks!task_messages_task_id_fkey(id, title)")
+        .eq("sender_id", id)
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as unknown as PersonMessage[];
+    },
+  });
+}
+
 export function usePerson(id: string) {
   return useQuery({
     queryKey: peopleKeys.one(id),
