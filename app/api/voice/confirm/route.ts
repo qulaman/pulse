@@ -22,7 +22,7 @@ const IncomingEntity = z.preprocess((value) => {
 const BodySchema = z.strictObject({
   client_request_id: z.uuid(),
   source: z.enum(["voice", "typed", "shared"]),
-  audio_path: z.string().optional(),
+  audio_path: z.string().nullable().optional(), // typed input has no recording
   transcript: z.string(),
   parsed_entities: z.array(IncomingEntity),
   confirmed_entities: z.array(IncomingEntity),

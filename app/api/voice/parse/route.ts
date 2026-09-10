@@ -12,7 +12,7 @@ export const maxDuration = 60;
 
 const BodySchema = z.strictObject({
   transcript: z.string().min(1),
-  audio_path: z.string().optional(),
+  audio_path: z.string().nullable().optional(), // typed input has no recording
   source: z.enum(["voice", "typed", "shared"]),
   client_request_id: z.uuid(),
   /** Guard verdict from /transcribe: low speech density (AI.md §1 (ж)). */

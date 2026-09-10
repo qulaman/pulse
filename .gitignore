@@ -58,3 +58,6 @@ tests/stt/results/
 # from create-next-app template
 *.pem
 .pnpm-debug.log*
+
+# UI smoke screenshots
+.smoke-ui/
