@@ -28,7 +28,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
         type="button"
         aria-label="Закрыть"
         className="absolute inset-0 h-full w-full"
-        style={{ background: "var(--overlay)" }}
+        style={{ background: "var(--overlay)", animation: "overlay-in var(--t-instant) var(--ease-out) both" }}
         onClick={onClose}
       />
       <div
@@ -39,6 +39,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
         style={{
           paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
           boxShadow: "var(--shadow-raised)",
+          animation: "sheet-up 180ms var(--ease-out) both",
         }}
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />

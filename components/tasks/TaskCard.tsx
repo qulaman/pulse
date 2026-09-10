@@ -49,7 +49,7 @@ export function TaskCard({
   return (
     <article
       className={[
-        "rounded-[16px] border border-border bg-surface p-4",
+        "rounded-[16px] border border-border bg-surface p-4 transition-[transform,border-color] duration-[120ms] active:scale-[0.995]",
         dimmed ? "opacity-60" : "",
       ].join(" ")}
     >

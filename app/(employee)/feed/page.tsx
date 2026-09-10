@@ -30,14 +30,15 @@ export default function FeedPage() {
         ) : (
           <div className="flex flex-col gap-3">
             {items.map((task) => (
+              <div key={task.id} className="card-in">
               <TaskCard
-                key={task.id}
                 task={task}
                 variant="employee"
                 actions={actions}
                 companyId={me.data?.companyId ?? ""}
                 href={`/tasks/${task.id}`}
               />
+              </div>
             ))}
           </div>
         )}

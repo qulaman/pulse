@@ -39,7 +39,7 @@ function ToastItem({ item }: { item: Toast }) {
     <div
       role="status"
       className="pointer-events-auto w-full max-w-lg rounded-[12px] border border-border bg-surface-2 px-4 py-3 text-[14px] leading-[18px]"
-      style={{ boxShadow: "var(--shadow-raised)" }}
+      style={{ boxShadow: "var(--shadow-raised)", animation: "toast-in var(--t-instant) var(--ease-out) both" }}
       onClick={() => dismiss(item.id)}
     >
       {item.text}

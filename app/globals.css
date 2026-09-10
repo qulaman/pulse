@@ -90,6 +90,45 @@ body {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-1.5px); }
 }
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes shimmer {
+  0% { opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { opacity: 0.55; }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Every screen slides in once; lists stagger their first six cards (transform/opacity only). */
+main { animation: page-enter var(--t-screen) var(--ease-out) both; }
+.card-in { animation: card-in 220ms var(--ease-out) both; }
+.card-in:nth-child(2) { animation-delay: 40ms; }
+.card-in:nth-child(3) { animation-delay: 80ms; }
+.card-in:nth-child(4) { animation-delay: 120ms; }
+.card-in:nth-child(5) { animation-delay: 160ms; }
+.card-in:nth-child(6) { animation-delay: 200ms; }
+.skeleton { animation: shimmer 1.4s ease-in-out infinite; }
+
+/* Tap feedback everywhere a finger lands. */
+button, a[href] { -webkit-tap-highlight-color: transparent; }
+
 @keyframes fab-pulse {
   0% { transform: scale(1); opacity: 0.35; }
   100% { transform: scale(1.75); opacity: 0; }

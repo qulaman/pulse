@@ -8,15 +8,37 @@ import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
 import type { EntityPatch } from "@/lib/store/ingest";
 
-const ICONS: Record<Entity["kind"], string> = {
-  task: "✅",
-  announcement: "📢",
-  points: "➕",
-  reminder: "🔔",
-  recurrence: "🔁",
-  delegation: "🧩",
-  query: "❓",
+const ICON_STROKE = {
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.9,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
 };
+
+/** One stroke family for every kind — platform emoji differ from phone to phone. */
+const ICONS: Record<Entity["kind"], { color: string; path: React.ReactNode }> = {
+  task: { color: "var(--accent)", path: <><rect x="4" y="4" width="16" height="16" rx="4" /><polyline points="8,12.5 11,15.5 16,9.5" /></> },
+  announcement: { color: "var(--gold)", path: <><path d="M4 10v4h3l6 4V6l-6 4z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></> },
+  points: { color: "var(--gold)", path: <><circle cx="12" cy="12" r="8" /><path d="M12 8.5v7M8.5 12h7" /></> },
+  reminder: { color: "var(--warn)", path: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 0 0 4 0" /></> },
+  recurrence: { color: "var(--accent)", path: <><path d="M4 12a8 8 0 0 1 13.5-5.8" /><polyline points="18,3 18,7 14,7" /><path d="M20 12a8 8 0 0 1-13.5 5.8" /><polyline points="6,21 6,17 10,17" /></> },
+  delegation: { color: "var(--accent)", path: <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="15" r="3" /><path d="M11 8h3.5a2.5 2.5 0 0 1 0 5H13" /></> },
+  query: { color: "var(--text-muted)", path: <><circle cx="12" cy="12" r="8.5" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" /><circle cx="12" cy="17" r=".6" fill="currentColor" /></> },
+};
+
+function KindIcon({ kind }: { kind: Entity["kind"] }) {
+  const icon = ICONS[kind];
+  return (
+    <span
+      aria-hidden
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+      style={{ color: icon.color, background: `color-mix(in srgb, ${icon.color} 14%, transparent)` }}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" {...ICON_STROKE}>{icon.path}</svg>
+    </span>
+  );
+}
 
 /** Every kind keeps its main text under its own name — one editor, one field map. */
 function mainField(
@@ -145,9 +167,7 @@ export function EntityCard({
       </button>
 
       <div className="flex gap-2 pr-10">
-        <span aria-hidden className="text-[18px] leading-6">
-          {ICONS[entity.kind]}
-        </span>
+        <KindIcon kind={entity.kind} />
 
         <div className="min-w-0 flex-1">
           {editing ? (
