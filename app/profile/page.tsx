@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { PasswordRow } from "@/components/profile/PasswordRow";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { getSessionProfile } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -46,6 +47,7 @@ export default async function ProfilePage() {
           </>
         ) : null}
         <Row href="/rating" title="Рейтинг" hint="очки за неделю и месяц" />
+        <PasswordRow />
         <div className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
           Telegram
           <span className="text-[13px] leading-4 text-muted">привязка — с доставкой уведомлений</span>

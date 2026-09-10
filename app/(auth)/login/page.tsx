@@ -39,7 +39,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-10">
+    <main className="card-in mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-10">
       <div className="flex items-end justify-between">
         <div>
           <PulseMark size="lg" />
@@ -56,6 +56,7 @@ export default function LoginPage() {
             name="email"
             autoComplete="email"
             inputMode="email"
+            placeholder="name@company.kz"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
@@ -69,6 +70,7 @@ export default function LoginPage() {
             type="password"
             name="password"
             autoComplete="current-password"
+            placeholder="••••••••"
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -90,6 +92,10 @@ export default function LoginPage() {
           {pending ? "Вхожу…" : "Войти"}
         </button>
       </form>
+
+      <p className="mt-8 text-center text-[13px] leading-4 text-muted">
+        Доступ выдаёт директор компании. Забыл пароль — попроси его сбросить
+      </p>
     </main>
   );
 }

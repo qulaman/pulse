@@ -11,7 +11,9 @@ const DOT: Record<string, string> = { active: "var(--ok)", vacation: "var(--text
 /** «Сотрудники»: the roster the parser and the STT prompt are built from. */
 export default function PeoplePage() {
   const people = usePeople();
-  const rows = people.data ?? [];
+  // directors first, the kiosk last, people alphabetically in between
+  const ROLE_ORDER: Record<string, number> = { director: 0, manager: 1, employee: 2, shopkeeper: 2, tv: 9 };
+  const rows = [...(people.data ?? [])].sort((a, b) => (ROLE_ORDER[a.role] ?? 5) - (ROLE_ORDER[b.role] ?? 5));
   const active = rows.filter((p) => p.is_active);
   const inactive = rows.filter((p) => !p.is_active);
 

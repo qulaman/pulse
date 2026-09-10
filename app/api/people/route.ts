@@ -11,7 +11,7 @@ const BodySchema = z.strictObject({
   role: z.enum(["director", "manager", "employee", "shopkeeper", "tv"]),
   position: z.string().trim().max(120).optional(),
   aliases: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
-  manager_id: z.uuid().nullable().optional(),
+  manager_id: z.guid().nullable().optional(), // guid: seed ids are not RFC-4122
 });
 
 /**

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 
 import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
+import { ResetPasswordCard } from "@/components/people/ResetPasswordCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
 import { initialsOf, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
 
@@ -40,6 +41,11 @@ export default function EditPersonPage() {
               onSubmit={(draft) => update.mutate({ id, patch: patchOf(draft) })}
             />
           </div>
+          {person.data.role !== "tv" ? (
+            <div className="mt-4">
+              <ResetPasswordCard personId={person.data.id} />
+            </div>
+          ) : null}
         </>
       ) : (
         <p className="mt-4 text-[16px] leading-[22px] text-muted">Сотрудник не найден</p>
