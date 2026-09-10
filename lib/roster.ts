@@ -32,7 +32,7 @@ export async function loadRoster(companyId: string): Promise<RosterProfile[]> {
   }));
 }
 
-export type CompanySettings = { vocabulary?: string[] } | null;
+export type CompanySettings = Record<string, unknown> | null;
 
 /** Everything client-specific lives here, never in code (V-02, docs/BACKEND.md §0.5). */
 export async function loadCompanySettings(companyId: string): Promise<CompanySettings> {
@@ -51,7 +51,7 @@ export async function loadCompanySettings(companyId: string): Promise<CompanySet
 }
 
 /** company.settings.vocabulary — counterparties and site names (docs/AI.md §1). */
-export function vocabularyHintsFor(roster: RosterProfile[], settings?: CompanySettings): string[] {
+export function vocabularyHintsFor(roster: RosterProfile[], settings?: { vocabulary?: string[] } | null): string[] {
   return buildVocabularyHints({
     users: roster.map((u) => ({ full_name: u.full_name, aliases: u.aliases })),
     counterparties: settings?.vocabulary ?? [],

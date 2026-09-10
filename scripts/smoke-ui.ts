@@ -119,6 +119,32 @@ async function main() {
     record("отправка → /pulse", sent, page.url());
   }
 
+  // ---- settings: the director switches points on --------------------------------
+  await page.goto(`${APP_URL}/settings`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Настройки" }).waitFor({ timeout: 10_000 });
+  await page.getByRole("switch", { name: /Очки включены/ }).waitFor({ timeout: 10_000 });
+  await page.screenshot({ path: join(SHOTS, "09-settings.png"), fullPage: true });
+  const pointsSwitch = page.getByRole("switch", { name: /Очки включены/ });
+  if ((await pointsSwitch.getAttribute("aria-checked")) !== "true") await pointsSwitch.click();
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByText("Сохранил настройки").waitFor({ timeout: 10_000 });
+  record("настройки: очки включены и сохранены", true);
+
+  // ---- rating: +10 to Марат through the sheet ------------------------------------
+  await page.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
+  await page.getByRole("tab", { name: "Рейтинг" }).click();
+  const maratRow = page.locator("li", { hasText: "Марат Оспанов" }).first();
+  await maratRow.waitFor({ timeout: 10_000 });
+  await maratRow.getByRole("button", { name: "+" }).click();
+  await page.getByRole("button", { name: /Начислить \+10/ }).click();
+  await page.getByText(/\+10 — за скорость/).waitFor({ timeout: 10_000 });
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: join(SHOTS, "10-rating.png") });
+  record("рейтинг: +10 Марату начислено", true);
+
+  await page.goto(`${APP_URL}/dev/mascot`, { waitUntil: "networkidle" });
+  await page.screenshot({ path: join(SHOTS, "11-mascot.png"), fullPage: true });
+
   // ---- voice: hold the FAB for six seconds of the fake microphone ---------------
   if (FAKE_MIC_WAV) {
     await director.grantPermissions(["microphone"], { origin: APP_URL });
@@ -157,6 +183,12 @@ async function main() {
   await epage.screenshot({ path: join(SHOTS, "06-feed.png") });
   const card = epage.getByText(/Казхром/i).first();
   record("карточка задачи в ленте Марата", await card.isVisible().catch(() => false));
+
+  await epage.goto(`${APP_URL}/profile`, { waitUntil: "networkidle" });
+  await epage.getByText("за скорость").first().waitFor({ timeout: 10_000 }).catch(() => {});
+  await epage.screenshot({ path: join(SHOTS, "12-profile-points.png") });
+  const balanceText = await epage.locator("p.nums").first().textContent().catch(() => "");
+  record("профиль Марата: баланс ≥ 10", Number(balanceText) >= 10, `balance=${balanceText}`);
 
   for (const e of [...errors, ...eerrors]) console.log("  !", e);
   await browser.close();

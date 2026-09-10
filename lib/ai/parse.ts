@@ -42,6 +42,8 @@ export interface ParseInput {
   model?: string;
   client?: Anthropic;
   escalate?: boolean;
+  /** Overrides PARSER_ESCALATION_MODEL (company.settings.parser.escalation_model). */
+  escalationModel?: string;
 }
 
 const MAX_TOKENS = 4096;
@@ -197,7 +199,7 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
 
   const escalate = input.escalate ?? true;
   if (escalate && needsEscalation(input.transcript, first.entities)) {
-    const target = escalationModel();
+    const target = input.escalationModel ?? escalationModel();
     const second = await callModel(client, target, input, MAX_TOKENS);
     usage = addUsage(usage, second.usage);
     return {

@@ -44,6 +44,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | `/api/push/ack` | POST | любая | — |
 | `/api/telegram/link-code` | POST | любая | — |
 | `/api/health` | GET | публичный | — |
+| `/api/settings` | GET, PATCH | director | — (D-48: секции `stt`, `parser`, `vocabulary`, `points_enabled`, `rating_mode`, `delivery_window`; PATCH сливает секции целиком через RPC `update_company_settings`) |
 
 Превышение лимита → `429 {error:{code:'rate_limited', message_ru:'Слишком много запросов, попробуй через несколько минут'}}`. Счётчики — по `(user_id, endpoint, hour)` в Postgres.
 

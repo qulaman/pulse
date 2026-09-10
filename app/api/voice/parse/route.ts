@@ -4,7 +4,8 @@ import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { DEFAULT_PARSER_MODEL, ParseError, parseTranscript } from "@/lib/ai/parse";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
-import { loadRoster } from "@/lib/roster";
+import { loadCompanySettings, loadRoster } from "@/lib/roster";
+import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/types";
 
@@ -70,6 +71,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const roster = await loadRoster(profile.companyId);
+    const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
 
     let outcome;
     try {
@@ -78,6 +80,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         source: body.source,
         now: new Date(),
         roster,
+        model: settings.parser.model,
+        escalate: settings.parser.escalate,
+        escalationModel: settings.parser.escalation_model,
       });
     } catch (error) {
       const code = error instanceof ParseError ? error.code : "parse_failed";

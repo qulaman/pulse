@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+
+import { ProfilePoints } from "@/components/profile/ProfilePoints";
 
 import { getSessionProfile, type Role } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -31,6 +34,18 @@ export default async function ProfilePage() {
         <dt className="mt-4 text-[13px] leading-4 text-muted">Роль</dt>
         <dd className="mt-1 text-[16px] leading-[22px]">{ROLE_RU[profile.role]}</dd>
       </dl>
+
+      {profile.role === "director" ? (
+        <Link
+          href="/settings"
+          className="mt-4 flex min-h-[52px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        >
+          Настройки
+          <span className="text-[13px] leading-4 text-muted">распознавание · разбор · очки</span>
+        </Link>
+      ) : (
+        <ProfilePoints userId={profile.userId} />
+      )}
 
       <form action={signOut} className="mt-6">
         <button

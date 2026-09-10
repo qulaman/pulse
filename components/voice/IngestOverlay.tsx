@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
-import { useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
+import { subscribeIngestLevel, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
 
 /**
  * Visible progress of the pipeline (D-43) and every failure state of docs/AI.md §11.
@@ -78,6 +78,19 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
   const router = useRouter();
   const pathname = usePathname();
   const timerRef = useRef<HTMLSpanElement>(null);
+  const [level, setLevel] = useState(0);
+
+  // Throttled to ~20 fps: the mascot swells with the voice without re-rendering per frame.
+  useEffect(() => {
+    if (stage !== "recording") return;
+    let last = 0;
+    return subscribeIngestLevel((value) => {
+      const now = performance.now();
+      if (now - last < 50) return;
+      last = now;
+      setLevel(value);
+    });
+  }, [stage]);
 
   useEffect(() => {
     if (stage !== "recording") return;
@@ -113,7 +126,7 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     >
       {showProgress ? (
         <>
-          <Mascot state={stage === "recording" ? "listening" : "thinking"} size={88} />
+          <Mascot state={stage === "recording" ? "listening" : "thinking"} size={88} level={level} />
           <p className="mt-4 text-[19px] font-semibold leading-6">
             {STAGE_LINE[stage]}
             {stage === "recording" ? (

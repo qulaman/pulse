@@ -3,9 +3,10 @@ import { z } from "zod";
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { guardTranscript } from "@/lib/ai/stt-guard";
-import { SttError, transcribe } from "@/lib/ai/stt";
+import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
 import { AuthError } from "@/lib/auth";
 import { loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
+import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 export const maxDuration = 60;
@@ -74,14 +75,24 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const mime = MIME_BY_EXT[ext] ?? "audio/webm";
 
     const roster = await loadRoster(profile.companyId);
-    const settings = await loadCompanySettings(profile.companyId);
+    const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
     const vocabularyHints = vocabularyHintsFor(roster, settings);
+    // Provider choice is company configuration, env is only the fallback default (V-02).
+    const providers = getSttProviders({
+      STT_PROVIDER: settings.stt.provider,
+      STT_FALLBACK_PROVIDER: settings.stt.fallback ?? undefined,
+    });
 
     const startedAt = Date.now();
     let result;
     try {
-      // No language hint: the STT gate showed "auto" beats "ru" on Kazakh speech.
-      result = await transcribe(buffer, mime, { language: null, vocabularyHints });
+      // Default is no language hint: the STT gate showed "auto" beats "ru" on Kazakh speech.
+      result = await transcribe(
+        buffer,
+        mime,
+        { language: settings.stt.language === "ru" ? "ru" : null, vocabularyHints },
+        providers,
+      );
     } catch (error) {
       const stt = error instanceof SttError ? error : undefined;
       await supabase.from("ai_logs").insert({
