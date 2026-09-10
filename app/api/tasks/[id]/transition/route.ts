@@ -1,7 +1,10 @@
+import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { kickDeliveries } from "@/lib/push/send";
+import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Database } from "@/lib/supabase/types";
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
@@ -31,7 +34,7 @@ const BodySchema = z.strictObject({
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   "any",
-  async ({ req, body, params }) => {
+  async ({ req, profile, body, params }) => {
     const taskId = params.id;
     if (!z.uuid().safeParse(taskId).success) {
       return apiError(404, "task_not_found", "Задача не найдена");
@@ -59,6 +62,19 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
+    after(async () => {
+      if (body.to_status === "accepted") {
+        // «принял» (D-32): the receipt on the director's card
+        const now = new Date().toISOString();
+        await createServiceSupabase()
+          .from("notification_deliveries")
+          .update({ acted_at: now, seen_at: now })
+          .eq("task_id", taskId)
+          .eq("user_id", profile.userId)
+          .is("acted_at", null);
+      }
+      kickDeliveries();
+    });
     return apiOk({ result, duplicate });
   },
   BodySchema,

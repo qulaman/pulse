@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { PeopleGrid } from "@/components/pulse/PeopleGrid";
+import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -124,6 +125,7 @@ export default function PulsePage() {
         </>
       )}
 
+      <PushCard compact />
       <PeopleGrid />
     </main>
   );

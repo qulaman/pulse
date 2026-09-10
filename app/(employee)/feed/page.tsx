@@ -1,6 +1,7 @@
 "use client";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -18,6 +19,7 @@ export default function FeedPage() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Лента</h1>
+      <PushCard />
 
       <div className="mt-4">
         {loading ? (

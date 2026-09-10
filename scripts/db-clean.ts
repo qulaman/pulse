@@ -56,6 +56,8 @@ async function main() {
   await wipe("inbox_items");
   await wipe("ai_logs");
   await wipe("ingest_batches");
+  await wipe("notification_deliveries");
+  await wipe("push_subscriptions");
 
   const { data: companies } = await supabase.from("companies").select("id");
   for (const bucket of ["voice", "photos"] as const) {

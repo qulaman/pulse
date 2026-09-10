@@ -1,9 +1,11 @@
+import { after } from "next/server";
 import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { editDiff } from "@/lib/ai/edit-diff";
 import { EntitySchema, type Entity } from "@/lib/ai/schema";
+import { kickDeliveries } from "@/lib/push/send";
 
 /**
  * /confirm hands back what it rendered, so entities still carry the service
@@ -65,6 +67,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
+    // the triggers queued the pushes; send them once the response is on its way
+    after(() => kickDeliveries());
     return apiOk({ result, duplicate });
   },
   BodySchema,

@@ -302,6 +302,82 @@ export type Database = {
           },
         ]
       }
+      notification_deliveries: {
+        Row: {
+          acted_at: string | null
+          attempts: number
+          channel: Database["public"]["Enums"]["delivery_channel"]
+          company_id: string
+          created_at: string
+          event_kind: string
+          id: string
+          last_error: string | null
+          meta: Json
+          seen_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["delivery_status"]
+          task_id: string | null
+          tier: number
+          user_id: string
+        }
+        Insert: {
+          acted_at?: string | null
+          attempts?: number
+          channel?: Database["public"]["Enums"]["delivery_channel"]
+          company_id: string
+          created_at?: string
+          event_kind: string
+          id?: string
+          last_error?: string | null
+          meta?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"]
+          task_id?: string | null
+          tier?: number
+          user_id: string
+        }
+        Update: {
+          acted_at?: string | null
+          attempts?: number
+          channel?: Database["public"]["Enums"]["delivery_channel"]
+          company_id?: string
+          created_at?: string
+          event_kind?: string
+          id?: string
+          last_error?: string | null
+          meta?: Json
+          seen_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["delivery_status"]
+          task_id?: string | null
+          tier?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_deliveries_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_deliveries_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       point_transactions: {
         Row: {
           actor_id: string | null
@@ -436,6 +512,54 @@ export type Database = {
           {
             foreignKeyName: "profiles_manager_id_fkey"
             columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          company_id: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          company_id: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          company_id?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]

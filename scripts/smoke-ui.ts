@@ -17,6 +17,7 @@ mkdirSync(SHOTS, { recursive: true });
 
 type Check = { name: string; ok: boolean; detail: string };
 const checks: Check[] = [];
+let lastPage: Page | null = null;
 const record = (name: string, ok: boolean, detail = "") => {
   checks.push({ name, ok, detail });
   console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
@@ -73,6 +74,7 @@ async function main() {
   // ---- director -------------------------------------------------------------
   const director = await browser.newContext(iphone);
   const page = await director.newPage();
+  lastPage = page;
   const errors = watch(page, "director");
 
   await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
@@ -271,6 +273,7 @@ async function main() {
   // ---- employee -------------------------------------------------------------
   const employee = await browser.newContext(iphone);
   const epage = await employee.newPage();
+  lastPage = epage;
   const eerrors = watch(epage, "marat");
   await login(epage, "marat@demo.local", "demo1234");
   record("marat: вход → /feed", epage.url().includes("/feed"), epage.url());
@@ -333,5 +336,8 @@ async function main() {
 }
 
 main()
-  .catch((error: unknown) => record("smoke", false, error instanceof Error ? error.message : String(error)))
+  .catch(async (error: unknown) => {
+    await lastPage?.screenshot({ path: join(SHOTS, "99-fail.png"), fullPage: true }).catch(() => undefined);
+    record("smoke", false, error instanceof Error ? error.message : String(error));
+  })
   .finally(() => process.exit(checks.some((c) => !c.ok) ? 1 : 0));

@@ -11,6 +11,7 @@ import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
 import { AudioOriginal } from "./AudioOriginal";
+import { DeliveryStatus } from "./DeliveryStatus";
 import { AskSheet, DeclineSheet, ReportSheet, ReworkSheet } from "./TaskSheets";
 
 export type TaskCardVariant = "employee" | "director";
@@ -87,6 +88,10 @@ export function TaskCard({
           <span className="text-[13px] leading-4 text-muted">{task.assignee.full_name}</span>
         ) : null}
       </div>
+
+      {variant === "director" && task.status !== "scheduled" && task.status !== "revoked" ? (
+        <DeliveryStatus taskId={task.id} status={task.status} />
+      ) : null}
 
       {task.source_audio_path ? <AudioOriginal path={task.source_audio_path} /> : null}
 
