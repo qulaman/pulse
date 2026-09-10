@@ -417,3 +417,56 @@
 - Порядок строго последовательный 006 → 007 → 008 → 009 → 010 (каждый от актуального `main`; предусловие «влито» теперь проверяется командой в наряде). Приёмка после каждого; 009/010 требуют живой проверки владельцем на телефоне.
 - Новые решения: G.20 («Настоять» в матрице), G.21 (dev-вход email+пароль; QR+PIN — наряд онбординга), G.22 (очки не персистятся в пилоте), G.23 (blob целиком, timeslice позже). BACKEND §7 — строка `declined → sent`.
 - Бэклог, не в этой пятёрке: rate limiting (BACKEND §1), outbox доставки + push + Telegram, PWA/serwist (проверить совместимость с Next 16), стриминг чанков, фото/голос в отчёте сотрудника, view `v_pulse_summary`/`v_employee_load`, «Переназначить», Web Share Target, маскот, оффлайн-outbox, `pulse-prod`, обновление Supabase CLI.
+
+## 2026-09-10 — Исполнитель (Opus) — 007 db-voice-rpc
+
+**Сделано**
+
+- Миграция `20260910100000_voice_pipeline.sql`: таблицы `ingest_batches`, `ai_logs`, `inbox_items` (+ moddatetime), `announcements`, `announcement_acks`, `recurrence_rules`, `reminders`; FK `tasks.recurrence_rule_id → recurrence_rules`; индексы из DATABASE.md «Индексы» + `ai_logs (company_id, client_request_id, kind)`; RLS по матрице (ingest_batches/ai_logs — select только director, без insert/update-политик; inbox_items — director или автор, правка автором до `confirmed`; announcements/acks — компания без `tv`, insert объявления — director, ack — свой; reminders — свои; recurrence_rules — select компания, write director); bucket `voice` (private) и политики insert/select на `storage.objects` по сегментам пути `{company_id}/{owner_id}/…`; функция `confirm_voice_batch(payload, client_request_id, p_now)`.
+- `confirm_voice_batch`: только director (`forbidden`), идемпотентность через `ingest_batches` (дубль → сохранённый `result` + `duplicate:true`), тихие часы из `companies.settings->'delivery_window'` в Asia/Aqtobe с `force_now` (D-38), `task`/`delegation` → `tasks` (мапа строкового `group_id` → один uuid на батч, D-02; `assignee_required`), `announcement` → `announcements`, `reminder` → `reminders`, `recurrence` → `recurrence_rules`, `points`/`query` → `skipped` (G.22), дозапись `confirmed_entities/was_edited/edit_fields` в строку `ai_logs` того же батча (D-35), `inbox_id` → `status='confirmed'`.
+- Миграция `20260910100100_task_rpc.sql`: `task_status_guard()` переопределён — добавлен переход `declined → sent` для директора («Настоять», G.20) со сбросом `closed_at`; `transition_task(task_id, to_status, payload, client_request_id)` (идемпотентность, `task_not_found`, проброс `invalid_transition` из триггера, сообщение с `meta.decline_reason` / `meta.rework_comment`); `revoke_task(task_id, client_request_id)` (director-only, `scheduled` → физический delete, иначе `revoked`, D-01); гранты трём функциям.
+- `seed.sql`: `delivery_window` в `companies.settings`, объявление + ack, строка `ai_logs` (`kind='parse'`, crid `40000000-…-0001`), черновик `inbox_items` в `parsed`, объект `voice` в папке Айгуль (для теста чужого файла).
+- pgTAP `006_voice_pipeline.test.sql` (21 тест) и `007_task_rpc.test.sql` (12 тестов). `lib/supabase/types.ts` сгенерирован.
+
+**Проверки**: `db reset --linked` — 5 миграций + seed, `migration list --linked` — все 5; `test db --linked` — **7 файлов, 63 теста, PASS**; `db lint --linked --schema public` — чисто; `tsc --noEmit` — чисто; `vitest run` — 10 файлов, 85 тестов.
+
+**Коммиты**: `feat(db): voice pipeline tables, RLS and voice bucket` · `feat(db): transition_task/revoke_task, declined→sent` · `test(db): pgTAP 006-007 + seed fixtures` · `chore(db): regenerate types` · `docs(worklog)`.
+
+**Арбитражи и вопросы**
+
+1. **`pnpm db:types` в package.json ещё нет** — скрипт заводит наряд 006, который не влит. Типы сгенерированы напрямую (`supabase gen types typescript --linked --schema public > lib/supabase/types.ts`), `package.json` не тронут (вне скоупа). Файл `lib/supabase/types.ts` появился раньше 006 — при 006 просто перегенерируется.
+2. **`revoke execute` пришлось делать и от `public`**, не только от `anon`: execute на функции по умолчанию выдан роли PUBLIC, и revoke только у `anon` ничего не меняет (тест «anon не может звать RPC» падал бы). Гранты — `authenticated` и `service_role` (второй нужен серверным/cron-вызовам).
+3. **`on conflict on constraint ingest_batches_company_request_key`** вместо `on conflict (company_id, client_request_id)`: параметр функции `client_request_id` затеняет колонку, Postgres даёт 42702 (поймал `db lint`). Поэтому unique-ограничение названо явно.
+4. **`ai_logs.provider` и `model` — `not null`** (в DATABASE.md без пометки «null», в отличие от соседних полей). Если конвейер захочет логировать ошибку до выбора модели — понадобится либо nullable, либо заглушка; решение за наряд 008.
+5. **`recurrence_rules.assignee_id` — `not null`**, и `confirm_voice_batch` требует его так же, как для задачи (`assignee_required`). В доке и наряде явного требования нет — правило по аналогии с task, правило спавнит задачу.
+6. **Неизвестный `kind`** сущности не роняет батч, а уходит в `skipped` с причиной `unknown_kind` (в наряде не описано).
+7. **`announcement_acks` без `company_id`** — как в DATABASE.md; изоляция компании в RLS проверяется через join к `announcements`.
+8. **Строки `storage.objects` переживают `db reset --linked`** (сбрасывается public/auth, но не содержимое storage) — вставка фикстуры в seed сделана `on conflict do nothing`, иначе второй reset падает на `bucketid_objname`.
+9. **Нумерация RLS-кейсов**: наряд ссылается на кейсы 8 и 9 как на «чужой inbox_items» и «повторный confirm», в DATABASE.md 8 — двойной `create_shop_order`, 9 — повторный confirm. Тесты написаны по тексту наряда; расхождение нумерации — на усмотрение архитектора.
+10. **Docker Desktop был выключен** — запущен вручную ради `supabase test db` (как и в 005); на миграции/seed/lint не влияет.
+
+## 2026-09-10 — Исполнитель (Opus) — 006 app-shell-auth
+
+**Сделано**
+
+- Зависимости `@supabase/supabase-js`, `@supabase/ssr`, `@tanstack/react-query`, `zustand`; скрипты `db:types`, `smoke:auth`; `lib/supabase/types.ts` перегенерирован с dev-проекта.
+- Клиенты Supabase: `lib/supabase/server.ts` (cookie-адаптер `next/headers`, `getAll`/`setAll`), `client.ts` (браузерный синглтон), `service.ts` (`server-only`, service_role, `persistSession: false`) — все типизированы `Database`.
+- `lib/auth.ts`: `AuthError(status, code)`, `getSessionProfile(req?)` (Bearer-токен, если передан `req`, иначе cookies; профиль читается под RLS пользователя), `requireRole`, `authErrorMessageRu`, `homeForRole`. `app/api/me/route.ts` — контракт ошибок BACKEND §0 п.4.
+- `proxy.ts` (Next 16): обновление сессии по паттерну @supabase/ssr, редирект на `/login` без сессии, разводка по роли с `/` и `/login` (director → `/pulse`, tv → `/profile`, иначе `/feed`), matcher без `_next`/`api`/файлов.
+- Дизайн-токены: `lib/design/tokens.ts` + CSS-переменные в `app/globals.css` + Tailwind v4 `@theme`; юнит-тест `lib/design/tokens.test.ts` сверяет hex и `--t-*` в обоих файлах. Тёмная тема единственная, `100dvh`, `viewport-fit=cover`, `.nums`.
+- Оболочка: `QueryProvider` (staleTime 30s, retry 1), zustand `useUiStore` (`quietMode`), группы `(director)`/`(employee)` с ролевыми гардами, `/ether` и `/profile` с проверкой сессии, `TabBar` (44px, safe-area), заглушки экранов, `/login` (email+пароль), `app/dev/tokens`, `app/page.tsx` → `/login`.
+- `scripts/smoke-auth.ts` + `pnpm smoke:auth`.
+
+**Проверки**: `pnpm install`, `db:types`, `typecheck`, `lint`, `test` (10 файлов / 85 тестов), `build` — зелёные; `/pulse` → 307 `/login`, `/login` → 200, `/dev/tokens` → 200; `pnpm smoke:auth` — 5/5 ок. Дополнительно проверены cookie-сессии всех трёх ролей: `/` → `/pulse` (director), `/feed` (employee), `/profile` (tv); чужая группа разводится редиректом.
+
+**Вопросы и отклонения**
+
+1. **`proxy.ts` vs `middleware.ts`**: Next 16.3.4 принял `proxy.ts` (в выводе build — `ƒ Proxy (Middleware)`), экспорт именованный `proxy` + `config`. Возврат к `middleware.ts` не понадобился.
+2. **Ключей Supabase в `.env.local` не было** (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`). По решению владельца получены через `supabase projects api-keys --project-ref qobsbjugromdwfdodwwa --reveal` (взяты legacy anon и service_role) и дописаны в `.env.local` (файл в `.gitignore`).
+3. **`seed.sql` ломает вход в Supabase Auth**: вставка в `auth.users` оставляет `confirmation_token`, `recovery_token`, `email_change`, `email_change_token_new` в `NULL`, из-за чего GoTrue отвечает 500 `Database error querying schema` на любой пароль-грант и на admin API. Починил данные в dev-БД (`update auth.users set … = coalesce(…, '')`), но **правка самого `seed.sql` — вне скоупа 006 и файл сейчас занят сессией 007**: после следующего `db reset --linked` вход снова сломается. Нужен наряд (или строка в 007): сидить эти колонки пустой строкой.
+4. **Петля редиректов для ролей `tv`/`shopkeeper`**: по букве наряда гард `(director)` шлёт не-директора на `/feed`, а гард `(employee)` шлёт не-сотрудника на `/pulse` — для `tv` это бесконечный пинг-понг (воспроизведён живьём). Ввёл `homeForRole()` в `lib/auth.ts`: для director/employee/manager поведение ровно как в наряде, `tv`/`shopkeeper` уходят на `/profile`. Дубль той же функции живёт в `proxy.ts` (edge-бандл не может импортировать `server-only`-модуль) — если это не устраивает, нужен общий `lib/routes.ts` отдельным решением.
+5. **`/dev/*` пришлось внести в публичные пути `proxy.ts`** (иначе `/dev/tokens` без сессии отдавал 307 вместо требуемого наряду 200); в проде путь всё равно закрыт `notFound()` в `app/dev/layout.tsx`.
+6. **`next dev` дописывает блок `nextjs-agent-rules` в `CLAUDE.md`** при каждом запуске. Откатил, в коммит не взял; нужно решение архитектора — коммитить блок или ставить `agentRules: false` в `next.config.ts` (оба варианта вне скоупа 006).
+7. **`lib/supabase/service.ts` читает `SUPABASE_SERVICE_ROLE_KEY` напрямую из `process.env`, а не через `getServerEnv()`**: схема `lib/env.schema.ts` требует `OPENAI_API_KEY`, которого в `.env.local` нет, и любой вызов `getServerEnv()` падал бы на несвязанной переменной.
+8. **Общий рабочий каталог**: одновременно с 006 в `Z:\Pulse` шла сессия 007 — её файлы (`supabase/migrations/2026091010*.sql`, `supabase/tests/006-007*.sql`, правка `seed.sql`) остались незакоммиченными, их не трогал. Запись 007 в WORKLOG.md была уже написана, но не закоммичена — попала в мой коммит `docs(worklog)` вместе с моей. Наряды 006–010 (`fbcfebf`) архитектор закоммитил в ветку `feat/006-app-shell-auth`, а не в `main`.
+9. Скриншоты `/login`, `/feed`, `/pulse`, `/dev/tokens` снять нечем — браузерной автоматизации в среде нет; визуальную проверку делает владелец.
