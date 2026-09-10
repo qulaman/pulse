@@ -38,6 +38,7 @@
 | `/rating` | все авторизованные | layout: проверка сессии; «+» только director |
 | `/sent` | director | layout группы; «Отправленные» — все поручения автора по дням, фильтры по статусу |
 | `/settings` | director | layout группы |
+| `/admin` | director | layout группы; таблицы компании только на чтение под RLS директора |
 | `/people`, `/people/new`, `/people/[id]` | director | layout группы; создание логина — `POST /api/people`, правка карточки — update `profiles` под RLS |
 | `/shop` | все [ПОСЛЕ ПИЛОТА] | layout: проверка сессии |
 | `/tv` | роль `tv` [ЭТАП МАСШТАБА] | отдельный layout, auth-пользователь tv |

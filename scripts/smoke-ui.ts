@@ -202,6 +202,9 @@ async function main() {
   await page.screenshot({ path: join(SHOTS, "16-admin.png") });
   record("админ-панель: таблицы открываются", true);
 
+  await page.goto(`${APP_URL}/nope-${STAMP}`, { waitUntil: "networkidle" });
+  record("404: страница «Такой страницы нет»", await page.getByText("Такой страницы нет").isVisible().catch(() => false));
+
   await page.goto(`${APP_URL}/dev/mascot`, { waitUntil: "networkidle" });
   await page.screenshot({ path: join(SHOTS, "11-mascot.png"), fullPage: true });
 

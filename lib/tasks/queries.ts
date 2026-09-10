@@ -95,10 +95,11 @@ export function sortByUrgency<T extends TaskRow>(tasks: T[], now: Date = new Dat
 /* Employee: the feed and «Мои дела»                                           */
 /* -------------------------------------------------------------------------- */
 
-async function fetchMyTasks(): Promise<TaskWithPeople[]> {
+async function fetchMyTasks(userId: string): Promise<TaskWithPeople[]> {
   const supabase = createBrowserSupabase();
   // No status filter: RLS already hides `scheduled` from everyone but its author.
-  const { data, error } = await supabase.from("tasks").select(TASK_SELECT);
+  // assignee filter: a manager also sees subordinates' tasks under RLS — not in «Лента».
+  const { data, error } = await supabase.from("tasks").select(TASK_SELECT).eq("assignee_id", userId);
   if (error) throw new Error(error.message);
   return sortByUrgency((data ?? []) as unknown as TaskWithPeople[]);
 }
@@ -110,7 +111,7 @@ async function fetchMyTasks(): Promise<TaskWithPeople[]> {
 export function useMyTasks(userId: string | undefined) {
   return useRealtimeQuery<TaskWithPeople[], TaskRow>({
     queryKey: taskKeys.mine(userId ?? ""),
-    queryFn: fetchMyTasks,
+    queryFn: () => fetchMyTasks(userId as string),
     channel: { table: "tasks", filter: userId ? `assignee_id=eq.${userId}` : undefined },
     enabled: Boolean(userId),
   });

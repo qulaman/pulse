@@ -33,6 +33,10 @@ async function postJson(path: string, payload: unknown): Promise<void> {
   }
 
   if (res.ok) return;
+  if (res.status === 401 && typeof window !== "undefined") {
+    window.location.assign("/login");
+    throw new Error("Сессия истекла. Войди заново");
+  }
 
   let body: ApiErrorBody | null = null;
   try {

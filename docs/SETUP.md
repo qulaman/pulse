@@ -49,7 +49,7 @@
 1. **Репозиторий:** `git clone` → `pnpm install`. Скопировать `.env.example` → `.env.local`, заполнять по ходу шагов.
 2. **Supabase-проекты:** создать `pulse-dev` (Free) и `pulse-prod` (Pro) в регионе Франкфурт. `supabase login` → `supabase link --project-ref <dev-ref>` (локальная работа всегда слинкована на dev).
 3. **Миграции:** `supabase migration up` в dev. Проверить: таблицы, RLS включён на каждой, pg_cron-джобы из DATABASE.md созданы.
-4. **Seed:** прогнать `supabase/seed.sql` в dev (демо-компания, «два Ерлана», задачи во всех статусах — контракт сида в DATABASE.md). **В prod seed не катится никогда** — прод наполняется анкетой клиента (§5).
+4. **Демо-состояние:** `pnpm db:clean` — стирает задачи/сообщения/очки/логи/черновики и smoke-логины dev-проекта, людей и настройки оставляет (для показа); `pnpm db:reset` возвращает полный seed для pgTAP. **Seed:** прогнать `supabase/seed.sql` в dev (демо-компания, «два Ерлана», задачи во всех статусах — контракт сида в DATABASE.md). **В prod seed не катится никогда** — прод наполняется анкетой клиента (§5).
 5. **VAPID:** `npx web-push generate-vapid-keys` — дважды (dev-пара и prod-пара). Разложить по скоупам Vercel.
 6. **Telegram-боты:** у @BotFather создать **двух** ботов — `pulse_dev_bot` и рабочий (имя по D-20). Токены — в env соответствующих сред. Один бот на две среды запрещён: вебхук у бота один, dev-эксперименты будут воровать апдейты у прода.
 7. **Вебхук:** после первого деплоя Edge Function `tg-webhook` — `setWebhook` на её URL с `secret_token=$TELEGRAM_WEBHOOK_SECRET` (для каждой среды свой бот → свой URL → свой секрет).
