@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
+import { DirectorFab } from "@/components/voice/DirectorFab";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
 
 export default async function DirectorLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,7 @@ export default async function DirectorLayout({ children }: { children: React.Rea
       <AppHeader fullName={profile.fullName} />
       {children}
       <TabBar role="director" />
+      <DirectorFab />
     </div>
   );
 }

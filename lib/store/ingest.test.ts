@@ -1,0 +1,168 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { PostprocessedEntity } from "../ai/postprocess";
+import { VoiceApiError, type VoiceApi } from "../voice/api";
+import { useIngestStore } from "./ingest";
+
+// Hoisted: vi.mock runs before the imports it replaces.
+const api = vi.hoisted(() => ({
+  uploadUrl: vi.fn(),
+  uploadAudio: vi.fn(),
+  transcribe: vi.fn(),
+  parse: vi.fn(),
+  confirm: vi.fn(),
+})) satisfies Record<keyof VoiceApi, unknown>;
+
+vi.mock("../voice/api", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../voice/api")>();
+  return { ...actual, voiceApi: api };
+});
+
+function taskEntity(overrides: Partial<PostprocessedEntity> = {}): PostprocessedEntity {
+  return {
+    kind: "task",
+    assignee_queries: ["Ерлан"],
+    assignee_id: null,
+    assignee_confidence: 0.4,
+    group_id: null,
+    title: "КП для Казхрома",
+    body: null,
+    deadline_iso: null,
+    deadline_confidence: null,
+    deadline_source_text: null,
+    priority: "normal",
+    scheduled_send_at: null,
+    source_span: "КП для Казхрома",
+    assignee: {
+      status: "ambiguous",
+      user_id: null,
+      candidates: [
+        { user_id: "u-1", full_name: "Ерлан Сатов", score: 0.8 },
+        { user_id: "u-2", full_name: "Ерлан Ким", score: 0.75 },
+      ],
+      flag: "check",
+    },
+    blocked: "assignee_unmatched",
+    ...overrides,
+  } as PostprocessedEntity;
+}
+
+const audio = { blob: new Blob(["x"]), mime: "audio/webm;codecs=opus", durationMs: 4200 };
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  useIngestStore.getState().reset();
+});
+
+describe("ingest store", () => {
+  it("takes typed input straight to confirm", async () => {
+    const entity = taskEntity({ blocked: undefined, assignee_id: "u-1" });
+    api.parse.mockResolvedValue({ entities: [entity] });
+
+    await useIngestStore.getState().submitText("  Ерлану КП для Казхрома  ");
+    const state = useIngestStore.getState();
+
+    expect(api.parse).toHaveBeenCalledWith(
+      expect.objectContaining({ transcript: "Ерлану КП для Казхрома", source: "typed" }),
+    );
+    expect(state.stage).toBe("confirm");
+    expect(state.source).toBe("typed");
+    expect(state.clientRequestId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(state.entities).toEqual([entity]);
+    expect(state.parsedEntities).toEqual([entity]);
+    expect(state.error).toBeNull();
+  });
+
+  it("surfaces empty_transcript without calling the parser", async () => {
+    api.uploadUrl.mockResolvedValue({ audio_path: "c/u/1.webm", signed_url: "https://s", token: "t" });
+    api.uploadAudio.mockResolvedValue(undefined);
+    api.transcribe.mockRejectedValue(new VoiceApiError("empty_transcript", 422, { error: { code: "empty_transcript" } }));
+
+    await useIngestStore.getState().ingestAudio(audio);
+    const state = useIngestStore.getState();
+
+    expect(state.stage).toBe("error");
+    expect(state.error?.code).toBe("empty_transcript");
+    expect(state.retryFrom).toBeNull();
+    expect(api.parse).not.toHaveBeenCalled();
+  });
+
+  it("keeps the audio path on stt_failed and retries transcription", async () => {
+    api.uploadUrl.mockResolvedValue({ audio_path: "c/u/2.webm", signed_url: "https://s", token: "t" });
+    api.uploadAudio.mockResolvedValue(undefined);
+    api.transcribe.mockRejectedValue(
+      new VoiceApiError("stt_failed", 502, { error: { code: "stt_failed" }, audio_path: "c/u/2.webm" }),
+    );
+
+    useIngestStore.setState({ clientRequestId: crypto.randomUUID() });
+    await useIngestStore.getState().ingestAudio(audio);
+
+    expect(useIngestStore.getState().error?.code).toBe("stt_failed");
+    expect(useIngestStore.getState().retryFrom).toBe("transcribe");
+    expect(useIngestStore.getState().audioPath).toBe("c/u/2.webm");
+    expect(useIngestStore.getState().audio).not.toBeNull();
+
+    api.transcribe.mockResolvedValue({
+      transcript: "Ерлану КП",
+      audio_path: "c/u/2.webm",
+      stt_provider: "openai",
+      latency_ms: 900,
+    });
+    api.parse.mockResolvedValue({ entities: [taskEntity({ blocked: undefined, assignee_id: "u-1" })] });
+
+    await useIngestStore.getState().retry();
+
+    expect(api.uploadUrl).toHaveBeenCalledTimes(1); // no re-upload of the same recording
+    expect(useIngestStore.getState().stage).toBe("confirm");
+  });
+
+  it("sends only unblocked entities and the assignee the director picked", async () => {
+    const blocked = taskEntity();
+    const announcement = {
+      kind: "announcement",
+      text: "В пятницу общий сбор",
+      source_span: "В пятницу общий сбор",
+    } as PostprocessedEntity;
+    const points = {
+      kind: "points",
+      assignee_queries: ["Ерлан"],
+      assignee_id: "u-1",
+      assignee_confidence: 0.9,
+      amount: 10,
+      reason: "за скорость",
+      source_span: "плюс десять Ерлану",
+    } as PostprocessedEntity;
+
+    api.parse.mockResolvedValue({ entities: [blocked, announcement, points] });
+    api.confirm.mockResolvedValue({ result: { task_ids: ["t-1"] }, duplicate: false });
+
+    await useIngestStore.getState().submitText("Ерлану КП, в пятницу общий сбор, плюс десять");
+
+    // The director taps the second candidate on the ambiguous chip.
+    useIngestStore.getState().editEntity(0, {
+      assignee: {
+        status: "matched",
+        user_id: "u-2",
+        candidates: blocked.assignee?.candidates ?? [],
+        flag: "ok",
+      },
+      blocked: undefined,
+    });
+
+    await useIngestStore.getState().send(true);
+
+    expect(api.confirm).toHaveBeenCalledTimes(1);
+    const payload = api.confirm.mock.calls[0][0];
+    expect(payload.force_now).toBe(true);
+    expect(payload.source).toBe("typed");
+    expect(payload.client_request_id).toBe(useIngestStore.getState().clientRequestId);
+    expect(payload.confirmed_entities).toHaveLength(2); // points never reach the batch (G.22)
+    expect(payload.confirmed_entities[0]).toMatchObject({ kind: "task", assignee_id: "u-2" });
+    expect(payload.confirmed_entities[0]).not.toHaveProperty("assignee");
+    expect(payload.confirmed_entities[0]).not.toHaveProperty("blocked");
+    expect(payload.confirmed_entities[1]).toMatchObject({ kind: "announcement" });
+    expect(payload.parsed_entities[0]).not.toHaveProperty("assignee");
+    expect(payload.parsed_entities[0].assignee_id).toBeNull(); // the diff keeps what the model said
+    expect(useIngestStore.getState().stage).toBe("done");
+  });
+});
