@@ -1,0 +1,43 @@
+# tasks/008-api-voice-routes.md — Route handlers голосового конвейера и задач: upload-url, transcribe, parse, confirm, transition, revoke
+
+> **Режим исполнителя.** Ты выполняешь этот наряд строго по шагам, ради экономии токенов: НЕ читай доки сверх списка ниже, НЕ запускай /code-review, НЕ улучшай и НЕ рефакторь вне скоупа, НЕ исследуй альтернативы. Самопроверка — ТОЛЬКО команды из «Проверки» (они обязательны, их пропускать нельзя). Семантическое ревью сделает отдельная сессия. Наткнулся на противоречие или отсутствующее решение — СТОП, запиши вопрос в отчёт и в WORKLOG.md, не выдумывай.
+
+## Контекст (читать только это)
+- `docs/BACKEND.md` §0 (правила слоя, формат ошибки), §2 (все четыре `/api/voice/*` — контракты входа/выхода), §3 (таблица RPC), §9 (контракт ошибок для фронта).
+- `docs/AI.md` §1 (guard: коды и что делать при отбросе), §10 (что пишется в `ai_logs` на parse и confirm), §11 (коды состояний).
+- Уже есть и используется как есть: `lib/ai/stt.ts` (`transcribe`, `buildVocabularyHints`), `lib/ai/stt-guard.ts` (`guardTranscript`), `lib/ai/parse.ts` (`parseTranscript`, `ParseError`), `lib/ai/postprocess.ts`, `lib/ai/schema.ts`, `lib/matchName.ts` (`RosterUser`), `lib/auth.ts` (`getSessionProfile(req)`, `requireRole`, `AuthError`), `lib/supabase/{server,service}.ts`, `lib/supabase/types.ts`, RPC `confirm_voice_batch`/`transition_task`/`revoke_task` (наряд 007), bucket `voice`.
+- Решения: G.3 (`client_request_id` на всех мутациях), принцип 5 CLAUDE.md (аудио в Storage ДО AI-вызовов), G.22 (points не персистятся в пилоте), D-36 (`source='shared'` — points запрещён).
+- Rate limiting (BACKEND §1) — НЕ в этом наряде (бэклог).
+- Предусловия: наряды 006 и 007 влиты в `main`.
+
+## Ветка и скоуп
+- Ветка: `feat/008-api-voice-routes` от `main`.
+- Трогать только: `lib/api/*`, `lib/roster.ts`, `lib/ai/edit-diff.ts` (+тест), `app/api/voice/*`, `app/api/tasks/[id]/*`, `scripts/smoke-voice.ts`, `package.json` (script `smoke:voice`), `WORKLOG.md`.
+
+## Шаги
+1. `lib/api/respond.ts` — `apiError(status, code, message_ru, extra?)` → `NextResponse.json({ error: { code, message_ru }, ...extra }, { status })`; `apiOk(body, status = 200)`. `lib/api/handler.ts` — `withAuth(roles: Role[] | 'any', fn: (ctx: { req, profile, body }) => Promise<Response>, schema?: ZodType)`: разбирает JSON, валидирует zod (ошибка → 400 `validation_error`, `message_ru: 'Неверный запрос'`), `getSessionProfile(req)` → `AuthError` → её статус/код; `requireRole`; любое иное исключение → 500 `internal` (в лог — `console.error` без тела запроса и без ключей). Роли: как в BACKEND §1.
+2. `lib/roster.ts` (server-only): `loadRoster(companyId): Promise<RosterUser[] & { position? }>` — активные профили компании через service-клиент (`id, full_name, aliases, is_active, position`), сортировка по `id`; плюс `vocabularyHintsFor(roster, settings)` → `buildVocabularyHints({ users, counterparties: settings?.vocabulary ?? [] })`.
+3. `POST /api/voice/upload-url` (любая активная роль): вход `{ ext: 'webm'|'m4a'|'mp4', context: 'director_input'|'task_message', client_request_id: uuid }`; путь `voice/{company_id}/{user_id}/{uuid}.{ext}` (uuid = `client_request_id`); service-клиент `storage.from('voice').createSignedUploadUrl(path)`; для `context='director_input'` — insert `inbox_items` (`status='recorded'`, `audio_path`, `client_request_id`, `user_id`, `company_id`) через service-клиент, вернуть `inbox_id`; выход `{ audio_path, signed_url, token, inbox_id? }`.
+4. `POST /api/voice/transcribe` (`export const maxDuration = 60`): вход `{ audio_path, context, client_request_id }`; проверка, что `audio_path` начинается с `{company_id}/{user_id}/` вызывающего (иначе 403 `forbidden`); скачать через service-клиент `storage.from('voice').download(path)` → Buffer + mime по расширению; `transcribe(buffer, mime, { language: null, vocabularyHints })` (без language-хинта — итог гейта, ступень «авто» лучше на казахском); при `SttError` → 502 `stt_failed` с `audio_path` в теле, `ai_logs` (`kind='stt'`, `status='error:stt_failed'`, provider/model из ошибки если есть); `guardTranscript({ text, durationMs: <длительность аудио — если недоступна, взять `result.durationMs` как оценку и записать в отчёт, что нужна реальная длительность из клиента: добавить необязательное поле `duration_ms` во вход и использовать его при наличии>, vocabularyHints })`: `ok:false` → 200 `{ transcript: null, code: 'empty_transcript', guard: code }`, `ai_logs` `status='error:stt_guard:<code>'`; `ok:true` → 200 `{ transcript, audio_path, stt_provider, latency_ms, suspicious }`, `ai_logs` `kind='stt'`, `status='ok'`, `transcript`, `stt_ms`, `provider`, `client_request_id`; `inbox_items` (если есть по `client_request_id`) → `transcribed`, `transcript`. `context='task_message'` — то же, без inbox.
+5. `POST /api/voice/parse` (director, `maxDuration = 60`): вход `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id, suspicious?: boolean }`; идемпотентность: если в `ai_logs` есть строка `kind='parse'` с этим `client_request_id` и `status='ok'` — вернуть её `parsed_entities` без вызова модели; иначе `parseTranscript({ transcript, source, now: new Date(), roster })` → `postprocess(entities, roster, source)`; при `suspicious` — принудительно `assignee.flag = 'check'` и `assignee_confidence = min(…, 0.5)` (AI.md §1 (ж)); ошибки: `ParseError('parse_refused')` → 422 `parse_refused` с `transcript`; `parse_failed` → 502 `parse_failed`; пусто → 200 `{ entities: [] }` (фронт покажет `parse_empty`); успех → 200 `{ entities, model, escalated, latency_ms }`; `ai_logs` (`kind='parse'`, `source`, `provider='anthropic'`, `model`, `transcript`, `parsed_entities`, `input_tokens`, `output_tokens`, `cache_read_tokens`, `parse_ms`, `latency_ms`, `status`, `client_request_id`, `raw_response` = usage+stop_reason, НЕ весь ответ); `inbox_items` → `parsed`, `entities`.
+6. `lib/ai/edit-diff.ts` — `editDiff(parsed: Entity[], confirmed: Entity[]): { was_edited: boolean; edit_fields: string[] }`: сравнение по индексу; удалённая/добавленная сущность → `edit_fields` включает `entity.<i>.removed|added`; различающиеся поля → `entity.<i>.<field>`; поля `assignee`, `blocked` (служебные из postprocess) игнорируются. Тест на 4 кейса.
+7. `POST /api/voice/confirm` (director): вход `{ client_request_id, source, audio_path?, transcript, parsed_entities, confirmed_entities, force_now?, inbox_id? }` (сущности — по `ParseResultSchema['entities']` с допуском служебных полей `assignee`/`blocked`, которые перед RPC вырезаются); `editDiff` → `rpc('confirm_voice_batch', { payload, client_request_id })` через **клиент пользователя** (`createServerSupabase()` / bearer — RPC сам проверяет роль); ответ RPC → 200 `{ result, duplicate }`; ошибка `assignee_required` → 400; `forbidden` → 403.
+8. `POST /api/tasks/[id]/transition` (любая роль): вход `{ to_status, reason?, comment?, client_request_id }` → `rpc('transition_task', …)` клиентом пользователя; `invalid_transition` → 409 `invalid_transition` («Так нельзя: статус уже изменился»); `task_not_found` → 404. `POST /api/tasks/[id]/revoke` (director): `{ client_request_id }` → `rpc('revoke_task', …)`.
+9. `scripts/smoke-voice.ts` (`smoke:voice`, требует `pnpm dev` и `.env.local`): вход director через supabase-js → bearer; (а) `POST /api/voice/parse` с `{ transcript: "Марат, подготовь КП по Казхрому завтра до обеда. Ерлану Б. плюс десять", source: "typed" }` → 2 сущности, points с `blocked`; (б) повтор с тем же `client_request_id` → тот же ответ (идемпотентность — проверить по `ai_logs`, что строка одна); (в) `POST /api/voice/confirm` с `confirmed_entities` = сущности (a) → `result.task_ids.length === 1`, `skipped` содержит points; (г) вход `erlan.b` → `GET`-чтение задачи через supabase-js под RLS — задача Марата не видна, вход `marat` → видна, `POST /api/tasks/{id}/transition {to_status:'accepted'}` → 200; повтор того же `client_request_id` → 200 без изменений; (д) director `POST /api/tasks/{id}/revoke` → 200 `revoked`; (е) без токена → 401; employee `POST /api/voice/parse` → 403. Печать таблицы, код выхода 1 при провале. Стоимость ~$0.01.
+
+## Проверки (обязательные, машинные)
+```powershell
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+# в отдельном терминале: pnpm dev
+pnpm smoke:voice
+```
+Все должны завершиться успешно. Красная проверка = чинить в рамках скоупа, не расширяя его.
+
+## Definition of Done
+- [ ] Шаги выполнены, проверки зелёные.
+- [ ] Коммит(ы): conventional commits, мелкие; подпись `Co-Authored-By` — своей моделью исполнителя (не Fable).
+- [ ] Append-запись в WORKLOG.md: `## <дата> — Исполнитель (Opus) — 008 api-voice-routes` + Сделано/Коммиты/Вопросы.
+- [ ] Отчёт в чат: что сделано, вывод `smoke:voice`, открытые вопросы. Файлы не пересказывать.

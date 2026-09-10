@@ -194,6 +194,7 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 | `accepted → pending_review` | исполнитель (отчёт) |
 | `pending_review → done \| rework` | только director |
 | `rework → accepted` | исполнитель |
+| `declined → sent` | director («Настоять», G.20; `closed_at` обнуляется) |
 | `любой до done → revoked` | director (`revoke_task`) |
 | `scheduled → (delete)` | director, до отправки |
 
