@@ -31,7 +31,7 @@ insert into announcements (id, company_id, author_id, transcript)
 values ('90000000-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111',
         '10000000-0000-0000-0000-000000000001', 'Завтра собрание');
 select is(
-  (select count(*) from notification_deliveries where event_kind = 'announcement'),
+  (select count(*) from notification_deliveries where event_kind = 'announcement' and meta->>'body' = 'Завтра собрание'),
   (select count(*) from profiles
     where company_id = '11111111-1111-1111-1111-111111111111' and is_active and role <> 'tv'
       and id <> '10000000-0000-0000-0000-000000000001'),
@@ -45,12 +45,15 @@ set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000007","r
 insert into task_messages (company_id, task_id, sender_id, type, content, meta)
 values ('11111111-1111-1111-1111-111111111111', '90000000-0000-0000-0000-000000000001',
         '10000000-0000-0000-0000-000000000007', 'text', 'Какой склад?', '{"is_question": true}');
+-- the receipt belongs to the author: count it as the director, then return to the assignee
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is(
   (select count(*) from notification_deliveries
     where task_id = '90000000-0000-0000-0000-000000000001' and event_kind = 'question'),
   1::bigint,
   'question queues a push for the author'
 );
+set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000007","role":"authenticated"}';
 
 -- ---------------------------------------------------------------------------
 -- Receipts: the addressee reads own rows, the director reads all, others none
