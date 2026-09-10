@@ -7,7 +7,7 @@ set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000005","r
 
 select is(
   (select count(*) from profiles),
-  8::bigint,
+  9::bigint,
   'employee sees every profile of his company'
 );
 

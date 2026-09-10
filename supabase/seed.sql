@@ -45,7 +45,9 @@ from (values
   ('10000000-0000-0000-0000-000000000005'::uuid, 'erlan.b@demo.local'),
   ('10000000-0000-0000-0000-000000000006'::uuid, 'erlan.d@demo.local'),
   ('10000000-0000-0000-0000-000000000007'::uuid, 'marat@demo.local'),
-  ('10000000-0000-0000-0000-000000000008'::uuid, 'aigul@demo.local')
+  ('10000000-0000-0000-0000-000000000008'::uuid, 'aigul@demo.local'),
+  -- owner's test account (dev only): password below is overridden right after the insert
+  ('10000000-0000-0000-0000-000000000009'::uuid, 'test@demo.local')
 ) as u(id, email);
 
 -- password sign-in resolves the account through auth.identities
@@ -82,7 +84,13 @@ insert into profiles (id, company_id, full_name, role, "position", aliases, mana
    'Марат Оспанов', 'employee', 'Специалист', '{"Марат"}',
    '10000000-0000-0000-0000-000000000002', 'active'),
   ('10000000-0000-0000-0000-000000000008', '11111111-1111-1111-1111-111111111111',
-   'Айгуль Сапарова', 'employee', 'Специалист', '{"Айгуль"}', null, 'vacation');
+   'Айгуль Сапарова', 'employee', 'Специалист', '{"Айгуль"}', null, 'vacation'),
+  ('10000000-0000-0000-0000-000000000009', '11111111-1111-1111-1111-111111111111',
+   'ТЕСТ', 'director', 'Тестовый директор', '{"Тест"}', null, 'active');
+
+-- The owner's test login: test@demo.local / 1 (dev seed only, never prod).
+update auth.users set encrypted_password = crypt('1', gen_salt('bf'))
+ where id = '10000000-0000-0000-0000-000000000009';
 
 -- ---------------------------------------------------------------------------
 -- Tasks: one per enum status, one group_id pair, one overdue, one open question.

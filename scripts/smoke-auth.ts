@@ -52,8 +52,8 @@ async function main() {
 
   const roster = await director.supabase.from("profiles").select("id");
   record(
-    "director: profiles = 8 строк",
-    !roster.error && roster.data?.length === 8,
+    "director: profiles = 9 строк",
+    !roster.error && roster.data?.length === 9,
     roster.error?.message ?? `rows=${roster.data?.length}`,
   );
 
