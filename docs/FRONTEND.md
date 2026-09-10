@@ -36,6 +36,7 @@
 | `/ether` | все авторизованные | layout: проверка сессии |
 | `/profile` | все авторизованные | layout: проверка сессии |
 | `/rating` | все авторизованные | layout: проверка сессии; «+» только director |
+| `/sent` | director | layout группы; «Отправленные» — все поручения автора по дням, фильтры по статусу |
 | `/settings` | director | layout группы |
 | `/people`, `/people/new`, `/people/[id]` | director | layout группы; создание логина — `POST /api/people`, правка карточки — update `profiles` под RLS |
 | `/shop` | все [ПОСЛЕ ПИЛОТА] | layout: проверка сессии |

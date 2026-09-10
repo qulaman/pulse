@@ -10,7 +10,8 @@ import { join } from "node:path";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
-const PHRASE = process.env.SMOKE_PHRASE ?? "Марат, подготовь КП по Казхрому завтра до обеда";
+const STAMP = Date.now().toString(36);
+const PHRASE = process.env.SMOKE_PHRASE ?? `Марат, подготовь КП по Казхрому ${STAMP} завтра до обеда`;
 
 mkdirSync(SHOTS, { recursive: true });
 
@@ -128,6 +129,21 @@ async function main() {
     }
     await page.screenshot({ path: join(SHOTS, "05-after-send.png") });
     record("отправка → /pulse", sent, page.url());
+
+    // persistence: a cold reload of /sent reads the task straight from the database
+    await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
+    await page.reload({ waitUntil: "networkidle" });
+    const sentCard = page.locator('[data-testid="sent-task"]', { hasText: STAMP }).first();
+    let persisted = false;
+    try {
+      await sentCard.waitFor({ timeout: 15_000 });
+      persisted = true;
+    } catch {
+      persisted = false;
+    }
+    const status = persisted ? await sentCard.getAttribute("data-status") : null;
+    await page.screenshot({ path: join(SHOTS, "05b-sent.png") });
+    record("задача сохранена: видна в «Отправленных» после перезагрузки", persisted && status === "sent", `status=${status}`);
   }
 
   // ---- settings: the director switches points on --------------------------------

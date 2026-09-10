@@ -39,6 +39,7 @@ export default async function ProfilePage() {
       <div className="mt-4 flex flex-col gap-2">
         {director ? (
           <>
+            <Row href="/sent" title="Отправленные" hint="все поручения по дням" />
             <Row href="/people" title="Сотрудники" hint="карточки, алиасы, роли" />
             <Row href="/settings" title="Настройки" hint="распознавание, разбор, очки" />
           </>

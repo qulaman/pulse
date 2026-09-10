@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
@@ -100,6 +102,14 @@ export default function PulsePage() {
           <p className="mt-1 text-[13px] leading-4 text-muted">{loading ? " " : style.sub}</p>
         </div>
       </section>
+
+      <Link
+        href="/sent"
+        className="mt-3 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+      >
+        Отправленные
+        <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
+      </Link>
 
       {loading ? (
         <div className="mt-6">

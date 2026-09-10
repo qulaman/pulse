@@ -46,6 +46,7 @@ const OVERDUE_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "rework"];
 export const taskKeys = {
   root: ["tasks"] as const,
   mine: (userId: string) => ["tasks", "mine", userId] as const,
+  sent: (userId: string) => ["tasks", "sent", userId] as const,
   inbox: () => ["tasks", "inbox"] as const,
   detail: (taskId: string) => ["tasks", "detail", taskId] as const,
   thread: (taskId: string) => ["task-thread", taskId] as const,
@@ -111,6 +112,28 @@ export function useMyTasks(userId: string | undefined) {
     queryKey: taskKeys.mine(userId ?? ""),
     queryFn: fetchMyTasks,
     channel: { table: "tasks", filter: userId ? `assignee_id=eq.${userId}` : undefined },
+    enabled: Boolean(userId),
+  });
+}
+
+async function fetchSentTasks(userId: string): Promise<TaskWithPeople[]> {
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_SELECT)
+    .eq("author_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as TaskWithPeople[];
+}
+
+/** Everything the director sent, newest first — «Отправленные». Scheduled ones included (author sees them). */
+export function useSentTasks(userId: string | undefined) {
+  return useRealtimeQuery<TaskWithPeople[], TaskRow>({
+    queryKey: taskKeys.sent(userId ?? ""),
+    queryFn: () => fetchSentTasks(userId as string),
+    channel: { table: "tasks", filter: userId ? `author_id=eq.${userId}` : undefined },
     enabled: Boolean(userId),
   });
 }
