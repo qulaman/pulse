@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
-import { formatAqtobe } from "@/lib/ai/time";
+import { humanAqtobe } from "@/lib/ai/time";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { isPendingMessage, type TaskMessage } from "@/lib/tasks/queries";
 import { statusChangeLine, TEXT } from "@/lib/tasks/status-text";
@@ -43,7 +43,7 @@ export function latestDeclineReason(messages: TaskMessage[] | undefined): string
 
 function MessageRow({ message }: { message: TaskMessage }) {
   const flags = messageFlags(message);
-  const time = formatAqtobe(new Date(message.created_at));
+  const time = humanAqtobe(new Date(message.created_at));
 
   if (message.type === "status_change") {
     return (

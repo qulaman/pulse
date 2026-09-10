@@ -5,7 +5,7 @@ import { useState } from "react";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { formatAqtobe } from "@/lib/ai/time";
+import { humanAqtobe } from "@/lib/ai/time";
 import type { Announcement } from "@/lib/ether/queries";
 
 const ICON = (
@@ -47,7 +47,7 @@ export function AnnouncementCard({
         <div className="min-w-0 flex-1">
           <p className="text-[16px] leading-[22px]">{item.transcript}</p>
           <p className="nums mt-1 text-[13px] leading-4 text-muted">
-            {item.author?.full_name ?? "Директор"} · {formatAqtobe(new Date(item.created_at))}
+            {item.author?.full_name ?? "Директор"} · {humanAqtobe(new Date(item.created_at))}
           </p>
         </div>
       </div>
@@ -88,7 +88,7 @@ export function AnnouncementCard({
             {item.acks.map((ack) => (
               <li key={ack.user_id} className="flex justify-between gap-3 text-[16px] leading-[22px]">
                 <span>{ack.user?.full_name ?? "Сотрудник"}</span>
-                <span className="nums text-[13px] text-muted">{formatAqtobe(new Date(ack.created_at))}</span>
+                <span className="nums text-[13px] text-muted">{humanAqtobe(new Date(ack.created_at))}</span>
               </li>
             ))}
           </ul>

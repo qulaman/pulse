@@ -1,4 +1,4 @@
-import { formatAqtobe } from "@/lib/ai/time";
+import { humanAqtobe } from "@/lib/ai/time";
 import type { Database } from "@/lib/supabase/types";
 
 export type TaskStatus = Database["public"]["Enums"]["task_status"];
@@ -81,7 +81,7 @@ export function deadlineLabel(
   now: Date = new Date(),
 ): DeadlineLabel {
   if (!task.deadline) return { text: TEXT.noDeadline, overdue: false, none: true };
-  const text = formatAqtobe(new Date(task.deadline));
+  const text = humanAqtobe(new Date(task.deadline), now);
   return { text, overdue: isOverdue(task, now), none: false };
 }
 

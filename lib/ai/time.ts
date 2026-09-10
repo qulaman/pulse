@@ -49,6 +49,24 @@ export function formatAqtobe(date: Date): string {
   );
 }
 
+/**
+ * What a person would say: «сегодня 13:00», «завтра 13:00», «пт 13:00» within the
+ * coming week, «14.08 13:00» further out, the year only when it differs from now's.
+ */
+export function humanAqtobe(date: Date, now: Date = new Date()): string {
+  const w = toWall(date);
+  const n = toWall(now);
+  const time = `${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`;
+  const dayOf = (d: Date) => Math.floor(d.getTime() / 86_400_000);
+  const diff = dayOf(w) - dayOf(n);
+  if (diff === 0) return `сегодня ${time}`;
+  if (diff === 1) return `завтра ${time}`;
+  if (diff === -1) return `вчера ${time}`;
+  if (diff > 1 && diff < 7) return `${WEEKDAYS_SHORT_RU[w.getUTCDay()]} ${time}`;
+  const day = `${pad(w.getUTCDate())}.${pad(w.getUTCMonth() + 1)}`;
+  return w.getUTCFullYear() === n.getUTCFullYear() ? `${day} ${time}` : `${day}.${w.getUTCFullYear()} ${time}`;
+}
+
 export function weekdayRu(date: Date): string {
   return WEEKDAYS_RU[toWall(date).getUTCDay()];
 }
