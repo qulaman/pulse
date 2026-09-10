@@ -1,0 +1,96 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
+
+import { getPublicEnv } from "@/lib/env.public";
+import type { Database } from "@/lib/supabase/types";
+
+/** Landing route per role. `/tv` does not exist yet (task 006 scope). */
+function homeForRole(role: Database["public"]["Enums"]["user_role"] | undefined): string {
+  if (role === "director") return "/pulse";
+  if (role === "tv") return "/profile";
+  return "/feed";
+}
+
+function isPublicPath(pathname: string): boolean {
+  // Component sandboxes need no session; app/dev/layout.tsx 404s them in production.
+  if (process.env.NODE_ENV !== "production" && (pathname === "/dev" || pathname.startsWith("/dev/"))) {
+    return true;
+  }
+  return (
+    pathname === "/login" ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.includes(".")
+  );
+}
+
+/**
+ * Next 16 proxy (former middleware.ts): refreshes the Supabase session cookie
+ * and routes by role. Role guards themselves live in the group layouts —
+ * docs/FRONTEND.md "Навигация и роутинг".
+ */
+export async function proxy(request: NextRequest) {
+  let response = NextResponse.next({ request });
+
+  const env = getPublicEnv();
+  const supabase = createServerClient<Database>(
+    env.NEXT_PUBLIC_SUPABASE_URL,
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          for (const { name, value } of cookiesToSet) {
+            request.cookies.set(name, value);
+          }
+          response = NextResponse.next({ request });
+          for (const { name, value, options } of cookiesToSet) {
+            response.cookies.set(name, value, options);
+          }
+        },
+      },
+    },
+  );
+
+  // Do not run code between createServerClient and getUser: it would break
+  // session refresh and log users out at random (@supabase/ssr contract).
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname } = request.nextUrl;
+
+  if (!user) {
+    if (isPublicPath(pathname)) return response;
+    return redirectTo(request, response, "/login");
+  }
+
+  if (pathname === "/" || pathname === "/login") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    return redirectTo(request, response, homeForRole(profile?.role));
+  }
+
+  return response;
+}
+
+/** Redirect that keeps the refreshed auth cookies of `response`. */
+function redirectTo(request: NextRequest, response: NextResponse, pathname: string) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  const redirect = NextResponse.redirect(url);
+  for (const cookie of response.cookies.getAll()) {
+    redirect.cookies.set(cookie);
+  }
+  return redirect;
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|api/|.*\.[\w]+$).*)"],
+};

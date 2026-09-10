@@ -13,15 +13,21 @@
     "test:stt": "node tests/stt/run.mjs",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset --linked",
-    "test:rls": "supabase test db --linked"
+    "test:rls": "supabase test db --linked",
+    "db:types": "supabase gen types typescript --linked --schema public > lib/supabase/types.ts",
+    "smoke:auth": "tsx scripts/smoke-auth.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.116.0",
+    "@tanstack/react-query": "^5.102.8",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
-    "zod": "^4.5.4"
+    "zod": "^4.5.4",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
