@@ -27,7 +27,7 @@ function useProfileStats(userId: string, role: Role) {
 
       if (role === "director") {
         const [people, sent, openAll] = await Promise.all([
-          supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true).neq("role", "tv"),
+          supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true).not("role", "in", "(tv,director)"),
           supabase.from("tasks").select("id", { count: "exact", head: true }).gte("created_at", since),
           supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["sent", "accepted", "rework", "pending_review"]),
         ]);

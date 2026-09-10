@@ -13,7 +13,8 @@ const PRESETS = [5, 10, 20];
 const REASONS = ["за скорость", "за качество", "за инициативу", "за выручку"];
 
 function Delta({ value }: { value: number }) {
-  if (value === 0) return <span className="text-[13px] leading-4 text-muted">—</span>;
+  // no movement yet — an empty line reads cleaner than a dash
+  if (value === 0) return null;
   const up = value > 0;
   return (
     <span className="nums text-[13px] leading-4" style={{ color: up ? "var(--ok)" : "var(--danger)" }}>
@@ -87,27 +88,27 @@ export function RatingList({ canAward, pointsEnabled }: { canAward: boolean; poi
 
       {rating.isLoading ? (
         <p className="mt-6 text-[16px] leading-[22px] text-muted">Считаю очки…</p>
-      ) : rows.length === 0 || rows.every((r) => r.points === 0) ? (
-        <div className="mt-6 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
-          <Mascot state="calm" size={64} />
-          <p className="mt-4 text-[16px] leading-[22px]">Пока никто не набрал очков</p>
-          <p className="mt-1 text-[13px] leading-4 text-muted">
-            {canAward ? "Нажми «+» у сотрудника или скажи «Марату плюс десять за скорость»" : "Первые очки появятся после закрытых задач"}
-          </p>
+      ) : (
+        <>
+          {rows.length === 0 || rows.every((r) => r.points === 0) ? (
+            <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-border bg-surface px-4 py-3 text-left">
+              <Mascot state="calm" size={44} />
+              <div>
+                <p className="text-[16px] leading-[22px]">Пока никто не набрал очков</p>
+                <p className="mt-0.5 text-[13px] leading-4 text-muted">
+                  {canAward ? "Нажми «+» у сотрудника или скажи «Марату плюс десять за скорость»" : "Первые очки придут за закрытые в срок задачи"}
+                </p>
+              </div>
+            </div>
+          ) : null}
           {rows.length > 0 ? (
-            <ul className="mt-6 w-full space-y-2">
+            <ul className="mt-4 space-y-2">
               {rows.map((row) => (
                 <Row key={row.user_id} row={row} canAward={canAward && pointsEnabled} onAward={setTarget} />
               ))}
             </ul>
           ) : null}
-        </div>
-      ) : (
-        <ul className="mt-4 space-y-2">
-          {rows.map((row) => (
-            <Row key={row.user_id} row={row} canAward={canAward && pointsEnabled} onAward={setTarget} />
-          ))}
-        </ul>
+        </>
       )}
 
       <AwardSheet
