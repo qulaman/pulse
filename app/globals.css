@@ -61,6 +61,11 @@ body {
   font-size: 16px;
   line-height: 22px;
   -webkit-font-smoothing: antialiased;
+  /* app chrome, not a document: no text caret or selection outside real inputs
+     (a mouse click on a label must never place a blinking cursor — Chrome caret browsing included) */
+  -webkit-user-select: none;
+  user-select: none;
+  caret-color: transparent;
 }
 
 /* Pulse numbers read on an outstretched arm — no digit jitter. */
@@ -178,4 +183,14 @@ button, a[href] { -webkit-tap-highlight-color: transparent; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* the only places a caret belongs */
+input,
+textarea,
+select,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  caret-color: var(--accent);
 }
