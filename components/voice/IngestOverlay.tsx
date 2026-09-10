@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { subscribeIngestLevel, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
@@ -44,6 +45,14 @@ const ERRORS: Record<IngestErrorCode, ErrorView> = {
   upload_failed: { line: "Не смог сохранить аудио — повторить?", action: "retry" },
   network: { line: "Нет связи. Попробую ещё раз", action: "retry" },
   unknown: { line: "Что-то пошло не так — повторить?", action: "retry" },
+};
+
+const SCENE: Record<string, Scene> = {
+  recording: "listening",
+  uploading: "saving",
+  transcribing: "transcribing",
+  parsing: "parsing",
+  sending: "sending",
 };
 
 function elapsed(startedAt: number | null): string {
@@ -133,8 +142,8 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     >
       {showProgress ? (
         <>
-          <Mascot state={stage === "recording" ? "listening" : "thinking"} size={88} level={level} />
-          <p className="mt-4 text-[19px] font-semibold leading-6">
+          <MascotScene scene={SCENE[stage] ?? "parsing"} level={level} />
+          <p className="mt-5 text-[19px] font-semibold leading-6">
             {STAGE_LINE[stage]}
             {stage === "recording" ? (
               <span ref={timerRef} className="nums ml-2 text-muted">

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
+import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 
 const STATES: { state: MascotState; label: string }[] = [
   { state: "calm", label: "Спокоен — дыхание, моргает, изредка косится" },
@@ -48,6 +49,16 @@ export default function MascotSandbox() {
         <button type="button" className="mt-3 text-[13px] text-accent underline" onClick={() => setAuto((v) => !v)}>
           {auto ? "Остановить автоуровень" : "Автоуровень"}
         </button>
+      </div>
+
+      <h2 className="mt-8 text-[19px] font-semibold leading-6">Сцены оверлея</h2>
+      <div className="mt-3 grid grid-cols-1 gap-4">
+        {(["listening", "transcribing", "sending"] as Scene[]).map((scene) => (
+          <div key={scene} className="flex flex-col items-center rounded-[16px] border border-border bg-surface p-5">
+            <MascotScene scene={scene} level={scene === "listening" ? level : 0} />
+            <p className="mt-3 text-[13px] leading-4 text-muted">{scene}</p>
+          </div>
+        ))}
       </div>
 
       <div className="mt-6 flex items-center gap-4 rounded-[16px] border border-border bg-surface p-4">

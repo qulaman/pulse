@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { AwardSheet, type AwardTarget } from "@/components/rating/AwardSheet";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
 import { Button } from "@/components/ui/Button";
@@ -17,6 +18,7 @@ import {
   usePerson,
   usePersonMessages,
 } from "@/lib/people/queries";
+import { balanceOf, useAwardPoints, usePointHistory, usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, type TaskWithPeople } from "@/lib/tasks/queries";
@@ -25,12 +27,14 @@ import { STATUS_LABEL, isOverdue, type TaskStatus } from "@/lib/tasks/status-tex
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
 
-function Stat({ value, label, tone }: { value: string | number; label: string; tone?: "danger" | "ok" }) {
+const STAT_COLOR = { danger: "var(--danger)", ok: "var(--ok)", gold: "var(--gold)" } as const;
+
+function Stat({ value, label, tone }: { value: string | number; label: string; tone?: keyof typeof STAT_COLOR }) {
   return (
-    <div className="rounded-[12px] bg-surface-2 px-3 py-2 text-center">
+    <div className="rounded-[12px] bg-surface-2 px-2 py-2 text-center">
       <p
-        className="nums text-[24px] font-bold leading-[30px]"
-        style={tone ? { color: tone === "danger" ? "var(--danger)" : "var(--ok)" } : undefined}
+        className="nums text-[22px] font-bold leading-[30px]"
+        style={tone ? { color: STAT_COLOR[tone] } : undefined}
       >
         {value}
       </p>
@@ -53,6 +57,10 @@ export default function PersonPage() {
   const actions = useTaskActions(me.data);
   const compose = useComposeStore((state) => state.request);
   const [showClosed, setShowClosed] = useState(false);
+  const points = usePointHistory(id);
+  const pointsEnabled = usePointsEnabled().data === true;
+  const award = useAwardPoints();
+  const [awardTarget, setAwardTarget] = useState<AwardTarget | null>(null);
 
   // the clock is read once per mount: a lazy initializer is allowed where render is not
   const [now] = useState(() => Date.now());
@@ -123,20 +131,33 @@ export default function PersonPage() {
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-4 gap-2">
           <Stat value={tasks.isLoading ? "…" : groups.open.length + groups.review.length} label="в работе" />
           <Stat value={tasks.isLoading ? "…" : groups.overdue} label="просрочено" tone={groups.overdue > 0 ? "danger" : undefined} />
           <Stat value={tasks.isLoading ? "…" : groups.done30} label="закрыто за 30 дн." tone={groups.done30 > 0 ? "ok" : undefined} />
+          <Stat value={points.isLoading ? "…" : balanceOf(points.data)} label="очков" tone="gold" />
         </div>
 
         <div className="mt-4 flex gap-2">
           <Button block onClick={() => compose(`${dative}, `)}>
             Дать задачу
           </Button>
+          <Button
+            variant="secondary"
+            className="shrink-0"
+            disabled={!pointsEnabled}
+            title={pointsEnabled ? undefined : "Очки выключены в Настройках"}
+            onClick={() => setAwardTarget({ user_id: p.id, display_name: p.full_name })}
+          >
+            Поощрить
+          </Button>
           <Link href={`/people/${p.id}/edit`} className="shrink-0">
-            <Button variant="secondary">Редактировать</Button>
+            <Button variant="secondary">Изменить</Button>
           </Link>
         </div>
+        {!pointsEnabled ? (
+          <p className="mt-2 text-[12px] leading-4 text-muted">Очки выключены — включаются в Настройках</p>
+        ) : null}
         {p.aliases.length > 0 ? (
           <p className="mt-3 text-[13px] leading-4 text-muted">В речи: {p.aliases.join(", ")}</p>
         ) : null}
@@ -222,6 +243,17 @@ export default function PersonPage() {
           )}
         </div>
       </section>
+
+      <AwardSheet
+        target={awardTarget}
+        onClose={() => setAwardTarget(null)}
+        pending={award.isPending}
+        onSubmit={(amount, reason) => {
+          if (!awardTarget) return;
+          award.mutate({ userId: awardTarget.user_id, amount, reason });
+          setAwardTarget(null);
+        }}
+      />
     </main>
   );
 }

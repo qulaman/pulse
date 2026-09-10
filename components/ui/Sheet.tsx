@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 type Props = {
   open: boolean;
@@ -22,7 +23,9 @@ export function Sheet({ open, onClose, title, children }: Props) {
 
   if (!open) return null;
 
-  return (
+  // Portal to <body>: an animated <main> is a stacking context, and a sheet inside it
+  // would sit under the FAB no matter its z-index.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center">
       <button
         type="button"
@@ -46,6 +49,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
         {title ? <h2 className="mb-3 text-[19px] font-semibold leading-6">{title}</h2> : null}
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
