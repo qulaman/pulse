@@ -317,6 +317,15 @@ async function main() {
   await epage.screenshot({ path: join(SHOTS, "20-thread-photo.png"), fullPage: true });
   record("отчёт: фото видно в треде (signed URL)", photoShown);
 
+  // ---- receipt on the director's card: «принял» (D-32) ------------------------------
+  await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /На приёмке/ }).click();
+  const receiptCard = page.locator("article", { hasText: STAMP }).first();
+  await receiptCard.waitFor({ timeout: 15_000 });
+  const receipt = (await receiptCard.getByTestId("delivery-status").textContent().catch(() => "")) ?? "";
+  await page.screenshot({ path: join(SHOTS, "21-receipt.png") });
+  record("квитанция у директора: «принял»", /принял/.test(receipt), receipt.trim());
+
   await epage.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
   const eCard = epage.locator("article", { hasText: STAMP }).first();
   await eCard.waitFor({ timeout: 15_000 });

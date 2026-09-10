@@ -71,8 +71,8 @@ export function PushCard({ compact = false }: { compact?: boolean }) {
     <div className={`card-in ${compact ? "mt-3" : "mt-4"} flex items-center gap-3 rounded-[16px] border border-accent/40 bg-surface px-4 py-3`}>
       <BellIcon />
       <div className="min-w-0 flex-1">
-        <p className="text-[16px] leading-[22px]">Включить уведомления</p>
-        <p className="text-[13px] leading-4 text-muted">Задача придёт на телефон сразу, даже если Pulse закрыт</p>
+        <p className="text-[16px] leading-[22px]">Уведомления</p>
+        <p className="text-[13px] leading-4 text-muted">Задача придёт на телефон, даже если Pulse закрыт</p>
       </div>
       <Button variant="primary" className="!min-h-[40px] !px-3 !text-[14px]" disabled={busy} onClick={enable}>
         {busy ? "…" : "Включить"}
