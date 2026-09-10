@@ -231,7 +231,7 @@ Game feel — часть продукта, не украшение (эталон
 
 ## Компонентная база
 
-`<VoiceButton>` (FAB, запись+волна), `<TaskCard>` (варианты director/employee/tv; пропс `anonymized`), `<EventItem>`, `<StatusChip>`, `<PointsBadge>`, `<SwipeDeck>`, `<AudioPlayer>` (пики из meta, ×1.5), `<CountUpNumber>`, `<RatingList>`, `<EmployeeDot>`, **`<DeliveryStatus>`** (отправлено/увидел/принял + часики оффлайна), **`<OutboxBadge>`** («N не отправлено», тап=ретрай), **`<OnboardingChecklist>`** (экран чек-листа с отметками в БД), `<EffectsLayer>` [ПОСЛЕ ПИЛОТА]. Всё в /components; Storybook не нужен — каждому компоненту страница-песочница в /app/dev (закрыта notFound() в проде).
+`<PulseMark>` (марка: линия кардиомонитора + слово), `<Mascot state size>` («Капля», D-45: calm/listening/thinking/happy, CSS-дыхание), `<VoiceButton>` (FAB, запись+волна, подсказка «удержи — говори · тап — текст»), `<TaskCard>` (варианты director/employee/tv; пропс `anonymized`), `<EventItem>`, `<StatusChip>`, `<PointsBadge>`, `<SwipeDeck>`, `<AudioPlayer>` (пики из meta, ×1.5), `<CountUpNumber>`, `<RatingList>`, `<EmployeeDot>`, **`<DeliveryStatus>`** (отправлено/увидел/принял + часики оффлайна), **`<OutboxBadge>`** («N не отправлено», тап=ретрай), **`<OnboardingChecklist>`** (экран чек-листа с отметками в БД), `<EffectsLayer>` [ПОСЛЕ ПИЛОТА]. Всё в /components; Storybook не нужен — каждому компоненту страница-песочница в /app/dev (закрыта notFound() в проде). Сквозная проверка в реальном браузере — `pnpm smoke:ui` (Playwright поверх системного Chrome, скриншоты; с `FAKE_MIC_WAV` проверяет и голосовой путь через фальшивый микрофон).
 
 ## Производительность [ПИЛОТ]
 
