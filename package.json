@@ -15,7 +15,8 @@
     "db:reset": "supabase db reset --linked",
     "test:rls": "supabase test db --linked",
     "db:types": "supabase gen types typescript --linked --schema public > lib/supabase/types.ts",
-    "smoke:auth": "tsx scripts/smoke-auth.ts"
+    "smoke:auth": "tsx scripts/smoke-auth.ts",
+    "smoke:voice": "tsx scripts/smoke-voice.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
