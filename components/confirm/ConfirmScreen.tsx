@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Mascot } from "@/components/brand/Mascot";
 import { AssigneePicker } from "@/components/confirm/AssigneePicker";
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { EntityCard } from "@/components/confirm/EntityCard";
@@ -99,8 +100,11 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
-        <h1 className="text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5">
+        <div className="flex items-center gap-3">
+          <Mascot state="calm" size={44} />
+          <h1 className="text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
+        </div>
 
         <div className="mt-4 space-y-3">
           {entities.map((entity, index) => (

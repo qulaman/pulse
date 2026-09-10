@@ -58,6 +58,8 @@ async function main() {
   const page = await director.newPage();
   const errors = watch(page, "director");
 
+  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
+  await page.screenshot({ path: join(SHOTS, "00-login.png") });
   await login(page, "test@demo.local", "1");
   record("director: вход → /pulse", page.url().includes("/pulse"), page.url());
   await page.screenshot({ path: join(SHOTS, "01-pulse.png") });

@@ -54,7 +54,7 @@ export function ToastHost() {
   return (
     <div
       className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
-      style={{ bottom: "calc(88px + env(safe-area-inset-bottom))" }}
+      style={{ top: "calc(60px + env(safe-area-inset-top))" }}
     >
       {toasts.map((item) => (
         <ToastItem key={item.id} item={item} />

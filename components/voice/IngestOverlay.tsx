@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
@@ -112,7 +113,8 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     >
       {showProgress ? (
         <>
-          <p className="text-[19px] font-semibold leading-6">
+          <Mascot state={stage === "recording" ? "listening" : "thinking"} size={88} />
+          <p className="mt-4 text-[19px] font-semibold leading-6">
             {STAGE_LINE[stage]}
             {stage === "recording" ? (
               <span ref={timerRef} className="nums ml-2 text-muted">
@@ -129,7 +131,10 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
           className="w-full max-w-lg rounded-[16px] border border-border bg-surface p-4"
           style={{ boxShadow: "var(--shadow-raised)" }}
         >
-          <p className="text-[16px] leading-[22px]">{error.message ?? ERRORS[error.code].line}</p>
+          <div className="flex items-start gap-3">
+            <Mascot state="thinking" size={40} />
+            <p className="text-[16px] leading-[22px]">{error.message ?? ERRORS[error.code].line}</p>
+          </div>
 
           {ERRORS[error.code].showTranscript && transcript ? (
             <p className="mt-3 rounded-[12px] bg-surface-2 px-3 py-2 text-[14px] leading-[18px] text-muted">

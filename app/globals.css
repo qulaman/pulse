@@ -68,6 +68,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Mascot «Капля» and the FAB: transform/opacity only (docs/DESIGN.md §2, D-45). */
+@keyframes mascot-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.045); }
+}
+@keyframes mascot-blink {
+  0%, 93%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.12); }
+}
+@keyframes fab-pulse {
+  0% { transform: scale(1); opacity: 0.35; }
+  100% { transform: scale(1.75); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -104,7 +104,7 @@ export function VoiceButton() {
     <>
       <div
         className="pointer-events-none fixed inset-x-0 z-30 flex flex-col items-center gap-2"
-        style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
+        style={{ bottom: "calc(64px + env(safe-area-inset-bottom))" }}
       >
         {recording ? (
           <span
@@ -116,6 +116,13 @@ export function VoiceButton() {
         ) : null}
 
         <div className="pointer-events-auto relative flex h-16 w-16 items-center justify-center">
+          {!recording && !busy ? (
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-full"
+              style={{ background: "var(--accent)", animation: "fab-pulse 2.6s ease-out infinite" }}
+            />
+          ) : null}
           <span
             ref={ringRef}
             aria-hidden
@@ -151,6 +158,11 @@ export function VoiceButton() {
             🎤
           </button>
         </div>
+        {!recording ? (
+          <span className="rounded-full bg-bg/80 px-2 py-0.5 text-[11px] leading-4 text-muted backdrop-blur">
+            удержи — говори · тап — текст
+          </span>
+        ) : null}
       </div>
 
       <TextSheet open={textOpen} onClose={() => setTextOpen(false)} />

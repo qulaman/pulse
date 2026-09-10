@@ -3,7 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+import { Mascot } from "@/components/brand/Mascot";
+import { PulseMark } from "@/components/brand/PulseMark";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+
+const FIELD =
+  "min-h-[48px] rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,13 +39,16 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-4 py-10">
-      <h1 className="text-[24px] font-bold leading-[30px]">Pulse</h1>
-      <p className="mt-2 text-[16px] leading-[22px] text-muted">
-        Голосовое управление компанией
-      </p>
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-10">
+      <div className="flex items-end justify-between">
+        <div>
+          <PulseMark size="lg" />
+          <p className="mt-2 text-[16px] leading-[22px] text-muted">Голосовое управление компанией</p>
+        </div>
+        <Mascot state={error ? "thinking" : pending ? "listening" : "calm"} size={72} />
+      </div>
 
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="mt-10 flex flex-col gap-4">
         <label className="flex flex-col gap-2">
           <span className="text-[14px] font-medium leading-[18px] text-muted">Почта</span>
           <input
@@ -51,7 +59,7 @@ export default function LoginPage() {
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="min-h-[44px] rounded-xl border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none focus:border-accent"
+            className={FIELD}
           />
         </label>
 
@@ -64,7 +72,7 @@ export default function LoginPage() {
             required
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="min-h-[44px] rounded-xl border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none focus:border-accent"
+            className={FIELD}
           />
         </label>
 
@@ -77,7 +85,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={pending}
-          className="min-h-[44px] rounded-xl bg-accent px-4 text-[16px] font-semibold text-bg disabled:opacity-60"
+          className="mt-2 min-h-[48px] rounded-[12px] bg-accent px-4 text-[16px] font-semibold text-bg transition-transform duration-[120ms] active:scale-[0.98] disabled:opacity-60"
         >
           {pending ? "Вхожу…" : "Войти"}
         </button>

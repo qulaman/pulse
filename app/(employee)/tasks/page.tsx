@@ -16,7 +16,7 @@ export default function TasksPage() {
   const items = activeOnly(tasks.data);
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Мои дела</h1>
 
       <div className="mt-4">
