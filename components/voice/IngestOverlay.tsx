@@ -102,10 +102,17 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     return () => clearInterval(id);
   }, [stage, recordingStartedAt]);
 
+  // Edge-triggered: one trip to /confirm per parse. A draft the director walked away
+  // from stays a draft (DirectorFab shows it) instead of hijacking every navigation.
+  const clientRequestId = useIngestStore((state) => state.clientRequestId);
+  const navigatedFor = useRef<string | null>(null);
   useEffect(() => {
+    if (!navigate || stage !== "confirm") return;
+    if (navigatedFor.current === clientRequestId) return;
+    navigatedFor.current = clientRequestId;
     // The sandbox renders /confirm in place and must not be sent to the real screen.
-    if (navigate && stage === "confirm" && pathname !== "/confirm") router.push("/confirm");
-  }, [navigate, stage, pathname, router]);
+    if (pathname !== "/confirm") router.push("/confirm");
+  }, [navigate, stage, clientRequestId, pathname, router]);
 
   // Too short to be speech: a toast, not a screen (docs/AI.md §11).
   useEffect(() => {

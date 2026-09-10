@@ -105,6 +105,17 @@ async function main() {
   if (reachedConfirm) {
     await page.getByRole("heading", { name: /Понял так/ }).waitFor({ timeout: 10_000 });
     await page.screenshot({ path: join(SHOTS, "04-confirm.png") });
+
+    // an unsent draft must not drag the director back to /confirm
+    await page.getByRole("link", { name: "Пульс" }).click();
+    await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 10_000 });
+    await page.waitForTimeout(1_500);
+    const stayed = new URL(page.url()).pathname === "/pulse";
+    const pill = page.getByRole("link", { name: /Черновик/ });
+    record("черновик не возвращает на /confirm, виден в плашке", stayed && (await pill.isVisible()), page.url());
+    await page.screenshot({ path: join(SHOTS, "04b-draft-pill.png") });
+    await pill.click();
+    await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 10_000 });
     const sendButton = page.getByRole("button", { name: /Отправить \d+ из \d+/ });
     const label = await sendButton.textContent();
     record("кнопка «Отправить N из M»", (await sendButton.isEnabled()) === true, label ?? "");
