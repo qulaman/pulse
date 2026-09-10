@@ -15,6 +15,8 @@ export type UploadUrlResponse = {
   audio_path: string;
   signed_url: string;
   token: string;
+  /** Staging row of the director's recording (docs/DATABASE.md inbox_items). */
+  inbox_id?: string | null;
 };
 
 export type TranscribeResponse = {
@@ -44,6 +46,7 @@ export type ConfirmRequest = {
   confirmed_entities: Entity[];
   /** D-38: override of the 08:00–21:00 delivery window, set by an explicit tap. */
   force_now?: boolean;
+  inbox_id?: string;
 };
 
 export type ConfirmResponse = {
@@ -100,18 +103,25 @@ async function post<T>(path: string, payload: unknown): Promise<T> {
 }
 
 export interface VoiceApi {
-  uploadUrl(input: { ext: AudioExt; context: UploadContext }): Promise<UploadUrlResponse>;
+  uploadUrl(input: {
+    ext: AudioExt;
+    context: UploadContext;
+    client_request_id: string;
+  }): Promise<UploadUrlResponse>;
   uploadAudio(input: { signed_url: string; blob: Blob; mime: string }): Promise<void>;
   transcribe(input: {
     audio_path: string;
     context: UploadContext;
     client_request_id: string;
+    /** Real recording length — the STT guard's density checks need it (docs/AI.md §1). */
+    duration_ms?: number;
   }): Promise<TranscribeResponse>;
   parse(input: {
     transcript: string;
     audio_path: string | null;
     source: IngestSource;
     client_request_id: string;
+    suspicious?: boolean;
   }): Promise<ParseResponse>;
   confirm(input: ConfirmRequest): Promise<ConfirmResponse>;
 }

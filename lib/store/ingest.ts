@@ -290,13 +290,14 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         const slot = await voiceApi.uploadUrl({
           ext: extForMime(audio.mime),
           context: "director_input",
+          client_request_id: get().clientRequestId as string,
         });
         await voiceApi.uploadAudio({
           signed_url: slot.signed_url,
           blob: audio.blob,
           mime: audio.mime,
         });
-        set({ audioPath: slot.audio_path });
+        set({ audioPath: slot.audio_path, inboxId: slot.inbox_id ?? get().inboxId });
       } catch (cause) {
         fail(cause, "upload");
         return;
@@ -314,6 +315,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           audio_path: audioPath,
           context: "director_input",
           client_request_id: clientRequestId,
+          ...(get().audio ? { duration_ms: get().audio!.durationMs } : {}),
         });
         set({
           transcript: res.transcript,
@@ -342,6 +344,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           audio_path: audioPath,
           source,
           client_request_id: clientRequestId,
+          ...(get().suspicious ? { suspicious: true } : {}),
         });
         const entities = res.entities ?? [];
         if (res.inbox_id) set({ inboxId: res.inbox_id });
@@ -414,7 +417,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     async send(forceNow = false) {
-      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId } = get();
+      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId } = get();
       const confirmed = entities.filter(isSendable).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
@@ -428,6 +431,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           parsed_entities: parsedEntities.map(strip),
           confirmed_entities: confirmed,
           ...(forceNow ? { force_now: true } : {}),
+          ...(inboxId ? { inbox_id: inboxId } : {}),
         });
         set({ stage: "done" });
         return res;

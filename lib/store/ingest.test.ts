@@ -113,6 +113,10 @@ describe("ingest store", () => {
     await useIngestStore.getState().retry();
 
     expect(api.uploadUrl).toHaveBeenCalledTimes(1); // no re-upload of the same recording
+    expect(api.uploadUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ client_request_id: useIngestStore.getState().clientRequestId }),
+    );
+    expect(api.transcribe).toHaveBeenCalledWith(expect.objectContaining({ duration_ms: audio.durationMs }));
     expect(useIngestStore.getState().stage).toBe("confirm");
   });
 

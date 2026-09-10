@@ -69,6 +69,10 @@ export function postprocess(
         roster,
       );
       entity.assignee = assignee;
+      // The chip and the payload must agree: a matched name becomes the assignee_id here,
+      // a namesake/unmatched one clears it — otherwise accepting the suggestion on /confirm
+      // counts as an "edit" and the D-35 metric reads 100% forever (live finding, task 008).
+      withAssignee.assignee_id = assignee.status === "matched" ? assignee.user_id : null;
       if (
         assignee.status !== "matched" &&
         (entity.kind === "task" || entity.kind === "points") &&
