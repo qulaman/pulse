@@ -169,6 +169,8 @@ export type SendMessageInput = {
   text: string;
   /** `{ is_question: true }` for «Уточнить» (D-03). */
   meta?: Record<string, unknown>;
+  /** Storage path in the `photos` bucket — the message becomes type `photo`, text is the caption. */
+  filePath?: string | null;
 };
 
 /**
@@ -188,8 +190,9 @@ export function useSendMessage(me: Me | undefined) {
         task_id: input.taskId,
         company_id: input.companyId,
         sender_id: me.userId,
-        type: "text",
-        content: input.text,
+        type: input.filePath ? "photo" : "text",
+        content: input.text || null,
+        file_path: input.filePath ?? null,
         meta: (input.meta ?? {}) as Json,
       });
       if (error) throw new Error(GENERIC_ERROR);
@@ -207,9 +210,9 @@ export function useSendMessage(me: Me | undefined) {
           sender_id: me.userId,
           // Placeholder ordering only: pending rows are excluded from the cursor.
           seq: (previous?.length ? previous[previous.length - 1].seq : 0) + 0.5,
-          type: "text",
-          content: input.text,
-          file_path: null,
+          type: input.filePath ? "photo" : "text",
+          content: input.text || null,
+          file_path: input.filePath ?? null,
           meta: { ...(input.meta ?? {}), pending: true } as Json,
           created_at: new Date().toISOString(),
           sender: { full_name: me.fullName },

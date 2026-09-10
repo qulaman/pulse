@@ -134,8 +134,8 @@ export function TaskCard({
       <ReportSheet
         open={sheet === "report"}
         onClose={close}
-        onSubmit={(text) => {
-          if (text) actions.sendMessage({ taskId: task.id, companyId, text });
+        onSubmit={(text, filePath) => {
+          if (text || filePath) actions.sendMessage({ taskId: task.id, companyId, text, filePath });
           actions.complete({ taskId: task.id, fromStatus: task.status });
         }}
       />

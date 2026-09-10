@@ -284,7 +284,7 @@ announcements (company_id, created_at desc);  absences (company_id, user_id, sta
 
 ## Storage
 
-Бакеты: `voice`, `reports`, `shop`, `avatars` — **все private**. Конвенция пути: `bucket/{company_id}/{owner_id}/{uuid}.ext`; политики — по сегментам `storage.foldername(name)`: запись — владелец в свою папку, чтение — владелец. Любое чтение чужого файла (директор слушает аудио, ТВ показывает фото) — **только signed URL, выданный сервером** после проверки прав. Загрузка аудио клиентом — напрямую в Storage по signed upload URL (лимит Vercel 4.5 МБ). Retention: аудио — 12 месяцев (pg_cron-чистка voice + обнуление audio_path), транскрипты — вечно.
+Бакеты: `voice`, `photos` (фото в отчётах; в ранних версиях — `reports`), `shop`, `avatars` — **все private**. Конвенция пути: `bucket/{company_id}/{owner_id}/{uuid}.ext`; политики — по сегментам `storage.foldername(name)`: запись — владелец в свою папку, чтение — владелец. Любое чтение чужого файла (директор слушает аудио, ТВ показывает фото) — **только signed URL, выданный сервером** после проверки прав. Загрузка аудио клиентом — напрямую в Storage по signed upload URL (лимит Vercel 4.5 МБ). Retention: аудио — 12 месяцев (pg_cron-чистка voice + обнуление audio_path), транскрипты — вечно.
 
 ## pg_cron (расписания в UTC явно; Aqtobe = UTC+5)
 

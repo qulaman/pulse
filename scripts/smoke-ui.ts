@@ -274,6 +274,41 @@ async function main() {
   const card = epage.getByText(/Казхром/i).first();
   record("карточка задачи в ленте Марата", await card.isVisible().catch(() => false));
 
+  // ---- report with a photo: Принял → Выполнено + снимок → thread shows it ------------
+  const taskCard = epage.locator("article", { hasText: /Казхром/i }).first();
+  const acceptBtn = taskCard.getByRole("button", { name: "Принял" });
+  if (await acceptBtn.isVisible().catch(() => false)) {
+    await acceptBtn.click();
+    await taskCard.getByRole("button", { name: "Выполнено" }).waitFor({ timeout: 10_000 });
+  }
+  await taskCard.getByRole("button", { name: "Выполнено" }).click();
+  const reportDialog = epage.getByRole("dialog");
+  await reportDialog.getByPlaceholder(/Можно без текста/).fill(`Готово ${STAMP}`);
+  const painter = await employee.newPage();
+  await painter.setViewportSize({ width: 1200, height: 900 });
+  await painter.setContent(
+    `<body style="margin:0;background:linear-gradient(135deg,#f5a623,#2ED3B7);font:bold 96px sans-serif;color:#0B0F14;display:flex;align-items:center;justify-content:center">Фото ${STAMP}</body>`,
+  );
+  const photoPng = await painter.screenshot({ type: "png" });
+  await painter.close();
+  await reportDialog.locator('input[type="file"]').setInputFiles({ name: "photo.png", mimeType: "image/png", buffer: photoPng });
+  await reportDialog.locator("img").waitFor({ timeout: 5_000 });
+  await epage.screenshot({ path: join(SHOTS, "19-report-photo.png") });
+  const [storagePut] = await Promise.all([
+    epage.waitForResponse((res) => res.request().method() === "PUT" && res.url().includes("/storage/"), { timeout: 30_000 }),
+    reportDialog.getByRole("button", { name: "Выполнено" }).click(),
+  ]);
+  record("отчёт: фото ушло в Storage", storagePut.status() === 200, `PUT ${storagePut.status()}`);
+  await epage.waitForTimeout(2_000);
+  await epage.goto(`${APP_URL}/feed`, { waitUntil: "networkidle" });
+  const threadHref = await epage.locator("article", { hasText: /Казхром/i }).first().locator('a[href^="/tasks/"]').first().getAttribute("href");
+  await epage.goto(`${APP_URL}${threadHref}`, { waitUntil: "networkidle" });
+  const photoInThread = epage.locator('img[alt="Фото к отчёту"]').first();
+  const photoShown = await photoInThread.waitFor({ timeout: 15_000 }).then(() => true).catch(() => false);
+  await epage.waitForTimeout(800);
+  await epage.screenshot({ path: join(SHOTS, "20-thread-photo.png"), fullPage: true });
+  record("отчёт: фото видно в треде (signed URL)", photoShown);
+
   await epage.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
   const eCard = epage.locator("article", { hasText: STAMP }).first();
   await eCard.waitFor({ timeout: 15_000 });

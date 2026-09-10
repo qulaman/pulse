@@ -57,17 +57,19 @@ async function main() {
   await wipe("ai_logs");
   await wipe("ingest_batches");
 
-  console.log("voice objects…");
   const { data: companies } = await supabase.from("companies").select("id");
-  for (const company of companies ?? []) {
-    const { data: folders } = await supabase.storage.from("voice").list(company.id, { limit: 1000 });
-    for (const folder of folders ?? []) {
-      const { data: files } = await supabase.storage.from("voice").list(`${company.id}/${folder.name}`, { limit: 1000 });
-      const paths = (files ?? []).map((f) => `${company.id}/${folder.name}/${f.name}`);
-      if (paths.length) {
-        const { error } = await supabase.storage.from("voice").remove(paths);
-        if (error) console.warn(`  storage ${folder.name}: ${error.message}`);
-        else console.log(`  storage ${folder.name.slice(0, 8)}… −${paths.length}`);
+  for (const bucket of ["voice", "photos"] as const) {
+    console.log(`${bucket} objects…`);
+    for (const company of companies ?? []) {
+      const { data: folders } = await supabase.storage.from(bucket).list(company.id, { limit: 1000 });
+      for (const folder of folders ?? []) {
+        const { data: files } = await supabase.storage.from(bucket).list(`${company.id}/${folder.name}`, { limit: 1000 });
+        const paths = (files ?? []).map((f) => `${company.id}/${folder.name}/${f.name}`);
+        if (paths.length) {
+          const { error } = await supabase.storage.from(bucket).remove(paths);
+          if (error) console.warn(`  ${bucket} ${folder.name}: ${error.message}`);
+          else console.log(`  ${bucket} ${folder.name.slice(0, 8)}… −${paths.length}`);
+        }
       }
     }
   }

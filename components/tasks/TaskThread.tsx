@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
+import { PhotoMessage } from "./PhotoMessage";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { isPendingMessage, type TaskMessage } from "@/lib/tasks/queries";
 import { statusChangeLine, TEXT } from "@/lib/tasks/status-text";
@@ -86,6 +87,9 @@ function MessageRow({ message }: { message: TaskMessage }) {
       </div>
       {message.content ? (
         <p className="mt-1 text-[16px] leading-[22px]">{message.content}</p>
+      ) : null}
+      {message.type === "photo" && message.file_path && !isPendingMessage(message) ? (
+        <PhotoMessage path={message.file_path} />
       ) : null}
     </div>
   );

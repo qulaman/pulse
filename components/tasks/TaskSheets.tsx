@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
+import { uploadPhoto } from "@/lib/files/photo";
 import { BUTTON, DECLINE_REASONS, TEXT } from "@/lib/tasks/status-text";
 
 const FIELD_CLASS =
@@ -124,12 +125,39 @@ export function ReportSheet({
   open,
   onClose,
   onSubmit,
-}: BaseProps & { onSubmit: (text: string) => void }) {
+}: BaseProps & { onSubmit: (text: string, filePath: string | null) => void }) {
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  const submit = () => {
-    onSubmit(text.trim());
+  const pick = (file: File | null) => {
+    if (preview) URL.revokeObjectURL(preview);
+    setPhoto(file);
+    setPreview(file ? URL.createObjectURL(file) : null);
+    setError(null);
+  };
+
+  const submit = async () => {
+    let filePath: string | null = null;
+    if (photo) {
+      // the photo lands in Storage first; the status changes only when it is there (принцип 5)
+      setUploading(true);
+      setError(null);
+      try {
+        filePath = await uploadPhoto(photo);
+      } catch {
+        setUploading(false);
+        setError(TEXT.photoFailed);
+        return;
+      }
+      setUploading(false);
+    }
+    onSubmit(text.trim(), filePath);
     setText("");
+    pick(null);
     onClose();
   };
 
@@ -143,12 +171,59 @@ export function ReportSheet({
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        aria-label={TEXT.photoPick}
+        onChange={(event) => pick(event.target.files?.[0] ?? null)}
+      />
+      {preview ? (
+        <div className="relative mt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element -- local object URL */}
+          <img src={preview} alt="" className="card-in max-h-[220px] w-full rounded-[12px] border border-border object-cover" />
+          <button
+            type="button"
+            onClick={() => pick(null)}
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/80 text-[16px]"
+            aria-label={TEXT.photoRemove}
+          >
+            ×
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[12px] border border-dashed border-border text-[14px] text-muted transition-colors duration-[120ms] active:border-accent"
+        >
+          <CameraIcon /> {TEXT.photoPick}
+        </button>
+      )}
+      {error ? (
+        <p role="alert" className="mt-2 text-[13px] leading-4 text-danger">
+          {error}
+        </p>
+      ) : null}
+
       <div className="mt-3">
-        <Button block onClick={submit}>
-          {BUTTON.complete}
+        <Button block onClick={submit} disabled={uploading}>
+          {uploading ? TEXT.photoUploading : BUTTON.complete}
         </Button>
       </div>
     </Sheet>
+  );
+}
+
+function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+      <circle cx="12" cy="13" r="3.5" />
+    </svg>
   );
 }
 
