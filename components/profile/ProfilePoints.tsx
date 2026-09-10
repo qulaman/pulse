@@ -21,7 +21,7 @@ export function ProfilePoints({ userId }: { userId: string }) {
             {history.isLoading ? "…" : balance}
           </p>
         </div>
-        <Link href="/ether" className="ml-auto text-[13px] leading-4 text-accent underline underline-offset-4">
+        <Link href="/rating" className="ml-auto text-[13px] leading-4 text-accent underline underline-offset-4">
           Рейтинг
         </Link>
       </div>

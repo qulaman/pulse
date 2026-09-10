@@ -131,8 +131,7 @@ async function main() {
   record("настройки: очки включены и сохранены", true);
 
   // ---- rating: +10 to Марат through the sheet ------------------------------------
-  await page.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
-  await page.getByRole("tab", { name: "Рейтинг" }).click();
+  await page.goto(`${APP_URL}/rating`, { waitUntil: "networkidle" });
   const maratRow = page.locator("li", { hasText: "Марат Оспанов" }).first();
   await maratRow.waitFor({ timeout: 10_000 });
   await maratRow.getByRole("button", { name: "+" }).click();

@@ -52,18 +52,34 @@ const ICONS = {
       <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
     </svg>
   ),
+  rating: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0z" />
+      <path d="M7 6H4.5a2.5 2.5 0 0 0 2.6 4.5M17 6h2.5a2.5 2.5 0 0 1-2.6 4.5" />
+      <path d="M12 14v3M8.5 20h7M10 17h4" />
+    </svg>
+  ),
+  settings: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
+    </svg>
+  ),
 };
 
 const TABS: Record<TabRole, Tab[]> = {
   director: [
     { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
     { href: "/ether", label: "Эфир", icon: ICONS.ether },
+    { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
+    { href: "/settings", label: "Настройки", icon: ICONS.settings },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
   ],
   employee: [
     { href: "/feed", label: "Лента", icon: ICONS.feed },
     { href: "/tasks", label: "Дела", icon: ICONS.tasks },
     { href: "/ether", label: "Эфир", icon: ICONS.ether },
+    { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
   ],
 };
@@ -86,11 +102,11 @@ export function TabBar({ role }: { role: TabRole }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-2 pb-1.5 pt-2 text-[11px] font-medium leading-4 transition-colors duration-[120ms]"
+                className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 text-[11px] font-medium leading-4 transition-colors duration-[120ms]"
                 style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
               >
                 <span
-                  className="flex h-7 w-11 items-center justify-center rounded-full transition-colors duration-[120ms]"
+                  className="flex h-7 w-10 items-center justify-center rounded-full transition-colors duration-[120ms]"
                   style={{ background: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
                 >
                   {tab.icon}

@@ -41,7 +41,7 @@ export default async function ProfilePage() {
           className="mt-4 flex min-h-[52px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
         >
           Настройки
-          <span className="text-[13px] leading-4 text-muted">распознавание · разбор · очки</span>
+          <span className="text-[13px] leading-4 text-muted">также во вкладке внизу</span>
         </Link>
       ) : (
         <ProfilePoints userId={profile.userId} />
