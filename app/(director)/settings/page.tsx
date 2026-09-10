@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { SettingsForm } from "@/components/settings/SettingsForm";
 
 export default function SettingsPage() {
@@ -7,7 +9,14 @@ export default function SettingsPage() {
       <p className="mt-1 text-[13px] leading-4 text-muted">
         Всё здесь — конфигурация компании: код одинаков для всех клиентов
       </p>
-      <div className="mt-5">
+      <Link
+        href="/people"
+        className="mt-5 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+      >
+        Сотрудники
+        <span className="text-[13px] leading-4 text-muted">карточки, алиасы, роли ›</span>
+      </Link>
+      <div className="mt-4">
         <SettingsForm />
       </div>
     </main>

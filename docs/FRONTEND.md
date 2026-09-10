@@ -37,6 +37,7 @@
 | `/profile` | все авторизованные | layout: проверка сессии |
 | `/rating` | все авторизованные | layout: проверка сессии; «+» только director |
 | `/settings` | director | layout группы |
+| `/people`, `/people/new`, `/people/[id]` | director | layout группы; создание логина — `POST /api/people`, правка карточки — update `profiles` под RLS |
 | `/shop` | все [ПОСЛЕ ПИЛОТА] | layout: проверка сессии |
 | `/tv` | роль `tv` [ЭТАП МАСШТАБА] | отдельный layout, auth-пользователь tv |
 | `/app/dev/*` | — | `if (process.env.NODE_ENV === 'production') notFound()` в layout |

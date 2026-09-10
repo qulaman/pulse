@@ -152,6 +152,32 @@ async function main() {
   await page.screenshot({ path: join(SHOTS, "10-rating.png") });
   record("рейтинг: +10 Марату начислено", true);
 
+  // ---- people: create, then edit -------------------------------------------------
+  await page.goto(`${APP_URL}/people`, { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Сотрудники" }).waitFor({ timeout: 10_000 });
+  await page.getByText("Марат Оспанов").first().waitFor({ timeout: 10_000 });
+  await page.screenshot({ path: join(SHOTS, "13-people.png") });
+  await page.getByRole("link", { name: /Добавить/ }).click();
+  await page.waitForURL((url) => url.pathname === "/people/new", { timeout: 10_000 });
+  const stamp = Date.now().toString(36);
+  await page.getByLabel("Почта").fill(`smoke-${stamp}@demo.local`);
+  await page.getByLabel("Первый пароль").fill("demo1234");
+  await page.getByLabel("Имя и фамилия").fill("Смоук Тестов");
+  await page.getByLabel("Должность").fill("Испытатель");
+  await page.getByLabel("Как называет директор").fill("Смоук");
+  await page.getByRole("button", { name: "Добавить сотрудника" }).click();
+  await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}$/.test(url.pathname), { timeout: 20_000 });
+  record("сотрудник создан → карточка", true, page.url());
+  await page.getByLabel("Должность").fill("Старший испытатель");
+  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByText("Сохранил").waitFor({ timeout: 10_000 });
+  await page.screenshot({ path: join(SHOTS, "14-person-edit.png"), fullPage: true });
+  record("карточка сотрудника: должность сохранена", true);
+
+  await page.goto(`${APP_URL}/profile`, { waitUntil: "networkidle" });
+  await page.getByText("в команде").waitFor({ timeout: 10_000 });
+  await page.screenshot({ path: join(SHOTS, "15-profile-director.png") });
+
   await page.goto(`${APP_URL}/dev/mascot`, { waitUntil: "networkidle" });
   await page.screenshot({ path: join(SHOTS, "11-mascot.png"), fullPage: true });
 
@@ -197,7 +223,7 @@ async function main() {
   await epage.goto(`${APP_URL}/profile`, { waitUntil: "networkidle" });
   await epage.getByText("за скорость").first().waitFor({ timeout: 10_000 }).catch(() => {});
   await epage.screenshot({ path: join(SHOTS, "12-profile-points.png") });
-  const balanceText = await epage.locator("p.nums").first().textContent().catch(() => "");
+  const balanceText = await epage.getByTestId("balance").textContent().catch(() => "");
   record("профиль Марата: баланс ≥ 10", Number(balanceText) >= 10, `balance=${balanceText}`);
 
   for (const e of [...errors, ...eerrors]) console.log("  !", e);
