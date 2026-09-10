@@ -34,6 +34,7 @@ async function postJson(path: string, payload: unknown): Promise<void> {
 
   if (res.ok) return;
   if (res.status === 401 && typeof window !== "undefined") {
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop every client cache of the dead session
     window.location.assign(`${window.location.origin}/login`);
     throw new Error("Сессия истекла. Войди заново");
   }

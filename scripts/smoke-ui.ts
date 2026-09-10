@@ -154,6 +154,25 @@ async function main() {
     record("задача сохранена: видна в «Отправленных» после перезагрузки", persisted && status === "sent", `status=${status}`);
   }
 
+  // ---- announcement: «всем: …» → Эфир ---------------------------------------------
+  await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /Записать голосовое|Идёт запись/ }).tap();
+  const annField = page.getByPlaceholder(/Ерлану подготовить/);
+  await annField.waitFor({ state: "visible", timeout: 5_000 });
+  await annField.fill(`Всем: завтра в десять общее собрание в офисе ${STAMP}`);
+  await page.getByRole("button", { name: "Отправить" }).click();
+  await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 40_000 });
+  await page.getByRole("heading", { name: /Понял так: объявление/ }).waitFor({ timeout: 10_000 });
+  const annSendNow = page.getByRole("button", { name: "отправить сейчас" });
+  if (await annSendNow.isVisible().catch(() => false)) await annSendNow.click();
+  else await page.getByRole("button", { name: /Отправить \d+ из \d+/ }).click();
+  await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 30_000 });
+  await page.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
+  const annCard = page.locator("article", { hasText: STAMP }).first();
+  await annCard.waitFor({ timeout: 15_000 });
+  await page.screenshot({ path: join(SHOTS, "17-ether-director.png") });
+  record("объявление: «всем: …» → Эфир директора", await annCard.getByText(/Ознакомились 0\//).isVisible().catch(() => false));
+
   // ---- settings: the director switches points on --------------------------------
   await page.goto(`${APP_URL}/settings`, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Настройки" }).waitFor({ timeout: 10_000 });
@@ -254,6 +273,14 @@ async function main() {
   await epage.screenshot({ path: join(SHOTS, "06-feed.png") });
   const card = epage.getByText(/Казхром/i).first();
   record("карточка задачи в ленте Марата", await card.isVisible().catch(() => false));
+
+  await epage.goto(`${APP_URL}/ether`, { waitUntil: "networkidle" });
+  const eCard = epage.locator("article", { hasText: STAMP }).first();
+  await eCard.waitFor({ timeout: 15_000 });
+  await eCard.getByRole("button", { name: "Ознакомился" }).click();
+  await eCard.getByText("✓ Ознакомился").waitFor({ timeout: 10_000 });
+  await epage.screenshot({ path: join(SHOTS, "18-ether-employee.png") });
+  record("объявление: Марат нажал «Ознакомился»", true);
 
   await epage.goto(`${APP_URL}/profile`, { waitUntil: "networkidle" });
   await epage.getByText("за скорость").first().waitFor({ timeout: 10_000 }).catch(() => {});

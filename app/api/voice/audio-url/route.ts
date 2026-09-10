@@ -28,7 +28,16 @@ export const GET = withAuth("any", async ({ req, profile }) => {
     .maybeSingle();
 
   if (error) throw new Error(`audio-url lookup failed: ${error.message}`);
-  if (!task) return apiError(403, "forbidden", "Нет доступа");
+  if (!task) {
+    // not a task recording — maybe an announcement (Эфир is company-wide)
+    const { data: announcement } = await supabase
+      .from("announcements")
+      .select("id")
+      .eq("audio_path", path)
+      .limit(1)
+      .maybeSingle();
+    if (!announcement) return apiError(403, "forbidden", "Нет доступа");
+  }
 
   const service = createServiceSupabase();
   const signed = await service.storage.from("voice").createSignedUrl(path, TTL_SECONDS);

@@ -98,6 +98,7 @@ async function post<T>(path: string, payload: unknown): Promise<T> {
   }
 
   const body = await readJson(res);
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop every client cache of the dead session
   if (res.status === 401 && typeof window !== "undefined") window.location.assign(`${window.location.origin}/login`);
   if (!res.ok) throw new VoiceApiError(errorCodeOf(body, res.status), res.status, body);
   return body as T;
