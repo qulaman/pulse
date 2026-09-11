@@ -183,7 +183,7 @@ async function main() {
   await page.screenshot({ path: join(SHOTS, "09-settings.png"), fullPage: true });
   const pointsSwitch = page.getByRole("switch", { name: /Очки включены/ });
   if ((await pointsSwitch.getAttribute("aria-checked")) !== "true") await pointsSwitch.click();
-  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
   await page.getByText("Сохранил настройки").waitFor({ timeout: 10_000 });
   record("настройки: очки включены и сохранены", true);
 
@@ -241,7 +241,7 @@ async function main() {
   await page.getByRole("link", { name: "Изменить" }).click();
   await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}\/edit$/.test(url.pathname), { timeout: 10_000 });
   await page.getByLabel("Должность").fill("Старший испытатель");
-  await page.getByRole("button", { name: "Сохранить" }).click();
+  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
   await page.getByText("Сохранил").waitFor({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "14-person-edit.png"), fullPage: true });
   record("карточка сотрудника: должность сохранена", true);
