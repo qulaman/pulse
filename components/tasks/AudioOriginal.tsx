@@ -37,8 +37,18 @@ export function AudioOriginal({ path }: { path: string }) {
 
   return (
     <div className="mt-3">
-      <Button variant="secondary" onClick={open} disabled={loading}>
-        ▶️ {TEXT.original}
+      <Button
+        variant="secondary"
+        size="sm"
+        loading={loading}
+        onClick={open}
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <path d="M8 5.5v13l11-6.5z" />
+          </svg>
+        }
+      >
+        {TEXT.original}
       </Button>
       {failed ? (
         <p className="mt-2 text-[13px] leading-4 text-danger">{TEXT.audioFailed}</p>
