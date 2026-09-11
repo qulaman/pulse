@@ -11,6 +11,9 @@ type Props = {
   /** Matcher candidates come first — the shortlist the director actually meant (D-16). */
   candidates: AssigneeMatch["candidates"];
   onPick: (user: { user_id: string; full_name: string }) => void;
+  /** Sheet title and the assistant's line — «Кому?» on /confirm, «Кому передать?» on a card. */
+  title?: string;
+  hint?: string;
 };
 
 function Row({
@@ -34,17 +37,18 @@ function Row({
   );
 }
 
-export function AssigneePicker({ open, onClose, candidates, onPick }: Props) {
+export function AssigneePicker({ open, onClose, candidates, onPick, title = "Кому?", hint }: Props) {
   const roster = useRoster();
   const candidateIds = new Set(candidates.map((c) => c.user_id));
   const rest: RosterEntry[] = (roster.data ?? []).filter((user) => !candidateIds.has(user.id));
 
   return (
-    <Sheet open={open} onClose={onClose} title="Кому?">
+    <Sheet open={open} onClose={onClose} title={title}>
       <div className="mb-2 flex items-center gap-3 px-1">
         <Mascot state="thinking" size={36} />
         <p className="text-[13px] leading-4 text-muted">
-          {candidates.length > 0 ? "Понял задачу, но имя подходит нескольким. Кому из них?" : "Понял задачу, но не понял, кому. Выбери человека"}
+          {hint ??
+            (candidates.length > 0 ? "Понял задачу, но имя подходит нескольким. Кому из них?" : "Понял задачу, но не понял, кому. Выбери человека")}
         </p>
       </div>
       <div className="max-h-[60vh] overflow-y-auto">

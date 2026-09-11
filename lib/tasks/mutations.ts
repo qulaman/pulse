@@ -161,6 +161,57 @@ export function useRevoke() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* «Продлить» and «Переназначить» — RPCs behind their own routes                 */
+/* -------------------------------------------------------------------------- */
+
+export type ExtendInput = { taskId: string; deadlineIso: string | null };
+
+export function useExtendDeadline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: ExtendInput) => {
+      await postJson(`/api/tasks/${input.taskId}/deadline`, {
+        deadline_iso: input.deadlineIso,
+        client_request_id: crypto.randomUUID(),
+      });
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.root });
+      const snapshot = snapshotTasks(queryClient);
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
+        patchCached(old, input.taskId, { deadline: input.deadlineIso }),
+      );
+      return { snapshot };
+    },
+    onError: (error, _input, context) => {
+      if (context) restoreTasks(queryClient, context.snapshot);
+      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+  });
+}
+
+export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string };
+
+export function useReassign() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: ReassignInput) => {
+      await postJson(`/api/tasks/${input.taskId}/reassign`, {
+        assignee_id: input.assigneeId,
+        client_request_id: crypto.randomUUID(),
+      });
+    },
+    // no optimistic clone: the new task's id comes from the server, the lists refetch at once
+    onSuccess: (_data, input) => toast(`Передал: ${input.assigneeName}`),
+    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* Messages — straight into task_messages under RLS                            */
 /* -------------------------------------------------------------------------- */
 
@@ -240,6 +291,10 @@ export type TaskActions = {
   /** rework → accepted → pending_review: two calls, two client_request_id. */
   complete: (input: { taskId: string; fromStatus: TaskStatus }) => void;
   revoke: (taskId: string) => void;
+  /** «Продлить»: a new deadline (null — «без срока») on an open task. */
+  extend: (input: ExtendInput) => void;
+  /** «Переназначить»: the same order to another person; the old task is revoked. */
+  reassign: (input: ReassignInput) => void;
   sendMessage: (input: SendMessageInput) => void;
   busy: boolean;
 };
@@ -247,10 +302,14 @@ export type TaskActions = {
 export function useTaskActions(me: Me | undefined): TaskActions {
   const transition = useTransition();
   const revoke = useRevoke();
+  const extend = useExtendDeadline();
+  const reassign = useReassign();
   const sendMessage = useSendMessage(me);
 
   return {
     transition: (input) => transition.mutate(input),
+    extend: (input) => extend.mutate(input),
+    reassign: (input) => reassign.mutate(input),
     complete: ({ taskId, fromStatus }) => {
       if (fromStatus === "rework") {
         // The employee taps once; the matrix still demands rework → accepted first.

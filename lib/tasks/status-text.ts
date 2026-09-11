@@ -30,6 +30,8 @@ export const BUTTON = {
   insist: "Настоять",
   cancel: "Отменить",
   revoke: "Отозвать",
+  extend: "Продлить",
+  reassign: "Переназначить",
   send: "Отправить",
 } as const;
 

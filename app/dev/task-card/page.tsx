@@ -24,6 +24,8 @@ const actions: TaskActions = {
   transition: (input) => console.log("transition", input),
   complete: (input) => console.log("complete", input),
   revoke: (taskId) => console.log("revoke", taskId),
+  extend: (input) => console.log("extend", input),
+  reassign: (input) => console.log("reassign", input),
   sendMessage: (input) => console.log("sendMessage", input),
   busy: false,
 };

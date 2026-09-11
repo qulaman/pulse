@@ -10,6 +10,8 @@ import { initialsOf } from "@/lib/people/queries";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
+import { AssigneePicker } from "@/components/confirm/AssigneePicker";
+import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
 import { AskSheet, DeclineSheet, ReportSheet, ReworkSheet } from "./TaskSheets";
@@ -27,7 +29,7 @@ export type TaskCardProps = {
   href?: string;
 };
 
-type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke";
+type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign";
 
 /* -------------------------------------------------------------------------- */
 /* Tone: one colour per status, used by the rail, the tint and the pill        */
@@ -244,6 +246,28 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, hre
 
       <ReworkSheet open={sheet === "rework"} onClose={close} onSubmit={(comment) => actions.transition({ taskId: task.id, toStatus: "rework", comment })} />
 
+      {variant === "director" ? (
+        <>
+          <DeadlineSheet
+            open={sheet === "extend"}
+            onClose={close}
+            currentIso={task.deadline}
+            onPick={(iso) => actions.extend({ taskId: task.id, deadlineIso: iso })}
+          />
+          <AssigneePicker
+            open={sheet === "reassign"}
+            onClose={close}
+            title="Кому передать?"
+            hint="Задача уйдёт этому человеку как новая, у прежнего исполнителя закроется с пометкой"
+            candidates={[]}
+            onPick={(user) => {
+              actions.reassign({ taskId: task.id, assigneeId: user.user_id, assigneeName: user.full_name });
+              close();
+            }}
+          />
+        </>
+      ) : null}
+
       <Sheet open={sheet === "revoke"} onClose={close} title={BUTTON.revoke}>
         <p className="text-[16px] leading-[22px] text-muted">{TEXT.revokeConfirm}</p>
         <div className="mt-4 flex gap-2">
@@ -375,16 +399,31 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
       {task.status === "declined" ? (
         <>
           <Button onClick={() => actions.transition({ taskId: task.id, toStatus: "sent" })}>{BUTTON.insist}</Button>
-          <Button variant="secondary" onClick={() => onOpen("revoke")}>
+          <Button variant="secondary" onClick={() => onOpen("reassign")}>
+            {BUTTON.reassign}
+          </Button>
+          <Button variant="ghost" onClick={() => onOpen("revoke")}>
             {BUTTON.cancel}
           </Button>
         </>
       ) : null}
 
       {!terminal ? (
-        <Button variant="ghost" icon={<Icon name="undo" />} onClick={() => onOpen("revoke")}>
-          {BUTTON.revoke}
-        </Button>
+        <>
+          {task.status !== "pending_review" ? (
+            <Button variant="secondary" onClick={() => onOpen("extend")}>
+              {BUTTON.extend}
+            </Button>
+          ) : null}
+          {task.status !== "declined" && ["sent", "accepted", "in_progress", "rework"].includes(task.status) ? (
+            <Button variant="ghost" onClick={() => onOpen("reassign")}>
+              {BUTTON.reassign}
+            </Button>
+          ) : null}
+          <Button variant="ghost" icon={<Icon name="undo" />} onClick={() => onOpen("revoke")}>
+            {BUTTON.revoke}
+          </Button>
+        </>
       ) : null}
     </>
   );

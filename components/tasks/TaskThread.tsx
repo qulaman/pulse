@@ -90,8 +90,12 @@ export function TaskTimeline({ task, messages }: { task: TaskWithPeople; message
   const events = [
     { id: "created", label: task.status === "scheduled" ? "Запланирована" : "Отправлена", at: task.created_at, tone: "var(--text-muted)" },
     ...(messages ?? [])
-      .filter((m) => m.type === "status_change")
+      .filter((m) => m.type === "status_change" || m.type === "system")
       .map((m) => {
+        if (m.type === "system") {
+          // «Срок продлён до …», «Переназначено: …» — the director's edits live here too
+          return { id: m.id, label: m.content ?? "Изменение", at: m.created_at, tone: "var(--accent)" };
+        }
         const status = messageFlags(m).newStatus as TaskStatus | null;
         return {
           id: m.id,

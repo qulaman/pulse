@@ -877,6 +877,14 @@ export type Database = {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
       }
+      extend_task_deadline: {
+        Args: { client_request_id?: string; new_deadline: string | null; task_id: string }
+        Returns: Json
+      }
+      reassign_task: {
+        Args: { client_request_id?: string; new_assignee_id: string; task_id: string }
+        Returns: Json
+      }
       subordinates: { Args: { mgr: string }; Returns: string[] }
       transition_task: {
         Args: {
