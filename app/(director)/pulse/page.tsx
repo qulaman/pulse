@@ -63,8 +63,9 @@ export default function PulsePage() {
         {draftCount > 0 ? (
           <Link
             href="/confirm"
-            className="card-in block rounded-[16px] rounded-tl-[6px] border border-accent/40 bg-surface px-4 py-3 text-[16px] leading-[22px]"
+            className="card-in relative block py-1 pl-4 text-[17px] leading-6"
           >
+            <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full bg-accent" />
             Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
             <span className="text-accent">Открыть ›</span>
           </Link>

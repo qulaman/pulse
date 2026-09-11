@@ -141,6 +141,30 @@ body {
   35% { transform: scale(1.1) rotate(20deg); opacity: 1; }
   100% { transform: scale(0.6) rotate(45deg); opacity: 0; }
 }
+/* speaking: the mouth opens and closes in the rhythm of a phrase — scale only */
+@keyframes mascot-mouth {
+  0%, 100% { transform: scale(0.9, 0.18); }
+  14% { transform: scale(1, 1); }
+  28% { transform: scale(1.1, 0.45); }
+  45% { transform: scale(0.95, 0.85); }
+  60% { transform: scale(1.05, 0.3); }
+  76% { transform: scale(1, 0.7); }
+  90% { transform: scale(0.9, 0.25); }
+}
+/* speaking: the body nods a little with the words */
+@keyframes mascot-talk {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.02, 0.99) rotate(-1deg); }
+  70% { transform: scale(0.99, 1.02) rotate(1.2deg); }
+}
+/* the assistant's letters fade in one by one — inline and opacity only, so the words
+   wrap exactly like the invisible full text underneath */
+@keyframes ch-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.ch { animation: ch-in 200ms var(--ease-out) both; }
+
 /* mascot scenes (components/brand/MascotScene.tsx) */
 @keyframes eq-idle {
   0%, 100% { opacity: 0.55; }

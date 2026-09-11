@@ -1,19 +1,22 @@
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
- * Director-facing neutral states only in the pilot: calm / listening / thinking / happy.
+ * Director-facing neutral states only in the pilot: calm / listening / thinking / happy,
+ * plus «speaking» (D-49): the assistant is saying something — the mouth moves with the
+ * words, the only state with a mouth besides the smile of «happy».
  * Each state has its own choreography — body, eyes and a small prop around the blob —
  * so the director reads the state at a glance without a caption.
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
  * microphone) while listening — the blob swells with the voice.
  */
-export type MascotState = "calm" | "listening" | "thinking" | "happy";
+export type MascotState = "calm" | "listening" | "thinking" | "happy" | "speaking";
 
 const COLOR: Record<MascotState, string> = {
   calm: "var(--accent)",
   listening: "var(--accent)",
   thinking: "var(--warn)",
   happy: "var(--gold)",
+  speaking: "var(--accent)",
 };
 
 /** Body: breathing at rest, an eager wobble while listening, a slow ponder tilt, a bounce when happy. */
@@ -22,6 +25,7 @@ const BODY: Record<MascotState, string> = {
   listening: "mascot-listen 0.9s ease-in-out infinite",
   thinking: "mascot-ponder 2.6s ease-in-out infinite",
   happy: "mascot-bounce 1.1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite",
+  speaking: "mascot-talk 1.3s ease-in-out infinite",
 };
 
 /** Eyes as a pair: a rare glance when calm, looking up while listening, wandering while thinking. */
@@ -30,6 +34,7 @@ const EYES: Record<MascotState, string> = {
   listening: "mascot-look-up 0.9s ease-in-out infinite",
   thinking: "mascot-wander 2.6s ease-in-out infinite",
   happy: "none",
+  speaking: "mascot-glance 9s ease-in-out infinite",
 };
 
 export function Mascot({
@@ -43,6 +48,7 @@ export function Mascot({
 }) {
   const squint = state === "happy";
   const wide = state === "listening";
+  const talking = state === "speaking";
   const clamped = Math.min(1, Math.max(0, level));
   const swell = state === "listening" ? 1 + clamped * 0.18 : 1;
   const eyeRy = squint ? 1.5 : wide ? 4.3 : 3.6;
@@ -155,6 +161,16 @@ export function Mascot({
             {squint ? (
               // a tiny smile only when happy — still no mouth in every other state
               <path d="M26 43 Q32 48 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />
+            ) : null}
+            {talking ? (
+              // speaking: the mouth opens and closes in the rhythm of a phrase (scale only)
+              <ellipse
+                cx="32"
+                cy="45"
+                rx="4.2"
+                ry="3"
+                style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }}
+              />
             ) : null}
           </g>
         </g>

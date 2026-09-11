@@ -53,13 +53,11 @@ export function PulseInboxBone() {
 export function PulseSkeleton() {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-4">
-      <div className="mx-auto flex h-[120px] w-[120px] items-center justify-center">
-        <Mascot state="thinking" size={96} />
+      <div className="mx-auto flex h-[168px] w-[168px] items-center justify-center">
+        <Mascot state="thinking" size={144} />
       </div>
-      <div className="mt-2 flex flex-col gap-2">
-        <div className="rounded-[16px] rounded-tl-[6px] border border-border bg-surface py-3 pl-4 pr-9 text-[16px] leading-[22px]">
-          Смотрю, что нового…
-        </div>
+      <div className="mt-3 flex flex-col gap-3">
+        <div className="py-1 pl-4 pr-8 text-[19px] font-semibold leading-6">Смотрю, что нового…</div>
       </div>
       <div
         aria-hidden

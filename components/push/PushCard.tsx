@@ -61,8 +61,9 @@ export function PushCard({ compact = false, bubble = false }: { compact?: boolea
 
   if (bubble) {
     return (
-      <div className="card-in relative rounded-[16px] rounded-tl-[6px] border border-border bg-surface px-4 py-3">
-        <p className="text-[16px] leading-[22px]">
+      <div className="card-in relative py-1 pl-4">
+        <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full" style={{ background: "var(--text-muted)" }} />
+        <p className="text-[17px] leading-6">
           {state === "denied"
             ? "Уведомления запрещены в браузере. Разреши их в настройках сайта, иначе задачи придут только при открытии."
             : "Уведомления на этом телефоне выключены. Включить, чтобы задачи приходили, даже когда Pulse закрыт?"}

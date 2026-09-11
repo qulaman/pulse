@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 export type TypedLine = { id: string; text: string };
 
-const TICK_MS = 24;
-const CHARS_PER_TICK = 2;
+const TICK_MS = 28;
+const CHARS_PER_TICK = 1;
 /** A breath between two lines — the assistant speaks in sentences, not in a stream. */
-const LINE_PAUSE_MS = 320;
+const LINE_PAUSE_MS = 380;
+/** Shorter breaths inside a line: a comma is a beat, a colon or a full stop a longer one. */
+const PAUSE_AFTER: Record<string, number> = { ",": 140, ";": 160, ":": 220, ".": 260, "?": 260, "!": 260, "—": 120 };
 
 type Progress = Record<string, number>;
 
@@ -56,7 +58,10 @@ export function useTypewriter(lines: TypedLine[], replayKey = 0) {
         if (have >= line.text.length) continue;
         const to = Math.min(line.text.length, have + CHARS_PER_TICK);
         progressRef.current = { ...progress, [line.id]: to };
+        const last = line.text[to - 1] ?? "";
+        const beat = PAUSE_AFTER[last] ?? 0;
         if (to === line.text.length) pauseUntil = Date.now() + LINE_PAUSE_MS;
+        else if (beat > 0) pauseUntil = Date.now() + beat;
         setState({ key: replayKey, shown: progressRef.current });
         return;
       }

@@ -73,7 +73,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
 
   const worst = spoken.find((line) => line.kind === "verdict")?.tone;
   const handledAll = spoken.every((line) => line.kind !== "fact" || isHandled(line, taskById));
-  const mascot: MascotState = loading ? "thinking" : speaking ? "calm" : worst && !handledAll ? "calm" : "happy";
+  const mascot: MascotState = loading ? "thinking" : speaking ? "speaking" : worst && !handledAll ? "calm" : "happy";
 
   const replay = () => {
     setOpen(null);
@@ -86,12 +86,12 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
         type="button"
         onClick={replay}
         aria-label="Повторить доклад"
-        className="mx-auto flex h-[120px] w-[120px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96]"
+        className="mx-auto flex h-[168px] w-[168px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96]"
       >
-        <Mascot state={mascot} size={96} />
+        <Mascot state={mascot} size={144} />
       </button>
 
-      <div className="mt-2 flex flex-col gap-2" aria-live="polite">
+      <div className="mt-3 flex flex-col gap-3" aria-live="polite">
         {loading && spoken.length === 0 ? (
           <Bubble text="Смотрю, что нового…" shownChars={17} active tone={undefined} />
         ) : null}
@@ -122,7 +122,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
                 expanded={expanded}
               />
               {expanded ? (
-                <div className="mt-2 flex flex-col gap-2 pl-3">
+                <div className="mt-2 flex flex-col gap-2 pl-4">
                   {(line.taskIds ?? []).map((id) => {
                     const task = taskById.get(id);
                     return task ? (
@@ -171,29 +171,38 @@ function Bubble({
   expanded?: boolean;
 }) {
   const visible = text.slice(0, shownChars);
+  // every letter lands on its own (keyed by position, so the ones already said stay put)
+  const letters = Array.from(visible).map((ch, i) => (
+    <span key={i} className="ch">
+      {ch}
+    </span>
+  ));
   const body = (
     <span className="relative block">
       <span aria-hidden className="invisible block">
         {text}
       </span>
-      <span className={`absolute inset-0 block ${active ? "saying" : ""}`}>{visible}</span>
+      <span className={`absolute inset-0 block ${active ? "saying" : ""}`}>{letters}</span>
     </span>
   );
+  // no frames: the assistant just talks — a tone dot on the left, a quiet mark on the right
+  const size = tone ? "text-[17px] leading-6" : "text-[19px] font-semibold leading-6";
   const className = [
-    "relative block w-full rounded-[16px] rounded-tl-[6px] border border-border bg-surface py-3 pl-4 pr-9 text-left text-[16px] leading-[22px]",
-    handled ? "opacity-55" : "",
+    "relative block w-full py-1 pl-4 pr-8 text-left",
+    size,
+    handled ? "opacity-50" : "",
     onTap || href ? "transition-transform duration-[120ms] active:scale-[0.99]" : "",
   ].join(" ");
   const dot = tone ? (
     <span
       aria-hidden
-      className="absolute left-0 top-[16px] h-2 w-2 -translate-x-1/2 rounded-full border-2 border-bg"
+      className="absolute left-0 top-[11px] h-2 w-2 rounded-full"
       style={{ background: TONE_COLOR[tone] }}
     />
   ) : null;
   const mark = handled ? "✓" : onTap ? (expanded ? "▴" : "▾") : href ? "›" : null;
   const tail = mark ? (
-    <span aria-hidden className="absolute right-3 top-3 text-[14px] leading-[22px] text-muted">
+    <span aria-hidden className="absolute right-1 top-1 text-[14px] leading-6 text-muted">
       {mark}
     </span>
   ) : null;

@@ -10,6 +10,7 @@ const STATES: { state: MascotState; label: string }[] = [
   { state: "listening", label: "Слушает — покачивается, широкие глаза, кольца звука, растёт от голоса" },
   { state: "thinking", label: "Разбирает — жёлтый, наклон, глаза бегают, три точки" },
   { state: "happy", label: "Доволен — золотой, прищур и румянец, прыжок с искрами" },
+  { state: "speaking", label: "Говорит — рот открывается в ритме фразы, лёгкие кивки (D-49)" },
 ];
 
 /** Sandbox for the mascot: every state side by side, a fake microphone level slider. */
