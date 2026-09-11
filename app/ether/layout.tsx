@@ -16,7 +16,7 @@ export default async function EtherLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} />
+      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role={profile.role === "director" ? "director" : "employee"} />
     </div>

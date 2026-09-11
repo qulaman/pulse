@@ -29,7 +29,24 @@ export const DeliveryWindowSchema = z.object({
   to: z.string().regex(/^\d{2}:\d{2}$/).default("21:00"),
 });
 
+/** D-44: the only client customisation — a logo, an optional accent, a tagline. */
+export const BrandSchema = z.object({
+  logo_url: z.url().nullable().default(null),
+  accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable().default(null),
+  tagline: z.string().trim().max(80).nullable().default(null),
+});
+
+/** Patch shape without defaults: a missing key must stay untouched, never reset (zod fills defaults even through .partial()). */
+export const BrandPatchSchema = z
+  .object({
+    logo_url: z.url().nullable(),
+    accent: z.string().regex(/^#[0-9A-Fa-f]{6}$/).nullable(),
+    tagline: z.string().trim().max(80).nullable(),
+  })
+  .partial();
+
 export const CompanySettingsSchema = z.object({
+  brand: BrandSchema.prefault({}),
   // prefault: the empty object goes through the section schema, so its own defaults apply
   stt: SttSettingsSchema.prefault({}),
   parser: ParserSettingsSchema.prefault({}),
@@ -59,6 +76,7 @@ export const SettingsPatchSchema = z
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
     delivery_window: DeliveryWindowSchema.partial(),
+    brand: BrandPatchSchema,
   })
   .partial()
   .strict();

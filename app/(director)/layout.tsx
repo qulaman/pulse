@@ -17,7 +17,7 @@ export default async function DirectorLayout({ children }: { children: React.Rea
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} />
+      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role="director" />
       <DirectorFab />

@@ -887,6 +887,7 @@ export type Database = {
         }
         Returns: Json
       }
+      update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
     }
     Enums: {

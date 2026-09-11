@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { loadBrand } from "@/lib/brand";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -22,9 +23,11 @@ export const viewport: Viewport = {
   themeColor: "#0B0F14",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // the client accent (contrast-checked) overrides the token for the whole instance
+  const brand = await loadBrand();
   return (
-    <html lang="ru">
+    <html lang="ru" style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}>
       <body className="min-h-dvh bg-bg text-text antialiased">
         <QueryProvider>
           {children}

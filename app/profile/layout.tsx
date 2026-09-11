@@ -15,7 +15,7 @@ export default async function ProfileLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} />
+      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role={profile.role === "director" ? "director" : "employee"} />
     </div>
