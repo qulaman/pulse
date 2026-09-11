@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { getSessionProfile } from "@/lib/auth";
@@ -11,18 +11,6 @@ async function signOut() {
   const supabase = await createServerSupabase();
   await supabase.auth.signOut();
   redirect("/login");
-}
-
-function Row({ href, title, hint }: { href: string; title: string; hint: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
-    >
-      {title}
-      <span className="text-[13px] leading-4 text-muted">{hint} ›</span>
-    </Link>
-  );
 }
 
 export default async function ProfilePage() {
@@ -37,22 +25,20 @@ export default async function ProfilePage() {
         <ProfileCard userId={profile.userId} fullName={profile.fullName} role={profile.role} />
       </div>
 
-      <div className="mt-4 flex flex-col gap-2">
-        {director ? (
-          <>
-            <Row href="/sent" title="Отправленные" hint="все поручения по дням" />
-            <Row href="/people" title="Сотрудники" hint="карточки, алиасы, роли" />
-            <Row href="/settings" title="Настройки" hint="распознавание, разбор, очки" />
-            <Row href="/admin" title="Данные" hint="таблицы компании" />
-          </>
-        ) : null}
-        <Row href="/rating" title="Рейтинг" hint="очки за неделю и месяц" />
+      <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Личное</h2>
+      <div className="mt-2 flex flex-col gap-2">
         <PasswordRow />
+        <NotificationsRow />
         <div className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
           Telegram
           <span className="text-[13px] leading-4 text-muted">привязка — с доставкой уведомлений</span>
         </div>
       </div>
+      {director ? (
+        <p className="mt-3 text-[13px] leading-4 text-muted">
+          Настройки компании — распознавание, разбор, очки, сотрудники, данные — на вкладке «Настройки»
+        </p>
+      ) : null}
 
       <form action={signOut} className="mt-6">
         <button

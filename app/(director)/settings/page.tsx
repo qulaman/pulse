@@ -9,9 +9,10 @@ export default function SettingsPage() {
       <p className="mt-1 text-[13px] leading-4 text-muted">
         Всё здесь — конфигурация компании: код одинаков для всех клиентов
       </p>
+      <h2 className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-muted">Компания</h2>
       <Link
         href="/people"
-        className="mt-5 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
       >
         Сотрудники
         <span className="text-[13px] leading-4 text-muted">карточки, алиасы, роли ›</span>
@@ -23,7 +24,15 @@ export default function SettingsPage() {
         Данные
         <span className="text-[13px] leading-4 text-muted">таблицы компании как есть ›</span>
       </Link>
-      <div className="mt-4">
+      <Link
+        href="/sent"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+      >
+        Отправленные
+        <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
+      </Link>
+      <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Голос и разбор</h2>
+      <div className="mt-2">
         <SettingsForm />
       </div>
     </main>
