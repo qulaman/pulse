@@ -79,7 +79,7 @@ describe("buildBriefing", () => {
     expect(facts).toHaveLength(MAX_FACTS);
     const more = lines.at(-1)!;
     expect(more.kind).toBe("more");
-    expect(more.text).toBe("И ещё 3 — в «Отправленных»");
+    expect(more.text).toBe("И ещё 3 — в «Задачах»");
     expect(more.taskIds).toHaveLength(3);
   });
 

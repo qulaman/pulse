@@ -3,10 +3,9 @@
 import { useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { TaskCard } from "@/components/tasks/TaskCard";
+import { TaskCapsule } from "@/components/tasks/TaskCapsule";
 import { SentListBone } from "@/components/ui/PageSkeletons";
 import { Chip } from "@/components/ui/Chip";
-import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 
@@ -29,20 +28,16 @@ function matches(task: TaskWithPeople, filter: Filter): boolean {
   return ACTIVE.includes(task.status);
 }
 
-function dayKey(iso: string): string {
-  const d = new Date(new Date(iso).getTime() + 5 * 3_600_000);
-  return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}.${d.getUTCFullYear()}`;
-}
-
 /**
- * «Отправленные»: everything the director has handed out, newest first, grouped by day.
- * Reading this list after a reload is the proof that a confirmed batch is persisted.
+ * «Задачи»: everything the director has handed out, newest first, one capsule per task —
+ * who, when it is due, when it was given. Reading this list after a reload is the
+ * proof that a confirmed batch is persisted.
  */
 export default function SentPage() {
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
-  const actions = useTaskActions(me.data);
   const [filter, setFilter] = useState<Filter>("active");
+  const now = useMemo(() => new Date(), []);
 
   const rows = useMemo(() => (tasks.data ?? []).filter((t) => matches(t, filter)), [tasks.data, filter]);
   const counts = useMemo(() => {
@@ -55,22 +50,13 @@ export default function SentPage() {
     };
   }, [tasks.data]);
 
-  const groups = useMemo(() => {
-    const map = new Map<string, TaskWithPeople[]>();
-    for (const task of rows) {
-      const key = dayKey(task.created_at);
-      map.set(key, [...(map.get(key) ?? []), task]);
-    }
-    return [...map.entries()];
-  }, [rows]);
-
   const loading = me.isLoading || tasks.isLoading;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Отправленные</h1>
+      <h1 className="text-[24px] font-bold leading-[30px]">Задачи</h1>
       <p className="mt-1 text-[13px] leading-4 text-muted">
-        {loading ? " " : `${counts.all} ${counts.all === 1 ? "поручение" : counts.all < 5 ? "поручения" : "поручений"} всего`}
+        {loading ? " " : `${counts.all} ${counts.all === 1 ? "задача" : counts.all < 5 ? "задачи" : "задач"} всего`}
       </p>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -92,25 +78,14 @@ export default function SentPage() {
           <p className="mt-1 text-[13px] leading-4 text-muted">Зажми кнопку и скажи, что нужно сделать</p>
         </div>
       ) : (
-        groups.map(([day, items]) => (
-          <section key={day} className="mt-6">
-            <h2 className="nums text-[13px] font-medium leading-4 text-muted">{day}</h2>
-            <div className="mt-2 flex flex-col gap-3">
-              {items.map((task) => (
-                <div key={task.id} data-testid="sent-task" data-status={task.status}>
-                  <TaskCard
-                    task={task}
-                    variant="director"
-                    actions={actions}
-                    companyId={me.data?.companyId ?? ""}
-                    href={`/tasks/${task.id}`}
-                  />
-                  <p className="sr-only">{STATUS_LABEL[task.status]}</p>
-                </div>
-              ))}
+        <div className="mt-5 flex flex-col gap-2">
+          {rows.map((task) => (
+            <div key={task.id} className="card-in" data-testid="sent-task" data-status={task.status}>
+              <TaskCapsule task={task} now={now} />
+              <p className="sr-only">{STATUS_LABEL[task.status]}</p>
             </div>
-          </section>
-        ))
+          ))}
+        </div>
       )}
     </main>
   );

@@ -73,19 +73,26 @@ export function PulseSkeleton() {
           <span className="text-[16px] font-semibold leading-[22px]">Дать задачу</span>
           <span className="text-[13px] leading-4 text-muted">удержи — говори · тап — текст</span>
         </SkeletonGroup>
-        <span className="mt-2 min-h-[44px] text-[14px] leading-[44px] text-muted">Отправленные ›</span>
+        <span className="mt-2 min-h-[44px] text-[14px] leading-[44px] text-muted">Задачи ›</span>
       </div>
     </main>
   );
 }
 
+/** «Задачи»: capsule rows — a dot, a title, one meta line, a short status. */
 export function SentListBone() {
   return (
-    <SkeletonGroup className="mt-6">
-      <Bone h={16} w={80} />
-      <div className="mt-2">
-        <TaskListBone count={3} variant="director" />
-      </div>
+    <SkeletonGroup className="mt-5 flex flex-col gap-2">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3 rounded-[20px] border border-border bg-surface py-3 pl-4 pr-4">
+          <Bone round w={10} h={10} />
+          <div className="min-w-0 flex-1">
+            <Bone h={22} w={i % 2 ? 180 : 220} />
+            <Bone h={16} w={240} className="mt-1" />
+          </div>
+          <Bone h={16} w={52} />
+        </div>
+      ))}
     </SkeletonGroup>
   );
 }
@@ -93,7 +100,7 @@ export function SentListBone() {
 export function SentSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Отправленные" sub=" " />
+      <Title text="Задачи" sub=" " />
       <SkeletonGroup className="mt-4 flex flex-wrap gap-2">
         {[96, 118, 104, 64].map((w) => (
           <Bone key={w} h={36} w={w} className="rounded-full" />
@@ -164,7 +171,7 @@ export function SettingsSkeleton() {
         {[
           ["Сотрудники", "карточки, алиасы, роли ›"],
           ["Данные", "таблицы компании как есть ›"],
-          ["Отправленные", "все поручения по дням ›"],
+          ["Задачи", "все поручения списком ›"],
         ].map(([title, hint]) => (
           <div key={title} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
             {title}

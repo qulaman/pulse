@@ -107,7 +107,7 @@ async function main() {
     locale: "ru-RU",
   };
 
-  // ---- director: Пульс → Отправленные → карточка → назад → вкладки ------------------
+  // ---- director: Пульс → Задачи → карточка → назад → вкладки ------------------------
   const director = await browser.newContext(phone);
   await director.addInitScript(COLLECTOR);
   const page = await director.newPage();
@@ -117,8 +117,8 @@ async function main() {
   await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
   await page.waitForTimeout(SETTLE_MS);
 
-  await measure(page, "директор: Пульс → Отправленные", async () => {
-    await page.getByRole("link", { name: "Отправленные" }).click();
+  await measure(page, "директор: Пульс → Задачи", async () => {
+    await page.getByRole("link", { name: "Задачи" }).click();
     await page.waitForURL((url) => url.pathname === "/sent", { timeout: 10_000 });
     await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 15_000 });
   });

@@ -189,7 +189,7 @@ export function buildBriefing(input: BriefingInput): BriefLine[] {
       id: "more",
       kind: "more",
       tone: "muted",
-      text: `И ещё ${hidden} — в «Отправленных»`,
+      text: `И ещё ${hidden} — в «Задачах»`,
       taskIds: all.slice(MAX_FACTS).flatMap((line) => line.taskIds ?? []),
     });
   }

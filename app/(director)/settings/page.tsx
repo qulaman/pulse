@@ -29,8 +29,8 @@ export default function SettingsPage() {
         href="/sent"
         className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
       >
-        Отправленные
-        <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
+        Задачи
+        <span className="text-[13px] leading-4 text-muted">все поручения списком ›</span>
       </Link>
       <div className="mt-4">
         <CompanyForm />

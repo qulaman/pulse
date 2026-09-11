@@ -86,7 +86,7 @@ export default function PulsePage() {
         <div className="pointer-events-auto flex flex-col items-center">
           <VoiceButton inline />
           <Link href="/sent" className="mt-2 min-h-[44px] px-4 text-[14px] leading-[44px] text-muted">
-            Отправленные ›
+            Задачи ›
           </Link>
         </div>
       </div>
