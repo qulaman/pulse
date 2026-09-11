@@ -170,7 +170,7 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
                     {ahead && ahead.points > me.points ? (
                       <>
                         {" "}
-                        · до {ahead.display_name.split(/\s+/)[0]} не хватает{" "}
+                        · {ahead.display_name.split(/\s+/)[0]} впереди на{" "}
                         <span className="nums font-semibold" style={{ color: "var(--gold)" }}>
                           {ahead.points - me.points}
                         </span>
