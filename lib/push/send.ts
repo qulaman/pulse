@@ -4,7 +4,7 @@ import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/service";
-import { holdsForQuietHours } from "@/lib/voice/quietHours";
+import { holdsForQuietHours, type DeliveryWindow } from "@/lib/voice/quietHours";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
@@ -30,7 +30,7 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
   const service = createServiceSupabase();
   const { data: rows, error } = await service
     .from("notification_deliveries")
-    .select("id, user_id, meta, attempts, event_kind")
+    .select("id, user_id, company_id, meta, attempts, event_kind")
     .eq("status", "queued")
     .eq("channel", "push")
     .lt("attempts", MAX_ATTEMPTS)
@@ -51,10 +51,19 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
     byUser.set(sub.user_id, list);
   }
 
+  // each company's own delivery window (settings.delivery_window), defaults when unset
+  const companyIds = [...new Set(rows.map((r) => r.company_id))];
+  const { data: companies } = await service.from("companies").select("id, settings").in("id", companyIds);
+  const windowOf = new Map<string, DeliveryWindow | undefined>();
+  for (const company of companies ?? []) {
+    const settings = company.settings as { delivery_window?: DeliveryWindow } | null;
+    windowOf.set(company.id, settings?.delivery_window);
+  }
+
   const now = new Date();
   for (const row of rows) {
     // quiet hours: the row stays queued, untouched, until the morning sweep
-    if (holdsForQuietHours(row.event_kind, now)) {
+    if (holdsForQuietHours(row.event_kind, now, windowOf.get(row.company_id))) {
       result.skipped += 1;
       continue;
     }

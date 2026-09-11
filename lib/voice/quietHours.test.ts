@@ -20,6 +20,16 @@ describe("delivery window", () => {
     expect(holdsForQuietHours("announcement", NIGHT)).toBe(false);
   });
 
+  it("honours the company's own window", () => {
+    // 22:30 Aqtobe is inside a 09:00–23:00 window and outside the default one
+    const late = new Date("2026-09-11T17:30:00Z");
+    expect(isWithinDeliveryWindow(late)).toBe(false);
+    expect(isWithinDeliveryWindow(late, { from: "09:00", to: "23:00" })).toBe(true);
+    expect(holdsForQuietHours("reply", late, { from: "09:00", to: "23:00" })).toBe(false);
+    // a broken value falls back to the default hours
+    expect(isWithinDeliveryWindow(late, { from: "nine", to: "" })).toBe(false);
+  });
+
   it("holds nothing by day", () => {
     expect(holdsForQuietHours("reply", DAY)).toBe(false);
     expect(holdsForQuietHours("task_sent", DAY)).toBe(false);
