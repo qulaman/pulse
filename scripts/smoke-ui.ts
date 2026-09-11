@@ -145,7 +145,8 @@ async function main() {
     // persistence: a cold reload of /sent reads the task straight from the database
     await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
     await page.reload({ waitUntil: "networkidle" });
-    const sentCard = page.locator('[data-testid="sent-task"]', { hasText: STAMP }).first();
+    // the parser may normalise the stamp away — the newest «Казхром» capsule is ours (list is newest-first)
+    const sentCard = page.locator('[data-testid="sent-task"]', { hasText: /Казхром/i }).first();
     let persisted = false;
     try {
       await sentCard.waitFor({ timeout: 15_000 });
@@ -342,11 +343,11 @@ async function main() {
   record("отчёт: фото видно в треде (signed URL)", photoShown);
 
   // ---- receipt on the director's card: «принял» (D-32) ------------------------------
-  await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /На приёмке/ }).click();
-  const receiptCard = page.locator("article", { hasText: STAMP }).first();
-  await receiptCard.waitFor({ timeout: 15_000 });
-  const receipt = (await receiptCard.getByTestId("delivery-status").textContent().catch(() => "")) ?? "";
+  // the list shows capsules; the receipt line lives on the task page
+  await page.goto(`${APP_URL}${threadHref}`, { waitUntil: "networkidle" });
+  const receiptLine = page.getByTestId("delivery-status");
+  await receiptLine.waitFor({ timeout: 15_000 });
+  const receipt = (await receiptLine.textContent().catch(() => "")) ?? "";
   await page.screenshot({ path: join(SHOTS, "21-receipt.png") });
   record("квитанция у директора: «принял»", /принял/.test(receipt), receipt.trim());
 
