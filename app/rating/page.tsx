@@ -13,7 +13,11 @@ export default function RatingPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Рейтинг</h1>
       <p className="mt-1 text-[13px] leading-4 text-muted">Очки за закрытые в срок задачи и поощрения директора</p>
-      <RatingList canAward={me.data?.role === "director"} pointsEnabled={pointsEnabled.data === true} />
+      <RatingList
+        canAward={me.data?.role === "director"}
+        isDirector={me.data?.role === "director"}
+        pointsEnabled={pointsEnabled.data === true}
+      />
     </main>
   );
 }

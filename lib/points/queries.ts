@@ -6,7 +6,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-export type RatingPeriod = "week" | "month";
+export type RatingPeriod = "week" | "month" | "all";
 
 export type RatingRow = {
   user_id: string;
@@ -22,7 +22,8 @@ export function periodBounds(period: RatingPeriod, now = new Date()): { from: Da
   const to = new Date(now.getTime() + 60_000);
   const from = new Date(now);
   if (period === "week") from.setDate(from.getDate() - 7);
-  else from.setMonth(from.getMonth() - 1);
+  else if (period === "month") from.setMonth(from.getMonth() - 1);
+  else return { from: new Date("2000-01-01T00:00:00Z"), to };
   return { from, to };
 }
 
@@ -72,6 +73,22 @@ export function usePointHistory(userId: string | undefined) {
         .limit(50);
       if (error) throw new Error(error.message);
       return (data ?? []) as PointRow[];
+    },
+  });
+}
+
+/** Every active balance of the company in one query (director RLS) — the team list's «очк.». */
+export function useTeamBalances(enabled: boolean) {
+  return useQuery({
+    queryKey: ["points", "team-balances"],
+    enabled,
+    queryFn: async (): Promise<Record<string, number>> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.from("point_transactions").select("user_id, amount");
+      if (error) throw new Error(error.message);
+      const sums: Record<string, number> = {};
+      for (const row of data ?? []) sums[row.user_id] = (sums[row.user_id] ?? 0) + row.amount;
+      return sums;
     },
   });
 }
