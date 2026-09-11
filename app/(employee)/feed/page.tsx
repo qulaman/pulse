@@ -3,7 +3,7 @@
 import { Mascot } from "@/components/brand/Mascot";
 import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
@@ -23,7 +23,9 @@ export default function FeedPage() {
 
       <div className="mt-4">
         {loading ? (
-          <TaskSkeleton />
+          <SkeletonGroup>
+            <TaskListBone />
+          </SkeletonGroup>
         ) : items.length === 0 ? (
           <div className="mt-4 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
             <Mascot state="calm" size={72} />

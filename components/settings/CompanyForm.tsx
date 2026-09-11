@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { CompanyFormBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { APP_BG, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
 
@@ -111,7 +112,11 @@ export function CompanyForm() {
   };
 
   if (!company) {
-    return <div className="skeleton h-40 rounded-[16px]" aria-label="Загружаю компанию" />;
+    return (
+      <SkeletonGroup>
+        <CompanyFormBone />
+      </SkeletonGroup>
+    );
   }
 
   return (

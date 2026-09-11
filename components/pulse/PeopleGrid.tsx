@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { PeopleGridBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { initialsOf, usePeople } from "@/lib/people/queries";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -51,18 +52,28 @@ function useLoads() {
   });
 }
 
-/** Пульс, block 4: the team at a glance — one dot per person, tap opens the card. */
-export function PeopleGrid() {
+/** «Команда»: the team at a glance — one dot per person, tap opens the card. */
+export function PeopleGrid({ title = "Люди" }: { title?: string }) {
   const people = usePeople();
   const loads = useLoads();
 
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "tv" && p.role !== "director");
+  if (people.isLoading) {
+    return (
+      <SkeletonGroup className="mt-7">
+        <h2 className="text-[19px] font-semibold leading-6">Люди</h2>
+        <div className="mt-3">
+          <PeopleGridBone />
+        </div>
+      </SkeletonGroup>
+    );
+  }
   if (team.length === 0) return null;
 
   return (
-    <section className="mt-7">
+    <section className="mt-6">
       <h2 className="flex items-center gap-2 text-[19px] font-semibold leading-6">
-        Люди
+        {title}
         <span className="nums rounded-full bg-surface-2 px-2 text-[13px] leading-5 text-muted">{team.length}</span>
       </h2>
       <ul className="mt-3 grid grid-cols-4 gap-2">

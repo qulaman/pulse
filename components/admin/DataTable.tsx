@@ -1,5 +1,7 @@
 "use client";
 
+import { Bone } from "@/components/ui/Skeleton";
+
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -133,9 +135,15 @@ export function DataTable({ spec }: { spec: TableSpec }) {
           </thead>
           <tbody>
             {query.isLoading ? (
-              <tr>
-                <td colSpan={spec.columns.length} className="px-3 py-6 text-center text-muted">Загружаю…</td>
-              </tr>
+              Array.from({ length: 6 }, (_, r) => (
+                <tr key={r} className="skeleton border-t border-border" aria-hidden>
+                  {spec.columns.map((col, c) => (
+                    <td key={col.key} className="px-3 py-2">
+                      <Bone h={16} w={["60%", "80%", "40%", "70%"][(r + c) % 4]} />
+                    </td>
+                  ))}
+                </tr>
+              ))
             ) : query.error ? (
               <tr>
                 <td colSpan={spec.columns.length} className="px-3 py-6 text-center text-danger">

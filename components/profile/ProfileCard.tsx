@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Chip } from "@/components/ui/Chip";
+import { Bone } from "@/components/ui/Skeleton";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Availability, type Role } from "@/lib/people/queries";
 import { balanceOf, usePointHistory } from "@/lib/points/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -59,10 +60,12 @@ function useProfileStats(userId: string, role: Role) {
   });
 }
 
-function Stat({ value, label }: { value: string | number; label: string }) {
+function Stat({ value, label }: { value: string | number | null; label: string }) {
   return (
     <div className="rounded-[12px] bg-surface-2 px-3 py-2 text-center">
-      <p className="nums text-[24px] font-bold leading-[30px]">{value}</p>
+      <p className="nums flex h-[30px] items-center justify-center text-[24px] font-bold leading-[30px]">
+        {value === null ? <Bone h={22} w={28} className="bg-border" /> : value}
+      </p>
       <p className="text-[11px] leading-4 text-muted">{label}</p>
     </div>
   );
@@ -99,14 +102,14 @@ export function ProfileCard({ userId, fullName, role }: Props) {
         <div className="mt-4 grid grid-cols-3 gap-2">
           {role === "director" ? (
             <>
-              <Stat value={s?.people ?? "…"} label="в команде" />
-              <Stat value={s?.sent30 ?? "…"} label="задач за 30 дн." />
-              <Stat value={s?.open ?? "…"} label="в работе у команды" />
+              <Stat value={s?.people ?? null} label="в команде" />
+              <Stat value={s?.sent30 ?? null} label="задач за 30 дн." />
+              <Stat value={s?.open ?? null} label="в работе у команды" />
             </>
           ) : (
             <>
-              <Stat value={s?.open ?? "…"} label="открытых" />
-              <Stat value={s?.done30 ?? "…"} label="закрыто за 30 дн." />
+              <Stat value={s?.open ?? null} label="открытых" />
+              <Stat value={s?.done30 ?? null} label="закрыто за 30 дн." />
               <Stat value={s?.onTimePct === null || s?.onTimePct === undefined ? "—" : `${s.onTimePct}%`} label="в срок" />
             </>
           )}
@@ -120,7 +123,7 @@ export function ProfileCard({ userId, fullName, role }: Props) {
             <div>
               <p className="text-[13px] leading-4 text-muted">Очки</p>
               <p data-testid="balance" className="nums text-[32px] font-bold leading-9" style={{ color: "var(--gold)" }}>
-                {history.isLoading ? "…" : balance}
+                {history.isLoading ? <Bone h={28} w={36} className="inline-block bg-border" /> : balance}
               </p>
             </div>
             <Link href="/rating" className="ml-auto text-[13px] leading-4 text-accent underline underline-offset-4">

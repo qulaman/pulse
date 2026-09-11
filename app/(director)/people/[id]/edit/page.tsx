@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 
 import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
 import { ResetPasswordCard } from "@/components/people/ResetPasswordCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { initialsOf, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
 
 export default function EditPersonPage() {
@@ -19,7 +19,10 @@ export default function EditPersonPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <Link href="/people" className="text-[13px] leading-4 text-muted">← Сотрудники</Link>
       {person.isLoading ? (
-        <div className="mt-4"><TaskSkeleton count={1} /></div>
+        <SkeletonGroup className="mt-4 flex flex-col gap-4">
+          <SectionBone fields={4} />
+          <SectionBone fields={2} />
+        </SkeletonGroup>
       ) : person.data ? (
         <>
           <div className="mt-3 flex items-center gap-3">

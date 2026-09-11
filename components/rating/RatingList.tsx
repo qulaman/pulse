@@ -6,6 +6,7 @@ import { Mascot } from "@/components/brand/Mascot";
 import { AwardSheet } from "@/components/rating/AwardSheet";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { RatingListBone } from "@/components/ui/PageSkeletons";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
 
 const MEDAL = ["🥇", "🥈", "🥉"];
@@ -85,7 +86,7 @@ export function RatingList({ canAward, pointsEnabled }: { canAward: boolean; poi
       ) : null}
 
       {rating.isLoading ? (
-        <p className="mt-6 text-[16px] leading-[22px] text-muted">Считаю очки…</p>
+        <RatingListBone withAward={canAward} />
       ) : (
         <>
           {rows.length === 0 || rows.every((r) => r.points === 0) ? (

@@ -11,14 +11,11 @@ export default function SettingsPage() {
         Всё здесь — конфигурация компании: код одинаков для всех клиентов
       </p>
       <h2 className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-muted">Компания</h2>
-      <div className="mt-2 mb-2">
-        <CompanyForm />
-      </div>
       <Link
         href="/people"
         className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
       >
-        Сотрудники
+        Команда
         <span className="text-[13px] leading-4 text-muted">карточки, алиасы, роли ›</span>
       </Link>
       <Link
@@ -35,6 +32,9 @@ export default function SettingsPage() {
         Отправленные
         <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
       </Link>
+      <div className="mt-4">
+        <CompanyForm />
+      </div>
       <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Голос и разбор</h2>
       <div className="mt-2">
         <SettingsForm />

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/Button";
+import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import {
   PARSER_MODEL_LABEL,
@@ -103,7 +104,12 @@ export function SettingsForm() {
   });
 
   if (!draft) {
-    return <p className="text-[16px] leading-[22px] text-muted">Загружаю настройки…</p>;
+    return (
+      <SkeletonGroup className="flex flex-col gap-4">
+        <SectionBone fields={3} />
+        <SectionBone fields={2} />
+      </SkeletonGroup>
+    );
   }
 
   const update = (patch: Partial<CompanySettings>) => setDraft({ ...draft, ...patch });

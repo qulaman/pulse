@@ -2,7 +2,7 @@
 
 import { Mascot } from "@/components/brand/Mascot";
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { activeOnly, useMe, useMyTasks } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
@@ -22,7 +22,9 @@ export default function TasksPage() {
 
       <div className="mt-4">
         {loading ? (
-          <TaskSkeleton />
+          <SkeletonGroup>
+            <TaskListBone />
+          </SkeletonGroup>
         ) : items.length === 0 ? (
           <div className="flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
             <Mascot state="calm" size={72} />

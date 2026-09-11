@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { SentListBone } from "@/components/ui/PageSkeletons";
 import { Chip } from "@/components/ui/Chip";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
@@ -82,9 +82,7 @@ export default function SentPage() {
       </div>
 
       {loading ? (
-        <div className="mt-6">
-          <TaskSkeleton />
-        </div>
+        <SentListBone />
       ) : rows.length === 0 ? (
         <div className="mt-6 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
           <Mascot state="calm" size={64} />

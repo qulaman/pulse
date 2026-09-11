@@ -7,7 +7,8 @@ import { useMemo, useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { AwardSheet, type AwardTarget } from "@/components/rating/AwardSheet";
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { PersonSkeleton } from "@/components/ui/PageSkeletons";
+import { Bone, RowListBone, SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -29,14 +30,14 @@ const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
 
 const STAT_COLOR = { danger: "var(--danger)", ok: "var(--ok)", gold: "var(--gold)" } as const;
 
-function Stat({ value, label, tone }: { value: string | number; label: string; tone?: keyof typeof STAT_COLOR }) {
+function Stat({ value, label, tone }: { value: string | number | null; label: string; tone?: keyof typeof STAT_COLOR }) {
   return (
     <div className="rounded-[12px] bg-surface-2 px-2 py-2 text-center">
       <p
-        className="nums text-[22px] font-bold leading-[30px]"
+        className="nums flex h-[30px] items-center justify-center text-[22px] font-bold leading-[30px]"
         style={tone ? { color: STAT_COLOR[tone] } : undefined}
       >
-        {value}
+        {value === null ? <Bone h={22} w={28} className="bg-border" /> : value}
       </p>
       <p className="text-[11px] leading-4 text-muted">{label}</p>
     </div>
@@ -77,13 +78,7 @@ export default function PersonPage() {
     };
   }, [tasks.data, now]);
 
-  if (person.isLoading) {
-    return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-        <TaskSkeleton count={2} />
-      </main>
-    );
-  }
+  if (person.isLoading) return <PersonSkeleton />;
   if (!person.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
@@ -132,10 +127,10 @@ export default function PersonPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2">
-          <Stat value={tasks.isLoading ? "…" : groups.open.length + groups.review.length} label="в работе" />
-          <Stat value={tasks.isLoading ? "…" : groups.overdue} label="просрочено" tone={groups.overdue > 0 ? "danger" : undefined} />
-          <Stat value={tasks.isLoading ? "…" : groups.done30} label="закрыто за 30 дн." tone={groups.done30 > 0 ? "ok" : undefined} />
-          <Stat value={points.isLoading ? "…" : balanceOf(points.data)} label="очков" tone="gold" />
+          <Stat value={tasks.isLoading ? null : groups.open.length + groups.review.length} label="в работе" />
+          <Stat value={tasks.isLoading ? null : groups.overdue} label="просрочено" tone={groups.overdue > 0 ? "danger" : undefined} />
+          <Stat value={tasks.isLoading ? null : groups.done30} label="закрыто за 30 дн." tone={groups.done30 > 0 ? "ok" : undefined} />
+          <Stat value={points.isLoading ? null : balanceOf(points.data)} label="очков" tone="gold" />
         </div>
 
         <div className="mt-4 flex gap-2">
@@ -174,7 +169,9 @@ export default function PersonPage() {
         </h2>
         <div className="mt-3">
           {tasks.isLoading ? (
-            <TaskSkeleton />
+            <SkeletonGroup>
+              <TaskListBone count={2} variant="director" />
+            </SkeletonGroup>
           ) : groups.open.length + groups.review.length === 0 ? (
             <div className="flex items-center gap-3 rounded-[16px] border border-border bg-surface px-4 py-3">
               <Mascot state="calm" size={44} />
@@ -217,7 +214,9 @@ export default function PersonPage() {
         <h2 className="text-[19px] font-semibold leading-6">Что писал</h2>
         <div className="mt-3">
           {messages.isLoading ? (
-            <TaskSkeleton count={1} />
+            <SkeletonGroup>
+              <RowListBone count={2} avatar={0} />
+            </SkeletonGroup>
           ) : (messages.data ?? []).length === 0 ? (
             <p className="text-[14px] leading-[18px] text-muted">Пока ни одного сообщения в задачах</p>
           ) : (

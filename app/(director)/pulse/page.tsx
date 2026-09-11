@@ -1,133 +1,93 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 
-import { Mascot, type MascotState } from "@/components/brand/Mascot";
-import { PeopleGrid } from "@/components/pulse/PeopleGrid";
+import { Assistant } from "@/components/pulse/Assistant";
 import { PushCard } from "@/components/push/PushCard";
-import { TaskCard } from "@/components/tasks/TaskCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { VoiceButton } from "@/components/voice/VoiceButton";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { buildBriefing } from "@/lib/pulse/briefing";
+import { firstNameOf, toBriefTask, useAcceptedSince, useLastVisit, useNow, useOpenTasks } from "@/lib/pulse/queries";
+import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
-import {
-  inboxCounts,
-  useDirectorInbox,
-  useMe,
-  type TaskWithPeople,
-} from "@/lib/tasks/queries";
-import { verdict, type VerdictTone } from "@/lib/tasks/status-text";
-
-const VERDICT_STYLE: Record<VerdictTone, { border: string; glow: string; mascot: MascotState; sub: string }> = {
-  ok: {
-    border: "color-mix(in srgb, var(--ok) 45%, transparent)",
-    glow: "color-mix(in srgb, var(--ok) 12%, transparent)",
-    mascot: "happy",
-    sub: "Ничего не требует внимания. Зажми кнопку внизу и скажи, что нужно сделать",
-  },
-  warn: {
-    border: "color-mix(in srgb, var(--warn) 55%, transparent)",
-    glow: "color-mix(in srgb, var(--warn) 12%, transparent)",
-    mascot: "thinking",
-    sub: "Есть что разобрать — всё ниже, по порядку срочности",
-  },
-  danger: {
-    border: "color-mix(in srgb, var(--danger) 55%, transparent)",
-    glow: "color-mix(in srgb, var(--danger) 12%, transparent)",
-    mascot: "thinking",
-    sub: "Сначала просрочки, потом вопросы и приёмка",
-  },
-};
-
-function firstName(fullName: string | undefined): string {
-  return fullName?.trim().split(/\s+/)[0] ?? "";
-}
+import { useDirectorInbox, useMe, type TaskWithPeople } from "@/lib/tasks/queries";
 
 /**
- * Пульс, blocks 1–2 of docs/FRONTEND.md: the verdict and «Требует вас».
- * Stacks in D-05 order — overdue, questions, review. Люди and Цифры недели
- * belong to the full Пульс, not here.
+ * Пульс — the director's home is a conversation with the assistant: «Капля» reports
+ * what changed since the last visit (overdue → questions → review, then who accepted
+ * what), each fact opens its cards right in the bubble, and the one thing to do here
+ * is to give a task — hold to speak, tap to type. The team lives on /people.
  */
 export default function PulsePage() {
   const me = useMe();
   const inbox = useDirectorInbox();
+  const since = useLastVisit();
+  const accepted = useAcceptedSince(since);
+  const open = useOpenTasks();
+  const now = useNow();
   const actions = useTaskActions(me.data);
-
-  const counts = inboxCounts(inbox.data);
-  const line = verdict(counts);
-  const style = VERDICT_STYLE[line.tone];
-  const loading = me.isLoading || inbox.isLoading;
   const companyId = me.data?.companyId ?? "";
 
-  const section = (title: string, tasks: TaskWithPeople[], tone: VerdictTone) =>
-    tasks.length === 0 ? null : (
-      <section className="mt-7">
-        <h2 className="flex items-center gap-2 text-[19px] font-semibold leading-6">
-          <span
-            aria-hidden
-            className="inline-block h-2.5 w-2.5 rounded-full"
-            style={{ background: `var(--${tone === "ok" ? "ok" : tone})` }}
-          />
-          {title}
-          <span className="nums rounded-full bg-surface-2 px-2 text-[13px] leading-5 text-muted">
-            {tasks.length}
-          </span>
-        </h2>
-        <div className="mt-3 flex flex-col gap-3">
-          {tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              variant="director"
-              actions={actions}
-              companyId={companyId}
-              href={`/tasks/${task.id}`}
-            />
-          ))}
-        </div>
-      </section>
-    );
+  const stage = useIngestStore((state) => state.stage);
+  const entities = useIngestStore((state) => state.entities);
+  const pointsEnabled = usePointsEnabled().data === true;
+  const draftCount = stage === "confirm" ? entities.filter((entity) => isCountable(entity, pointsEnabled)).length : 0;
+
+  const loading = me.isLoading || inbox.isLoading || open.isLoading || accepted.isLoading;
+
+  const lines = useMemo(() => {
+    const data = inbox.data;
+    return buildBriefing({
+      now,
+      directorName: firstNameOf(me.data?.fullName),
+      overdue: (data?.overdue ?? []).map(toBriefTask),
+      questions: (data?.questions ?? []).map(toBriefTask),
+      review: (data?.review ?? []).map(toBriefTask),
+      accepted: accepted.data ?? [],
+      open: open.data ?? [],
+    });
+  }, [now, me.data?.fullName, inbox.data, accepted.data, open.data]);
+
+  const taskById = useMemo(() => {
+    const map = new Map<string, TaskWithPeople>();
+    for (const list of [inbox.data?.overdue, inbox.data?.questions, inbox.data?.review]) {
+      for (const task of list ?? []) map.set(task.id, task);
+    }
+    return map;
+  }, [inbox.data]);
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <p className="text-[13px] leading-4 text-muted">
-        {me.data ? `Здравствуйте, ${firstName(me.data.fullName)}` : " "}
-      </p>
-      <h1 className="mt-1 text-[24px] font-bold leading-[30px]">Пульс</h1>
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-4">
+      <Assistant lines={lines} loading={loading} taskById={taskById} actions={actions} companyId={companyId} />
 
-      <section
-        className="mt-4 flex items-center gap-4 rounded-[16px] border bg-surface p-4"
-        style={{ borderColor: style.border, background: `linear-gradient(135deg, ${style.glow}, transparent 60%), var(--surface)` }}
-        aria-live="polite"
+      <div className="mt-2 flex flex-col gap-2">
+        {draftCount > 0 ? (
+          <Link
+            href="/confirm"
+            className="card-in block rounded-[16px] rounded-tl-[6px] border border-accent/40 bg-surface px-4 py-3 text-[16px] leading-[22px]"
+          >
+            Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
+            <span className="text-accent">Открыть ›</span>
+          </Link>
+        ) : null}
+        <PushCard bubble />
+      </div>
+
+      {/* the one action of the screen: stays under the thumb while the briefing scrolls */}
+      <div
+        className="sticky mt-auto flex flex-col items-center pt-8"
+        style={{
+          bottom: "calc(56px + env(safe-area-inset-bottom))",
+          paddingBottom: 16,
+          background: "linear-gradient(180deg, transparent, var(--bg) 32%)",
+        }}
       >
-        <Mascot state={loading ? "thinking" : style.mascot} size={56} />
-        {/* two lines of verdict reserved: the card keeps its height when the real line lands */}
-        <div className="min-h-[68px] min-w-0">
-          <p className="text-[19px] font-semibold leading-6">{loading ? "Смотрю, что нового…" : line.text}</p>
-          <p className="mt-1 text-[13px] leading-4 text-muted">{loading ? " " : style.sub}</p>
-        </div>
-      </section>
-
-      <Link
-        href="/sent"
-        className="mt-3 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
-      >
-        Отправленные
-        <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
-      </Link>
-
-      {loading ? (
-        <div className="mt-6">
-          <TaskSkeleton />
-        </div>
-      ) : counts.total === 0 ? null : (
-        <>
-          {section("Просрочки", inbox.data?.overdue ?? [], "danger")}
-          {section("Вопросы", inbox.data?.questions ?? [], "warn")}
-          {section("Приёмка", inbox.data?.review ?? [], "ok")}
-        </>
-      )}
-
-      <PushCard compact />
-      <PeopleGrid />
+        <VoiceButton inline />
+        <Link href="/sent" className="mt-4 min-h-[44px] text-[14px] leading-[44px] text-muted">
+          Отправленные ›
+        </Link>
+      </div>
     </main>
   );
 }

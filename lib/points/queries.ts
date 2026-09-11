@@ -1,7 +1,7 @@
 "use client";
 
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -35,6 +35,7 @@ export const pointKeys = {
 export function useRating(period: RatingPeriod) {
   return useQuery({
     queryKey: pointKeys.rating(period),
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<RatingRow[]> => {
       const { from, to } = periodBounds(period);
       const supabase = createBrowserSupabase();

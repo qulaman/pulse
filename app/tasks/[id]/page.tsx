@@ -4,7 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { latestDeclineReason, TaskChat, TaskDates, TaskTimeline } from "@/components/tasks/TaskThread";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
 import { homeForRole } from "@/lib/routes";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useTaskThread } from "@/lib/tasks/queries";
@@ -27,17 +27,15 @@ export default function TaskThreadPage() {
     else router.replace(home);
   };
 
+  if (task.isLoading || me.isLoading) return <TaskPageSkeleton />;
+
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 py-5">
       <button type="button" onClick={back} className="flex min-h-[32px] items-center gap-1 text-[14px] leading-[18px] text-muted">
         <span aria-hidden>←</span> Назад
       </button>
 
-      {task.isLoading || me.isLoading ? (
-        <div className="mt-3">
-          <TaskSkeleton count={1} />
-        </div>
-      ) : task.data ? (
+      {task.data ? (
         <>
           <div className="mt-3">
             <TaskCard

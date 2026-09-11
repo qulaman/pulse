@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { AnnouncementCard } from "@/components/ether/AnnouncementCard";
-import { TaskSkeleton } from "@/components/tasks/TaskSkeleton";
+import { EtherListBone } from "@/components/ui/PageSkeletons";
 import { useAcknowledge, useEther } from "@/lib/ether/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { useMe } from "@/lib/tasks/queries";
@@ -41,9 +41,7 @@ export default function EtherPage() {
       </p>
 
       {feed.isLoading || me.isLoading ? (
-        <div className="mt-6">
-          <TaskSkeleton count={2} />
-        </div>
+        <EtherListBone />
       ) : items.length === 0 ? (
         <div className="mt-6 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
           <Mascot state="calm" size={72} />

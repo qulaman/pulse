@@ -3,12 +3,14 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
+import { RowListBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { Chip } from "@/components/ui/Chip";
+import { PeopleGrid } from "@/components/pulse/PeopleGrid";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, usePeople } from "@/lib/people/queries";
 
 const DOT: Record<string, string> = { active: "var(--ok)", vacation: "var(--text-muted)", sick: "var(--warn)" };
 
-/** «Сотрудники»: the roster the parser and the STT prompt are built from. */
+/** «Команда»: who is loaded how right now, then the roster the parser and the STT prompt are built from. */
 export default function PeoplePage() {
   const people = usePeople();
   // directors first, the kiosk last, people alphabetically in between
@@ -21,7 +23,7 @@ export default function PeoplePage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <div className="flex items-end justify-between gap-3">
         <div>
-          <h1 className="text-[24px] font-bold leading-[30px]">Сотрудники</h1>
+          <h1 className="text-[24px] font-bold leading-[30px]">Команда</h1>
           <p className="mt-1 text-[13px] leading-4 text-muted">
             {people.isLoading ? " " : `${active.length} в команде`}
           </p>
@@ -31,7 +33,24 @@ export default function PeoplePage() {
         </Link>
       </div>
 
-      <ul className="mt-5 space-y-2">
+      <PeopleGrid title="Сейчас" />
+
+      <Link
+        href="/rating"
+        className="mt-6 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+      >
+        Рейтинг
+        <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
+      </Link>
+
+      <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
+
+      {people.isLoading ? (
+        <SkeletonGroup className="mt-5">
+          <RowListBone count={7} />
+        </SkeletonGroup>
+      ) : null}
+      <ul className="mt-3 space-y-2">
         {rows.length === 0 && !people.isLoading ? (
           <li className="text-[16px] leading-[22px] text-muted">Пока никого</li>
         ) : null}
