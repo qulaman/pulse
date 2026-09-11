@@ -327,17 +327,18 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
   };
 }
 
-export function useDirectorInbox() {
+export function useDirectorInbox(enabled = true) {
   const queryKey = taskKeys.inbox();
 
   const query = useRealtimeQuery<DirectorInbox, TaskRow>({
     queryKey,
     queryFn: fetchDirectorInbox,
     channel: { table: "tasks" },
+    enabled,
   });
 
   // An open question is a task_messages row — the tasks channel never sees it.
-  useRealtimeInvalidate({ table: "task_messages" }, queryKey);
+  useRealtimeInvalidate({ table: "task_messages" }, queryKey, enabled);
 
   return query;
 }

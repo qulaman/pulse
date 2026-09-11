@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -59,6 +59,10 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
     onEventRef.current = onEvent;
     onResyncRef.current = onResync;
   });
+  // One channel per mounted hook: two screens (or a screen and the tab bar) sharing a query
+  // key would otherwise reuse the same topic, and supabase-js refuses new callbacks on a
+  // channel that has already subscribed («cannot add postgres_changes callbacks after subscribe()»).
+  const instance = useId();
 
   useEffect(() => {
     if (!enabled) return;
@@ -70,7 +74,7 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
 
     const subscribe = () => {
       active = supabase
-        .channel(`rtq:${table}:${filter ?? "all"}:${channelKey}`)
+        .channel(`rtq:${table}:${filter ?? "all"}:${channelKey}:${instance}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
@@ -106,7 +110,7 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
       if (settleTimer !== null) clearTimeout(settleTimer);
       if (active) void supabase.removeChannel(active);
     };
-  }, [enabled, table, filter, channelKey]);
+  }, [enabled, table, filter, channelKey, instance]);
 }
 
 export type UseRealtimeQueryOptions<TData, TRow extends Record<string, unknown>> = {

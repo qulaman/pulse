@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { inboxCounts, useDirectorInbox, useMe, useMyTasks } from "@/lib/tasks/queries";
+
 type TabRole = "director" | "employee";
 
 type Tab = { href: string; label: string; icon: ReactNode };
@@ -92,9 +94,27 @@ const TABS: Record<TabRole, Tab[]> = {
   ],
 };
 
+/**
+ * What each role should not miss, as a count on its tab: the employee's tasks not yet
+ * accepted on «Дела», everything waiting for the director on «Пульс». Live through the
+ * same queries the screens use, so the number never disagrees with the list behind it.
+ */
+function useTabBadges(role: TabRole): Record<string, number> {
+  const me = useMe();
+  const mine = useMyTasks(role === "employee" ? me.data?.userId : undefined);
+  const inbox = useDirectorInbox(role === "director");
+  if (role === "employee") {
+    const fresh = (mine.data ?? []).filter((task) => task.status === "sent").length;
+    return fresh > 0 ? { "/tasks": fresh } : {};
+  }
+  const total = inboxCounts(inbox.data).total;
+  return total > 0 ? { "/pulse": total } : {};
+}
+
 /** Bottom navigation: icon + label, 44px targets, safe-area aware (docs/FRONTEND.md). */
 export function TabBar({ role }: { role: TabRole }) {
   const pathname = usePathname();
+  const badges = useTabBadges(role);
 
   return (
     <nav
@@ -114,10 +134,19 @@ export function TabBar({ role }: { role: TabRole }) {
                 style={{ color: active ? "var(--accent)" : "var(--text-muted)", fontWeight: active ? 600 : 500 }}
               >
                 <span
-                  className="flex h-8 w-12 items-center justify-center rounded-full transition-colors duration-[120ms]"
+                  className="relative flex h-8 w-12 items-center justify-center rounded-full transition-colors duration-[120ms]"
                   style={{ background: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
                 >
                   {tab.icon}
+                  {badges[tab.href] ? (
+                    <span
+                      className="nums absolute -right-0.5 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface px-1 font-display text-[10px] font-bold leading-none"
+                      style={{ background: "var(--accent)", color: "var(--bg)" }}
+                      aria-label={`${badges[tab.href]} требуют внимания`}
+                    >
+                      {badges[tab.href] > 99 ? "99+" : badges[tab.href]}
+                    </span>
+                  ) : null}
                 </span>
                 {tab.label}
               </Link>

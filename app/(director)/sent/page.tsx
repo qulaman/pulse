@@ -37,9 +37,17 @@ export default function SentPage() {
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
   const [filter, setFilter] = useState<Filter>("active");
+  const [query, setQuery] = useState("");
   const now = useMemo(() => new Date(), []);
 
-  const rows = useMemo(() => (tasks.data ?? []).filter((t) => matches(t, filter)), [tasks.data, filter]);
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return (tasks.data ?? []).filter(
+      (t) =>
+        matches(t, filter) &&
+        (!needle || t.title.toLowerCase().includes(needle) || (t.assignee?.full_name ?? "").toLowerCase().includes(needle)),
+    );
+  }, [tasks.data, filter, query]);
   const counts = useMemo(() => {
     const all = tasks.data ?? [];
     return {
@@ -59,7 +67,27 @@ export default function SentPage() {
         {loading ? " " : `${counts.all} ${counts.all === 1 ? "задача" : counts.all < 5 ? "задачи" : "задач"} всего`}
       </p>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <label className="mt-4 flex min-h-[44px] items-center gap-2 rounded-[12px] border border-border bg-surface-2 px-3">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-muted" aria-hidden>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="M16 16l4.5 4.5" />
+        </svg>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Название или имя"
+          aria-label="Поиск по задачам"
+          className="min-w-0 flex-1 bg-transparent text-[16px] leading-[22px] text-text outline-none placeholder:text-muted"
+        />
+        {query ? (
+          <button type="button" aria-label="Очистить" onClick={() => setQuery("")} className="text-[16px] text-muted">
+            ×
+          </button>
+        ) : null}
+      </label>
+
+      <div className="mt-3 flex flex-wrap gap-2">
         {FILTERS.map((f) => (
           <Chip key={f.key} tone={filter === f.key ? "accent" : "neutral"} onClick={() => setFilter(f.key)}>
             {f.label} <span className="nums opacity-70">{counts[f.key]}</span>
@@ -73,7 +101,7 @@ export default function SentPage() {
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={64} />
           <p className="mt-4 text-[16px] leading-[22px]">
-            {filter === "all" ? "Пока ничего не отправлено" : "В этой стопке пусто"}
+            {query ? "Ничего не нашёл" : filter === "all" ? "Пока ничего не отправлено" : "В этой стопке пусто"}
           </p>
           <p className="mt-1 text-[13px] leading-4 text-muted">Зажми кнопку и скажи, что нужно сделать</p>
         </div>
