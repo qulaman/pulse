@@ -45,7 +45,7 @@ export function NotificationsRow() {
       type="button"
       onClick={enable}
       disabled={!canEnable || busy}
-      className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-left text-[16px] leading-[22px] disabled:opacity-100"
+      className="flex min-h-[52px] w-full items-center justify-between gap-3 card px-4 text-left text-[16px] leading-[22px] disabled:opacity-100"
     >
       Уведомления
       <span className="text-[13px] leading-4" style={{ color: state === "granted" ? "var(--ok)" : "var(--text-muted)" }}>

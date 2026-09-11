@@ -89,6 +89,8 @@ const TONE_COLOR: Record<ChipTone, string> = {
   danger: "var(--danger)",
   muted: "var(--text-muted)",
   accent: "var(--accent)",
+  ok: "var(--ok)",
+  gold: "var(--gold)",
 };
 
 type Props = {
@@ -162,7 +164,7 @@ export function EntityCard({
 
   return (
     <article
-      className="relative rounded-[16px] border border-border bg-surface p-3"
+      className="relative card p-3"
       style={{ opacity: muted ? 0.55 : 1 }}
       aria-label={`Сущность ${index + 1}`}
     >

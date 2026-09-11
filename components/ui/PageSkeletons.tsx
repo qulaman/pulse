@@ -147,7 +147,7 @@ export function PeopleSkeleton() {
           <PeopleGridBone />
         </div>
       </SkeletonGroup>
-      <div className="mt-6 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
+      <div className="mt-6 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]">
         Рейтинг
         <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
       </div>
@@ -162,7 +162,7 @@ export function PersonSkeleton() {
     <main className={MAIN}>
       <p className="text-[13px] leading-4 text-muted">← Сотрудники</p>
       <SkeletonGroup>
-        <section className="mt-3 rounded-[16px] border border-border bg-surface p-4">
+        <section className="mt-3 card p-4">
           <div className="flex items-start gap-3">
             <Bone round w={64} h={64} className="shrink-0" />
             <div className="min-w-0 flex-1">
@@ -205,7 +205,7 @@ export function SettingsSkeleton() {
           ["Данные", "таблицы компании как есть ›"],
           ["Задачи", "все поручения списком ›"],
         ].map(([title, hint]) => (
-          <div key={title} className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
+          <div key={title} className="flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]">
             {title}
             <span className="text-[13px] leading-4 text-muted">{hint}</span>
           </div>
@@ -232,7 +232,7 @@ export function AdminSkeleton() {
           <Bone key={i} h={36} w={w} className="rounded-full" />
         ))}
       </SkeletonGroup>
-      <SkeletonGroup className="mt-4 rounded-[16px] border border-border bg-surface">
+      <SkeletonGroup className="mt-4 card">
         <div className="px-4 pt-4">
           <Bone h={26} w={140} />
           <Bone h={16} w={200} className="mt-1" />
@@ -319,7 +319,7 @@ export function ProfileSkeleton() {
     <main className={MAIN}>
       <Title text="Профиль" />
       <SkeletonGroup className="mt-4">
-        <section className="rounded-[16px] border border-border bg-surface p-4">
+        <section className="card p-4">
           <div className="flex items-center gap-4">
             <Bone round w={64} h={64} className="shrink-0" />
             <div className="min-w-0 flex-1">
@@ -355,7 +355,7 @@ export function TaskPageSkeleton() {
         <div className="mt-3">
           <TaskCardBone variant="director" />
         </div>
-        <section className="mt-4 rounded-[16px] border border-border bg-surface px-4 py-2">
+        <section className="mt-4 card px-4 py-2">
           <h2 className="pt-1 text-[13px] font-semibold uppercase tracking-wide text-muted">Сроки</h2>
           {["Создана", "Срок", "Принял", "Выполнил", "Закрыта"].map((label) => (
             <div key={label} className="flex items-center justify-between py-1.5">

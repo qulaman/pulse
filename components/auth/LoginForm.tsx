@@ -8,7 +8,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 const FIELD =
-  "min-h-[48px] rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
+  "min-h-[48px] field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 export type LoginBrand = { name: string; logoUrl: string | null; tagline: string | null };
 
@@ -53,7 +53,7 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
                 // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
                 <img src={brand.logoUrl} alt="" className="h-9 max-w-[140px] object-contain" />
               ) : null}
-              <span className="truncate text-[19px] font-semibold leading-6">{brand.name}</span>
+              <span className="font-display text-[19px] font-bold leading-6 tracking-[-0.02em]">{brand.name}</span>
             </div>
           ) : null}
           <PulseMark size={branded ? "md" : "lg"} />
@@ -101,7 +101,7 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
         <button
           type="submit"
           disabled={pending}
-          className="mt-2 min-h-[48px] rounded-[12px] bg-accent px-4 text-[16px] font-semibold text-bg transition-transform duration-[120ms] active:scale-[0.98] disabled:opacity-60"
+          className="btn-primary mt-2 min-h-[52px] rounded-[12px] px-4 font-display text-[16px] font-semibold text-bg transition-transform duration-[120ms] active:scale-[0.97] disabled:opacity-60"
         >
           {pending ? "Вхожу…" : "Войти"}
         </button>

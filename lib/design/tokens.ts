@@ -6,11 +6,11 @@
 
 export const colors = {
   bg: "#0B0F14",
-  surface: "#131A22",
-  "surface-2": "#1B242F",
-  border: "#243040",
-  text: "#E8EEF4",
-  "text-muted": "#8C99A8",
+  surface: "#121A23",
+  "surface-2": "#1B2533",
+  border: "#283548",
+  text: "#EEF3F8",
+  "text-muted": "#93A2B4",
   accent: "#2ED3B7",
   gold: "#F0B24A",
   ok: "#34C759",
@@ -21,8 +21,10 @@ export const colors = {
 /** Not a hex color: kept apart so the CSS parity test stays exact. */
 export const overlay = "rgba(4,8,12,.6)";
 
+/** Body: Golos Text (self-hosted by next/font); headings and numbers: Manrope (D-50). */
 export const fontStack =
-  '-apple-system, "SF Pro", Roboto, "Segoe UI", system-ui, sans-serif';
+  'var(--font-body), -apple-system, "SF Pro", Roboto, "Segoe UI", system-ui, sans-serif';
+export const displayStack = 'var(--font-display), var(--font-body), system-ui, sans-serif';
 
 export const typography = {
   display: { size: 40, lineHeight: 44, weight: 700 },

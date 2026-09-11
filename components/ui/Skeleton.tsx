@@ -39,7 +39,7 @@ export function SkeletonGroup({ children, className = "" }: { children: React.Re
 /** components/tasks/TaskCard: title (2 lines max), chips row, receipt line, actions row. */
 export function TaskCardBone({ variant = "employee" }: { variant?: "employee" | "director" }) {
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-4">
+    <div className="card p-4">
       <Bone h={24} w="72%" />
       <div className="mt-3 flex gap-2">
         <Bone h={32} w={112} className="rounded-full" />
@@ -69,7 +69,7 @@ export function TaskListBone({ count = 3, variant = "employee" }: { count?: numb
 /** A list row with an avatar and two lines (people list, thread history). */
 export function RowBone({ avatar = 44 }: { avatar?: number }) {
   return (
-    <div className="flex items-center gap-3 rounded-[16px] border border-border bg-surface px-3 py-3">
+    <div className="flex items-center gap-3 card px-3 py-3">
       <Bone round w={avatar} h={avatar} className="shrink-0" />
       <div className="min-w-0 flex-1">
         <Bone h={22} w="60%" />
@@ -102,7 +102,7 @@ export function StatBone({ label }: { label: string }) {
 /** components/rating/RatingList Row: rank circle, name, points, «+». */
 export function RatingRowBone({ withAward = true }: { withAward?: boolean }) {
   return (
-    <div className="flex items-center gap-3 rounded-[16px] border border-border bg-surface px-3 py-3">
+    <div className="flex items-center gap-3 card px-3 py-3">
       <Bone round w={40} h={40} className="shrink-0" />
       <div className="min-w-0 flex-1">
         <Bone h={22} w="55%" />
@@ -116,7 +116,7 @@ export function RatingRowBone({ withAward = true }: { withAward?: boolean }) {
 /** components/ether/AnnouncementCard: icon, two text lines, meta, ack line. */
 export function AnnouncementBone() {
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-4">
+    <div className="card p-4">
       <div className="flex gap-3">
         <Bone w={36} h={36} className="shrink-0 rounded-[10px]" />
         <div className="min-w-0 flex-1">
@@ -135,7 +135,7 @@ export function PeopleGridBone({ count = 8 }: { count?: number }) {
   return (
     <div className="grid grid-cols-4 gap-2">
       {Array.from({ length: count }, (_, i) => (
-        <div key={i} className="flex flex-col items-center rounded-[16px] border border-border bg-surface px-1 py-3">
+        <div key={i} className="flex flex-col items-center card px-1 py-3">
           <Bone round w={48} h={48} />
           <Bone h={16} w={48} className="mt-2" />
         </div>
@@ -147,7 +147,7 @@ export function PeopleGridBone({ count = 8 }: { count?: number }) {
 /** A settings section: title, hint, two fields. */
 export function SectionBone({ fields = 2 }: { fields?: number }) {
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-4">
+    <div className="card p-4">
       <Bone h={24} w="45%" />
       <Bone h={16} w="80%" className="mt-2" />
       <div className="mt-4 flex flex-col gap-4">
@@ -165,7 +165,7 @@ export function SectionBone({ fields = 2 }: { fields?: number }) {
 /** components/settings/CompanyForm: title, hint, preview row, name, tagline, logo block, accent block, button. */
 export function CompanyFormBone() {
   return (
-    <div className="rounded-[16px] border border-border bg-surface p-4">
+    <div className="card p-4">
       <Bone h={24} w={140} />
       <Bone h={16} className="mt-1" />
       <Bone h={16} w="60%" className="mt-0" />

@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 const FIELD =
-  "min-h-[48px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
+  "min-h-[48px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 /** Profile row that opens a sheet to set a new password for the signed-in user. */
 export function PasswordRow() {
@@ -48,7 +48,7 @@ export function PasswordRow() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex min-h-[52px] w-full items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-left text-[16px] leading-[22px]"
+        className="flex min-h-[52px] w-full items-center justify-between gap-3 card px-4 text-left text-[16px] leading-[22px]"
       >
         Пароль
         <span className="text-[13px] leading-4 text-muted">сменить ›</span>

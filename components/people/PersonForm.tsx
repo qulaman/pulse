@@ -13,7 +13,7 @@ import {
 } from "@/lib/people/queries";
 
 const FIELD =
-  "min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
+  "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
 
 const ROLES: Role[] = ["employee", "manager", "shopkeeper", "director", "tv"];
 const AVAILABILITIES: Availability[] = ["active", "vacation", "sick"];
@@ -89,7 +89,7 @@ export function PersonForm({
   return (
     <div className="flex flex-col gap-4">
       {mode === "create" ? (
-        <section className="rounded-[16px] border border-border bg-surface p-4">
+        <section className="card p-4">
           <h2 className="text-[19px] font-semibold leading-6">Вход</h2>
           <p className="mt-1 text-[13px] leading-4 text-muted">
             Пока вход по почте и паролю. Скажи пароль сотруднику лично — в приложении он его сменит
@@ -105,7 +105,7 @@ export function PersonForm({
         </section>
       ) : null}
 
-      <section className="rounded-[16px] border border-border bg-surface p-4">
+      <section className="card p-4">
         <h2 className="text-[19px] font-semibold leading-6">Карточка</h2>
         <div className="mt-4 flex flex-col gap-4">
           <Field label="Имя и фамилия">
@@ -136,7 +136,7 @@ export function PersonForm({
       </section>
 
       {mode === "edit" ? (
-        <section className="rounded-[16px] border border-border bg-surface p-4">
+        <section className="card p-4">
           <h2 className="text-[19px] font-semibold leading-6">Статус</h2>
           <div className="mt-4 flex flex-col gap-4">
             <Field label="Доступность" hint="В отпуске и на больничном: серая точка в «Людях», серия не сгорает, штрафы не начисляются">

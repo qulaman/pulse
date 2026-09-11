@@ -13,21 +13,21 @@ export default function SettingsPage() {
       <h2 className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-muted">Компания</h2>
       <Link
         href="/people"
-        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
       >
         Команда
         <span className="text-[13px] leading-4 text-muted">карточки, алиасы, роли ›</span>
       </Link>
       <Link
         href="/admin"
-        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
       >
         Данные
         <span className="text-[13px] leading-4 text-muted">таблицы компании как есть ›</span>
       </Link>
       <Link
         href="/sent"
-        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
       >
         Задачи
         <span className="text-[13px] leading-4 text-muted">все поручения списком ›</span>

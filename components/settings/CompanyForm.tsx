@@ -8,7 +8,7 @@ import { toast } from "@/components/ui/Toast";
 import { APP_BG, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
 
 const FIELD =
-  "min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
+  "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 type Company = { name: string; brand: { logo_url: string | null; accent: string | null; tagline: string | null } };
 
@@ -120,7 +120,7 @@ export function CompanyForm() {
   }
 
   return (
-    <section className="rounded-[16px] border border-border bg-surface p-4">
+    <section className="card p-4">
       <h2 className="text-[19px] font-semibold leading-6">О компании</h2>
       <p className="mt-1 text-[13px] leading-4 text-muted">
         Название и логотип видят все в шапке и на экране входа. Стиль Pulse остаётся, меняется только акцент

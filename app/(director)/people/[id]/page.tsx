@@ -105,7 +105,7 @@ export default function PersonPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <Link href="/people" className="text-[13px] leading-4 text-muted">← Сотрудники</Link>
 
-      <section className="mt-3 rounded-[16px] border border-border bg-surface p-4">
+      <section className="mt-3 card p-4">
         <div className="flex items-start gap-3">
           <span
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-[22px] font-semibold text-bg"
@@ -173,7 +173,7 @@ export default function PersonPage() {
               <TaskListBone count={2} variant="director" />
             </SkeletonGroup>
           ) : groups.open.length + groups.review.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-[16px] border border-border bg-surface px-4 py-3">
+            <div className="flex items-center gap-3 card px-4 py-3">
               <Mascot state="calm" size={44} />
               <p className="text-[16px] leading-[22px] text-muted">Открытых задач нет. Дай задачу голосом или текстом</p>
             </div>

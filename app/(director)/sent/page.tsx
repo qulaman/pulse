@@ -70,7 +70,7 @@ export default function SentPage() {
       {loading ? (
         <SentListBone />
       ) : rows.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
+        <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={64} />
           <p className="mt-4 text-[16px] leading-[22px]">
             {filter === "all" ? "Пока ничего не отправлено" : "В этой стопке пусто"}

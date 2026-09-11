@@ -85,7 +85,7 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
             <li key={person.id} className="card-in">
               <Link
                 href={`/people/${person.id}`}
-                className="flex flex-col items-center rounded-[16px] border border-border bg-surface px-1 py-3 text-center transition-transform duration-[120ms] active:scale-[0.97]"
+                className="flex flex-col items-center card px-1 py-3 text-center transition-transform duration-[120ms] active:scale-[0.97]"
               >
                 <span className="relative">
                   <span

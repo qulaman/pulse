@@ -196,7 +196,7 @@ export default function LandingPage() {
           <div className="rounded-[12px] border border-border bg-bg p-3">
             <p className="text-[16px] font-semibold leading-[22px]">Подготовить КП по Казхрому</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="nums inline-flex items-center rounded-[12px] border border-border bg-surface-2 px-2.5 py-1 text-[13px] leading-4">
+              <span className="nums inline-flex items-center field px-2.5 py-1 text-[13px] leading-4">
                 завтра 13:00
               </span>
               <span className="text-[13px] leading-4 text-muted">Марат Оспанов</span>
@@ -258,7 +258,7 @@ export default function LandingPage() {
       </section>
 
       {/* ---- promises: the principles the product is built on -------------------------- */}
-      <section className="mt-10 rounded-[16px] border border-border bg-surface" aria-label="Принципы">
+      <section className="mt-10 card" aria-label="Принципы">
         {PROMISES.map((item, index) => (
           <div key={item.title} className={`px-4 py-4 ${index > 0 ? "border-t border-border" : ""}`}>
             <p className="text-[16px] font-semibold leading-[22px]">{item.title}</p>

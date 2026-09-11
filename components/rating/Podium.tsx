@@ -20,7 +20,7 @@ export function Podium({ rows, onPick }: { rows: RatingRow[]; onPick?: (row: Rat
   const order = [top[1], top[0], top[2]];
 
   return (
-    <div className="mt-4 rounded-[16px] border border-border bg-surface px-3 pb-3 pt-4">
+    <div className="mt-4 card px-3 pb-3 pt-4">
       <div className="flex items-end justify-center gap-2">
         {order.map((row, i) =>
           row ? (

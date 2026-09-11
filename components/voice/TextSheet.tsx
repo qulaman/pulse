@@ -54,7 +54,7 @@ export function TextSheet({ open, onClose }: { open: boolean; onClose: () => voi
         }}
         rows={3}
         placeholder="Ерлану подготовить КП для Казхрома до завтра"
-        className="w-full resize-none rounded-[12px] border border-border bg-surface-2 px-3 py-3 text-[16px] leading-[22px] outline-none focus:border-accent"
+        className="w-full resize-none field px-3 py-3 text-[16px] leading-[22px] outline-none focus:border-accent"
       />
       <div className="mt-3">
         <Button block disabled={value.trim().length === 0} onClick={submit}>

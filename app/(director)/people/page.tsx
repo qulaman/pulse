@@ -61,7 +61,7 @@ export default function PeoplePage() {
 
       <Link
         href="/rating"
-        className="mt-6 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]"
+        className="mt-6 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
       >
         Рейтинг
         <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>

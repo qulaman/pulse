@@ -67,7 +67,7 @@ function Skeleton() {
       {[0, 1, 2].map((i) => (
         <div
           key={i}
-          className="h-[72px] rounded-[16px] border border-border bg-surface"
+          className="h-[72px] card"
           style={{ opacity: 1 - i * 0.25 }}
         />
       ))}
@@ -157,7 +157,7 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
 
       {showError && error ? (
         <div
-          className="w-full max-w-lg rounded-[16px] border border-border bg-surface p-4"
+          className="w-full max-w-lg card p-4"
           style={{ boxShadow: "var(--shadow-raised)" }}
         >
           <div className="flex items-start gap-3">

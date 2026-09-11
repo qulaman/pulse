@@ -79,7 +79,7 @@ export function ProfileCard({ userId, fullName, role }: Props) {
 
   return (
     <>
-      <section className="rounded-[16px] border border-border bg-surface p-4">
+      <section className="card p-4">
         <div className="flex items-center gap-4">
           <span
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-[22px] font-bold text-bg"
@@ -117,7 +117,7 @@ export function ProfileCard({ userId, fullName, role }: Props) {
       </section>
 
       {role !== "director" ? (
-        <section className="mt-4 rounded-[16px] border border-border bg-surface p-4">
+        <section className="mt-4 card p-4">
           <div className="flex items-center gap-4">
             <Mascot state={balance > 0 ? "happy" : "calm"} size={48} />
             <div>

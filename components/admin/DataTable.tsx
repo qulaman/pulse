@@ -103,7 +103,7 @@ export function DataTable({ spec }: { spec: TableSpec }) {
   const pages = Math.max(1, Math.ceil(total / PAGE));
 
   return (
-    <section className="rounded-[16px] border border-border bg-surface">
+    <section className="card">
       <div className="flex flex-wrap items-end justify-between gap-3 p-4">
         <div>
           <h2 className="text-[19px] font-semibold leading-6">
@@ -118,7 +118,7 @@ export function DataTable({ spec }: { spec: TableSpec }) {
           placeholder="Фильтр по странице…"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="min-h-[40px] w-full max-w-[240px] rounded-[12px] border border-border bg-surface-2 px-3 text-[14px] outline-none focus:border-accent"
+          className="min-h-[40px] w-full max-w-[240px] field px-3 text-[14px] outline-none focus:border-accent"
         />
       </div>
 

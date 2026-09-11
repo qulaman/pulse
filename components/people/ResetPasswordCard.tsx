@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 
 const FIELD =
-  "min-h-[48px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
+  "min-h-[48px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 /** Edit page, «Вход» block: the director hands out a fresh password in person. */
 export function ResetPasswordCard({ personId }: { personId: string }) {
@@ -36,7 +36,7 @@ export function ResetPasswordCard({ personId }: { personId: string }) {
   }
 
   return (
-    <section className="rounded-[16px] border border-border bg-surface p-4">
+    <section className="card p-4">
       <h2 className="text-[19px] font-semibold leading-6">Вход</h2>
       <p className="mt-1 text-[13px] leading-4 text-muted">
         Забыл пароль — задай новый и скажи лично. В приложении он сменит его на свой

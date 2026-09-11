@@ -9,7 +9,7 @@ import { uploadPhoto } from "@/lib/files/photo";
 import { BUTTON, DECLINE_REASONS, TEXT } from "@/lib/tasks/status-text";
 
 const FIELD_CLASS =
-  "w-full rounded-[12px] border border-border bg-surface-2 px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
+  "w-full field px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
 
 type BaseProps = { open: boolean; onClose: () => void };
 

@@ -16,7 +16,7 @@ import {
 } from "@/lib/settings";
 
 const FIELD =
-  "min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
+  "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
 
 async function fetchSettings(): Promise<CompanySettings> {
   const res = await fetch("/api/settings", { credentials: "include" });
@@ -37,7 +37,7 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
 
 function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[16px] border border-border bg-surface p-4">
+    <section className="card p-4">
       <h2 className="text-[19px] font-semibold leading-6">{title}</h2>
       {hint ? <p className="mt-1 text-[13px] leading-4 text-muted">{hint}</p> : null}
       <div className="mt-4 flex flex-col gap-4">{children}</div>

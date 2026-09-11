@@ -61,7 +61,7 @@ function DateRow({ label, iso, tone }: { label: string; iso: string | null; tone
 export function TaskDates({ task }: { task: TaskWithPeople }) {
   const overdue = isOverdue(task);
   return (
-    <section className="mt-4 rounded-[16px] border border-border bg-surface px-4 py-2">
+    <section className="mt-4 card px-4 py-2">
       <h2 className="pt-1 text-[13px] font-semibold uppercase tracking-wide text-muted">Сроки</h2>
       <DateRow label="Создана" iso={task.created_at} />
       {task.status === "scheduled" ? <DateRow label="Отправится" iso={task.scheduled_send_at} /> : null}
@@ -220,7 +220,7 @@ export function TaskChat({
       >
         <div className="mx-auto flex max-w-lg items-end gap-2">
           <textarea
-            className="min-h-[44px] flex-1 rounded-[12px] border border-border bg-surface-2 px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
+            className="min-h-[44px] flex-1 field px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
             rows={1}
             placeholder={TEXT.composerPlaceholder}
             value={draft}

@@ -20,7 +20,7 @@ export function PulseMark({ size = "md" }: { size?: "md" | "lg" }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className={`${text} font-bold tracking-tight text-text`}>Pulse</span>
+      <span className={`${text} font-display font-extrabold tracking-[-0.03em] text-text`}>Pulse</span>
     </span>
   );
 }

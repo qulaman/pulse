@@ -55,7 +55,7 @@ function Row({ person, load, balance, pointsOn }: { person: Person; load: Load |
     <li>
       <Link
         href={`/people/${person.id}`}
-        className="flex items-center gap-3 rounded-[16px] border border-border bg-surface px-3 py-3 transition-transform duration-[120ms] active:scale-[0.99]"
+        className="flex items-center gap-3 card px-3 py-3 transition-transform duration-[120ms] active:scale-[0.99]"
         style={{ opacity: person.is_active ? 1 : 0.55 }}
       >
         <span
@@ -171,7 +171,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Имя, должность или как зовут в речи"
           aria-label="Поиск по команде"
-          className="min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 pl-10 pr-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"
+          className="min-h-[44px] w-full field pl-10 pr-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"
         />
       </label>
 
@@ -210,7 +210,7 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
       </div>
 
       {visible.length === 0 ? (
-        <p className="mt-6 rounded-[16px] border border-border bg-surface px-4 py-6 text-center text-[16px] leading-[22px] text-muted">
+        <p className="mt-6 card px-4 py-6 text-center text-[16px] leading-[22px] text-muted">
           {q ? "Никого с таким именем или должностью" : "Никого в этой группе"}
         </p>
       ) : null}

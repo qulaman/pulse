@@ -35,7 +35,7 @@ export function AnnouncementCard({
   const count = item.acks.length;
 
   return (
-    <article className="card-in rounded-[16px] border border-border bg-surface p-4">
+    <article className="card-in card p-4">
       <div className="flex items-start gap-3">
         <span
           aria-hidden

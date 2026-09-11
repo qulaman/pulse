@@ -110,11 +110,11 @@ export function TabBar({ role }: { role: TabRole }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 text-[11px] font-medium leading-4 transition-colors duration-[120ms]"
-                style={{ color: active ? "var(--accent)" : "var(--text-muted)" }}
+                className="flex min-h-[58px] flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 font-display text-[11px] leading-4 tracking-[-0.01em] transition-colors duration-[120ms]"
+                style={{ color: active ? "var(--accent)" : "var(--text-muted)", fontWeight: active ? 600 : 500 }}
               >
                 <span
-                  className="flex h-7 w-10 items-center justify-center rounded-full transition-colors duration-[120ms]"
+                  className="flex h-8 w-12 items-center justify-center rounded-full transition-colors duration-[120ms]"
                   style={{ background: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
                 >
                   {tab.icon}

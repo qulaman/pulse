@@ -29,7 +29,7 @@ export default async function ProfilePage() {
       <div className="mt-2 flex flex-col gap-2">
         <PasswordRow />
         <NotificationsRow />
-        <div className="flex min-h-[52px] items-center justify-between gap-3 rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
+        <div className="flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]">
           Telegram
           <span className="text-[13px] leading-4 text-muted">привязка — с доставкой уведомлений</span>
         </div>
@@ -43,7 +43,7 @@ export default async function ProfilePage() {
       <form action={signOut} className="mt-6">
         <button
           type="submit"
-          className="min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 px-4 text-[16px] font-medium"
+          className="min-h-[44px] w-full field px-4 text-[16px] font-medium"
         >
           Выйти
         </button>

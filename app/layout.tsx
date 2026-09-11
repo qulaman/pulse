@@ -1,9 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { Golos_Text, Manrope } from "next/font/google";
 
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { loadBrand } from "@/lib/brand";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
+
+// Self-hosted at build time (no runtime request, works offline): Manrope for headings and
+// numbers, Golos Text for running Cyrillic text (D-50).
+const display = Manrope({ subsets: ["cyrillic", "latin"], weight: ["600", "700", "800"], variable: "--font-display", display: "swap" });
+const body = Golos_Text({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-body", display: "swap" });
 
 export const metadata: Metadata = {
   title: "Pulse",
@@ -27,7 +33,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // the client accent (contrast-checked) overrides the token for the whole instance
   const brand = await loadBrand();
   return (
-    <html lang="ru" style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}>
+    <html
+      lang="ru"
+      className={`${display.variable} ${body.variable}`}
+      style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}
+    >
       <body className="min-h-dvh bg-bg text-text antialiased">
         <QueryProvider>
           {children}

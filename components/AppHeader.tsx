@@ -19,7 +19,7 @@ export async function AppHeader({ fullName, companyId }: { fullName: string; com
 
   return (
     <header
-      className="sticky top-0 z-10 border-b border-border bg-bg px-4"
+      className="sticky top-0 z-10 border-b border-border/80 bg-bg px-4"
       style={{ paddingTop: "calc(8px + env(safe-area-inset-top))", paddingBottom: 8 }}
     >
       <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
@@ -31,7 +31,7 @@ export async function AppHeader({ fullName, companyId }: { fullName: string; com
             ) : (
               <PulseMark />
             )}
-            <span className="truncate text-[16px] font-semibold leading-[22px]">{brand.name}</span>
+            <span className="truncate font-display text-[17px] font-bold leading-[22px] tracking-[-0.02em]">{brand.name}</span>
           </div>
         ) : (
           <PulseMark />

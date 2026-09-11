@@ -47,7 +47,7 @@ export function AwardSheet({
         ))}
         <input
           type="number"
-          className="nums min-h-[32px] w-20 rounded-[12px] border border-border bg-surface-2 px-2 text-[14px] outline-none focus:border-accent"
+          className="nums min-h-[32px] w-20 field px-2 text-[14px] outline-none focus:border-accent"
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value) || 0)}
           aria-label="Сумма очков"
@@ -69,7 +69,7 @@ export function AwardSheet({
         ))}
       </div>
       <input
-        className="mt-3 min-h-[44px] w-full rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] outline-none focus:border-accent"
+        className="mt-3 min-h-[44px] w-full field px-3 text-[16px] outline-none focus:border-accent"
         placeholder="Своя причина"
         value={custom}
         onChange={(e) => setCustom(e.target.value)}

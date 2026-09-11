@@ -43,7 +43,7 @@ export default function EtherPage() {
       {feed.isLoading || me.isLoading ? (
         <EtherListBone />
       ) : items.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center rounded-[16px] border border-border bg-surface px-6 py-10 text-center">
+        <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={72} />
           <p className="mt-4 text-[16px] leading-[22px]">Объявлений пока нет</p>
           <p className="mt-1 text-[13px] leading-4 text-muted">

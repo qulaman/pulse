@@ -48,7 +48,7 @@ export function DeadlineSheet({ open, onClose, currentIso, onPick }: Props) {
           type="datetime-local"
           value={custom}
           onChange={(event) => setCustom(event.target.value)}
-          className="min-h-[44px] flex-1 rounded-[12px] border border-border bg-surface-2 px-3 text-[16px] leading-[22px] outline-none focus:border-accent"
+          className="min-h-[44px] flex-1 field px-3 text-[16px] leading-[22px] outline-none focus:border-accent"
         />
         <Button
           disabled={localInputToAqtobeIso(custom) === null}

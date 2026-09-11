@@ -133,7 +133,7 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
       ) : (
         <>
           {scored.length === 0 ? (
-            <div className="mt-4 flex items-center gap-3 rounded-[16px] border border-border bg-surface px-4 py-3 text-left">
+            <div className="mt-4 flex items-center gap-3 card px-4 py-3 text-left">
               <Mascot state="calm" size={44} />
               <div>
                 <p className="text-[16px] leading-[22px]">Пока никто не набрал очков</p>
