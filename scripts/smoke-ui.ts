@@ -114,8 +114,10 @@ async function main() {
     await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 10_000 });
     await page.waitForTimeout(1_500);
     const stayed = new URL(page.url()).pathname === "/pulse";
+    // the assistant types its lines first; the draft bubble lands after the greeting
     const pill = page.getByRole("link", { name: /Черновик/ });
-    record("черновик не возвращает на /confirm, виден в плашке", stayed && (await pill.isVisible()), page.url());
+    const pillShown = await pill.waitFor({ timeout: 20_000 }).then(() => true).catch(() => false);
+    record("черновик не возвращает на /confirm, виден в плашке", stayed && pillShown, page.url());
     await page.screenshot({ path: join(SHOTS, "04b-draft-pill.png") });
     await pill.click();
     await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 10_000 });
@@ -212,7 +214,7 @@ async function main() {
   await page.goto(`${APP_URL}/rating`, { waitUntil: "networkidle" });
   const maratRow = page.locator("li", { hasText: "Марат Оспанов" }).first();
   await maratRow.waitFor({ timeout: 10_000 });
-  await maratRow.getByRole("button", { name: "+" }).click();
+  await maratRow.getByRole("button", { name: /Поощрить: Марат/ }).click();
   await page.getByRole("button", { name: /Начислить \+10/ }).click();
   await page.getByText(/\+10 — за скорость/).waitFor({ timeout: 10_000 });
   await page.waitForTimeout(800);
