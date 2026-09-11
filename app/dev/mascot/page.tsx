@@ -7,10 +7,14 @@ import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 
 const STATES: { state: MascotState; label: string }[] = [
   { state: "calm", label: "Спокоен — дыхание, моргает, изредка косится" },
-  { state: "listening", label: "Слушает — покачивается, широкие глаза, кольца звука, растёт от голоса" },
-  { state: "thinking", label: "Разбирает — жёлтый, наклон, глаза бегают, три точки" },
+  { state: "listening", label: "Слушает — наклоняется, подставляет ухо, кивает в такт голосу; волны входят в ухо" },
+  { state: "saving", label: "Сохраняю — записка опускается в голову, тело принимает её" },
+  { state: "transcribing", label: "Распознаю — полоски звука становятся строками, глаза читают слева направо" },
+  { state: "parsing", label: "Разбираю — карточки появляются над головой и уходят в стопку" },
+  { state: "sending", label: "Отправляю — замах, бросок, глаза провожают" },
+  { state: "thinking", label: "Думает — наклон, глаза бегают, три точки (общее)" },
+  { state: "speaking", label: "Говорит — рот в ритме фразы, лёгкие кивки (D-49)" },
   { state: "happy", label: "Доволен — золотой, прищур и румянец, прыжок с искрами" },
-  { state: "speaking", label: "Говорит — рот открывается в ритме фразы, лёгкие кивки (D-49)" },
 ];
 
 /** Sandbox for the mascot: every state side by side, a fake microphone level slider. */
@@ -35,14 +39,14 @@ export default function MascotSandbox() {
 
       <div className="mt-6 grid grid-cols-2 gap-4">
         {STATES.map(({ state, label }) => (
-          <div key={state} className="flex flex-col items-center rounded-[16px] border border-border bg-surface p-4 text-center">
+          <div key={state} className="flex flex-col items-center card p-4 text-center">
             <Mascot state={state} size={96} level={state === "listening" ? level : 0} />
             <p className="mt-3 text-[13px] leading-4 text-muted">{label}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 rounded-[16px] border border-border bg-surface p-4">
+      <div className="mt-6 card p-4">
         <label className="flex flex-col gap-2 text-[14px] text-muted">
           Уровень микрофона: <span className="nums text-text">{level.toFixed(2)}</span>
           <input type="range" min={0} max={1} step={0.01} value={level} onChange={(e) => { setAuto(false); setLevel(Number(e.target.value)); }} />
@@ -54,15 +58,15 @@ export default function MascotSandbox() {
 
       <h2 className="mt-8 text-[19px] font-semibold leading-6">Сцены оверлея</h2>
       <div className="mt-3 grid grid-cols-1 gap-4">
-        {(["listening", "transcribing", "sending"] as Scene[]).map((scene) => (
-          <div key={scene} className="flex flex-col items-center rounded-[16px] border border-border bg-surface p-5">
+        {(["listening", "saving", "transcribing", "parsing", "sending"] as Scene[]).map((scene) => (
+          <div key={scene} className="flex flex-col items-center card p-5">
             <MascotScene scene={scene} level={scene === "listening" ? level : 0} />
             <p className="mt-3 text-[13px] leading-4 text-muted">{scene}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-6 flex items-center gap-4 rounded-[16px] border border-border bg-surface p-4">
+      <div className="mt-6 flex items-center gap-4 card p-4">
         <Mascot state="calm" size={24} />
         <Mascot state="happy" size={32} />
         <Mascot state="thinking" size={44} />

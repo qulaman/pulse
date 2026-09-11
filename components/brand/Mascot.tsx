@@ -1,40 +1,82 @@
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
- * Director-facing neutral states only in the pilot: calm / listening / thinking / happy,
- * plus «speaking» (D-49): the assistant is saying something — the mouth moves with the
- * words, the only state with a mouth besides the smile of «happy».
- * Each state has its own choreography — body, eyes and a small prop around the blob —
- * so the director reads the state at a glance without a caption.
+ * Director-facing states only in the pilot. Each state is its own choreography — a
+ * one-shot pose on entry (lean in, wind up), a looping body motion, the eyes as a pair,
+ * and a small prop around the blob — so the director reads what the assistant is doing
+ * at a glance, without a caption:
+ *   calm         breathing, a rare glance
+ *   listening    leans in and offers an ear; nods with the voice; sound waves enter the ear
+ *   saving       tucks the note away: a card sinks into the head, a satisfied squash
+ *   transcribing reads: bars of sound turn into lines of text, the eyes scan left → right
+ *   parsing      sorts: cards appear over the head one by one and slide into a stack
+ *   sending      winds up and throws; the eyes follow the card (the card itself is the scene's)
+ *   thinking     generic pondering — a tilt, wandering eyes, three dots
+ *   speaking     the mouth moves with the words, small nods (D-49)
+ *   happy        golden, squint and blush, a bounce with sparks
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
- * microphone) while listening — the blob swells with the voice.
+ * microphone) while listening — the blob swells and nods harder with the voice.
  */
-export type MascotState = "calm" | "listening" | "thinking" | "happy" | "speaking";
+export type MascotState =
+  | "calm"
+  | "listening"
+  | "saving"
+  | "transcribing"
+  | "parsing"
+  | "sending"
+  | "thinking"
+  | "speaking"
+  | "happy";
 
 const COLOR: Record<MascotState, string> = {
   calm: "var(--accent)",
   listening: "var(--accent)",
+  saving: "var(--accent)",
+  transcribing: "var(--warn)",
+  parsing: "var(--warn)",
+  sending: "var(--accent)",
   thinking: "var(--warn)",
-  happy: "var(--gold)",
   speaking: "var(--accent)",
+  happy: "var(--gold)",
 };
 
-/** Body: breathing at rest, an eager wobble while listening, a slow ponder tilt, a bounce when happy. */
+/** One-shot pose on entering the state (outer group, keeps its end frame). */
+const POSE: Record<MascotState, string> = {
+  calm: "none",
+  listening: "mascot-lean 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both",
+  saving: "none",
+  transcribing: "mascot-tilt-read 0.5s var(--ease-out) both",
+  parsing: "none",
+  sending: "none",
+  thinking: "none",
+  speaking: "none",
+  happy: "none",
+};
+
+/** Looping body motion (inner group). */
 const BODY: Record<MascotState, string> = {
   calm: "mascot-breathe 6s ease-in-out infinite",
-  listening: "mascot-listen 0.9s ease-in-out infinite",
+  listening: "mascot-nod 1.15s ease-in-out infinite",
+  saving: "mascot-tuck 1.4s ease-in-out infinite",
+  transcribing: "mascot-breathe 3s ease-in-out infinite",
+  parsing: "mascot-ponder 2.6s ease-in-out infinite",
+  sending: "mascot-throw 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite",
   thinking: "mascot-ponder 2.6s ease-in-out infinite",
-  happy: "mascot-bounce 1.1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite",
   speaking: "mascot-talk 1.3s ease-in-out infinite",
+  happy: "mascot-bounce 1.1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite",
 };
 
-/** Eyes as a pair: a rare glance when calm, looking up while listening, wandering while thinking. */
+/** Eyes as a pair. */
 const EYES: Record<MascotState, string> = {
   calm: "mascot-glance 9s ease-in-out infinite",
-  listening: "mascot-look-up 0.9s ease-in-out infinite",
+  listening: "mascot-attend 3.2s ease-in-out infinite",
+  saving: "mascot-track-down 1.4s ease-in-out infinite",
+  transcribing: "mascot-read 1.3s ease-in-out infinite",
+  parsing: "mascot-look-cards 2.4s ease-in-out infinite",
+  sending: "mascot-follow 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite",
   thinking: "mascot-wander 2.6s ease-in-out infinite",
-  happy: "none",
   speaking: "mascot-glance 9s ease-in-out infinite",
+  happy: "none",
 };
 
 export function Mascot({
@@ -49,10 +91,14 @@ export function Mascot({
   const squint = state === "happy";
   const wide = state === "listening";
   const talking = state === "speaking";
+  const lidded = state === "saving"; // eyes half-closed while tucking the note away
   const clamped = Math.min(1, Math.max(0, level));
-  const swell = state === "listening" ? 1 + clamped * 0.18 : 1;
-  const eyeRy = squint ? 1.5 : wide ? 4.3 : 3.6;
+  const swell = state === "listening" ? 1 + clamped * 0.14 : 1;
+  // the voice pushes the nod: louder — a deeper dip
+  const dip = state === "listening" ? clamped * 2.2 : 0;
+  const eyeRy = squint ? 1.5 : lidded ? 2.2 : wide ? 4.3 : 3.6;
   const eyeRx = wide ? 3.7 : 3.4;
+  const blink = squint || lidded ? "none" : "mascot-blink 4.6s infinite";
 
   return (
     <svg
@@ -67,21 +113,16 @@ export function Mascot({
       {/* ground shadow: a static ellipse, no filters */}
       <ellipse cx="32" cy="61" rx="16" ry="2.5" fill="var(--bg)" opacity="0.5" />
 
-      {/* listening: sound rings ripple outwards, faster and wider with the voice */}
+      {/* listening: sound waves come in from the right and land on the ear */}
       {state === "listening" ? (
-        <g style={{ transformOrigin: "32px 34px" }}>
-          {[0, 1, 2].map((ring) => (
-            <circle
-              key={ring}
-              cx="32"
-              cy="34"
-              r="30"
-              fill="none"
-              stroke={COLOR.listening}
-              strokeWidth="1.6"
+        <g fill="none" stroke={COLOR.listening} strokeWidth="1.7" strokeLinecap="round">
+          {[0, 1, 2].map((wave) => (
+            <path
+              key={wave}
+              d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
               style={{
-                transformOrigin: "32px 34px",
-                animation: `mascot-ring ${(1.8 - clamped * 0.6).toFixed(2)}s ease-out ${ring * 0.55}s infinite`,
+                transformOrigin: "62px 25px",
+                animation: `mascot-wave-in ${(1.5 - clamped * 0.5).toFixed(2)}s ease-out ${wave * 0.28}s infinite`,
                 opacity: 0,
               }}
             />
@@ -108,6 +149,70 @@ export function Mascot({
         </g>
       ) : null}
 
+      {/* saving: a note sinks into the head and is gone — tucked away safely */}
+      {state === "saving" ? (
+        <g style={{ transformOrigin: "32px -2px", animation: "mascot-tuck-note 1.4s ease-in-out infinite", opacity: 0 }}>
+          <rect x="24" y="-9" width="16" height="12" rx="2.5" fill="var(--surface)" stroke={COLOR.saving} strokeWidth="1.5" />
+          <path d="M27 -4.5h10M27 -1.5h6" stroke={COLOR.saving} strokeWidth="1.3" strokeLinecap="round" />
+        </g>
+      ) : null}
+
+      {/* transcribing: bars of sound turn, one after another, into lines of text */}
+      {state === "transcribing" ? (
+        <g fill={COLOR.transcribing}>
+          {/* the voice: four bars that breathe, then go quiet */}
+          {[0, 1, 2, 3].map((bar) => (
+            <rect
+              key={`bar-${bar}`}
+              x={-9 + bar * 4}
+              y={22 - [4, 7, 5, 3][bar]!}
+              width="2.2"
+              height={[8, 14, 10, 6][bar]}
+              rx="1.1"
+              style={{
+                transformOrigin: `${-8 + bar * 4}px 22px`,
+                animation: `mascot-bar-fade 2.4s ease-in-out ${bar * 0.12}s infinite`,
+              }}
+            />
+          ))}
+          {/* the words: three lines type in on the right, one under another */}
+          {[0, 1, 2].map((line) => (
+            <rect
+              key={`line-${line}`}
+              x="65"
+              y={15 + line * 5.5}
+              width={[13, 9, 11][line]}
+              height="2.4"
+              rx="1.2"
+              style={{
+                transformOrigin: "65px 16px",
+                animation: `mascot-line-type 2.4s ease-out ${0.7 + line * 0.3}s infinite`,
+                opacity: 0,
+              }}
+            />
+          ))}
+        </g>
+      ) : null}
+
+      {/* parsing: cards appear over the head one by one and slide into a stack on the right */}
+      {state === "parsing" ? (
+        <g>
+          {[0, 1, 2].map((card) => (
+            <g
+              key={card}
+              style={{
+                transformOrigin: `${20 + card * 14}px -4px`,
+                animation: `mascot-sort-card 2.4s ease-in-out ${card * 0.3}s infinite`,
+                opacity: 0,
+              }}
+            >
+              <rect x={12 + card * 14} y="-9" width="13" height="10" rx="2.5" fill="var(--surface)" stroke={COLOR.parsing} strokeWidth="1.4" />
+              <path d={`M${15 + card * 14} -5h7M${15 + card * 14} -2h4`} stroke={COLOR.parsing} strokeWidth="1.1" strokeLinecap="round" />
+            </g>
+          ))}
+        </g>
+      ) : null}
+
       {/* happy: two sparks pop beside the blob in turn */}
       {state === "happy" ? (
         <g fill={COLOR.happy}>
@@ -122,56 +227,67 @@ export function Mascot({
         </g>
       ) : null}
 
+      {/* voice: swell and dip follow the microphone (one transform, no re-layout) */}
       <g
         style={{
           transformOrigin: "32px 60px",
-          transform: `scale(${swell.toFixed(3)})`,
+          transform: `translateY(${dip.toFixed(2)}px) scale(${swell.toFixed(3)})`,
           transition: "transform 90ms linear",
         }}
       >
-        <g
-          style={{
-            transformOrigin: "32px 44px",
-            animation: BODY[state],
-          }}
-        >
-          <path
-            d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
-            fill={COLOR[state]}
-            style={{ transition: "fill var(--t-screen) var(--ease-out)" }}
-          />
-          {/* highlight: a lighter lens, colour only */}
-          <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" opacity="0.14" />
+        {/* pose: one-shot on entry */}
+        <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
+          {/* loop: the body's own motion */}
+          <g style={{ transformOrigin: "32px 44px", animation: BODY[state] }}>
+            <path
+              d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
+              fill={COLOR[state]}
+              style={{ transition: "fill var(--t-screen) var(--ease-out)" }}
+            />
+            {/* highlight: a lighter lens, colour only */}
+            <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" opacity="0.14" />
 
-          {/* happy: a soft blush under the eyes */}
-          {squint ? (
-            <g fill="#ffffff" opacity="0.22">
-              <ellipse cx="17" cy="40" rx="4" ry="2" />
-              <ellipse cx="47" cy="40" rx="4" ry="2" />
-            </g>
-          ) : null}
+            {/* listening: the ear pricks up on the right and twitches now and then */}
+            {state === "listening" ? (
+              <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both" }}>
+                <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-twitch 3.2s ease-in-out 1s infinite" }}>
+                  {/* a proper ear: a rounded lobe standing out of the head, with a darker hollow */}
+                  <path d="M52 16 C58 8 69 12 68 22 C67.5 29 61 33 55 31 C53 30 51.5 28 52 26 Z" fill={COLOR.listening} />
+                  <path d="M56 19 C60 15.5 65.5 18.5 64.5 24 C64 27.5 60 29.5 57.5 27.5 C56 26.5 55.5 24.5 56.5 23 Z" fill="var(--bg)" opacity="0.26" />
+                </g>
+              </g>
+            ) : null}
 
-          <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: EYES[state] }}>
-            <g style={{ transformOrigin: "24px 33px", animation: squint ? "none" : "mascot-blink 4.6s infinite" }}>
-              <ellipse cx="24" cy="33" rx={eyeRx} ry={eyeRy} style={{ transition: "ry 120ms" }} />
-            </g>
-            <g style={{ transformOrigin: "40px 33px", animation: squint ? "none" : "mascot-blink 4.6s 0.15s infinite" }}>
-              <ellipse cx="40" cy="33" rx={eyeRx} ry={eyeRy} style={{ transition: "ry 120ms" }} />
-            </g>
+            {/* happy: a soft blush under the eyes */}
             {squint ? (
-              // a tiny smile only when happy — still no mouth in every other state
-              <path d="M26 43 Q32 48 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />
+              <g fill="#ffffff" opacity="0.22">
+                <ellipse cx="17" cy="40" rx="4" ry="2" />
+                <ellipse cx="47" cy="40" rx="4" ry="2" />
+              </g>
             ) : null}
-            {talking ? (
-              // speaking: the mouth opens and closes in the rhythm of a phrase (scale only)
-              <ellipse
-                cx="32"
-                cy="45"
-                rx="4.2"
-                ry="3"
-                style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }}
-              />
-            ) : null}
+
+            <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: EYES[state] }}>
+              <g style={{ transformOrigin: "24px 33px", animation: blink }}>
+                <ellipse cx="24" cy="33" rx={eyeRx} ry={eyeRy} style={{ transition: "ry 120ms" }} />
+              </g>
+              <g style={{ transformOrigin: "40px 33px", animation: blink === "none" ? "none" : "mascot-blink 4.6s 0.15s infinite" }}>
+                <ellipse cx="40" cy="33" rx={eyeRx} ry={eyeRy} style={{ transition: "ry 120ms" }} />
+              </g>
+              {squint ? (
+                // a tiny smile only when happy — still no mouth in every other state
+                <path d="M26 43 Q32 48 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />
+              ) : null}
+              {talking ? (
+                // speaking: the mouth opens and closes in the rhythm of a phrase (scale only)
+                <ellipse
+                  cx="32"
+                  cy="45"
+                  rx="4.2"
+                  ry="3"
+                  style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }}
+                />
+              ) : null}
+            </g>
           </g>
         </g>
       </g>
