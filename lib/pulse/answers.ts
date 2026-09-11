@@ -9,7 +9,7 @@ import { quoteTitle, type BriefTask } from "./briefing";
  * Names stay in the nominative; times are exact (docs/DESIGN.md §4).
  */
 
-export type AnswerTask = BriefTask & { status: TaskStatus };
+export type AnswerTask = BriefTask & { status: TaskStatus; closedAt?: string | null };
 
 export type AnswerPerson = { id: string; fullName: string; aliases: string[] };
 
@@ -19,6 +19,8 @@ export type AnswerInput = {
   people: AnswerPerson[];
   /** Tasks in work (sent / accepted / rework / in_progress) with their assignee. */
   open: AnswerTask[];
+  /** Closed ones (done / declined / revoked), newest first — «что там по …» about a finished job. */
+  closed?: AnswerTask[];
   overdue: BriefTask[];
   /** «Не могу» with reasons, when the caller has them. */
   declined?: (BriefTask & { reason: string | null })[];
@@ -38,6 +40,9 @@ const STATUS_WORD: Partial<Record<TaskStatus, string>> = {
   in_progress: "в работе",
   rework: "на доработке",
   pending_review: "на приёмке",
+  done: "готово",
+  declined: "отказ",
+  revoked: "отозвана",
 };
 
 const NOT_UNDERSTOOD = "Пока отвечаю только про задачи и людей: кто чем занят, что там по делу, кто просрочил, что на приёмке. Спроси иначе или скажи задачу.";
@@ -85,11 +90,16 @@ export function findByTopic<T extends BriefTask>(question: string, tasks: T[]): 
   });
 }
 
-type LineOpts = { person?: boolean; status?: boolean; overdue?: boolean };
+type LineOpts = { person?: boolean; status?: boolean; overdue?: boolean; closed?: boolean };
 
 function taskLine(task: BriefTask & { status?: TaskStatus }, now: Date, opts: LineOpts = {}): string {
   const who = opts.person && task.assignee ? `${task.assignee}, ` : "";
   const status = opts.status && task.status ? STATUS_WORD[task.status] : undefined;
+  const closedAt = (task as AnswerTask).closedAt;
+  // a closed task is about when it closed, not about a deadline that no longer matters
+  if (opts.closed && closedAt) {
+    return `${who}${quoteTitle(task.title)} — ${status ?? "закрыта"} ${humanAqtobe(new Date(closedAt), now)}`;
+  }
   const when = task.deadline ? humanAqtobe(new Date(task.deadline), now) : null;
   const due = !when ? "без срока" : opts.overdue ? `срок был ${when}` : `до ${when}`;
   const tail = [status, due].filter(Boolean).join(", ");
@@ -151,11 +161,19 @@ export function answer(input: AnswerInput): Answer {
     return { understood: true, lines: [head, ...mine.map((t) => taskLine(t, now, { status: true }))] };
   }
 
-  // 5. a topic — a client, a document, a place
+  // 5. a topic — a client, a document, a place; open tasks first, then the closed ones
   const byTopic = findByTopic(question, input.open);
   if (byTopic.length > 0) {
     const head = byTopic.length === 1 ? "Нашёл одну задачу:" : `Нашёл ${byTopic.length}:`;
     return { understood: true, lines: [head, ...byTopic.map((t) => taskLine(t, now, { person: true, status: true }))] };
+  }
+  const closedByTopic = findByTopic(question, input.closed ?? []).slice(0, 3);
+  if (closedByTopic.length > 0) {
+    const head = closedByTopic.length === 1 ? "В работе такого нет, но было:" : "В работе такого нет, но были:";
+    return {
+      understood: true,
+      lines: [head, ...closedByTopic.map((t) => taskLine(t, now, { person: true, status: true, closed: true }))],
+    };
   }
 
   // 6. the general picture

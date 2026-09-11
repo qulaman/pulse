@@ -14,7 +14,7 @@ import { buildBriefing, type BriefLine } from "@/lib/pulse/briefing";
 import { firstNameOf, toBriefTask, useAcceptedSince, useLastVisit, useNow, useOpenTasks } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
-import { useDirectorInbox, useMe, type TaskWithPeople } from "@/lib/tasks/queries";
+import { useDirectorInbox, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 
 /** Suggestions under the briefing: the questions the assistant answers from the data. */
 const QUICK_QUESTIONS = ["Кто не отчитался?", "Что на приёмке?", "Как дела в целом?"];
@@ -49,6 +49,7 @@ export default function PulsePage() {
 
   // A question the phrase turned out to be: the director's words, then the answer from the data.
   const people = usePeople();
+  const sent = useSentTasks(me.data?.userId);
   const asked = stage === "question" && question ? question : null;
   const reply = useMemo(() => {
     if (!asked || people.isLoading) return null;
@@ -59,12 +60,15 @@ export default function PulsePage() {
         .filter((p) => p.is_active && p.role !== "tv")
         .map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
       open: open.data ?? [],
+      closed: (sent.data ?? [])
+        .filter((t) => t.status === "done" || t.status === "declined" || t.status === "revoked")
+        .map((t) => ({ ...toBriefTask(t), status: t.status, closedAt: t.closed_at })),
       overdue: (inbox.data?.overdue ?? []).map(toBriefTask),
       declined: (inbox.data?.declined ?? []).map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
       questions: (inbox.data?.questions ?? []).map(toBriefTask),
       review: (inbox.data?.review ?? []).map(toBriefTask),
     });
-  }, [asked, now, people.isLoading, people.data, open.data, inbox.data]);
+  }, [asked, now, people.isLoading, people.data, open.data, sent.data, inbox.data]);
   const qaLines = useMemo<BriefLine[]>(() => {
     if (!asked || !reply) return [];
     // keyed by the request, not the words: the same question asked again is a new exchange

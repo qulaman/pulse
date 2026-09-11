@@ -87,6 +87,15 @@ describe("answer", () => {
     expect(a.lines).toEqual(["Нашёл одну задачу:", "Марат, «Подготовить КП по Казхрому» — в работе, до завтра 13:00"]);
   });
 
+  it("a topic that is only in the closed tasks", () => {
+    const a = answer({
+      ...BASE,
+      closed: [{ ...task("c1", "Договор с Казцинком", "Динара", "done"), closedAt: "2026-09-10T13:00:00Z" }],
+      question: "Что там по Казцинку?",
+    });
+    expect(a.lines).toEqual(["В работе такого нет, но было:", "Динара, «Договор с Казцинком» — готово вчера 18:00"]);
+  });
+
   it("the general picture", () => {
     const a = answer({ ...BASE, question: "Как дела в целом?" });
     expect(a.lines).toEqual(["В работе 3 задачи. Просрочено 1. На приёмке 1."]);
