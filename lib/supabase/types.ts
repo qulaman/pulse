@@ -309,6 +309,7 @@ export type Database = {
           channel: Database["public"]["Enums"]["delivery_channel"]
           company_id: string
           created_at: string
+          deliver_after: string
           event_kind: string
           id: string
           last_error: string | null

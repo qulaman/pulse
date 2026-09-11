@@ -35,16 +35,8 @@ export function isWithinDeliveryWindow(now: Date = new Date(), window?: Delivery
 }
 
 /**
- * What an employee's phone may not receive at night (принцип 8, D-51): the director's answer,
- * a rework, an acceptance, a revoke, a moved deadline, an announcement. `task_sent` is not
- * here — its moment is decided by the producer (a batch waits for the morning, «отправить
- * сейчас» and a reassign inside the window go now, a reassign outside it is scheduled).
- * The director's own alerts (question, pending_review, declined) are not held either: that
- * is a product decision the owner has not taken (D-51 lists it as open).
+ * The hold policy itself lives in the database (D-51 §2): trigger
+ * `notification_deliveries_deliver_after` stamps every outbox row with the moment it may
+ * leave, from the company window, for the kinds an employee should not hear at night. This
+ * module only mirrors the window for what /confirm promises before the batch goes.
  */
-export const HELD_AT_NIGHT: ReadonlySet<string> = new Set(["reply", "rework", "done", "revoked", "deadline_extended", "announcement"]);
-
-export function holdsForQuietHours(eventKind: string, now: Date = new Date(), window?: DeliveryWindow): boolean {
-  if (!HELD_AT_NIGHT.has(eventKind)) return false;
-  return !isWithinDeliveryWindow(now, window);
-}

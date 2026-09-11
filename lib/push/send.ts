@@ -4,7 +4,6 @@ import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/service";
-import { HELD_AT_NIGHT, holdsForQuietHours, type DeliveryWindow } from "@/lib/voice/quietHours";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
@@ -28,44 +27,18 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
   if (!vapidReady()) return result;
 
   const service = createServiceSupabase();
-  const heldKinds = [...HELD_AT_NIGHT];
-  const base = () =>
-    service
-      .from("notification_deliveries")
-      .select("id, user_id, company_id, meta, attempts, event_kind")
-      .eq("status", "queued")
-      .eq("channel", "push")
-      .lt("attempts", MAX_ATTEMPTS)
-      .order("created_at")
-      .limit(BATCH);
-  // two windows: kinds that always go out first, so rows held for the night never starve them
-  const [urgent, rest] = await Promise.all([
-    base().not("event_kind", "in", `(${heldKinds.join(",")})`),
-    base().in("event_kind", heldKinds),
-  ]);
-  if (urgent.error) throw new Error(`outbox read failed: ${urgent.error.message}`);
-  if (rest.error) throw new Error(`outbox read failed: ${rest.error.message}`);
-  const rows = [...(urgent.data ?? []), ...(rest.data ?? [])];
-  if (rows.length === 0) return result;
-
-  // each company's own delivery window (settings.delivery_window), defaults when unset
-  const companyIds = [...new Set(rows.map((r) => r.company_id))];
-  const { data: companies } = await service.from("companies").select("id, settings").in("id", companyIds);
-  const windowOf = new Map<string, DeliveryWindow | undefined>();
-  for (const company of companies ?? []) {
-    const settings = company.settings as { delivery_window?: DeliveryWindow } | null;
-    windowOf.set(company.id, settings?.delivery_window);
-  }
-
-  const now = new Date();
-  const sendable = rows.filter((row) => {
-    // quiet hours: the row stays queued, untouched, until the morning sweep
-    if (holdsForQuietHours(row.event_kind, now, windowOf.get(row.company_id))) {
-      result.skipped += 1;
-      return false;
-    }
-    return true;
-  });
+  // quiet hours are already in the rows: the trigger set deliver_after from the company window
+  const { data: rows, error } = await service
+    .from("notification_deliveries")
+    .select("id, user_id, company_id, meta, attempts, event_kind")
+    .eq("status", "queued")
+    .eq("channel", "push")
+    .lt("attempts", MAX_ATTEMPTS)
+    .lte("deliver_after", new Date().toISOString())
+    .order("created_at")
+    .limit(BATCH);
+  if (error) throw new Error(`outbox read failed: ${error.message}`);
+  const sendable = rows ?? [];
   if (sendable.length === 0) return result;
 
   const userIds = [...new Set(sendable.map((r) => r.user_id))];
