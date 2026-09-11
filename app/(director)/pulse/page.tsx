@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo } from "react";
 
+import { InstallHint } from "@/components/InstallHint";
 import { Assistant } from "@/components/pulse/Assistant";
 import { PushCard } from "@/components/push/PushCard";
 import { Button } from "@/components/ui/Button";
@@ -146,6 +147,7 @@ export default function PulsePage() {
           </div>
         ) : null}
         <PushCard bubble />
+        <InstallHint bubble />
       </Assistant>
 
       {/* the one action of the screen: pinned above the tab bar, always under the thumb;

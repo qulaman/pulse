@@ -1,6 +1,7 @@
 "use client";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { InstallHint } from "@/components/InstallHint";
 import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
@@ -20,6 +21,7 @@ export default function FeedPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Лента</h1>
       <PushCard />
+      <InstallHint />
 
       <div className="mt-4">
         {loading ? (
