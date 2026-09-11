@@ -96,6 +96,19 @@ describe("answer", () => {
     expect(a.lines).toEqual(["В работе такого нет, но было:", "Динара, «Договор с Казцинком» — готово вчера 18:00"]);
   });
 
+  it("the week", () => {
+    const a = answer({
+      ...BASE,
+      closed: [
+        { ...task("c1", "Договор", "Динара", "done"), closedAt: "2026-09-10T13:00:00Z" },
+        { ...task("c2", "Смета", "Марат", "done"), closedAt: "2026-09-09T13:00:00Z" },
+        { ...task("c3", "Старое", "Марат", "done"), closedAt: "2026-08-01T13:00:00Z" },
+      ],
+      question: "Как прошла неделя?",
+    });
+    expect(a.lines).toEqual(["За неделю закрыто 2 задачи, 2 человек. Сейчас в работе 3, просрочено 1."]);
+  });
+
   it("the general picture", () => {
     const a = answer({ ...BASE, question: "Как дела в целом?" });
     expect(a.lines).toEqual(["В работе 3 задачи. Просрочено 1. На приёмке 1."]);

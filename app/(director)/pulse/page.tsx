@@ -146,6 +146,14 @@ export default function PulsePage() {
             </Button>
           </div>
         ) : null}
+        {/* a fresh instance: nobody to give tasks to yet — the first step is the team */}
+        {people.data && people.data.filter((p) => p.is_active && p.role !== "director" && p.role !== "tv").length === 0 ? (
+          <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[17px] leading-6">
+            <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full bg-accent" />
+            В команде пока никого. Добавь первого сотрудника, и задачи будет кому давать.{" "}
+            <span className="text-accent">Добавить ›</span>
+          </Link>
+        ) : null}
         <PushCard bubble />
         <InstallHint bubble />
       </Assistant>

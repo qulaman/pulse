@@ -176,6 +176,18 @@ export function answer(input: AnswerInput): Answer {
     };
   }
 
+  // 5b. the week: what got closed in the last seven days
+  if (/недел/.test(q)) {
+    const weekAgo = now.getTime() - 7 * 86_400_000;
+    const done = (input.closed ?? []).filter((t) => t.status === "done" && t.closedAt && new Date(t.closedAt).getTime() >= weekAgo);
+    const people = new Set(done.map((t) => t.assignee).filter(Boolean)).size;
+    const head = done.length === 0
+      ? "За неделю ничего не закрыто."
+      : `За неделю закрыто ${done.length} ${pluralRu(done.length, TASKS_FORM)}${people > 1 ? `, ${people} человек` : ""}.`;
+    const tail = `Сейчас в работе ${input.open.length}${input.overdue.length ? `, просрочено ${input.overdue.length}` : ""}.`;
+    return { understood: true, lines: [`${head} ${tail}`] };
+  }
+
   // 6. the general picture
   if (/сколько|в работе|что сегодня|что у нас|как дела|обстановк|что нового|итог|сводк|все ли|всё ли/.test(q)) {
     const parts: string[] = [];
