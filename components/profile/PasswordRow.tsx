@@ -64,7 +64,7 @@ export function PasswordRow() {
             className={FIELD}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoFocus
+            data-autofocus
           />
           <input
             type="password"

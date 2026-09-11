@@ -158,11 +158,33 @@ async function fetchTask(taskId: string): Promise<TaskWithPeople> {
   return data as unknown as TaskWithPeople;
 }
 
+/**
+ * The same task as it sits in any cached list (feed, «Мои дела», inbox stacks,
+ * «Отправленные»): opening a card must paint it at once, not after a skeleton.
+ */
+function findCachedTask(queryClient: ReturnType<typeof useQueryClient>, taskId: string) {
+  for (const [, data] of queryClient.getQueriesData<unknown>({ queryKey: taskKeys.root })) {
+    const lists: unknown[] = Array.isArray(data)
+      ? [data]
+      : data && typeof data === "object"
+        ? Object.values(data as Record<string, unknown>)
+        : [];
+    for (const list of lists) {
+      if (!Array.isArray(list)) continue;
+      const hit = (list as TaskWithPeople[]).find((task) => task?.id === taskId);
+      if (hit) return hit;
+    }
+  }
+  return undefined;
+}
+
 export function useTask(taskId: string) {
+  const queryClient = useQueryClient();
   return useRealtimeQuery<TaskWithPeople, TaskRow>({
     queryKey: taskKeys.detail(taskId),
     queryFn: () => fetchTask(taskId),
     channel: { table: "tasks", filter: `id=eq.${taskId}` },
+    placeholderData: () => findCachedTask(queryClient, taskId),
   });
 }
 

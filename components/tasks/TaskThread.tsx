@@ -213,9 +213,10 @@ export function TaskChat({
         </div>
       </section>
 
+      {/* pinned above the tab bar (56px + safe area), which the thread keeps like every other screen */}
       <div
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg/95 px-4 pt-3 backdrop-blur"
-        style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}
+        className="fixed inset-x-0 z-20 border-t border-border bg-bg px-4 pb-3 pt-3"
+        style={{ bottom: "calc(56px + env(safe-area-inset-bottom))" }}
       >
         <div className="mx-auto flex max-w-lg items-end gap-2">
           <textarea

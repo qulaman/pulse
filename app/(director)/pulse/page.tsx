@@ -99,7 +99,8 @@ export default function PulsePage() {
         aria-live="polite"
       >
         <Mascot state={loading ? "thinking" : style.mascot} size={56} />
-        <div className="min-w-0">
+        {/* two lines of verdict reserved: the card keeps its height when the real line lands */}
+        <div className="min-h-[68px] min-w-0">
           <p className="text-[19px] font-semibold leading-6">{loading ? "Смотрю, что нового…" : line.text}</p>
           <p className="mt-1 text-[13px] leading-4 text-muted">{loading ? " " : style.sub}</p>
         </div>

@@ -23,17 +23,15 @@ export function PhotoMessage({ path }: { path: string }) {
   }, [path]);
 
   if (failed) return <p className="mt-2 text-[13px] leading-4 text-danger">Фото не открылось. Попробуй позже</p>;
-  if (!url) return <div className="skeleton mt-2 h-40 w-full rounded-[12px]" aria-label="Загружаю фото" />;
+
+  // one fixed frame (4:3, capped) for the placeholder and the photo alike — the thread never reflows
+  const frame = "mt-2 block w-full max-h-[320px] overflow-hidden rounded-[12px] border border-border";
+  if (!url) return <div className={`skeleton ${frame} aspect-[4/3] bg-surface-2`} aria-label="Загружаю фото" />;
 
   return (
-    <a href={url} target="_blank" rel="noreferrer" className="mt-2 block">
+    <a href={url} target="_blank" rel="noreferrer" className={`${frame} aspect-[4/3] bg-surface-2`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- signed URL, ten-minute lifetime */}
-      <img
-        src={url}
-        alt="Фото к отчёту"
-        className="card-in max-h-[320px] w-full rounded-[12px] border border-border object-cover"
-        loading="lazy"
-      />
+      <img src={url} alt="Фото к отчёту" className="card-in h-full w-full object-cover" loading="lazy" />
     </a>
   );
 }

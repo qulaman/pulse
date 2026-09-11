@@ -20,6 +20,7 @@
     "smoke:realtime": "tsx scripts/smoke-realtime.ts",
     "dev:https": "next dev --experimental-https",
     "smoke:ui": "tsx scripts/smoke-ui.ts",
+    "smoke:jank": "tsx scripts/smoke-jank.ts",
     "db:clean": "tsx scripts/db-clean.ts"
   },
   "dependencies": {

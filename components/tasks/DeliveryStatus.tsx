@@ -35,7 +35,8 @@ function useTaskDelivery(taskId: string) {
 export function DeliveryStatus({ taskId, status }: { taskId: string; status: string }) {
   const delivery = useTaskDelivery(taskId);
   const d = delivery.data;
-  if (!d) return null;
+  // the line's height is reserved before the receipt arrives — cards never grow under the thumb
+  if (!d) return <p className="mt-2 h-4" aria-hidden />;
 
   let text: string;
   let tone = "var(--text-muted)";

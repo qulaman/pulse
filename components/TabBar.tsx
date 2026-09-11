@@ -90,7 +90,7 @@ export function TabBar({ role }: { role: TabRole }) {
 
   return (
     <nav
-      className="sticky bottom-0 z-10 border-t border-border bg-surface/95 backdrop-blur"
+      className="sticky bottom-0 z-10 border-t border-border bg-surface"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-label="Основная навигация"
     >

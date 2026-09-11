@@ -33,7 +33,7 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
       <textarea
         className={FIELD_CLASS}
         rows={3}
-        autoFocus
+        data-autofocus
         placeholder={TEXT.askPlaceholder}
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -166,7 +166,7 @@ export function ReportSheet({
       <textarea
         className={FIELD_CLASS}
         rows={3}
-        autoFocus
+        data-autofocus
         placeholder={TEXT.reportPlaceholder}
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -251,7 +251,7 @@ export function ReworkSheet({
       <textarea
         className={FIELD_CLASS}
         rows={3}
-        autoFocus
+        data-autofocus
         placeholder={TEXT.reworkPlaceholder}
         value={text}
         onChange={(event) => setText(event.target.value)}

@@ -6,6 +6,7 @@ import {
   useQueryClient,
   type QueryClient,
   type QueryKey,
+  type UseQueryOptions,
 } from "@tanstack/react-query";
 import type {
   RealtimeChannel,
@@ -115,16 +116,18 @@ export type UseRealtimeQueryOptions<TData, TRow extends Record<string, unknown>>
   /** Default without a handler: invalidate the query. */
   onEvent?: (payload: RealtimeEvent<TRow>, queryClient: QueryClient) => void;
   enabled?: boolean;
+  /** Shown until the first fetch lands (never cached) — e.g. a row already known from a list. */
+  placeholderData?: UseQueryOptions<TData, Error, TData, QueryKey>["placeholderData"];
 };
 
 export function useRealtimeQuery<
   TData,
   TRow extends Record<string, unknown> = Record<string, unknown>,
 >(options: UseRealtimeQueryOptions<TData, TRow>) {
-  const { queryKey, queryFn, channel, onEvent, enabled = true } = options;
+  const { queryKey, queryFn, channel, onEvent, enabled = true, placeholderData } = options;
   const queryClient = useQueryClient();
 
-  const query = useQuery({ queryKey, queryFn, enabled });
+  const query = useQuery({ queryKey, queryFn, enabled, placeholderData });
   const { refetch } = query;
   const channelKey = JSON.stringify(queryKey);
 
