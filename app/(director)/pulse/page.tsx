@@ -16,6 +16,9 @@ import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useDirectorInbox, useMe, type TaskWithPeople } from "@/lib/tasks/queries";
 
+/** Suggestions under the briefing: the questions the assistant answers from the data. */
+const QUICK_QUESTIONS = ["Кто не отчитался?", "Что на приёмке?", "Как дела в целом?"];
+
 /**
  * Пульс — the director's home is a conversation with the assistant: «Капля» reports
  * what changed since the last visit (overdue → questions → review, then who accepted
@@ -35,8 +38,10 @@ export default function PulsePage() {
   const stage = useIngestStore((state) => state.stage);
   const entities = useIngestStore((state) => state.entities);
   const question = useIngestStore((state) => state.question);
+  const requestId = useIngestStore((state) => state.clientRequestId);
   const resetIngest = useIngestStore((state) => state.reset);
   const startManual = useIngestStore((state) => state.startManual);
+  const ask = useIngestStore((state) => state.ask);
   const pointsEnabled = usePointsEnabled().data === true;
   const draftCount = stage === "confirm" ? entities.filter((entity) => isCountable(entity, pointsEnabled)).length : 0;
 
@@ -62,11 +67,13 @@ export default function PulsePage() {
   }, [asked, now, people.isLoading, people.data, open.data, inbox.data]);
   const qaLines = useMemo<BriefLine[]>(() => {
     if (!asked || !reply) return [];
+    // keyed by the request, not the words: the same question asked again is a new exchange
+    const key = requestId ?? asked;
     return [
-      { id: `q:${asked}`, kind: "director", text: asked, instant: true },
-      ...reply.lines.map((text, i) => ({ id: `a:${asked}:${i}`, kind: "answer" as const, text })),
+      { id: `q:${key}`, kind: "director", text: asked, instant: true },
+      ...reply.lines.map((text, i) => ({ id: `a:${key}:${i}`, kind: "answer" as const, text })),
     ];
-  }, [asked, reply]);
+  }, [asked, reply, requestId]);
   // An answered question is done: the lines stay in the conversation (the assistant keeps
   // what it said), the pipeline goes idle. An unread one waits for the director's choice.
   useEffect(() => {
@@ -108,6 +115,21 @@ export default function PulsePage() {
             Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
             <span className="text-accent">Открыть ›</span>
           </Link>
+        ) : null}
+        {/* what the assistant can be asked — a tap asks at once, no parser round-trip */}
+        {stage === "idle" ? (
+          <div className="card-in flex flex-wrap gap-2 pl-4 pt-1" aria-label="Спросить">
+            {QUICK_QUESTIONS.map((text) => (
+              <button
+                key={text}
+                type="button"
+                onClick={() => ask(text)}
+                className="min-h-[36px] rounded-full border border-border bg-surface px-3 text-[14px] leading-[18px] text-muted transition-transform duration-[120ms] active:scale-[0.97]"
+              >
+                {text}
+              </button>
+            ))}
+          </div>
         ) : null}
         {asked && reply && !reply.understood ? (
           <div className="card-in flex flex-wrap gap-2 pl-4 pt-1">
