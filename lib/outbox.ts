@@ -10,7 +10,17 @@ const KEY = "pulse.outbox.v1";
 /** Older than this the intent is stale: a task may have moved on, the person may have acted. */
 const MAX_AGE_MS = 24 * 3_600_000;
 
-export type OutboxEntry = { id: string; path: string; payload: unknown; at: number };
+export type OutboxEntry = {
+  id: string;
+  /** `post` — a task route (path + JSON body); `message` — a task_messages row inserted through supabase-js. */
+  kind?: "post" | "message";
+  path: string;
+  payload: unknown;
+  at: number;
+};
+
+/** How a `message` entry is written on replay — supabase-js lives in the browser bundle, not here. */
+export type MessageWriter = (row: unknown) => Promise<{ error: { message: string } | null }>;
 
 function read(): OutboxEntry[] {
   try {
@@ -53,10 +63,19 @@ export function dequeue(id: string): void {
  * Send what is left, oldest first. A network failure keeps the entry; any answer from the
  * server — 2xx, a 409 «уже изменился», a 4xx of any kind — closes it: the server has spoken.
  */
-export async function replayOutbox(): Promise<{ sent: number; left: number }> {
+export async function replayOutbox(writeMessage?: MessageWriter): Promise<{ sent: number; left: number }> {
   const entries = read();
   let sent = 0;
   for (const entry of entries) {
+    if (entry.kind === "message") {
+      if (!writeMessage) continue;
+      const { error } = await writeMessage(entry.payload);
+      // a duplicate id (it did land) or any other verdict closes the entry; only a dead network keeps it
+      if (error && /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(error.message)) break;
+      dequeue(entry.id);
+      if (!error) sent += 1;
+      continue;
+    }
     try {
       const res = await fetch(entry.path, {
         method: "POST",

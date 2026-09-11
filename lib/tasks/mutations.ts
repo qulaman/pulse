@@ -247,17 +247,24 @@ export function useSendMessage(me: Me | undefined) {
     mutationFn: async (input: SendMessageInput & { id: string }) => {
       if (!me) throw new Error(GENERIC_ERROR);
       const supabase = createBrowserSupabase();
-      const { error } = await supabase.from("task_messages").insert({
+      const row = {
         id: input.id,
         task_id: input.taskId,
         company_id: input.companyId,
         sender_id: me.userId,
-        type: input.filePath ? "photo" : "text",
+        type: (input.filePath ? "photo" : "text") as "photo" | "text",
         content: input.text || null,
         file_path: input.filePath ?? null,
         meta: (input.meta ?? {}) as Json,
-      });
-      if (error) throw isNetworkError(error) ? new NetworkError() : new Error(GENERIC_ERROR);
+      };
+      const { error } = await supabase.from("task_messages").insert(row);
+      if (error && isNetworkError(error)) {
+        // the row waits in the persisted outbox too — a closed tab must not lose the words
+        enqueue({ id: input.id, kind: "message", path: "task_messages", payload: row });
+        throw new NetworkError();
+      }
+      if (error) throw new Error(GENERIC_ERROR);
+      dequeue(input.id);
     },
     onMutate: async (input) => {
       const queryKey = taskKeys.thread(input.taskId);
