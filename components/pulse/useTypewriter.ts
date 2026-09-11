@@ -11,7 +11,7 @@ const LINE_PAUSE_MS = 380;
 /** Shorter breaths inside a line: a comma is a beat, a colon or a full stop a longer one. */
 const PAUSE_AFTER: Record<string, number> = { ",": 140, ";": 160, ":": 220, ".": 260, "?": 260, "!": 260, "—": 120 };
 
-type Progress = Record<string, number>;
+export type Progress = Record<string, number>;
 
 /**
  * Letters appear one after another, line by line, like the assistant is talking.
@@ -19,8 +19,8 @@ type Progress = Record<string, number>;
  * starts the whole briefing over. With `prefers-reduced-motion` everything is shown
  * at once. Returns how many characters of each line are visible.
  */
-export function useTypewriter(lines: TypedLine[], replayKey = 0) {
-  const [state, setState] = useState<{ key: number; shown: Progress }>({ key: replayKey, shown: {} });
+export function useTypewriter(lines: TypedLine[], replayKey = 0, initialShown: Progress = {}) {
+  const [state, setState] = useState<{ key: number; shown: Progress }>({ key: replayKey, shown: initialShown });
   // a replay wipes the progress: derived-state reset during render, refs reset in effects below
   if (state.key !== replayKey) setState({ key: replayKey, shown: {} });
   const shown = state.key === replayKey ? state.shown : {};
@@ -29,9 +29,10 @@ export function useTypewriter(lines: TypedLine[], replayKey = 0) {
   useEffect(() => {
     linesRef.current = lines;
   });
-  const progressRef = useRef<Progress>({});
+  const progressRef = useRef<Progress>(initialShown);
+  const firstKey = useRef(replayKey);
   useEffect(() => {
-    progressRef.current = {};
+    if (replayKey !== firstKey.current) progressRef.current = {};
   }, [replayKey]);
 
   const pending = lines.some((line) => (shown[line.id] ?? 0) < line.text.length);

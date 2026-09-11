@@ -17,19 +17,29 @@ type BaseProps = { open: boolean; onClose: () => void };
 /* «Уточнить» — a message with meta.is_question, never a status (D-03)         */
 /* -------------------------------------------------------------------------- */
 
+/** The questions people actually ask — one tap each, the textarea is for the rest. */
+const QUICK_QUESTIONS = ["Когда срок?", "Какой формат?", "Где взять данные?", "Это срочно?"] as const;
+
 export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (text: string) => void }) {
   const [text, setText] = useState("");
 
-  const submit = () => {
-    const value = text.trim();
-    if (!value) return;
-    onSubmit(value);
+  const submit = (value = text) => {
+    const clean = value.trim();
+    if (!clean) return;
+    onSubmit(clean);
     setText("");
     onClose();
   };
 
   return (
     <Sheet open={open} onClose={onClose} title={BUTTON.ask}>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {QUICK_QUESTIONS.map((question) => (
+          <Chip key={question} onClick={() => submit(question)}>
+            {question}
+          </Chip>
+        ))}
+      </div>
       <textarea
         className={FIELD_CLASS}
         rows={3}
@@ -39,7 +49,7 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
         onChange={(event) => setText(event.target.value)}
       />
       <div className="mt-3">
-        <Button block onClick={submit} disabled={!text.trim()}>
+        <Button block onClick={() => submit()} disabled={!text.trim()}>
           {BUTTON.send}
         </Button>
       </div>

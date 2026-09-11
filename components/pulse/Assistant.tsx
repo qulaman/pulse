@@ -8,6 +8,7 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import type { BriefLine, BriefTone } from "@/lib/pulse/briefing";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
+import { conversation, forgetConversation } from "./conversation";
 import { useTypewriter } from "./useTypewriter";
 
 const TONE_COLOR: Record<BriefTone, string> = {
@@ -63,7 +64,8 @@ type Props = {
 };
 
 export function Assistant({ lines, loading, taskById, actions, companyId, children }: Props) {
-  const [spoken, setSpoken] = useState<BriefLine[]>([]);
+  // picks up where this tab session left off: the briefing is not re-typed on every return
+  const [spoken, setSpoken] = useState<BriefLine[]>(() => conversation.spoken);
   const merged = loading ? spoken : mergeLines(spoken, lines);
   if (merged !== spoken) setSpoken(merged);
 
@@ -72,7 +74,12 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
   const { shown, activeId, speaking } = useTypewriter(
     spoken.map((line) => ({ id: line.id, text: line.text, instant: line.instant })),
     replayKey,
+    conversation.shown,
   );
+  useEffect(() => {
+    conversation.spoken = spoken;
+    conversation.shown = shown;
+  }, [spoken, shown]);
 
   const worst = spoken.find((line) => line.kind === "verdict")?.tone;
   const handledAll = spoken.every((line) => line.kind !== "fact" || isHandled(line, taskById));
@@ -103,6 +110,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
 
   const replay = () => {
     setOpen(null);
+    forgetConversation();
     setReplayKey((key) => key + 1);
   };
 

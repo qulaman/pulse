@@ -10,6 +10,8 @@ import type { AnswerTask } from "./answers";
 import type { BriefTask } from "./briefing";
 
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
+/** The «since» of the current tab session: coming back from another tab is the same visit. */
+const SESSION_SINCE_KEY = "pulse.brief.since";
 /** A first visit (or a wiped storage) reads the news of the last day. */
 const FIRST_VISIT_WINDOW_MS = 24 * 3_600_000;
 
@@ -34,16 +36,20 @@ export function toBriefTask(task: Pick<TaskWithPeople, "id" | "title" | "deadlin
 export function useLastVisit(): string {
   const [since] = useState(() => {
     const now = Date.now();
-    let previous: number | null = null;
     try {
+      // the same tab session keeps its «since»: a trip to «Задачи» and back is not a new visit
+      const session = window.sessionStorage.getItem(SESSION_SINCE_KEY);
       const raw = window.localStorage.getItem(LAST_VISIT_KEY);
-      previous = raw ? Number(raw) : null;
       window.localStorage.setItem(LAST_VISIT_KEY, String(now));
+      if (session) return session;
+      const previous = raw ? Number(raw) : null;
+      const from = previous && Number.isFinite(previous) ? previous : now - FIRST_VISIT_WINDOW_MS;
+      const iso = new Date(from).toISOString();
+      window.sessionStorage.setItem(SESSION_SINCE_KEY, iso);
+      return iso;
     } catch {
-      previous = null;
+      return new Date(now - FIRST_VISIT_WINDOW_MS).toISOString();
     }
-    const from = previous && Number.isFinite(previous) ? previous : now - FIRST_VISIT_WINDOW_MS;
-    return new Date(from).toISOString();
   });
   return since;
 }
