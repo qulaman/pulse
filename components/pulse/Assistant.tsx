@@ -71,11 +71,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
 
   const [replayKey, setReplayKey] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
-  const { shown, activeId, speaking } = useTypewriter(
-    spoken.map((line) => ({ id: line.id, text: line.text, instant: line.instant })),
-    replayKey,
-    conversation.shown,
-  );
+  const { shown, activeId, speaking } = useTypewriter(spoken, replayKey, conversation.shown);
   useEffect(() => {
     conversation.spoken = spoken;
     conversation.shown = shown;

@@ -46,6 +46,11 @@ export function stem(word: string): string {
   return s;
 }
 
+/** «Марат Оспанов» → «Марат»: the name the director says. */
+export function firstNameOf(fullName: string | null | undefined): string {
+  return fullName?.trim().split(/\s+/)[0] ?? "";
+}
+
 export function tokens(text: string): string[] {
   return normalize(text).split(" ").filter(Boolean);
 }

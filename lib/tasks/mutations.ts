@@ -56,7 +56,7 @@ async function postJson(path: string, payload: unknown): Promise<void> {
 
 type TaskPatch = Partial<TaskRow>;
 
-function patchOne(task: TaskWithPeople, taskId: string, patch: TaskPatch): TaskWithPeople {
+function patchOne<T extends TaskWithPeople>(task: T, taskId: string, patch: TaskPatch): T {
   return task.id === taskId ? { ...task, ...patch } : task;
 }
 
@@ -73,8 +73,8 @@ function patchCached(old: unknown, taskId: string, patch: TaskPatch): unknown {
       const inbox = old as DirectorInbox;
       return {
         overdue: inbox.overdue.map((task) => patchOne(task, taskId, patch)),
-        declined: (inbox.declined ?? []).map((task) => ({ ...patchOne(task, taskId, patch), decline_reason: task.decline_reason })),
-        questions: inbox.questions.map((task) => ({ ...patchOne(task, taskId, patch), question: task.question })),
+        declined: (inbox.declined ?? []).map((task) => patchOne(task, taskId, patch)),
+        questions: inbox.questions.map((task) => patchOne(task, taskId, patch)),
         review: inbox.review.map((task) => patchOne(task, taskId, patch)),
       } satisfies DirectorInbox;
     }
@@ -103,8 +103,8 @@ function invalidateTasks(queryClient: QueryClient, taskId: string) {
 export type TransitionInput = {
   taskId: string;
   toStatus: TaskStatus;
-  /** Idempotency key, minted once per tap so a paused/retried call stays one call. */
-  requestId?: string;
+  /** Idempotency key, minted once per tap (useTaskActions) so a paused/retried call stays one call. */
+  requestId: string;
   /** «Не могу»: chip + free text, becomes a visible message. */
   reason?: string;
   /** Rework note from the director, likewise a visible message. */
@@ -120,7 +120,7 @@ export function useTransition() {
         to_status: input.toStatus,
         reason: input.reason,
         comment: input.comment,
-        client_request_id: input.requestId ?? crypto.randomUUID(),
+        client_request_id: input.requestId,
       });
     },
     onMutate: async (input) => {
@@ -168,7 +168,7 @@ export function useRevoke() {
 /* «Продлить» and «Переназначить» — RPCs behind their own routes                 */
 /* -------------------------------------------------------------------------- */
 
-export type ExtendInput = { taskId: string; deadlineIso: string | null; requestId?: string };
+export type ExtendInput = { taskId: string; deadlineIso: string | null; requestId: string };
 
 export function useExtendDeadline() {
   const queryClient = useQueryClient();
@@ -177,7 +177,7 @@ export function useExtendDeadline() {
     mutationFn: async (input: ExtendInput) => {
       await postJson(`/api/tasks/${input.taskId}/deadline`, {
         deadline_iso: input.deadlineIso,
-        client_request_id: input.requestId ?? crypto.randomUUID(),
+        client_request_id: input.requestId,
       });
     },
     onMutate: async (input) => {
@@ -196,7 +196,7 @@ export function useExtendDeadline() {
   });
 }
 
-export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string; requestId?: string };
+export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string; requestId: string };
 
 export function useReassign() {
   const queryClient = useQueryClient();
@@ -205,7 +205,7 @@ export function useReassign() {
     mutationFn: async (input: ReassignInput) => {
       await postJson(`/api/tasks/${input.taskId}/reassign`, {
         assignee_id: input.assigneeId,
-        client_request_id: input.requestId ?? crypto.randomUUID(),
+        client_request_id: input.requestId,
       });
     },
     // no optimistic clone: the new task's id comes from the server, the lists refetch at once
@@ -291,14 +291,14 @@ export function useSendMessage(me: Me | undefined) {
 /* -------------------------------------------------------------------------- */
 
 export type TaskActions = {
-  transition: (input: TransitionInput) => void;
+  transition: (input: Omit<TransitionInput, "requestId">) => void;
   /** rework → accepted → pending_review: two calls, two client_request_id. */
   complete: (input: { taskId: string; fromStatus: TaskStatus }) => void;
   revoke: (taskId: string) => void;
   /** «Продлить»: a new deadline (null — «без срока») on an open task. */
-  extend: (input: ExtendInput) => void;
+  extend: (input: Omit<ExtendInput, "requestId">) => void;
   /** «Переназначить»: the same order to another person; the old task is revoked. */
-  reassign: (input: ReassignInput) => void;
+  reassign: (input: Omit<ReassignInput, "requestId">) => void;
   sendMessage: (input: SendMessageInput) => void;
   busy: boolean;
 };

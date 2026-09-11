@@ -4,13 +4,14 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import { initialsOf } from "@/lib/people/queries";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
+import { BUTTON, deadlineLabel, SHORT_STATUS, STATUS_LABEL, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { AssigneePicker } from "@/components/confirm/AssigneePicker";
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { AudioOriginal } from "./AudioOriginal";
@@ -19,18 +20,11 @@ import { AskSheet, DeclineSheet, ReportSheet, ReworkSheet } from "./TaskSheets";
 
 export type TaskCardVariant = "employee" | "director";
 
-/** The eyebrow of the card: one short word per status, so row 1 never wraps on a phone. */
-const EYEBROW: Record<TaskStatus, string> = {
-  scheduled: "Отправлю позже",
-  sent: "Новая",
-  accepted: "В работе",
-  in_progress: "В работе",
-  pending_review: "На проверке",
-  done: "Готово",
-  rework: "На доработке",
-  declined: "Отказ",
-  revoked: "Отозвана",
-};
+/** The eyebrow of the card: the shared short status, capitalised, so row 1 never wraps on a phone. */
+function eyebrow(status: TaskStatus): string {
+  const word = SHORT_STATUS[status];
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
 
 export type TaskCardProps = {
   task: TaskWithPeople;
@@ -155,7 +149,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
       <div className="relative flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 font-display text-[12px] font-semibold uppercase tracking-[0.06em]" style={{ color: TONE_VAR[tone] }}>
           <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[tone] }} />
-          {deadline.overdue && task.status !== "done" ? "Просрочено" : EYEBROW[task.status]}
+          {deadline.overdue && task.status !== "done" ? "Просрочено" : eyebrow(task.status)}
         </span>
         <span
           className="nums inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
@@ -329,14 +323,9 @@ function QuestionBanner({ question, onAnswer }: { question: string; onAnswer: (t
       </Banner>
       <div className="mt-2 flex flex-wrap gap-2">
         {QUICK_ANSWERS.map((text) => (
-          <button
-            key={text}
-            type="button"
-            onClick={() => onAnswer(text)}
-            className="min-h-[36px] rounded-full border border-border bg-surface-2 px-3 text-[14px] leading-[18px] transition-transform duration-[120ms] active:scale-[0.97]"
-          >
+          <Chip key={text} onClick={() => onAnswer(text)}>
             {text}
-          </button>
+          </Chip>
         ))}
       </div>
     </div>
@@ -473,7 +462,7 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
               {BUTTON.extend}
             </Button>
           ) : null}
-          {task.status !== "declined" && ["sent", "accepted", "in_progress", "rework"].includes(task.status) ? (
+          {["sent", "accepted", "in_progress", "rework"].includes(task.status) ? (
             <Button variant="ghost" onClick={() => onOpen("reassign")}>
               {BUTTON.reassign}
             </Button>

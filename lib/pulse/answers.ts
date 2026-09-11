@@ -1,5 +1,6 @@
 import { humanAqtobe } from "@/lib/ai/time";
-import { pluralRu, type TaskStatus } from "@/lib/tasks/status-text";
+import { pluralRu, SHORT_STATUS, type TaskStatus } from "@/lib/tasks/status-text";
+import { firstNameOf, stem, tokens } from "@/lib/text/normalize";
 import { quoteTitle, type BriefTask } from "./briefing";
 
 /**
@@ -34,67 +35,32 @@ export type Answer = {
   understood: boolean;
 };
 
-const STATUS_WORD: Partial<Record<TaskStatus, string>> = {
-  sent: "не открыта",
-  accepted: "в работе",
-  in_progress: "в работе",
-  rework: "на доработке",
-  pending_review: "на приёмке",
-  done: "готово",
-  declined: "отказ",
-  revoked: "отозвана",
-};
-
 const NOT_UNDERSTOOD = "Пока отвечаю только про задачи и людей: кто чем занят, что там по делу, кто просрочил, что на приёмке. Спроси иначе или скажи задачу.";
 
-function norm(text: string): string {
-  return text.toLowerCase().replace(/ё/g, "е").replace(/[^a-zа-я0-9\s]/g, " ").replace(/\s+/g, " ").trim();
-}
-
-/** A Russian word matches its inflected form by its stem («марат» ~ «марату», «дина» ~ «дины»). */
-function stem(word: string): string {
-  return word.slice(0, Math.max(3, word.length - 2));
-}
-
-function firstName(full: string): string {
-  return full.trim().split(/\s+/)[0] ?? full;
-}
-
-function personOf(person: AnswerPerson): string {
-  return firstName(person.fullName);
-}
-
-/** The person the question is about: a first name or an alias, inflected or not. */
+/** The person the question is about: a first name or an alias, in any case («Марату», «Дины»). */
 export function findPerson(question: string, people: AnswerPerson[]): AnswerPerson | null {
-  const words = norm(question).split(" ");
+  const words = new Set(tokens(question).map(stem));
   for (const person of people) {
-    const names = [firstName(person.fullName), ...person.aliases].map((n) => norm(n)).filter(Boolean);
-    for (const name of names) {
-      const s = stem(name);
-      if (words.some((w) => w.startsWith(s) && Math.abs(w.length - name.length) <= 2)) return person;
-    }
+    const names = [firstNameOf(person.fullName), ...person.aliases].flatMap((n) => tokens(n)).map(stem);
+    if (names.some((name) => name && words.has(name))) return person;
   }
   return null;
 }
 
 const STOP = new Set(["что", "там", "как", "дела", "где", "кто", "чем", "занят", "занята", "сейчас", "сегодня", "по", "с", "про", "насчет", "у", "нас", "все", "всё", "и", "а", "ли", "мне", "есть", "делает", "делают", "скажи", "покажи", "какие", "какой", "задачи", "задача", "задач", "статус", "дело", "делу"]);
 
-/** Tasks whose title shares a meaningful word with the question («что там по Казхрому» → «КП по Казхрому»). */
+/** Tasks whose title shares a meaningful stem with the question («что там по Казхрому» → «КП по Казхрому»). */
 export function findByTopic<T extends BriefTask>(question: string, tasks: T[]): T[] {
-  const words = norm(question).split(" ").filter((w) => w.length >= 4 && !STOP.has(w));
-  if (words.length === 0) return [];
-  const stems = words.map(stem);
-  return tasks.filter((task) => {
-    const titleWords = norm(task.title).split(" ");
-    return titleWords.some((tw) => stems.some((s) => tw.startsWith(s) || (tw.length >= 4 && s.startsWith(stem(tw)))));
-  });
+  const wanted = new Set(tokens(question).filter((w) => w.length >= 4 && !STOP.has(w)).map(stem));
+  if (wanted.size === 0) return [];
+  return tasks.filter((task) => tokens(task.title).some((word) => word.length >= 4 && wanted.has(stem(word))));
 }
 
 type LineOpts = { person?: boolean; status?: boolean; overdue?: boolean; closed?: boolean };
 
 function taskLine(task: BriefTask & { status?: TaskStatus }, now: Date, opts: LineOpts = {}): string {
   const who = opts.person && task.assignee ? `${task.assignee}, ` : "";
-  const status = opts.status && task.status ? STATUS_WORD[task.status] : undefined;
+  const status = opts.status && task.status ? SHORT_STATUS[task.status] : undefined;
   const closedAt = (task as AnswerTask).closedAt;
   // a closed task is about when it closed, not about a deadline that no longer matters
   if (opts.closed && closedAt) {
@@ -110,7 +76,7 @@ const TASKS_FORM: [string, string, string] = ["задача", "задачи", "�
 
 export function answer(input: AnswerInput): Answer {
   const { question, now } = input;
-  const q = norm(question);
+  const q = tokens(question).join(" ");
 
   // 1. overdue / who has not reported
   if (/просроч|не отчита|не сдал|опозда|горит|сорва/.test(q)) {
@@ -153,7 +119,7 @@ export function answer(input: AnswerInput): Answer {
   // 4. a person
   const person = findPerson(question, input.people);
   if (person) {
-    const name = personOf(person);
+    const name = firstNameOf(person.fullName);
     const mine = input.open.filter((t) => t.assignee === name);
     const late = input.overdue.filter((t) => t.assignee === name);
     if (mine.length === 0) return { understood: true, lines: [`${name}: задач в работе нет.`] };

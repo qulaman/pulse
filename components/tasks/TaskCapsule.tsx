@@ -4,20 +4,7 @@ import Link from "next/link";
 
 import { humanAqtobe } from "@/lib/ai/time";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
-
-/** Short, lowercase: the capsule is a glance, not a card. */
-const SHORT_STATUS: Record<TaskStatus, string> = {
-  scheduled: "отложена",
-  sent: "новая",
-  accepted: "в работе",
-  in_progress: "в работе",
-  pending_review: "на приёмке",
-  done: "готово",
-  rework: "доработка",
-  declined: "отказ",
-  revoked: "отозвана",
-};
+import { isOverdue, SHORT_STATUS, type TaskStatus } from "@/lib/tasks/status-text";
 
 const DOT: Record<TaskStatus, string> = {
   scheduled: "var(--text-muted)",

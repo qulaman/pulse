@@ -1,18 +1,11 @@
 "use client";
 
-import { useMutationState } from "@tanstack/react-query";
+import { onlineManager, useMutationState } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
-function subscribe(onChange: () => void) {
-  window.addEventListener("online", onChange);
-  window.addEventListener("offline", onChange);
-  return () => {
-    window.removeEventListener("online", onChange);
-    window.removeEventListener("offline", onChange);
-  };
-}
-
-const online = () => (typeof navigator === "undefined" ? true : navigator.onLine);
+// the same switch that pauses and resumes mutations — the line never disagrees with the queue
+const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
+const online = () => onlineManager.isOnline();
 
 /**
  * A thin line at the top while the phone has no network: the assistant's own words

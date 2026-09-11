@@ -20,6 +20,19 @@ export const STATUS_LABEL: Record<TaskStatus, string> = {
   revoked: "Отозвано директором",
 };
 
+/** Short, lower-case status words — capsules, the card's eyebrow and the assistant share them. */
+export const SHORT_STATUS: Record<TaskStatus, string> = {
+  scheduled: "отложена",
+  sent: "новая",
+  accepted: "в работе",
+  in_progress: "в работе",
+  pending_review: "на приёмке",
+  done: "готово",
+  rework: "на доработке",
+  declined: "отказ",
+  revoked: "отозвана",
+};
+
 export const BUTTON = {
   accept: "Принял",
   ask: "Уточнить",

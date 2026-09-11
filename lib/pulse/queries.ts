@@ -8,6 +8,7 @@ import type { TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import type { AnswerTask } from "./answers";
 import type { BriefTask } from "./briefing";
+import { firstNameOf } from "@/lib/text/normalize";
 
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
 /** The «since» of the current tab session: coming back from another tab is the same visit. */
@@ -15,9 +16,7 @@ const SESSION_SINCE_KEY = "pulse.brief.since";
 /** A first visit (or a wiped storage) reads the news of the last day. */
 const FIRST_VISIT_WINDOW_MS = 24 * 3_600_000;
 
-export function firstNameOf(fullName: string | null | undefined): string {
-  return fullName?.trim().split(/\s+/)[0] ?? "";
-}
+export { firstNameOf };
 
 export function toBriefTask(task: Pick<TaskWithPeople, "id" | "title" | "deadline" | "assignee">): BriefTask {
   return {
