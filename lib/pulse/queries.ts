@@ -33,6 +33,15 @@ export function toBriefTask(task: Pick<TaskWithPeople, "id" | "title" | "deadlin
  * stamp moves to now — so the next opening tells what happened in between, while the
  * current screen keeps its own «since» for the whole visit (Realtime appends to it).
  */
+/** A new person signs in on this tab: their first opening is a first visit. */
+export function forgetVisit(): void {
+  try {
+    window.sessionStorage.removeItem(SESSION_SINCE_KEY);
+  } catch {
+    // nothing stored, nothing to forget
+  }
+}
+
 export function useLastVisit(): string {
   const [since] = useState(() => {
     const now = Date.now();

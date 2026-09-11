@@ -2,9 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { PulseMark } from "@/components/brand/PulseMark";
+import { forgetConversation } from "@/components/pulse/conversation";
+import { forgetVisit } from "@/lib/pulse/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 const FIELD =
@@ -15,6 +18,7 @@ export type LoginBrand = { name: string; logoUrl: string | null; tagline: string
 /** The sign-in form; the company's logo and name sit above the product mark (D-44). */
 export function LoginForm({ brand }: { brand: LoginBrand }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,11 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
       return;
     }
 
+    // A sign-out is a client-side navigation: nothing of the previous person may survive
+    // in this tab — cached lists, the assistant's conversation, the visit stamp.
+    queryClient.clear();
+    forgetConversation();
+    forgetVisit();
     // The proxy sends the session to the right screen for the role.
     router.replace("/");
     router.refresh();
