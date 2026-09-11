@@ -21,7 +21,9 @@ export function DirectorFab() {
   const entities = useIngestStore((state) => state.entities);
   const reset = useIngestStore((state) => state.reset);
 
-  const onConfirm = pathname === "/confirm";
+  // /confirm is about the phrase already spoken; /pulse hosts the button inline and
+  // the assistant mentions the draft itself
+  const onConfirm = pathname === "/confirm" || pathname === "/pulse";
   const draft = stage === "confirm" && !onConfirm;
   const pointsEnabled = usePointsEnabled().data === true;
   const count = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;

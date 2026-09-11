@@ -16,7 +16,11 @@ const CANCEL_DISTANCE_PX = 60;
  * The director's single input: hold to speak, tap to type. Walkie-talkie in a browser
  * needs pointer capture and a dead touch-action, or the page scrolls mid-phrase.
  */
-export function VoiceButton() {
+/**
+ * `inline`: the button lives in the page flow as the hero of Пульс — bigger, with
+ * «Дать задачу» under it — instead of floating above the tab bar.
+ */
+export function VoiceButton({ inline = false }: { inline?: boolean } = {}) {
   const stage = useIngestStore((state) => state.stage);
   const startVoice = useIngestStore((state) => state.startVoice);
   const stopVoice = useIngestStore((state) => state.stopVoice);
@@ -112,8 +116,12 @@ export function VoiceButton() {
   return (
     <>
       <div
-        className="pointer-events-none fixed inset-x-0 z-30 flex flex-col items-center gap-2"
-        style={{ bottom: "calc(64px + env(safe-area-inset-bottom))" }}
+        className={
+          inline
+            ? "pointer-events-none relative flex flex-col items-center gap-2"
+            : "pointer-events-none fixed inset-x-0 z-30 flex flex-col items-center gap-2"
+        }
+        style={inline ? undefined : { bottom: "calc(64px + env(safe-area-inset-bottom))" }}
       >
         {recording ? (
           <span
@@ -124,7 +132,7 @@ export function VoiceButton() {
           </span>
         ) : null}
 
-        <div className="pointer-events-auto relative flex h-16 w-16 items-center justify-center">
+        <div className={`pointer-events-auto relative flex items-center justify-center ${inline ? "h-20 w-20" : "h-16 w-16"}`}>
           {!recording && !busy ? (
             // idle: a thin ring breathes outwards — a pulse, not a murky disc behind the button
             <span
@@ -152,7 +160,7 @@ export function VoiceButton() {
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
             onContextMenu={(event) => event.preventDefault()}
-            className="relative flex h-16 w-16 items-center justify-center rounded-full disabled:opacity-40"
+            className={`relative flex items-center justify-center rounded-full disabled:opacity-40 ${inline ? "h-20 w-20" : "h-16 w-16"}`}
             style={{
               background: cancelArmed ? "var(--danger)" : "var(--accent)",
               color: "var(--bg)",
@@ -165,15 +173,18 @@ export function VoiceButton() {
               transition: "transform var(--t-instant) var(--ease-out)",
             }}
           >
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <svg width={inline ? 34 : 28} height={inline ? 34 : 28} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <rect x="9" y="3" width="6" height="11" rx="3" />
               <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
               <path d="M12 17.5V21M9 21h6" />
             </svg>
           </button>
         </div>
+        {inline ? (
+          <span className="text-[16px] font-semibold leading-[22px]">{recording ? "Слушаю…" : "Дать задачу"}</span>
+        ) : null}
         {!recording ? (
-          <span className="rounded-full bg-bg/80 px-2 py-0.5 text-[11px] leading-4 text-muted backdrop-blur">
+          <span className={inline ? "text-[13px] leading-4 text-muted" : "rounded-full bg-bg/80 px-2 py-0.5 text-[11px] leading-4 text-muted"}>
             удержи — говори · тап — текст
           </span>
         ) : null}

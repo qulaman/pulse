@@ -58,10 +58,8 @@ export default function PulsePage() {
   }, [inbox.data]);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pt-4">
-      <Assistant lines={lines} loading={loading} taskById={taskById} actions={actions} companyId={companyId} />
-
-      <div className="mt-2 flex flex-col gap-2">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-4">
+      <Assistant lines={lines} loading={loading} taskById={taskById} actions={actions} companyId={companyId}>
         {draftCount > 0 ? (
           <Link
             href="/confirm"
@@ -72,21 +70,24 @@ export default function PulsePage() {
           </Link>
         ) : null}
         <PushCard bubble />
-      </div>
+      </Assistant>
 
-      {/* the one action of the screen: stays under the thumb while the briefing scrolls */}
+      {/* the one action of the screen: pinned above the tab bar, always under the thumb;
+          the briefing scrolls underneath and the main's bottom padding lets it clear the block */}
       <div
-        className="sticky mt-auto flex flex-col items-center pt-8"
+        className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center pt-8"
         style={{
           bottom: "calc(56px + env(safe-area-inset-bottom))",
-          paddingBottom: 16,
-          background: "linear-gradient(180deg, transparent, var(--bg) 32%)",
+          paddingBottom: 12,
+          background: "linear-gradient(180deg, transparent, var(--bg) 28px)",
         }}
       >
-        <VoiceButton inline />
-        <Link href="/sent" className="mt-4 min-h-[44px] text-[14px] leading-[44px] text-muted">
-          Отправленные ›
-        </Link>
+        <div className="pointer-events-auto flex flex-col items-center">
+          <VoiceButton inline />
+          <Link href="/sent" className="mt-2 min-h-[44px] px-4 text-[14px] leading-[44px] text-muted">
+            Отправленные ›
+          </Link>
+        </div>
       </div>
     </main>
   );

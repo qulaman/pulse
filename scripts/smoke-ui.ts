@@ -221,7 +221,7 @@ async function main() {
 
   // ---- people: create, then edit -------------------------------------------------
   await page.goto(`${APP_URL}/people`, { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: "Сотрудники" }).waitFor({ timeout: 10_000 });
+  await page.getByRole("heading", { name: "Команда" }).waitFor({ timeout: 10_000 });
   await page.getByText("Марат Оспанов").first().waitFor({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "13-people.png") });
   await page.getByRole("link", { name: /Добавить/ }).click();

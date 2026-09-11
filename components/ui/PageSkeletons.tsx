@@ -11,7 +11,6 @@ import {
   Bone,
   ChatBone,
   CompanyFormBone,
-  PeopleGridBone,
   RatingRowBone,
   RowListBone,
   SectionBone,
@@ -50,29 +49,34 @@ export function PulseInboxBone() {
   );
 }
 
+/** Пульс (D-49): the assistant thinking, its first bubble, the button block where the page pins it. */
 export function PulseSkeleton() {
   return (
-    <main className={MAIN}>
-      <p className="text-[13px] leading-4 text-muted"> </p>
-      <h1 className="mt-1 text-[24px] font-bold leading-[30px]">Пульс</h1>
-      <section className="mt-4 flex items-center gap-4 rounded-[16px] border border-border bg-surface p-4">
-        <Mascot state="thinking" size={56} />
-        <div className="min-h-[68px] min-w-0 flex-1">
-          <p className="text-[19px] font-semibold leading-6">Смотрю, что нового…</p>
-          <p className="mt-1 text-[13px] leading-4 text-muted"> </p>
-        </div>
-      </section>
-      <div className="mt-3 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
-        Отправленные
-        <span className="text-[13px] leading-4 text-muted">все поручения по дням ›</span>
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-4">
+      <div className="mx-auto flex h-[120px] w-[120px] items-center justify-center">
+        <Mascot state="thinking" size={96} />
       </div>
-      <PulseInboxBone />
-      <SkeletonGroup className="mt-7">
-        <Bone h={24} w={90} />
-        <div className="mt-3">
-          <PeopleGridBone />
+      <div className="mt-2 flex flex-col gap-2">
+        <div className="rounded-[16px] rounded-tl-[6px] border border-border bg-surface py-3 pl-4 pr-9 text-[16px] leading-[22px]">
+          Смотрю, что нового…
         </div>
-      </SkeletonGroup>
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center pt-8"
+        style={{
+          bottom: "calc(56px + env(safe-area-inset-bottom))",
+          paddingBottom: 12,
+          background: "linear-gradient(180deg, transparent, var(--bg) 28px)",
+        }}
+      >
+        <SkeletonGroup className="flex flex-col items-center gap-2">
+          <Bone round w={80} h={80} />
+          <span className="text-[16px] font-semibold leading-[22px]">Дать задачу</span>
+          <span className="text-[13px] leading-4 text-muted">удержи — говори · тап — текст</span>
+        </SkeletonGroup>
+        <span className="mt-2 min-h-[44px] text-[14px] leading-[44px] text-muted">Отправленные ›</span>
+      </div>
     </main>
   );
 }

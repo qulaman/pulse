@@ -228,6 +228,23 @@ button, a[href] { -webkit-tap-highlight-color: transparent; }
 .landing .pulse-line { stroke-dasharray: 900; animation: line-draw 1.4s var(--ease-out) 200ms both; }
 .landing .wave { animation: eq-idle 1.6s ease-in-out infinite; }
 
+/* the assistant's caret while a line is being said (components/pulse/Assistant.tsx):
+   a pseudo-element, so its travel along the text is never a layout shift of a node */
+@keyframes caret-blink {
+  0%, 45% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.saying::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--accent);
+  animation: caret-blink 0.9s steps(1) infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

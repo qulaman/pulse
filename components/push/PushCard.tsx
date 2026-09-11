@@ -12,7 +12,7 @@ const DISMISS_KEY = "pulse.push.dismissed";
  * «Включить уведомления» — shown until the browser says granted. Also the place
  * where an opened app reports «увидел» for its recent deliveries.
  */
-export function PushCard({ compact = false }: { compact?: boolean }) {
+export function PushCard({ compact = false, bubble = false }: { compact?: boolean; bubble?: boolean }) {
   const [state, setState] = useState<PushState | null>(null);
   const [dismissed, setDismissed] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -58,6 +58,28 @@ export function PushCard({ compact = false }: { compact?: boolean }) {
     }
     setDismissed(true);
   };
+
+  if (bubble) {
+    return (
+      <div className="card-in relative rounded-[16px] rounded-tl-[6px] border border-border bg-surface px-4 py-3">
+        <p className="text-[16px] leading-[22px]">
+          {state === "denied"
+            ? "Уведомления запрещены в браузере. Разреши их в настройках сайта, иначе задачи придут только при открытии."
+            : "Уведомления на этом телефоне выключены. Включить, чтобы задачи приходили, даже когда Pulse закрыт?"}
+        </p>
+        {state !== "denied" ? (
+          <div className="mt-3 flex gap-2">
+            <Button variant="primary" className="!min-h-[40px] !px-4 !text-[14px]" disabled={busy} onClick={enable}>
+              {busy ? "…" : "Включить"}
+            </Button>
+            <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={dismiss}>
+              Не сейчас
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   if (state === "denied") {
     return (
