@@ -114,7 +114,7 @@ channel delivery_channel, status delivery_status not null default 'queued',
 attempts int not null default 0, last_error text null,
 created_at, sent_at, seen_at, acted_at timestamptz null
 ```
-Триггеры БД **вставляют строку**, не зовут HTTP; отправляет cron-свип. Эскалация: канал N+1 (telegram) стреляет, только если по N нет seen_at за таймаут из settings. `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
+Триггеры БД **вставляют строку**, не зовут HTTP; отправляет cron-свип. `event_kind` (текст, `meta` несёт title/body/url — воркер ничего не сочиняет): директору — `question`, `pending_review`, `declined`; сотруднику — `task_sent`, и с 2026-09-11 (владелец, миграция `20260911210000_outbox_replies.sql`) `reply` (директор написал в треде: текст/голос/фото), `rework`, `done`, `revoked` (из открытых статусов, в т.ч. после переназначения), `deadline_extended` («Срок продлён до …»); всем — `announcement`. Эскалация: канал N+1 (telegram) стреляет, только если по N нет seen_at за таймаут из settings. `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
 
 ### ingest_batches — идемпотентность мутаций
 `id, company_id, user_id, client_request_id uuid not null, result jsonb not null, created_at`, `unique (company_id, client_request_id)`. При дубле confirm возвращается сохранённый result (те же id сущностей). `client_request_id` обязателен на всех мутирующих эндпоинтах.
