@@ -18,3 +18,15 @@ export function isWithinDeliveryWindow(now: Date = new Date()): boolean {
   const hour = aqtobeHour(now);
   return hour >= WINDOW_OPEN_HOUR && hour < WINDOW_CLOSE_HOUR;
 }
+
+/**
+ * Kinds whose moment was already decided upstream (D-38: a batch waits for the morning,
+ * «отправить сейчас» overrides) — the worker never holds them. Everything else — an answer,
+ * a rework, a question at 23:00 — waits for the window (принцип 8: тихие часы доставки).
+ */
+const TIMED_UPSTREAM = new Set(["task_sent", "announcement"]);
+
+export function holdsForQuietHours(eventKind: string, now: Date = new Date()): boolean {
+  if (TIMED_UPSTREAM.has(eventKind)) return false;
+  return !isWithinDeliveryWindow(now);
+}

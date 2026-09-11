@@ -4,6 +4,7 @@ import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/service";
+import { holdsForQuietHours } from "@/lib/voice/quietHours";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
@@ -29,7 +30,7 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
   const service = createServiceSupabase();
   const { data: rows, error } = await service
     .from("notification_deliveries")
-    .select("id, user_id, meta, attempts")
+    .select("id, user_id, meta, attempts, event_kind")
     .eq("status", "queued")
     .eq("channel", "push")
     .lt("attempts", MAX_ATTEMPTS)
@@ -50,7 +51,13 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
     byUser.set(sub.user_id, list);
   }
 
+  const now = new Date();
   for (const row of rows) {
+    // quiet hours: the row stays queued, untouched, until the morning sweep
+    if (holdsForQuietHours(row.event_kind, now)) {
+      result.skipped += 1;
+      continue;
+    }
     const targets = byUser.get(row.user_id) ?? [];
     if (targets.length === 0) {
       // nobody to send to: failed with a readable reason — tier 2 (Telegram) picks it up later
