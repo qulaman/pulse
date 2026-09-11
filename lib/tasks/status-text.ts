@@ -100,13 +100,17 @@ export function pluralRu(count: number, forms: [string, string, string]): string
 
 export type VerdictTone = "ok" | "warn" | "danger";
 
-export type InboxCounts = { overdue: number; questions: number; review: number };
+export type InboxCounts = { overdue: number; questions: number; review: number; declined?: number };
 
 /** Block 1 of Пульс: one line, one colour (docs/FRONTEND.md «Пульс»). */
 export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string } {
   const parts: string[] = [];
   if (counts.overdue > 0) {
     parts.push(`${counts.overdue} ${pluralRu(counts.overdue, ["просрочка", "просрочки", "просрочек"])}`);
+  }
+  if ((counts.declined ?? 0) > 0) {
+    const n = counts.declined ?? 0;
+    parts.push(`${n} ${pluralRu(n, ["отказ", "отказа", "отказов"])}`);
   }
   if (counts.questions > 0) {
     parts.push(`${counts.questions} ${pluralRu(counts.questions, ["вопрос", "вопроса", "вопросов"])}`);

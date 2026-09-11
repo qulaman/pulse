@@ -92,6 +92,12 @@ describe("answer", () => {
     expect(a.lines).toEqual(["В работе 3 задачи. Просрочено 1. На приёмке 1."]);
   });
 
+  it("refusals with reasons", () => {
+    const a = answer({ ...BASE, declined: [{ ...task("d", "Смета", "Ерлан", "sent"), reason: "Занят срочным" }], question: "Кто отказался?" });
+    expect(a.lines).toEqual(["Один отказ:", "Ерлан, «Смета» — Занят срочным"]);
+    expect(answer({ ...BASE, question: "кто не может?" }).lines).toEqual(["Отказов нет."]);
+  });
+
   it("honest when it cannot read the question", () => {
     const a = answer({ ...BASE, question: "Вы думаете всем явиться ли завтра?" });
     expect(a.understood).toBe(false);

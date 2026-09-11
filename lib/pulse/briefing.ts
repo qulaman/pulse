@@ -16,11 +16,15 @@ export type BriefTask = {
   assignee: string | null;
 };
 
+export type DeclinedBriefTask = BriefTask & { reason: string | null };
+
 export type BriefingInput = {
   now: Date;
   /** Director's first name for the greeting. */
   directorName: string;
   overdue: BriefTask[];
+  /** «Не могу» with the reason — the director decides, so it comes right after the overdue. */
+  declined?: DeclinedBriefTask[];
   questions: BriefTask[];
   review: BriefTask[];
   /** Tasks accepted since the previous visit — good news, told last. */
@@ -58,8 +62,8 @@ export function quoteTitle(title: string): string {
   return `«${short}»`;
 }
 
-function groupByPerson(tasks: BriefTask[]): { person: string; tasks: BriefTask[] }[] {
-  const groups = new Map<string, BriefTask[]>();
+function groupByPerson<T extends BriefTask>(tasks: T[]): { person: string; tasks: T[] }[] {
+  const groups = new Map<string, T[]>();
   for (const task of tasks) {
     const key = task.assignee ?? "";
     const list = groups.get(key);
@@ -79,6 +83,21 @@ function overdueLine(person: string, tasks: BriefTask[], now: Date): string {
     return `${who} просрочил ${quoteTitle(task.title)}${when}`;
   }
   return `${who} просрочил ${tasks.length} ${pluralRu(tasks.length, TASKS)}`;
+}
+
+/** «занят срочным» reads better than «Занят срочным» mid-sentence; free text keeps its case beyond the first letter. */
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function declinedLine(person: string, tasks: DeclinedBriefTask[]): string {
+  const who = person || "Кто-то";
+  if (tasks.length === 1) {
+    const task = tasks[0]!;
+    const reason = task.reason ? `: ${lowerFirst(task.reason.trim())}` : "";
+    return `${who} не может ${quoteTitle(task.title)}${reason}`;
+  }
+  return `${who} не может ${tasks.length} ${pluralRu(tasks.length, TASKS)}`;
 }
 
 function questionLine(person: string, tasks: BriefTask[]): string {
@@ -137,6 +156,15 @@ export function buildBriefing(input: BriefingInput): BriefLine[] {
       taskIds: group.tasks.map((t) => t.id),
     });
   }
+  for (const group of groupByPerson(input.declined ?? [])) {
+    facts.push({
+      id: `declined:${group.person}`,
+      kind: "fact",
+      tone: "warn",
+      text: declinedLine(group.person, group.tasks),
+      taskIds: group.tasks.map((t) => t.id),
+    });
+  }
   for (const group of groupByPerson(input.questions)) {
     facts.push({
       id: `question:${group.person}`,
@@ -174,7 +202,12 @@ export function buildBriefing(input: BriefingInput): BriefLine[] {
     });
   }
 
-  const counts = { overdue: input.overdue.length, questions: input.questions.length, review: input.review.length };
+  const counts = {
+    overdue: input.overdue.length,
+    declined: input.declined?.length ?? 0,
+    questions: input.questions.length,
+    review: input.review.length,
+  };
   if (facts.length > 0) {
     const line = verdict(counts);
     lines.push({ id: "verdict", kind: "verdict", tone: line.tone, text: `${line.text}. По порядку:` });

@@ -243,13 +243,18 @@ export function useTaskThread(taskId: string) {
 /* Director: «Требует вас» — three stacks in D-05 order                        */
 /* -------------------------------------------------------------------------- */
 
+/** A task the employee could not take, with the reason they gave («Не могу» + chip or words). */
+export type DeclinedTask = TaskWithPeople & { decline_reason: string | null };
+
 export type DirectorInbox = {
   overdue: TaskWithPeople[];
+  /** «Не могу» — the director decides: insist, cancel, hand to someone else (FRONTEND «declined»). */
+  declined: DeclinedTask[];
   questions: TaskWithPeople[];
   review: TaskWithPeople[];
 };
 
-export const EMPTY_INBOX: DirectorInbox = { overdue: [], questions: [], review: [] };
+export const EMPTY_INBOX: DirectorInbox = { overdue: [], declined: [], questions: [], review: [] };
 
 function isQuestionOpen(meta: Json): boolean {
   if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
@@ -262,7 +267,7 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
   const nowIso = new Date().toISOString();
 
   // Company scoping is RLS's job — a director sees their company and nothing else.
-  const [review, overdue, questionRows] = await Promise.all([
+  const [review, overdue, questionRows, declinedRows, reasonRows] = await Promise.all([
     supabase.from("tasks").select(TASK_SELECT).eq("status", "pending_review"),
     supabase
       .from("tasks")
@@ -274,11 +279,27 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
       .select(`meta, task:tasks!task_messages_task_id_fkey(${TASK_SELECT})`)
       .eq("meta->>is_question", "true")
       .is("meta->>answered_at", null),
+    supabase.from("tasks").select(TASK_SELECT).eq("status", "declined"),
+    // the newest reason per declined task: RLS narrows the rows, the client keeps the latest
+    supabase
+      .from("task_messages")
+      .select("task_id, content, created_at")
+      .eq("meta->>decline_reason", "true")
+      .order("created_at", { ascending: false })
+      .limit(200),
   ]);
 
-  for (const result of [review, overdue, questionRows]) {
+  for (const result of [review, overdue, questionRows, declinedRows, reasonRows]) {
     if (result.error) throw new Error(result.error.message);
   }
+
+  const reasonByTask = new Map<string, string>();
+  for (const row of (reasonRows.data ?? []) as Array<{ task_id: string; content: string | null }>) {
+    if (row.content && !reasonByTask.has(row.task_id)) reasonByTask.set(row.task_id, row.content);
+  }
+  const declined: DeclinedTask[] = sortByUrgency((declinedRows.data ?? []) as unknown as TaskWithPeople[]).map(
+    (task) => ({ ...task, decline_reason: reasonByTask.get(task.id) ?? null }),
+  );
 
   const questionsById = new Map<string, TaskWithPeople>();
   for (const row of (questionRows.data ?? []) as unknown as Array<{
@@ -294,6 +315,7 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
 
   return {
     overdue: sortByUrgency((overdue.data ?? []) as unknown as TaskWithPeople[]),
+    declined,
     questions: sortByUrgency([...questionsById.values()]),
     review: sortByUrgency((review.data ?? []) as unknown as TaskWithPeople[]),
   };
@@ -318,8 +340,9 @@ export function inboxCounts(inbox: DirectorInbox | undefined) {
   const value = inbox ?? EMPTY_INBOX;
   return {
     overdue: value.overdue.length,
+    declined: value.declined.length,
     questions: value.questions.length,
     review: value.review.length,
-    total: value.overdue.length + value.questions.length + value.review.length,
+    total: value.overdue.length + value.declined.length + value.questions.length + value.review.length,
   };
 }

@@ -20,6 +20,8 @@ export type AnswerInput = {
   /** Tasks in work (sent / accepted / rework / in_progress) with their assignee. */
   open: AnswerTask[];
   overdue: BriefTask[];
+  /** «Не могу» with reasons, when the caller has them. */
+  declined?: (BriefTask & { reason: string | null })[];
   questions: BriefTask[];
   review: BriefTask[];
 };
@@ -105,6 +107,19 @@ export function answer(input: AnswerInput): Answer {
     if (input.overdue.length === 0) return { understood: true, lines: ["Просрочек нет. Все сроки пока держатся."] };
     const head = `Просрочено ${input.overdue.length}:`;
     return { understood: true, lines: [head, ...input.overdue.map((t) => taskLine(t, now, { person: true, overdue: true }))] };
+  }
+
+  // 1b. refusals
+  if (/отказ|не может|не могут|не смог|не хочет/.test(q)) {
+    const declined = input.declined ?? [];
+    if (declined.length === 0) return { understood: true, lines: ["Отказов нет."] };
+    return {
+      understood: true,
+      lines: [
+        `${declined.length === 1 ? "Один отказ" : `Отказов ${declined.length}`}:`,
+        ...declined.map((t) => `${t.assignee ? `${t.assignee}, ` : ""}${quoteTitle(t.title)}${t.reason ? ` — ${t.reason}` : ""}`),
+      ],
+    };
   }
 
   // 2. review stack

@@ -55,6 +55,7 @@ export default function PulsePage() {
         .map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
       open: open.data ?? [],
       overdue: (inbox.data?.overdue ?? []).map(toBriefTask),
+      declined: (inbox.data?.declined ?? []).map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
       questions: (inbox.data?.questions ?? []).map(toBriefTask),
       review: (inbox.data?.review ?? []).map(toBriefTask),
     });
@@ -78,6 +79,7 @@ export default function PulsePage() {
       now,
       directorName: firstNameOf(me.data?.fullName),
       overdue: (data?.overdue ?? []).map(toBriefTask),
+      declined: (data?.declined ?? []).map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
       questions: (data?.questions ?? []).map(toBriefTask),
       review: (data?.review ?? []).map(toBriefTask),
       accepted: accepted.data ?? [],
@@ -88,7 +90,7 @@ export default function PulsePage() {
 
   const taskById = useMemo(() => {
     const map = new Map<string, TaskWithPeople>();
-    for (const list of [inbox.data?.overdue, inbox.data?.questions, inbox.data?.review]) {
+    for (const list of [inbox.data?.overdue, inbox.data?.declined, inbox.data?.questions, inbox.data?.review]) {
       for (const task of list ?? []) map.set(task.id, task);
     }
     return map;

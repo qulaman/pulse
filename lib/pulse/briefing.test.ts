@@ -62,6 +62,19 @@ describe("buildBriefing", () => {
     expect(lines[4]!.taskIds).toEqual(["r1", "r2"]);
   });
 
+  it("a refusal comes right after the overdue, with the reason in running text", () => {
+    const lines = buildBriefing({
+      ...EMPTY,
+      overdue: [task("o1", "Отчёт", "Тимур", "2026-09-10T13:00:00Z")],
+      declined: [{ ...task("d1", "Смета по складу", "Ерлан"), reason: "Занят срочным" }],
+      review: [task("r1", "КП", "Марат")],
+    });
+    expect(lines[1]!.text).toBe("1 просрочка, 1 отказ, 1 на приёмке. По порядку:");
+    expect(lines.map((l) => l.id)).toEqual(["greeting", "verdict", "overdue:Тимур", "declined:Ерлан", "review:Марат"]);
+    expect(lines[3]!.text).toBe("Ерлан не может «Смета по складу»: занят срочным");
+    expect(lines[3]!.tone).toBe("warn");
+  });
+
   it("tells accepted tasks as news after the facts, with the time", () => {
     const lines = buildBriefing({
       ...EMPTY,
