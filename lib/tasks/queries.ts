@@ -246,11 +246,14 @@ export function useTaskThread(taskId: string) {
 /** A task the employee could not take, with the reason they gave («Не могу» + chip or words). */
 export type DeclinedTask = TaskWithPeople & { decline_reason: string | null };
 
+/** A task with an open question from the employee — the newest unanswered words. */
+export type QuestionTask = TaskWithPeople & { question: string | null };
+
 export type DirectorInbox = {
   overdue: TaskWithPeople[];
   /** «Не могу» — the director decides: insist, cancel, hand to someone else (FRONTEND «declined»). */
   declined: DeclinedTask[];
-  questions: TaskWithPeople[];
+  questions: QuestionTask[];
   review: TaskWithPeople[];
 };
 
@@ -276,9 +279,10 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
       .lt("deadline", nowIso),
     supabase
       .from("task_messages")
-      .select(`meta, task:tasks!task_messages_task_id_fkey(${TASK_SELECT})`)
+      .select(`meta, content, created_at, task:tasks!task_messages_task_id_fkey(${TASK_SELECT})`)
       .eq("meta->>is_question", "true")
-      .is("meta->>answered_at", null),
+      .is("meta->>answered_at", null)
+      .order("created_at", { ascending: false }),
     supabase.from("tasks").select(TASK_SELECT).eq("status", "declined"),
     // the newest reason per declined task: RLS narrows the rows, the client keeps the latest
     supabase
@@ -301,16 +305,18 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
     (task) => ({ ...task, decline_reason: reasonByTask.get(task.id) ?? null }),
   );
 
-  const questionsById = new Map<string, TaskWithPeople>();
+  const questionsById = new Map<string, QuestionTask>();
   for (const row of (questionRows.data ?? []) as unknown as Array<{
     meta: Json;
+    content: string | null;
     task: TaskWithPeople | null;
   }>) {
     // The server filter already narrowed this; repeating the check client-side
-    // keeps a malformed meta from widening the stack.
+    // keeps a malformed meta from widening the stack. Newest first: the first row wins.
     if (!row.task || !isQuestionOpen(row.meta)) continue;
     if (row.task.status === "done" || row.task.status === "revoked") continue;
-    questionsById.set(row.task.id, row.task);
+    if (questionsById.has(row.task.id)) continue;
+    questionsById.set(row.task.id, { ...row.task, question: row.content });
   }
 
   return {

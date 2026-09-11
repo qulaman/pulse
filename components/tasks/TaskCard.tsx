@@ -25,6 +25,8 @@ export type TaskCardProps = {
   companyId: string;
   /** Reason of a decline — it lives in the thread, so only the thread has it. */
   declineReason?: string | null;
+  /** The employee's open question — the director answers it right on the card. */
+  question?: string | null;
   /** Omitted inside the thread itself: the card must not link to its own page. */
   href?: string;
 };
@@ -103,7 +105,7 @@ function Icon({ name, size = 16 }: { name: "clock" | "check" | "question" | "x" 
 
 /* -------------------------------------------------------------------------- */
 
-export function TaskCard({ task, variant, actions, companyId, declineReason, href }: TaskCardProps) {
+export function TaskCard({ task, variant, actions, companyId, declineReason, question, href }: TaskCardProps) {
   const [sheet, setSheet] = useState<OpenSheet>("none");
   const close = () => setSheet("none");
 
@@ -216,6 +218,16 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, hre
 
       <StatusBanner task={task} declineReason={declineReason} />
 
+      {variant === "director" && question ? (
+        <QuestionBanner
+          question={question}
+          onAnswer={(text) => {
+            actions.sendMessage({ taskId: task.id, companyId, text });
+            toast("Ответил");
+          }}
+        />
+      ) : null}
+
       <div className="relative mt-4 flex flex-wrap gap-2">
         {variant === "employee" ? (
           <EmployeeActions task={task} onOpen={setSheet} actions={actions} />
@@ -291,6 +303,31 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, hre
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** Quick answers of the swipe table (FRONTEND «Вопросы»), as chips; anything longer — in the thread. */
+const QUICK_ANSWERS = ["Да", "Нет", "Позже", "Действуй сам"] as const;
+
+function QuestionBanner({ question, onAnswer }: { question: string; onAnswer: (text: string) => void }) {
+  return (
+    <div className="mt-3">
+      <Banner tone="warn" icon={<Icon name="question" size={15} />}>
+        {question}
+      </Banner>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {QUICK_ANSWERS.map((text) => (
+          <button
+            key={text}
+            type="button"
+            onClick={() => onAnswer(text)}
+            className="min-h-[36px] rounded-full border border-border bg-surface-2 px-3 text-[14px] leading-[18px] transition-transform duration-[120ms] active:scale-[0.97]"
+          >
+            {text}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function Banner({ tone, icon, children }: { tone: Tone; icon: ReactNode; children: ReactNode }) {
   return (

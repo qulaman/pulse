@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { latestDeclineReason, TaskChat, TaskDates, TaskTimeline } from "@/components/tasks/TaskThread";
+import { latestDeclineReason, latestOpenQuestion, TaskChat, TaskDates, TaskTimeline } from "@/components/tasks/TaskThread";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
 import { homeForRole } from "@/lib/routes";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -44,6 +44,7 @@ export default function TaskThreadPage() {
               actions={actions}
               companyId={me.data?.companyId ?? ""}
               declineReason={latestDeclineReason(messages.data)}
+              question={latestOpenQuestion(messages.data)}
             />
           </div>
 

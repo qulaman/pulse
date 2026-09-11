@@ -87,7 +87,7 @@ export default function PulsePage() {
       directorName: firstNameOf(me.data?.fullName),
       overdue: (data?.overdue ?? []).map(toBriefTask),
       declined: (data?.declined ?? []).map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
-      questions: (data?.questions ?? []).map(toBriefTask),
+      questions: (data?.questions ?? []).map((t) => ({ ...toBriefTask(t), question: t.question })),
       review: (data?.review ?? []).map(toBriefTask),
       accepted: accepted.data ?? [],
       open: open.data ?? [],

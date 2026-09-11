@@ -62,6 +62,14 @@ describe("buildBriefing", () => {
     expect(lines[4]!.taskIds).toEqual(["r1", "r2"]);
   });
 
+  it("a question brings its own words", () => {
+    const lines = buildBriefing({
+      ...EMPTY,
+      questions: [{ ...task("q1", "Сроки КП", "Динара"), question: "Когда нужно сдать?" }],
+    });
+    expect(lines[2]!.text).toBe("Динара спрашивает по «Сроки КП»: «Когда нужно сдать?»");
+  });
+
   it("a refusal comes right after the overdue, with the reason in running text", () => {
     const lines = buildBriefing({
       ...EMPTY,

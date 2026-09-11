@@ -91,6 +91,16 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
     return () => clearTimeout(timer);
   }, [lastId, lastIsChat, activeId, speaking]);
 
+  // an expanded fact scrolls to the top of the screen (under the sticky header),
+  // so its cards are read at once instead of hiding under the pinned button
+  useEffect(() => {
+    if (!open) return;
+    const timer = setTimeout(() => {
+      document.querySelector<HTMLElement>(`[data-line="${CSS.escape(open)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [open]);
+
   const replay = () => {
     setOpen(null);
     setReplayKey((key) => key + 1);
@@ -136,7 +146,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
           }
 
           return (
-            <div key={line.id} className="card-in">
+            <div key={line.id} className="card-in scroll-mt-[76px]" data-line={line.id}>
               <Bubble
                 kind={line.kind}
                 text={line.text}
@@ -152,9 +162,20 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
                 <div className="mt-2 flex flex-col gap-2 pl-4">
                   {(line.taskIds ?? []).map((id) => {
                     const task = taskById.get(id);
-                    return task ? (
-                      <TaskCard key={id} task={task} variant="director" actions={actions} companyId={companyId} href={`/tasks/${id}`} />
-                    ) : null;
+                    if (!task) return null;
+                    const extra = task as TaskWithPeople & { question?: string | null; decline_reason?: string | null };
+                    return (
+                      <TaskCard
+                        key={id}
+                        task={task}
+                        variant="director"
+                        actions={actions}
+                        companyId={companyId}
+                        href={`/tasks/${id}`}
+                        question={extra.question ?? null}
+                        declineReason={extra.decline_reason ?? null}
+                      />
+                    );
                   })}
                 </div>
               ) : null}

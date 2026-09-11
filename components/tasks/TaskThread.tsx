@@ -42,6 +42,16 @@ export function latestDeclineReason(messages: TaskMessage[] | undefined): string
   return null;
 }
 
+/** The newest question still waiting for the director — the card offers quick answers. */
+export function latestOpenQuestion(messages: TaskMessage[] | undefined): string | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index];
+    const flags = messageFlags(message);
+    if (flags.isQuestion && !flags.answered && message.content) return message.content;
+  }
+  return null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Сроки — the dates that matter, in one glance                                */
 /* -------------------------------------------------------------------------- */

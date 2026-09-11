@@ -17,6 +17,7 @@ export type BriefTask = {
 };
 
 export type DeclinedBriefTask = BriefTask & { reason: string | null };
+export type QuestionBriefTask = BriefTask & { question?: string | null };
 
 export type BriefingInput = {
   now: Date;
@@ -25,7 +26,7 @@ export type BriefingInput = {
   overdue: BriefTask[];
   /** «Не могу» with the reason — the director decides, so it comes right after the overdue. */
   declined?: DeclinedBriefTask[];
-  questions: BriefTask[];
+  questions: QuestionBriefTask[];
   review: BriefTask[];
   /** Tasks accepted since the previous visit — good news, told last. */
   accepted: { task: BriefTask; at: string }[];
@@ -100,9 +101,16 @@ function declinedLine(person: string, tasks: DeclinedBriefTask[]): string {
   return `${who} не может ${tasks.length} ${pluralRu(tasks.length, TASKS)}`;
 }
 
-function questionLine(person: string, tasks: BriefTask[]): string {
+const QUESTION_MAX = 80;
+
+function questionLine(person: string, tasks: QuestionBriefTask[]): string {
   const who = person || "Кто-то";
-  if (tasks.length === 1) return `${who} спрашивает по ${quoteTitle(tasks[0]!.title)}`;
+  if (tasks.length === 1) {
+    const task = tasks[0]!;
+    const words = task.question?.trim();
+    const quoted = words ? `: «${words.length > QUESTION_MAX ? `${words.slice(0, QUESTION_MAX - 1).trimEnd()}…` : words}»` : "";
+    return `${who} спрашивает по ${quoteTitle(task.title)}${quoted}`;
+  }
   return `${who} задал ${tasks.length} ${pluralRu(tasks.length, ["вопрос", "вопроса", "вопросов"])}`;
 }
 

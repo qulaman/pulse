@@ -72,7 +72,7 @@ function patchCached(old: unknown, taskId: string, patch: TaskPatch): unknown {
       return {
         overdue: inbox.overdue.map((task) => patchOne(task, taskId, patch)),
         declined: (inbox.declined ?? []).map((task) => ({ ...patchOne(task, taskId, patch), decline_reason: task.decline_reason })),
-        questions: inbox.questions.map((task) => patchOne(task, taskId, patch)),
+        questions: inbox.questions.map((task) => ({ ...patchOne(task, taskId, patch), question: task.question })),
         review: inbox.review.map((task) => patchOne(task, taskId, patch)),
       } satisfies DirectorInbox;
     }
