@@ -61,20 +61,6 @@ function elapsed(startedAt: number | null): string {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
 
-function Skeleton() {
-  return (
-    <div className="mt-6 w-full max-w-lg space-y-3 px-4">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="h-[72px] card"
-          style={{ opacity: 1 - i * 0.25 }}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) {
   const stage = useIngestStore((state) => state.stage);
   const error = useIngestStore((state) => state.error);
@@ -151,7 +137,6 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
               </span>
             ) : null}
           </p>
-          {stage !== "recording" ? <Skeleton /> : null}
         </>
       ) : null}
 
