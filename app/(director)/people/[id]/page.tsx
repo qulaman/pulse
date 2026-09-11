@@ -133,22 +133,27 @@ export default function PersonPage() {
           <Stat value={points.isLoading ? null : balanceOf(points.data)} label="очков" tone="gold" />
         </div>
 
-        <div className="mt-4 flex gap-2">
+        {/* the main action on its own line — three buttons in a row wrap on a 375px phone */}
+        <div className="mt-4 flex flex-col gap-2">
           <Button block onClick={() => compose(`${dative}, `)}>
             Дать задачу
           </Button>
-          <Button
-            variant="secondary"
-            className="shrink-0"
-            disabled={!pointsEnabled}
-            title={pointsEnabled ? undefined : "Очки выключены в Настройках"}
-            onClick={() => setAwardTarget({ user_id: p.id, display_name: p.full_name })}
-          >
-            Поощрить
-          </Button>
-          <Link href={`/people/${p.id}/edit`} className="shrink-0">
-            <Button variant="secondary">Изменить</Button>
-          </Link>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              block
+              variant="secondary"
+              disabled={!pointsEnabled}
+              title={pointsEnabled ? undefined : "Очки выключены в Настройках"}
+              onClick={() => setAwardTarget({ user_id: p.id, display_name: p.full_name })}
+            >
+              Поощрить
+            </Button>
+            <Link href={`/people/${p.id}/edit`} className="block">
+              <Button block variant="secondary">
+                Изменить
+              </Button>
+            </Link>
+          </div>
         </div>
         {!pointsEnabled ? (
           <p className="mt-2 text-[12px] leading-4 text-muted">Очки выключены — включаются в Настройках</p>

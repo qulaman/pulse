@@ -6,7 +6,7 @@ import { Mascot } from "@/components/brand/Mascot";
 import { TaskCapsule } from "@/components/tasks/TaskCapsule";
 import { SentListBone } from "@/components/ui/PageSkeletons";
 import { Chip } from "@/components/ui/Chip";
-import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
+import { useDirectorInbox, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 
 type Filter = "active" | "review" | "closed" | "all";
@@ -36,6 +36,9 @@ function matches(task: TaskWithPeople, filter: Filter): boolean {
 export default function SentPage() {
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
+  // open questions mark their capsules — the same stack Пульс reads, already cached
+  const inbox = useDirectorInbox();
+  const questionIds = useMemo(() => new Set((inbox.data?.questions ?? []).map((t) => t.id)), [inbox.data]);
   const [filter, setFilter] = useState<Filter>("active");
   const [query, setQuery] = useState("");
   const now = useMemo(() => new Date(), []);
@@ -109,7 +112,7 @@ export default function SentPage() {
         <div className="mt-5 flex flex-col gap-2">
           {rows.map((task) => (
             <div key={task.id} className="card-in" data-testid="sent-task" data-status={task.status}>
-              <TaskCapsule task={task} now={now} />
+              <TaskCapsule task={task} now={now} question={questionIds.has(task.id)} />
               <p className="sr-only">{STATUS_LABEL[task.status]}</p>
             </div>
           ))}

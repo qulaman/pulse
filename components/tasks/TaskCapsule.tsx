@@ -53,10 +53,10 @@ function firstName(full: string | undefined | null): string {
  * three facts in one line under the title, a status dot on the left, the short
  * status on the right. Tap opens the thread.
  */
-export function TaskCapsule({ task, now = new Date() }: { task: TaskWithPeople; now?: Date }) {
+export function TaskCapsule({ task, now = new Date(), question = false }: { task: TaskWithPeople; now?: Date; question?: boolean }) {
   const overdue = isOverdue(task, now);
   const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
-  const dot = overdue ? "var(--danger)" : DOT[task.status];
+  const dot = overdue ? "var(--danger)" : question ? "var(--warn)" : DOT[task.status];
   const who = firstName(task.assignee?.full_name) || "без исполнителя";
   const due = task.deadline ? humanAqtobe(new Date(task.deadline), now) : "без срока";
   const given = humanAqtobe(new Date(task.created_at), now);
@@ -96,7 +96,12 @@ export function TaskCapsule({ task, now = new Date() }: { task: TaskWithPeople; 
           </span>
         </span>
       </span>
-      <span className="shrink-0 text-[13px] leading-4 text-muted">{overdue ? "просрочена" : SHORT_STATUS[task.status]}</span>
+      <span
+        className="shrink-0 text-[13px] leading-4"
+        style={{ color: overdue ? "var(--danger)" : question ? "var(--warn)" : "var(--text-muted)" }}
+      >
+        {overdue ? "просрочена" : question ? "вопрос" : SHORT_STATUS[task.status]}
+      </span>
     </Link>
   );
 }
