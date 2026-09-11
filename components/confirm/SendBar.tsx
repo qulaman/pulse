@@ -11,13 +11,15 @@ type Props = {
   sending: boolean;
   onSend: (forceNow: boolean) => void;
   onReset: () => void;
+  /** Every task is blocked on «кому?»: the main button opens the first one. */
+  onFixFirst?: () => void;
 };
 
 /**
  * "Отправить N из M" (D-36) plus the quiet-hours promise (D-38). The server decides
  * for real; this bar only tells the director what is about to happen.
  */
-export function SendBar({ sendable, total, sending, onSend, onReset }: Props) {
+export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst }: Props) {
   // Read after hydration: the server renders "within the window" so both passes match.
   const quietHours = useSyncExternalStore(
     () => () => {},
@@ -31,13 +33,24 @@ export function SendBar({ sendable, total, sending, onSend, onReset }: Props) {
       style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}
     >
       <div className="mx-auto max-w-lg">
-        <Button block disabled={sendable === 0 || sending} onClick={() => onSend(false)}>
-          {sending ? "Отправляю…" : `Отправить ${sendable} из ${total}`}
-        </Button>
+        {/* the main button always does something: send, point at the first «кому?», or close */}
+        {sendable > 0 || sending ? (
+          <Button block disabled={sending} onClick={() => onSend(false)}>
+            {sending ? "Отправляю…" : `Отправить ${sendable} из ${total}`}
+          </Button>
+        ) : total > 0 && onFixFirst ? (
+          <Button block onClick={onFixFirst}>
+            Указать, кому
+          </Button>
+        ) : (
+          <Button block variant="secondary" onClick={onReset}>
+            Закрыть
+          </Button>
+        )}
 
-        {sendable === 0 && !sending ? (
+        {sendable === 0 && !sending && total > 0 ? (
           <p className="mt-2 text-center text-[13px] leading-4 text-muted">
-            Отправлять нечего ·{" "}
+            У {total === 1 ? "задачи" : "задач"} нет исполнителя ·{" "}
             <button type="button" className="underline" style={{ color: "var(--accent)" }} onClick={onReset}>
               сбросить и вернуться
             </button>

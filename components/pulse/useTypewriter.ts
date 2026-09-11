@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-export type TypedLine = { id: string; text: string };
+export type TypedLine = { id: string; text: string; instant?: boolean };
 
 const TICK_MS = 28;
 const CHARS_PER_TICK = 1;
@@ -56,11 +56,13 @@ export function useTypewriter(lines: TypedLine[], replayKey = 0) {
       for (const line of linesRef.current) {
         const have = progress[line.id] ?? 0;
         if (have >= line.text.length) continue;
-        const to = Math.min(line.text.length, have + CHARS_PER_TICK);
+        // the director's own line is not «said» — it is already there
+        const to = line.instant ? line.text.length : Math.min(line.text.length, have + CHARS_PER_TICK);
         progressRef.current = { ...progress, [line.id]: to };
         const last = line.text[to - 1] ?? "";
         const beat = PAUSE_AFTER[last] ?? 0;
-        if (to === line.text.length) pauseUntil = Date.now() + LINE_PAUSE_MS;
+        if (line.instant) pauseUntil = Date.now() + 200;
+        else if (to === line.text.length) pauseUntil = Date.now() + LINE_PAUSE_MS;
         else if (beat > 0) pauseUntil = Date.now() + beat;
         setState({ key: replayKey, shown: progressRef.current });
         return;

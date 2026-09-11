@@ -11,6 +11,7 @@ import { SendBar } from "@/components/confirm/SendBar";
 import { entitiesSummary, joinRu } from "@/components/confirm/format";
 import { useRoster } from "@/components/confirm/useRoster";
 import { Button } from "@/components/ui/Button";
+import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -26,6 +27,17 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const removeEntity = useIngestStore((state) => state.removeEntity);
   const send = useIngestStore((state) => state.send);
   const reset = useIngestStore((state) => state.reset);
+  const transcript = useIngestStore((state) => state.transcript);
+  const reparse = useIngestStore((state) => state.reparse);
+  const startManual = useIngestStore((state) => state.startManual);
+  const ask = useIngestStore((state) => state.ask);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const close = () => {
+    reset();
+    router.replace("/pulse");
+  };
 
   const router = useRouter();
   const roster = useRoster();
@@ -72,6 +84,63 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const sendableCount = entities.filter((entity) => isSendable(entity, pointsEnabled)).length;
   const compact = entities.length >= COMPACT_FROM;
 
+  // Nothing parsed out of a real phrase: the words are shown and there is always a way out —
+  // fix the text and parse again, make the words a task by hand, or close.
+  if (entities.length === 0 && transcript.trim() && stage !== "parsing") {
+    return (
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
+        <div className="flex items-center gap-3">
+          <Mascot state="thinking" size={44} />
+          <h1 className="text-[24px] font-bold leading-[30px]">Не разобрал</h1>
+        </div>
+        <p className="mt-4 text-[13px] leading-4 text-muted">Услышал так:</p>
+        <p className="mt-1 rounded-[12px] bg-surface-2 px-3 py-2 text-[16px] leading-[22px]">«{transcript}»</p>
+        <p className="mt-4 text-[16px] leading-[22px] text-muted">
+          Не нашёл здесь ни задач, ни объявлений. Можно поправить слова и разобрать заново, или сделать из них задачу.
+        </p>
+        <div className="mt-6 flex flex-col gap-2">
+          <Button
+            block
+            onClick={() => {
+              setDraft(transcript);
+              setEditing(true);
+            }}
+          >
+            Исправить текст
+          </Button>
+          <Button block variant="secondary" onClick={startManual}>
+            Сделать задачей
+          </Button>
+          <Button block variant="ghost" onClick={close}>
+            Закрыть
+          </Button>
+        </div>
+
+        <Sheet open={editing} onClose={() => setEditing(false)} title="Исправить текст">
+          <textarea
+            className="w-full rounded-[12px] border border-border bg-surface-2 px-3 py-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent"
+            rows={4}
+            data-autofocus
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <div className="mt-3">
+            <Button
+              block
+              disabled={!draft.trim()}
+              onClick={() => {
+                setEditing(false);
+                void reparse(draft);
+              }}
+            >
+              Разобрать заново
+            </Button>
+          </div>
+        </Sheet>
+      </main>
+    );
+  }
+
   if (entities.length === 0) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
@@ -93,6 +162,11 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
     }
 
     const sent = entities.filter((entity) => isSendable(entity, pointsEnabled));
+    // questions in a mixed phrase are answered on Пульс once the batch is away
+    const question = entities
+      .map((entity) => (entity.kind === "query" ? entity.question : ""))
+      .filter(Boolean)
+      .join(" ");
     const names = [
       ...new Set(
         sent
@@ -110,8 +184,11 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
     if (hasAnnouncement) parts.push("объявление в Эфир");
     toast(parts.length > 0 ? `Отправил ${joinRu(parts)}` : "Отправил");
     reset();
+    if (question) ask(question);
     router.replace("/pulse");
   };
+
+  const firstBlocked = entities.findIndex((entity) => entity.blocked === "assignee_unmatched");
 
   const toggle = (index: number) =>
     setExpanded((prev) => {
@@ -129,7 +206,15 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5">
         <div className="flex items-center gap-3">
           <Mascot state={sendableCount === countable.length && countable.length > 0 ? "happy" : "thinking"} size={44} />
-          <h1 className="text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
+          <h1 className="min-w-0 flex-1 text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
+          <button
+            type="button"
+            onClick={close}
+            aria-label="Закрыть"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-[20px] leading-none text-muted transition-transform duration-[120ms] active:scale-[0.96]"
+          >
+            ×
+          </button>
         </div>
 
         <div className="mt-4 space-y-3">
@@ -159,10 +244,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
         total={countable.length}
         sending={stage === "sending"}
         onSend={(forceNow) => void handleSend(forceNow)}
-        onReset={() => {
-          reset();
-          router.replace("/pulse");
-        }}
+        onReset={close}
+        onFixFirst={firstBlocked >= 0 ? () => setAssigneeIndex(firstBlocked) : undefined}
       />
 
       <AssigneePicker

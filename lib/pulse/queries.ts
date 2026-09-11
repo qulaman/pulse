@@ -6,6 +6,7 @@ import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
+import type { AnswerTask } from "./answers";
 import type { BriefTask } from "./briefing";
 
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
@@ -82,18 +83,19 @@ export function useAcceptedSince(since: string) {
 
 const OPEN: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
 
-/** Everything still in work — for the quiet line and the nearest deadline. */
+/** Everything still in work — for the quiet line, the nearest deadline and the answers. */
 export function useOpenTasks() {
-  return useRealtimeQuery<BriefTask[], TaskRow>({
+  return useRealtimeQuery<AnswerTask[], TaskRow>({
     queryKey: ["pulse", "open"],
     queryFn: async () => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("tasks")
-        .select("id, title, deadline, assignee:profiles!tasks_assignee_id_fkey(full_name)")
+        .select("id, title, deadline, status, assignee:profiles!tasks_assignee_id_fkey(full_name)")
         .in("status", [...OPEN]);
       if (error) throw new Error(error.message);
-      return ((data ?? []) as unknown as Pick<TaskWithPeople, "id" | "title" | "deadline" | "assignee">[]).map(toBriefTask);
+      type Row = Pick<TaskWithPeople, "id" | "title" | "deadline" | "status" | "assignee">;
+      return ((data ?? []) as unknown as Row[]).map((row) => ({ ...toBriefTask(row), status: row.status }));
     },
     channel: { table: "tasks" },
   });

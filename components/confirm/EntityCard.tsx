@@ -262,7 +262,7 @@ export function EntityCard({
 
               {entity.kind === "query" ? (
                 <Chip tone="muted" interactive={false}>
-                  вопрос → ассистенту, не в задачи
+                  вопрос — отвечу на Пульсе после отправки
                 </Chip>
               ) : null}
 

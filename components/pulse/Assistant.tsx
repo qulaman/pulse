@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { TaskCard } from "@/components/tasks/TaskCard";
@@ -69,11 +69,27 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
 
   const [replayKey, setReplayKey] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
-  const { shown, activeId, speaking } = useTypewriter(spoken, replayKey);
+  const { shown, activeId, speaking } = useTypewriter(
+    spoken.map((line) => ({ id: line.id, text: line.text, instant: line.instant })),
+    replayKey,
+  );
 
   const worst = spoken.find((line) => line.kind === "verdict")?.tone;
   const handledAll = spoken.every((line) => line.kind !== "fact" || isHandled(line, taskById));
   const mascot: MascotState = loading ? "thinking" : speaking ? "speaking" : worst && !handledAll ? "calm" : "happy";
+
+  // a question and its answer land at the bottom: bring them into view, above the pinned button
+  const last = spoken[spoken.length - 1];
+  const lastId = last?.id;
+  const lastIsChat = last?.kind === "director" || last?.kind === "answer";
+  // each new line reserves its full height the moment it starts, so one scroll per line is enough
+  useEffect(() => {
+    if (!lastIsChat) return;
+    const timer = setTimeout(() => {
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [lastId, lastIsChat, activeId, speaking]);
 
   const replay = () => {
     setOpen(null);
@@ -93,7 +109,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
 
       <div className="mt-3 flex flex-col gap-3" aria-live="polite">
         {loading && spoken.length === 0 ? (
-          <Bubble text="Смотрю, что нового…" shownChars={17} active tone={undefined} />
+          <Bubble kind="greeting" text="Смотрю, что нового…" shownChars={17} active tone={undefined} />
         ) : null}
 
         {spoken.map((line) => {
@@ -109,9 +125,20 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
                 : null;
           const expanded = open === line.id;
 
+          if (line.kind === "director") {
+            return (
+              <div key={line.id} className="card-in flex justify-end pt-2">
+                <p className="max-w-[85%] rounded-[16px] rounded-tr-[6px] bg-surface-2 px-4 py-2 text-[16px] leading-[22px]">
+                  {line.text}
+                </p>
+              </div>
+            );
+          }
+
           return (
             <div key={line.id} className="card-in">
               <Bubble
+                kind={line.kind}
                 text={line.text}
                 shownChars={chars}
                 active={activeId === line.id}
@@ -152,6 +179,7 @@ function isHandled(line: BriefLine, taskById: Map<string, TaskWithPeople>): bool
  * its final height from the first frame; the letters said so far are painted on top.
  */
 function Bubble({
+  kind,
   text,
   shownChars,
   active,
@@ -161,6 +189,7 @@ function Bubble({
   onTap,
   expanded,
 }: {
+  kind: BriefLine["kind"];
   text: string;
   shownChars: number;
   active: boolean;
@@ -186,7 +215,7 @@ function Bubble({
     </span>
   );
   // no frames: the assistant just talks — a tone dot on the left, a quiet mark on the right
-  const size = tone ? "text-[17px] leading-6" : "text-[19px] font-semibold leading-6";
+  const size = kind === "greeting" ? "text-[19px] font-semibold leading-6" : "text-[17px] leading-6";
   const className = [
     "relative block w-full py-1 pl-4 pr-8 text-left",
     size,

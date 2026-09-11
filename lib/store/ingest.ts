@@ -34,6 +34,8 @@ export type IngestStage =
   | "transcribing"
   | "parsing"
   | "confirm"
+  /** The phrase was a question, not an order: the assistant answers it on Пульс. */
+  | "question"
   | "sending"
   | "done"
   | "error";
@@ -97,6 +99,8 @@ type IngestState = {
   audioPath: string | null;
   inboxId: string | null;
   transcript: string;
+  /** The director's question when the phrase held nothing to send (stage «question»). */
+  question: string | null;
   source: IngestSource;
   /** Editable copy shown on /confirm. */
   entities: PostprocessedEntity[];
@@ -114,6 +118,10 @@ type IngestActions = {
   runTranscribe: () => Promise<void>;
   runParse: () => Promise<void>;
   startManual: () => void;
+  /** The director corrected the transcript by hand: parse it again, same request. */
+  reparse: (text: string) => Promise<void>;
+  /** Hand a question to the assistant on Пульс (a query-only phrase, or the questions of a sent batch). */
+  ask: (question: string) => void;
   retry: () => Promise<void>;
   editEntity: (index: number, patch: EntityPatch) => void;
   removeEntity: (index: number) => void;
@@ -131,6 +139,7 @@ const initialState: IngestState = {
   audioPath: null,
   inboxId: null,
   transcript: "",
+  question: null,
   source: "voice",
   entities: [],
   parsedEntities: [],
@@ -360,14 +369,46 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         if (res.inbox_id) set({ inboxId: res.inbox_id });
         if (res.suspicious !== undefined) set({ suspicious: res.suspicious });
 
+        // nothing found: /confirm shows the raw words with a way out (fix the text, make a task, close)
         if (entities.length === 0) {
-          set({ stage: "error", error: { code: "parse_empty" }, retryFrom: "parse" });
+          set({ entities: [], parsedEntities: [], stage: "confirm", error: null, retryFrom: "parse" });
+          return;
+        }
+        // only questions: nothing to confirm — the assistant answers on Пульс
+        if (entities.every((entity) => entity.kind === "query")) {
+          const question = entities.map((entity) => (entity.kind === "query" ? entity.question : "")).join(" ").trim();
+          set({ entities: [], parsedEntities: entities, question: question || transcript, stage: "question", error: null, retryFrom: null });
           return;
         }
         set({ entities, parsedEntities: entities, stage: "confirm", error: null, retryFrom: null });
       } catch (cause) {
         fail(cause, "parse");
+        // «не берусь разобрать» is not a failure to retry — it is the same «nothing found» screen
+        if (get().error?.code === "parse_refused") {
+          set({ entities: [], parsedEntities: [], stage: "confirm", error: null, retryFrom: "parse" });
+        }
       }
+    },
+
+    async reparse(text) {
+      const transcript = text.trim();
+      if (!transcript) return;
+      // corrected words are a new request: the old key would replay the empty result (principle 7)
+      set({ transcript, entities: [], parsedEntities: [], question: null, clientRequestId: crypto.randomUUID() });
+      await get().runParse();
+    },
+
+    ask(question) {
+      const text = question.trim();
+      if (!text) return;
+      set({
+        ...initialState,
+        clientRequestId: get().clientRequestId ?? crypto.randomUUID(),
+        source: get().source,
+        transcript: text,
+        question: text,
+        stage: "question",
+      });
     },
 
     /** Emergency path: the model gave nothing, so the transcript becomes one task by hand. */

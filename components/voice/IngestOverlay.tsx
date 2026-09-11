@@ -102,11 +102,13 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
   const clientRequestId = useIngestStore((state) => state.clientRequestId);
   const navigatedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!navigate || stage !== "confirm") return;
-    if (navigatedFor.current === clientRequestId) return;
-    navigatedFor.current = clientRequestId;
+    if (!navigate || (stage !== "confirm" && stage !== "question")) return;
+    const target = stage === "question" ? "/pulse" : "/confirm";
+    const key = `${clientRequestId}:${target}`;
+    if (navigatedFor.current === key) return;
+    navigatedFor.current = key;
     // The sandbox renders /confirm in place and must not be sent to the real screen.
-    if (pathname !== "/confirm") router.push("/confirm");
+    if (pathname !== target) router.push(target);
   }, [navigate, stage, clientRequestId, pathname, router]);
 
   // Too short to be speech: a toast, not a screen (docs/AI.md §11).

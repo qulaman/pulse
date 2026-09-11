@@ -33,9 +33,11 @@ export type BriefTone = "danger" | "warn" | "ok" | "muted";
 
 export type BriefLine = {
   id: string;
-  kind: "greeting" | "verdict" | "fact" | "more" | "quiet";
+  kind: "greeting" | "verdict" | "fact" | "more" | "quiet" | "director" | "answer";
   text: string;
   tone?: BriefTone;
+  /** Shown at once, not typed — the director's own words. */
+  instant?: boolean;
   /** Tasks behind the line — the bubble expands into their cards. */
   taskIds?: string[];
 };
