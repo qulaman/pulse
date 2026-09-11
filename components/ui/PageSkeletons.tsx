@@ -10,6 +10,7 @@ import {
   AnnouncementBone,
   Bone,
   ChatBone,
+  PeopleGridBone,
   CompanyFormBone,
   RatingRowBone,
   RowListBone,
@@ -106,16 +107,47 @@ export function SentSkeleton() {
   );
 }
 
+/** Search, filter chips, the count line, then rows — the roster below the grid. */
+export function TeamListBone() {
+  return (
+    <SkeletonGroup className="mt-4">
+      <Bone h={44} className="rounded-[12px]" />
+      <div className="mt-3 flex flex-wrap gap-2">
+        {[52, 92, 118, 122, 96].map((w) => (
+          <Bone key={w} h={32} w={w} className="rounded-full" />
+        ))}
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <Bone h={16} w={80} />
+        <Bone h={16} w={160} />
+      </div>
+      <div className="mt-4">
+        <Bone h={16} w={110} className="mb-2" />
+        <RowListBone count={6} />
+      </div>
+    </SkeletonGroup>
+  );
+}
+
 export function PeopleSkeleton() {
   return (
     <main className={MAIN}>
       <div className="flex items-end justify-between gap-3">
-        <Title text="Сотрудники" sub=" " />
+        <Title text="Команда" sub=" " />
         <Bone h={44} w={128} className="rounded-[12px]" />
       </div>
-      <SkeletonGroup className="mt-5">
-        <RowListBone count={7} />
+      <SkeletonGroup className="mt-7">
+        <Bone h={24} w={80} />
+        <div className="mt-3">
+          <PeopleGridBone />
+        </div>
       </SkeletonGroup>
+      <div className="mt-6 flex min-h-[48px] items-center justify-between rounded-[16px] border border-border bg-surface px-4 text-[16px] leading-[22px]">
+        Рейтинг
+        <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
+      </div>
+      <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
+      <TeamListBone />
     </main>
   );
 }
@@ -268,8 +300,9 @@ export function RatingSkeleton() {
     <main className={MAIN}>
       <Title text="Рейтинг" sub="Очки за закрытые в срок задачи и поощрения директора" />
       <div className="mt-4 flex gap-2">
-        <Bone h={36} w={92} className="rounded-full" />
-        <Bone h={36} w={84} className="rounded-full" />
+        <Bone h={32} w={92} className="rounded-full" />
+        <Bone h={32} w={84} className="rounded-full" />
+        <Bone h={32} w={104} className="rounded-full" />
       </div>
       <RatingListBone />
     </main>
