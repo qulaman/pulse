@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
+import { haptic } from "@/lib/haptics";
 import { initialsOf } from "@/lib/people/queries";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -17,6 +18,19 @@ import { DeliveryStatus } from "./DeliveryStatus";
 import { AskSheet, DeclineSheet, ReportSheet, ReworkSheet } from "./TaskSheets";
 
 export type TaskCardVariant = "employee" | "director";
+
+/** The eyebrow of the card: one short word per status, so row 1 never wraps on a phone. */
+const EYEBROW: Record<TaskStatus, string> = {
+  scheduled: "Отправлю позже",
+  sent: "Новая",
+  accepted: "В работе",
+  in_progress: "В работе",
+  pending_review: "На проверке",
+  done: "Готово",
+  rework: "На доработке",
+  declined: "Отказ",
+  revoked: "Отозвана",
+};
 
 export type TaskCardProps = {
   task: TaskWithPeople;
@@ -141,10 +155,10 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
       <div className="relative flex items-center justify-between gap-2">
         <span className="inline-flex items-center gap-1.5 font-display text-[12px] font-semibold uppercase tracking-[0.06em]" style={{ color: TONE_VAR[tone] }}>
           <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[tone] }} />
-          {deadline.overdue && task.status !== "done" ? "Просрочено" : STATUS_LABEL[task.status]}
+          {deadline.overdue && task.status !== "done" ? "Просрочено" : EYEBROW[task.status]}
         </span>
         <span
-          className="nums inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
+          className="nums inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
           style={{
             color: TONE_VAR[deadlineTone],
             borderColor: `color-mix(in srgb, ${TONE_VAR[deadlineTone]} 40%, transparent)`,
@@ -228,7 +242,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         />
       ) : null}
 
-      <div className="relative mt-4 flex flex-wrap gap-2">
+      <div className={`relative mt-4 gap-2 ${variant === "employee" && task.status === "sent" ? "grid grid-cols-3" : "flex flex-wrap"}`}>
         {variant === "employee" ? (
           <EmployeeActions task={task} onOpen={setSheet} actions={actions} />
         ) : (
@@ -353,13 +367,6 @@ function StatusBanner({ task, declineReason }: { task: TaskWithPeople; declineRe
       </Banner>
     );
   }
-  if (task.status === "pending_review") {
-    return (
-      <Banner tone="warn" icon={<Icon name="clock" size={15} />}>
-        {TEXT.underReview}
-      </Banner>
-    );
-  }
   if (task.status === "declined") {
     return (
       <Banner tone="danger" icon={<Icon name="hand" size={15} />}>
@@ -392,13 +399,21 @@ function EmployeeActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
   if (task.status === "sent") {
     return (
       <>
-        <Button icon={<Icon name="check" />} onClick={() => actions.transition({ taskId: task.id, toStatus: "accepted" })}>
+        <Button
+          block
+          className="!px-2 whitespace-nowrap"
+          icon={<Icon name="check" />}
+          onClick={() => {
+            haptic(15);
+            actions.transition({ taskId: task.id, toStatus: "accepted" });
+          }}
+        >
           {BUTTON.accept}
         </Button>
-        <Button variant="secondary" icon={<Icon name="question" />} onClick={() => onOpen("ask")}>
+        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onOpen("ask")}>
           {BUTTON.ask}
         </Button>
-        <Button variant="danger" icon={<Icon name="x" />} onClick={() => onOpen("decline")}>
+        <Button block className="!px-2 whitespace-nowrap" variant="danger" icon={<Icon name="x" />} onClick={() => onOpen("decline")}>
           {BUTTON.cant}
         </Button>
       </>
@@ -424,7 +439,13 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
     <>
       {task.status === "pending_review" ? (
         <>
-          <Button icon={<Icon name="check" />} onClick={() => actions.transition({ taskId: task.id, toStatus: "done" })}>
+          <Button
+            icon={<Icon name="check" />}
+            onClick={() => {
+              haptic(15);
+              actions.transition({ taskId: task.id, toStatus: "done" });
+            }}
+          >
             {BUTTON.approve}
           </Button>
           <Button variant="secondary" icon={<Icon name="rotate" />} onClick={() => onOpen("rework")}>
