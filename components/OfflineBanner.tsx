@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutationState } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
 function subscribe(onChange: () => void) {
@@ -20,7 +21,11 @@ const online = () => (typeof navigator === "undefined" ? true : navigator.onLine
  */
 export function OfflineBanner() {
   const isOnline = useSyncExternalStore(subscribe, online, () => true);
-  if (isOnline) return null;
+  // taps made without network wait in the mutation cache (QueryProvider, networkMode offlineFirst)
+  const paused = useMutationState({ filters: { status: "pending" }, select: (m) => m.state.isPaused }).filter(Boolean).length;
+  if (isOnline && paused === 0) return null;
+  const queue = paused > 0 ? ` (${paused} в очереди)` : "";
+  const text = isOnline ? `Отправляю${queue}` : `Нет связи. Отправлю, как появится${queue}`;
   return (
     <div
       role="status"
@@ -28,7 +33,7 @@ export function OfflineBanner() {
       style={{ top: "calc(6px + env(safe-area-inset-top))" }}
     >
       <p className="card-in rounded-full border border-border bg-surface px-3 py-1.5 text-[13px] leading-4 text-muted" style={{ boxShadow: "var(--shadow-raised)" }}>
-        Нет связи. Покажу всё, как появится
+        {text}
       </p>
     </div>
   );

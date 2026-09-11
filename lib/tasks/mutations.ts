@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { isNetworkError, NetworkError } from "@/lib/net";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -29,7 +30,8 @@ async function postJson(path: string, payload: unknown): Promise<void> {
       body: JSON.stringify(payload),
     });
   } catch {
-    throw new Error("Нет связи. Повторю по тапу");
+    // the mutation pauses and resumes when the network is back (QueryProvider, networkMode offlineFirst)
+    throw new NetworkError("Нет связи. Отправлю, как появится");
   }
 
   if (res.ok) return;
@@ -101,6 +103,8 @@ function invalidateTasks(queryClient: QueryClient, taskId: string) {
 export type TransitionInput = {
   taskId: string;
   toStatus: TaskStatus;
+  /** Idempotency key, minted once per tap so a paused/retried call stays one call. */
+  requestId?: string;
   /** «Не могу»: chip + free text, becomes a visible message. */
   reason?: string;
   /** Rework note from the director, likewise a visible message. */
@@ -116,7 +120,7 @@ export function useTransition() {
         to_status: input.toStatus,
         reason: input.reason,
         comment: input.comment,
-        client_request_id: crypto.randomUUID(),
+        client_request_id: input.requestId ?? crypto.randomUUID(),
       });
     },
     onMutate: async (input) => {
@@ -139,12 +143,12 @@ export function useRevoke() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async ({ taskId, requestId }: { taskId: string; requestId: string }) => {
       await postJson(`/api/tasks/${taskId}/revoke`, {
-        client_request_id: crypto.randomUUID(),
+        client_request_id: requestId,
       });
     },
-    onMutate: async (taskId) => {
+    onMutate: async ({ taskId }) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.root });
       const snapshot = snapshotTasks(queryClient);
       queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
@@ -152,11 +156,11 @@ export function useRevoke() {
       );
       return { snapshot };
     },
-    onError: (error, _taskId, context) => {
+    onError: (error, _input, context) => {
       if (context) restoreTasks(queryClient, context.snapshot);
       toast(error instanceof Error ? error.message : GENERIC_ERROR);
     },
-    onSettled: (_data, _error, taskId) => invalidateTasks(queryClient, taskId),
+    onSettled: (_data, _error, { taskId }) => invalidateTasks(queryClient, taskId),
   });
 }
 
@@ -164,7 +168,7 @@ export function useRevoke() {
 /* «Продлить» and «Переназначить» — RPCs behind their own routes                 */
 /* -------------------------------------------------------------------------- */
 
-export type ExtendInput = { taskId: string; deadlineIso: string | null };
+export type ExtendInput = { taskId: string; deadlineIso: string | null; requestId?: string };
 
 export function useExtendDeadline() {
   const queryClient = useQueryClient();
@@ -173,7 +177,7 @@ export function useExtendDeadline() {
     mutationFn: async (input: ExtendInput) => {
       await postJson(`/api/tasks/${input.taskId}/deadline`, {
         deadline_iso: input.deadlineIso,
-        client_request_id: crypto.randomUUID(),
+        client_request_id: input.requestId ?? crypto.randomUUID(),
       });
     },
     onMutate: async (input) => {
@@ -192,7 +196,7 @@ export function useExtendDeadline() {
   });
 }
 
-export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string };
+export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string; requestId?: string };
 
 export function useReassign() {
   const queryClient = useQueryClient();
@@ -201,7 +205,7 @@ export function useReassign() {
     mutationFn: async (input: ReassignInput) => {
       await postJson(`/api/tasks/${input.taskId}/reassign`, {
         assignee_id: input.assigneeId,
-        client_request_id: crypto.randomUUID(),
+        client_request_id: input.requestId ?? crypto.randomUUID(),
       });
     },
     // no optimistic clone: the new task's id comes from the server, the lists refetch at once
@@ -247,7 +251,7 @@ export function useSendMessage(me: Me | undefined) {
         file_path: input.filePath ?? null,
         meta: (input.meta ?? {}) as Json,
       });
-      if (error) throw new Error(GENERIC_ERROR);
+      if (error) throw isNetworkError(error) ? new NetworkError() : new Error(GENERIC_ERROR);
     },
     onMutate: async (input) => {
       const queryKey = taskKeys.thread(input.taskId);
@@ -307,23 +311,23 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const sendMessage = useSendMessage(me);
 
   return {
-    transition: (input) => transition.mutate(input),
-    extend: (input) => extend.mutate(input),
-    reassign: (input) => reassign.mutate(input),
+    transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
+    extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
+    reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
     complete: ({ taskId, fromStatus }) => {
       if (fromStatus === "rework") {
         // The employee taps once; the matrix still demands rework → accepted first.
         transition.mutate(
-          { taskId, toStatus: "accepted" },
+          { taskId, toStatus: "accepted", requestId: crypto.randomUUID() },
           {
-            onSuccess: () => transition.mutate({ taskId, toStatus: "pending_review" }),
+            onSuccess: () => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID() }),
           },
         );
         return;
       }
-      transition.mutate({ taskId, toStatus: "pending_review" });
+      transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID() });
     },
-    revoke: (taskId) => revoke.mutate(taskId),
+    revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: crypto.randomUUID() }),
     busy: transition.isPending || revoke.isPending || sendMessage.isPending,
   };
