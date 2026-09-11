@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 
 import { toast } from "@/components/ui/Toast";
 import { isNetworkError, NetworkError } from "@/lib/net";
+import { dequeue, enqueue } from "@/lib/outbox";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -21,6 +22,8 @@ const GENERIC_ERROR = "Не получилось. Попробую ещё раз
 type ApiErrorBody = { error?: { code?: string; message_ru?: string } };
 
 async function postJson(path: string, payload: unknown): Promise<void> {
+  // the idempotency key doubles as the outbox key: a replay after a reload is the same call
+  const key = (payload as { client_request_id?: string } | null)?.client_request_id ?? `${path}:${Date.now()}`;
   let res: Response;
   try {
     res = await fetch(path, {
@@ -30,9 +33,12 @@ async function postJson(path: string, payload: unknown): Promise<void> {
       body: JSON.stringify(payload),
     });
   } catch {
-    // the mutation pauses and resumes when the network is back (QueryProvider, networkMode offlineFirst)
+    // the mutation pauses and resumes when the network is back (QueryProvider, networkMode
+    // offlineFirst); the persisted copy survives a closed tab and replays on the next start
+    enqueue({ id: key, path, payload });
     throw new NetworkError("Нет связи. Отправлю, как появится");
   }
+  dequeue(key);
 
   if (res.ok) return;
   if (res.status === 401 && typeof window !== "undefined") {

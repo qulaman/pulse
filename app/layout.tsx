@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Golos_Text, Manrope } from "next/font/google";
 
 import { OfflineBanner } from "@/components/OfflineBanner";
+import { OutboxReplay } from "@/components/OutboxReplay";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { loadBrand } from "@/lib/brand";
 import { ToastHost } from "@/components/ui/Toast";
@@ -44,6 +45,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
           <ToastHost />
           <OfflineBanner />
+          <OutboxReplay />
         </QueryProvider>
       </body>
     </html>
