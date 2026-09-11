@@ -270,7 +270,7 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
   const nowIso = new Date().toISOString();
 
   // Company scoping is RLS's job — a director sees their company and nothing else.
-  const [review, overdue, questionRows, declinedRows, reasonRows] = await Promise.all([
+  const [review, overdue, questionRows, declinedRows] = await Promise.all([
     supabase.from("tasks").select(TASK_SELECT).eq("status", "pending_review"),
     supabase
       .from("tasks")
@@ -284,22 +284,26 @@ async function fetchDirectorInbox(): Promise<DirectorInbox> {
       .is("meta->>answered_at", null)
       .order("created_at", { ascending: false }),
     supabase.from("tasks").select(TASK_SELECT).eq("status", "declined"),
-    // the newest reason per declined task: RLS narrows the rows, the client keeps the latest
-    supabase
-      .from("task_messages")
-      .select("task_id, content, created_at")
-      .eq("meta->>decline_reason", "true")
-      .order("created_at", { ascending: false })
-      .limit(200),
   ]);
 
-  for (const result of [review, overdue, questionRows, declinedRows, reasonRows]) {
+  for (const result of [review, overdue, questionRows, declinedRows]) {
     if (result.error) throw new Error(result.error.message);
   }
 
+  // the newest reason per declined task — only for those tasks, on the (task_id, created_at) index
+  const declinedIds = ((declinedRows.data ?? []) as unknown as TaskWithPeople[]).map((t) => t.id);
   const reasonByTask = new Map<string, string>();
-  for (const row of (reasonRows.data ?? []) as Array<{ task_id: string; content: string | null }>) {
-    if (row.content && !reasonByTask.has(row.task_id)) reasonByTask.set(row.task_id, row.content);
+  if (declinedIds.length > 0) {
+    const reasonRows = await supabase
+      .from("task_messages")
+      .select("task_id, content, created_at")
+      .in("task_id", declinedIds)
+      .eq("meta->>decline_reason", "true")
+      .order("created_at", { ascending: false });
+    if (reasonRows.error) throw new Error(reasonRows.error.message);
+    for (const row of (reasonRows.data ?? []) as Array<{ task_id: string; content: string | null }>) {
+      if (row.content && !reasonByTask.has(row.task_id)) reasonByTask.set(row.task_id, row.content);
+    }
   }
   const declined: DeclinedTask[] = sortByUrgency((declinedRows.data ?? []) as unknown as TaskWithPeople[]).map(
     (task) => ({ ...task, decline_reason: reasonByTask.get(task.id) ?? null }),

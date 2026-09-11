@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { useDeliveryWindow } from "@/lib/points/queries";
 import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
 
 type Props = {
@@ -21,11 +22,14 @@ type Props = {
  */
 export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst }: Props) {
   // Read after hydration: the server renders "within the window" so both passes match.
-  const quietHours = useSyncExternalStore(
+  const hydrated = useSyncExternalStore(
     () => () => {},
-    () => !isWithinDeliveryWindow(),
+    () => true,
     () => false,
   );
+  const window = useDeliveryWindow().data;
+  const quietHours = hydrated && !isWithinDeliveryWindow(new Date(), window);
+  const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
 
   return (
     <div
@@ -59,7 +63,7 @@ export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst 
 
         {quietHours ? (
           <p className="mt-2 text-center text-[13px] leading-4 text-muted">
-            {`Отправлю утром в 0${WINDOW_OPEN_HOUR}:00 · `}
+            {`Отправлю утром в ${opensAt} · `}
             <button
               type="button"
               className="underline"

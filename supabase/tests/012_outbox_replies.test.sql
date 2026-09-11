@@ -1,7 +1,7 @@
 -- The employee hears back: a reply from the director, a rework, an acceptance, a revoke
 -- each queue an outbox row for the assignee (migration 20260911210000_outbox_replies).
 begin;
-select plan(6);
+select plan(7);
 
 -- the director answers in the thread of Марат's accepted task (003 → assignee 006)
 set local role authenticated;
@@ -45,6 +45,12 @@ select is(
     where task_id = '20000000-0000-0000-0000-000000000005' and event_kind = 'rework'),
   1::bigint,
   'rework queues a push to the assignee'
+);
+select is(
+  (select count(*) from notification_deliveries
+    where task_id = '20000000-0000-0000-0000-000000000005' and event_kind = 'reply'),
+  0::bigint,
+  'the rework comment is not a second push'
 );
 
 -- revoke of an open task: the assignee is told

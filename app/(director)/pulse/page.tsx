@@ -50,10 +50,11 @@ export default function PulsePage() {
 
   // A question the phrase turned out to be: the director's words, then the answer from the data.
   const people = usePeople();
-  const sent = useSentTasks(me.data?.userId);
   const asked = stage === "question" && question ? question : null;
+  // the closed list (200 rows, two joins) is fetched only while a question needs it
+  const sent = useSentTasks(asked ? me.data?.userId : undefined);
   const reply = useMemo(() => {
-    if (!asked || people.isLoading) return null;
+    if (!asked || people.isLoading || sent.isLoading) return null;
     return answer({
       question: asked,
       now,
@@ -69,7 +70,7 @@ export default function PulsePage() {
       questions: (inbox.data?.questions ?? []).map(toBriefTask),
       review: (inbox.data?.review ?? []).map(toBriefTask),
     });
-  }, [asked, now, people.isLoading, people.data, open.data, sent.data, inbox.data]);
+  }, [asked, now, people.isLoading, people.data, open.data, sent.isLoading, sent.data, inbox.data]);
   const qaLines = useMemo<BriefLine[]>(() => {
     if (!asked || !reply) return [];
     // keyed by the request, not the words: the same question asked again is a new exchange

@@ -3,6 +3,8 @@
 import { onlineManager, useMutationState } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 
+import { isNetworkError } from "@/lib/net";
+
 // the same switch that pauses and resumes mutations — the line never disagrees with the queue
 const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
 const online = () => onlineManager.isOnline();
@@ -15,7 +17,10 @@ const online = () => onlineManager.isOnline();
 export function OfflineBanner() {
   const isOnline = useSyncExternalStore(subscribe, online, () => true);
   // taps made without network wait in the mutation cache (QueryProvider, networkMode offlineFirst)
-  const paused = useMutationState({ filters: { status: "pending" }, select: (m) => m.state.isPaused }).filter(Boolean).length;
+  const paused = useMutationState({
+    filters: { status: "pending" },
+    select: (m) => m.state.isPaused || (m.state.failureCount > 0 && isNetworkError(m.state.failureReason)),
+  }).filter(Boolean).length;
   if (isOnline && paused === 0) return null;
   const queue = paused > 0 ? ` (${paused} в очереди)` : "";
   const text = isOnline ? `Отправляю${queue}` : `Нет связи. Отправлю, как появится${queue}`;

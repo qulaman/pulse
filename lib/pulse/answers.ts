@@ -120,8 +120,10 @@ export function answer(input: AnswerInput): Answer {
   const person = findPerson(question, input.people);
   if (person) {
     const name = firstNameOf(person.fullName);
-    const mine = input.open.filter((t) => t.assignee === name);
-    const late = input.overdue.filter((t) => t.assignee === name);
+    // by id when the task carries one — two Мараты are two people
+    const theirs = (t: BriefTask) => (t.assigneeId ? t.assigneeId === person.id : t.assignee === name);
+    const mine = input.open.filter(theirs);
+    const late = input.overdue.filter(theirs);
     if (mine.length === 0) return { understood: true, lines: [`${name}: задач в работе нет.`] };
     const head = `${name}: ${mine.length} ${pluralRu(mine.length, TASKS_FORM)} в работе${late.length ? `, ${late.length} с просрочкой` : ""}:`;
     return { understood: true, lines: [head, ...mine.map((t) => taskLine(t, now, { status: true }))] };

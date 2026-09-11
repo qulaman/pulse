@@ -123,6 +123,20 @@ export function useAwardPoints() {
 }
 
 /** points_enabled is readable by everyone: the company row is visible to its members (D-48). */
+/** `company.settings.delivery_window` — what /confirm promises about quiet hours (the RPC decides for real). */
+export function useDeliveryWindow() {
+  return useQuery({
+    queryKey: ["company", "delivery_window"],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<{ from?: string; to?: string } | undefined> => {
+      const supabase = createBrowserSupabase();
+      const { data } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
+      const settings = data?.settings as { delivery_window?: { from?: string; to?: string } } | null;
+      return settings?.delivery_window;
+    },
+  });
+}
+
 export function usePointsEnabled() {
   return useQuery({
     queryKey: ["company", "points_enabled"],

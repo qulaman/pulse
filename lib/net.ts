@@ -13,7 +13,11 @@ export class NetworkError extends Error {
 /** Fetch and supabase-js both surface a dead network as a TypeError-ish «Failed to fetch». */
 export function isNetworkError(error: unknown): boolean {
   if (error instanceof NetworkError) return true;
-  if (typeof navigator !== "undefined" && navigator.onLine === false) return true;
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const message =
+    error instanceof Error
+      ? error.message
+      : error && typeof error === "object" && "message" in error
+        ? String((error as { message: unknown }).message)
+        : String(error ?? "");
   return /failed to fetch|networkerror|network request failed|load failed|fetch failed/i.test(message);
 }

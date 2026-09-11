@@ -13,17 +13,22 @@ import { firstNameOf } from "@/lib/text/normalize";
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
 /** The «since» of the current tab session: coming back from another tab is the same visit. */
 const SESSION_SINCE_KEY = "pulse.brief.since";
+/** A PWA kept alive in the background for days: after this long the next opening is a new visit. */
+const VISIT_MAX_AGE_MS = 8 * 3_600_000;
 /** A first visit (or a wiped storage) reads the news of the last day. */
 const FIRST_VISIT_WINDOW_MS = 24 * 3_600_000;
 
 export { firstNameOf };
 
-export function toBriefTask(task: Pick<TaskWithPeople, "id" | "title" | "deadline" | "assignee">): BriefTask {
+export function toBriefTask(
+  task: Pick<TaskWithPeople, "id" | "title" | "deadline" | "assignee"> & { assignee_id?: string | null },
+): BriefTask {
   return {
     id: task.id,
     title: task.title,
     deadline: task.deadline,
     assignee: task.assignee?.full_name ? firstNameOf(task.assignee.full_name) : null,
+    assigneeId: task.assignee_id ?? null,
   };
 }
 
@@ -36,6 +41,7 @@ export function toBriefTask(task: Pick<TaskWithPeople, "id" | "title" | "deadlin
 export function forgetVisit(): void {
   try {
     window.sessionStorage.removeItem(SESSION_SINCE_KEY);
+    window.sessionStorage.removeItem(`${SESSION_SINCE_KEY}:at`);
   } catch {
     // nothing stored, nothing to forget
   }
@@ -49,11 +55,13 @@ export function useLastVisit(): string {
       const session = window.sessionStorage.getItem(SESSION_SINCE_KEY);
       const raw = window.localStorage.getItem(LAST_VISIT_KEY);
       window.localStorage.setItem(LAST_VISIT_KEY, String(now));
-      if (session) return session;
+      const sessionStarted = Number(window.sessionStorage.getItem(`${SESSION_SINCE_KEY}:at`) ?? "0");
+      if (session && now - sessionStarted < VISIT_MAX_AGE_MS) return session;
       const previous = raw ? Number(raw) : null;
       const from = previous && Number.isFinite(previous) ? previous : now - FIRST_VISIT_WINDOW_MS;
       const iso = new Date(from).toISOString();
       window.sessionStorage.setItem(SESSION_SINCE_KEY, iso);
+      window.sessionStorage.setItem(`${SESSION_SINCE_KEY}:at`, String(now));
       return iso;
     } catch {
       return new Date(now - FIRST_VISIT_WINDOW_MS).toISOString();
@@ -68,6 +76,7 @@ type AcceptedRow = {
     id: string;
     title: string;
     deadline: string | null;
+    assignee_id?: string | null;
     assignee: { full_name: string } | null;
   } | null;
 };
@@ -80,7 +89,7 @@ export function useAcceptedSince(since: string) {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("task_messages")
-        .select("created_at, task:tasks!task_messages_task_id_fkey(id, title, deadline, assignee:profiles!tasks_assignee_id_fkey(full_name))")
+        .select("created_at, task:tasks!task_messages_task_id_fkey(id, title, deadline, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name))")
         .eq("type", "status_change")
         .eq("meta->>new_status", "accepted")
         .gt("created_at", since)
@@ -105,10 +114,10 @@ export function useOpenTasks() {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("tasks")
-        .select("id, title, deadline, status, assignee:profiles!tasks_assignee_id_fkey(full_name)")
+        .select("id, title, deadline, status, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name)")
         .in("status", [...OPEN]);
       if (error) throw new Error(error.message);
-      type Row = Pick<TaskWithPeople, "id" | "title" | "deadline" | "status" | "assignee">;
+      type Row = Pick<TaskWithPeople, "id" | "title" | "deadline" | "status" | "assignee" | "assignee_id">;
       return ((data ?? []) as unknown as Row[]).map((row) => ({ ...toBriefTask(row), status: row.status }));
     },
     channel: { table: "tasks" },

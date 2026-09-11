@@ -329,6 +329,6 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     },
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: crypto.randomUUID() }),
-    busy: transition.isPending || revoke.isPending || sendMessage.isPending,
+    busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending || sendMessage.isPending,
   };
 }

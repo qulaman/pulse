@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -39,13 +39,105 @@ export type ChannelSpec = {
   filter?: string;
 };
 
+type Listener<TRow extends Record<string, unknown>> = {
+  onEvent: (payload: RealtimeEvent<TRow>) => void;
+  onResync: () => void;
+};
+
+type Entry = {
+  listeners: Set<Listener<Record<string, unknown>>>;
+  teardown: () => void;
+};
+
 /**
- * Subscription lifecycle on its own: subscribe, resubscribe after a gap, tear
- * down on unmount. `onResync` runs after every resubscribe — that is where the
+ * One Supabase channel per topic, shared by every mounted hook that asks for it: the
+ * screen and the tab bar reading the same key cost one socket join, one settle snapshot
+ * and one resubscribe on foreground. The first mount creates the channel, later mounts
+ * attach a listener, the last unmount removes it (supabase-js refuses new callbacks on a
+ * channel that has already subscribed, so sharing has to happen here, not per hook).
+ */
+const registry = new Map<string, Entry>();
+
+function acquire<TRow extends Record<string, unknown>>(
+  topic: string,
+  { table, filter }: ChannelSpec,
+  listener: Listener<TRow>,
+): () => void {
+  let entry = registry.get(topic);
+  if (!entry) {
+    const supabase = createBrowserSupabase();
+    const listeners = new Set<Listener<Record<string, unknown>>>();
+    let active: RealtimeChannel | null = null;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const subscribe = () => {
+      active = supabase
+        .channel(topic)
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
+          (payload) => {
+            for (const l of listeners) l.onEvent(payload as RealtimeEvent<Record<string, unknown>>);
+          },
+        )
+        .subscribe((status) => {
+          // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
+          // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
+          // One late snapshot closes that gap after every (re)subscribe.
+          if (status !== "SUBSCRIBED") return;
+          if (settleTimer !== null) clearTimeout(settleTimer);
+          settleTimer = setTimeout(() => {
+            for (const l of listeners) l.onResync();
+          }, SETTLE_MS);
+        });
+    };
+
+    const resync = () => {
+      if (active) void supabase.removeChannel(active);
+      subscribe();
+      for (const l of listeners) l.onResync();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") resync();
+    };
+
+    subscribe();
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("online", resync);
+
+    entry = {
+      listeners,
+      teardown: () => {
+        document.removeEventListener("visibilitychange", onVisibility);
+        window.removeEventListener("online", resync);
+        if (settleTimer !== null) clearTimeout(settleTimer);
+        if (active) void supabase.removeChannel(active);
+      },
+    };
+    registry.set(topic, entry);
+  }
+
+  const shared = listener as unknown as Listener<Record<string, unknown>>;
+  entry.listeners.add(shared);
+  return () => {
+    const current = registry.get(topic);
+    if (!current) return;
+    current.listeners.delete(shared);
+    if (current.listeners.size === 0) {
+      current.teardown();
+      registry.delete(topic);
+    }
+  };
+}
+
+/**
+ * Subscription lifecycle for one hook: attach to the shared channel of the topic,
+ * detach on unmount. `onResync` runs after every resubscribe — that is where the
  * snapshot refetch belongs.
  */
 function useRealtimeChannel<TRow extends Record<string, unknown>>(
-  { table, filter }: ChannelSpec,
+  spec: ChannelSpec,
   onEvent: (payload: RealtimeEvent<TRow>) => void,
   onResync: () => void,
   enabled: boolean,
@@ -59,58 +151,17 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
     onEventRef.current = onEvent;
     onResyncRef.current = onResync;
   });
-  // One channel per mounted hook: two screens (or a screen and the tab bar) sharing a query
-  // key would otherwise reuse the same topic, and supabase-js refuses new callbacks on a
-  // channel that has already subscribed («cannot add postgres_changes callbacks after subscribe()»).
-  const instance = useId();
 
+  const { table, filter } = spec;
   useEffect(() => {
     if (!enabled) return;
-
-    const supabase = createBrowserSupabase();
-    let active: RealtimeChannel | null = null;
-
-    let settleTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const subscribe = () => {
-      active = supabase
-        .channel(`rtq:${table}:${filter ?? "all"}:${channelKey}:${instance}`)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
-          (payload) => onEventRef.current(payload as RealtimeEvent<TRow>),
-        )
-        .subscribe((status) => {
-          // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
-          // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
-          // One late snapshot closes that gap after every (re)subscribe.
-          if (status !== "SUBSCRIBED") return;
-          if (settleTimer !== null) clearTimeout(settleTimer);
-          settleTimer = setTimeout(() => onResyncRef.current(), SETTLE_MS);
-        });
-    };
-
-    const resync = () => {
-      if (active) void supabase.removeChannel(active);
-      subscribe();
-      onResyncRef.current();
-    };
-
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") resync();
-    };
-
-    subscribe();
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("online", resync);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("online", resync);
-      if (settleTimer !== null) clearTimeout(settleTimer);
-      if (active) void supabase.removeChannel(active);
-    };
-  }, [enabled, table, filter, channelKey, instance]);
+    const topic = `rtq:${table}:${filter ?? "all"}:${channelKey}`;
+    return acquire<TRow>(
+      topic,
+      { table, filter },
+      { onEvent: (payload) => onEventRef.current(payload), onResync: () => onResyncRef.current() },
+    );
+  }, [enabled, table, filter, channelKey]);
 }
 
 export type UseRealtimeQueryOptions<TData, TRow extends Record<string, unknown>> = {

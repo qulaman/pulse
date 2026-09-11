@@ -12,12 +12,13 @@ describe("delivery window", () => {
     expect(isWithinDeliveryWindow(NIGHT)).toBe(false);
   });
 
-  it("holds an answer or a rework at night, never a task already timed upstream", () => {
+  it("holds what an employee would hear at night; not a timed task, not the director's own alerts", () => {
     expect(holdsForQuietHours("reply", NIGHT)).toBe(true);
     expect(holdsForQuietHours("rework", NIGHT)).toBe(true);
-    expect(holdsForQuietHours("question", NIGHT)).toBe(true);
+    expect(holdsForQuietHours("announcement", NIGHT)).toBe(true);
     expect(holdsForQuietHours("task_sent", NIGHT)).toBe(false);
-    expect(holdsForQuietHours("announcement", NIGHT)).toBe(false);
+    expect(holdsForQuietHours("question", NIGHT)).toBe(false);
+    expect(holdsForQuietHours("pending_review", NIGHT)).toBe(false);
   });
 
   it("honours the company's own window", () => {

@@ -226,7 +226,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
 
     async startVoice() {
       const stage = get().stage;
-      if (stage !== "idle" && stage !== "error") return;
+      // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
+      if (stage !== "idle" && stage !== "error" && stage !== "question") return;
 
       const recorder = createRecorder();
       activeRecorder = recorder;

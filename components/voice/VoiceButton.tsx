@@ -43,7 +43,7 @@ export function VoiceButton({ inline = false }: { inline?: boolean } = {}) {
   const startY = useRef(0);
 
   const recording = stage === "recording";
-  const busy = stage !== "idle" && stage !== "error" && stage !== "recording";
+  const busy = stage !== "idle" && stage !== "error" && stage !== "recording" && stage !== "question";
 
   // Loudness drives one transform; no state, no re-render per frame (DESIGN §2 perf).
   useEffect(

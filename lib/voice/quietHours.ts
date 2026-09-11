@@ -35,13 +35,16 @@ export function isWithinDeliveryWindow(now: Date = new Date(), window?: Delivery
 }
 
 /**
- * Kinds whose moment was already decided upstream (D-38: a batch waits for the morning,
- * «отправить сейчас» overrides) — the worker never holds them. Everything else — an answer,
- * a rework, a question at 23:00 — waits for the window (принцип 8: тихие часы доставки).
+ * What an employee's phone may not receive at night (принцип 8, D-51): the director's answer,
+ * a rework, an acceptance, a revoke, a moved deadline, an announcement. `task_sent` is not
+ * here — its moment is decided by the producer (a batch waits for the morning, «отправить
+ * сейчас» and a reassign inside the window go now, a reassign outside it is scheduled).
+ * The director's own alerts (question, pending_review, declined) are not held either: that
+ * is a product decision the owner has not taken (D-51 lists it as open).
  */
-const TIMED_UPSTREAM = new Set(["task_sent", "announcement"]);
+export const HELD_AT_NIGHT: ReadonlySet<string> = new Set(["reply", "rework", "done", "revoked", "deadline_extended", "announcement"]);
 
 export function holdsForQuietHours(eventKind: string, now: Date = new Date(), window?: DeliveryWindow): boolean {
-  if (TIMED_UPSTREAM.has(eventKind)) return false;
+  if (!HELD_AT_NIGHT.has(eventKind)) return false;
   return !isWithinDeliveryWindow(now, window);
 }

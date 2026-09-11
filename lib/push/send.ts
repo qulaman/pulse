@@ -4,7 +4,7 @@ import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
 import { createServiceSupabase } from "@/lib/supabase/service";
-import { holdsForQuietHours, type DeliveryWindow } from "@/lib/voice/quietHours";
+import { HELD_AT_NIGHT, holdsForQuietHours, type DeliveryWindow } from "@/lib/voice/quietHours";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
@@ -28,28 +28,25 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
   if (!vapidReady()) return result;
 
   const service = createServiceSupabase();
-  const { data: rows, error } = await service
-    .from("notification_deliveries")
-    .select("id, user_id, company_id, meta, attempts, event_kind")
-    .eq("status", "queued")
-    .eq("channel", "push")
-    .lt("attempts", MAX_ATTEMPTS)
-    .order("created_at")
-    .limit(BATCH);
-  if (error) throw new Error(`outbox read failed: ${error.message}`);
-  if (!rows || rows.length === 0) return result;
-
-  const userIds = [...new Set(rows.map((r) => r.user_id))];
-  const { data: subs } = await service
-    .from("push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth")
-    .in("user_id", userIds);
-  const byUser = new Map<string, NonNullable<typeof subs>>();
-  for (const sub of subs ?? []) {
-    const list = byUser.get(sub.user_id) ?? [];
-    list.push(sub);
-    byUser.set(sub.user_id, list);
-  }
+  const heldKinds = [...HELD_AT_NIGHT];
+  const base = () =>
+    service
+      .from("notification_deliveries")
+      .select("id, user_id, company_id, meta, attempts, event_kind")
+      .eq("status", "queued")
+      .eq("channel", "push")
+      .lt("attempts", MAX_ATTEMPTS)
+      .order("created_at")
+      .limit(BATCH);
+  // two windows: kinds that always go out first, so rows held for the night never starve them
+  const [urgent, rest] = await Promise.all([
+    base().not("event_kind", "in", `(${heldKinds.join(",")})`),
+    base().in("event_kind", heldKinds),
+  ]);
+  if (urgent.error) throw new Error(`outbox read failed: ${urgent.error.message}`);
+  if (rest.error) throw new Error(`outbox read failed: ${rest.error.message}`);
+  const rows = [...(urgent.data ?? []), ...(rest.data ?? [])];
+  if (rows.length === 0) return result;
 
   // each company's own delivery window (settings.delivery_window), defaults when unset
   const companyIds = [...new Set(rows.map((r) => r.company_id))];
@@ -61,12 +58,29 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
   }
 
   const now = new Date();
-  for (const row of rows) {
+  const sendable = rows.filter((row) => {
     // quiet hours: the row stays queued, untouched, until the morning sweep
     if (holdsForQuietHours(row.event_kind, now, windowOf.get(row.company_id))) {
       result.skipped += 1;
-      continue;
+      return false;
     }
+    return true;
+  });
+  if (sendable.length === 0) return result;
+
+  const userIds = [...new Set(sendable.map((r) => r.user_id))];
+  const { data: subs } = await service
+    .from("push_subscriptions")
+    .select("id, user_id, endpoint, p256dh, auth")
+    .in("user_id", userIds);
+  const byUser = new Map<string, NonNullable<typeof subs>>();
+  for (const sub of subs ?? []) {
+    const list = byUser.get(sub.user_id) ?? [];
+    list.push(sub);
+    byUser.set(sub.user_id, list);
+  }
+
+  for (const row of sendable) {
     const targets = byUser.get(row.user_id) ?? [];
     if (targets.length === 0) {
       // nobody to send to: failed with a readable reason — tier 2 (Telegram) picks it up later

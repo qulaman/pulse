@@ -16,8 +16,8 @@ export function QueryProvider({ children }: { children: ReactNode }) {
           // only a dead network is retried, every other failure surfaces at once
           mutations: {
             networkMode: "offlineFirst",
-            retry: (count, error) => isNetworkError(error) && count < 40,
-            retryDelay: (count) => Math.min(30_000, 2_000 * (count + 1)),
+            retry: (count, error) => isNetworkError(error) && count < 6,
+            retryDelay: (count) => Math.min(15_000, 2_000 * (count + 1)),
           },
         },
       }),

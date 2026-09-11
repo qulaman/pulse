@@ -14,6 +14,8 @@ export type BriefTask = {
   deadline: string | null;
   /** First name of the assignee as the director calls them; null when unassigned. */
   assignee: string | null;
+  /** The assignee's id — two people with the same first name are still two people. */
+  assigneeId?: string | null;
 };
 
 export type DeclinedBriefTask = BriefTask & { reason: string | null };

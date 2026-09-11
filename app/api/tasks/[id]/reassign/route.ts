@@ -18,7 +18,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
   async ({ req, body, params }) => {
     const taskId = params.id;
-    if (!z.uuid().safeParse(taskId).success) {
+    if (!z.guid().safeParse(taskId).success) {
       return apiError(404, "task_not_found", "Задача не найдена");
     }
 
