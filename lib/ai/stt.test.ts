@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   buildVocabularyHints,
+  hintSurfaces,
   hintsToPrompt,
   SttError,
   transcribe,
@@ -55,9 +56,32 @@ describe("buildVocabularyHints / hintsToPrompt", () => {
     const hints = buildVocabularyHints(ROSTER);
     expect(hints).toContain("Ерлан Байжанов / Ерлан Б");
     expect(hints).toContain("Марат Оспанов / Марат");
+    // A sentence, not a list: a list gets continued instead of transcribed (D-53).
     expect(hintsToPrompt(hints)).toBe(
-      "Имена сотрудников: Ерлан Байжанов / Ерлан Б, Марат Оспанов / Марат." +
+      "Директор диктует поручения сотрудникам." +
+        " В компании работают Ерлан Байжанов, Марат Оспанов; коротко их зовут Ерлан Б, Марат." +
         " Контрагенты и объекты: Казхром, ERG.",
+    );
+  });
+
+  it("hintSurfaces lists every name form and counterparty once", () => {
+    expect(hintSurfaces(buildVocabularyHints(ROSTER))).toEqual([
+      "Ерлан Байжанов",
+      "Ерлан Б",
+      "Марат Оспанов",
+      "Марат",
+      "Казхром",
+      "ERG",
+    ]);
+  });
+
+  it("a roster without aliases or counterparties still reads as a sentence", () => {
+    const hints = buildVocabularyHints({
+      users: [{ full_name: "Марат Оспанов", aliases: [] }],
+      counterparties: [],
+    });
+    expect(hintsToPrompt(hints)).toBe(
+      "Директор диктует поручения сотрудникам. В компании работают Марат Оспанов.",
     );
   });
 });

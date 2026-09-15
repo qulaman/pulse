@@ -1,5 +1,5 @@
 import type { SttOptions, SttProvider, SttResult } from "./stt";
-import { hintsToPrompt, splitVocabularyHints } from "./stt";
+import { hintSurfaces, hintsToPrompt, splitVocabularyHints } from "./stt";
 
 export type SttProviderName = "openai-4o" | "whisper1" | "deepgram" | "elevenlabs";
 
@@ -64,13 +64,6 @@ async function openaiTranscribe(
   return { text: json.text ?? "", durationMs: Date.now() - startedAt, provider: providerName };
 }
 
-/** Individual surfaces, not the "full / alias" display form the prompt uses. */
-function keywordsFrom(hints: string[]): string[] {
-  const { users, counterparties } = splitVocabularyHints(hints);
-  const surfaces = users.flatMap((entry) => entry.split(" / ").map((s) => s.trim()));
-  return [...new Set([...surfaces, ...counterparties])].filter(Boolean);
-}
-
 const openai4o: SttProvider = {
   name: "openai-4o",
   transcribe: (audio, mime, opts) => openaiTranscribe("openai-4o", "gpt-4o-transcribe", audio, mime, opts),
@@ -84,7 +77,7 @@ const whisper1: SttProvider = {
 const deepgram: SttProvider = {
   name: "deepgram",
   async transcribe(audio, mime, opts) {
-    const kw = keywordsFrom(opts.vocabularyHints ?? [])
+    const kw = hintSurfaces(opts.vocabularyHints ?? [])
       .map((k) => "keyterm=" + encodeURIComponent(k)) // nova-3: keyterm prompting, not keywords
       .join("&");
     const url =
@@ -116,8 +109,14 @@ const elevenlabs: SttProvider = {
   async transcribe(audio, mime, opts) {
     const fd = new FormData();
     fd.append("file", new Blob([toBlobPart(audio)], { type: mime }), fileNameFor(mime));
-    fd.append("model_id", "scribe_v1");
+    // scribe_v2 takes keyterms. Counterparties only: measured 2026-09-15, «касхраму» became
+    // «Казхрому» with them, but roster names as keyterms made noisy phone audio come back
+    // as a list of roster names (4 of 15 runs) — the one failure class the matcher cannot
+    // catch. Scribe has no free-text prompt, so it cannot echo one (docs/AI.md §1, D-53).
+    fd.append("model_id", "scribe_v2");
     if (opts.language) fd.append("language_code", opts.language);
+    const { counterparties } = splitVocabularyHints(opts.vocabularyHints ?? []);
+    for (const term of counterparties) fd.append("keyterms", term);
 
     const startedAt = Date.now();
     const res = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {

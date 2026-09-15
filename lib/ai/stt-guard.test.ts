@@ -59,6 +59,17 @@ describe("guardTranscript", () => {
     expect(result).toEqual({ ok: false, code: "prompt_echo" });
   });
 
+  // The prompt's own words are ordinary speech; only names count towards the echo share.
+  it("prompt scaffolding words in real speech are not an echo", () => {
+    expect(
+      guardTranscript({
+        text: "Директор сказал сотрудникам компании работать",
+        durationMs: 4000,
+        vocabularyHints: HINTS,
+      }),
+    ).toEqual({ ok: true, suspicious: false });
+  });
+
   it("loop: one phrase repeated back to back", () => {
     expect(
       guardTranscript({ text: "иди сюда иди сюда иди сюда", durationMs: 6000, vocabularyHints: HINTS }),

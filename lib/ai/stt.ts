@@ -80,11 +80,33 @@ export function splitVocabularyHints(hints: string[]): { users: string[]; counte
   return { users: hints.slice(0, at), counterparties: hints.slice(at + 1) };
 }
 
+/** Individual surfaces (full names, aliases, counterparties) — for keyterm APIs and the echo guard. */
+export function hintSurfaces(hints: string[]): string[] {
+  const { users, counterparties } = splitVocabularyHints(hints);
+  const surfaces = users.flatMap((entry) => entry.split(" / ").map((s) => s.trim()));
+  return [...new Set([...surfaces, ...counterparties])].filter(Boolean);
+}
+
+/**
+ * The prompt reads as a sentence, never as a list. gpt-4o-transcribe treats the prompt
+ * as preceding context and, on short or noisy audio, continues a list instead of
+ * transcribing: with «Имена сотрудников: A / B, C / D» the owner's live recordings came
+ * back as the roster itself in 5 of 9 runs, with this wording in 0 of 27 (D-53).
+ */
 export function hintsToPrompt(hints: string[]): string {
   const { users, counterparties } = splitVocabularyHints(hints);
-  let prompt = "Имена сотрудников: " + users.join(", ") + ".";
+  const full = users.map((entry) => entry.split(" / ")[0].trim()).filter(Boolean);
+  const short = [
+    ...new Set(users.flatMap((entry) => entry.split(" / ").slice(1).map((s) => s.trim()))),
+  ].filter(Boolean);
+
+  let prompt = "Директор диктует поручения сотрудникам.";
+  if (full.length) {
+    prompt += ` В компании работают ${full.join(", ")}`;
+    prompt += short.length ? `; коротко их зовут ${short.join(", ")}.` : ".";
+  }
   if (counterparties.length) {
-    prompt += " " + COUNTERPARTIES_MARKER + ": " + counterparties.join(", ") + ".";
+    prompt += ` ${COUNTERPARTIES_MARKER}: ${counterparties.join(", ")}.`;
   }
   return prompt;
 }

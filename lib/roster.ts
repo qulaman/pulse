@@ -11,6 +11,8 @@ export type RosterProfile = RosterUser & { position: string | null };
  * Service client — a director's own RLS would do, but the pipeline also runs for
  * employee voice messages, whose RLS shows them nobody else.
  * Stable order by id keeps prompt caching honest (docs/AI.md §9).
+ * The TV kiosk is a login, not a person: it can neither be assigned a task nor be
+ * heard in speech, and «TV Kiosk» in the STT prompt is one more line to echo (D-53).
  */
 export async function loadRoster(companyId: string): Promise<RosterProfile[]> {
   const supabase = createServiceSupabase();
@@ -19,6 +21,7 @@ export async function loadRoster(companyId: string): Promise<RosterProfile[]> {
     .select("id, full_name, aliases, is_active, position")
     .eq("company_id", companyId)
     .eq("is_active", true)
+    .neq("role", "tv")
     .order("id");
 
   if (error) throw new Error(`roster read failed: ${error.message}`);

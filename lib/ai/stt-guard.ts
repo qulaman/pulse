@@ -1,5 +1,5 @@
 import { normalize, tokens } from "../text/normalize";
-import { hintsToPrompt } from "./stt";
+import { hintSurfaces, hintsToPrompt } from "./stt";
 
 export type GuardCode = "too_dense" | "phantom" | "too_short" | "prompt_echo" | "loop" | "low_density";
 
@@ -43,7 +43,11 @@ function containsSequence(haystack: string[], needle: string[]): boolean {
   return false;
 }
 
-/** Verbatim chunk of the roster prompt, or a transcript built almost entirely out of hint words. */
+/**
+ * Verbatim chunk of the roster prompt, or a transcript built almost entirely out of
+ * names. The share check uses the name surfaces only: the prompt's own scaffolding
+ * («директор», «поручения», «компании») is ordinary speech and must not count.
+ */
 function isPromptEcho(words: string[], hints: string[]): boolean {
   if (!hints.length || words.length < ECHO_MIN_WORDS) return false;
   const hintWords = tokens(hintsToPrompt(hints));
@@ -52,7 +56,7 @@ function isPromptEcho(words: string[], hints: string[]): boolean {
     if (containsSequence(words, hintWords.slice(i, i + ECHO_NGRAM))) return true;
   }
 
-  const vocabulary = new Set(hintWords);
+  const vocabulary = new Set(tokens(hintSurfaces(hints).join(" ")));
   const hits = words.filter((w) => vocabulary.has(w)).length;
   return hits / words.length >= ECHO_SHARE;
 }

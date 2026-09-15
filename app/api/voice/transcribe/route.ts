@@ -33,7 +33,7 @@ const MODEL_BY_PROVIDER: Record<string, string> = {
   "openai-4o": "gpt-4o-transcribe",
   whisper1: "whisper-1",
   deepgram: "nova-3",
-  elevenlabs: "scribe_v1",
+  elevenlabs: "scribe_v2",
 };
 
 function modelOf(provider: string | undefined): string {
