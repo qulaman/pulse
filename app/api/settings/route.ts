@@ -27,6 +27,7 @@ export const PATCH = withAuth<SettingsPatch>(
     if (body.vocabulary) patch.vocabulary = [...new Set(body.vocabulary.map((v) => v.trim()).filter(Boolean))];
     // Empty rows are the editor's scratch space, not a convention.
     if (body.conventions) patch.conventions = body.conventions.filter((c) => c.phrase && c.meaning);
+    if (body.matching) patch.matching = { ...current.matching, ...body.matching };
     if (body.points_enabled !== undefined) patch.points_enabled = body.points_enabled;
     if (body.rating_mode) patch.rating_mode = body.rating_mode;
 

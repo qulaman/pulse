@@ -1,3 +1,4 @@
+import { resolveMatchingConfig, type MatchingConfig } from "./config";
 import type { ParseSource } from "./prompt";
 import type { Entity } from "./schema";
 import { matchName, type AssigneeMatch, type RosterUser } from "../matchName";
@@ -23,8 +24,10 @@ export function postprocess(
   entities: Entity[],
   roster: RosterUser[],
   source: ParseSource,
+  matching?: Partial<MatchingConfig>,
 ): PostprocessedEntity[] {
   const activeIds = new Set(roster.filter((u) => u.is_active).map((u) => u.id));
+  const matchingConfig = resolveMatchingConfig(matching);
   const out: PostprocessedEntity[] = [];
 
   for (const original of entities) {
@@ -67,6 +70,7 @@ export function postprocess(
           assignee_confidence: withAssignee.assignee_confidence,
         },
         roster,
+        matchingConfig,
       );
       entity.assignee = assignee;
       // The chip and the payload must agree: a matched name becomes the assignee_id here,

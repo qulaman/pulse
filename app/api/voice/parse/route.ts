@@ -102,9 +102,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       });
     }
 
-    const entities = body.suspicious
-      ? capSuspicious(postprocess(outcome.entities, roster, body.source))
-      : postprocess(outcome.entities, roster, body.source);
+    const processed = postprocess(outcome.entities, roster, body.source, settings.matching);
+    const entities = body.suspicious ? capSuspicious(processed) : processed;
 
     const raw = outcome.raw as { usage?: Json; stop_reason?: Json } | null;
     await supabase.from("ai_logs").insert({

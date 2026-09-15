@@ -26,6 +26,16 @@ export const ParserSettingsSchema = z.object({
   escalate: z.boolean().default(true),
 });
 
+/** Overrides only: an absent key keeps the default from lib/ai/config.ts. */
+export const MatchingSettingsSchema = z
+  .object({
+    autoThreshold: z.number().min(0).max(1),
+    minGap: z.number().min(0).max(1),
+    ambiguousThreshold: z.number().min(0).max(1),
+    modelConfidenceYellow: z.number().min(0).max(1),
+  })
+  .partial();
+
 export const DeliveryWindowSchema = z.object({
   from: z.string().regex(/^\d{2}:\d{2}$/).default("08:00"),
   to: z.string().regex(/^\d{2}:\d{2}$/).default("21:00"),
@@ -56,6 +66,8 @@ export const CompanySettingsSchema = z.object({
   vocabulary: z.array(z.string().min(1)).default([]),
   /** What «до обеда» means here (D-15); rendered into the parser prompt. */
   conventions: z.array(ConventionSchema).max(40).default(DEFAULT_CONVENTIONS),
+  /** Name-matcher thresholds (D-16, docs/AI.md §5) — tuned per company from the gate, no UI. */
+  matching: MatchingSettingsSchema.prefault({}),
   /** Points off during the pilot (D-40(в)); the director switches them on (D-48). */
   points_enabled: z.boolean().default(false),
   rating_mode: z.enum(["top5", "full"]).default("top5"),
@@ -78,6 +90,7 @@ export const SettingsPatchSchema = z
     parser: ParserSettingsSchema.partial(),
     vocabulary: z.array(z.string().trim().min(1)).max(200),
     conventions: z.array(ConventionSchema).max(40),
+    matching: MatchingSettingsSchema,
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
     delivery_window: DeliveryWindowSchema.partial(),

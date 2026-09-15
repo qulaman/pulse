@@ -203,13 +203,38 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
   const model = parserModel(input.model);
   const startedAt = Date.now();
 
-  const first = await callModel(client, model, input, MAX_TOKENS);
-  let usage = addUsage(emptyUsage(), first.usage);
-
   const escalate = input.escalate ?? true;
-  if (escalate && needsEscalation(input.transcript, first.entities)) {
-    const target = input.escalationModel ?? escalationModel();
-    const second = await callModel(client, target, input, MAX_TOKENS);
+  const target = input.escalationModel ?? escalationModel();
+
+  // A long transcript escalates no matter what Haiku says, so both calls start at once
+  // and the director waits for the slower one only, not for the sum (backlog, D-43).
+  const longTranscript = input.transcript.length > ESCALATION_TRANSCRIPT_CHARS;
+  const eager = escalate && longTranscript ? callModel(client, target, input, MAX_TOKENS) : null;
+  // Haiku's failure is irrelevant once Sonnet is already running; its success feeds usage.
+  const first = await callModel(client, model, input, MAX_TOKENS).catch((error: unknown) => {
+    if (eager) return null;
+    throw error;
+  });
+  let usage = addUsage(emptyUsage(), first?.usage ?? emptyUsage());
+
+  if (eager || (escalate && first && needsEscalation(input.transcript, first.entities))) {
+    // The stronger model failing is not fatal while the weaker parse is in hand.
+    const second = await (eager ?? callModel(client, target, input, MAX_TOKENS)).catch(
+      (error: unknown) => {
+        if (first) return null;
+        throw error;
+      },
+    );
+    if (!second) {
+      return {
+        entities: first!.entities,
+        model,
+        escalated: false,
+        usage,
+        latencyMs: Date.now() - startedAt,
+        raw: first!.raw,
+      };
+    }
     usage = addUsage(usage, second.usage);
     return {
       entities: second.entities,
@@ -221,6 +246,7 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
     };
   }
 
+  if (!first) throw new ParseError("parse_failed", `${model}: вызов парсера не удался`);
   return {
     entities: first.entities,
     model,

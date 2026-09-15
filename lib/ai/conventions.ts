@@ -21,6 +21,8 @@ export const DEFAULT_CONVENTIONS: Convention[] = [
   { phrase: "до обеда", meaning: "13:00 названного дня", confidence: 0.7 },
   { phrase: "к обеду", meaning: "12:30 названного дня", confidence: 0.7 },
   { phrase: "вечером / к вечеру / до вечера", meaning: "18:00 названного дня", confidence: 0.7 },
+  { phrase: "до конца дня / к концу дня", meaning: "18:00 названного дня", confidence: 0.7 },
+  { phrase: "после обеда", meaning: "14:00 названного дня", confidence: 0.6 },
   { phrase: "утром / с утра", meaning: "09:00 названного дня", confidence: 0.7 },
   { phrase: "к концу недели / до конца недели", meaning: "ближайшая пятница 18:00", confidence: 0.6 },
   { phrase: "на неделе", meaning: "ближайшая пятница 18:00", confidence: 0.5 },
