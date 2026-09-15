@@ -3,16 +3,18 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ParseResult } from "./schema";
 
 /**
- * Few-shot pairs П1–П8 (docs/AI.md §4), mapped onto the single demo roster
+ * Few-shot pairs П1–П9 (docs/AI.md §4), mapped onto the single demo roster
  * tests/stt/roster.json: Айгуль → u-005, Ерлан → u-001 (spoken as «Ерлану Б.», otherwise
- * the two Erlans are ambiguous), Марат → u-003, Сакен → u-004.
+ * the two Erlans are ambiguous), Марат → u-003, Сакен → u-004, Тимур → u-009, Жандос → u-010.
  * Context of every example: четверг, 13.08.2026 16:32 (+05:00), источник voice.
  * Nothing here may vary between requests — these messages are cached.
+ * The examples teach the FORMAT, not a client's world: counterparties are the neutral
+ * «Альфа», never a real partner of client №1 (code is client-agnostic, V-02).
  */
 export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
   // П1. Одиночная задача, явный дедлайн.
   {
-    user: "Марат, подготовь коммерческое предложение по Казхрому к пятнице к трём часам",
+    user: "Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам",
     assistant: {
       entities: [
         {
@@ -21,7 +23,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           assignee_id: "u-003",
           assignee_confidence: 0.98,
           group_id: null,
-          title: "Подготовить КП по Казхрому",
+          title: "Подготовить КП по Альфе",
           body: null,
           deadline_iso: "2026-08-14T15:00:00+05:00",
           deadline_confidence: 0.95,
@@ -29,7 +31,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           priority: "normal",
           scheduled_send_at: null,
           source_span:
-            "Марат, подготовь коммерческое предложение по Казхрому к пятнице к трём часам",
+            "Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам",
         },
       ],
     },
@@ -38,7 +40,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
   {
     user:
       "Так, всем: завтра в десять общее собрание в офисе, не опаздывать. " +
-      "Айгуль, подготовь акт сверки по Казхрому завтра до обеда. " +
+      "Айгуль, подготовь акт сверки по Альфе завтра до обеда. " +
       "Сакен, срочно закрой наряды по третьему объекту сегодня до вечера. " +
       "И Ерлану Б. плюс десять за вчерашнюю поставку",
     assistant: {
@@ -54,14 +56,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           assignee_id: "u-005",
           assignee_confidence: 0.97,
           group_id: null,
-          title: "Подготовить акт сверки по Казхрому",
+          title: "Подготовить акт сверки по Альфе",
           body: null,
           deadline_iso: "2026-08-14T13:00:00+05:00",
           deadline_confidence: 0.7,
           deadline_source_text: "завтра до обеда",
           priority: "normal",
           scheduled_send_at: null,
-          source_span: "Айгуль, подготовь акт сверки по Казхрому завтра до обеда",
+          source_span: "Айгуль, подготовь акт сверки по Альфе завтра до обеда",
         },
         {
           kind: "task",
@@ -92,7 +94,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
   },
   // П3. Телеграфный стиль.
   {
-    user: "марат кп казхром завтра до обеда, ерлану б +10",
+    user: "марат кп альфа завтра до обеда, ерлану б +10",
     assistant: {
       entities: [
         {
@@ -101,14 +103,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           assignee_id: "u-003",
           assignee_confidence: 0.95,
           group_id: null,
-          title: "КП по Казхрому",
+          title: "КП по Альфе",
           body: null,
           deadline_iso: "2026-08-14T13:00:00+05:00",
           deadline_confidence: 0.7,
           deadline_source_text: "завтра до обеда",
           priority: "normal",
           scheduled_send_at: null,
-          source_span: "марат кп казхром завтра до обеда",
+          source_span: "марат кп альфа завтра до обеда",
         },
         {
           kind: "points",
@@ -170,13 +172,13 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
   },
   // П6. Вопрос к системе.
   {
-    user: "Что там по Казхрому и кто сегодня не отчитался?",
+    user: "Что там по Альфе и кто сегодня не отчитался?",
     assistant: {
       entities: [
         {
           kind: "query",
-          question: "Что там по Казхрому и кто сегодня не отчитался?",
-          source_span: "Что там по Казхрому и кто сегодня не отчитался?",
+          question: "Что там по Альфе и кто сегодня не отчитался?",
+          source_span: "Что там по Альфе и кто сегодня не отчитался?",
         },
       ],
     },

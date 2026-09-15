@@ -105,7 +105,7 @@ export const STT_PROVIDER_LABEL: Record<SttProviderKey, string> = {
   openai: "OpenAI gpt-4o-transcribe (основной по гейту)",
   whisper1: "OpenAI whisper-1 (контроль)",
   deepgram: "Deepgram nova-3",
-  elevenlabs: "ElevenLabs Scribe",
+  elevenlabs: "ElevenLabs Scribe v2 — запасной (D-53)",
 };
 
 export const PARSER_MODEL_LABEL: Record<string, string> = {
