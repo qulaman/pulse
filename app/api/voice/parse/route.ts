@@ -83,6 +83,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         model: settings.parser.model,
         escalate: settings.parser.escalate,
         escalationModel: settings.parser.escalation_model,
+        conventions: settings.conventions,
       });
     } catch (error) {
       const code = error instanceof ParseError ? error.code : "parse_failed";

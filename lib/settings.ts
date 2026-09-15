@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
+
 /**
  * company.settings — everything client-specific lives here, never in code (V-02).
  * Unknown keys are kept (other subsystems own theirs); known keys get defaults.
@@ -52,6 +54,8 @@ export const CompanySettingsSchema = z.object({
   parser: ParserSettingsSchema.prefault({}),
   /** Counterparties and site names — STT prompt hints (docs/AI.md §1). */
   vocabulary: z.array(z.string().min(1)).default([]),
+  /** What «до обеда» means here (D-15); rendered into the parser prompt. */
+  conventions: z.array(ConventionSchema).max(40).default(DEFAULT_CONVENTIONS),
   /** Points off during the pilot (D-40(в)); the director switches them on (D-48). */
   points_enabled: z.boolean().default(false),
   rating_mode: z.enum(["top5", "full"]).default("top5"),
@@ -73,6 +77,7 @@ export const SettingsPatchSchema = z
     stt: SttSettingsSchema.partial(),
     parser: ParserSettingsSchema.partial(),
     vocabulary: z.array(z.string().trim().min(1)).max(200),
+    conventions: z.array(ConventionSchema).max(40),
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
     delivery_window: DeliveryWindowSchema.partial(),

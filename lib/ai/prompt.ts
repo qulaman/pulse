@@ -1,5 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
+import { DEFAULT_CONVENTIONS, renderConventionsTable, type Convention } from "./conventions";
 import { formatAqtobe, upcomingDaysRu, weekdayRu } from "./time";
 import type { RosterUser } from "../matchName";
 
@@ -9,7 +10,15 @@ import type { RosterUser } from "../matchName";
  * time lives in the user message only.
  */
 
-export const PARSER_SYSTEM_PROMPT = `Ты — парсер устных распоряжений директора компании в системе управления задачами.
+/**
+ * The static text with the company's convention table rendered in. Per company the
+ * result is a constant, so the cached prefix (this + roster + few-shot) still holds.
+ */
+export function parserSystemPrompt(conventions: Convention[] = DEFAULT_CONVENTIONS): string {
+  return PARSER_SYSTEM_TEMPLATE.replace("{CONVENTIONS_TABLE}", renderConventionsTable(conventions));
+}
+
+const PARSER_SYSTEM_TEMPLATE = `Ты — парсер устных распоряжений директора компании в системе управления задачами.
 Твоя единственная задача: разобрать транскрипт речи (или пересланный текст) на массив
 структурированных сущностей строго по заданной JSON-схеме. Речь смешанная,
 русско-казахская, часто телеграфная и с ошибками распознавания.
@@ -35,16 +44,7 @@ export const PARSER_SYSTEM_PROMPT = `Ты — парсер устных расп
    время и день недели даны в сообщении пользователя — относительные даты («завтра»,
    «к пятнице») считай от них.
 3. Конвенции времени компании (утверждены директором):
-   | Сказано              | Означает                          | deadline_confidence |
-   |----------------------|-----------------------------------|---------------------|
-   | до обеда             | 13:00 названного дня              | 0.7                 |
-   | к обеду              | 12:30                             | 0.7                 |
-   | вечером / к вечеру   | 18:00                             | 0.7                 |
-   | утром                | 09:00                             | 0.7                 |
-   | к концу недели       | ближайшая пятница 18:00           | 0.6                 |
-   | на неделе            | ближайшая пятница 18:00           | 0.5                 |
-   | к <дню недели>       | этот день 09:00                   | 0.6                 |
-   | явное время («к 15:00», «завтра в 10») | как сказано      | 0.9–1.0             |
+{CONVENTIONS_TABLE}
    Дедлайн не назван вовсе → null (НЕ подставляй конвенцию сам).
 4. Исполнителя матчь по ростеру сам: в assignee_queries — упоминание дословно, как в
    речи (в исходном падеже); в assignee_id — id наиболее подходящего сотрудника;
@@ -86,6 +86,9 @@ export const PARSER_SYSTEM_PROMPT = `Ты — парсер устных расп
     этому сотруднику; title — предмет как действие («Купить сигареты», «Принести
     кофе»). Одно слово без имени — не сущность.`;
 
+/** Default-company prompt — evals and tests read it; the API renders per company. */
+export const PARSER_SYSTEM_PROMPT = parserSystemPrompt();
+
 export type ParseSource = "voice" | "typed" | "shared";
 
 export interface RosterPromptUser {
@@ -109,9 +112,12 @@ export function rosterJson(roster: RosterUser[]): string {
   return JSON.stringify(users, null, 1);
 }
 
-export function buildSystemBlocks(roster: RosterUser[]): Anthropic.TextBlockParam[] {
+export function buildSystemBlocks(
+  roster: RosterUser[],
+  conventions: Convention[] = DEFAULT_CONVENTIONS,
+): Anthropic.TextBlockParam[] {
   return [
-    { type: "text", text: PARSER_SYSTEM_PROMPT },
+    { type: "text", text: parserSystemPrompt(conventions) },
     {
       type: "text",
       text: rosterJson(roster),

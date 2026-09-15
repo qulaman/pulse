@@ -113,6 +113,8 @@ export function SettingsForm() {
   }
 
   const update = (patch: Partial<CompanySettings>) => setDraft({ ...draft, ...patch });
+  const updateConvention = (index: number, patch: Partial<CompanySettings["conventions"][number]>) =>
+    update({ conventions: draft.conventions.map((row, i) => (i === index ? { ...row, ...patch } : row)) });
 
   const submit = () => {
     const vocabulary = vocabularyText
@@ -123,6 +125,7 @@ export function SettingsForm() {
       stt: draft.stt,
       parser: draft.parser,
       vocabulary,
+      conventions: draft.conventions.filter((c) => c.phrase.trim() && c.meaning.trim()),
       points_enabled: draft.points_enabled,
       rating_mode: draft.rating_mode,
       delivery_window: draft.delivery_window,
@@ -186,6 +189,46 @@ export function SettingsForm() {
           onChange={(e) => setVocabularyText(e.target.value)}
           placeholder="Казхром, КазАзот, ERG, Актобе-склад"
         />
+      </Section>
+
+      <Section title="Слова о сроках" hint="Что значит «до обеда» или «к вечеру» именно у вас. Слева — как говорите, справа — во сколько это.">
+        <div className="flex flex-col gap-2">
+          {draft.conventions.map((row, index) => (
+            <div key={index} className="grid grid-cols-[1fr_1fr_44px] items-center gap-2">
+              <input
+                className={FIELD}
+                aria-label="Как говорите"
+                placeholder="до обеда"
+                value={row.phrase}
+                onChange={(e) => updateConvention(index, { phrase: e.target.value })}
+              />
+              <input
+                className={FIELD}
+                aria-label="Означает"
+                placeholder="13:00 названного дня"
+                value={row.meaning}
+                onChange={(e) => updateConvention(index, { meaning: e.target.value })}
+              />
+              <button
+                type="button"
+                aria-label="Убрать строку"
+                className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
+                onClick={() => update({ conventions: draft.conventions.filter((_, i) => i !== index) })}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <Button
+          variant="secondary"
+          block
+          onClick={() =>
+            update({ conventions: [...draft.conventions, { phrase: "", meaning: "", confidence: 0.7 }] })
+          }
+        >
+          Добавить слово
+        </Button>
       </Section>
 
       <Section title="Очки и рейтинг" hint="Во время пилота очки выключены (D-40). Включи, когда команда привыкнет к задачам.">

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+import type { Convention } from "./conventions";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
 import { ENTITIES_JSON_SCHEMA, ParseResultSchema, type Entity } from "./schema";
@@ -44,6 +45,8 @@ export interface ParseInput {
   escalate?: boolean;
   /** Overrides PARSER_ESCALATION_MODEL (company.settings.parser.escalation_model). */
   escalationModel?: string;
+  /** company.settings.conventions (D-15); the defaults when absent. */
+  conventions?: Convention[];
 }
 
 const MAX_TOKENS = 4096;
@@ -140,7 +143,7 @@ async function callModel(
       model,
       max_tokens: maxTokens,
       thinking: thinkingFor(model),
-      system: buildSystemBlocks(input.roster),
+      system: buildSystemBlocks(input.roster, input.conventions),
       messages: [
         ...fewShotMessages(),
         {
