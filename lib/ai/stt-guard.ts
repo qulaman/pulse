@@ -23,10 +23,12 @@ export const PHANTOMS: readonly string[] = [
 const PHANTOMS_NORMALIZED = PHANTOMS.map(normalize);
 
 const MAX_CHARS_PER_SEC = 30;
-const LOW_DENSITY_DROP = 4;
 const LOW_DENSITY_SUSPICIOUS = 6;
 const LOW_DENSITY_MIN_MS = 3000;
-const MIN_WORDS = 3;
+// A two-word order («Марат сигареты», «Жандос кофе») is a real command; only a lone
+// word («Ага», «Да») is the shape of Whisper on silence (D-52).
+const MIN_WORDS = 2;
+const ECHO_MIN_WORDS = 3;
 const ECHO_NGRAM = 4;
 const ECHO_SHARE = 0.6;
 const LOOP_COVERAGE = 0.7;
@@ -43,7 +45,7 @@ function containsSequence(haystack: string[], needle: string[]): boolean {
 
 /** Verbatim chunk of the roster prompt, or a transcript built almost entirely out of hint words. */
 function isPromptEcho(words: string[], hints: string[]): boolean {
-  if (!hints.length || words.length < MIN_WORDS) return false;
+  if (!hints.length || words.length < ECHO_MIN_WORDS) return false;
   const hintWords = tokens(hintsToPrompt(hints));
 
   for (let i = 0; i + ECHO_NGRAM <= hintWords.length; i++) {
@@ -77,6 +79,11 @@ function isLoop(words: string[]): boolean {
 /**
  * Pure guard between STT and the parser (AI.md §1 (б)–(ж)). Every ok:false becomes
  * `empty_transcript` for the client and `stt_guard:<code>` in ai_logs.
+ *
+ * Hard drops are reserved for transcripts that cannot be speech at all (phantoms,
+ * prompt echo, loops, impossible density). Anything that might be the director
+ * talking slowly or briefly goes through as `suspicious` — the director sees it on
+ * /confirm with a yellow chip and decides (D-52).
  */
 export function guardTranscript(input: GuardInput): GuardResult {
   const normalized = normalize(input.text);
@@ -93,11 +100,8 @@ export function guardTranscript(input: GuardInput): GuardResult {
   if (seconds > 0) {
     const density = normalized.length / seconds;
     if (density > MAX_CHARS_PER_SEC) return { ok: false, code: "too_dense" };
-    if (input.durationMs > LOW_DENSITY_MIN_MS) {
-      if (density < LOW_DENSITY_DROP) return { ok: false, code: "low_density" };
-      if (density < LOW_DENSITY_SUSPICIOUS) {
-        return { ok: true, suspicious: true, reason: "low_density" };
-      }
+    if (input.durationMs > LOW_DENSITY_MIN_MS && density < LOW_DENSITY_SUSPICIOUS) {
+      return { ok: true, suspicious: true, reason: "low_density" };
     }
   }
 

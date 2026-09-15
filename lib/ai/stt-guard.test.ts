@@ -24,11 +24,24 @@ describe("guardTranscript", () => {
     });
   });
 
-  it("too_short: fewer than three words", () => {
+  it("too_short: a lone word", () => {
     expect(guardTranscript({ text: "Ага", durationMs: 4000, vocabularyHints: HINTS })).toEqual({
       ok: false,
       code: "too_short",
     });
+  });
+
+  // D-52: «Марат сигареты» is an order, not silence — it must reach the parser.
+  it("passes a two-word telegraphic order", () => {
+    expect(
+      guardTranscript({ text: "Марат сигареты", durationMs: 1500, vocabularyHints: HINTS }),
+    ).toEqual({ ok: true, suspicious: false });
+  });
+
+  it("a two-word transcript is never treated as prompt echo", () => {
+    expect(
+      guardTranscript({ text: "Марат Казхром", durationMs: 1500, vocabularyHints: HINTS }),
+    ).toEqual({ ok: true, suspicious: false });
   });
 
   it("phantom: known Whisper filler", () => {
@@ -59,14 +72,16 @@ describe("guardTranscript", () => {
     });
   });
 
-  it("low_density: 5 с / 22 симв is suspicious, 5 с / 15 симв is dropped", () => {
+  // Slow speech with pauses looks exactly like noise to a density check; the director
+  // decides on /confirm, the guard only flags (D-52).
+  it("low_density: sparse speech is suspicious, never dropped", () => {
     expect(
       guardTranscript({ text: "Марат сделай КП завтра", durationMs: 5000, vocabularyHints: HINTS }),
     ).toEqual({ ok: true, suspicious: true, reason: "low_density" });
 
     expect(
       guardTranscript({ text: "Марат КП завтра", durationMs: 5000, vocabularyHints: HINTS }),
-    ).toEqual({ ok: false, code: "low_density" });
+    ).toEqual({ ok: true, suspicious: true, reason: "low_density" });
   });
 
   // Live failure 2026-08-20: whisper returned a verbatim slice of the roster prompt

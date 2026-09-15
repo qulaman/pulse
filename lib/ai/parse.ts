@@ -100,7 +100,13 @@ function needsEscalation(transcript: string, entities: Entity[]): boolean {
   if (transcript.length > ESCALATION_TRANSCRIPT_CHARS) return true;
   if (entities.length > ESCALATION_ENTITY_COUNT) return true;
   return entities.some((entity) => {
-    if ("assignee_confidence" in entity && entity.assignee_confidence < ESCALATION_ASSIGNEE_CONFIDENCE) {
+    // A task nobody was named for legitimately carries confidence 0 (prompt rule 1):
+    // the stronger model has no name to resolve either, so a second call buys nothing.
+    if (
+      "assignee_confidence" in entity &&
+      entity.assignee_queries.length > 0 &&
+      entity.assignee_confidence < ESCALATION_ASSIGNEE_CONFIDENCE
+    ) {
       return true;
     }
     return (
