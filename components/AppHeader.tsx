@@ -1,5 +1,6 @@
 import { PulseMark } from "@/components/brand/PulseMark";
 import { loadBrand } from "@/lib/brand";
+import { firstNameOf } from "@/lib/text/normalize";
 
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -37,7 +38,8 @@ export async function AppHeader({ fullName, companyId }: { fullName: string; com
           <PulseMark />
         )}
         <div className="flex min-w-0 shrink-0 items-center gap-2">
-          <span className="max-w-[140px] truncate text-[13px] leading-4 text-muted">{fullName}</span>
+          {/* first name only: «Марат Оспанов» next to the client's name left «West Arla…» on a phone */}
+          <span className="max-w-[110px] truncate text-[13px] leading-4 text-muted">{firstNameOf(fullName)}</span>
           <span
             aria-hidden
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-bg"

@@ -116,9 +116,12 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
         type="button"
         onClick={replay}
         aria-label="Повторить доклад"
-        className="mx-auto flex h-[168px] w-[168px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96]"
+        className="mx-auto flex h-[168px] w-[168px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96] [@media(max-height:760px)]:h-[128px] [@media(max-height:760px)]:w-[128px]"
       >
-        <Mascot state={mascot} size={144} />
+        {/* a short phone (iPhone SE class) gives the briefing one more line instead of a larger face */}
+        <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.78]">
+          <Mascot state={mascot} size={144} />
+        </span>
       </button>
 
       <div className="mt-3 flex flex-col gap-3" aria-live="polite">
