@@ -12,11 +12,21 @@ import { z } from "zod";
 export const PrioritySchema = z.enum(["high", "normal", "low"]);
 export type Priority = z.infer<typeof PrioritySchema>;
 
+/**
+ * What the MODEL says about the assignee: the verbatim mention and the roster's
+ * full_name copied verbatim, or null. Names it copies reliably; ids it does not —
+ * on a real (uuid) roster it echoed few-shot ids in every call (D-56). The id is the
+ * server's to fill from the name (`assigneeId` below), and it is kept out of the model
+ * schema: the API caps nullable fields at 16 and the id would be a wasted one.
+ */
 const assigneeFields = {
   assignee_queries: z.array(z.string()), // verbatim mentions as heard; [] if none
-  assignee_id: z.string().nullable(), // roster id matched by the model
+  assignee_name: z.string().nullable(),
   assignee_confidence: z.number(), // 0..1
 };
+
+/** App-side addition: set by postprocess from the match, what confirm and the UI use. */
+const assigneeId = { assignee_id: z.string().nullable() };
 
 export const AnnouncementEntitySchema = z.strictObject({
   kind: z.literal("announcement"),
@@ -24,7 +34,7 @@ export const AnnouncementEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
-export const TaskEntitySchema = z.strictObject({
+const ModelTaskEntitySchema = z.strictObject({
   kind: z.literal("task"),
   ...assigneeFields,
   group_id: z.string().nullable(), // same for copies born from one multi-assignee phrase
@@ -38,7 +48,7 @@ export const TaskEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
-export const PointsEntitySchema = z.strictObject({
+const ModelPointsEntitySchema = z.strictObject({
   kind: z.literal("points"),
   ...assigneeFields,
   amount: z.number(),
@@ -53,7 +63,7 @@ export const ReminderEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
-export const RecurrenceEntitySchema = z.strictObject({
+const ModelRecurrenceEntitySchema = z.strictObject({
   kind: z.literal("recurrence"),
   ...assigneeFields,
   title: z.string(),
@@ -61,13 +71,18 @@ export const RecurrenceEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
-export const DelegationEntitySchema = z.strictObject({
+const ModelDelegationEntitySchema = z.strictObject({
   kind: z.literal("delegation"),
   ...assigneeFields,
   title: z.string(),
   note: z.string().nullable(),
   source_span: z.string(),
 });
+
+export const TaskEntitySchema = ModelTaskEntitySchema.extend(assigneeId);
+export const PointsEntitySchema = ModelPointsEntitySchema.extend(assigneeId);
+export const RecurrenceEntitySchema = ModelRecurrenceEntitySchema.extend(assigneeId);
+export const DelegationEntitySchema = ModelDelegationEntitySchema.extend(assigneeId);
 
 export const QueryEntitySchema = z.strictObject({
   kind: z.literal("query"),
@@ -86,6 +101,24 @@ export const EntitySchema = z.discriminatedUnion("kind", [
 ]);
 
 export const ParseResultSchema = z.strictObject({ entities: z.array(EntitySchema) });
+
+/** The contract the API enforces: no assignee_id — that field is born in postprocess. */
+export const ModelEntitySchema = z.discriminatedUnion("kind", [
+  AnnouncementEntitySchema,
+  ModelTaskEntitySchema,
+  ModelPointsEntitySchema,
+  ReminderEntitySchema,
+  ModelRecurrenceEntitySchema,
+  ModelDelegationEntitySchema,
+  QueryEntitySchema,
+]);
+export const ModelParseResultSchema = z.strictObject({ entities: z.array(ModelEntitySchema) });
+export type ModelEntity = z.infer<typeof ModelEntitySchema>;
+
+/** A model entity becomes an app entity once the server owns the id (null until matched). */
+export function withAssigneeId(entity: ModelEntity): Entity {
+  return "assignee_name" in entity ? { ...entity, assignee_id: null } : entity;
+}
 
 export type AnnouncementEntity = z.infer<typeof AnnouncementEntitySchema>;
 export type TaskEntity = z.infer<typeof TaskEntitySchema>;
@@ -150,4 +183,4 @@ function hardenMap(value: unknown): unknown {
   return out;
 }
 
-export const ENTITIES_JSON_SCHEMA = harden(z.toJSONSchema(ParseResultSchema)) as JsonSchemaNode;
+export const ENTITIES_JSON_SCHEMA = harden(z.toJSONSchema(ModelParseResultSchema)) as JsonSchemaNode;

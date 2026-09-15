@@ -8,6 +8,7 @@ function task(overrides: Partial<TaskEntity> = {}): TaskEntity {
     kind: "task",
     assignee_queries: ["Марат"],
     assignee_id: "u-003",
+    assignee_name: null,
     assignee_confidence: 0.95,
     group_id: null,
     title: "КП по Казхрому",

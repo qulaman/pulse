@@ -7,7 +7,7 @@ import { matchName, trigramSimilarity, type RosterUser } from "./matchName";
 const ROSTER: RosterUser[] = rosterFixture.users.map((u) => ({ ...u, is_active: true }));
 
 function byQuery(query: string, roster: RosterUser[] = ROSTER) {
-  return matchName({ assignee_id: null, assignee_queries: [query], assignee_confidence: 0 }, roster);
+  return matchName({ assignee_id: null, assignee_name: null, assignee_queries: [query], assignee_confidence: 0 }, roster);
 }
 
 describe("trigramSimilarity", () => {
@@ -55,14 +55,14 @@ describe("matchName: model id", () => {
   it("trusts a valid active id and flags low model confidence", () => {
     expect(
       matchName(
-        { assignee_id: "u-003", assignee_queries: ["Марату"], assignee_confidence: 0.6 },
+        { assignee_id: "u-003", assignee_name: null, assignee_queries: ["Марату"], assignee_confidence: 0.6 },
         ROSTER,
       ),
     ).toMatchObject({ status: "matched", user_id: "u-003", flag: "check" });
 
     expect(
       matchName(
-        { assignee_id: "u-003", assignee_queries: ["Марату"], assignee_confidence: 0.95 },
+        { assignee_id: "u-003", assignee_name: null, assignee_queries: ["Марату"], assignee_confidence: 0.95 },
         ROSTER,
       ),
     ).toMatchObject({ status: "matched", flag: "ok" });
@@ -70,19 +70,47 @@ describe("matchName: model id", () => {
 
   it("overrides the model id when a bare first name has namesakes", () => {
     expect(
-      matchName({ assignee_id: "u-001", assignee_queries: ["Ерлану"], assignee_confidence: 0.95 }, ROSTER),
+      matchName({ assignee_id: "u-001", assignee_name: null, assignee_queries: ["Ерлану"], assignee_confidence: 0.95 }, ROSTER),
     ).toMatchObject({ status: "ambiguous", user_id: null });
     expect(
-      matchName({ assignee_id: "u-001", assignee_queries: ["Ерлану Б."], assignee_confidence: 0.95 }, ROSTER),
+      matchName({ assignee_id: "u-001", assignee_name: null, assignee_queries: ["Ерлану Б."], assignee_confidence: 0.95 }, ROSTER),
     ).toMatchObject({ status: "matched", user_id: "u-001" });
   });
 
   it("falls back to fuzzy when the id is not in the roster", () => {
     expect(
       matchName(
-        { assignee_id: "u-999", assignee_queries: ["Марату"], assignee_confidence: 0.9 },
+        { assignee_id: "u-999", assignee_name: null, assignee_queries: ["Марату"], assignee_confidence: 0.9 },
         ROSTER,
       ),
+    ).toMatchObject({ status: "matched", user_id: "u-003" });
+  });
+
+  // D-56: the model copies few-shot ids on a real roster; an exact alias must not cost a yellow chip.
+  it("an exact alias match with a foreign id is auto-filled without «проверь»", () => {
+    expect(
+      matchName({ assignee_id: "u-777", assignee_name: null, assignee_queries: ["Марат"], assignee_confidence: 0.97 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-003", flag: "ok" });
+    // a declined form stems to the same surface — exact too; a misspelling is not
+    expect(
+      matchName({ assignee_id: "u-999", assignee_name: null, assignee_queries: ["Марату"], assignee_confidence: 0.9 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-003", flag: "ok" });
+    expect(
+      matchName({ assignee_id: "u-999", assignee_name: null, assignee_queries: ["Марад"], assignee_confidence: 0.9 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-003", flag: "check" });
+  });
+
+  // D-56: the model names the person; the name is the primary channel, the id is the server's.
+  it("a roster full_name from the model wins over a foreign id and keeps the confidence flag", () => {
+    expect(
+      matchName({ assignee_id: "u-005", assignee_name: "Марат Оспанов", assignee_queries: ["Марату"], assignee_confidence: 0.97 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-003", flag: "ok" });
+    expect(
+      matchName({ assignee_id: null, assignee_name: "марат оспанов", assignee_queries: ["Марату"], assignee_confidence: 0.6 }, ROSTER),
+    ).toMatchObject({ status: "matched", user_id: "u-003", flag: "check" });
+    // a name that is not on the roster falls through to the fuzzy match on the mention
+    expect(
+      matchName({ assignee_id: null, assignee_name: "Марат Иванов", assignee_queries: ["Марату"], assignee_confidence: 0.9 }, ROSTER),
     ).toMatchObject({ status: "matched", user_id: "u-003" });
   });
 
@@ -91,7 +119,7 @@ describe("matchName: model id", () => {
     expect(byQuery("Марат", roster)).toMatchObject({ status: "unmatched", user_id: null });
     expect(
       matchName(
-        { assignee_id: "u-003", assignee_queries: ["Марат"], assignee_confidence: 0.9 },
+        { assignee_id: "u-003", assignee_name: null, assignee_queries: ["Марат"], assignee_confidence: 0.9 },
         roster,
       ),
     ).toMatchObject({ status: "unmatched" });
@@ -103,7 +131,7 @@ describe("matchName: thresholds come from config", () => {
     { id: "a", full_name: "Марат Оспанов", aliases: ["Марат"], is_active: true },
     { id: "b", full_name: "Мурат Оспанов", aliases: ["Мурат"], is_active: true },
   ];
-  const input = { assignee_id: null, assignee_queries: ["Марат"], assignee_confidence: 0 };
+  const input = { assignee_id: null, assignee_name: null, assignee_queries: ["Марат"], assignee_confidence: 0 };
 
   it("auto-fills only while the gap clears minGap", () => {
     const scores = matchName(input, roster).candidates;

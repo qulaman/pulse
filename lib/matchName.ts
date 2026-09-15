@@ -16,6 +16,8 @@ export type AssigneeMatch = {
 };
 
 export interface MatchNameInput {
+  /** roster full_name copied by the model (D-56) — the primary channel */
+  assignee_name?: string | null;
   assignee_id: string | null;
   assignee_queries: string[];
   assignee_confidence: number;
@@ -103,9 +105,12 @@ export function matchName(
     }
   }
 
-  // 1. The model's own id, if it points at an active roster member.
-  if (input.assignee_id) {
-    const user = active.find((u) => u.id === input.assignee_id);
+  // 1. The model's pick: the full name it copied from the roster (D-56), or — for
+  // callers that still hand over an id — an id that points at an active member.
+  const named = input.assignee_name ? normalize(input.assignee_name) : "";
+  const byName = named ? active.find((u) => normalize(u.full_name) === named) : undefined;
+  if (byName || input.assignee_id) {
+    const user = byName ?? active.find((u) => u.id === input.assignee_id);
     if (user) {
       return {
         status: "matched",
@@ -141,9 +146,12 @@ export function matchName(
     .slice(0, MAX_CANDIDATES);
   const gap = best.score - (scored[1]?.score ?? 0);
 
-  // 3. Confident enough and clearly ahead of the runner-up — auto-fill, still a yellow chip.
+  // 3. Confident enough and clearly ahead of the runner-up — auto-fill. An exact surface
+  // match («Айгуль» = her alias) is D-16's «точное совпадение → авто»: no yellow chip,
+  // whatever id the model wrote (it copies few-shot ids on a real roster, D-56).
   if (best.score >= cfg.autoThreshold && gap >= cfg.minGap) {
-    return { status: "matched", user_id: best.user_id, candidates, flag: "check" };
+    const exact = best.score === 1 && (scored[1]?.score ?? 0) < 1;
+    return { status: "matched", user_id: best.user_id, candidates, flag: exact ? "ok" : "check" };
   }
 
   return { status: "ambiguous", user_id: null, candidates, flag: "check" };

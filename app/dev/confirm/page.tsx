@@ -17,6 +17,8 @@ const FIXTURE: PostprocessedEntity[] = [
     kind: "task",
     assignee_queries: ["Марат"],
     assignee_id: MARAT,
+
+    assignee_name: null,
     assignee_confidence: 0.95,
     group_id: null,
     title: "Подготовить КП для Казхрома",
@@ -38,6 +40,8 @@ const FIXTURE: PostprocessedEntity[] = [
     kind: "task",
     assignee_queries: ["Ерлан"],
     assignee_id: null,
+
+    assignee_name: null,
     assignee_confidence: 0.5,
     group_id: null,
     title: "Съездить на объект в Актобе",
@@ -63,6 +67,8 @@ const FIXTURE: PostprocessedEntity[] = [
     kind: "task",
     assignee_queries: ["Динара из Казхрома"],
     assignee_id: null,
+
+    assignee_name: null,
     assignee_confidence: 0.1,
     group_id: null,
     title: "Согласовать смету по складу",
@@ -85,6 +91,8 @@ const FIXTURE: PostprocessedEntity[] = [
     kind: "points",
     assignee_queries: ["Марат"],
     assignee_id: MARAT,
+
+    assignee_name: null,
     assignee_confidence: 0.95,
     amount: 10,
     reason: "за скорость по КП",

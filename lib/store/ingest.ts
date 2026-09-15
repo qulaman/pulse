@@ -419,6 +419,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         kind: "task",
         assignee_queries: [],
         assignee_id: null,
+        assignee_name: null,
         assignee_confidence: 0,
         group_id: null,
         title: transcript,

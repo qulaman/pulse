@@ -18,6 +18,8 @@ const TASK: TaskEntity = {
   kind: "task",
   assignee_queries: ["Марату"],
   assignee_id: "u-003",
+
+  assignee_name: null,
   assignee_confidence: 0.9,
   group_id: null,
   title: "КП по Казхрому",

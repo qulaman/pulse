@@ -3,7 +3,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { Convention } from "./conventions";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
-import { ENTITIES_JSON_SCHEMA, ParseResultSchema, type Entity } from "./schema";
+import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, withAssigneeId, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 export type ParseErrorCode = "parse_refused" | "parse_failed";
@@ -178,7 +178,7 @@ async function callModel(
     throw new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
   }
   // The API enforces the schema; this is the safety net and the typed boundary.
-  const parsed = ParseResultSchema.safeParse(json);
+  const parsed = ModelParseResultSchema.safeParse(json);
   if (!parsed.success) {
     throw new ParseError(
       "parse_failed",
@@ -188,7 +188,7 @@ async function callModel(
   }
 
   return {
-    entities: parsed.data.entities,
+    entities: parsed.data.entities.map(withAssigneeId),
     usage: readUsage(message.usage),
     raw: message,
   };

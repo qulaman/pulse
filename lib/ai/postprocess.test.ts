@@ -15,6 +15,8 @@ function task(overrides: Partial<TaskEntity> = {}): TaskEntity {
     kind: "task",
     assignee_queries: ["Марат"],
     assignee_id: "u-003",
+
+    assignee_name: null,
     assignee_confidence: 0.95,
     group_id: null,
     title: "КП по Казхрому",
@@ -34,6 +36,8 @@ function points(overrides: Partial<PointsEntity> = {}): PointsEntity {
     kind: "points",
     assignee_queries: ["Марату"],
     assignee_id: "u-003",
+
+    assignee_name: null,
     assignee_confidence: 0.95,
     amount: 10,
     reason: null,
@@ -47,12 +51,12 @@ const run = (entities: Entity[], source: "voice" | "typed" | "shared" = "voice")
 
 describe("postprocess", () => {
   it("drops an assignee_id that is missing from the roster or inactive", () => {
-    const [invented] = run([task({ assignee_id: "u-999", assignee_queries: ["Марат"] })]);
+    const [invented] = run([task({ assignee_id: "u-999", assignee_name: null, assignee_queries: ["Марат"] })]);
     // the fuzzy match replaces the invented id, so the payload agrees with the chip
     expect(invented.kind === "task" && invented.assignee_id).toBe("u-003");
     expect(invented.assignee).toMatchObject({ status: "matched", user_id: "u-003" });
 
-    const [inactive] = run([task({ assignee_id: "u-009", assignee_queries: ["Тимур"] })]);
+    const [inactive] = run([task({ assignee_id: "u-009", assignee_name: null, assignee_queries: ["Тимур"] })]);
     expect(inactive.kind === "task" && inactive.assignee_id).toBeNull();
     expect(inactive.assignee?.status).toBe("unmatched");
     expect(inactive.blocked).toBe("assignee_unmatched");
@@ -92,7 +96,7 @@ describe("postprocess", () => {
       { id: "u-001", full_name: "Ерлан Байжанов", aliases: ["Ерлан"], is_active: true },
       { id: "u-002", full_name: "Ерлан Досов", aliases: ["Ерлан"], is_active: true },
     ];
-    const [entity] = postprocess([task({ assignee_id: "u-001", assignee_queries: ["Ерлану"] })], roster, "voice");
+    const [entity] = postprocess([task({ assignee_id: "u-001", assignee_name: null, assignee_queries: ["Ерлану"] })], roster, "voice");
     expect(entity.kind === "task" && entity.assignee_id).toBeNull();
     expect(entity.assignee?.status).toBe("ambiguous");
     expect(entity.blocked).toBe("assignee_unmatched");

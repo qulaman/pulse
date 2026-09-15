@@ -59,12 +59,14 @@ export function postprocess(
 
     if (HAS_ASSIGNEE_FIELDS.has(entity.kind)) {
       const withAssignee = entity as PostprocessedEntity & {
+        assignee_name: string | null;
         assignee_id: string | null;
         assignee_queries: string[];
         assignee_confidence: number;
       };
       const assignee = matchName(
         {
+          assignee_name: withAssignee.assignee_name,
           assignee_id: withAssignee.assignee_id,
           assignee_queries: withAssignee.assignee_queries,
           assignee_confidence: withAssignee.assignee_confidence,

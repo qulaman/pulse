@@ -4,7 +4,7 @@ import rosterFixture from "../../tests/stt/roster.json";
 import { FEW_SHOT, fewShotMessages } from "./examples";
 import { ParseResultSchema } from "./schema";
 
-const ROSTER_IDS = new Set(rosterFixture.users.map((u) => u.id));
+const ROSTER_NAMES = new Set(rosterFixture.users.map((u) => u.full_name));
 
 describe("FEW_SHOT", () => {
   it("every assistant answer validates against the entity schema", () => {
@@ -13,14 +13,18 @@ describe("FEW_SHOT", () => {
     }
   });
 
-  it("every assignee_id exists in the demo roster", () => {
-    const ids = FEW_SHOT.flatMap((pair) =>
+  // D-56: the model names people, never ids — an example with an id would teach it to copy ids.
+  it("every assignee_name exists in the demo roster and no example carries an id", () => {
+    const names = FEW_SHOT.flatMap((pair) =>
       pair.assistant.entities.flatMap((e) =>
-        "assignee_id" in e && e.assignee_id !== null ? [e.assignee_id] : [],
+        "assignee_name" in e && e.assignee_name !== null ? [e.assignee_name] : [],
       ),
     );
-    expect(ids.length).toBeGreaterThan(0);
-    for (const id of ids) expect(ROSTER_IDS).toContain(id);
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) expect(ROSTER_NAMES).toContain(name);
+    for (const pair of FEW_SHOT) {
+      for (const e of pair.assistant.entities) if ("assignee_id" in e) expect(e.assignee_id).toBeNull();
+    }
   });
 
   it("П8 splits one phrase into two tasks sharing a group_id", () => {
@@ -31,7 +35,7 @@ describe("FEW_SHOT", () => {
     expect(tasks[0].kind === "task" && tasks[1].kind === "task" && tasks[0].group_id).toBe(
       tasks[1].kind === "task" ? tasks[1].group_id : undefined,
     );
-    expect(new Set(tasks.map((t) => (t.kind === "task" ? t.assignee_id : null))).size).toBe(2);
+    expect(new Set(tasks.map((t) => (t.kind === "task" ? t.assignee_name : null))).size).toBe(2);
   });
 });
 

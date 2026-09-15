@@ -20,7 +20,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Марат"],
-          assignee_id: "u-003",
+          assignee_id: null,
+          assignee_name: "Марат Оспанов",
           assignee_confidence: 0.98,
           group_id: null,
           title: "Подготовить КП по Альфе",
@@ -53,7 +54,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Айгуль"],
-          assignee_id: "u-005",
+          assignee_id: null,
+          assignee_name: "Айгуль Сапарова",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Подготовить акт сверки по Альфе",
@@ -68,7 +70,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Сакен"],
-          assignee_id: "u-004",
+          assignee_id: null,
+          assignee_name: "Сәкен Жумабаев",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Закрыть наряды по третьему объекту",
@@ -83,7 +86,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "points",
           assignee_queries: ["Ерлану Б."],
-          assignee_id: "u-001",
+          assignee_id: null,
+          assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.97,
           amount: 10,
           reason: "за вчерашнюю поставку",
@@ -100,7 +104,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["марат"],
-          assignee_id: "u-003",
+          assignee_id: null,
+          assignee_name: "Марат Оспанов",
           assignee_confidence: 0.95,
           group_id: null,
           title: "КП по Альфе",
@@ -115,7 +120,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "points",
           assignee_queries: ["ерлану б"],
-          assignee_id: "u-001",
+          assignee_id: null,
+          assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.95,
           amount: 10,
           reason: null,
@@ -133,6 +139,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           kind: "task",
           assignee_queries: [],
           assignee_id: null,
+          assignee_name: null,
           assignee_confidence: 0,
           group_id: null,
           title: "Заказать щебень на третий объект",
@@ -155,7 +162,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Айгуль"],
-          assignee_id: "u-005",
+          assignee_id: null,
+          assignee_name: "Айгуль Сапарова",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Закрыть отчёты по командировкам",
@@ -193,7 +201,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Сәкенге"],
-          assignee_id: "u-004",
+          assignee_id: null,
+          assignee_name: "Сәкен Жумабаев",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Отправить фотоотчёт по объекту",
@@ -208,7 +217,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Маратқа"],
-          assignee_id: "u-003",
+          assignee_id: null,
+          assignee_name: "Марат Оспанов",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Перезвонить по тендеру",
@@ -231,7 +241,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Ерлану Б."],
-          assignee_id: "u-001",
+          assignee_id: null,
+          assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.97,
           group_id: "g1",
           title: "Подготовить площадку к приезду комиссии",
@@ -247,7 +258,8 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Марату"],
-          assignee_id: "u-003",
+          assignee_id: null,
+          assignee_name: "Марат Оспанов",
           assignee_confidence: 0.97,
           group_id: "g1",
           title: "Подготовить площадку к приезду комиссии",
@@ -265,28 +277,32 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
   },
   // П9. Бытовые поручения: телеграф из двух слов, задача без имени (не reminder).
   {
-    user: "Тимур, забери мою машину с мойки к вечеру. Жандос кофе. И кто-нибудь сходите за сигаретами",
+    // not «забери машину с мойки»: eval ev-05 says nearly that without a deadline, and the
+    // model copied this example's 18:00 onto it — an example must not shadow a fixture
+    user: "Тимур, отгони мою машину на мойку к вечеру. Жандос кофе. И кто-нибудь сходите за сигаретами",
     assistant: {
       entities: [
         {
           kind: "task",
           assignee_queries: ["Тимур"],
-          assignee_id: "u-009",
+          assignee_id: null,
+          assignee_name: "Тимур Салимов",
           assignee_confidence: 0.97,
           group_id: null,
-          title: "Забрать машину с мойки",
+          title: "Отогнать машину на мойку",
           body: null,
           deadline_iso: "2026-08-13T18:00:00+05:00",
           deadline_confidence: 0.7,
           deadline_source_text: "к вечеру",
           priority: "normal",
           scheduled_send_at: null,
-          source_span: "Тимур, забери мою машину с мойки к вечеру",
+          source_span: "Тимур, отгони мою машину на мойку к вечеру",
         },
         {
           kind: "task",
           assignee_queries: ["Жандос"],
-          assignee_id: "u-010",
+          assignee_id: null,
+          assignee_name: "Жандос Ермеков",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Принести кофе",
@@ -302,6 +318,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           kind: "task",
           assignee_queries: [],
           assignee_id: null,
+          assignee_name: null,
           assignee_confidence: 0,
           group_id: null,
           title: "Сходить за сигаретами",
@@ -332,7 +349,8 @@ export function fewShotMessages(): Anthropic.MessageParam[] {
       role: "user",
       content: `${FEW_SHOT_CONTEXT}\n<input>\n${pair.user}\n</input>`,
     });
-    const text = JSON.stringify(pair.assistant);
+    // the id is the server's field, not the model's: it never appears in an example
+    const text = JSON.stringify(pair.assistant, (key, value) => (key === "assignee_id" ? undefined : value));
     messages.push({
       role: "assistant",
       content:

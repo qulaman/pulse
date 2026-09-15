@@ -59,13 +59,20 @@ interface CaseResult {
   queryOk: boolean;
   failures: string[];
   error?: string;
+  /** model ids that exist in the roster, before postprocess repairs them (D-56) */
+  idValid: number;
+  idTotal: number;
+  /** matched assignees the director sees without a yellow «проверь» chip */
+  autoOk: number;
+  autoChecked: number;
 }
 
 function parseArgs(argv: string[]) {
-  const out = { escalate: true, filter: "", limit: 0, gate: true };
+  const out = { escalate: true, filter: "", limit: 0, gate: true, demoIds: false };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--no-escalate") out.escalate = false;
     else if (argv[i] === "--no-gate") out.gate = false;
+    else if (argv[i] === "--demo-ids") out.demoIds = true;
     else if (argv[i] === "--filter") out.filter = argv[++i] ?? "";
     else if (argv[i] === "--limit") out.limit = Number(argv[++i] ?? 0);
   }
@@ -78,11 +85,23 @@ function loadEnv(): void {
   process.loadEnvFile(file);
 }
 
-function loadRoster(): RosterUser[] {
+/** Fixture ids (u-003) → what production hands the model (uuids), and back for scoring. */
+const idBack = new Map<string, string>();
+
+/**
+ * Production rosters carry uuids, and the few-shot examples carry u-0NN ids the model
+ * happily copies (D-56) — a run on the demo ids never sees that. Real ids are the
+ * default; `--demo-ids` keeps the fixtures' own ids for comparison with old runs.
+ */
+function loadRoster(demoIds: boolean): RosterUser[] {
   const raw = JSON.parse(readFileSync(join(ROOT, "tests", "stt", "roster.json"), "utf8")) as {
     users: { id: string; full_name: string; aliases: string[] }[];
   };
-  return raw.users.map((u) => ({ ...u, is_active: true }));
+  return raw.users.map((u, index) => {
+    const id = demoIds ? u.id : `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
+    idBack.set(id, u.id);
+    return { ...u, id, is_active: true };
+  });
 }
 
 function loadCases(): EvalCase[] {
@@ -94,7 +113,8 @@ function loadCases(): EvalCase[] {
 }
 
 function assigneeIdOf(entity: PostprocessedEntity): string | null {
-  return entity.assignee?.status === "matched" ? (entity.assignee.user_id ?? null) : null;
+  const id = entity.assignee?.status === "matched" ? (entity.assignee.user_id ?? null) : null;
+  return id === null ? null : (idBack.get(id) ?? id);
 }
 
 /** Greedy match on (kind, assignee after matchName); kind-only fallback keeps recall honest. */
@@ -135,7 +155,7 @@ function groupIdOf(entity: PostprocessedEntity): string | null {
 
 function scoreCase(c: EvalCase, predicted: PostprocessedEntity[]): Omit<
   CaseResult,
-  "id" | "model" | "escalated" | "latencyMs" | "error"
+  "id" | "model" | "escalated" | "latencyMs" | "error" | "idValid" | "idTotal" | "autoOk" | "autoChecked"
 > {
   const failures: string[] = [];
   const pairs = pair(c.expected.entities, predicted);
@@ -228,7 +248,7 @@ function stamp(date: Date): string {
 async function main(): Promise<void> {
   loadEnv();
   const args = parseArgs(process.argv.slice(2));
-  const roster = loadRoster();
+  const roster = loadRoster(args.demoIds);
   let cases = loadCases();
   if (args.filter) cases = cases.filter((c) => c.id.startsWith(args.filter));
   if (args.limit > 0) cases = cases.slice(0, args.limit);
@@ -252,8 +272,20 @@ async function main(): Promise<void> {
         roster,
         escalate: args.escalate,
       });
+      // the model's own pick before postprocess: a full_name copied from the roster (D-56)
+      const rosterIds = new Set(roster.map((u) => u.full_name));
+      const rawIds = outcome.entities.flatMap((e) =>
+        "assignee_name" in e && e.assignee_name !== null ? [e.assignee_name] : [],
+      );
       const predicted = postprocess(outcome.entities, roster, c.source);
-      const score = scoreCase(c, predicted);
+      const matched = predicted.filter((e) => e.assignee?.status === "matched");
+      const score = {
+        ...scoreCase(c, predicted),
+        idValid: rawIds.filter((id) => rosterIds.has(id)).length,
+        idTotal: rawIds.length,
+        autoOk: matched.filter((e) => e.assignee?.flag === "ok").length,
+        autoChecked: matched.length,
+      };
 
       usage.input += outcome.usage.input_tokens;
       usage.output += outcome.usage.output_tokens;
@@ -297,6 +329,10 @@ async function main(): Promise<void> {
         splitOk: false,
         queryOk: false,
         failures: [],
+        idValid: 0,
+        idTotal: 0,
+        autoOk: 0,
+        autoChecked: 0,
         error: `${code}: ${(error as Error).message}${detail}`,
       });
       console.log(`ERR  ${c.id} — ${code}: ${(error as Error).message}${detail}`);
@@ -324,6 +360,10 @@ async function main(): Promise<void> {
   console.log("|---|---|");
   console.log(`| кейсов | ${results.length} (провалено ${results.filter((r) => !r.ok).length}) |`);
   console.log(`| assignee accuracy | ${pct(assignee)} (гейт 97%) |`);
+  const idTotal = sum((r) => r.idTotal);
+  const autoChecked = sum((r) => r.autoChecked);
+  console.log(`| имя исполнителя от модели — из ростера | ${idTotal ? pct(sum((r) => r.idValid) / idTotal) : "—"} |`);
+  console.log(`| исполнитель без чипа «проверь» | ${autoChecked ? pct(sum((r) => r.autoOk) / autoChecked) : "—"} |`);
   console.log(`| entity F1 | ${pct(f1)} (гейт 90%), P ${pct(precision)} / R ${pct(recall)} |`);
   console.log(`| deadline accuracy | ${pct(deadline)} |`);
   console.log(`| полнота мульти-разбиения | ${pct(split)} |`);

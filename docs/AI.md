@@ -45,7 +45,7 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
 - query — вопрос к системе о состоянии дел («что там по…», «кто не отчитался», «чем занят…»).
 
 ## Правила
-1. НИЧЕГО НЕ ВЫДУМЫВАЙ. Не назван исполнитель — assignee_id: null, assignee_queries: [].
+1. НИЧЕГО НЕ ВЫДУМЫВАЙ. Не назван исполнитель — assignee_name: null, assignee_queries: [].
    Не назван дедлайн — deadline_iso: null. Пустое поле всегда лучше выдуманного.
 2. Все даты и время — ISO 8601 с явным смещением +05:00 (Asia/Aqtobe). Текущие дата,
    время и день недели даны в сообщении пользователя — относительные даты («завтра»,
@@ -60,10 +60,12 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
    последняя строка таблицы всегда «явное время («к 15:00», «завтра в 10») — как сказано — 0.9–1.0».
    Дедлайн не назван вовсе → null (НЕ подставляй конвенцию сам).
 4. Исполнителя матчь по ростеру сам: в assignee_queries — упоминание дословно, как в
-   речи (в исходном падеже); в assignee_id — id наиболее подходящего сотрудника;
+   речи (в исходном падеже); в assignee_name — поле "full_name" наиболее подходящего
+   сотрудника, СКОПИРОВАННОЕ ДОСЛОВНО из блока ростера этого запроса (не из примеров —
+   там другая компания) — id сотрудника по этому имени проставит система;
    в assignee_confidence — уверенность 0..1. Имена склоняются по-русски и по-казахски:
    «Ерлану» = «Ерлан», «Маратқа» = «Марат», «Сәкенге» = «Сакен». Учитывай ошибки STT
-   (созвучные искажения). Нет уверенного кандидата — assignee_id: null и
+   (созвучные искажения). Нет уверенного кандидата — assignee_name: null и
    confidence ≤ 0.3. Никогда не назначай id «наугад».
 5. «Ерлану и Марату сделать X» — это ДВЕ независимые сущности task (по одной на
    исполнителя) с одинаковым group_id (любая строка, уникальная в этом ответе).
@@ -91,7 +93,7 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
     восстанови вероятное значение, ОБЯЗАТЕЛЬНО с confidence ≤ 0.5 и исходными
     словами в *_source_text (жёлтый чип на /confirm). Суммы очков и знаки чисел
     НЕ реконструировать никогда — только как услышаны.
-14. ПОРУЧЕНИЕ БЕЗ ИМЕНИ — всё равно task (assignee_id: null, адресата выберет
+14. ПОРУЧЕНИЕ БЕЗ ИМЕНИ — всё равно task (assignee_name: null, адресата выберет
     директор): «сходи за сигаретами», «надо заказать щебень», «кто-нибудь сгоняйте в
     аптеку». reminder — ТОЛЬКО когда директор просит напомнить ему самому («напомни
     мне», «не забыть мне»).
@@ -122,7 +124,8 @@ export type Priority = 'high' | 'normal' | 'low';
 
 interface AssigneeFields {
   assignee_queries: string[];        // verbatim mentions as heard; [] if none
-  assignee_id: string | null;        // roster id matched by the model
+  assignee_name: string | null;      // roster full_name copied verbatim by the model (D-56)
+  assignee_id: string | null;        // NOT in the model schema: postprocess sets it from the match
   assignee_confidence: number;       // 0..1
 }
 export interface AnnouncementEntity { kind: 'announcement'; text: string; source_span: string }
@@ -152,7 +155,7 @@ export interface ParseResult { entities: Entity[] }
 export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, strict */ };
 ```
 
-**Вызов** — `@anthropic-ai/sdk`, `client.messages.create` со structured outputs: `output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } }`; параметр `thinking` для Haiku не передаётся, для Sonnet-класса на эскалации — `{ type: "disabled" }` (извлечение с few-shot не требует рассуждений, а adaptive thinking давал 7–14 с против бюджета D-43). **Repair-retry не существует как явление** — невалидный JSON невозможен. Обрабатываются только: `stop_reason: "max_tokens"` → один повтор с лимитом ×2, затем ошибка `parse_failed`; refusal → `parse_refused` (§11). Форму ответа бэкенд не перевалидирует (гарантирована API); валидируется семантика: `assignee_id` существует и `is_active`, `amount ≠ 0`, ISO парсится, для `source='shared'` нет `points` (страховка к правилу 11).
+**Вызов** — `@anthropic-ai/sdk`, `client.messages.create` со structured outputs: `output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } }`; параметр `thinking` для Haiku не передаётся, для Sonnet-класса на эскалации — `{ type: "disabled" }` (извлечение с few-shot не требует рассуждений, а adaptive thinking давал 7–14 с против бюджета D-43). **Repair-retry не существует как явление** — невалидный JSON невозможен. Обрабатываются только: `stop_reason: "max_tokens"` → один повтор с лимитом ×2, затем ошибка `parse_failed`; refusal → `parse_refused` (§11). Форму ответа бэкенд не перевалидирует (гарантирована API); валидируется семантика: `assignee_name` совпадает с `full_name` активного сотрудника (иначе — fuzzy по `assignee_queries`), `amount ≠ 0`, ISO парсится, для `source='shared'` нет `points` (страховка к правилу 11). **В схему модели `assignee_id` не входит (D-56):** на реальном uuid-ростере модель в 100% ответов копировала id из few-shot («u-005») — девять примеров «имя → u-00N» сильнее любого правила; имя же она копирует из ростера надёжно (evals на uuid-ростере: 100%). `ModelEntitySchema` (без id, идёт в API) и `EntitySchema` (с id, для confirm и UI) живут в одном файле; `withAssigneeId` соединяет их, `postprocess` ставит id по матчу. Побочная причина: лимит API — 16 nullable-полей в схеме, семнадцатое (id + имя) API отвергает. `pnpm eval:parser` по умолчанию подменяет демо-id на uuid-подобные — иначе эффект не виден (`--demo-ids` для сравнения со старыми прогонами); метрики «имя исполнителя от модели — из ростера» и «исполнитель без чипа «проверь»» в отчёте.
 
 Правила поверх схемы: любое поле с confidence < 0.8 — жёлтый чип на /confirm; `deadline_iso` конвертируется в UTC перед insert; N сущностей task с одним `group_id` = N независимых задач (D-02); отрицательный `amount` из голоса блокируется на /confirm с подсказкой «снятие — только вручную с причиной» (D-30).
 
@@ -162,7 +165,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 **П1. Одиночная задача, явный дедлайн.** Вход: «Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам»
 ```json
-{"entities":[{"kind":"task","assignee_queries":["Марат"],"assignee_id":"u-003","assignee_confidence":0.98,
+{"entities":[{"kind":"task","assignee_queries":["Марат"],"assignee_name":"Марат Оспанов","assignee_confidence":0.98,
  "group_id":null,"title":"Подготовить КП по Альфе","body":null,
  "deadline_iso":"2026-08-14T15:00:00+05:00","deadline_confidence":0.95,
  "deadline_source_text":"к пятнице к трём часам","priority":"normal","scheduled_send_at":null,
@@ -173,31 +176,31 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 ```json
 {"entities":[
  {"kind":"announcement","text":"Завтра в 10:00 общее собрание в офисе, не опаздывать","source_span":"всем: завтра в десять общее собрание в офисе, не опаздывать"},
- {"kind":"task","assignee_queries":["Айгуль"],"assignee_id":"u-001","assignee_confidence":0.97,"group_id":null,
+ {"kind":"task","assignee_queries":["Айгуль"],"assignee_name":"Айгуль Сапарова","assignee_confidence":0.97,"group_id":null,
   "title":"Подготовить акт сверки по Альфе","body":null,"deadline_iso":"2026-08-14T13:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"завтра до обеда","priority":"normal","scheduled_send_at":null,
   "source_span":"Айгуль, подготовь акт сверки по Альфе завтра до обеда"},
- {"kind":"task","assignee_queries":["Сакен"],"assignee_id":"u-004","assignee_confidence":0.97,"group_id":null,
+ {"kind":"task","assignee_queries":["Сакен"],"assignee_name":"Сәкен Жумабаев","assignee_confidence":0.97,"group_id":null,
   "title":"Закрыть наряды по третьему объекту","body":null,"deadline_iso":"2026-08-13T18:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"сегодня до вечера","priority":"high","scheduled_send_at":null,
   "source_span":"Сакен, срочно закрой наряды по третьему объекту сегодня до вечера"},
- {"kind":"points","assignee_queries":["Ерлану"],"assignee_id":"u-002","assignee_confidence":0.97,
+ {"kind":"points","assignee_queries":["Ерлану"],"assignee_name":"Ерлан Байжанов","assignee_confidence":0.97,
   "amount":10,"reason":"за вчерашнюю поставку","source_span":"Ерлану плюс десять за вчерашнюю поставку"}]}
 ```
 
 **П3. Телеграфный стиль.** Вход: «марат кп альфа завтра до обеда, ерлану +10»
 ```json
 {"entities":[
- {"kind":"task","assignee_queries":["марат"],"assignee_id":"u-003","assignee_confidence":0.95,"group_id":null,
+ {"kind":"task","assignee_queries":["марат"],"assignee_name":"Марат Оспанов","assignee_confidence":0.95,"group_id":null,
   "title":"КП по Альфе","body":null,"deadline_iso":"2026-08-14T13:00:00+05:00","deadline_confidence":0.7,
   "deadline_source_text":"завтра до обеда","priority":"normal","scheduled_send_at":null,"source_span":"марат кп альфа завтра до обеда"},
- {"kind":"points","assignee_queries":["ерлану"],"assignee_id":"u-002","assignee_confidence":0.95,
+ {"kind":"points","assignee_queries":["ерлану"],"assignee_name":"Ерлан Байжанов","assignee_confidence":0.95,
   "amount":10,"reason":null,"source_span":"ерлану +10"}]}
 ```
 
 **П4. Без исполнителя — null, не выдумывать.** Вход: «Надо заказать щебень на третий объект до конца недели»
 ```json
-{"entities":[{"kind":"task","assignee_queries":[],"assignee_id":null,"assignee_confidence":0,
+{"entities":[{"kind":"task","assignee_queries":[],"assignee_name":null,"assignee_confidence":0,
  "group_id":null,"title":"Заказать щебень на третий объект","body":null,
  "deadline_iso":"2026-08-14T18:00:00+05:00","deadline_confidence":0.6,"deadline_source_text":"до конца недели",
  "priority":"normal","scheduled_send_at":null,"source_span":"Надо заказать щебень на третий объект до конца недели"}]}
@@ -205,7 +208,7 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 
 **П5. Неоднозначный дедлайн (low confidence).** Вход: «Айгуль пусть на неделе закроет отчёты по командировкам»
 ```json
-{"entities":[{"kind":"task","assignee_queries":["Айгуль"],"assignee_id":"u-001","assignee_confidence":0.97,
+{"entities":[{"kind":"task","assignee_queries":["Айгуль"],"assignee_name":"Айгуль Сапарова","assignee_confidence":0.97,
  "group_id":null,"title":"Закрыть отчёты по командировкам","body":null,
  "deadline_iso":"2026-08-14T18:00:00+05:00","deadline_confidence":0.5,"deadline_source_text":"на неделе",
  "priority":"normal","scheduled_send_at":null,"source_span":"Айгуль пусть на неделе закроет отчёты по командировкам"}]}
@@ -220,11 +223,11 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 **П7. Казахские падежи и вставка казахского.** Вход: «Сәкенге айт, объект бойынша фотоотчёт жіберсін бүгін кешке. И Маратқа скажи, пусть перезвонит по тендеру»
 ```json
 {"entities":[
- {"kind":"task","assignee_queries":["Сәкенге"],"assignee_id":"u-004","assignee_confidence":0.95,"group_id":null,
+ {"kind":"task","assignee_queries":["Сәкенге"],"assignee_name":"Сәкен Жумабаев","assignee_confidence":0.95,"group_id":null,
   "title":"Отправить фотоотчёт по объекту","body":null,"deadline_iso":"2026-08-13T18:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"бүгін кешке","priority":"normal","scheduled_send_at":null,
   "source_span":"Сәкенге айт, объект бойынша фотоотчёт жіберсін бүгін кешке"},
- {"kind":"task","assignee_queries":["Маратқа"],"assignee_id":"u-003","assignee_confidence":0.95,"group_id":null,
+ {"kind":"task","assignee_queries":["Маратқа"],"assignee_name":"Марат Оспанов","assignee_confidence":0.95,"group_id":null,
   "title":"Перезвонить по тендеру","body":null,"deadline_iso":null,"deadline_confidence":null,
   "deadline_source_text":null,"priority":"normal","scheduled_send_at":null,
   "source_span":"Маратқа скажи, пусть перезвонит по тендеру"}]}
@@ -233,11 +236,11 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 **П8. Два исполнителя → две копии.** Вход: «Ерлану и Марату подготовить площадку к приезду комиссии к понедельнику»
 ```json
 {"entities":[
- {"kind":"task","assignee_queries":["Ерлану"],"assignee_id":"u-002","assignee_confidence":0.97,"group_id":"g1",
+ {"kind":"task","assignee_queries":["Ерлану"],"assignee_name":"Ерлан Байжанов","assignee_confidence":0.97,"group_id":"g1",
   "title":"Подготовить площадку к приезду комиссии","body":null,"deadline_iso":"2026-08-17T09:00:00+05:00",
   "deadline_confidence":0.6,"deadline_source_text":"к понедельнику","priority":"normal","scheduled_send_at":null,
   "source_span":"Ерлану и Марату подготовить площадку к приезду комиссии к понедельнику"},
- {"kind":"task","assignee_queries":["Марату"],"assignee_id":"u-003","assignee_confidence":0.97,"group_id":"g1",
+ {"kind":"task","assignee_queries":["Марату"],"assignee_name":"Марат Оспанов","assignee_confidence":0.97,"group_id":"g1",
   "title":"Подготовить площадку к приезду комиссии","body":null,"deadline_iso":"2026-08-17T09:00:00+05:00",
   "deadline_confidence":0.6,"deadline_source_text":"к понедельнику","priority":"normal","scheduled_send_at":null,
   "source_span":"Ерлану и Марату подготовить площадку к приезду комиссии к понедельнику"}]}
@@ -246,27 +249,27 @@ export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, stri
 **П9. Бытовые поручения: телеграф из двух слов, задача без имени (D-52).** Вход: «Тимур, забери мою машину с мойки к вечеру. Жандос кофе. И кто-нибудь сходите за сигаретами»
 ```json
 {"entities":[
- {"kind":"task","assignee_queries":["Тимур"],"assignee_id":"u-009","assignee_confidence":0.97,"group_id":null,
+ {"kind":"task","assignee_queries":["Тимур"],"assignee_name":"Тимур Салимов","assignee_confidence":0.97,"group_id":null,
   "title":"Забрать машину с мойки","body":null,"deadline_iso":"2026-08-13T18:00:00+05:00",
   "deadline_confidence":0.7,"deadline_source_text":"к вечеру","priority":"normal","scheduled_send_at":null,
   "source_span":"Тимур, забери мою машину с мойки к вечеру"},
- {"kind":"task","assignee_queries":["Жандос"],"assignee_id":"u-010","assignee_confidence":0.95,"group_id":null,
+ {"kind":"task","assignee_queries":["Жандос"],"assignee_name":"Жандос Ермеков","assignee_confidence":0.95,"group_id":null,
   "title":"Принести кофе","body":null,"deadline_iso":null,"deadline_confidence":null,"deadline_source_text":null,
   "priority":"normal","scheduled_send_at":null,"source_span":"Жандос кофе"},
- {"kind":"task","assignee_queries":[],"assignee_id":null,"assignee_confidence":0,"group_id":null,
+ {"kind":"task","assignee_queries":[],"assignee_name":null,"assignee_confidence":0,"group_id":null,
   "title":"Сходить за сигаретами","body":null,"deadline_iso":null,"deadline_confidence":null,"deadline_source_text":null,
   "priority":"normal","scheduled_send_at":null,"source_span":"кто-нибудь сходите за сигаретами"}]}
 ```
 
 ## 5. Матчинг имён: модель + `lib/matchName.ts`
 
-Модель матчит сама (ростер в промпте, склонения — её сила). `matchName` — детерминированный слой поверх:
+Модель матчит сама (ростер в промпте, склонения — её сила) и отвечает ИМЕНЕМ: `assignee_name` = `full_name` из ростера дословно (D-56: id она не копирует, имя — копирует). `matchName` — детерминированный слой поверх:
 
 0. **Тёзки**: если упоминание — одно слово (без фамилии/инициала) и его стем совпадает со стемом имени у ≥2 активных сотрудников («Ерлану» при двух Ерланах) → `ambiguous` с этими кандидатами, **даже если модель уверенно поставила id**. Ошибочный адресат — единственная недопустимая ошибка (STT_GATE §4); живой кейс r-024, 2026-09-07.
-1. **Валидация**: `assignee_id` существует в ростере и `is_active` — иначе id сбрасывается в null и вступает шаг 2.
+1. **Имя от модели**: `assignee_name` совпадает (без регистра, ё=е) с `full_name` активного сотрудника → matched, чип по `assignee_confidence` (<0.8 — жёлтый). Имени нет или оно не из ростера → шаг 2. (Старый канал `assignee_id` матчер ещё принимает — для вызовов из кода, не от модели.)
 2. **Fuzzy-фолбэк** по `assignee_queries[0]`: нормализация (нижний регистр, ё→е) + усечение падежных окончаний (`-у, -е, -ом, -а, -ой, -ға, -ге, -қа, -ке`) → trigram similarity против full_name+aliases.
 3. Пороги (в `lib/ai/config.ts`, переопределяются `company.settings.matching` — частичный объект тех же ключей, без UI, задаётся при провижининге по данным гейта; подключено 2026-09-15):
-   - `≥ 0.45` и разрыв со вторым кандидатом `≥ 0.15` → авто-подстановка, **жёлтый чип** «проверь»;
+   - `≥ 0.45` и разрыв со вторым кандидатом `≥ 0.15` → авто-подстановка, **жёлтый чип** «проверь»; точное совпадение поверхности (score 1 после нормализации и стемминга: «Марат», «Марату», «Сәкенге») и единственный такой кандидат → авто **без** чипа (D-16 «точное совпадение → авто», D-56);
    - `0.30–0.45` или два близких → чип с выбором из 2–3 кандидатов тапом;
    - `< 0.30` → красный чип «Кому?», отправка ТОЛЬКО этой сущности заблокирована («Отправить N из M», D-36).
 4. `assignee_confidence < 0.8` от модели → жёлтый чип даже при валидном id.

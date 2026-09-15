@@ -60,6 +60,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const pickAssignee = (index: number, user: { user_id: string; full_name: string }) =>
     editEntity(index, {
       assignee_id: user.user_id,
+      assignee_name: null,
       assignee: {
         status: "matched",
         user_id: user.user_id,
