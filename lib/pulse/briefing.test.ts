@@ -36,6 +36,9 @@ describe("quoteTitle", () => {
     const long = quoteTitle("Подготовить коммерческое предложение по Казхрому до конца недели");
     expect(long.length).toBeLessThanOrEqual(38);
     expect(long.endsWith("…»")).toBe(true);
+    // the cut lands on a word boundary, and a trailing comma does not survive it
+    expect(quoteTitle("Сходить за сигаретами в магазин на углу")).toBe("«Сходить за сигаретами в магазин…»");
+    expect(quoteTitle("Позвонить, написать, договориться, отчитаться")).toBe("«Позвонить, написать, договориться…»");
   });
 });
 

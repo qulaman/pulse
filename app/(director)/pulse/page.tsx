@@ -108,10 +108,12 @@ export default function PulsePage() {
     }
     return map;
   }, [inbox.data]);
+  // news («принял») is over once the task left work — the open list says so
+  const openIds = useMemo(() => (open.data ? new Set(open.data.map((t) => t.id)) : null), [open.data]);
 
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-4">
-      <Assistant lines={lines} loading={loading} taskById={taskById} actions={actions} companyId={companyId}>
+      <Assistant lines={lines} loading={loading} taskById={taskById} openIds={openIds} actions={actions} companyId={companyId}>
         {draftCount > 0 ? (
           <Link
             href="/confirm"

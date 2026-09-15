@@ -59,10 +59,16 @@ export function greeting(now: Date, name: string): string {
   return name ? `${word}, ${name}.` : `${word}.`;
 }
 
+/** Long titles are cut at a word, not mid-word («…в магазин…», never «…в магази…»). */
 export function quoteTitle(title: string): string {
   const clean = title.trim();
-  const short = clean.length > TITLE_MAX ? `${clean.slice(0, TITLE_MAX - 1).trimEnd()}…` : clean;
-  return `«${short}»`;
+  if (clean.length <= TITLE_MAX) return `«${clean}»`;
+  const head = clean.slice(0, TITLE_MAX - 1).trimEnd();
+  // a head that ends on punctuation already ends on a whole item («…, договориться,»);
+  // otherwise step back to the last space — even a whole short word there reads as cut off
+  const atWord = /[,;:.!?—-]$/.test(head) ? -1 : head.lastIndexOf(" ");
+  const cut = atWord >= Math.floor(TITLE_MAX / 2) ? head.slice(0, atWord) : head;
+  return `«${cut.replace(/[\s,;:—-]+$/, "")}…»`;
 }
 
 function groupByPerson<T extends BriefTask>(tasks: T[]): { person: string; tasks: T[] }[] {

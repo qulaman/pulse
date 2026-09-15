@@ -6,6 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import type { BriefLine, BriefTone } from "@/lib/pulse/briefing";
+import { isHandled, mergeLines } from "@/lib/pulse/merge";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { conversation, forgetConversation } from "./conversation";
@@ -18,52 +19,22 @@ const TONE_COLOR: Record<BriefTone, string> = {
   muted: "var(--text-muted)",
 };
 
-/**
- * The briefing said out loud: the lines the assistant talks through are already
- * known, so a snapshot of the conversation stays on screen — a handled fact fades
- * and gets a check, it is never unsaid. New facts (Realtime) join the end.
- */
-export function mergeLines(snapshot: BriefLine[], fresh: BriefLine[]): BriefLine[] {
-  if (snapshot.length === 0) return fresh;
-  let changed = false;
-  const byId = new Map(fresh.map((line) => [line.id, line]));
-  const next = snapshot.map((line) => {
-    const update = byId.get(line.id);
-    if (!update) return line;
-    if (update.text === line.text && sameIds(update.taskIds, line.taskIds)) return line;
-    changed = true;
-    return update;
-  });
-  const known = new Set(snapshot.map((line) => line.id));
-  for (const line of fresh) {
-    if (known.has(line.id)) continue;
-    // the quiet line has nothing to add once facts were spoken, and vice versa
-    if (line.kind === "quiet" || line.kind === "greeting") continue;
-    next.push(line);
-    changed = true;
-  }
-  return changed ? next : snapshot;
-}
-
-function sameIds(a: string[] | undefined, b: string[] | undefined): boolean {
-  if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
-  return a.every((id, i) => id === b[i]);
-}
-
 type Props = {
   /** Fresh lines from the data; the component keeps its own spoken snapshot. */
   lines: BriefLine[];
   loading: boolean;
   /** Tasks the director can act on, by id — a fact bubble opens their cards inline. */
   taskById: Map<string, TaskWithPeople>;
+  /** Tasks still in work — null until loaded; tells when a piece of news is over. */
+  openIds: ReadonlySet<string> | null;
   actions: TaskActions;
   companyId: string;
   /** Service bubbles (push, draft) — said after the briefing, so nothing above them ever moves. */
   children?: ReactNode;
 };
 
-export function Assistant({ lines, loading, taskById, actions, companyId, children }: Props) {
+export function Assistant({ lines, loading, taskById, openIds, actions, companyId, children }: Props) {
+  const attention = new Set(taskById.keys());
   // picks up where this tab session left off: the briefing is not re-typed on every return
   const [spoken, setSpoken] = useState<BriefLine[]>(() => conversation.spoken);
   const merged = loading ? spoken : mergeLines(spoken, lines);
@@ -78,7 +49,11 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
   }, [spoken, shown]);
 
   const worst = spoken.find((line) => line.kind === "verdict")?.tone;
-  const handledAll = spoken.every((line) => line.kind !== "fact" || isHandled(line, taskById));
+  // news never holds the face back; the verdict is history once the closing line is said
+  const closed = spoken.some((line) => line.id === "quiet:after");
+  const handledAll = spoken.every(
+    (line) => line.kind !== "fact" || line.tone === "muted" || isHandled(line, attention, openIds),
+  );
   const mascot: MascotState = loading ? "thinking" : speaking ? "speaking" : worst && !handledAll ? "calm" : "happy";
 
   // a question and its answer land at the bottom: bring them into view, above the pinned button
@@ -132,7 +107,7 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
         {spoken.map((line) => {
           const chars = shown[line.id] ?? 0;
           if (chars === 0 && activeId !== line.id) return null; // not said yet
-          const handled = line.kind === "fact" && isHandled(line, taskById);
+          const handled = line.kind === "verdict" ? closed : isHandled(line, attention, openIds);
           const expandable = line.kind === "fact" && !handled && (line.taskIds ?? []).some((id) => taskById.has(id));
           const link =
             line.kind === "more"
@@ -195,12 +170,6 @@ export function Assistant({ lines, loading, taskById, actions, companyId, childr
   );
 }
 
-function isHandled(line: BriefLine, taskById: Map<string, TaskWithPeople>): boolean {
-  const ids = line.taskIds ?? [];
-  if (ids.length === 0) return false;
-  if (line.tone === "muted") return false; // news never needs handling
-  return ids.every((id) => !taskById.has(id));
-}
 
 /**
  * One line of the assistant. The full text is laid out invisibly so the bubble has

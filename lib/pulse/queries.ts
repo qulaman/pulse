@@ -76,12 +76,21 @@ type AcceptedRow = {
     id: string;
     title: string;
     deadline: string | null;
+    status: TaskStatus;
     assignee_id?: string | null;
     assignee: { full_name: string } | null;
   } | null;
 };
 
-/** Tasks that went to `accepted` since the previous visit — the good news of the briefing. */
+/** «Принял» is news only while the person is still on it. */
+const STILL_ACCEPTED: readonly TaskStatus[] = ["accepted", "in_progress"];
+
+/**
+ * Tasks that went to `accepted` since the previous visit — the good news of the
+ * briefing. Only tasks still in that state: one handed in, accepted by the director
+ * or refused since is not «принял» any more — it is either a fact of its own or over.
+ * A task accepted twice (after rework) is one piece of news, at its latest acceptance.
+ */
 export function useAcceptedSince(since: string) {
   return useRealtimeQuery<{ task: BriefTask; at: string }[], Record<string, unknown>>({
     queryKey: ["pulse", "accepted", since],
@@ -89,17 +98,21 @@ export function useAcceptedSince(since: string) {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("task_messages")
-        .select("created_at, task:tasks!task_messages_task_id_fkey(id, title, deadline, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name))")
+        .select("created_at, task:tasks!task_messages_task_id_fkey(id, title, deadline, status, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name))")
         .eq("type", "status_change")
         .eq("meta->>new_status", "accepted")
         .gt("created_at", since)
         .order("created_at", { ascending: true })
         .limit(50);
       if (error) throw new Error(error.message);
-      return ((data ?? []) as unknown as AcceptedRow[])
-        .filter((row) => row.task)
-        .map((row) => ({ at: row.created_at, task: toBriefTask(row.task as NonNullable<AcceptedRow["task"]>) }));
+      const latest = new Map<string, { task: BriefTask; at: string }>();
+      for (const row of (data ?? []) as unknown as AcceptedRow[]) {
+        if (!row.task || !STILL_ACCEPTED.includes(row.task.status)) continue;
+        latest.set(row.task.id, { at: row.created_at, task: toBriefTask(row.task) });
+      }
+      return [...latest.values()];
     },
+    // a transition writes a status_change message, so the tasks table needs no channel of its own
     channel: { table: "task_messages" },
   });
 }
