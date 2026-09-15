@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "eval:parser": "tsx tests/ai/eval.ts",
+    "eval:harvest": "tsx tests/ai/harvest.ts",
     "test:stt": "node tests/stt/run.mjs",
     "db:push": "supabase db push",
     "db:reset": "supabase db reset --linked",

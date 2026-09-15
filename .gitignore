@@ -61,3 +61,6 @@ tests/stt/results/
 
 # UI smoke screenshots
 .smoke-ui/
+
+# harvested eval drafts: client speech, reviewed by hand before it becomes a fixture
+tests/ai/harvest/
