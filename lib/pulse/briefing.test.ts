@@ -59,9 +59,9 @@ describe("buildBriefing", () => {
     expect(lines.map((l) => l.kind)).toEqual(["greeting", "verdict", "fact", "fact", "fact"]);
     expect(lines[1]!.text).toBe("1 просрочка, 1 вопрос, 2 на приёмке. По порядку:");
     expect(lines[1]!.tone).toBe("danger");
-    expect(lines[2]!.text).toBe("Тимур просрочил «Отчёт по складу», срок был вчера 18:00");
+    expect(lines[2]!.text).toBe("Тимур: задача «Отчёт по складу» просрочена, срок был вчера 18:00");
     expect(lines[3]!.text).toBe("Динара спрашивает по «Сроки КП»");
-    expect(lines[4]!.text).toBe("Марат сдал 2 задачи, ждут приёмки");
+    expect(lines[4]!.text).toBe("Марат: сдано 2 задачи, ждут приёмки");
     expect(lines[4]!.taskIds).toEqual(["r1", "r2"]);
   });
 
@@ -92,7 +92,7 @@ describe("buildBriefing", () => {
       accepted: [{ task: task("a1", "КП", "Марат"), at: "2026-09-11T04:14:00Z" }],
     });
     expect(lines.map((l) => l.kind)).toEqual(["greeting", "quiet", "fact"]);
-    expect(lines[2]!.text).toBe("Марат принял «КП» сегодня 09:14");
+    expect(lines[2]!.text).toBe("Марат: задача «КП» принята в работу сегодня 09:14");
     expect(lines[2]!.tone).toBe("muted");
   });
 

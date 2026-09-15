@@ -82,16 +82,21 @@ function groupByPerson<T extends BriefTask>(tasks: T[]): { person: string; tasks
   return [...groups.entries()].map(([person, list]) => ({ person, tasks: list }));
 }
 
-const TASKS: [string, string, string] = ["задачу", "задачи", "задач"];
+/**
+ * Every fact is «Имя: задача … сдана / просрочена / принята». The verb agrees with
+ * «задача», never with the person — a past-tense verb on a name («Айгуль сдал») would
+ * have to guess the gender of every Kazakh and Russian name, and gets it wrong.
+ */
+const TASKS: [string, string, string] = ["задача", "задачи", "задач"];
 
 function overdueLine(person: string, tasks: BriefTask[], now: Date): string {
   const who = person || "Без исполнителя";
   if (tasks.length === 1) {
     const task = tasks[0]!;
     const when = task.deadline ? `, срок был ${humanAqtobe(new Date(task.deadline), now)}` : "";
-    return `${who} просрочил ${quoteTitle(task.title)}${when}`;
+    return `${who}: задача ${quoteTitle(task.title)} просрочена${when}`;
   }
-  return `${who} просрочил ${tasks.length} ${pluralRu(tasks.length, TASKS)}`;
+  return `${who}: просрочено ${tasks.length} ${pluralRu(tasks.length, TASKS)}`;
 }
 
 /** «занят срочным» reads better than «Занят срочным» mid-sentence; free text keeps its case beyond the first letter. */
@@ -119,22 +124,22 @@ function questionLine(person: string, tasks: QuestionBriefTask[]): string {
     const quoted = words ? `: «${words.length > QUESTION_MAX ? `${words.slice(0, QUESTION_MAX - 1).trimEnd()}…` : words}»` : "";
     return `${who} спрашивает по ${quoteTitle(task.title)}${quoted}`;
   }
-  return `${who} задал ${tasks.length} ${pluralRu(tasks.length, ["вопрос", "вопроса", "вопросов"])}`;
+  return `${who}: ${tasks.length} ${pluralRu(tasks.length, ["вопрос", "вопроса", "вопросов"])} без ответа`;
 }
 
 function reviewLine(person: string, tasks: BriefTask[]): string {
   const who = person || "Кто-то";
-  if (tasks.length === 1) return `${who} сдал ${quoteTitle(tasks[0]!.title)}, ждёт приёмки`;
-  return `${who} сдал ${tasks.length} ${pluralRu(tasks.length, TASKS)}, ждут приёмки`;
+  if (tasks.length === 1) return `${who}: задача ${quoteTitle(tasks[0]!.title)} сдана, ждёт приёмки`;
+  return `${who}: сдано ${tasks.length} ${pluralRu(tasks.length, TASKS)}, ждут приёмки`;
 }
 
 function acceptedLine(person: string, items: { task: BriefTask; at: string }[], now: Date): string {
   const who = person || "Кто-то";
   if (items.length === 1) {
     const { task, at } = items[0]!;
-    return `${who} принял ${quoteTitle(task.title)} ${humanAqtobe(new Date(at), now)}`;
+    return `${who}: задача ${quoteTitle(task.title)} принята в работу ${humanAqtobe(new Date(at), now)}`;
   }
-  return `${who} принял ${items.length} ${pluralRu(items.length, TASKS)}`;
+  return `${who}: принято в работу ${items.length} ${pluralRu(items.length, TASKS)}`;
 }
 
 function nearestOf(open: BriefTask[]): BriefTask | null {
