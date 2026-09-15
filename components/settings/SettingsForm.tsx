@@ -191,23 +191,17 @@ export function SettingsForm() {
         />
       </Section>
 
-      <Section title="Слова о сроках" hint="Что значит «до обеда» или «к вечеру» именно у вас. Слева — как говорите, справа — во сколько это.">
-        <div className="flex flex-col gap-2">
+      <Section title="Слова о сроках" hint="Что значит «до обеда» или «к вечеру» именно у вас. Сверху — как говорите, под ним — во сколько это.">
+        <div className="flex flex-col gap-3">
           {draft.conventions.map((row, index) => (
-            <div key={index} className="grid grid-cols-[1fr_1fr_44px] items-center gap-2">
+            // Two lines per row: a phone-width screen cannot fit both texts side by side.
+            <div key={index} className="grid grid-cols-[1fr_44px] gap-x-2 gap-y-1">
               <input
                 className={FIELD}
                 aria-label="Как говорите"
                 placeholder="до обеда"
                 value={row.phrase}
                 onChange={(e) => updateConvention(index, { phrase: e.target.value })}
-              />
-              <input
-                className={FIELD}
-                aria-label="Означает"
-                placeholder="13:00 названного дня"
-                value={row.meaning}
-                onChange={(e) => updateConvention(index, { meaning: e.target.value })}
               />
               <button
                 type="button"
@@ -217,6 +211,18 @@ export function SettingsForm() {
               >
                 ×
               </button>
+              <div className="col-span-2 flex items-center gap-2 pl-3">
+                <span aria-hidden className="text-[16px] text-muted">
+                  =
+                </span>
+                <input
+                  className={FIELD}
+                  aria-label="Означает"
+                  placeholder="13:00 названного дня"
+                  value={row.meaning}
+                  onChange={(e) => updateConvention(index, { meaning: e.target.value })}
+                />
+              </div>
             </div>
           ))}
         </div>
