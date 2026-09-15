@@ -5,7 +5,8 @@ import { apiError, apiOk } from "@/lib/api/respond";
 import { guardTranscript } from "@/lib/ai/stt-guard";
 import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
 import { AuthError } from "@/lib/auth";
-import { loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
+import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
+import { loadAssigneeCounts, loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
@@ -76,7 +77,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
 
     const roster = await loadRoster(profile.companyId);
     const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
-    const vocabularyHints = vocabularyHintsFor(roster, settings);
+    // Only a large roster needs the task history to decide whom the prompt names (D-55).
+    const counts = roster.length > HINT_MAX_PEOPLE ? await loadAssigneeCounts(profile.companyId) : undefined;
+    const vocabularyHints = vocabularyHintsFor(roster, settings, counts);
     // Provider choice is company configuration, env is only the fallback default (V-02).
     const providers = getSttProviders({
       STT_PROVIDER: settings.stt.provider,

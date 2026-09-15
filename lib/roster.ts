@@ -1,5 +1,6 @@
 import "server-only";
 
+import { countByAssignee, pickHintRoster } from "@/lib/ai/hint-roster";
 import { buildVocabularyHints } from "@/lib/ai/stt";
 import type { RosterUser } from "@/lib/matchName";
 import { createServiceSupabase } from "@/lib/supabase/service";
@@ -53,10 +54,34 @@ export async function loadCompanySettings(companyId: string): Promise<CompanySet
     : null;
 }
 
-/** company.settings.vocabulary — counterparties and site names (docs/AI.md §1). */
-export function vocabularyHintsFor(roster: RosterProfile[], settings?: { vocabulary?: string[] } | null): string[] {
+/**
+ * Tasks per assignee over the last `days` — the order of preference for the STT prompt
+ * when the roster is larger than the prompt can safely carry (D-55).
+ */
+export async function loadAssigneeCounts(companyId: string, days = 90): Promise<Map<string, number>> {
+  const supabase = createServiceSupabase();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("assignee_id")
+    .eq("company_id", companyId)
+    .gte("created_at", since)
+    .limit(5000);
+  if (error) throw new Error(`assignee counts read failed: ${error.message}`);
+  return countByAssignee(data ?? []);
+}
+
+/**
+ * company.settings.vocabulary — counterparties and site names (docs/AI.md §1).
+ * A roster over HINT_MAX_PEOPLE is trimmed to the most-addressed people (`counts`).
+ */
+export function vocabularyHintsFor(
+  roster: RosterProfile[],
+  settings?: { vocabulary?: string[] } | null,
+  counts: ReadonlyMap<string, number> = new Map(),
+): string[] {
   return buildVocabularyHints({
-    users: roster.map((u) => ({ full_name: u.full_name, aliases: u.aliases })),
+    users: pickHintRoster(roster, counts).map((u) => ({ full_name: u.full_name, aliases: u.aliases })),
     counterparties: settings?.vocabulary ?? [],
   });
 }
