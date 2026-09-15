@@ -184,7 +184,8 @@ export function VoiceButton({ inline = false }: { inline?: boolean } = {}) {
           <span className="text-[16px] font-semibold leading-[22px]">{recording ? "Слушаю…" : "Дать задачу"}</span>
         ) : null}
         {!recording ? (
-          <span className={inline ? "text-[13px] leading-4 text-muted" : "rounded-full bg-bg/80 px-2 py-0.5 text-[11px] leading-4 text-muted"}>
+          // the inline hint yields its row to the briefing on a short phone (iPhone SE class)
+          <span className={inline ? "text-[13px] leading-4 text-muted [@media(max-height:700px)]:hidden" : "rounded-full bg-bg/80 px-2 py-0.5 text-[11px] leading-4 text-muted"}>
             удержи — говори · тап — текст
           </span>
         ) : null}

@@ -6,6 +6,7 @@ import { Chip, type ChipTone } from "@/components/ui/Chip";
 import { formatDeadline } from "@/components/confirm/format";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
+import { shortNames } from "@/lib/people/aliases";
 import type { EntityPatch } from "@/lib/store/ingest";
 
 const ICON_STROKE = {
@@ -129,6 +130,7 @@ export function EntityCard({
 }: Props) {
   const field = mainField(entity);
   const [editing, setEditing] = useState(false);
+  const shortLabels = shortNames(people.map((p) => ({ id: p.user_id, full_name: p.full_name })));
   const [draft, setDraft] = useState(field.value);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -293,6 +295,7 @@ export function EntityCard({
                 {entity.assignee?.status === "ambiguous" ? "Не понял, кому из них:" : "Не понял, кому это. Выбери:"}
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
+                {/* first names on the chips: full names run one per line and push the button off screen */}
                 {((entity.assignee?.candidates.length ?? 0) > 0
                   ? (entity.assignee?.candidates ?? []).slice(0, 4)
                   : people.slice(0, 8)
@@ -302,7 +305,7 @@ export function EntityCard({
                     tone="accent"
                     onClick={() => onPickAssignee({ user_id: candidate.user_id, full_name: candidate.full_name })}
                   >
-                    {candidate.full_name}
+                    {shortLabels.get(candidate.user_id) ?? candidate.full_name}
                   </Chip>
                 ))}
                 <Chip tone="neutral" onClick={onOpenAssignee}>

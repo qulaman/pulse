@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { initialAlias, suggestAliases } from "./aliases";
+import { initialAlias, shortNames, suggestAliases } from "./aliases";
+
+describe("shortNames", () => {
+  it("first names, initials only where a first name is shared", () => {
+    const labels = shortNames([
+      { id: "a", full_name: "Ерлан Байжанов" },
+      { id: "b", full_name: "Ерлан Досов" },
+      { id: "c", full_name: "Марат Оспанов" },
+      { id: "d", full_name: "Динара" },
+    ]);
+    expect([...labels.values()]).toEqual(["Ерлан Б.", "Ерлан Д.", "Марат", "Динара"]);
+  });
+});
 
 const ROSTER = [
   { full_name: "Ерлан Байжанов", aliases: ["Ерлан"] },

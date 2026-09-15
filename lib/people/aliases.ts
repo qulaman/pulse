@@ -32,6 +32,25 @@ function hasAlias(aliases: string[], alias: string): boolean {
   return aliases.some((a) => normalize(a) === wanted);
 }
 
+/**
+ * Short labels for a list of people: the first name, or «Имя Ф.» where two share it —
+ * what a chip or a shortlist can afford where the full name cannot.
+ */
+export function shortNames<T extends { id: string; full_name: string }>(people: T[]): Map<string, string> {
+  const byFirst = new Map<string, number>();
+  for (const p of people) {
+    const key = normalize(words(p.full_name)[0] ?? "");
+    byFirst.set(key, (byFirst.get(key) ?? 0) + 1);
+  }
+  const out = new Map<string, string>();
+  for (const p of people) {
+    const [first] = words(p.full_name);
+    const shared = (byFirst.get(normalize(first ?? "")) ?? 0) > 1;
+    out.set(p.id, (shared ? initialAlias(p.full_name) : null) ?? first ?? p.full_name);
+  }
+  return out;
+}
+
 export function suggestAliases(fullName: string, others: RosterName[]): AliasSuggestion {
   const [first] = words(fullName);
   if (!first) return { mine: [], forOthers: [], namesakes: [] };

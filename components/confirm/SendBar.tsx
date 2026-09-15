@@ -33,8 +33,9 @@ export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst 
 
   return (
     <div
-      className="sticky bottom-0 z-20 border-t border-border bg-bg/95 px-4 pt-3 backdrop-blur"
-      style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}
+      className="sticky z-20 border-t border-border bg-bg/95 px-4 pt-3 backdrop-blur"
+      // sticks above the tab bar (56px + safe area), not under it — the bar is fixed and covered the hint line
+      style={{ bottom: "calc(56px + env(safe-area-inset-bottom))", paddingBottom: 12 }}
     >
       <div className="mx-auto max-w-lg">
         {/* the main button always does something: send, point at the first «кому?», or close */}
