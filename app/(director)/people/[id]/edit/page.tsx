@@ -40,6 +40,7 @@ export default function EditPersonPage() {
               mode="edit"
               initial={draftOf(person.data)}
               managers={managers}
+              roster={(people.data ?? []).filter((p) => p.id !== id && p.is_active && p.role !== "tv")}
               pending={update.isPending}
               onSubmit={(draft) => update.mutate({ id, patch: patchOf(draft) })}
             />

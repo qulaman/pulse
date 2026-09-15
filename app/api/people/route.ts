@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { suggestAliases } from "@/lib/people/aliases";
+import { loadRoster } from "@/lib/roster";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const BodySchema = z.strictObject({
@@ -40,6 +42,12 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiError(502, "auth_failed", "Не удалось создать вход, попробуй ещё раз");
     }
 
+    // Spoken forms (D-54): the form usually sends them; an API client may not.
+    // A namesake already on the roster gets the initial that now tells the two apart.
+    const roster = await loadRoster(profile.companyId);
+    const suggestion = suggestAliases(body.full_name, roster);
+    const aliases = body.aliases?.length ? body.aliases : suggestion.mine;
+
     const userId = created.data.user.id;
     const inserted = await service.from("profiles").insert({
       id: userId,
@@ -47,7 +55,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       full_name: body.full_name,
       role: body.role,
       position: body.position ?? null,
-      aliases: body.aliases ?? [],
+      aliases,
       manager_id: body.manager_id ?? null,
     });
 
@@ -57,7 +65,17 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiError(502, "profile_failed", "Не удалось создать профиль, попробуй ещё раз");
     }
 
-    return apiOk({ id: userId }, 201);
+    for (const other of suggestion.forOthers) {
+      const namesake = roster.find((u) => u.full_name === other.full_name);
+      if (!namesake) continue;
+      const updated = await service
+        .from("profiles")
+        .update({ aliases: [...namesake.aliases, other.alias] })
+        .eq("id", namesake.id);
+      if (updated.error) console.error("namesake alias update failed:", updated.error.message);
+    }
+
+    return apiOk({ id: userId, aliases, namesakes: suggestion.forOthers }, 201);
   },
   BodySchema,
 );

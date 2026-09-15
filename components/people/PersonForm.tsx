@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { initialAlias, suggestAliases } from "@/lib/people/aliases";
 import {
   AVAILABILITY_LABEL,
   ROLE_LABEL,
@@ -69,18 +70,29 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 export function PersonForm({
   initial,
   managers,
+  roster = [],
   mode,
   pending,
   onSubmit,
 }: {
   initial: PersonDraft;
   managers: Person[];
+  /** Everyone else on the roster — spoken forms are suggested against it (D-54). */
+  roster?: Person[];
   mode: "create" | "edit";
   pending: boolean;
   onSubmit: (draft: PersonDraft) => void;
 }) {
   const [draft, setDraft] = useState<PersonDraft>(initial);
   const set = (patch: Partial<PersonDraft>) => setDraft({ ...draft, ...patch });
+  // Until the director touches the aliases field, it follows the name they type.
+  const [aliasesTouched, setAliasesTouched] = useState(mode === "edit");
+  const suggestion = suggestAliases(draft.full_name, roster);
+  const setName = (full_name: string) => {
+    const next = { ...draft, full_name };
+    if (!aliasesTouched) next.aliases = suggestAliases(full_name, roster).mine.join(", ");
+    setDraft(next);
+  };
 
   const valid =
     draft.full_name.trim().length >= 2 &&
@@ -109,13 +121,28 @@ export function PersonForm({
         <h2 className="text-[19px] font-semibold leading-6">Карточка</h2>
         <div className="mt-4 flex flex-col gap-4">
           <Field label="Имя и фамилия">
-            <input className={FIELD} value={draft.full_name} onChange={(e) => set({ full_name: e.target.value })} />
+            <input className={FIELD} value={draft.full_name} onChange={(e) => setName(e.target.value)} />
           </Field>
           <Field label="Должность">
             <input className={FIELD} value={draft.position} onChange={(e) => set({ position: e.target.value })} placeholder="Снабженец" />
           </Field>
-          <Field label="Как называет директор" hint="Через запятую: Ерлан, Ерлан Б. — по этим формам распознаётся речь">
-            <input className={FIELD} value={draft.aliases} onChange={(e) => set({ aliases: e.target.value })} placeholder="Ерлан, Ерлан Б." />
+          <Field
+            label="Как называет директор"
+            hint={
+              suggestion.namesakes.length
+                ? `Тёзка: ${suggestion.namesakes.join(", ")}. Инициал («${initialAlias(draft.full_name) ?? "Имя Ф."}») отличает их в речи`
+                : "Через запятую: Ерлан, Ерлан Б. — по этим формам распознаётся речь"
+            }
+          >
+            <input
+              className={FIELD}
+              value={draft.aliases}
+              onChange={(e) => {
+                setAliasesTouched(true);
+                set({ aliases: e.target.value });
+              }}
+              placeholder="Ерлан, Ерлан Б."
+            />
           </Field>
           <Field label="Роль">
             <select className={FIELD} value={draft.role} onChange={(e) => set({ role: e.target.value as Role })}>

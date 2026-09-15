@@ -21,6 +21,7 @@ export default function NewPersonPage() {
           mode="create"
           initial={draftOf(null)}
           managers={managers}
+          roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
           pending={create.isPending}
           onSubmit={(draft) =>
             create.mutate(
