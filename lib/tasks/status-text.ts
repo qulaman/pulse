@@ -37,6 +37,8 @@ export const BUTTON = {
   accept: "Принял",
   ask: "Уточнить",
   cant: "Не могу",
+  /** the decline sheet's submit: an action, distinct from the card button that opened it */
+  declineSend: "Сообщить директору",
   complete: "Выполнено",
   approve: "Принято",
   rework: "Доработка",

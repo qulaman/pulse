@@ -119,8 +119,9 @@ export function DeclineSheet({
       />
 
       <div className="mt-3">
+        {/* the card button chose; this one sends — the same word on both read as a stuck tap */}
         <Button block variant="danger" onClick={submit} disabled={!chip}>
-          {BUTTON.cant}
+          {BUTTON.declineSend}
         </Button>
       </div>
     </Sheet>
