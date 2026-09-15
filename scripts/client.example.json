@@ -1,0 +1,16 @@
+{
+  "slug": "acme",
+  "company_name": "ТОО «Пример»",
+  "settings": {
+    "delivery_window": { "from": "08:00", "to": "21:00" },
+    "vocabulary": ["Казхром", "Актобе-склад"],
+    "brand": { "tagline": "Голосовое управление компанией" }
+  },
+  "director": { "full_name": "Асель Нурланова", "email": "director@example.kz", "position": "Директор" },
+  "tv": { "email": "tv@example.kz" },
+  "employees": [
+    { "full_name": "Ерлан Байжанов", "email": "erlan.b@example.kz", "role": "manager", "position": "Руководитель отдела" },
+    { "full_name": "Ерлан Досов", "email": "erlan.d@example.kz", "position": "Менеджер", "manager_email": "erlan.b@example.kz" },
+    { "full_name": "Марат Оспанов", "email": "marat@example.kz", "position": "Снабженец", "aliases": ["Марат", "Маке"] }
+  ]
+}

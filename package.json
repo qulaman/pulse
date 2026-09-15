@@ -22,7 +22,8 @@
     "dev:https": "next dev --experimental-https",
     "smoke:ui": "tsx scripts/smoke-ui.ts",
     "smoke:jank": "tsx scripts/smoke-jank.ts",
-    "db:clean": "tsx scripts/db-clean.ts"
+    "db:clean": "tsx scripts/db-clean.ts",
+    "seed:client": "tsx scripts/seed-client.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

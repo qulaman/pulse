@@ -79,7 +79,9 @@
 Шаги (идемпотентно, с чекпоинтами — повторный запуск продолжает):
   1. supabase projects create pulse-<slug> --region <region>   # юрисдикция клиента — аргумент продажи
   2. supabase migration up --db-url <new-project>              # ВСЕ миграции с нуля
-  3. seed компании: insert company (settings из анкеты), профили из employees[],
+  3. seed компании — `pnpm seed:client <анкета.json>` (scripts/seed-client.ts, образец scripts/client.example.json;
+     `--dry-run` показывает план, `--undo` откатывает ровно анкету; идемпотентен; алиасы подсказываются по D-54;
+     пароли без значения в анкете генерируются и печатаются один раз): insert company (settings из анкеты), профили из employees[],
      служебный tv-пользователь; демо-данные НЕ сеются
   4. vercel project create pulse-<slug> + домен/поддомен клиента
   5. env: генерация VAPID-пары, INTERNAL_FN_SECRET, TELEGRAM_WEBHOOK_SECRET;

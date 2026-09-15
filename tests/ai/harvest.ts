@@ -168,7 +168,8 @@ async function main(): Promise<void> {
   }
 }
 
+// exitCode, not exit(): on Windows an immediate exit trips libuv while the HTTP keep-alive closes.
 main().catch((error) => {
   console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
+  process.exitCode = 1;
 });
