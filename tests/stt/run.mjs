@@ -92,11 +92,17 @@ function wer(ref, hyp) {
 
 /* ---------- providers ---------- */
 
-// Include aliases ("Ерлан Б", "Ерлан Д"): spoken initials are acoustically fragile — hint the valid combinations.
-const rosterPrompt = () =>
-  "Имена сотрудников: " +
-  ROSTER.users.map(u => [u.full_name, ...u.aliases.filter(a => a !== u.full_name)].join(" / ")).join(", ") +
-  ". Контрагенты и объекты: " + ROSTER.counterparties.join(", ") + ".";
+// Mirrors lib/ai/stt.ts hintsToPrompt (D-53): a sentence, never a list — gpt-4o-transcribe
+// continues a list instead of transcribing short or noisy audio. Aliases ("Ерлан Б", "Ерлан Д")
+// are included: spoken initials are acoustically fragile — hint the valid combinations.
+const rosterPrompt = () => {
+  const full = ROSTER.users.map(u => u.full_name);
+  const short = [...new Set(ROSTER.users.flatMap(u => u.aliases.filter(a => a !== u.full_name)))];
+  let p = "Директор диктует поручения сотрудникам.";
+  if (full.length) p += " В компании работают " + full.join(", ") + (short.length ? "; коротко их зовут " + short.join(", ") + "." : ".");
+  if (ROSTER.counterparties.length) p += " Контрагенты и объекты: " + ROSTER.counterparties.join(", ") + ".";
+  return p;
+};
 
 const PRICE_PER_MIN = { gpt4o: 0.006, "gpt4o-noroster": 0.006, whisper: 0.006, deepgram: 0.0043, scribe: 0.0067 }; // estimates
 
@@ -128,7 +134,7 @@ async function sttDeepgram(buf, { lang }) {
 async function sttScribe(buf, filename, { lang }) {
   const fd = new FormData();
   fd.append("file", new Blob([buf], { type: "audio/mp4" }), filename);
-  fd.append("model_id", "scribe_v1");
+  fd.append("model_id", "scribe_v2");
   if (lang) fd.append("language_code", lang);
   const r = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
     method: "POST", headers: { "xi-api-key": process.env.ELEVENLABS_API_KEY }, body: fd });
