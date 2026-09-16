@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -39,7 +40,7 @@ export type TaskCardProps = {
   href?: string;
 };
 
-type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign";
+type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign" | "delete";
 
 /* -------------------------------------------------------------------------- */
 /* Tone: one colour per status, used by the rail, the tint and the pill        */
@@ -116,6 +117,7 @@ function Icon({ name, size = 16 }: { name: "clock" | "check" | "question" | "x" 
 export function TaskCard({ task, variant, actions, companyId, declineReason, question, href }: TaskCardProps) {
   const [sheet, setSheet] = useState<OpenSheet>("none");
   const close = () => setSheet("none");
+  const router = useRouter();
 
   // the clock is read once per mount: «скоро» needs no live tick on a card
   const [now] = useState(() => Date.now());
@@ -306,6 +308,29 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
           </Button>
         </div>
       </Sheet>
+
+      {variant === "director" ? (
+        <Sheet open={sheet === "delete"} onClose={close} title={BUTTON.remove}>
+          <p className="text-[16px] leading-[22px] text-muted">{TEXT.removeConfirm}</p>
+          <div className="mt-4 flex gap-2">
+            <Button
+              variant="danger"
+              block
+              onClick={() => {
+                actions.remove(task.id);
+                close();
+                // on the task's own page there is nothing left to look at
+                if (!href) router.back();
+              }}
+            >
+              {BUTTON.remove}
+            </Button>
+            <Button variant="secondary" block onClick={close}>
+              Не сейчас
+            </Button>
+          </div>
+        </Sheet>
+      ) : null}
     </article>
   );
 }
@@ -472,6 +497,11 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
           </Button>
         </>
       ) : null}
+
+      {/* cleanup, not a status: a wrong or test order disappears without a trace */}
+      <Button variant="ghost" className="!text-danger/80" icon={<Icon name="x" />} onClick={() => onOpen("delete")}>
+        {BUTTON.remove}
+      </Button>
     </>
   );
 }

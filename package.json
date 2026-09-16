@@ -23,6 +23,7 @@
     "smoke:ui": "tsx scripts/smoke-ui.ts",
     "smoke:jank": "tsx scripts/smoke-jank.ts",
     "smoke:board": "tsx scripts/smoke-board.ts",
+    "smoke:cleanup": "tsx scripts/smoke-cleanup.ts",
     "db:clean": "tsx scripts/db-clean.ts",
     "seed:client": "tsx scripts/seed-client.ts"
   },

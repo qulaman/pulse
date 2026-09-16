@@ -327,6 +327,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["delivery_channel"]
           company_id: string
           created_at?: string
+          deliver_after?: string
           event_kind: string
           id?: string
           last_error?: string | null
@@ -344,6 +345,7 @@ export type Database = {
           channel?: Database["public"]["Enums"]["delivery_channel"]
           company_id?: string
           created_at?: string
+          deliver_after?: string
           event_kind?: string
           id?: string
           last_error?: string | null
@@ -862,6 +864,15 @@ export type Database = {
         Args: { client_request_id: string; p_now?: string; payload: Json }
         Returns: Json
       }
+      delete_task: { Args: { task_id: string }; Returns: Json }
+      extend_task_deadline: {
+        Args: {
+          client_request_id?: string
+          new_deadline: string | null
+          task_id: string
+        }
+        Returns: Json
+      }
       fn_rating: {
         Args: { p_from: string; p_to: string }
         Returns: {
@@ -874,16 +885,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      next_delivery_slot: {
+        Args: { p_company: string; p_now?: string }
+        Returns: string
+      }
+      purge_closed_tasks: { Args: never; Returns: Json }
+      reassign_task: {
+        Args: {
+          client_request_id?: string
+          new_assignee_id: string
+          task_id: string
+        }
+        Returns: Json
+      }
       revoke_task: {
         Args: { client_request_id?: string; task_id: string }
-        Returns: Json
-      }
-      extend_task_deadline: {
-        Args: { client_request_id?: string; new_deadline: string | null; task_id: string }
-        Returns: Json
-      }
-      reassign_task: {
-        Args: { client_request_id?: string; new_assignee_id: string; task_id: string }
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }

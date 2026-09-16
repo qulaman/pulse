@@ -5,7 +5,10 @@ import { useMemo, useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { TaskCapsule } from "@/components/tasks/TaskCapsule";
 import { SentListBone } from "@/components/ui/PageSkeletons";
+import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { Sheet } from "@/components/ui/Sheet";
+import { usePurgeClosed } from "@/lib/tasks/mutations";
 import { useDirectorInbox, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 
@@ -40,6 +43,8 @@ export default function SentPage() {
   const inbox = useDirectorInbox();
   const questionIds = useMemo(() => new Set((inbox.data?.questions ?? []).map((t) => t.id)), [inbox.data]);
   const [filter, setFilter] = useState<Filter>("active");
+  const [purging, setPurging] = useState(false);
+  const purge = usePurgeClosed();
   const [query, setQuery] = useState("");
   const now = useMemo(() => new Date(), []);
 
@@ -97,6 +102,35 @@ export default function SentPage() {
           </Chip>
         ))}
       </div>
+
+      {/* cleanup of the closed stack: wrong and test orders go for good, in one tap */}
+      {!loading && filter === "closed" && counts.closed > 0 ? (
+        <div className="mt-3 flex justify-end">
+          <Button variant="ghost" size="sm" className="!text-danger/80" onClick={() => setPurging(true)}>
+            Очистить закрытые ({counts.closed})
+          </Button>
+          <Sheet open={purging} onClose={() => setPurging(false)} title="Очистить закрытые">
+            <p className="text-[16px] leading-[22px] text-muted">
+              Удалить {counts.closed} {counts.closed === 1 ? "закрытую задачу" : counts.closed < 5 ? "закрытые задачи" : "закрытых задач"} насовсем, вместе с перепиской? Начисленные очки останутся.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <Button
+                variant="danger"
+                block
+                loading={purge.isPending}
+                onClick={() => {
+                  purge.mutate(undefined, { onSettled: () => setPurging(false) });
+                }}
+              >
+                Удалить
+              </Button>
+              <Button variant="secondary" block onClick={() => setPurging(false)}>
+                Не сейчас
+              </Button>
+            </div>
+          </Sheet>
+        </div>
+      ) : null}
 
       {loading ? (
         <SentListBone />

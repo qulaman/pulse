@@ -47,6 +47,7 @@ export const BUTTON = {
   revoke: "Отозвать",
   extend: "Продлить",
   reassign: "Переназначить",
+  remove: "Удалить",
   send: "Отправить",
 } as const;
 
@@ -74,6 +75,7 @@ export const TEXT = {
   reworkTitle: "Что доработать?",
   reworkPlaceholder: "Комментарий обязателен — сотрудник увидит его в треде",
   revokeConfirm: "Отозвать задачу? Сотрудник увидит пометку «отозвано директором»",
+  removeConfirm: "Удалить насовсем? Задача исчезнет у всех вместе с перепиской, без следа. Отзыв — мягче: сотрудник видит пометку",
   composerPlaceholder: "Написать…",
   answered: "отвечено",
   question: "вопрос",

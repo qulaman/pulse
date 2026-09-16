@@ -212,6 +212,55 @@ export function useReassign() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Cleanup — hard deletes, the director's only (delete_task / purge_closed_tasks) */
+/* -------------------------------------------------------------------------- */
+
+function dropCached(old: unknown, taskId: string): unknown {
+  if (Array.isArray(old)) return (old as TaskWithPeople[]).filter((task) => task.id !== taskId);
+  return old;
+}
+
+/** «Удалить»: the order leaves every list at once; the server call follows. */
+export function useDeleteTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ taskId }: { taskId: string }) => {
+      await postJson(`/api/tasks/${taskId}/delete`, {});
+    },
+    onMutate: async ({ taskId }) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.root });
+      const snapshot = snapshotTasks(queryClient);
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) => dropCached(old, taskId));
+      return { snapshot };
+    },
+    onSuccess: () => toast("Удалил"),
+    onError: (error, _input, context) => {
+      if (context) restoreTasks(queryClient, context.snapshot);
+      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: taskKeys.root }),
+  });
+}
+
+/** «Очистить закрытые»: done / declined / revoked orders of the company, gone for good. */
+export function usePurgeClosed() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (): Promise<number> => {
+      const res = await fetch("/api/tasks/purge", { method: "POST", credentials: "include" });
+      if (!res.ok) throw new Error(GENERIC_ERROR);
+      const body = (await res.json()) as { deleted?: number };
+      return body.deleted ?? 0;
+    },
+    onSuccess: (deleted) => toast(deleted > 0 ? `Удалил: ${deleted}` : "Закрытых задач не было"),
+    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: taskKeys.root }),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* Messages — straight into task_messages under RLS                            */
 /* -------------------------------------------------------------------------- */
 
@@ -303,6 +352,8 @@ export type TaskActions = {
   /** «Переназначить»: the same order to another person; the old task is revoked. */
   reassign: (input: Omit<ReassignInput, "requestId">) => void;
   sendMessage: (input: SendMessageInput) => void;
+  /** «Удалить»: hard delete, no trace — cleanup of wrong and test orders. */
+  remove: (taskId: string) => void;
   busy: boolean;
 };
 
@@ -312,6 +363,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const extend = useExtendDeadline();
   const reassign = useReassign();
   const sendMessage = useSendMessage(me);
+  const remove = useDeleteTask();
 
   return {
     transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
@@ -332,6 +384,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     },
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: crypto.randomUUID() }),
+    remove: (taskId) => remove.mutate({ taskId }),
     busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending || sendMessage.isPending,
   };
 }
