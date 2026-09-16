@@ -41,8 +41,8 @@ const RING_RADIUS = 122;
  * Пульс — the director's home (D-57, D-60): the face of «Капля» alone in the middle of
  * the screen. Hold it to speak, pull it down to type, tap it and the tasks come out as
  * balls around it; a tap on a ball opens that task as a card with the deck gestures.
- * Hints and service lines live at the bottom, never under the face. A wide screen
- * gets the live board instead of balls.
+ * The gesture hint lives at the bottom; service lines (push, draft) appear only after
+ * the tap, under the assistant's line. A wide screen gets the live board instead of balls.
  */
 export default function PulsePage() {
   const me = useMe();
@@ -209,7 +209,7 @@ export default function PulsePage() {
 
   return (
     <main
-      className={`mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-28 ${mode === "idle" ? "justify-center" : "justify-start pt-2"}`}
+      className={`mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-12 ${mode === "idle" ? "justify-center" : "justify-start pt-2"}`}
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
     >
@@ -234,6 +234,8 @@ export default function PulsePage() {
         <motion.div layout className="mt-3">
           <Assistant said={exchange?.said ?? null} lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
             {exchange ? <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} /> : null}
+            {/* service lines only once the face has been tapped — the idle screen is the face alone */}
+            {mode !== "idle" ? serviceLines : null}
           </Assistant>
         </motion.div>
 
@@ -250,17 +252,16 @@ export default function PulsePage() {
         ) : null}
       </LayoutGroup>
 
-      {/* the bottom: service lines and the gesture hint — never under the face */}
-      <div className="pointer-events-none fixed inset-x-0 z-20 px-4" style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 8px)" }}>
-        <div className="pointer-events-auto mx-auto flex max-w-lg flex-col gap-1">
-          {serviceLines}
-          {showHint && mode === "idle" ? (
-            <p className="text-center text-[12px] leading-4 text-muted" data-testid="lever-hint">
-              удержи — говори · тап — задачи · потяни вниз — текст
-            </p>
-          ) : null}
-        </div>
-      </div>
+      {/* the bottom: the gesture hint — never under the face */}
+      {showHint && mode === "idle" ? (
+        <p
+          className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
+          style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}
+          data-testid="lever-hint"
+        >
+          удержи — говори · тап — задачи · потяни вниз — текст
+        </p>
+      ) : null}
     </main>
   );
 }
