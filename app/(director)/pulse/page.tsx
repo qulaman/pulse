@@ -80,8 +80,8 @@ export default function PulsePage() {
   const [wakeKey, setWakeKey] = useState(0);
   const ether = useEther();
 
-  // tasks that need the director (messages are counted apart), unseen messages of any lane, announcements
-  const taskCount = counts.overdue + counts.declined + counts.review;
+  // every open task on the ball (in work included), coloured by the worst of them; messages are counted apart
+  const taskCount = counts.overdue + counts.declined + counts.review + counts.work;
   const messageTasks = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status) && hasMessage(task)), [rows]);
   const balls = useMemo<OrbitBall[]>(
     () => [
@@ -272,7 +272,7 @@ export default function PulsePage() {
         {mode === "panel" ? (
           <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
             {panel === "tasks" ? (
-              taskCount === 0 && counts.work === 0 ? (
+              taskCount === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
               ) : (
                 <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} />
