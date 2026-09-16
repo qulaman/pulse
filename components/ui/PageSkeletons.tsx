@@ -55,7 +55,7 @@ export function PulseSkeleton() {
   return (
     <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 pb-28">
       <div className="flex h-[152px] w-[152px] items-center justify-center">
-        <Mascot state="thinking" size={128} />
+        <Mascot state="sleeping" size={128} />
       </div>
     </main>
   );

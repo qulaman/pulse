@@ -52,6 +52,8 @@ export type CardDeckProps = {
   focus: { id: string; key: number } | null;
   /** The card on top changed (a swipe): the ball to light up, "work" for the closing card. */
   onCurrentChange?: (id: string | null) => void;
+  /** The closing «В работе · N» card; off for a deck of one kind (questions). */
+  showWork?: boolean;
 };
 
 /**
@@ -61,7 +63,7 @@ export type CardDeckProps = {
  * put the card at the end, tap to open the full card, hold for the quick menu. The
  * calm lane is one closing card that opens «Задачи».
  */
-export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurrentChange }: CardDeckProps) {
+export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurrentChange, showWork = true }: CardDeckProps) {
   const [postponed, setPostponed] = useState<string[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
@@ -74,9 +76,9 @@ export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurre
     const later = attention.filter((item) => item.kind === "task" && postponed.includes(item.task.id));
     const soon = attention.filter((item) => !later.includes(item));
     const list = [...soon, ...later];
-    if (lanes.work.length > 0) list.push({ kind: "work", tasks: lanes.work });
+    if (showWork && lanes.work.length > 0) list.push({ kind: "work", tasks: lanes.work });
     return list;
-  }, [lanes, hidden, postponed]);
+  }, [lanes, hidden, postponed, showWork]);
 
   const [index, setIndex] = useState(0);
   const safeIndex = Math.min(index, Math.max(0, items.length - 1));

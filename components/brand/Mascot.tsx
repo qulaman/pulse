@@ -12,7 +12,8 @@
  *   sending      winds up and throws; the eyes follow the card (the card itself is the scene's)
  *   thinking     generic pondering — a tilt, wandering eyes, three dots
  *   speaking     the mouth moves with the words, small nods (D-49)
- *   happy        golden, squint and blush, a bounce with sparks
+ *   happy        golden, squint and blush, a slow breath with sparks
+ *   sleeping     eyes shut, the slowest breath, z-s drifting up — the screen before the first tap
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
  * microphone) while listening — the blob swells and nods harder with the voice.
@@ -26,7 +27,8 @@ export type MascotState =
   | "sending"
   | "thinking"
   | "speaking"
-  | "happy";
+  | "happy"
+  | "sleeping";
 
 const COLOR: Record<MascotState, string> = {
   calm: "var(--accent)",
@@ -38,6 +40,7 @@ const COLOR: Record<MascotState, string> = {
   thinking: "var(--warn)",
   speaking: "var(--accent)",
   happy: "var(--gold)",
+  sleeping: "color-mix(in srgb, var(--accent) 72%, var(--surface-2))",
 };
 
 /** One-shot pose on entering the state (outer group, keeps its end frame). */
@@ -51,6 +54,7 @@ const POSE: Record<MascotState, string> = {
   thinking: "none",
   speaking: "none",
   happy: "none",
+  sleeping: "none",
 };
 
 /** Looping body motion (inner group). */
@@ -63,7 +67,8 @@ const BODY: Record<MascotState, string> = {
   sending: "mascot-throw 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite",
   thinking: "mascot-ponder 2.6s ease-in-out infinite",
   speaking: "mascot-talk 1.3s ease-in-out infinite",
-  happy: "mascot-bounce 1.1s cubic-bezier(0.34, 1.56, 0.64, 1) infinite",
+  happy: "mascot-breathe 5s ease-in-out infinite",
+  sleeping: "mascot-breathe 8s ease-in-out infinite",
 };
 
 /** Eyes as a pair. */
@@ -77,6 +82,7 @@ const EYES: Record<MascotState, string> = {
   thinking: "mascot-wander 2.6s ease-in-out infinite",
   speaking: "mascot-glance 9s ease-in-out infinite",
   happy: "none",
+  sleeping: "none",
 };
 
 export function Mascot({
@@ -92,13 +98,14 @@ export function Mascot({
   const wide = state === "listening";
   const talking = state === "speaking";
   const lidded = state === "saving"; // eyes half-closed while tucking the note away
+  const asleep = state === "sleeping"; // eyes shut, a slow breath, small z-s drifting up
   const clamped = Math.min(1, Math.max(0, level));
   const swell = state === "listening" ? 1 + clamped * 0.14 : 1;
   // the voice pushes the nod: louder — a deeper dip
   const dip = state === "listening" ? clamped * 2.2 : 0;
-  const eyeRy = squint ? 1.5 : lidded ? 2.2 : wide ? 4.3 : 3.6;
+  const eyeRy = asleep ? 0.7 : squint ? 1.5 : lidded ? 2.2 : wide ? 4.3 : 3.6;
   const eyeRx = wide ? 3.7 : 3.4;
-  const blink = squint || lidded ? "none" : "mascot-blink 4.6s infinite";
+  const blink = squint || lidded || asleep ? "none" : "mascot-blink 4.6s infinite";
 
   return (
     <svg
@@ -213,16 +220,28 @@ export function Mascot({
         </g>
       ) : null}
 
+      {/* sleeping: two small z-s drift up from the head, one after the other */}
+      {asleep ? (
+        <g fill="var(--text-muted)" fontFamily="var(--font-display), system-ui, sans-serif" fontWeight="700">
+          <text x="50" y="12" fontSize="8" style={{ transformOrigin: "52px 12px", animation: "mascot-zzz 3.2s ease-out infinite", opacity: 0 }}>
+            z
+          </text>
+          <text x="56" y="4" fontSize="6" style={{ transformOrigin: "58px 4px", animation: "mascot-zzz 3.2s ease-out 1.1s infinite", opacity: 0 }}>
+            z
+          </text>
+        </g>
+      ) : null}
+
       {/* happy: two sparks pop beside the blob in turn */}
       {state === "happy" ? (
         <g fill={COLOR.happy}>
           <path
             d="M8 16 L9.6 20.4 L14 22 L9.6 23.6 L8 28 L6.4 23.6 L2 22 L6.4 20.4 Z"
-            style={{ transformOrigin: "8px 22px", animation: "mascot-spark 1.1s ease-out infinite", opacity: 0 }}
+            style={{ transformOrigin: "8px 22px", animation: "mascot-spark 2.6s ease-out infinite", opacity: 0 }}
           />
           <path
             d="M56 6 L57.2 9.2 L60.4 10.4 L57.2 11.6 L56 14.8 L54.8 11.6 L51.6 10.4 L54.8 9.2 Z"
-            style={{ transformOrigin: "56px 10.4px", animation: "mascot-spark 1.1s ease-out 0.5s infinite", opacity: 0 }}
+            style={{ transformOrigin: "56px 10.4px", animation: "mascot-spark 2.6s ease-out 1.3s infinite", opacity: 0 }}
           />
         </g>
       ) : null}

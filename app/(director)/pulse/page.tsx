@@ -2,8 +2,7 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
@@ -12,14 +11,15 @@ import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
 import { LiveBoard } from "@/components/pulse/LiveBoard";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
-import { TaskBalls, type Ball } from "@/components/pulse/TaskBalls";
+import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { Button } from "@/components/ui/Button";
-import { initialsOf, usePeople } from "@/lib/people/queries";
+import { useEther } from "@/lib/ether/queries";
+import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { ATTENTION_LANES, countsOf, LANE_ORDER, lanesOf, toBriefTask, WORK_STATUSES } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, lanesOf, toBriefTask, WORK_STATUSES, type Lanes } from "@/lib/pulse/board";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -29,18 +29,19 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 
 type Exchange = { key: string; said: string; lines: string[]; understood: boolean };
 
-/** idle — the face alone in the middle; ring — the balls around it; card — one card open under the row of balls. */
-type Mode = "idle" | "ring" | "card";
+/** idle — the face asleep in the middle; ring — awake, the balls orbit it; panel — one ball opened under the row of balls. */
+type Mode = "idle" | "ring" | "panel";
 
 const FACE = 128;
 const FACE_SMALL = 88;
 /** Distance from the face's centre to the balls' centres. */
-const RING_RADIUS = 122;
+const RING_RADIUS = 124;
 
 /**
- * Пульс — the director's home (D-57, D-60): the face of «Капля» alone in the middle of
- * the screen. Hold it to speak, pull it down to type, tap it and the tasks come out as
- * balls around it; a tap on a ball opens that task as a card with the deck gestures.
+ * Пульс — the director's home (D-57, D-60): the face of «Капля» asleep in the middle of
+ * the screen. Hold it to speak, pull it down to type, tap it and it wakes: three balls
+ * orbit it — tasks, messages, Эфир — each with its count; a tap on a ball opens its panel
+ * (the card deck with the gestures, or the announcements).
  * The gesture hint lives at the bottom; service lines (push, draft) appear only after
  * the tap, under the assistant's line. A wide screen gets the live board instead of balls.
  */
@@ -52,7 +53,6 @@ export default function PulsePage() {
   const actions = useTaskActions(me.data);
   const companyId = me.data?.companyId ?? "";
   const directorName = firstNameOf(me.data?.fullName);
-  const router = useRouter();
 
   const stage = useIngestStore((state) => state.stage);
   const entities = useIngestStore((state) => state.entities);
@@ -71,40 +71,41 @@ export default function PulsePage() {
   const wide = useMediaQuery("(min-width: 640px)");
   const showHint = useLeverHint();
 
-  // ---- the balls and the card -------------------------------------------------------------
+  // ---- the balls and the panels ------------------------------------------------------------
   const [mode, setMode] = useState<Mode>("idle");
-  const [active, setActive] = useState<string | null>(null);
-  const [focus, setFocus] = useState<{ id: string; key: number } | null>(null);
+  const [panel, setPanel] = useState<OrbitId | null>(null);
+  const [wakeKey, setWakeKey] = useState(0);
+  const ether = useEther();
 
-  const balls = useMemo<Ball[]>(() => {
-    const list: Ball[] = [];
-    for (const lane of LANE_ORDER) {
-      if (!ATTENTION_LANES.has(lane)) continue;
-      for (const task of lanes[lane]) {
-        const name = task.assignee?.full_name ?? "";
-        list.push({ kind: "task", id: task.id, lane, initials: name ? initialsOf(name) : "•", name: firstNameOf(name) || "Без исполнителя" });
-      }
-    }
-    if (lanes.work.length > 0) list.push({ kind: "work", id: "work", count: lanes.work.length });
-    return list;
-  }, [lanes]);
+  // tasks that need the director (questions are messages), open questions, announcements
+  const taskCount = counts.overdue + counts.declined + counts.review;
+  const balls = useMemo<OrbitBall[]>(
+    () => [
+      {
+        id: "tasks",
+        label: "Задачи",
+        count: taskCount,
+        tone: counts.overdue > 0 || counts.declined > 0 ? "var(--danger)" : counts.review > 0 ? "var(--ok)" : "var(--accent)",
+      },
+      { id: "messages", label: "Сообщения", count: counts.question, tone: "var(--warn)" },
+      { id: "ether", label: "Эфир", count: (ether.data ?? []).length, tone: "var(--gold)" },
+    ],
+    [taskCount, counts.overdue, counts.declined, counts.review, counts.question, ether.data],
+  );
+  // the deck behind each ball: tasks without the questions, or the questions alone
+  const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
+  const questionLanes = useMemo<Lanes>(() => ({ ...emptyLanes(), question: lanes.question }), [lanes]);
 
-  const pick = (ball: Ball) => {
-    if (ball.kind === "more") {
-      router.push("/sent");
-      return;
-    }
-    if (mode === "card" && active === ball.id) {
-      // the open ball again: the card folds back
+  const pick = (ball: OrbitBall) => {
+    if (mode === "panel" && panel === ball.id) {
+      // the open ball again: the panel folds back, the balls orbit again
       setMode("ring");
-      setActive(null);
+      setPanel(null);
       return;
     }
-    setActive(ball.id);
-    setFocus({ id: ball.id, key: Date.now() });
-    setMode("card");
+    setPanel(ball.id);
+    setMode("panel");
   };
-  const onCurrentChange = useCallback((id: string | null) => setActive(id), []);
 
   // ---- a question the phrase turned out to be ---------------------------------------------
   const people = usePeople();
@@ -156,18 +157,21 @@ export default function PulsePage() {
   const onFaceTap = () => {
     closeExchange();
     if (mode === "idle") {
+      // waking up: a stretch, the summary, the balls come out
+      setWakeKey((key) => key + 1);
       speech.replay();
       setMode("ring");
     } else {
       setMode("idle");
-      setActive(null);
+      setPanel(null);
     }
   };
 
-  const mascot: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : counts.attention > 0 ? "calm" : "happy";
+  const awake: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : counts.attention > 0 ? "calm" : "happy";
+  const mascot: MascotState = mode === "idle" && !wide ? "sleeping" : awake;
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
-  const faceSize = mode === "card" && !wide ? FACE_SMALL : FACE;
-  const box = mode === "ring" ? RING_RADIUS * 2 + 56 : faceSize + 24;
+  const faceSize = mode === "panel" && !wide ? FACE_SMALL : FACE;
+  const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
   const serviceLines = (
     <>
@@ -193,7 +197,7 @@ export default function PulsePage() {
     return (
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3">
         <div className="flex flex-col items-center">
-          <MascotLever state={mascot} onTap={onFaceTap} size={FACE} />
+          <MascotLever state={awake} onTap={onFaceTap} size={FACE} />
         </div>
         <div className="mt-2">
           <Assistant said={exchange?.said ?? null} lines={loading && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
@@ -214,18 +218,18 @@ export default function PulsePage() {
       data-mode={mode}
     >
       <LayoutGroup>
-        {/* the face, and the balls around it (ring) or in a row under it (card) */}
+        {/* the face, and the balls orbiting it (ring) or in a row under it (panel) */}
         <div className="relative flex flex-col items-center">
           <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} />
+            <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} wakeKey={wakeKey} />
             <AnimatePresence>
-              {mode === "ring" ? <TaskBalls key="ring" balls={balls} mode="ring" activeId={active} radius={RING_RADIUS} onPick={pick} /> : null}
+              {mode === "ring" ? <OrbitBalls key="ring" balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} /> : null}
             </AnimatePresence>
           </motion.div>
           <AnimatePresence>
-            {mode === "card" ? (
+            {mode === "panel" ? (
               <motion.div key="row" layout className="mt-1 w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <TaskBalls balls={balls} mode="row" activeId={active} radius={RING_RADIUS} onPick={pick} />
+                <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
               </motion.div>
             ) : null}
           </AnimatePresence>
@@ -239,15 +243,29 @@ export default function PulsePage() {
           </Assistant>
         </motion.div>
 
-        {mode === "card" ? (
-          <motion.div layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId={companyId} focus={focus} onCurrentChange={onCurrentChange} />
-          </motion.div>
-        ) : null}
-
-        {mode !== "idle" ? (
-          <motion.div layout>
-            <EtherSection variant="director" />
+        {mode === "panel" ? (
+          <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
+            {panel === "tasks" ? (
+              taskCount === 0 && counts.work === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
+              ) : (
+                <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} />
+              )
+            ) : null}
+            {panel === "messages" ? (
+              counts.question === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Вопросов от сотрудников нет.</p>
+              ) : (
+                <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} showWork={false} />
+              )
+            ) : null}
+            {panel === "ether" ? (
+              (ether.data ?? []).length === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>
+              ) : (
+                <EtherSection variant="page" />
+              )
+            ) : null}
           </motion.div>
         ) : null}
       </LayoutGroup>

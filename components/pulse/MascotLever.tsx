@@ -59,7 +59,7 @@ function useUses(): number {
  * the summary again and the cards thrown anew; pull down — the typed input. Pointer
  * capture and a dead touch-action keep the page still under the finger.
  */
-export function MascotLever({ state, onTap, size = 128 }: { state: MascotState; onTap: () => void; size?: number }) {
+export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: MascotState; onTap: () => void; size?: number; /** bumped when the face wakes up: a one-shot stretch */ wakeKey?: number }) {
   const stage = useIngestStore((s) => s.stage);
   const startVoice = useIngestStore((s) => s.startVoice);
   const stopVoice = useIngestStore((s) => s.stopVoice);
@@ -208,8 +208,9 @@ export function MascotLever({ state, onTap, size = 128 }: { state: MascotState; 
           }}
         />
         <span
+          key={wakeKey}
           className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
-          style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : "none" }}
+          style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
         >
           <Mascot state={face} size={size} />
         </span>
