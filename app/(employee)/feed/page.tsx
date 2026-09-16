@@ -17,7 +17,7 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import { Chip } from "@/components/ui/Chip";
 import { useEther } from "@/lib/ether/queries";
 import { isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
-import { describeForEmployeeAll, employeeOpening, hasUnreadFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
+import { describeForEmployeeAll, employeeOpening, hasUnreadFor, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
 import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -55,8 +55,10 @@ export default function FeedPage() {
   const voice = useMemo<Voice>(() => ({ opening: employeeOpening, describe: (prev, next) => describeForEmployeeAll(prev, next, meId) }), [meId]);
   const speech = useSpeechWith(rows, lanes, now, name, voice);
 
+  // «Дела»: what to accept or redo first, then what is in work, then what waits for the director
   const todo = useMemo(() => sortByUrgency(open.filter(isTodo), now), [open, now]);
-  const inWork = useMemo(() => sortByUrgency(open.filter((task) => !isTodo(task)), now), [open, now]);
+  const inWork = useMemo(() => sortByUrgency(open.filter((task) => isOpenFor(task) && !isTodo(task)), now), [open, now]);
+  const onReview = useMemo(() => sortByUrgency(open.filter((task) => task.status === "pending_review"), now), [open, now]);
   const unread = useMemo(() => open.filter((task) => hasUnreadFor(task, meId)), [open, meId]);
   const unacked = useMemo(() => (ether.data ?? []).filter((item) => !item.acks.some((ack) => ack.user_id === meId)), [ether.data, meId]);
 
@@ -66,11 +68,11 @@ export default function FeedPage() {
 
   const balls = useMemo<OrbitBall[]>(
     () => [
-      { id: "tasks", label: "Дела", count: todo.length, tone: lanes.overdue.length > 0 ? "var(--danger)" : "var(--accent)" },
+      { id: "tasks", label: "Дела", count: todo.length + inWork.length, tone: lanes.overdue.length > 0 ? "var(--danger)" : todo.length > 0 ? "var(--warn)" : "var(--accent)" },
       { id: "messages", label: "Сообщения", count: unread.length, tone: "var(--warn)" },
       { id: "ether", label: "Эфир", count: unacked.length, tone: "var(--gold)" },
     ],
-    [todo.length, lanes.overdue.length, unread.length, unacked.length],
+    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length],
   );
 
   const pick = (ball: OrbitBall) => {
@@ -156,20 +158,28 @@ export default function FeedPage() {
         {mode === "panel" ? (
           <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
             {panel === "tasks" ? (
-              todo.length === 0 && inWork.length === 0 ? (
+              todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {todo.map((task) => (
+                  {[...todo, ...inWork].map((task) => (
                     <div key={task.id} className="card-in">
                       <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
                     </div>
                   ))}
-                  {inWork.length > 0 ? (
-                    <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted">
-                      В работе · {inWork.length} — все дела ›
-                    </Link>
+                  {onReview.length > 0 ? (
+                    <>
+                      <p className="mt-1 px-1 text-[14px] leading-4 text-muted">На проверке у директора · {onReview.length}</p>
+                      {onReview.map((task) => (
+                        <div key={task.id} className="card-in opacity-80">
+                          <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
+                        </div>
+                      ))}
+                    </>
                   ) : null}
+                  <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted">
+                    Все дела ›
+                  </Link>
                 </div>
               )
             ) : null}

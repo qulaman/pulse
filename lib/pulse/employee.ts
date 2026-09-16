@@ -8,9 +8,14 @@ import { pluralRu } from "@/lib/tasks/status-text";
  * the thread is the director's.
  */
 
-/** «Дела»: what the person has to act on — new orders to accept, orders sent back. */
+/** What the person has to act on first — new orders to accept, orders sent back. */
 export function isTodo(task: Pick<BoardTask, "status">): boolean {
   return task.status === "sent" || task.status === "rework";
+}
+
+/** «Дела»: everything the person has on their hands — to accept, to redo, in work. */
+export function isOpenFor(task: Pick<BoardTask, "status">): boolean {
+  return task.status === "sent" || task.status === "rework" || task.status === "accepted" || task.status === "in_progress";
 }
 
 /** An unread word from the other side of the thread: not mine, above my cursor. */
