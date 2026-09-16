@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { CompanyForm } from "@/components/settings/CompanyForm";
+import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 
 export default function SettingsPage() {
@@ -39,6 +40,15 @@ export default function SettingsPage() {
       <div className="mt-2">
         <SettingsForm />
       </div>
+      {/* a demo instance only: the value is inlined at build time, a client's prod never sets it */}
+      {process.env.NEXT_PUBLIC_DEMO_MODE === "1" ? (
+        <>
+          <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Демо</h2>
+          <div className="mt-2">
+            <DemoReset />
+          </div>
+        </>
+      ) : null}
     </main>
   );
 }

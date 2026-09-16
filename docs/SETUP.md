@@ -38,6 +38,8 @@
 | `TELEGRAM_BOT_TOKEN` | Vercel server-only + Edge Functions secrets | токен **dev-бота** | токен **prod-бота** | боты разные, см. §3 |
 | `TELEGRAM_WEBHOOK_SECRET` | Edge Functions secrets | свой | свой | `secret_token` вебхука, сверяется в `tg-webhook` |
 | `INTERNAL_FN_SECRET` | Supabase (Vault/настройка БД) + Edge Functions secrets | свой | свой | заголовок `x-internal-secret` для вызовов pg_net → Edge Functions; функции без него отвечают 401 |
+| `DEMO_RESET_ENABLED` | Vercel server-only (Preview), `.env.local` | `1` | **не задавать** | замок кнопки «Обнулить демо-базу» (`POST /api/admin/reset-demo`, стирает активность компании, людей и настройки оставляет); без него роут отвечает 403 |
+| `NEXT_PUBLIC_DEMO_MODE` | Vercel (Preview), `.env.local` | `1` | **не задавать** | показывает раздел «Демо» в Настройках; решает всё равно серверный замок |
 | `SENTRY_DSN` (+`NEXT_PUBLIC_SENTRY_DSN`) | Vercel | dev-проект Sentry или пусто | prod-проект Sentry | §6 |
 
 **⚠️ VAPID: отдельные пары на среду, смена ключей убивает подписки.** Push-подписка браузера криптографически привязана к публичному VAPID-ключу. Замена пары в prod = **все** существующие подписки сотрудников мертвы, каждому нужна переподписка на устройстве. Поэтому: (а) dev и prod никогда не делят пару; (б) прод-пара генерируется один раз и ротируется только при компрометации, с осознанным планом переподписки (push-уведомление не доставить — оповещение через Telegram-канал доставки).
