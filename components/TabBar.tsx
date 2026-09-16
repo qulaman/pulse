@@ -60,7 +60,16 @@ const ICONS = {
       <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
     </svg>
   ),
+  lab: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <path d="M9.5 3h5M10 3v6.2L4.8 18.3A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.7L14 9.2V3" />
+      <line x1="7.5" y1="15" x2="16.5" y2="15" />
+    </svg>
+  ),
 };
+
+/** The developer's lab (D-63): every role sees it for now, no role check by design. */
+const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
 const TABS: Record<TabRole, Tab[]> = {
   // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
@@ -69,12 +78,14 @@ const TABS: Record<TabRole, Tab[]> = {
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
+    LAB_TAB,
   ],
   employee: [
     { href: "/feed", label: "Лента", icon: ICONS.feed },
     { href: "/tasks", label: "Дела", icon: ICONS.tasks },
     { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
+    LAB_TAB,
   ],
 };
 

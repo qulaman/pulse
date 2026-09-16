@@ -21,6 +21,7 @@ export const serverEnvSchema = z.object({
   STT_FALLBACK_PROVIDER: optional,
   DEEPGRAM_API_KEY: optional,
   ELEVENLABS_API_KEY: optional,
+  DEEPSEEK_API_KEY: optional,
   PARSER_MODEL: optional,
   PARSER_ESCALATION_MODEL: optional,
   QUERY_MODEL: optional,

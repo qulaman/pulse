@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { DEFAULT_PARSER_MODEL, ParseError, parseTranscript } from "@/lib/ai/parse";
+import { ParseError, parseTranscript, providerOf } from "@/lib/ai/parse";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
 import { loadCompanySettings, loadRoster } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
@@ -46,7 +46,6 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       user_id: profile.userId,
       kind: "parse" as const,
       source: body.source,
-      provider: "anthropic",
       client_request_id: body.client_request_id,
       transcript: body.transcript,
     };
@@ -89,7 +88,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       const code = error instanceof ParseError ? error.code : "parse_failed";
       await supabase.from("ai_logs").insert({
         ...logRow,
-        model: DEFAULT_PARSER_MODEL,
+        provider: providerOf(settings.parser.model),
+        model: settings.parser.model,
         status: `error:${code}`,
       });
       if (code === "parse_refused") {
@@ -108,6 +108,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const raw = outcome.raw as { usage?: Json; stop_reason?: Json } | null;
     await supabase.from("ai_logs").insert({
       ...logRow,
+      provider: outcome.provider,
       model: outcome.model,
       parsed_entities: entities,
       input_tokens: outcome.usage.input_tokens,
@@ -116,8 +117,14 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       parse_ms: outcome.latencyMs,
       latency_ms: outcome.latencyMs,
       status: "ok",
-      // Never the whole answer: the entities are already stored above.
-      raw_response: { usage: raw?.usage ?? null, stop_reason: raw?.stop_reason ?? null },
+      // Never the whole answer: the entities are already stored above. The per-call
+      // list is what the lab prices — an escalated parse paid two models (D-63).
+      raw_response: {
+        usage: raw?.usage ?? null,
+        stop_reason: raw?.stop_reason ?? null,
+        escalated: outcome.escalated,
+        calls: outcome.calls as unknown as Json,
+      },
     });
 
     if (entities.length > 0) {

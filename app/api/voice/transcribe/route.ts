@@ -141,6 +141,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       status: "ok",
       stt_ms: sttMs,
       latency_ms: sttMs,
+      // STT is billed per minute of audio; the lab prices the row from this (D-63).
+      raw_response: { duration_ms: body.duration_ms ?? null },
     });
 
     if (body.context === "director_input") {

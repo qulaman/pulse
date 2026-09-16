@@ -10,7 +10,8 @@ import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
 export const STT_PROVIDERS = ["openai", "whisper1", "deepgram", "elevenlabs"] as const;
 export type SttProviderKey = (typeof STT_PROVIDERS)[number];
 
-export const PARSER_MODELS = ["claude-haiku-4-5", "claude-sonnet-5"] as const;
+/** DeepSeek ids are the lab's A/B against Haiku (D-63); the default stays Claude. */
+export const PARSER_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "deepseek-chat", "deepseek-reasoner"] as const;
 
 export const SttSettingsSchema = z.object({
   provider: z.enum(STT_PROVIDERS).default("openai"),
@@ -111,4 +112,6 @@ export const STT_PROVIDER_LABEL: Record<SttProviderKey, string> = {
 export const PARSER_MODEL_LABEL: Record<string, string> = {
   "claude-haiku-4-5": "Claude Haiku 4.5 — быстрый, ~2.8 с",
   "claude-sonnet-5": "Claude Sonnet 5 — точнее, ~6 с",
+  "deepseek-chat": "DeepSeek V3 (chat) — без рассуждений, лаборатория",
+  "deepseek-reasoner": "DeepSeek R1 (reasoner) — с рассуждениями, медленно, лаборатория",
 };

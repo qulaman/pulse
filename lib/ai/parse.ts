@@ -1,23 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import type { Convention } from "./conventions";
+import { callDeepSeek, isDeepSeekModel, toChatMessages } from "./deepseek";
+import { ParseError, type ParseErrorCode } from "./errors";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
 import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, withAssigneeId, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
-export type ParseErrorCode = "parse_refused" | "parse_failed";
-
-/** Frontend error contract (docs/AI.md §11). Carries no prompt content and no keys. */
-export class ParseError extends Error {
-  readonly code: ParseErrorCode;
-
-  constructor(code: ParseErrorCode, message: string, options: { cause?: unknown } = {}) {
-    super(message, { cause: options.cause });
-    this.name = "ParseError";
-    this.code = code;
-  }
-}
+export { ParseError, type ParseErrorCode };
 
 export interface ParseUsage {
   input_tokens: number;
@@ -26,13 +17,28 @@ export interface ParseUsage {
   cache_creation_input_tokens: number;
 }
 
+export type ParseProvider = "anthropic" | "deepseek";
+
+/** One model call as it went, so an escalated parse can be priced per model (lab, D-63). */
+export interface ParseCall {
+  model: string;
+  provider: ParseProvider;
+  usage: ParseUsage;
+  /** DeepSeek reasoner: thinking tokens inside output_tokens. */
+  reasoning_tokens: number;
+  latencyMs: number;
+  ok: boolean;
+}
+
 export interface ParseOutcome {
   entities: Entity[];
   model: string;
+  provider: ParseProvider;
   escalated: boolean;
   usage: ParseUsage;
   latencyMs: number;
   raw: unknown;
+  calls: ParseCall[];
 }
 
 export interface ParseInput {
@@ -50,6 +56,7 @@ export interface ParseInput {
 }
 
 const MAX_TOKENS = 4096;
+const DEEPSEEK_TIMEOUT_MS: Record<string, number> = { "deepseek-chat": 25_000, "deepseek-reasoner": 55_000 };
 const ESCALATION_TRANSCRIPT_CHARS = 400;
 const ESCALATION_ENTITY_COUNT = 3;
 const ESCALATION_ASSIGNEE_CONFIDENCE = 0.6;
@@ -59,6 +66,10 @@ const ESCALATION_DEADLINE_CONFIDENCE = 0.5;
 
 export const DEFAULT_PARSER_MODEL = "claude-haiku-4-5";
 export const DEFAULT_ESCALATION_MODEL = "claude-sonnet-5";
+
+export function providerOf(model: string): ParseProvider {
+  return isDeepSeekModel(model) ? "deepseek" : "anthropic";
+}
 
 function parserModel(override?: string): string {
   return override ?? process.env.PARSER_MODEL ?? DEFAULT_PARSER_MODEL;
@@ -123,6 +134,7 @@ function needsEscalation(transcript: string, entities: Entity[]): boolean {
 interface CallResult {
   entities: Entity[];
   usage: ParseUsage;
+  reasoningTokens: number;
   raw: unknown;
 }
 
@@ -131,12 +143,76 @@ function thinkingFor(model: string): Anthropic.ThinkingConfigParam | undefined {
   return model.includes("haiku-4-5") ? undefined : { type: "disabled" };
 }
 
+/** The typed boundary shared by both providers: the API (or JSON mode) gives text, zod gives entities. */
+function entitiesFromText(model: string, text: string): Entity[] {
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch (cause) {
+    throw new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
+  }
+  const parsed = ModelParseResultSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new ParseError(
+      "parse_failed",
+      `${model}: ответ не прошёл схему (${parsed.error.issues.length} issue(s))`,
+      { cause: parsed.error },
+    );
+  }
+  return parsed.data.entities.map(withAssigneeId);
+}
+
+function requestMessages(input: ParseInput): Anthropic.MessageParam[] {
+  return [
+    ...fewShotMessages(),
+    {
+      role: "user",
+      content: buildUserMessage({
+        transcript: input.transcript,
+        source: input.source,
+        now: input.now,
+      }),
+    },
+  ];
+}
+
+async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: number): Promise<CallResult> {
+  const result = await callDeepSeek({
+    model,
+    messages: toChatMessages(
+      buildSystemBlocks(input.roster, input.conventions),
+      requestMessages(input),
+      ENTITIES_JSON_SCHEMA,
+    ),
+    maxTokens,
+    timeoutMs: DEEPSEEK_TIMEOUT_MS[model] ?? 25_000,
+  });
+  if (result.finishReason === "length") {
+    if (maxTokens >= MAX_TOKENS * 4) {
+      throw new ParseError("parse_failed", `${model}: ответ не уместился в max_tokens`);
+    }
+    return callDeepSeekModel(model, input, maxTokens * 2);
+  }
+  if (result.finishReason === "content_filter") {
+    throw new ParseError("parse_refused", `${model}: модель отказалась разбирать транскрипт`);
+  }
+  return {
+    entities: entitiesFromText(model, result.text),
+    usage: result.usage,
+    reasoningTokens: result.reasoningTokens,
+    raw: result.raw,
+  };
+}
+
 async function callModel(
   client: Anthropic,
   model: string,
   input: ParseInput,
   maxTokens: number,
 ): Promise<CallResult> {
+  // The reasoner thinks before it answers, so its budget must cover both.
+  if (isDeepSeekModel(model)) return callDeepSeekModel(model, input, model === "deepseek-reasoner" ? maxTokens * 4 : maxTokens);
+
   let message: Anthropic.Message;
   try {
     message = await client.messages.create({
@@ -144,17 +220,7 @@ async function callModel(
       max_tokens: maxTokens,
       thinking: thinkingFor(model),
       system: buildSystemBlocks(input.roster, input.conventions),
-      messages: [
-        ...fewShotMessages(),
-        {
-          role: "user",
-          content: buildUserMessage({
-            transcript: input.transcript,
-            source: input.source,
-            now: input.now,
-          }),
-        },
-      ],
+      messages: requestMessages(input),
       output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } },
     });
   } catch (cause) {
@@ -171,27 +237,44 @@ async function callModel(
     return callModel(client, model, input, maxTokens * 2);
   }
   const text = message.content.find((block) => block.type === "text")?.text ?? "";
-  let json: unknown;
-  try {
-    json = JSON.parse(text);
-  } catch (cause) {
-    throw new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
-  }
-  // The API enforces the schema; this is the safety net and the typed boundary.
-  const parsed = ModelParseResultSchema.safeParse(json);
-  if (!parsed.success) {
-    throw new ParseError(
-      "parse_failed",
-      `${model}: ответ не прошёл схему (${parsed.error.issues.length} issue(s))`,
-      { cause: parsed.error },
-    );
-  }
-
   return {
-    entities: parsed.data.entities.map(withAssigneeId),
+    entities: entitiesFromText(model, text),
     usage: readUsage(message.usage),
+    reasoningTokens: 0,
     raw: message,
   };
+}
+
+/** Runs one call and records it, so the lab sees every model that was paid for. */
+async function tracked(
+  calls: ParseCall[],
+  client: Anthropic,
+  model: string,
+  input: ParseInput,
+): Promise<CallResult> {
+  const startedAt = Date.now();
+  try {
+    const result = await callModel(client, model, input, MAX_TOKENS);
+    calls.push({
+      model,
+      provider: providerOf(model),
+      usage: result.usage,
+      reasoning_tokens: result.reasoningTokens,
+      latencyMs: Date.now() - startedAt,
+      ok: true,
+    });
+    return result;
+  } catch (error) {
+    calls.push({
+      model,
+      provider: providerOf(model),
+      usage: emptyUsage(),
+      reasoning_tokens: 0,
+      latencyMs: Date.now() - startedAt,
+      ok: false,
+    });
+    throw error;
+  }
 }
 
 /**
@@ -202,6 +285,7 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
   const client = input.client ?? new Anthropic({ timeout: 20_000, maxRetries: 2 });
   const model = parserModel(input.model);
   const startedAt = Date.now();
+  const calls: ParseCall[] = [];
 
   const escalate = input.escalate ?? true;
   const target = input.escalationModel ?? escalationModel();
@@ -209,9 +293,9 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
   // A long transcript escalates no matter what Haiku says, so both calls start at once
   // and the director waits for the slower one only, not for the sum (backlog, D-43).
   const longTranscript = input.transcript.length > ESCALATION_TRANSCRIPT_CHARS;
-  const eager = escalate && longTranscript ? callModel(client, target, input, MAX_TOKENS) : null;
+  const eager = escalate && longTranscript ? tracked(calls, client, target, input) : null;
   // Haiku's failure is irrelevant once Sonnet is already running; its success feeds usage.
-  const first = await callModel(client, model, input, MAX_TOKENS).catch((error: unknown) => {
+  const first = await tracked(calls, client, model, input).catch((error: unknown) => {
     if (eager) return null;
     throw error;
   });
@@ -219,7 +303,7 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
 
   if (eager || (escalate && first && needsEscalation(input.transcript, first.entities))) {
     // The stronger model failing is not fatal while the weaker parse is in hand.
-    const second = await (eager ?? callModel(client, target, input, MAX_TOKENS)).catch(
+    const second = await (eager ?? tracked(calls, client, target, input)).catch(
       (error: unknown) => {
         if (first) return null;
         throw error;
@@ -229,20 +313,24 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
       return {
         entities: first!.entities,
         model,
+        provider: providerOf(model),
         escalated: false,
         usage,
         latencyMs: Date.now() - startedAt,
         raw: first!.raw,
+        calls,
       };
     }
     usage = addUsage(usage, second.usage);
     return {
       entities: second.entities,
       model: target,
+      provider: providerOf(target),
       escalated: true,
       usage,
       latencyMs: Date.now() - startedAt,
       raw: second.raw,
+      calls,
     };
   }
 
@@ -250,9 +338,11 @@ export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> 
   return {
     entities: first.entities,
     model,
+    provider: providerOf(model),
     escalated: false,
     usage,
     latencyMs: Date.now() - startedAt,
     raw: first.raw,
+    calls,
   };
 }
