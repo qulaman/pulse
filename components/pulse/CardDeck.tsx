@@ -48,11 +48,10 @@ export type CardDeckProps = {
   since: string;
   actions: TaskActions;
   companyId: string;
-  /** Bumped by a tap on the mascot: the cards fly out again. */
-  throwKey: number;
-  /** A tap on a strip chip: jump to the first card of that lane. */
-  focus: { lane: Lane; key: number } | null;
-  onLaneChange?: (lane: Lane | null) => void;
+  /** A tap on a ball: that task's card comes to the top ("work" — the closing card). */
+  focus: { id: string; key: number } | null;
+  /** The card on top changed (a swipe): the ball to light up, "work" for the closing card. */
+  onCurrentChange?: (id: string | null) => void;
 };
 
 /**
@@ -62,7 +61,7 @@ export type CardDeckProps = {
  * put the card at the end, tap to open the full card, hold for the quick menu. The
  * calm lane is one closing card that opens «Задачи».
  */
-export function CardDeck({ lanes, now, since, actions, companyId, throwKey, focus, onLaneChange }: CardDeckProps) {
+export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurrentChange }: CardDeckProps) {
   const [postponed, setPostponed] = useState<string[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
@@ -83,22 +82,22 @@ export function CardDeck({ lanes, now, since, actions, companyId, throwKey, focu
   const safeIndex = Math.min(index, Math.max(0, items.length - 1));
   const current = items[safeIndex];
 
-  // a tap on a lane chip: the first card of that lane comes to the top (derived state:
-  // applied once per tap, during render, so a later change of the list never re-jumps)
+  // a tap on a ball: that card comes to the top (derived state: applied once per tap,
+  // during render, so a later change of the list never re-jumps)
   const [appliedFocus, setAppliedFocus] = useState<number | null>(null);
   if (focus && focus.key !== appliedFocus) {
     setAppliedFocus(focus.key);
-    const at = items.findIndex((item) => item.kind === "task" && item.lane === focus.lane);
+    const at = items.findIndex((item) => (item.kind === "task" ? item.task.id : "work") === focus.id);
     if (at >= 0) setIndex(at);
   }
 
-  const laneRef = useRef<Lane | null | undefined>(undefined);
+  const currentId = current ? (current.kind === "task" ? current.task.id : "work") : null;
+  const reported = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    const lane = current?.kind === "task" ? current.lane : null;
-    if (laneRef.current === lane) return;
-    laneRef.current = lane;
-    onLaneChange?.(lane);
-  }, [current, onLaneChange]);
+    if (reported.current === currentId) return;
+    reported.current = currentId;
+    onCurrentChange?.(currentId);
+  }, [currentId, onCurrentChange]);
 
   const [open, setOpen] = useState<BoardTask | null>(null);
   const [menu, setMenu] = useState<BoardTask | null>(null);
@@ -230,7 +229,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, throwKey, focu
 
   return (
     <section aria-label="Стопка задач" className="mt-3" data-testid="deck" data-index={safeIndex} data-count={items.length}>
-      <div key={throwKey} className="relative grid" style={{ touchAction: "pan-y" }}>
+      <div className="relative grid" style={{ touchAction: "pan-y" }}>
         {roles.map(({ item, role }) => {
           const id = keyOf(item);
           const isCurrent = role === "current";

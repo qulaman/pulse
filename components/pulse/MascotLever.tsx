@@ -37,6 +37,11 @@ function bumpUses(): void {
   }
   for (const listener of usesListeners) listener();
 }
+/** Whether the gesture hint should still be shown — the screen puts it at the bottom. */
+export function useLeverHint(): boolean {
+  return useUses() < HINT_USES;
+}
+
 function useUses(): number {
   return useSyncExternalStore(
     (onChange) => {
@@ -72,7 +77,6 @@ export function MascotLever({ state, onTap, size = 128 }: { state: MascotState; 
 
   const [shaking, setShaking] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
-  const uses = useUses();
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdFired = useRef(false);
@@ -165,7 +169,7 @@ export function MascotLever({ state, onTap, size = 128 }: { state: MascotState; 
     <div className="flex flex-col items-center">
       <button
         type="button"
-        aria-label={recording ? "Идёт запись, отпусти для отправки" : "Маскот: удержи — говори, тап — сводка, потяни вниз — текст"}
+        aria-label={recording ? "Идёт запись, отпусти для отправки" : "Маскот: удержи — говори, тап — задачи, потяни вниз — текст"}
         disabled={busy}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -214,8 +218,6 @@ export function MascotLever({ state, onTap, size = 128 }: { state: MascotState; 
         <span className="mt-1 text-[13px] leading-4" style={{ color: cancelArmed ? "var(--danger)" : "var(--text-muted)" }}>
           {cancelArmed ? "Отпусти, чтобы отменить" : "Слушаю… веди вверх, чтобы отменить"}
         </span>
-      ) : uses < HINT_USES ? (
-        <span className="mt-1 text-[13px] leading-4 text-muted [@media(max-height:700px)]:hidden">удержи — говори · тап — сводка · потяни вниз — текст</span>
       ) : null}
 
       <TextSheet open={textOpen} onClose={() => setTextOpen(false)} />

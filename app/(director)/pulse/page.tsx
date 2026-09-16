@@ -1,22 +1,25 @@
 "use client";
 
+import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
-import { LaneStrip } from "@/components/pulse/LaneStrip";
 import { LiveBoard } from "@/components/pulse/LiveBoard";
+import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
+import { TaskBalls, type Ball } from "@/components/pulse/TaskBalls";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { Button } from "@/components/ui/Button";
-import { usePeople } from "@/lib/people/queries";
+import { initialsOf, usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, lanesOf, toBriefTask, WORK_STATUSES, type Lane } from "@/lib/pulse/board";
+import { ATTENTION_LANES, countsOf, LANE_ORDER, lanesOf, toBriefTask, WORK_STATUSES } from "@/lib/pulse/board";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -24,16 +27,22 @@ import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 
-/** Suggestions under the assistant: the questions it answers from the data. */
-const QUICK_QUESTIONS = ["Кто не отчитался?", "Что на приёмке?", "Как дела в целом?"];
-
 type Exchange = { key: string; said: string; lines: string[]; understood: boolean };
 
+/** idle — the face alone in the middle; ring — the balls around it; card — one card open under the row of balls. */
+type Mode = "idle" | "ring" | "card";
+
+const FACE = 128;
+const FACE_SMALL = 88;
+/** Distance from the face's centre to the balls' centres. */
+const RING_RADIUS = 122;
+
 /**
- * Пульс — the director's home: the assistant «Капля» with one line (the verdict on
- * opening, then whatever just happened), the live board of tasks under it (lanes by
- * what each task needs, tiles that recolour and move as statuses change), and the one
- * thing to do here — give a task: hold to speak, tap to type. The team lives on /people.
+ * Пульс — the director's home (D-57, D-60): the face of «Капля» alone in the middle of
+ * the screen. Hold it to speak, pull it down to type, tap it and the tasks come out as
+ * balls around it; a tap on a ball opens that task as a card with the deck gestures.
+ * Hints and service lines live at the bottom, never under the face. A wide screen
+ * gets the live board instead of balls.
  */
 export default function PulsePage() {
   const me = useMe();
@@ -43,6 +52,7 @@ export default function PulsePage() {
   const actions = useTaskActions(me.data);
   const companyId = me.data?.companyId ?? "";
   const directorName = firstNameOf(me.data?.fullName);
+  const router = useRouter();
 
   const stage = useIngestStore((state) => state.stage);
   const entities = useIngestStore((state) => state.entities);
@@ -50,7 +60,6 @@ export default function PulsePage() {
   const requestId = useIngestStore((state) => state.clientRequestId);
   const resetIngest = useIngestStore((state) => state.reset);
   const startManual = useIngestStore((state) => state.startManual);
-  const ask = useIngestStore((state) => state.ask);
   const pointsEnabled = usePointsEnabled().data === true;
   const draftCount = stage === "confirm" ? entities.filter((entity) => isCountable(entity, pointsEnabled)).length : 0;
 
@@ -60,12 +69,44 @@ export default function PulsePage() {
   const counts = countsOf(lanes);
   const speech = useSpeech(rows, lanes, now, directorName);
   const wide = useMediaQuery("(min-width: 640px)");
-  // a tap on the face throws the cards again; a tap on a lane chip brings that lane to the top
-  const [throwKey, setThrowKey] = useState(0);
-  const [focus, setFocus] = useState<{ lane: Lane; key: number } | null>(null);
-  const [deckLane, setDeckLane] = useState<Lane | null>(null);
+  const showHint = useLeverHint();
 
-  // A question the phrase turned out to be: the director's words, then the answer from the data.
+  // ---- the balls and the card -------------------------------------------------------------
+  const [mode, setMode] = useState<Mode>("idle");
+  const [active, setActive] = useState<string | null>(null);
+  const [focus, setFocus] = useState<{ id: string; key: number } | null>(null);
+
+  const balls = useMemo<Ball[]>(() => {
+    const list: Ball[] = [];
+    for (const lane of LANE_ORDER) {
+      if (!ATTENTION_LANES.has(lane)) continue;
+      for (const task of lanes[lane]) {
+        const name = task.assignee?.full_name ?? "";
+        list.push({ kind: "task", id: task.id, lane, initials: name ? initialsOf(name) : "•", name: firstNameOf(name) || "Без исполнителя" });
+      }
+    }
+    if (lanes.work.length > 0) list.push({ kind: "work", id: "work", count: lanes.work.length });
+    return list;
+  }, [lanes]);
+
+  const pick = (ball: Ball) => {
+    if (ball.kind === "more") {
+      router.push("/sent");
+      return;
+    }
+    if (mode === "card" && active === ball.id) {
+      // the open ball again: the card folds back
+      setMode("ring");
+      setActive(null);
+      return;
+    }
+    setActive(ball.id);
+    setFocus({ id: ball.id, key: Date.now() });
+    setMode("card");
+  };
+  const onCurrentChange = useCallback((id: string | null) => setActive(id), []);
+
+  // ---- a question the phrase turned out to be ---------------------------------------------
   const people = usePeople();
   const asked = stage === "question" && question ? question : null;
   // the closed list (200 rows, two joins) is fetched only while a question needs it
@@ -90,14 +131,12 @@ export default function PulsePage() {
   }, [asked, now, rows, lanes, people.isLoading, people.data, sent.isLoading, sent.data]);
 
   // The exchange stays on screen after the pipeline goes idle: the assistant keeps its
-  // answer until the director asks again, taps the face, or closes it. Keyed by the
-  // request, so the same question asked again is a new exchange.
+  // answer until the director asks again, taps the face, or closes it.
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const exchangeKey = asked ? (requestId ?? asked) : null;
   if (asked && reply && exchangeKey && exchange?.key !== exchangeKey) {
     setExchange({ key: exchangeKey, said: asked, lines: reply.lines, understood: reply.understood });
   }
-  // an answered question is done — the pipeline goes idle; an unread one waits for the choice
   useEffect(() => {
     if (asked && reply?.understood) resetIngest();
   }, [asked, reply, resetIngest]);
@@ -105,84 +144,138 @@ export default function PulsePage() {
     setExchange(null);
     if (stage === "question") resetIngest();
   };
+
+  // the face alone when idle: the opening line waits for a tap; a change on the board is said at once
   const lines = useMemo<AssistantLine[]>(() => {
     if (exchange) return exchange.lines.map((text, i) => ({ id: `${exchange.key}:${i}`, text }));
-    return speech.line ? [speech.line] : [];
-  }, [exchange, speech.line]);
+    if (!speech.line) return [];
+    if (mode === "idle" && !wide && speech.line.opening) return [];
+    return [speech.line];
+  }, [exchange, speech.line, mode, wide]);
+
+  const onFaceTap = () => {
+    closeExchange();
+    if (mode === "idle") {
+      speech.replay();
+      setMode("ring");
+    } else {
+      setMode("idle");
+      setActive(null);
+    }
+  };
 
   const mascot: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : counts.attention > 0 ? "calm" : "happy";
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
+  const faceSize = mode === "card" && !wide ? FACE_SMALL : FACE;
+  const box = mode === "ring" ? RING_RADIUS * 2 + 56 : faceSize + 24;
+
+  const serviceLines = (
+    <>
+      {draftCount > 0 ? (
+        <Link href="/confirm" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
+          <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
+          Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
+          <span className="text-accent">Открыть ›</span>
+        </Link>
+      ) : null}
+      {people.data && team.length === 0 ? (
+        <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
+          <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
+          В команде пока никого. Добавь первого сотрудника. <span className="text-accent">Добавить ›</span>
+        </Link>
+      ) : null}
+      <PushCard bubble />
+      <InstallHint bubble />
+    </>
+  );
+
+  if (wide) {
+    return (
+      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3">
+        <div className="flex flex-col items-center">
+          <MascotLever state={mascot} onTap={onFaceTap} size={FACE} />
+        </div>
+        <div className="mt-2">
+          <Assistant said={exchange?.said ?? null} lines={loading && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
+            {exchange ? <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} /> : null}
+            {serviceLines}
+          </Assistant>
+        </div>
+        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
+        <EtherSection variant="director" />
+      </main>
+    );
+  }
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3" style={{ overscrollBehaviorY: "contain" }}>
-      <Assistant
-        mascot={mascot}
-        said={exchange?.said ?? null}
-        lines={loading && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}
-        onTap={() => {
-          closeExchange();
-          speech.replay();
-          setThrowKey((key) => key + 1);
-        }}
-      >
-        {exchange ? (
-          <div className="card-in flex flex-wrap gap-2 pl-4 pt-1">
-            {!exchange.understood ? (
-              <Button variant="secondary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={startManual}>
-                Сделать задачей
-              </Button>
+    <main
+      className={`mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-28 ${mode === "idle" ? "justify-center" : "justify-start pt-2"}`}
+      style={{ overscrollBehaviorY: "contain" }}
+      data-mode={mode}
+    >
+      <LayoutGroup>
+        {/* the face, and the balls around it (ring) or in a row under it (card) */}
+        <div className="relative flex flex-col items-center">
+          <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+            <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} />
+            <AnimatePresence>
+              {mode === "ring" ? <TaskBalls key="ring" balls={balls} mode="ring" activeId={active} radius={RING_RADIUS} onPick={pick} /> : null}
+            </AnimatePresence>
+          </motion.div>
+          <AnimatePresence>
+            {mode === "card" ? (
+              <motion.div key="row" layout className="mt-1 w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                <TaskBalls balls={balls} mode="row" activeId={active} radius={RING_RADIUS} onPick={pick} />
+              </motion.div>
             ) : null}
-            <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={closeExchange}>
-              Закрыть
-            </Button>
-          </div>
-        ) : null}
-        {draftCount > 0 ? (
-          <Link href="/confirm" className="card-in relative block py-1 pl-4 text-[17px] leading-6">
-            <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full bg-accent" />
-            Черновик: {draftCount} {draftCount === 1 ? "сущность" : draftCount < 5 ? "сущности" : "сущностей"}, не отправлен.{" "}
-            <span className="text-accent">Открыть ›</span>
-          </Link>
-        ) : null}
-        {/* what the assistant can be asked — a tap asks at once, no parser round-trip */}
-        {stage === "idle" && !loading ? (
-          <div className="card-in flex flex-wrap gap-2 pl-4 pt-1" aria-label="Спросить">
-            {QUICK_QUESTIONS.map((text) => (
-              <button
-                key={text}
-                type="button"
-                onClick={() => ask(text)}
-                className="min-h-[36px] rounded-full border border-border bg-surface px-3 text-[14px] leading-[18px] text-muted transition-transform duration-[120ms] active:scale-[0.97]"
-              >
-                {text}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {/* a fresh instance: nobody to give tasks to yet — the first step is the team */}
-        {people.data && team.length === 0 ? (
-          <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[17px] leading-6">
-            <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full bg-accent" />
-            В команде пока никого. Добавь первого сотрудника, и задачи будет кому давать.{" "}
-            <span className="text-accent">Добавить ›</span>
-          </Link>
-        ) : null}
-        <PushCard bubble />
-        <InstallHint bubble />
-      </Assistant>
-
-      {wide ? (
-        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
-      ) : rows ? (
-        <div className="mt-4">
-          <LaneStrip counts={counts} active={deckLane} onSelect={(lane) => setFocus({ lane, key: Date.now() })} />
-          <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId={companyId} throwKey={throwKey} focus={focus} onLaneChange={setDeckLane} />
+          </AnimatePresence>
         </div>
-      ) : null}
 
-      {/* the announcements (D-59: Эфир lives here, folded under the board) */}
-      <EtherSection variant="director" />
+        <motion.div layout className="mt-3">
+          <Assistant said={exchange?.said ?? null} lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
+            {exchange ? <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} /> : null}
+          </Assistant>
+        </motion.div>
 
+        {mode === "card" ? (
+          <motion.div layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+            <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId={companyId} focus={focus} onCurrentChange={onCurrentChange} />
+          </motion.div>
+        ) : null}
+
+        {mode !== "idle" ? (
+          <motion.div layout>
+            <EtherSection variant="director" />
+          </motion.div>
+        ) : null}
+      </LayoutGroup>
+
+      {/* the bottom: service lines and the gesture hint — never under the face */}
+      <div className="pointer-events-none fixed inset-x-0 z-20 px-4" style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 8px)" }}>
+        <div className="pointer-events-auto mx-auto flex max-w-lg flex-col gap-1">
+          {serviceLines}
+          {showHint && mode === "idle" ? (
+            <p className="text-center text-[12px] leading-4 text-muted" data-testid="lever-hint">
+              удержи — говори · тап — задачи · потяни вниз — текст
+            </p>
+          ) : null}
+        </div>
+      </div>
     </main>
+  );
+}
+
+function ExchangeButtons({ exchange, onManual, onClose }: { exchange: Exchange; onManual: () => void; onClose: () => void }) {
+  return (
+    <div className="card-in flex flex-wrap justify-center gap-2 pt-1">
+      {!exchange.understood ? (
+        <Button variant="secondary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={onManual}>
+          Сделать задачей
+        </Button>
+      ) : null}
+      <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={onClose}>
+        Закрыть
+      </Button>
+    </div>
   );
 }

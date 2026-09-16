@@ -7,7 +7,7 @@ import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase }
 /** How long the mascot's mouth moves after a new line. */
 const SPEAKING_MS = 1_200;
 
-export type SpokenLine = Phrase & { id: string };
+export type SpokenLine = Phrase & { id: string; /** the greeting and verdict, as opposed to a change on the board */ opening: boolean };
 
 let counter = 0;
 const nextId = () => `say:${++counter}`;
@@ -33,8 +33,8 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
     lanesRef.current = lanes;
   }, [now, lanes]);
 
-  const say = useCallback((phrase: Phrase) => {
-    setLine({ ...phrase, id: nextId() });
+  const say = useCallback((phrase: Phrase, isOpening = false) => {
+    setLine({ ...phrase, id: nextId(), opening: isOpening });
     setSpeaking(true);
   }, []);
 
@@ -44,7 +44,7 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
     previous.current = rows;
     if (!before) {
       opening.current = { name: directorName };
-      say(openingLine(lanesRef.current, nowRef.current, directorName));
+      say(openingLine(lanesRef.current, nowRef.current, directorName), true);
       return;
     }
     const phrases = describeChanges(before, rows, nowRef.current);
@@ -57,7 +57,7 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
   useEffect(() => {
     if (!opening.current || opening.current.name === directorName) return;
     opening.current = { name: directorName };
-    setLine((current) => (current ? { ...openingLine(lanesRef.current, nowRef.current, directorName), id: current.id } : current));
+    setLine((current) => (current ? { ...openingLine(lanesRef.current, nowRef.current, directorName), id: current.id, opening: true } : current));
   }, [directorName]);
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
 
   const replay = useCallback(() => {
     opening.current = { name: directorName };
-    say(openingLine(lanesRef.current, nowRef.current, directorName));
+    say(openingLine(lanesRef.current, nowRef.current, directorName), true);
   }, [say, directorName]);
 
   return { line, speaking, replay };
