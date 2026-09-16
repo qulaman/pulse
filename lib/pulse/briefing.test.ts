@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBriefing, greeting, quietLine, quoteTitle, MAX_FACTS, type BriefTask } from "./briefing";
+import { greeting, quietLine, quoteTitle, type BriefTask } from "./briefing";
 
 // 2026-09-11 09:30 Aqtobe (UTC+5)
 const NOW = new Date("2026-09-11T04:30:00Z");
@@ -11,8 +11,6 @@ const task = (id: string, title: string, assignee: string | null, deadline: stri
   assignee,
   deadline,
 });
-
-const EMPTY = { now: NOW, directorName: "Асхат", overdue: [], questions: [], review: [], accepted: [], open: [] };
 
 describe("greeting", () => {
   it.each([
@@ -42,69 +40,11 @@ describe("quoteTitle", () => {
   });
 });
 
-describe("buildBriefing", () => {
-  it("starts with the greeting and says it is quiet when nothing needs the director", () => {
-    const lines = buildBriefing({ ...EMPTY, open: [task("a", "Отчёт", "Марат", "2026-09-11T13:00:00Z")] });
-    expect(lines.map((l) => l.kind)).toEqual(["greeting", "quiet"]);
-    expect(lines[1]!.text).toBe("Пока тихо. 1 задача в работе, ближайший срок сегодня 18:00 (Марат, «Отчёт»).");
-  });
-
-  it("orders facts overdue → questions → review, grouped by person", () => {
-    const lines = buildBriefing({
-      ...EMPTY,
-      review: [task("r1", "КП по Казхрому", "Марат"), task("r2", "Смета", "Марат")],
-      questions: [task("q1", "Сроки КП", "Динара")],
-      overdue: [task("o1", "Отчёт по складу", "Тимур", "2026-09-10T13:00:00Z")],
-    });
-    expect(lines.map((l) => l.kind)).toEqual(["greeting", "verdict", "fact", "fact", "fact"]);
-    expect(lines[1]!.text).toBe("1 просрочка, 1 вопрос, 2 на приёмке. По порядку:");
-    expect(lines[1]!.tone).toBe("danger");
-    expect(lines[2]!.text).toBe("Тимур: задача «Отчёт по складу» просрочена, срок был вчера 18:00");
-    expect(lines[3]!.text).toBe("Динара спрашивает по «Сроки КП»");
-    expect(lines[4]!.text).toBe("Марат: сдано 2 задачи, ждут приёмки");
-    expect(lines[4]!.taskIds).toEqual(["r1", "r2"]);
-  });
-
-  it("a question brings its own words", () => {
-    const lines = buildBriefing({
-      ...EMPTY,
-      questions: [{ ...task("q1", "Сроки КП", "Динара"), question: "Когда нужно сдать?" }],
-    });
-    expect(lines[2]!.text).toBe("Динара спрашивает по «Сроки КП»: «Когда нужно сдать?»");
-  });
-
-  it("a refusal comes right after the overdue, with the reason in running text", () => {
-    const lines = buildBriefing({
-      ...EMPTY,
-      overdue: [task("o1", "Отчёт", "Тимур", "2026-09-10T13:00:00Z")],
-      declined: [{ ...task("d1", "Смета по складу", "Ерлан"), reason: "Занят срочным" }],
-      review: [task("r1", "КП", "Марат")],
-    });
-    expect(lines[1]!.text).toBe("1 просрочка, 1 отказ, 1 на приёмке. По порядку:");
-    expect(lines.map((l) => l.id)).toEqual(["greeting", "verdict", "overdue:Тимур", "declined:Ерлан", "review:Марат"]);
-    expect(lines[3]!.text).toBe("Ерлан не может «Смета по складу»: занят срочным");
-    expect(lines[3]!.tone).toBe("warn");
-  });
-
-  it("tells accepted tasks as news after the facts, with the time", () => {
-    const lines = buildBriefing({
-      ...EMPTY,
-      accepted: [{ task: task("a1", "КП", "Марат"), at: "2026-09-11T04:14:00Z" }],
-    });
-    expect(lines.map((l) => l.kind)).toEqual(["greeting", "quiet", "fact"]);
-    expect(lines[2]!.text).toBe("Марат: задача «КП» принята в работу сегодня 09:14");
-    expect(lines[2]!.tone).toBe("muted");
-  });
-
-  it("folds everything past the limit into «и ещё N»", () => {
-    const review = Array.from({ length: MAX_FACTS + 3 }, (_, i) => task(`r${i}`, `Задача ${i}`, `Человек${i}`));
-    const lines = buildBriefing({ ...EMPTY, review });
-    const facts = lines.filter((l) => l.kind === "fact");
-    expect(facts).toHaveLength(MAX_FACTS);
-    const more = lines.at(-1)!;
-    expect(more.kind).toBe("more");
-    expect(more.text).toBe("И ещё 3 — в «Задачах»");
-    expect(more.taskIds).toHaveLength(3);
+describe("quietLine", () => {
+  it("names the nearest deadline with the person in the nominative", () => {
+    expect(quietLine([task("a", "Отчёт", "Марат", "2026-09-11T13:00:00Z")], NOW)).toBe(
+      "Пока тихо. 1 задача в работе, ближайший срок сегодня 18:00 (Марат, «Отчёт»).",
+    );
   });
 
   it("names the count of open tasks without a deadline honestly", () => {

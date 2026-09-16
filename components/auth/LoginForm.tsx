@@ -6,7 +6,6 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { PulseMark } from "@/components/brand/PulseMark";
-import { forgetConversation } from "@/components/pulse/conversation";
 import { forgetVisit } from "@/lib/pulse/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
@@ -43,7 +42,6 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
     // A sign-out is a client-side navigation: nothing of the previous person may survive
     // in this tab — cached lists, the assistant's conversation, the visit stamp.
     queryClient.clear();
-    forgetConversation();
     forgetVisit();
     // The proxy sends the session to the right screen for the role.
     router.replace("/");

@@ -22,6 +22,7 @@
     "dev:https": "next dev --experimental-https",
     "smoke:ui": "tsx scripts/smoke-ui.ts",
     "smoke:jank": "tsx scripts/smoke-jank.ts",
+    "smoke:board": "tsx scripts/smoke-board.ts",
     "db:clean": "tsx scripts/db-clean.ts",
     "seed:client": "tsx scripts/seed-client.ts"
   },
@@ -30,6 +31,7 @@
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "@tanstack/react-query": "^5.102.8",
+    "framer-motion": "^13.3.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8",

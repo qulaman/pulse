@@ -1,42 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
-import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
-import type { TaskStatus } from "@/lib/tasks/status-text";
-import type { AnswerTask } from "./answers";
-import type { BriefTask } from "./briefing";
-import { firstNameOf } from "@/lib/text/normalize";
+import { useEffect, useState } from "react";
 
 const LAST_VISIT_KEY = "pulse.brief.seen_at";
 /** The «since» of the current tab session: coming back from another tab is the same visit. */
 const SESSION_SINCE_KEY = "pulse.brief.since";
 /** A PWA kept alive in the background for days: after this long the next opening is a new visit. */
 const VISIT_MAX_AGE_MS = 8 * 3_600_000;
-/** A first visit (or a wiped storage) reads the news of the last day. */
+/** A first visit (or a wiped storage) marks the changes of the last day as new. */
 const FIRST_VISIT_WINDOW_MS = 24 * 3_600_000;
 
-export { firstNameOf };
-
-export function toBriefTask(
-  task: Pick<TaskWithPeople, "id" | "title" | "deadline" | "assignee"> & { assignee_id?: string | null },
-): BriefTask {
-  return {
-    id: task.id,
-    title: task.title,
-    deadline: task.deadline,
-    assignee: task.assignee?.full_name ? firstNameOf(task.assignee.full_name) : null,
-    assigneeId: task.assignee_id ?? null,
-  };
-}
-
-/**
- * When the director last opened Пульс on this phone. Read once per mount, then the
- * stamp moves to now — so the next opening tells what happened in between, while the
- * current screen keeps its own «since» for the whole visit (Realtime appends to it).
- */
 /** A new person signs in on this tab: their first opening is a first visit. */
 export function forgetVisit(): void {
   try {
@@ -47,6 +20,11 @@ export function forgetVisit(): void {
   }
 }
 
+/**
+ * When the director last opened Пульс on this phone. Read once per mount, then the
+ * stamp moves to now — so the next opening marks what changed in between as new,
+ * while the current screen keeps its own «since» for the whole visit.
+ */
 export function useLastVisit(): string {
   const [since] = useState(() => {
     const now = Date.now();
@@ -70,74 +48,15 @@ export function useLastVisit(): string {
   return since;
 }
 
-type AcceptedRow = {
-  created_at: string;
-  task: {
-    id: string;
-    title: string;
-    deadline: string | null;
-    status: TaskStatus;
-    assignee_id?: string | null;
-    assignee: { full_name: string } | null;
-  } | null;
-};
-
-/** «Принял» is news only while the person is still on it. */
-const STILL_ACCEPTED: readonly TaskStatus[] = ["accepted", "in_progress"];
-
 /**
- * Tasks that went to `accepted` since the previous visit — the good news of the
- * briefing. Only tasks still in that state: one handed in, accepted by the director
- * or refused since is not «принял» any more — it is either a fact of its own or over.
- * A task accepted twice (after rework) is one piece of news, at its latest acceptance.
+ * The clock of the board: read on mount, then once a minute — a deadline that passes
+ * while the screen is open moves its tile into the overdue lane without a reload.
  */
-export function useAcceptedSince(since: string) {
-  return useRealtimeQuery<{ task: BriefTask; at: string }[], Record<string, unknown>>({
-    queryKey: ["pulse", "accepted", since],
-    queryFn: async () => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase
-        .from("task_messages")
-        .select("created_at, task:tasks!task_messages_task_id_fkey(id, title, deadline, status, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name))")
-        .eq("type", "status_change")
-        .eq("meta->>new_status", "accepted")
-        .gt("created_at", since)
-        .order("created_at", { ascending: true })
-        .limit(50);
-      if (error) throw new Error(error.message);
-      const latest = new Map<string, { task: BriefTask; at: string }>();
-      for (const row of (data ?? []) as unknown as AcceptedRow[]) {
-        if (!row.task || !STILL_ACCEPTED.includes(row.task.status)) continue;
-        latest.set(row.task.id, { at: row.created_at, task: toBriefTask(row.task) });
-      }
-      return [...latest.values()];
-    },
-    // a transition writes a status_change message, so the tasks table needs no channel of its own
-    channel: { table: "task_messages" },
-  });
-}
-
-const OPEN: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
-
-/** Everything still in work — for the quiet line, the nearest deadline and the answers. */
-export function useOpenTasks() {
-  return useRealtimeQuery<AnswerTask[], TaskRow>({
-    queryKey: ["pulse", "open"],
-    queryFn: async () => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("id, title, deadline, status, assignee_id, assignee:profiles!tasks_assignee_id_fkey(full_name)")
-        .in("status", [...OPEN]);
-      if (error) throw new Error(error.message);
-      type Row = Pick<TaskWithPeople, "id" | "title" | "deadline" | "status" | "assignee" | "assignee_id">;
-      return ((data ?? []) as unknown as Row[]).map((row) => ({ ...toBriefTask(row), status: row.status }));
-    },
-    channel: { table: "tasks" },
-  });
-}
-
-/** Stable reference for the briefing builder: the clock ticks once per mount. */
-export function useNow(): Date {
-  return useMemo(() => new Date(), []);
+export function useNow(tickMs = 60_000): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), tickMs);
+    return () => clearInterval(timer);
+  }, [tickMs]);
+  return now;
 }

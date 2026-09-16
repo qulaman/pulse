@@ -50,16 +50,34 @@ export function PulseInboxBone() {
   );
 }
 
-/** Пульс (D-49): the assistant thinking, its first bubble, the button block where the page pins it. */
+/** Пульс (D-57): the assistant thinking, its first line, two tiles of the board, the pinned button block. */
 export function PulseSkeleton() {
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-4">
-      <div className="mx-auto flex h-[168px] w-[168px] items-center justify-center">
-        <Mascot state="thinking" size={144} />
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-3">
+      <div className="mx-auto flex h-[128px] w-[128px] items-center justify-center [@media(max-height:760px)]:h-[104px] [@media(max-height:760px)]:w-[104px]">
+        <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
+          <Mascot state="thinking" size={112} />
+        </span>
       </div>
-      <div className="mt-3 flex flex-col gap-3">
-        <div className="py-1 pl-4 pr-8 text-[19px] font-semibold leading-6">Смотрю, что нового…</div>
+      <div className="mt-2 flex flex-col gap-2">
+        <div className="py-1 pl-4 text-[17px] leading-6">Смотрю, что нового…</div>
       </div>
+      <SkeletonGroup className="mt-4 flex flex-col gap-2">
+        <div className="mb-1 flex gap-2">
+          <Bone round w={96} h={26} />
+          <Bone round w={110} h={26} />
+        </div>
+        {[0, 1].map((i) => (
+          <div key={i} className="rounded-[20px] border border-border bg-surface p-4 pl-5">
+            <div className="flex items-center justify-between">
+              <Bone w={72} h={14} />
+              <Bone w={64} h={12} />
+            </div>
+            <Bone className="mt-2" w="80%" h={20} />
+            <Bone className="mt-2" w={140} h={14} />
+          </div>
+        ))}
+      </SkeletonGroup>
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center pt-8"

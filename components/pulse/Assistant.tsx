@@ -1,261 +1,66 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
-import { TaskCard } from "@/components/tasks/TaskCard";
-import type { BriefLine, BriefTone } from "@/lib/pulse/briefing";
-import { isHandled, mergeLines } from "@/lib/pulse/merge";
-import type { TaskActions } from "@/lib/tasks/mutations";
-import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { conversation, forgetConversation } from "./conversation";
-import { useTypewriter } from "./useTypewriter";
+import type { SpeechTone } from "@/lib/pulse/board";
 
-const TONE_COLOR: Record<BriefTone, string> = {
+const TONE_COLOR: Record<SpeechTone, string> = {
   danger: "var(--danger)",
   warn: "var(--warn)",
   ok: "var(--ok)",
   muted: "var(--text-muted)",
 };
 
+export type AssistantLine = { id: string; text: string; tone?: SpeechTone };
+
 type Props = {
-  /** Fresh lines from the data; the component keeps its own spoken snapshot. */
-  lines: BriefLine[];
-  loading: boolean;
-  /** Tasks the director can act on, by id — a fact bubble opens their cards inline. */
-  taskById: Map<string, TaskWithPeople>;
-  /** Tasks still in work — null until loaded; tells when a piece of news is over. */
-  openIds: ReadonlySet<string> | null;
-  actions: TaskActions;
-  companyId: string;
-  /** Service bubbles (push, draft) — said after the briefing, so nothing above them ever moves. */
+  mascot: MascotState;
+  /** The director's own words, when the assistant is answering a question. */
+  said?: string | null;
+  /** What the assistant says — one line for the moment, a few when it answers. */
+  lines: AssistantLine[];
+  /** A tap on the face repeats the opening line. */
+  onReplay: () => void;
+  /** Service lines (push, draft, chips) — under what the assistant says. */
   children?: ReactNode;
 };
 
-export function Assistant({ lines, loading, taskById, openIds, actions, companyId, children }: Props) {
-  const attention = new Set(taskById.keys());
-  // picks up where this tab session left off: the briefing is not re-typed on every return
-  const [spoken, setSpoken] = useState<BriefLine[]>(() => conversation.spoken);
-  const merged = loading ? spoken : mergeLines(spoken, lines);
-  if (merged !== spoken) setSpoken(merged);
-
-  const [replayKey, setReplayKey] = useState(0);
-  const [open, setOpen] = useState<string | null>(null);
-  const { shown, activeId, speaking } = useTypewriter(spoken, replayKey, conversation.shown);
-  useEffect(() => {
-    conversation.spoken = spoken;
-    conversation.shown = shown;
-  }, [spoken, shown]);
-
-  const worst = spoken.find((line) => line.kind === "verdict")?.tone;
-  // news never holds the face back; the verdict is history once the closing line is said
-  const closed = spoken.some((line) => line.id === "quiet:after");
-  const handledAll = spoken.every(
-    (line) => line.kind !== "fact" || line.tone === "muted" || isHandled(line, attention, openIds),
-  );
-  const mascot: MascotState = loading ? "thinking" : speaking ? "speaking" : worst && !handledAll ? "calm" : "happy";
-
-  // a question and its answer land at the bottom: bring them into view, above the pinned button
-  const last = spoken[spoken.length - 1];
-  const lastId = last?.id;
-  const lastIsChat = last?.kind === "director" || last?.kind === "answer";
-  // each new line reserves its full height the moment it starts, so one scroll per line is enough
-  useEffect(() => {
-    if (!lastIsChat) return;
-    const timer = setTimeout(() => {
-      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
-    }, 80);
-    return () => clearTimeout(timer);
-  }, [lastId, lastIsChat, activeId, speaking]);
-
-  // an expanded fact scrolls to the top of the screen (under the sticky header),
-  // so its cards are read at once instead of hiding under the pinned button
-  useEffect(() => {
-    if (!open) return;
-    const timer = setTimeout(() => {
-      document.querySelector<HTMLElement>(`[data-line="${CSS.escape(open)}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 60);
-    return () => clearTimeout(timer);
-  }, [open]);
-
-  const replay = () => {
-    setOpen(null);
-    forgetConversation();
-    setReplayKey((key) => key + 1);
-  };
-
+/**
+ * The assistant on Пульс: the face and one line under it. The line appears at once
+ * (a short fade, the mouth moves for a second) and is replaced by the next one — the
+ * board below keeps the state, so nothing here has to be remembered or scrolled.
+ */
+export function Assistant({ mascot, said, lines, onReplay, children }: Props) {
   return (
     <section aria-label="Ассистент" className="flex flex-col items-stretch">
       <button
         type="button"
-        onClick={replay}
-        aria-label="Повторить доклад"
-        className="mx-auto flex h-[168px] w-[168px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96] [@media(max-height:760px)]:h-[128px] [@media(max-height:760px)]:w-[128px]"
+        onClick={onReplay}
+        aria-label="Повторить сводку"
+        className="mx-auto flex h-[128px] w-[128px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96] [@media(max-height:760px)]:h-[104px] [@media(max-height:760px)]:w-[104px]"
       >
-        {/* a short phone (iPhone SE class) gives the briefing one more line instead of a larger face */}
-        <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.78]">
-          <Mascot state={mascot} size={144} />
+        {/* a short phone (iPhone SE class) gives the board one more tile instead of a larger face */}
+        <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
+          <Mascot state={mascot} size={112} />
         </span>
       </button>
 
-      <div className="mt-3 flex flex-col gap-3" aria-live="polite">
-        {loading && spoken.length === 0 ? (
-          <Bubble kind="greeting" text="Смотрю, что нового…" shownChars={17} active tone={undefined} />
+      <div className="mt-2 flex flex-col gap-2" aria-live="polite">
+        {said ? (
+          <div className="flex justify-end pt-1">
+            <p className="max-w-[85%] rounded-[16px] rounded-tr-[6px] bg-surface-2 px-4 py-2 text-[16px] leading-[22px]">{said}</p>
+          </div>
         ) : null}
-
-        {spoken.map((line) => {
-          const chars = shown[line.id] ?? 0;
-          if (chars === 0 && activeId !== line.id) return null; // not said yet
-          const handled = line.kind === "verdict" ? closed : isHandled(line, attention, openIds);
-          const expandable = line.kind === "fact" && !handled && (line.taskIds ?? []).some((id) => taskById.has(id));
-          const link =
-            line.kind === "more"
-              ? "/sent"
-              : line.kind === "fact" && !expandable && line.taskIds?.length === 1
-                ? `/tasks/${line.taskIds[0]}`
-                : null;
-          const expanded = open === line.id;
-
-          if (line.kind === "director") {
-            return (
-              <div key={line.id} className="card-in flex justify-end pt-2">
-                <p className="max-w-[85%] rounded-[16px] rounded-tr-[6px] bg-surface-2 px-4 py-2 text-[16px] leading-[22px]">
-                  {line.text}
-                </p>
-              </div>
-            );
-          }
-
-          return (
-            <div key={line.id} className="card-in scroll-mt-[76px]" data-line={line.id}>
-              <Bubble
-                kind={line.kind}
-                text={line.text}
-                shownChars={chars}
-                active={activeId === line.id}
-                tone={line.tone}
-                handled={handled}
-                href={link}
-                onTap={expandable ? () => setOpen(expanded ? null : line.id) : undefined}
-                expanded={expanded}
-              />
-              {expanded ? (
-                <div className="mt-2 flex flex-col gap-2 pl-4">
-                  {(line.taskIds ?? []).map((id) => {
-                    const task = taskById.get(id);
-                    if (!task) return null;
-                    const extra = task as TaskWithPeople & { question?: string | null; decline_reason?: string | null };
-                    return (
-                      <TaskCard
-                        key={id}
-                        task={task}
-                        variant="director"
-                        actions={actions}
-                        companyId={companyId}
-                        href={`/tasks/${id}`}
-                        question={extra.question ?? null}
-                        declineReason={extra.decline_reason ?? null}
-                      />
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-        {!loading && !speaking ? children : null}
+        {lines.map((line) => (
+          // keyed by id: a new line fades in as a whole, the old one is gone
+          <p key={line.id} className="card-in relative py-1 pl-4 text-[17px] leading-6" data-testid="assistant-line">
+            {line.tone ? <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full" style={{ background: TONE_COLOR[line.tone] }} /> : null}
+            {line.text}
+          </p>
+        ))}
+        {children}
       </div>
     </section>
-  );
-}
-
-
-/**
- * One line of the assistant. The full text is laid out invisibly so the bubble has
- * its final height from the first frame; the letters said so far are painted on top.
- */
-function Bubble({
-  kind,
-  text,
-  shownChars,
-  active,
-  tone,
-  handled,
-  href,
-  onTap,
-  expanded,
-}: {
-  kind: BriefLine["kind"];
-  text: string;
-  shownChars: number;
-  active: boolean;
-  tone: BriefTone | undefined;
-  handled?: boolean;
-  href?: string | null;
-  onTap?: () => void;
-  expanded?: boolean;
-}) {
-  const visible = text.slice(0, shownChars);
-  // every letter lands on its own (keyed by position, so the ones already said stay put)
-  const letters = Array.from(visible).map((ch, i) => (
-    <span key={i} className="ch">
-      {ch}
-    </span>
-  ));
-  const body = (
-    <span className="relative block">
-      <span aria-hidden className="invisible block">
-        {text}
-      </span>
-      <span className={`absolute inset-0 block ${active ? "saying" : ""}`}>{letters}</span>
-    </span>
-  );
-  // no frames: the assistant just talks — a tone dot on the left, a quiet mark on the right
-  const size = kind === "greeting" ? "text-[19px] font-semibold leading-6" : "text-[17px] leading-6";
-  const className = [
-    "relative block w-full py-1 pl-4 pr-8 text-left",
-    size,
-    handled ? "opacity-50" : "",
-    onTap || href ? "transition-transform duration-[120ms] active:scale-[0.99]" : "",
-  ].join(" ");
-  const dot = tone ? (
-    <span
-      aria-hidden
-      className="absolute left-0 top-[11px] h-2 w-2 rounded-full"
-      style={{ background: TONE_COLOR[tone] }}
-    />
-  ) : null;
-  const mark = handled ? "✓" : onTap ? (expanded ? "▴" : "▾") : href ? "›" : null;
-  const tail = mark ? (
-    <span aria-hidden className="absolute right-1 top-1 text-[14px] leading-6 text-muted">
-      {mark}
-    </span>
-  ) : null;
-
-  if (onTap) {
-    return (
-      <button type="button" onClick={onTap} aria-expanded={expanded} className={className}>
-        {dot}
-        {body}
-        {tail}
-      </button>
-    );
-  }
-  if (href) {
-    return (
-      <Link href={href} className={className}>
-        {dot}
-        {body}
-        {tail}
-      </Link>
-    );
-  }
-  return (
-    <div className={className}>
-      {dot}
-      {body}
-      {tail}
-    </div>
   );
 }

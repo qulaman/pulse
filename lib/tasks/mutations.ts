@@ -9,7 +9,6 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 import {
   taskKeys,
-  type DirectorInbox,
   type Me,
   type TaskMessage,
   type TaskRow,
@@ -74,15 +73,6 @@ function patchCached(old: unknown, taskId: string, patch: TaskPatch): unknown {
     const record = old as Record<string, unknown>;
     if (typeof record.id === "string") {
       return patchOne(old as TaskWithPeople, taskId, patch);
-    }
-    if (Array.isArray(record.overdue)) {
-      const inbox = old as DirectorInbox;
-      return {
-        overdue: inbox.overdue.map((task) => patchOne(task, taskId, patch)),
-        declined: (inbox.declined ?? []).map((task) => patchOne(task, taskId, patch)),
-        questions: inbox.questions.map((task) => patchOne(task, taskId, patch)),
-        review: inbox.review.map((task) => patchOne(task, taskId, patch)),
-      } satisfies DirectorInbox;
     }
   }
   return old;

@@ -1,15 +1,27 @@
 "use client";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
+import {
+  applyMessage,
+  applyTaskChange,
+  BOARD_STATUSES,
+  isOnBoard,
+  lanesOf,
+  toBoardTask,
+  withoutTask,
+  type BoardNote,
+  type BoardTask,
+} from "@/lib/pulse/board";
 import {
   lastSeqOf,
   mergeBySeq,
-  useRealtimeInvalidate,
+  useRealtimeListener,
   useRealtimeQuery,
 } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Database, Json } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 import { isOverdue, type TaskStatus } from "./status-text";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
@@ -41,13 +53,12 @@ export const ACTIVE_STATUSES: readonly TaskStatus[] = [
   "pending_review",
 ];
 
-const OVERDUE_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "rework"];
 
 export const taskKeys = {
   root: ["tasks"] as const,
   mine: (userId: string) => ["tasks", "mine", userId] as const,
   sent: (userId: string) => ["tasks", "sent", userId] as const,
-  inbox: () => ["tasks", "inbox"] as const,
+  board: () => ["tasks", "board"] as const,
   detail: (taskId: string) => ["tasks", "detail", taskId] as const,
   thread: (taskId: string) => ["task-thread", taskId] as const,
   me: () => ["me"] as const,
@@ -240,7 +251,7 @@ export function useTaskThread(taskId: string) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Director: «Требует вас» — three stacks in D-05 order                        */
+/* Director: the live board — one query, two channels, patches from payloads   */
 /* -------------------------------------------------------------------------- */
 
 /** A task the employee could not take, with the reason they gave («Не могу» + chip or words). */
@@ -249,9 +260,9 @@ export type DeclinedTask = TaskWithPeople & { decline_reason: string | null };
 /** A task with an open question from the employee — the newest unanswered words. */
 export type QuestionTask = TaskWithPeople & { question: string | null };
 
+/** The board split the old way — the tab badge and «Задачи» still read these stacks. */
 export type DirectorInbox = {
   overdue: TaskWithPeople[];
-  /** «Не могу» — the director decides: insist, cancel, hand to someone else (FRONTEND «declined»). */
   declined: DeclinedTask[];
   questions: QuestionTask[];
   review: TaskWithPeople[];
@@ -259,92 +270,112 @@ export type DirectorInbox = {
 
 export const EMPTY_INBOX: DirectorInbox = { overdue: [], declined: [], questions: [], review: [] };
 
-function isQuestionOpen(meta: Json): boolean {
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return false;
-  const record = meta as Record<string, unknown>;
-  return record.is_question === true && !record.answered_at;
+/** Tasks with their question and decline notes only — the notes list stays small. */
+const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at)`;
+
+type BoardRow = TaskWithPeople & { notes: BoardNote[] | null };
+
+/**
+ * Everything on the board in one request: tasks in work or waiting for the director,
+ * each with the messages that matter to the board (open questions, decline reasons).
+ * Company scoping is RLS's job — a director sees their company and nothing else.
+ */
+async function fetchBoard(): Promise<BoardTask[]> {
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(BOARD_SELECT)
+    .in("status", [...BOARD_STATUSES])
+    .or("meta->>is_question.eq.true,meta->>decline_reason.eq.true", { referencedTable: "notes" })
+    .order("created_at", { referencedTable: "notes", ascending: false });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as BoardRow[]).map(({ notes, ...task }) => toBoardTask(task, notes ?? []));
 }
 
-async function fetchDirectorInbox(): Promise<DirectorInbox> {
-  const supabase = createBrowserSupabase();
-  const nowIso = new Date().toISOString();
+/** Bursts of events (a batch confirmed, a cron tick) ask for one refetch, not one each. */
+const REFETCH_COALESCE_MS = 150;
+let refetchTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Company scoping is RLS's job — a director sees their company and nothing else.
-  const [review, overdue, questionRows, declinedRows] = await Promise.all([
-    supabase.from("tasks").select(TASK_SELECT).eq("status", "pending_review"),
-    supabase
-      .from("tasks")
-      .select(TASK_SELECT)
-      .in("status", [...OVERDUE_STATUSES])
-      .lt("deadline", nowIso),
-    supabase
-      .from("task_messages")
-      .select(`meta, content, created_at, task:tasks!task_messages_task_id_fkey(${TASK_SELECT})`)
-      .eq("meta->>is_question", "true")
-      .is("meta->>answered_at", null)
-      .order("created_at", { ascending: false }),
-    supabase.from("tasks").select(TASK_SELECT).eq("status", "declined"),
-  ]);
+function scheduleBoardRefetch(queryClient: QueryClient) {
+  if (refetchTimer !== null) return;
+  refetchTimer = setTimeout(() => {
+    refetchTimer = null;
+    void queryClient.invalidateQueries({ queryKey: taskKeys.board() });
+  }, REFETCH_COALESCE_MS);
+}
 
-  for (const result of [review, overdue, questionRows, declinedRows]) {
-    if (result.error) throw new Error(result.error.message);
-  }
+/**
+ * The director's board, live. A `tasks` event patches the cached row from its payload
+ * — the tile recolours before any request is made; only an unknown row (a new task) or
+ * a new assignee needs the joined names and asks for one coalesced refetch. A
+ * `task_messages` event lands a question or a reason the same way. Closed rows keep
+ * their closed status until the screen has said goodbye (`pruneClosed`).
+ */
+export function usePulseBoard(enabled = true) {
+  const queryKey = taskKeys.board();
+  const queryClient = useQueryClient();
 
-  // the newest reason per declined task — only for those tasks, on the (task_id, created_at) index
-  const declinedIds = ((declinedRows.data ?? []) as unknown as TaskWithPeople[]).map((t) => t.id);
-  const reasonByTask = new Map<string, string>();
-  if (declinedIds.length > 0) {
-    const reasonRows = await supabase
-      .from("task_messages")
-      .select("task_id, content, created_at")
-      .in("task_id", declinedIds)
-      .eq("meta->>decline_reason", "true")
-      .order("created_at", { ascending: false });
-    if (reasonRows.error) throw new Error(reasonRows.error.message);
-    for (const row of (reasonRows.data ?? []) as Array<{ task_id: string; content: string | null }>) {
-      if (row.content && !reasonByTask.has(row.task_id)) reasonByTask.set(row.task_id, row.content);
-    }
-  }
-  const declined: DeclinedTask[] = sortByUrgency((declinedRows.data ?? []) as unknown as TaskWithPeople[]).map(
-    (task) => ({ ...task, decline_reason: reasonByTask.get(task.id) ?? null }),
+  const query = useRealtimeQuery<BoardTask[], TaskRow>({
+    queryKey,
+    queryFn: fetchBoard,
+    channel: { table: "tasks" },
+    enabled,
+    onEvent: (payload, client) => {
+      if (payload.eventType === "DELETE") {
+        const id = (payload.old as Partial<TaskRow>).id;
+        if (id) client.setQueryData<BoardTask[]>(queryKey, (old) => (old ? withoutTask(old, id) : old));
+        return;
+      }
+      const row = payload.new as TaskRow;
+      const cached = client.getQueryData<BoardTask[]>(queryKey);
+      if (!cached) return; // nothing to patch yet — the first fetch will have it
+      const next = applyTaskChange(cached, row);
+      if (next === "refetch") scheduleBoardRefetch(client);
+      else if (next) client.setQueryData(queryKey, next);
+    },
+  });
+
+  useRealtimeListener<TaskMessageRow>(
+    { table: "task_messages" },
+    (payload) => {
+      if (payload.eventType === "DELETE") return;
+      const message = payload.new as TaskMessageRow;
+      const cached = queryClient.getQueryData<BoardTask[]>(queryKey);
+      if (!cached) return;
+      const next = applyMessage(cached, message);
+      if (next) queryClient.setQueryData(queryKey, next);
+    },
+    // the settle snapshot after a (re)subscribe belongs to the tasks channel; nothing to do here
+    () => {},
+    "board-messages",
+    enabled,
   );
 
-  const questionsById = new Map<string, QuestionTask>();
-  for (const row of (questionRows.data ?? []) as unknown as Array<{
-    meta: Json;
-    content: string | null;
-    task: TaskWithPeople | null;
-  }>) {
-    // The server filter already narrowed this; repeating the check client-side
-    // keeps a malformed meta from widening the stack. Newest first: the first row wins.
-    if (!row.task || !isQuestionOpen(row.meta)) continue;
-    if (row.task.status === "done" || row.task.status === "revoked") continue;
-    if (questionsById.has(row.task.id)) continue;
-    questionsById.set(row.task.id, { ...row.task, question: row.content });
-  }
+  return query;
+}
 
+/** A closed row has said goodbye: drop it from the cache (a refetch would too). */
+export function pruneClosed(queryClient: QueryClient, taskId: string) {
+  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) => (old ? withoutTask(old, taskId) : old));
+}
+
+/** The board as the four stacks of D-05 — derived, never fetched on its own. */
+export function inboxOf(rows: readonly BoardTask[], now: Date): DirectorInbox {
+  const lanes = lanesOf(rows, now);
   return {
-    overdue: sortByUrgency((overdue.data ?? []) as unknown as TaskWithPeople[]),
-    declined,
-    questions: sortByUrgency([...questionsById.values()]),
-    review: sortByUrgency((review.data ?? []) as unknown as TaskWithPeople[]),
+    overdue: lanes.overdue,
+    declined: lanes.declined,
+    // every open question, whichever lane the task sits in — «Задачи» marks them all
+    questions: rows.filter((task) => task.question && isOnBoard(task.status)),
+    review: lanes.review,
   };
 }
 
 export function useDirectorInbox(enabled = true) {
-  const queryKey = taskKeys.inbox();
-
-  const query = useRealtimeQuery<DirectorInbox, TaskRow>({
-    queryKey,
-    queryFn: fetchDirectorInbox,
-    channel: { table: "tasks" },
-    enabled,
-  });
-
-  // An open question is a task_messages row — the tasks channel never sees it.
-  useRealtimeInvalidate({ table: "task_messages" }, queryKey, enabled);
-
-  return query;
+  const board = usePulseBoard(enabled);
+  const rows = board.data;
+  const data = useMemo(() => (rows ? inboxOf(rows, new Date()) : undefined), [rows]);
+  return { data, isLoading: board.isLoading, isError: board.isError };
 }
 
 export function inboxCounts(inbox: DirectorInbox | undefined) {
