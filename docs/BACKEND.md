@@ -35,6 +35,9 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | `/api/voice/confirm` | POST | director | — |
 | `/api/voice/query` | POST | director | 20 |
 | `/api/tasks/:id/revoke` | POST | director | — |
+| `/api/tasks/:id/delete` | POST | director | — |
+| `/api/tasks/purge` | POST | director | — |
+| `/api/admin/reset-demo` | POST | director + `DEMO_RESET_ENABLED=1` на инстансе | — |
 | `/api/points` | POST | director | — |
 | `/api/reactions` | POST | любая | 60 |
 | `/api/shop/order` | POST | любая | — |
@@ -132,6 +135,8 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 | `extend_task_deadline` | `(task_id uuid, new_deadline timestamptz, client_request_id uuid) → jsonb` | «Продлить» (владелец, 2026-09-11): новый срок (null — «без срока») на открытой задаче, системная строка «Срок продлён до DD.MM HH:MM» в треде, outbox `deadline_extended` адресату. Роут `POST /api/tasks/:id/deadline` |
 | `reassign_task` | `(task_id uuid, new_assignee_id uuid, client_request_id uuid) → jsonb` | «Переназначить»: клон задачи новому человеку как свежая `sent` (`parent_task_id` = старая; outbox `task_sent` триггером), старая → `revoked` с системной строкой «Переназначено: Имя». Допустимые исходные статусы: sent/accepted/in_progress/rework/declined. Роут `POST /api/tasks/:id/reassign` |
 | `transition_task` | `(task_id uuid, to_status task_status, payload jsonb, client_request_id uuid) → jsonb` | Единая точка переходов; валидирует матрицу §7 по роли; ошибка `invalid_transition` |
+| `delete_task` | `(task_id uuid) → jsonb` | Жёсткое удаление (владелец, 2026-09-16): чистка ошибочных и тестовых поручений, без следа; только директор своей компании; `task_messages`/`notification_deliveries` каскадом, `point_transactions` остаются (append-only) с `task_id = null`, у клона-переназначения обнуляется `parent_task_id`. Роут `POST /api/tasks/:id/delete`. Отзыв (D-01) остаётся штатным способом забрать поручение |
+| `purge_closed_tasks` | `() → jsonb` | «Очистить закрытые»: все `done`/`declined`/`revoked` компании директора, те же правила по детям; возвращает `{deleted}`. Роут `POST /api/tasks/purge` |
 | `apply_auto_rule` | `(task_id uuid, rule_code text) → void` | Вызывается только cron/триггерами; идемпотентна partial-unique `(task_id, rule_code)` — повторный done после rework бонуса не даёт (D-31) |
 
 ## 4. Подсистема доставки уведомлений — продуктовая фича №1
