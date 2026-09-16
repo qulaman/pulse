@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
+import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { LiveBoard } from "@/components/pulse/LiveBoard";
@@ -106,7 +107,7 @@ export default function PulsePage() {
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-3">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[196px] pt-3">
       <Assistant
         mascot={mascot}
         said={exchange?.said ?? null}
@@ -164,6 +165,9 @@ export default function PulsePage() {
 
       <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
 
+      {/* the announcements (D-59: Эфир lives here, folded under the board) */}
+      <EtherSection variant="director" />
+
       {/* the one action of the screen: pinned above the tab bar, always under the thumb;
           the board scrolls underneath and the main's bottom padding lets it clear the block */}
       <div
@@ -176,9 +180,6 @@ export default function PulsePage() {
       >
         <div className="pointer-events-auto flex flex-col items-center">
           <VoiceButton inline />
-          <Link href="/sent" className="mt-2 min-h-[44px] px-4 text-[14px] leading-[44px] text-muted">
-            Задачи ›
-          </Link>
         </div>
       </div>
     </main>

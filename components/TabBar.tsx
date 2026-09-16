@@ -41,25 +41,10 @@ const ICONS = {
       <circle cx="6.5" cy="19" r="1.2" fill="currentColor" stroke="none" />
     </svg>
   ),
-  ether: (
-    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <circle cx="12" cy="12" r="2.2" />
-      <path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4" />
-      <path d="M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2" />
-    </svg>
-  ),
   profile: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <circle cx="12" cy="8.5" r="3.6" />
       <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
-    </svg>
-  ),
-  team: (
-    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <circle cx="9" cy="8.5" r="3.2" />
-      <path d="M2.5 19a6.5 6.5 0 0 1 13 0" />
-      <circle cx="17" cy="9.5" r="2.6" />
-      <path d="M15.5 14.2a5 5 0 0 1 6 4.8" />
     </svg>
   ),
   rating: (
@@ -78,17 +63,16 @@ const ICONS = {
 };
 
 const TABS: Record<TabRole, Tab[]> = {
+  // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
   director: [
     { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
-    { href: "/people", label: "Команда", icon: ICONS.team },
-    { href: "/ether", label: "Эфир", icon: ICONS.ether },
+    { href: "/sent", label: "Задачи", icon: ICONS.tasks },
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
   ],
   employee: [
     { href: "/feed", label: "Лента", icon: ICONS.feed },
     { href: "/tasks", label: "Дела", icon: ICONS.tasks },
-    { href: "/ether", label: "Эфир", icon: ICONS.ether },
     { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
   ],

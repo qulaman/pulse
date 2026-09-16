@@ -53,7 +53,7 @@ export function PulseInboxBone() {
 /** Пульс (D-57): the assistant thinking, its first line, two tiles of the board, the pinned button block. */
 export function PulseSkeleton() {
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[232px] pt-3">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[196px] pt-3">
       <div className="mx-auto flex h-[128px] w-[128px] items-center justify-center [@media(max-height:760px)]:h-[104px] [@media(max-height:760px)]:w-[104px]">
         <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
           <Mascot state="thinking" size={112} />
@@ -92,7 +92,6 @@ export function PulseSkeleton() {
           <span className="text-[16px] font-semibold leading-[22px]">Дать задачу</span>
           <span className="text-[13px] leading-4 text-muted">удержи — говори · тап — текст</span>
         </SkeletonGroup>
-        <span className="mt-2 min-h-[44px] text-[14px] leading-[44px] text-muted">Задачи ›</span>
       </div>
     </main>
   );

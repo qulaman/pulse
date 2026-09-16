@@ -1,37 +1,19 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-
 import { Mascot } from "@/components/brand/Mascot";
-import { AnnouncementCard } from "@/components/ether/AnnouncementCard";
-import { EtherListBone } from "@/components/ui/PageSkeletons";
-import { useAcknowledge, useEther } from "@/lib/ether/queries";
-import { createBrowserSupabase } from "@/lib/supabase/client";
+import { EtherSection } from "@/components/ether/EtherSection";
+import { useEther } from "@/lib/ether/queries";
 import { useMe } from "@/lib/tasks/queries";
 
-function useTeamSize() {
-  return useQuery({
-    queryKey: ["people", "team-size"],
-    queryFn: async (): Promise<number> => {
-      const supabase = createBrowserSupabase();
-      const { count } = await supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("is_active", true)
-        .in("role", ["employee", "manager", "shopkeeper"]);
-      return count ?? 0;
-    },
-  });
-}
-
-/** Эфир: the director's announcements for everybody, «Ознакомился» under each (CONCEPT §3.1). */
+/**
+ * Эфир: the director's announcements for everybody, «Ознакомился» under each (CONCEPT §3.1).
+ * Not a tab any more (D-59) — reached from the fold on Пульс and Лента; the same cards.
+ */
 export default function EtherPage() {
   const me = useMe();
   const feed = useEther();
-  const team = useTeamSize();
-  const ack = useAcknowledge(me.data?.userId);
   const isDirector = me.data?.role === "director";
-  const items = feed.data ?? [];
+  const empty = !feed.isLoading && !me.isLoading && (feed.data ?? []).length === 0;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
@@ -40,9 +22,7 @@ export default function EtherPage() {
         {isDirector ? "Скажи «всем: …» — объявление появится здесь у каждого" : "Объявления директора для всей компании"}
       </p>
 
-      {feed.isLoading || me.isLoading ? (
-        <EtherListBone />
-      ) : items.length === 0 ? (
+      {empty ? (
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={72} />
           <p className="mt-4 text-[16px] leading-[22px]">Объявлений пока нет</p>
@@ -51,19 +31,7 @@ export default function EtherPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-5 flex flex-col gap-3">
-          {items.map((item) => (
-            <AnnouncementCard
-              key={item.id}
-              item={item}
-              userId={me.data?.userId}
-              isDirector={isDirector}
-              teamSize={team.data ?? 0}
-              onAck={(id) => ack.mutate(id)}
-              acking={ack.isPending}
-            />
-          ))}
-        </div>
+        <EtherSection variant="page" />
       )}
     </main>
   );

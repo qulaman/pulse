@@ -1,6 +1,7 @@
 "use client";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { EtherSection } from "@/components/ether/EtherSection";
 import { InstallHint } from "@/components/InstallHint";
 import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
@@ -22,6 +23,8 @@ export default function FeedPage() {
       <h1 className="text-[24px] font-bold leading-[30px]">Лента</h1>
       <PushCard />
       <InstallHint />
+      {/* the director's announcements (D-59): what needs «Ознакомился» is open, the rest folded */}
+      <EtherSection variant="employee" />
 
       <div className="mt-4">
         {loading ? (

@@ -149,9 +149,9 @@ async function main() {
     });
   }
 
-  await measure(page, "директор: вкладка Эфир", async () => {
-    await page.getByRole("link", { name: "Эфир" }).click();
-    await page.waitForURL((url) => url.pathname === "/ether", { timeout: 10_000 });
+  await measure(page, "директор: вкладка Настройки", async () => {
+    await page.getByRole("link", { name: "Настройки" }).click();
+    await page.waitForURL((url) => url.pathname === "/settings", { timeout: 10_000 });
     await page.waitForLoadState("networkidle");
   });
   await measure(page, "директор: вкладка Пульс", async () => {
