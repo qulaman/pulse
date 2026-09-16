@@ -70,30 +70,45 @@ function acquire<TRow extends Record<string, unknown>>(
     let active: RealtimeChannel | null = null;
     let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
+    let generation = 0;
+    let torn = false;
+
     const subscribe = () => {
-      active = supabase
-        .channel(topic)
-        .on(
-          "postgres_changes",
-          { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
-          (payload) => {
-            for (const l of listeners) l.onEvent(payload as RealtimeEvent<Record<string, unknown>>);
-          },
-        )
-        .subscribe((status) => {
-          // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
-          // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
-          // One late snapshot closes that gap after every (re)subscribe.
-          if (status !== "SUBSCRIBED") return;
-          if (settleTimer !== null) clearTimeout(settleTimer);
-          settleTimer = setTimeout(() => {
-            for (const l of listeners) l.onResync();
-          }, SETTLE_MS);
-        });
+      const mine = ++generation;
+      // The join must carry the user's token: on a hard load the session is still being
+      // read from the cookie when the first hook mounts, the channel joined as anon, RLS
+      // let nothing through, and the board only ever learned of changes from snapshots
+      // (found by scripts/smoke-board.ts). Read the session first, hand the token to the
+      // socket, then join — a resubscribe does the same, so a refreshed token is used too.
+      void supabase.auth.getSession().then(async ({ data }) => {
+        if (torn || mine !== generation) return;
+        await supabase.realtime.setAuth(data.session?.access_token);
+        if (torn || mine !== generation) return;
+        active = supabase
+          .channel(topic)
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
+            (payload) => {
+              for (const l of listeners) l.onEvent(payload as RealtimeEvent<Record<string, unknown>>);
+            },
+          )
+          .subscribe((status) => {
+            // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
+            // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
+            // One late snapshot closes that gap after every (re)subscribe.
+            if (status !== "SUBSCRIBED") return;
+            if (settleTimer !== null) clearTimeout(settleTimer);
+            settleTimer = setTimeout(() => {
+              for (const l of listeners) l.onResync();
+            }, SETTLE_MS);
+          });
+      });
     };
 
     const resync = () => {
       if (active) void supabase.removeChannel(active);
+      active = null;
       subscribe();
       for (const l of listeners) l.onResync();
     };
@@ -109,6 +124,7 @@ function acquire<TRow extends Record<string, unknown>>(
     entry = {
       listeners,
       teardown: () => {
+        torn = true;
         document.removeEventListener("visibilitychange", onVisibility);
         window.removeEventListener("online", resync);
         if (settleTimer !== null) clearTimeout(settleTimer);
@@ -203,9 +219,23 @@ export function useRealtimeQuery<
 }
 
 /**
+ * A channel without a query of its own, with the payload in hand: a table whose rows
+ * patch someone else's cache. The live board needs it — an employee's question is a
+ * `task_messages` insert that lands on a `tasks` row.
+ */
+export function useRealtimeListener<TRow extends Record<string, unknown>>(
+  channel: ChannelSpec,
+  onEvent: (payload: RealtimeEvent<TRow>) => void,
+  onResync: () => void,
+  key: string,
+  enabled = true,
+) {
+  useRealtimeChannel<TRow>(channel, onEvent, onResync, enabled, `listen:${key}`);
+}
+
+/**
  * A channel without a query of its own: a table whose changes invalidate someone
- * else's data. The director's inbox needs it — an open question is a
- * `task_messages` insert, invisible to the `tasks` channel.
+ * else's data.
  */
 export function useRealtimeInvalidate(
   channel: ChannelSpec,
