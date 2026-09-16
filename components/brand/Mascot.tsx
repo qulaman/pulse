@@ -14,6 +14,7 @@
  *   speaking     the mouth moves with the words, small nods (D-49)
  *   happy        golden, squint and blush, a slow breath with sparks
  *   sleeping     eyes shut, the slowest breath, z-s drifting up — the screen before the first tap
+ *   surprised    woken by a thought: a startle, wide eyes turned up to the bubble, a small round mouth
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
  * microphone) while listening — the blob swells and nods harder with the voice.
@@ -28,7 +29,8 @@ export type MascotState =
   | "thinking"
   | "speaking"
   | "happy"
-  | "sleeping";
+  | "sleeping"
+  | "surprised";
 
 const COLOR: Record<MascotState, string> = {
   calm: "var(--accent)",
@@ -41,6 +43,7 @@ const COLOR: Record<MascotState, string> = {
   speaking: "var(--accent)",
   happy: "var(--gold)",
   sleeping: "color-mix(in srgb, var(--accent) 72%, var(--surface-2))",
+  surprised: "var(--accent)",
 };
 
 /** One-shot pose on entering the state (outer group, keeps its end frame). */
@@ -55,6 +58,7 @@ const POSE: Record<MascotState, string> = {
   speaking: "none",
   happy: "none",
   sleeping: "none",
+  surprised: "mascot-startle 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both",
 };
 
 /** Looping body motion (inner group). */
@@ -69,6 +73,7 @@ const BODY: Record<MascotState, string> = {
   speaking: "mascot-talk 1.3s ease-in-out infinite",
   happy: "mascot-breathe 5s ease-in-out infinite",
   sleeping: "mascot-breathe 8s ease-in-out infinite",
+  surprised: "mascot-breathe 3.2s ease-in-out infinite",
 };
 
 /** Eyes as a pair. */
@@ -83,6 +88,7 @@ const EYES: Record<MascotState, string> = {
   speaking: "mascot-glance 9s ease-in-out infinite",
   happy: "none",
   sleeping: "none",
+  surprised: "mascot-look-up 2.4s ease-in-out infinite",
 };
 
 export function Mascot({
@@ -99,12 +105,13 @@ export function Mascot({
   const talking = state === "speaking";
   const lidded = state === "saving"; // eyes half-closed while tucking the note away
   const asleep = state === "sleeping"; // eyes shut, a slow breath, small z-s drifting up
+  const startled = state === "surprised"; // woken by a thought: wide eyes up at it, a small round mouth
   const clamped = Math.min(1, Math.max(0, level));
   const swell = state === "listening" ? 1 + clamped * 0.14 : 1;
   // the voice pushes the nod: louder — a deeper dip
   const dip = state === "listening" ? clamped * 2.2 : 0;
-  const eyeRy = asleep ? 0.7 : squint ? 1.5 : lidded ? 2.2 : wide ? 4.3 : 3.6;
-  const eyeRx = wide ? 3.7 : 3.4;
+  const eyeRy = asleep ? 0.7 : squint ? 1.5 : lidded ? 2.2 : wide || startled ? 4.4 : 3.6;
+  const eyeRx = wide ? 3.7 : startled ? 3.9 : 3.4;
   const blink = squint || lidded || asleep ? "none" : "mascot-blink 4.6s infinite";
 
   return (
@@ -295,6 +302,10 @@ export function Mascot({
               {squint ? (
                 // a tiny smile only when happy — still no mouth in every other state
                 <path d="M26 43 Q32 48 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />
+              ) : null}
+              {startled ? (
+                // a small «o»: the face has just noticed something
+                <ellipse cx="32" cy="45.5" rx="2.6" ry="3" />
               ) : null}
               {talking ? (
                 // speaking: the mouth opens and closes in the rhythm of a phrase (scale only)

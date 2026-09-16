@@ -314,6 +314,20 @@ h1 { letter-spacing: -0.025em; }
   100% { opacity: 0; transform: translate(6px, -14px) scale(1.15); }
 }
 
+/* surprised: a small jump back on noticing a thought */
+@keyframes mascot-startle {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-5px) scale(1.06, 0.95); }
+  60% { transform: translateY(1px) scale(0.98, 1.03); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* a thought pops above the head — scale from the tail, opacity only otherwise */
+@keyframes thought-in {
+  from { opacity: 0; transform: translateX(-50%) scale(0.85); }
+  to { opacity: 1; transform: translateX(-50%) scale(1); }
+}
+
 /* waking up: a stretch on the first tap of the day */
 @keyframes mascot-wake {
   0% { transform: scale(1) rotate(0); }

@@ -12,6 +12,7 @@ import { CardDeck } from "@/components/pulse/CardDeck";
 import { LiveBoard } from "@/components/pulse/LiveBoard";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
+import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { Button } from "@/components/ui/Button";
@@ -36,6 +37,8 @@ const FACE = 128;
 const FACE_SMALL = 88;
 /** Distance from the face's centre to the balls' centres. */
 const RING_RADIUS = 124;
+/** How long a thought hangs above the head before the face dozes off again. */
+const THOUGHT_MS = 9_000;
 
 /**
  * Пульс — the director's home (D-57, D-60): the face of «Капля» asleep in the middle of
@@ -146,11 +149,25 @@ export default function PulsePage() {
     if (stage === "question") resetIngest();
   };
 
-  // the face alone when idle: the opening line waits for a tap; a change on the board is said at once
+  // A change on the board is a thought: it pops above the head, the face wakes up surprised
+  // at it, and after a while the thought is gone and the face dozes off again. The opening
+  // line (the summary on a tap) is speech, under the face. Both answer to the same line.
+  const [expiredThought, setExpiredThought] = useState<string | null>(null);
+  const thought = speech.line && !speech.line.opening && speech.line.id !== expiredThought ? speech.line : null;
+  const thoughtId = thought?.id ?? null;
+  useEffect(() => {
+    if (!thoughtId) return;
+    const timer = setTimeout(() => setExpiredThought(thoughtId), THOUGHT_MS);
+    return () => clearTimeout(timer);
+  }, [thoughtId]);
+
   const lines = useMemo<AssistantLine[]>(() => {
     if (exchange) return exchange.lines.map((text, i) => ({ id: `${exchange.key}:${i}`, text }));
     if (!speech.line) return [];
-    if (mode === "idle" && !wide && speech.line.opening) return [];
+    if (wide) return [speech.line];
+    // on the phone a change is a thought (above), never a line (below); the summary shows once awake
+    if (!speech.line.opening) return [];
+    if (mode === "idle") return [];
     return [speech.line];
   }, [exchange, speech.line, mode, wide]);
 
@@ -168,7 +185,8 @@ export default function PulsePage() {
   };
 
   const awake: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : counts.attention > 0 ? "calm" : "happy";
-  const mascot: MascotState = mode === "idle" && !wide ? "sleeping" : awake;
+  // a thought wakes the face whatever it was doing; without one the idle face sleeps
+  const mascot: MascotState = thought && !wide ? "surprised" : mode === "idle" && !wide ? "sleeping" : awake;
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
   const faceSize = mode === "panel" && !wide ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
@@ -224,6 +242,9 @@ export default function PulsePage() {
             <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} wakeKey={wakeKey} />
             <AnimatePresence>
               {mode === "ring" ? <OrbitBalls key="ring" balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} /> : null}
+            </AnimatePresence>
+            <AnimatePresence>
+              {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
             </AnimatePresence>
           </motion.div>
           <AnimatePresence>
