@@ -20,10 +20,20 @@ export type BoardTask = TaskWithPeople & {
   question_at: string | null;
   /** The reason behind «Не могу», when the employee gave one. */
   decline_reason: string | null;
+  /** The newest message of the thread that is not a status line — who wrote it and what. */
+  last_message: BoardMessage | null;
+  /** The director's read cursor on the thread (D-61): messages above it are unread. */
+  seen_seq: number;
 };
 
 /** One row of the embedded message list the board query fetches next to each task. */
 export type BoardNote = { id: string; content: string | null; meta: Json; created_at: string };
+
+/** The last real message of a thread, as the board keeps it. */
+export type BoardMessage = { id: string; content: string | null; type: string; sender_id: string; seq: number; created_at: string };
+
+/** Messages that are part of the conversation — the status lines and system notes are not. */
+export const CHAT_TYPES: readonly string[] = ["text", "voice", "photo"];
 
 export type Lane = "overdue" | "declined" | "question" | "review" | "work";
 
@@ -68,7 +78,7 @@ function isDeclineNote(meta: Json): boolean {
  * The fetched shape (task + its question/decline notes, newest first) becomes a board
  * row: the newest open question, the newest reason. Called once per row per fetch.
  */
-export function toBoardTask(task: TaskWithPeople, notes: BoardNote[]): BoardTask {
+export function toBoardTask(task: TaskWithPeople, notes: BoardNote[], last: BoardMessage | null = null, seenSeq = 0): BoardTask {
   const sorted = [...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
   const question = sorted.find((note) => isOpenQuestion(note.meta) && note.content);
   const reason = sorted.find((note) => isDeclineNote(note.meta) && note.content);
@@ -78,7 +88,34 @@ export function toBoardTask(task: TaskWithPeople, notes: BoardNote[]): BoardTask
     question_id: question?.id ?? null,
     question_at: question?.created_at ?? null,
     decline_reason: reason?.content ?? null,
+    last_message: last,
+    seen_seq: seenSeq,
   };
+}
+
+/**
+ * An employee's message the director has not seen: the thread's last real message is
+ * the assignee's and sits above the director's cursor. A message from the director
+ * (or a manager) closes the matter — the last word is theirs.
+ */
+export function hasUnread(task: Pick<BoardTask, "last_message" | "seen_seq" | "assignee_id">): boolean {
+  const last = task.last_message;
+  return Boolean(last && last.sender_id === task.assignee_id && last.seq > task.seen_seq);
+}
+
+/** The task carries a message for the director: an open question, or an unread one. */
+export function hasMessage(task: BoardTask): boolean {
+  return Boolean(task.question) || hasUnread(task);
+}
+
+/** What the card shows as the message: the open question first, else the unread words. */
+export function messageOf(task: BoardTask): string | null {
+  if (task.question) return task.question;
+  if (!hasUnread(task)) return null;
+  const last = task.last_message!;
+  if (last.type === "photo") return last.content ? `фото: ${last.content}` : "фото";
+  if (last.type === "voice") return last.content ? `голосовое: ${last.content}` : "голосовое";
+  return last.content ?? "";
 }
 
 /** Where a task sits; null once it has left the board. First match wins, in D-05 order. */
@@ -86,7 +123,7 @@ export function laneOf(task: BoardTask, now: Date): Lane | null {
   if (!isOnBoard(task.status)) return null;
   if (isOverdue(task, now)) return "overdue";
   if (task.status === "declined") return "declined";
-  if (task.question) return "question";
+  if (hasMessage(task)) return "question";
   if (task.status === "pending_review") return "review";
   return "work";
 }
@@ -177,6 +214,15 @@ export function applyTaskChange(board: readonly BoardTask[], row: Partial<TaskRo
   return copy;
 }
 
+/** The director has seen the thread up to `seq` (a reply, «Прочитал», the thread opened). */
+export function applyRead(board: readonly BoardTask[], taskId: string, seq: number): BoardTask[] | null {
+  const index = board.findIndex((task) => task.id === taskId);
+  if (index === -1 || board[index]!.seen_seq >= seq) return null;
+  const copy = [...board];
+  copy[index] = { ...board[index]!, seen_seq: seq };
+  return copy;
+}
+
 /** A closed row was announced and its goodbye is over: drop it. */
 export function withoutTask(board: readonly BoardTask[], taskId: string): BoardTask[] {
   return board.filter((task) => task.id !== taskId);
@@ -186,28 +232,44 @@ export function withoutTask(board: readonly BoardTask[], taskId: string): BoardT
  * A `task_messages` row arrived: a question opens (insert), closes (its answered_at
  * update) or a decline reason lands. Rows of tasks not on the board are ignored.
  */
-export function applyMessage(board: readonly BoardTask[], message: Pick<TaskMessageRow, "id" | "task_id" | "content" | "meta" | "created_at">): BoardTask[] | null {
+export function applyMessage(
+  board: readonly BoardTask[],
+  message: Pick<TaskMessageRow, "id" | "task_id" | "content" | "meta" | "created_at"> & Partial<Pick<TaskMessageRow, "type" | "sender_id" | "seq">>,
+): BoardTask[] | null {
   const index = board.findIndex((task) => task.id === message.task_id);
   if (index === -1) return null;
   const current = board[index]!;
   let next: BoardTask | null = null;
 
+  // any real message becomes the thread's last word; the director's own word also moves the cursor
+  if (message.type && CHAT_TYPES.includes(message.type) && message.sender_id && typeof message.seq === "number") {
+    if (!current.last_message || message.seq > current.last_message.seq) {
+      const last: BoardMessage = { id: message.id, content: message.content, type: message.type, sender_id: message.sender_id, seq: message.seq, created_at: message.created_at };
+      next = { ...current, last_message: last, seen_seq: message.sender_id === current.assignee_id ? current.seen_seq : Math.max(current.seen_seq, message.seq) };
+    }
+  }
+  const base = next ?? current;
+
   if (isQuestionNote(message.meta)) {
     if (isOpenQuestion(message.meta) && message.content) {
       // the newest open question wins; the same one again is not a change
-      if (current.question_id === message.id) return null;
-      if (current.question_at && current.question_at > message.created_at) return null;
-      next = { ...current, question: message.content, question_id: message.id, question_at: message.created_at };
+      if (current.question_id === message.id) return next ? withRow(board, index, next) : null;
+      if (current.question_at && current.question_at > message.created_at) return next ? withRow(board, index, next) : null;
+      next = { ...base, question: message.content, question_id: message.id, question_at: message.created_at };
     } else if (current.question_id === message.id) {
-      next = { ...current, question: null, question_id: null, question_at: null };
+      next = { ...base, question: null, question_id: null, question_at: null };
     }
   } else if (isDeclineNote(message.meta) && message.content && message.content !== current.decline_reason) {
-    next = { ...current, decline_reason: message.content };
+    next = { ...base, decline_reason: message.content };
   }
 
   if (!next) return null;
+  return withRow(board, index, next);
+}
+
+function withRow(board: readonly BoardTask[], index: number, row: BoardTask): BoardTask[] {
   const copy = [...board];
-  copy[index] = next;
+  copy[index] = row;
   return copy;
 }
 
@@ -287,6 +349,10 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
   if (!after.question && before.question) {
     return { text: `${who}: вопрос по ${title} закрыт`, tone: "muted" };
   }
+  if (hasUnread(after) && after.last_message!.id !== before.last_message?.id && after.last_message!.id !== after.question_id) {
+    const words = messageOf(after) ?? "";
+    return { text: `${who} пишет по ${title}: «${shortQuestion(words)}»`, tone: "warn" };
+  }
   if (after.deadline !== before.deadline) {
     const when = after.deadline ? `до ${humanAqtobe(new Date(after.deadline), now)}` : "без срока";
     return { text: `${who}: задача ${title} ${when}`, tone: "muted" };
@@ -341,7 +407,7 @@ export const quoteTitleOf = quoteTitle;
 export const LANE_WORD: Record<Lane, string> = {
   overdue: "просрочена",
   declined: "отказ",
-  question: "вопрос",
+  question: "сообщение",
   review: "на приёмке",
   work: "в работе",
 };

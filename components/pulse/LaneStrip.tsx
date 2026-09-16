@@ -7,7 +7,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
 const STRIP: { lane: Lane; tone: ChipTone; word: [string, string, string] }[] = [
   { lane: "overdue", tone: "danger", word: ["просрочена", "просрочены", "просрочено"] },
   { lane: "declined", tone: "danger", word: ["отказ", "отказа", "отказов"] },
-  { lane: "question", tone: "warn", word: ["вопрос", "вопроса", "вопросов"] },
+  { lane: "question", tone: "warn", word: ["сообщение", "сообщения", "сообщений"] },
   { lane: "review", tone: "ok", word: ["на приёмке", "на приёмке", "на приёмке"] },
 ];
 

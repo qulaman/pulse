@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useState } from "react";
 
 import { TaskCard } from "@/components/tasks/TaskCard";
@@ -10,7 +11,7 @@ import { Chip } from "@/components/ui/Chip";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
-import { LANE_WORD, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
+import { LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
 
@@ -63,7 +64,7 @@ function contextOf(task: BoardTask, lane: Lane, now: Date): string {
     case "declined":
       return task.decline_reason ? task.decline_reason : "без причины";
     case "question":
-      return `«${task.question}»`;
+      return `«${messageOf(task) ?? ""}»`;
     case "review":
       return task.completed_at ? `сдана ${humanAqtobe(new Date(task.completed_at), now)}` : "сдана";
     default:
@@ -153,13 +154,23 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
           )}
 
           {/* the director's quick actions: the ones a tile can carry without a sheet */}
-          {interactive && lane === "question" ? (
+          {interactive && lane === "question" && !task.question ? (
+            // a plain message: seen, or the thread to answer in
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip onClick={() => actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 })}>Прочитал</Chip>
+              <Link href={`/tasks/${task.id}`} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
+                Ответить ›
+              </Link>
+            </div>
+          ) : null}
+          {interactive && lane === "question" && task.question ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {QUICK_ANSWERS.map((text) => (
                 <Chip
                   key={text}
                   onClick={() => {
                     actions.sendMessage({ taskId: task.id, companyId, text });
+                    actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 });
                     toast("Ответил");
                   }}
                 >

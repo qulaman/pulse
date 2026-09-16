@@ -8,6 +8,7 @@ import { dequeue, enqueue } from "@/lib/outbox";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 import {
+  markBoardRead,
   taskKeys,
   type Me,
   type TaskMessage,
@@ -212,6 +213,33 @@ export function useReassign() {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Read cursor — «I have seen this thread up to here» (D-61)                    */
+/* -------------------------------------------------------------------------- */
+
+export type MarkReadInput = { taskId: string; companyId: string; seq: number };
+
+/**
+ * The person's read cursor on a thread: opening the thread, «Прочитал» on the card, a
+ * reply. The board row loses its unread mark at once; the upsert follows. Nothing to
+ * roll back on failure — the next fetch tells the truth.
+ */
+export function useMarkRead(me: Me | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: MarkReadInput) => {
+      if (!me) return;
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase
+        .from("task_reads")
+        .upsert({ task_id: input.taskId, user_id: me.userId, company_id: input.companyId, last_seq: input.seq, seen_at: new Date().toISOString() }, { onConflict: "task_id,user_id" });
+      if (error) throw new Error(error.message);
+    },
+    onMutate: (input) => markBoardRead(queryClient, input.taskId, input.seq),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /* Cleanup — hard deletes, the director's only (delete_task / purge_closed_tasks) */
 /* -------------------------------------------------------------------------- */
 
@@ -354,6 +382,8 @@ export type TaskActions = {
   sendMessage: (input: SendMessageInput) => void;
   /** «Удалить»: hard delete, no trace — cleanup of wrong and test orders. */
   remove: (taskId: string) => void;
+  /** «Прочитал» / the thread opened: the read cursor up to this seq. */
+  markRead: (input: MarkReadInput) => void;
   busy: boolean;
 };
 
@@ -364,6 +394,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const reassign = useReassign();
   const sendMessage = useSendMessage(me);
   const remove = useDeleteTask();
+  const markRead = useMarkRead(me);
 
   return {
     transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
@@ -385,6 +416,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: crypto.randomUUID() }),
     remove: (taskId) => remove.mutate({ taskId }),
+    markRead: (input) => markRead.mutate(input),
     busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending || sendMessage.isPending,
   };
 }

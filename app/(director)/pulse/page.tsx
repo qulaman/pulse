@@ -20,7 +20,7 @@ import { useEther } from "@/lib/ether/queries";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, emptyLanes, lanesOf, toBriefTask, WORK_STATUSES, type Lanes } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, hasMessage, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type Lanes } from "@/lib/pulse/board";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -80,8 +80,9 @@ export default function PulsePage() {
   const [wakeKey, setWakeKey] = useState(0);
   const ether = useEther();
 
-  // tasks that need the director (questions are messages), open questions, announcements
+  // tasks that need the director (messages are counted apart), unseen messages of any lane, announcements
   const taskCount = counts.overdue + counts.declined + counts.review;
+  const messageTasks = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status) && hasMessage(task)), [rows]);
   const balls = useMemo<OrbitBall[]>(
     () => [
       {
@@ -90,14 +91,14 @@ export default function PulsePage() {
         count: taskCount,
         tone: counts.overdue > 0 || counts.declined > 0 ? "var(--danger)" : counts.review > 0 ? "var(--ok)" : "var(--accent)",
       },
-      { id: "messages", label: "Сообщения", count: counts.question, tone: "var(--warn)" },
+      { id: "messages", label: "Сообщения", count: messageTasks.length, tone: "var(--warn)" },
       { id: "ether", label: "Эфир", count: (ether.data ?? []).length, tone: "var(--gold)" },
     ],
-    [taskCount, counts.overdue, counts.declined, counts.review, counts.question, ether.data],
+    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data],
   );
-  // the deck behind each ball: tasks without the questions, or the questions alone
+  // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
-  const questionLanes = useMemo<Lanes>(() => ({ ...emptyLanes(), question: lanes.question }), [lanes]);
+  const questionLanes = useMemo<Lanes>(() => ({ ...emptyLanes(), question: messageTasks }), [messageTasks]);
 
   const pick = (ball: OrbitBall) => {
     if (mode === "panel" && panel === ball.id) {
@@ -274,8 +275,8 @@ export default function PulsePage() {
               )
             ) : null}
             {panel === "messages" ? (
-              counts.question === 0 ? (
-                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Вопросов от сотрудников нет.</p>
+              messageTasks.length === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
               ) : (
                 <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} showWork={false} />
               )

@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { latestDeclineReason, latestOpenQuestion, TaskChat, TaskDates, TaskTimeline } from "@/components/tasks/TaskThread";
@@ -20,6 +21,15 @@ export default function TaskThreadPage() {
   const actions = useTaskActions(me.data);
 
   const variant = me.data?.role === "director" ? "director" : "employee";
+
+  // the thread on screen is a thread seen: the read cursor follows the newest message (D-61)
+  const newestSeq = (messages.data ?? []).reduce((max, message) => Math.max(max, message.seq), 0);
+  const companyId = me.data?.companyId;
+  const markRead = actions.markRead;
+  useEffect(() => {
+    if (!companyId || newestSeq === 0) return;
+    markRead({ taskId, companyId, seq: newestSeq });
+  }, [taskId, companyId, newestSeq, markRead]);
   const home = me.data ? homeForRole(me.data.role) : "/";
 
   const back = () => {

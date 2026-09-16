@@ -4,7 +4,10 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import {
   applyMessage,
+  applyRead,
   applyTaskChange,
+  hasUnread,
+  messageOf,
   countsOf,
   describeChange,
   describeChanges,
@@ -55,7 +58,7 @@ function row(
     assignee: who ? { full_name: `${who} Тестов` } : null,
     author: { full_name: "Директор" },
   };
-  return { ...base, question: null, question_id: null, question_at: null, decline_reason: null, ...extra };
+  return { ...base, question: null, question_id: null, question_at: null, decline_reason: null, last_message: null, seen_seq: 0, ...extra };
 }
 
 describe("laneOf", () => {
@@ -242,5 +245,56 @@ describe("openingLine", () => {
   it("labels the collapsed work row", () => {
     expect(workRowLabel(1)).toBe("В работе · 1 задача");
     expect(workRowLabel(6)).toBe("В работе · 6 задач");
+  });
+});
+
+describe("messages of the thread (D-61)", () => {
+  const marat = "u-Марат";
+  const director = "d";
+  const said = (id: string, sender: string, seq: number, content = "Готово, отчёт в папке"): NonNullable<BoardTask["last_message"]> => ({
+    id,
+    content,
+    type: "text",
+    sender_id: sender,
+    seq,
+    created_at: `2026-09-11T04:0${seq}:00Z`,
+  });
+
+  it("an employee's last word above the cursor is unread; the director's last word is not", () => {
+    const task = row("a", "Отчёт", "Марат", "accepted", { last_message: said("m1", marat, 3), seen_seq: 2 });
+    expect(hasUnread(task)).toBe(true);
+    expect(laneOf(task, NOW)).toBe("question");
+    expect(messageOf(task)).toBe("Готово, отчёт в папке");
+    expect(hasUnread({ ...task, seen_seq: 3 })).toBe(false);
+    expect(hasUnread({ ...task, last_message: said("m2", director, 4) })).toBe(false);
+  });
+
+  it("a plain message over the socket becomes the last word; the director's reply moves the cursor", () => {
+    const board = [row("a", "Отчёт", "Марат", "accepted", { seen_seq: 1 })];
+    const heard = applyMessage(board, { id: "m1", task_id: "a", content: "Сделал", meta: {}, created_at: "2026-09-11T04:02:00Z", type: "text", sender_id: marat, seq: 2 }) as BoardTask[];
+    expect(heard[0]!.last_message?.id).toBe("m1");
+    expect(hasUnread(heard[0]!)).toBe(true);
+    const replied = applyMessage(heard, { id: "m2", task_id: "a", content: "Ок", meta: {}, created_at: "2026-09-11T04:03:00Z", type: "text", sender_id: director, seq: 3 }) as BoardTask[];
+    expect(replied[0]!.last_message?.id).toBe("m2");
+    expect(replied[0]!.seen_seq).toBe(3);
+    expect(hasUnread(replied[0]!)).toBe(false);
+    // a status line is not a word of the thread
+    expect(applyMessage(replied, { id: "s", task_id: "a", content: null, meta: { new_status: "done" }, created_at: "2026-09-11T04:04:00Z", type: "status_change", sender_id: marat, seq: 4 })).toBeNull();
+  });
+
+  it("«Прочитал» moves the cursor and nothing else", () => {
+    const board = [row("a", "Отчёт", "Марат", "accepted", { last_message: said("m1", marat, 3), seen_seq: 0 })];
+    const read = applyRead(board, "a", 3) as BoardTask[];
+    expect(read[0]!.seen_seq).toBe(3);
+    expect(hasUnread(read[0]!)).toBe(false);
+    expect(applyRead(read, "a", 2)).toBeNull();
+  });
+
+  it("the assistant quotes an unread message, but not the question twice", () => {
+    const before = row("a", "Отчёт", "Марат", "accepted");
+    const after = { ...before, last_message: said("m1", marat, 3, "Готово, отчёт в папке на диске") };
+    expect(describeChange(before, after, NOW)?.text).toBe("Марат пишет по «Отчёт»: «Готово, отчёт в папке на диске»");
+    const asked = { ...before, question: "Какой формат?", question_id: "m9", question_at: "x", last_message: said("m9", marat, 4, "Какой формат?") };
+    expect(describeChange(before, asked, NOW)?.text).toBe("Марат спрашивает по «Отчёт»: «Какой формат?»");
   });
 });

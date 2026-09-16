@@ -77,6 +77,9 @@ meta jsonb not null default '{}'
 ```
 Всё происходящее с задачей — строка здесь; Пульс/лента/ТВ читают отсюда. `meta`: `status_change` → `{old_status,new_status}`; вопрос сотрудника → `meta.is_question=true`, `meta.answered_at` проставляет триггер при **первом** последующем сообщении директора (стопка «Вопросы» = is_question без answered_at, задача не терминальна); реакция → строка `type='system'`, `meta={kind:'reaction', emoji, message_id}` от триггера на reactions (типа `reaction_ref` в enum НЕТ). Таблицы `task_events`/`feed_items` **не вводить** — task_messages+seq и tv_events закрывают ленты (DECISIONS.md, раздел G).
 
+### task_reads — курсор прочтения треда (D-61)
+`task_id fk tasks (cascade), user_id fk profiles (cascade), company_id fk companies, last_seq int default 0, seen_at timestamptz`, PK (task_id, user_id). Одна строка на человека и задачу: сообщения треда с `seq > last_seq` для него непрочитаны. Пишет и читает только сам человек (RLS `user_id = auth.uid()`), апсерт прямо из клиента. Двигают курсор: открытие треда, «Прочитал» на карточке Пульса, ответ директора (его слово — последнее). «Сообщения» Пульса = задачи, где последнее настоящее сообщение (text/voice/photo, не status_change/system) — от исполнителя и выше курсора директора, плюс открытые вопросы (`is_question` без `answered_at`). Флаг «прочитано» на самом сообщении не вводить: сообщения общие и append-only, курсор — личный.
+
 ### announcements (Эфир)
 `id, company_id, author_id, audio_path text null, transcript text, created_at`. Индекс `(company_id, created_at desc)`.
 ### announcement_acks
@@ -218,6 +221,7 @@ create policy tasks_insert on tasks for insert with check (
 Матрица по остальным таблицам:
 - **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); update — владелец (защищённые поля — триггер 9) + director. **companies**: select — компания, кроме `tv`; write — только service role.
 - **task_messages / reactions**: участники задачи (author/assignee/директор/менеджер глубины 1); insert — участники; update/delete — нет (append-only, answered_at ставит триггер).
+- **task_reads**: только свои строки — select/insert/update по `user_id = auth.uid()`, `company_id` сверяется с `auth_company_id()`; delete — нет (каскад от задачи).
 - **point_transactions**: select — свои + director; insert — director только `source='manual'`; всё авто/магазинное — service role или security-definer-функции. Рейтинг клиентом из сырых транзакций НЕ читается — только `fn_rating()`.
 - **shop_items**: select — все компании; write — director/shopkeeper. **orders**: свои + director/shopkeeper; мутации — только RPC.
 - **announcements/acks**: select — компания; insert announcements — director; ack — свой.

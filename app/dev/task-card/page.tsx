@@ -28,6 +28,7 @@ const actions: TaskActions = {
   reassign: (input) => console.log("reassign", input),
   sendMessage: (input) => console.log("sendMessage", input),
   remove: (taskId) => console.log("remove", taskId),
+  markRead: (input) => console.log("markRead", input),
   busy: false,
 };
 

@@ -5,12 +5,15 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 
 import {
   applyMessage,
+  applyRead,
   applyTaskChange,
   BOARD_STATUSES,
+  CHAT_TYPES,
   isOnBoard,
   lanesOf,
   toBoardTask,
   withoutTask,
+  type BoardMessage,
   type BoardNote,
   type BoardTask,
 } from "@/lib/pulse/board";
@@ -270,10 +273,13 @@ export type DirectorInbox = {
 
 export const EMPTY_INBOX: DirectorInbox = { overdue: [], declined: [], questions: [], review: [] };
 
-/** Tasks with their question and decline notes only — the notes list stays small. */
-const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at)`;
+/**
+ * Tasks with their question and decline notes (a short list), the newest real message
+ * of the thread (one row) and the caller's read cursor (their own row, by RLS).
+ */
+const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at), last:task_messages(id, content, type, sender_id, seq, created_at), reads:task_reads(last_seq)`;
 
-type BoardRow = TaskWithPeople & { notes: BoardNote[] | null };
+type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage[] | null; reads: { last_seq: number }[] | null };
 
 /**
  * Everything on the board in one request: tasks in work or waiting for the director,
@@ -287,9 +293,12 @@ async function fetchBoard(): Promise<BoardTask[]> {
     .select(BOARD_SELECT)
     .in("status", [...BOARD_STATUSES])
     .or("meta->>is_question.eq.true,meta->>decline_reason.eq.true", { referencedTable: "notes" })
-    .order("created_at", { referencedTable: "notes", ascending: false });
+    .order("created_at", { referencedTable: "notes", ascending: false })
+    .in("last.type", [...CHAT_TYPES])
+    .order("seq", { referencedTable: "last", ascending: false })
+    .limit(1, { referencedTable: "last" });
   if (error) throw new Error(error.message);
-  return ((data ?? []) as unknown as BoardRow[]).map(({ notes, ...task }) => toBoardTask(task, notes ?? []));
+  return ((data ?? []) as unknown as BoardRow[]).map(({ notes, last, reads, ...task }) => toBoardTask(task, notes ?? [], last?.[0] ?? null, reads?.[0]?.last_seq ?? 0));
 }
 
 /** Bursts of events (a batch confirmed, a cron tick) ask for one refetch, not one each. */
@@ -352,6 +361,11 @@ export function usePulseBoard(enabled = true) {
   );
 
   return query;
+}
+
+/** The read cursor moved: the row's unread mark goes at once (the server row follows). */
+export function markBoardRead(queryClient: QueryClient, taskId: string, seq: number) {
+  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) => (old ? (applyRead(old, taskId, seq) ?? old) : old));
 }
 
 /** A closed row has said goodbye: drop it from the cache (a refetch would too). */
