@@ -22,6 +22,7 @@ export function AnnouncementCard({
   teamSize,
   onAck,
   acking,
+  onDelete,
 }: {
   item: Announcement;
   userId: string | undefined;
@@ -29,8 +30,11 @@ export function AnnouncementCard({
   teamSize: number;
   onAck: (id: string) => void;
   acking: boolean;
+  /** The director's «Удалить» — the announcement is gone for everybody. */
+  onDelete?: (id: string) => void;
 }) {
   const [who, setWho] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const acked = Boolean(userId && item.acks.some((a) => a.user_id === userId));
   const count = item.acks.length;
 
@@ -67,6 +71,11 @@ export function AnnouncementCard({
           <span className="nums text-[13px] leading-4 text-muted">Ознакомились {count}</span>
         )}
 
+        {isDirector && onDelete ? (
+          <button type="button" className="text-[14px] leading-[18px] text-danger/80" onClick={() => setConfirming(true)}>
+            Удалить
+          </button>
+        ) : null}
         {!isDirector ? (
           acked ? (
             <span className="text-[14px] leading-[18px]" style={{ color: "var(--ok)" }}>
@@ -79,6 +88,25 @@ export function AnnouncementCard({
           )
         ) : null}
       </div>
+
+      <Sheet open={confirming} onClose={() => setConfirming(false)} title="Удалить объявление">
+        <p className="text-[16px] leading-[22px] text-muted">Объявление исчезнет из Эфира у всех, вместе с отметками «Ознакомился».</p>
+        <div className="mt-4 flex gap-2">
+          <Button
+            variant="danger"
+            block
+            onClick={() => {
+              onDelete?.(item.id);
+              setConfirming(false);
+            }}
+          >
+            Удалить
+          </Button>
+          <Button variant="secondary" block onClick={() => setConfirming(false)}>
+            Не сейчас
+          </Button>
+        </div>
+      </Sheet>
 
       <Sheet open={who} onClose={() => setWho(false)} title="Кто ознакомился">
         {item.acks.length === 0 ? (

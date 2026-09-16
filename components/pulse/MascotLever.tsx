@@ -59,7 +59,21 @@ function useUses(): number {
  * the summary again and the cards thrown anew; pull down — the typed input. Pointer
  * capture and a dead touch-action keep the page still under the finger.
  */
-export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: MascotState; onTap: () => void; size?: number; /** bumped when the face wakes up: a one-shot stretch */ wakeKey?: number }) {
+export function MascotLever({
+  state,
+  onTap,
+  size = 128,
+  wakeKey = 0,
+  voice = true,
+}: {
+  state: MascotState;
+  onTap: () => void;
+  size?: number;
+  /** bumped when the face wakes up: a one-shot stretch */
+  wakeKey?: number;
+  /** false — the employee's face: a tap only, no hold-to-speak and no pull-down */
+  voice?: boolean;
+}) {
   const stage = useIngestStore((s) => s.stage);
   const startVoice = useIngestStore((s) => s.startVoice);
   const stopVoice = useIngestStore((s) => s.stopVoice);
@@ -94,7 +108,7 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (busy) return;
+      if (busy || !voice) return;
       event.currentTarget.setPointerCapture(event.pointerId);
       start.current = { x: event.clientX, y: event.clientY };
       holdFired.current = false;
@@ -111,7 +125,7 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
         bumpUses();
       }, HOLD_MS);
     },
-    [busy, clearHold, startVoice],
+    [busy, clearHold, startVoice, voice],
   );
 
   const onPointerMove = useCallback(
@@ -132,6 +146,10 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
 
   const onPointerUp = useCallback(async () => {
     clearHold();
+    if (!voice) {
+      onTap();
+      return;
+    }
     if (pulledDown.current) {
       pulledDown.current = false;
       setTextOpen(true);
@@ -151,7 +169,7 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
       return;
     }
     await stopVoice();
-  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice]);
+  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice]);
 
   const onPointerCancel = useCallback(() => {
     clearHold();
@@ -169,7 +187,7 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
     <div className="flex flex-col items-center">
       <button
         type="button"
-        aria-label={recording ? "Идёт запись, отпусти для отправки" : "Маскот: удержи — говори, тап — задачи, потяни вниз — текст"}
+        aria-label={recording ? "Идёт запись, отпусти для отправки" : voice ? "Маскот: удержи — говори, тап — задачи, потяни вниз — текст" : "Маскот: тап — дела"}
         disabled={busy}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
@@ -194,8 +212,9 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
           className="absolute inset-0 rounded-full"
           style={{
             border: "2px solid var(--accent)",
-            opacity: recording ? 0 : 0.5,
-            animation: recording || busy ? "none" : "fab-pulse 2.6s ease-out infinite",
+            // the ring says «hold me» — only where holding does something
+            opacity: recording || !voice ? 0 : 0.5,
+            animation: recording || busy || !voice ? "none" : "fab-pulse 2.6s ease-out infinite",
           }}
         />
         <span
@@ -221,7 +240,7 @@ export function MascotLever({ state, onTap, size = 128, wakeKey = 0 }: { state: 
         </span>
       ) : null}
 
-      <TextSheet open={textOpen} onClose={() => setTextOpen(false)} />
+      {voice ? <TextSheet open={textOpen} onClose={() => setTextOpen(false)} /> : null}
     </div>
   );
 }

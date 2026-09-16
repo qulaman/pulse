@@ -179,6 +179,10 @@ export default function PulsePage() {
       setWakeKey((key) => key + 1);
       speech.replay();
       setMode("ring");
+    } else if (mode === "panel") {
+      // one step back: the panel folds, the balls orbit again
+      setMode("ring");
+      setPanel(null);
     } else {
       setMode("idle");
       setPanel(null);

@@ -18,7 +18,19 @@ const nextId = () => `say:${++counter}`;
  * tap) replaces the line with what happened. A tap on the face repeats the opening.
  * No queue, no typing: the board carries the state, the line carries the moment.
  */
+export type Voice = {
+  opening: (lanes: Lanes, now: Date, name: string) => Phrase;
+  describe: (prev: readonly BoardTask[], next: readonly BoardTask[], now: Date) => Phrase[];
+};
+
+/** The director's voice: the verdict on opening, the board's changes as facts. */
+const DIRECTOR_VOICE: Voice = { opening: openingLine, describe: describeChanges };
+
 export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string) {
+  return useSpeechWith(rows, lanes, now, directorName, DIRECTOR_VOICE);
+}
+
+export function useSpeechWith(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string, voice: Voice) {
   const [line, setLine] = useState<SpokenLine | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const previous = useRef<BoardTask[] | undefined>(undefined);
@@ -44,21 +56,21 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
     previous.current = rows;
     if (!before) {
       opening.current = { name: directorName };
-      say(openingLine(lanesRef.current, nowRef.current, directorName), true);
+      say(voice.opening(lanesRef.current, nowRef.current, directorName), true);
       return;
     }
-    const phrases = describeChanges(before, rows, nowRef.current);
+    const phrases = voice.describe(before, rows, nowRef.current);
     if (phrases.length > 0) {
       opening.current = null;
       say(phrases[phrases.length - 1]!);
     }
-  }, [rows, directorName, say]);
+  }, [rows, directorName, say, voice]);
 
   useEffect(() => {
     if (!opening.current || opening.current.name === directorName) return;
     opening.current = { name: directorName };
-    setLine((current) => (current ? { ...openingLine(lanesRef.current, nowRef.current, directorName), id: current.id, opening: true } : current));
-  }, [directorName]);
+    setLine((current) => (current ? { ...voice.opening(lanesRef.current, nowRef.current, directorName), id: current.id, opening: true } : current));
+  }, [directorName, voice]);
 
   useEffect(() => {
     if (!speaking) return;
@@ -68,8 +80,8 @@ export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date
 
   const replay = useCallback(() => {
     opening.current = { name: directorName };
-    say(openingLine(lanesRef.current, nowRef.current, directorName), true);
-  }, [say, directorName]);
+    say(voice.opening(lanesRef.current, nowRef.current, directorName), true);
+  }, [say, directorName, voice]);
 
   return { line, speaking, replay };
 }

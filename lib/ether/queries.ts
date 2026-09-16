@@ -76,3 +76,27 @@ export function useAcknowledge(userId: string | undefined) {
     onSettled: () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }),
   });
 }
+
+/** «Удалить» an announcement: the director takes it back for good, acks go with it (RLS: director only). */
+export function useDeleteAnnouncement() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (announcementId: string) => {
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase.from("announcements").delete().eq("id", announcementId);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (announcementId) => {
+      await queryClient.cancelQueries({ queryKey: etherKeys.feed });
+      const previous = queryClient.getQueryData<Announcement[]>(etherKeys.feed);
+      if (previous) queryClient.setQueryData<Announcement[]>(etherKeys.feed, previous.filter((a) => a.id !== announcementId));
+      return { previous };
+    },
+    onSuccess: () => toast("Удалил объявление"),
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(etherKeys.feed, context.previous);
+      toast("Не получилось удалить. Попробуй ещё раз");
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }),
+  });
+}

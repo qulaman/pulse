@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { AnnouncementCard } from "@/components/ether/AnnouncementCard";
 import { EtherListBone } from "@/components/ui/PageSkeletons";
-import { useAcknowledge, useEther, type Announcement } from "@/lib/ether/queries";
+import { useAcknowledge, useDeleteAnnouncement, useEther, type Announcement } from "@/lib/ether/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
@@ -46,6 +46,7 @@ export function EtherSection({ variant }: Props) {
   const feed = useEther();
   const team = useTeamSize();
   const ack = useAcknowledge(me.data?.userId);
+  const remove = useDeleteAnnouncement();
   const isDirector = me.data?.role === "director";
   const userId = me.data?.userId;
 
@@ -83,6 +84,7 @@ export function EtherSection({ variant }: Props) {
       teamSize={team.data ?? 0}
       onAck={(id) => ack.mutate(id)}
       acking={ack.isPending}
+      onDelete={isDirector ? (id) => remove.mutate(id) : undefined}
     />
   );
 
