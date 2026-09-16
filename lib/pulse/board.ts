@@ -334,6 +334,9 @@ export function openingLine(lanes: Lanes, now: Date, directorName: string): Phra
   return { text: `${hello} ${line.text}.`, tone: line.tone };
 }
 
+/** A title quoted the assistant's way — for sheets and toasts of the deck. */
+export const quoteTitleOf = quoteTitle;
+
 /** The short lane word on a tile, lower case, in the SHORT_STATUS voice. */
 export const LANE_WORD: Record<Lane, string> = {
   overdue: "просрочена",

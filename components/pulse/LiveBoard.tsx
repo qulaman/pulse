@@ -4,8 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, LayoutGroup, MotionConfig } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Chip, type ChipTone } from "@/components/ui/Chip";
-import { pluralRu } from "@/lib/tasks/status-text";
 import {
   ATTENTION_LANES,
   countsOf,
@@ -19,18 +17,12 @@ import {
 } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { pruneClosed } from "@/lib/tasks/queries";
+import { LaneStrip } from "./LaneStrip";
 import { TaskTile } from "./TaskTile";
 
 /** How long a closed tile stays to say goodbye before it leaves the board. */
 const GOODBYE_MS = 1_400;
 const WORK_OPEN_KEY = "pulse.board.work_open";
-
-const STRIP: { lane: Lane; tone: ChipTone; word: [string, string, string] }[] = [
-  { lane: "overdue", tone: "danger", word: ["просрочена", "просрочены", "просрочено"] },
-  { lane: "declined", tone: "danger", word: ["отказ", "отказа", "отказов"] },
-  { lane: "question", tone: "warn", word: ["вопрос", "вопроса", "вопросов"] },
-  { lane: "review", tone: "ok", word: ["на приёмке", "на приёмке", "на приёмке"] },
-];
 
 type Placement = { lane: Lane; index: number };
 
@@ -170,15 +162,7 @@ export function LiveBoard({ rows, now, since, actions, companyId, readOnly = fal
   return (
     <MotionConfig reducedMotion="user">
       <section aria-label="Доска задач" className="mt-4 flex flex-col gap-2" data-testid="board">
-        {counts.attention > 0 ? (
-          <div className="mb-1 flex flex-wrap gap-2" aria-label="Сводка">
-            {STRIP.filter((item) => counts[item.lane] > 0).map((item) => (
-              <Chip key={item.lane} tone={item.tone} interactive={false}>
-                <span className="nums">{counts[item.lane]}</span> {pluralRu(counts[item.lane], item.word)}
-              </Chip>
-            ))}
-          </div>
-        ) : null}
+        <LaneStrip counts={counts} />
 
         <LayoutGroup>
           <AnimatePresence mode="popLayout" initial={false}>

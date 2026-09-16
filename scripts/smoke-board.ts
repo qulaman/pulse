@@ -95,7 +95,8 @@ async function main() {
   const marat = await signIn("marat@demo.local");
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });
-  const context = await browser.newContext({ viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU" });
+  // a tablet width: the board (tiles in lanes) is what this smoke reads; the phone gets the deck (D-60)
+  const context = await browser.newContext({ viewport: { width: 820, height: 1180 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU" });
   const page = await context.newPage();
   // a thrown render or a failed request shows up here, next to the check it broke
   page.on("pageerror", (error) => console.log(`page error: ${error.message}`));

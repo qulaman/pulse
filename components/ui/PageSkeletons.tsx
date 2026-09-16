@@ -53,10 +53,10 @@ export function PulseInboxBone() {
 /** Пульс (D-57): the assistant thinking, its first line, two tiles of the board, the pinned button block. */
 export function PulseSkeleton() {
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[196px] pt-3">
-      <div className="mx-auto flex h-[128px] w-[128px] items-center justify-center [@media(max-height:760px)]:h-[104px] [@media(max-height:760px)]:w-[104px]">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3">
+      <div className="mx-auto flex h-[152px] w-[152px] items-center justify-center">
         <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
-          <Mascot state="thinking" size={112} />
+          <Mascot state="thinking" size={128} />
         </span>
       </div>
       <div className="mt-2 flex flex-col gap-2">
@@ -78,21 +78,6 @@ export function PulseSkeleton() {
           </div>
         ))}
       </SkeletonGroup>
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center pt-8"
-        style={{
-          bottom: "calc(56px + env(safe-area-inset-bottom))",
-          paddingBottom: 12,
-          background: "linear-gradient(180deg, transparent, var(--bg) 28px)",
-        }}
-      >
-        <SkeletonGroup className="flex flex-col items-center gap-2">
-          <Bone round w={80} h={80} />
-          <span className="text-[16px] font-semibold leading-[22px]">Дать задачу</span>
-          <span className="text-[13px] leading-4 text-muted">удержи — говори · тап — текст</span>
-        </SkeletonGroup>
-      </div>
     </main>
   );
 }

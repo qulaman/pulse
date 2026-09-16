@@ -2,8 +2,9 @@
 
 import type { ReactNode } from "react";
 
-import { Mascot, type MascotState } from "@/components/brand/Mascot";
+import type { MascotState } from "@/components/brand/Mascot";
 import type { SpeechTone } from "@/lib/pulse/board";
+import { MascotLever } from "./MascotLever";
 
 const TONE_COLOR: Record<SpeechTone, string> = {
   danger: "var(--danger)",
@@ -20,31 +21,22 @@ type Props = {
   said?: string | null;
   /** What the assistant says — one line for the moment, a few when it answers. */
   lines: AssistantLine[];
-  /** A tap on the face repeats the opening line. */
-  onReplay: () => void;
+  /** A tap on the face: the opening line again and the cards thrown anew. */
+  onTap: () => void;
   /** Service lines (push, draft, chips) — under what the assistant says. */
   children?: ReactNode;
 };
 
 /**
- * The assistant on Пульс: the face and one line under it. The line appears at once
+ * The assistant on Пульс: the face is the lever of the screen (hold — listen, tap —
+ * summary, pull down — text; D-60) and one line under it. The line appears at once
  * (a short fade, the mouth moves for a second) and is replaced by the next one — the
- * board below keeps the state, so nothing here has to be remembered or scrolled.
+ * deck below keeps the state, so nothing here has to be remembered or scrolled.
  */
-export function Assistant({ mascot, said, lines, onReplay, children }: Props) {
+export function Assistant({ mascot, said, lines, onTap, children }: Props) {
   return (
     <section aria-label="Ассистент" className="flex flex-col items-stretch">
-      <button
-        type="button"
-        onClick={onReplay}
-        aria-label="Повторить сводку"
-        className="mx-auto flex h-[128px] w-[128px] items-center justify-center rounded-full transition-transform duration-[120ms] active:scale-[0.96] [@media(max-height:760px)]:h-[104px] [@media(max-height:760px)]:w-[104px]"
-      >
-        {/* a short phone (iPhone SE class) gives the board one more tile instead of a larger face */}
-        <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
-          <Mascot state={mascot} size={112} />
-        </span>
-      </button>
+      <MascotLever state={mascot} onTap={onTap} size={128} />
 
       <div className="mt-2 flex flex-col gap-2" aria-live="polite">
         {said ? (

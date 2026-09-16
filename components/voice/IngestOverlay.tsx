@@ -125,7 +125,8 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
 
   return (
     <div
-      className="fixed inset-0 z-40 flex flex-col items-center justify-center px-4"
+      // while the director holds the face in the middle of the screen, the scene stays above the finger
+      className={`fixed inset-0 z-40 flex flex-col items-center px-4 ${stage === "recording" ? "justify-start pt-[10vh]" : "justify-center"}`}
       style={{ background: "var(--overlay)", backdropFilter: "blur(2px)" }}
     >
       {showProgress ? (

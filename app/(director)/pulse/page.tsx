@@ -7,20 +7,22 @@ import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
+import { CardDeck } from "@/components/pulse/CardDeck";
+import { LaneStrip } from "@/components/pulse/LaneStrip";
 import { LiveBoard } from "@/components/pulse/LiveBoard";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { Button } from "@/components/ui/Button";
-import { VoiceButton } from "@/components/voice/VoiceButton";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, lanesOf, toBriefTask, WORK_STATUSES } from "@/lib/pulse/board";
+import { countsOf, lanesOf, toBriefTask, WORK_STATUSES, type Lane } from "@/lib/pulse/board";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
+import { useMediaQuery } from "@/lib/useMediaQuery";
 
 /** Suggestions under the assistant: the questions it answers from the data. */
 const QUICK_QUESTIONS = ["Кто не отчитался?", "Что на приёмке?", "Как дела в целом?"];
@@ -57,6 +59,11 @@ export default function PulsePage() {
   const lanes = useMemo(() => lanesOf(rows ?? [], now), [rows, now]);
   const counts = countsOf(lanes);
   const speech = useSpeech(rows, lanes, now, directorName);
+  const wide = useMediaQuery("(min-width: 640px)");
+  // a tap on the face throws the cards again; a tap on a lane chip brings that lane to the top
+  const [throwKey, setThrowKey] = useState(0);
+  const [focus, setFocus] = useState<{ lane: Lane; key: number } | null>(null);
+  const [deckLane, setDeckLane] = useState<Lane | null>(null);
 
   // A question the phrase turned out to be: the director's words, then the answer from the data.
   const people = usePeople();
@@ -107,14 +114,15 @@ export default function PulsePage() {
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-[196px] pt-3">
+    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3" style={{ overscrollBehaviorY: "contain" }}>
       <Assistant
         mascot={mascot}
         said={exchange?.said ?? null}
         lines={loading && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}
-        onReplay={() => {
+        onTap={() => {
           closeExchange();
           speech.replay();
+          setThrowKey((key) => key + 1);
         }}
       >
         {exchange ? (
@@ -163,25 +171,18 @@ export default function PulsePage() {
         <InstallHint bubble />
       </Assistant>
 
-      <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
+      {wide ? (
+        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
+      ) : rows ? (
+        <div className="mt-4">
+          <LaneStrip counts={counts} active={deckLane} onSelect={(lane) => setFocus({ lane, key: Date.now() })} />
+          <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId={companyId} throwKey={throwKey} focus={focus} onLaneChange={setDeckLane} />
+        </div>
+      ) : null}
 
       {/* the announcements (D-59: Эфир lives here, folded under the board) */}
       <EtherSection variant="director" />
 
-      {/* the one action of the screen: pinned above the tab bar, always under the thumb;
-          the board scrolls underneath and the main's bottom padding lets it clear the block */}
-      <div
-        className="pointer-events-none fixed inset-x-0 z-20 flex flex-col items-center pt-8"
-        style={{
-          bottom: "calc(56px + env(safe-area-inset-bottom))",
-          paddingBottom: 12,
-          background: "linear-gradient(180deg, transparent, var(--bg) 28px)",
-        }}
-      >
-        <div className="pointer-events-auto flex flex-col items-center">
-          <VoiceButton inline />
-        </div>
-      </div>
     </main>
   );
 }
