@@ -40,8 +40,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | `/api/admin/reset-demo` | POST | director + `DEMO_RESET_ENABLED=1` на инстансе | — |
 | `/api/points` | POST | director | — |
 | `/api/reactions` | POST | любая | 60 |
-| `/api/shop/order` | POST | любая | — |
-| `/api/shop/order/:id/(approve\|deliver\|cancel)` | POST | director, shopkeeper; `cancel` в `pending` — также владелец заказа (D-37) | — |
+| ~~`/api/shop/*`~~ | — | магазин ходит в RPC напрямую из клиента (D-71): `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`. Права и идемпотентность — внутри функций; роутов-обёрток нет | — |
 | `/api/tv/control` | POST | director | — |
 | `/api/push/subscribe` | POST | любая | — |
 | `/api/push/seen` | POST | любая | — («увидел», D-32: из SW при показе уведомления или при открытии приложения) |
@@ -130,8 +129,9 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 | Функция | Сигнатура | Поведение |
 |---|---|---|
 | `confirm_voice_batch` | `(payload jsonb, client_request_id uuid) → jsonb` | §2 |
-| `create_shop_order` | `(item_id uuid, client_request_id uuid) → jsonb` | Баланс `SUM(point_transactions) ≥ price` и `stock > 0` с `select ... for update` + advisory lock на user; insert order(`pending`) + `point_transactions(shop_hold, −price)` + декремент stock. Ошибки: `insufficient_points`, `out_of_stock` |
-| `cancel_shop_order` | `(order_id uuid, client_request_id uuid) → jsonb` | Владелец — только из `pending` (D-37); director/shopkeeper — из `pending/approved`. `point_transactions(shop_release, +price)` + возврат stock. Выдача (deliver): hold остаётся финальным, `shop_final` не существует (D-10) |
+| `create_shop_order` | `(p_item_id uuid, client_request_id uuid) → jsonb` | Баланс `SUM(point_transactions) ≥ price` и `stock > 0` с `select ... for update` + advisory lock на user; insert order(`pending`) + `point_transactions(shop_hold, −price)` + декремент stock (`stock is null` = без ограничения, не трогается); outbox `shop_order` директору и завхозу. Ошибки: `insufficient_points`, `out_of_stock`, `item_not_found` |
+| `cancel_shop_order` | `(p_order_id uuid, client_request_id uuid) → jsonb` | Владелец — только из `pending` (D-37); director/shopkeeper — из `pending/approved`. `point_transactions(shop_release, +price)` ровно на сумму холда по `order_id` + возврат stock; чужую отмену сотрудник узнаёт из outbox `shop_cancelled`. Ошибки: `wrong_status`, `order_not_found`, `forbidden` |
+| `set_shop_order_status` | `(p_order_id uuid, p_status order_status, client_request_id uuid) → jsonb` | Завхоз/директор ведёт заказ: `pending → approved`, `pending\|approved → delivered`; outbox `shop_approved` / `shop_ready` сотруднику. Выдача новых транзакций **не пишет** — hold финален, `shop_final` не существует (D-10) |
 | `revoke_task` | `(task_id uuid, client_request_id uuid) → jsonb` | D-01: любой статус до `done` → `revoked`; у сотрудника карточка «отозвано директором». `scheduled` до отправки — физический delete (никому не доставлена) |
 | `next_delivery_slot` | `(company uuid, now timestamptz) → timestamptz` | null внутри окна доставки компании, иначе ближайшее открытие окна (Asia/Aqtobe). Общее правило D-38 для всех производителей задач; `reassign_task` кладёт клон как `scheduled` на этот момент |
 | `extend_task_deadline` | `(task_id uuid, new_deadline timestamptz, client_request_id uuid) → jsonb` | «Продлить» (владелец, 2026-09-11): новый срок (null — «без срока») на открытой задаче, системная строка «Срок продлён до DD.MM HH:MM» в треде, outbox `deadline_extended` адресату. Роут `POST /api/tasks/:id/deadline` |
@@ -177,7 +177,8 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 | Объявление | все активные | «Объявление: {text…}» | `/feed` | push (без эскалации) |
 | Реакция директора | сотрудник | «{emoji} на твой отчёт» | `/tasks/{id}` | push |
 | Очки | сотрудник | «+{n} очков: {reason}» | `/feed` | push |
-| Заказ выдан | сотрудник | «Твой заказ готов: {item}» | `/shop/orders` | push |
+| Заказ сделан (`shop_order`) | director + shopkeeper | «Заказ в магазине: {item}» | `/shop` | push (уходит сразу — это их работа) |
+| Заказ подтверждён (`shop_approved`) / выдан (`shop_ready`) / отменён не им самим (`shop_cancelled`) | сотрудник | «Заказ подтверждён/готов/отменён: {item}» | `/shop` | push (ждёт окна доставки, D-51) |
 | `rework` | исполнитель | «Доработка: {title}» | `/tasks/{id}` | push → tg |
 | Сообщение в задаче (`message`, D-64) | все участники треда, кроме отправителя (автор ∪ исполнитель) | «{Имя} · «{title}»» / «Вопрос по «{title}»» + слова (фото и голосовое — своими словами) | `/tasks/{id}` | push (кнопка «Прочитал» в шторке) |
 

@@ -67,6 +67,14 @@ export default function PeoplePage() {
         <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
       </Link>
 
+      <Link
+        href="/shop"
+        className="mt-2 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
+      >
+        Магазин
+        <span className="text-[13px] leading-4 text-muted">награды и выдача ›</span>
+      </Link>
+
       <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
       {people.isLoading ? <TeamListBone /> : <TeamList people={people.data ?? []} loads={loads.data} pointsOn={pointsOn} />}
     </main>

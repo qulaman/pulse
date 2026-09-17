@@ -381,6 +381,67 @@ export type Database = {
           },
         ]
       }
+      orders: {
+        Row: {
+          approved_at: string | null
+          company_id: string
+          created_at: string
+          delivered_at: string | null
+          id: string
+          item_id: string
+          price: number
+          status: Database["public"]["Enums"]["order_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          company_id: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          item_id: string
+          price: number
+          status?: Database["public"]["Enums"]["order_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          company_id?: string
+          created_at?: string
+          delivered_at?: string | null
+          id?: string
+          item_id?: string
+          price?: number
+          status?: Database["public"]["Enums"]["order_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       point_transactions: {
         Row: {
           actor_id: string | null
@@ -675,6 +736,59 @@ export type Database = {
           },
         ]
       }
+      shop_items: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean
+          photo_path: string | null
+          price: number
+          sort: number
+          stock: number | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          photo_path?: string | null
+          price: number
+          sort?: number
+          stock?: number | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          photo_path?: string | null
+          price?: number
+          sort?: number
+          stock?: number | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_messages: {
         Row: {
           company_id: string
@@ -906,8 +1020,16 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_shop_order: {
+        Args: { client_request_id?: string; p_order_id: string }
+        Returns: Json
+      }
       confirm_voice_batch: {
         Args: { client_request_id: string; p_now?: string; payload: Json }
+        Returns: Json
+      }
+      create_shop_order: {
+        Args: { client_request_id?: string; p_item_id: string }
         Returns: Json
       }
       delete_task: { Args: { task_id: string }; Returns: Json }
@@ -950,6 +1072,14 @@ export type Database = {
       }
       revoke_task: {
         Args: { client_request_id?: string; task_id: string }
+        Returns: Json
+      }
+      set_shop_order_status: {
+        Args: {
+          client_request_id?: string
+          p_order_id: string
+          p_status: Database["public"]["Enums"]["order_status"]
+        }
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }

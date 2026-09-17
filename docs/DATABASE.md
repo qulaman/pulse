@@ -99,12 +99,16 @@ task_id uuid null, order_id uuid null, actor_id uuid null, created_at
 
 ### shop_items / orders
 ```
-shop_items: id, company_id, title, photo_path, price int check (price > 0),
-            stock int check (stock >= 0), is_active bool default true, updated_at
+shop_items: id, company_id, title, description null, icon null, photo_path null,
+            price int check (price > 0),
+            stock int null check (stock >= 0),   -- null = без ограничения, 0 = закончился
+            is_active bool default true, sort int default 100, created_at, updated_at
 orders: id, company_id, user_id, item_id references shop_items on delete restrict,
         price int not null,           -- снапшот цены на момент заказа
-        status order_status default 'pending', created_at, delivered_at null, updated_at
+        status order_status default 'pending', created_at,
+        approved_at null, delivered_at null, updated_at
 ```
+`icon` — эмодзи, пока у компании нет фото награды (`photo_path` его перебивает); `description` — одна строка «что человек получает». Стартовая витрина ставится миграцией любой компании, у которой витрины ещё нет (состав и цены — D-71, правятся как данные).
 Товар с заказами не удаляется — `is_active=false`. Отмена pending — сам сотрудник, director, shopkeeper; после approved — только director/shopkeeper (D-37). Мутации — только через RPC ниже.
 
 ### push_subscriptions
@@ -238,13 +242,17 @@ confirm_voice_batch(payload jsonb, client_request_id uuid) returns jsonb
 -- разворачивает мульти-исполнителя в N задач с общим group_id; пишет diff в ai_logs;
 -- вне окна 08:00–21:00 Asia/Aqtobe ставит status='scheduled', scheduled_send_at = ближайшие 08:00 (D-38)
 
-create_shop_order(item_id uuid) returns uuid
+create_shop_order(p_item_id uuid, client_request_id uuid) returns jsonb
 -- pg_advisory_xact_lock(hashtext('points:'||auth.uid())) → SUM-баланс ≥ price
 -- → select stock for update, stock>0 → insert order(price снапшот) + shop_hold + stock-1
--- страховка: constraint-триггер на point_transactions — после insert amount<0 проверить SUM≥0 по user
+-- страховка: constraint-триггер на point_transactions — после insert shop_hold проверить SUM≥0 по user
+-- (только для shop_hold: ручной минус директора уводить баланс в минус вправе, D-12)
 
-cancel_shop_order(order_id uuid) returns void
+cancel_shop_order(p_order_id uuid, client_request_id uuid) returns jsonb
 -- права по D-37; shop_release на сумму hold, stock+1, status='cancelled'
+
+set_shop_order_status(p_order_id uuid, p_status order_status, client_request_id uuid) returns jsonb
+-- director/shopkeeper: pending→approved, pending|approved→delivered; транзакций не пишет (D-10)
 
 fn_rating(p_from timestamptz, p_to timestamptz)
   returns table (user_id uuid, display_name text, points int, rank int,
