@@ -220,7 +220,9 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 
 ## 8. ТВ-режим
 
-- Киоск — **auth-пользователь роли `tv`** (не anon), RLS-доступ только к `tv_events` (предмаскированный `payload_guest`) и событийным view. Логин на устройстве один раз.
+**Статус (2026-09-17):** экран `/tv` построен и работает на данных `tv_events` + `tv_summary()`; пульт, канал `tv_control` и `POST /api/tv/control` — ещё нет, гостевой режим включается стартовым `?guest=1`.
+
+- Киоск — **auth-пользователь роли `tv`** (не anon), RLS-доступ только к `tv_events` (предмаскированный `payload_guest`) и вызову `tv_summary(p_guest boolean)`. Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
 - Канал `tv_control:{company_id}` — **private broadcast**; подписка — участники компании, публикация — только service role.
 - **Публикация ТОЛЬКО через `POST /api/tv/control`** (role=director): `{ mode:'ether'|'employee_focus'|'task_focus'|'week_summary'|'compare', employee_id?, task_id?, guest: boolean }`.
 - Guest-режим — состояние канала `tv_control` (кнопка в пульте директора, D-33), НЕ query-параметр; `?guest=1` — лишь стартовое значение до первой команды.

@@ -1007,6 +1007,61 @@ export type Database = {
           },
         ]
       }
+      tv_events: {
+        Row: {
+          actor_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          payload_guest: Json
+          task_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          payload_guest?: Json
+          task_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          payload_guest?: Json
+          task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1095,6 +1150,20 @@ export type Database = {
         }
         Returns: Json
       }
+      tv_emit: {
+        Args: {
+          p_actor: string
+          p_amount: number
+          p_company: string
+          p_kind: string
+          p_task: string
+          p_title: string
+          p_title_guest?: string
+        }
+        Returns: undefined
+      }
+      tv_events_prune: { Args: { p_days?: number }; Returns: number }
+      tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
     }
