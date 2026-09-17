@@ -9,7 +9,6 @@ import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
-import { LiveBoard } from "@/components/pulse/LiveBoard";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
@@ -27,7 +26,6 @@ import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
-import { useMediaQuery } from "@/lib/useMediaQuery";
 
 type Exchange = { key: string; said: string; lines: string[]; understood: boolean };
 
@@ -47,7 +45,8 @@ const THOUGHT_MS = 9_000;
  * orbit it — tasks, messages, Эфир — each with its count; a tap on a ball opens its panel
  * (the card deck with the gestures, or the announcements).
  * The gesture hint lives at the bottom; service lines (push, draft) appear only after
- * the tap, under the assistant's line. A wide screen gets the live board instead of balls.
+ * the tap, under the assistant's line. One screen at every width — a wide window only
+ * centres it (owner, 2026-09-17: the board of D-57 stays a reserve for /tv).
  */
 export default function PulsePage() {
   const me = useMe();
@@ -73,7 +72,6 @@ export default function PulsePage() {
   const lanes = useMemo(() => lanesOf(rows ?? [], now, meId), [rows, now, meId]);
   const counts = countsOf(lanes);
   const speech = useSpeech(rows, lanes, now, directorName, meId);
-  const wide = useMediaQuery("(min-width: 640px)");
   const showHint = useLeverHint();
 
   // ---- the balls and the panels ------------------------------------------------------------
@@ -173,12 +171,11 @@ export default function PulsePage() {
   const lines = useMemo<AssistantLine[]>(() => {
     if (exchange) return exchange.lines.map((text, i) => ({ id: `${exchange.key}:${i}`, text }));
     if (!speech.line) return [];
-    if (wide) return [speech.line];
     // on the phone a change is a thought (above), never a line (below); the summary shows once awake
     if (!speech.line.opening) return [];
     if (mode === "idle") return [];
     return [speech.line];
-  }, [exchange, speech.line, mode, wide]);
+  }, [exchange, speech.line, mode]);
 
   const onFaceTap = () => {
     closeExchange();
@@ -199,9 +196,9 @@ export default function PulsePage() {
 
   const awake: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : counts.attention > 0 ? "calm" : "happy";
   // a thought wakes the face whatever it was doing; without one the idle face sleeps
-  const mascot: MascotState = thought && !wide ? "surprised" : mode === "idle" && !wide ? "sleeping" : awake;
+  const mascot: MascotState = thought ? "surprised" : mode === "idle" ? "sleeping" : awake;
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
-  const faceSize = mode === "panel" && !wide ? FACE_SMALL : FACE;
+  const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
   const serviceLines = (
@@ -224,33 +221,6 @@ export default function PulsePage() {
     </>
   );
 
-  if (wide) {
-    return (
-      <main className="mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-24 pt-3">
-        <div className="flex flex-col items-center">
-          <MascotLever state={awake} onTap={onFaceTap} size={FACE} />
-        </div>
-        <div className="mt-2">
-          <Assistant said={exchange?.said ?? null} lines={loading && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
-            {exchange ? <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} /> : null}
-            {serviceLines}
-          </Assistant>
-        </div>
-        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} />
-        <EtherSection variant="director" />
-        <ThreadSheet
-          open={Boolean(thread)}
-          onClose={() => setThread(null)}
-          taskId={thread?.id ?? null}
-          title={thread?.title ?? ""}
-          companyId={companyId}
-          userId={meId || undefined}
-          actions={actions}
-          isDirector
-        />
-      </main>
-    );
-  }
 
   return (
     <main
