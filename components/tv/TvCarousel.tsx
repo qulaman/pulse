@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { tvWeekday } from "@/lib/tv/clock";
-import type { TvLoadRow, TvMerchRow, TvRatingRow, TvSummary, TvWeekDay } from "@/lib/tv/queries";
+import type { TvMerchRow, TvRatingRow, TvSummary, TvWeekDay } from "@/lib/tv/queries";
 
 /**
  * Правый низ: карусель по 15 секунд с кроссфейдом — топ-5 недели, загрузка людей,
@@ -57,22 +57,6 @@ function TopFive({ rows }: { rows: TvRatingRow[] }) {
   );
 }
 
-function Load({ rows }: { rows: TvLoadRow[] }) {
-  return (
-    <Rows>
-      {rows.slice(0, 6).map((row) => (
-        <li key={row.name} className="flex items-center justify-between gap-[1.4vh]">
-          <span className="min-w-0 flex-1 truncate text-[2.4vh] leading-[3vh]">{row.name}</span>
-          <span className="shrink-0 text-[2.4vh] leading-[3vh] text-muted tabular-nums">
-            {/* глаголы и прилагательные не согласуются с человеком: имя не даёт рода */}
-            {row.active === 0 ? "без задач" : `${row.active} в работе`}
-          </span>
-        </li>
-      ))}
-    </Rows>
-  );
-}
-
 function Week({ days }: { days: TvWeekDay[] }) {
   const max = Math.max(1, ...days.map((day) => day.done));
   return (
@@ -113,9 +97,7 @@ export function panelsOf(summary: TvSummary): Panel[] {
   if (summary.points_enabled && summary.rating.length > 0) {
     panels.push({ key: "rating", title: "Топ недели", body: <TopFive rows={summary.rating} /> });
   }
-  if (summary.load.length > 0) {
-    panels.push({ key: "load", title: "Кто чем занят", body: <Load rows={summary.load} /> });
-  }
+  // «кто чем занят» больше не слайд: команда живёт полосой под лентой (TvTeam)
   if (summary.week.length > 0) {
     panels.push({ key: "week", title: "Неделя: закрыто задач", body: <Week days={summary.week} /> });
   }

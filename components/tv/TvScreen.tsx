@@ -9,6 +9,7 @@ import { speechOf } from "@/lib/tv/voice";
 import { PulseLine } from "./PulseLine";
 import { TvCarousel } from "./TvCarousel";
 import { TvFeed } from "./TvFeed";
+import { TvTeam } from "./TvTeam";
 import { TvVerdict } from "./TvVerdict";
 import { useClock, useNightReload, useOffline } from "./useKiosk";
 
@@ -41,6 +42,7 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
 
   return (
     <div className="relative grid h-dvh w-full grid-cols-[3fr_2fr] gap-[1.8vh] overflow-hidden p-[2vh]">
+
 
       {/* левые 60%: шапка и живая лента */}
       <div className="flex min-h-0 flex-col gap-[1.6vh]">
@@ -75,6 +77,9 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
         <div className="min-h-0 flex-1">
           <TvFeed events={events} guest={guest} />
         </div>
+
+        {/* кто сейчас несёт работу, а кому можно дать */}
+        <TvTeam rows={data?.load ?? []} pulse={data?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
       </div>
 
       {/* правые 40%: вердикт с числами дня и карусель */}

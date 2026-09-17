@@ -21,10 +21,10 @@ export const tvKeys = {
 };
 
 /**
- * Лента на экране — последние события (CONCEPT §3.5: 8–10). Восемь, потому что строки
- * делят высоту колонки поровну: на десяти карточка ужимается до нечитаемой с двух метров.
+ * Лента на экране — последние события (CONCEPT §3.5: 8–10). Семь: первое идёт героем и
+ * занимает место двух строк, а под лентой ещё стоит полоса команды.
  */
-const FEED_LIMIT = 8;
+const FEED_LIMIT = 7;
 /** Сводка живёт медленнее ленты: вердикт и карусель пересчитываются раз в минуту. */
 const SUMMARY_REFRESH_MS = 60_000;
 
@@ -75,6 +75,8 @@ export type TvSummary = {
   guest: boolean;
   points_enabled: boolean;
   now: string;
+  /** События по часам суток компании — из них рисуется фон «пульс дня». */
+  pulse: number[];
   counts: TvCounts;
   today: TvToday;
   rating: TvRatingRow[];
@@ -87,6 +89,7 @@ const EMPTY_SUMMARY: TvSummary = {
   guest: false,
   points_enabled: false,
   now: new Date(0).toISOString(),
+  pulse: [],
   counts: { overdue: 0, declined: 0, review: 0, questions: 0 },
   today: { sent: 0, done: 0, in_work: 0 },
   rating: [],
