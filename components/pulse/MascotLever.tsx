@@ -196,7 +196,8 @@ export function MascotLever({
         onContextMenu={(event) => event.preventDefault()}
         data-testid="mascot-lever"
         data-recording={recording ? "1" : "0"}
-        className="relative flex items-center justify-center rounded-full disabled:opacity-60"
+        // press answers in the same frame as the finger (DESIGN §2: press = scale only)
+        className="relative flex items-center justify-center rounded-full transition-transform duration-[120ms] ease-out active:scale-[0.97] disabled:opacity-60 disabled:active:scale-100"
         style={{
           width: size + 24,
           height: size + 24,
