@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/types";
+import { pluralRu } from "@/lib/tasks/status-text";
 
 type OrderStatus = Database["public"]["Enums"]["order_status"];
 
@@ -46,4 +47,47 @@ export function cancellableByOwner(status: OrderStatus): boolean {
 /** Заказ ещё в работе у завхоза — он висит в очереди выдачи. */
 export function isOpenOrder(status: OrderStatus): boolean {
   return status === "pending" || status === "approved";
+}
+
+/**
+ * Сколько заказ уже ждёт — словами, как сказал бы человек: «только что», «12 минут»,
+ * «3 часа», «2 дня». Директору важно не время заказа, а то, сколько он висит.
+ */
+export function waitingRu(created: Date, now: Date = new Date()): string {
+  const minutes = Math.floor((now.getTime() - created.getTime()) / 60_000);
+  if (minutes < 2) return "только что";
+  if (minutes < 60) return `${minutes} ${pluralRu(minutes, ["минуту", "минуты", "минут"])}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${pluralRu(hours, ["час", "часа", "часов"])}`;
+  const days = Math.floor(hours / 24);
+  return `${days} ${pluralRu(days, ["день", "дня", "дней"])}`;
+}
+
+/** Ближайшая по цене награда, на которую этому балансу ещё не хватает. */
+export function nearestGoal(
+  balance: number,
+  items: { title: string; price: number; is_active: boolean }[],
+): { title: string; missing: number } | null {
+  const ahead = items
+    .filter((item) => item.is_active && item.price > balance)
+    .sort((a, b) => a.price - b.price)[0];
+  return ahead ? { title: ahead.title, missing: ahead.price - balance } : null;
+}
+
+/**
+ * Строка под заголовком пульта: что с магазином прямо сейчас. Одна мысль, факты —
+ * сначала то, что ждёт директора, потом то, чем живёт витрина (тон — DESIGN §5).
+ */
+export function shopVerdict(waiting: number, active: number, hidden: number): { text: string; tone: ShopTone } {
+  if (waiting > 0) {
+    const verb = pluralRu(waiting, ["ждёт", "ждут", "ждут"]);
+    const noun = pluralRu(waiting, ["заказ", "заказа", "заказов"]);
+    return { text: `${waiting} ${noun} ${verb} выдачи`, tone: "warn" };
+  }
+  if (active === 0) {
+    return { text: "На витрине пока пусто — добавь первую награду", tone: "muted" };
+  }
+  const hiddenTail = hidden > 0 ? `, скрыто ${hidden}` : "";
+  const noun = pluralRu(active, ["награда", "награды", "наград"]);
+  return { text: `Всё выдано. На витрине ${active} ${noun}${hiddenTail}`, tone: "muted" };
 }

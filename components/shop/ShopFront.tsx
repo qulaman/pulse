@@ -43,7 +43,7 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
       {canOrder ? (
         <section className="card mt-4 flex items-center gap-4 px-4 py-3.5">
           <div className="min-w-0">
-            <p className="eyebrow">Твои очки</p>
+            <p className="eyebrow">Очки</p>
             <p
               data-testid="shop-balance"
               className="nums mt-0.5 text-[40px] font-bold leading-[44px]"

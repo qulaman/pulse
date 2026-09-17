@@ -306,24 +306,40 @@ export type ShopSummary = {
   onHands: number;
   /** Столько унесено в магазин и не вернулось (холды минус возвраты). */
   spent: number;
+  /** Начислено за последние 30 дней — что компания раздала, без магазинных возвратов. */
+  earned30: number;
+  /** Балансы по людям, богатые первыми — «кто копит» на пульте директора. */
+  balances: { userId: string; points: number }[];
 };
 
-/** Две цифры над лентой очков: сколько на руках и сколько уже потрачено в магазине. */
+/**
+ * Одна выборка транзакций — все цифры пульта: сколько на руках, сколько унесено в
+ * магазин, сколько роздано за месяц и у кого сколько. Второго источника правды об
+ * очках не существует (принцип 4), поэтому считаем здесь, а не храним.
+ */
 export function useShopSummary(enabled: boolean) {
   const query = useQuery({
     queryKey: [...shopKeys.ledger, "summary"],
     enabled,
     queryFn: async (): Promise<ShopSummary> => {
       const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("point_transactions").select("amount, source");
+      const { data, error } = await supabase.from("point_transactions").select("amount, source, user_id, created_at");
       if (error) throw new Error(error.message);
+      const monthAgo = Date.now() - 30 * 86_400_000;
+      const perUser = new Map<string, number>();
       let onHands = 0;
       let spent = 0;
+      let earned30 = 0;
       for (const row of data ?? []) {
         onHands += row.amount;
+        perUser.set(row.user_id, (perUser.get(row.user_id) ?? 0) + row.amount);
         if (row.source === "shop_hold" || row.source === "shop_release") spent -= row.amount;
+        else if (row.amount > 0 && new Date(row.created_at).getTime() >= monthAgo) earned30 += row.amount;
       }
-      return { onHands, spent };
+      const balances = [...perUser.entries()]
+        .map(([userId, points]) => ({ userId, points }))
+        .sort((a, b) => b.points - a.points);
+      return { onHands, spent, earned30, balances };
     },
   });
   useRealtimeInvalidate({ table: "point_transactions" }, [...shopKeys.ledger, "summary"], enabled);

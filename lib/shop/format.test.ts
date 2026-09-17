@@ -4,9 +4,12 @@ import {
   ORDER_STATUS,
   cancellableByOwner,
   isOpenOrder,
+  nearestGoal,
   pointsWord,
   progressPct,
+  shopVerdict,
   shortfall,
+  waitingRu,
 } from "./format";
 
 describe("pointsWord", () => {
@@ -66,5 +69,62 @@ describe("order status", () => {
     expect(isOpenOrder("approved")).toBe(true);
     expect(isOpenOrder("delivered")).toBe(false);
     expect(isOpenOrder("cancelled")).toBe(false);
+  });
+});
+
+describe("waitingRu", () => {
+  const now = new Date("2026-09-17T12:00:00Z");
+  const ago = (ms: number) => new Date(now.getTime() - ms);
+
+  it("says how long the order has been hanging", () => {
+    expect(waitingRu(ago(30_000), now)).toBe("только что");
+    expect(waitingRu(ago(12 * 60_000), now)).toBe("12 минут");
+    expect(waitingRu(ago(61 * 60_000), now)).toBe("1 час");
+    expect(waitingRu(ago(3 * 3600_000), now)).toBe("3 часа");
+    expect(waitingRu(ago(50 * 3600_000), now)).toBe("2 дня");
+  });
+
+  it("declines the numbers", () => {
+    expect(waitingRu(ago(21 * 60_000), now)).toBe("21 минуту");
+    expect(waitingRu(ago(5 * 3600_000), now)).toBe("5 часов");
+  });
+});
+
+describe("nearestGoal", () => {
+  const items = [
+    { title: "Куртка", price: 200, is_active: true },
+    { title: "Безрукавка", price: 500, is_active: true },
+    { title: "Скрытая", price: 300, is_active: false },
+    { title: "Отгул", price: 1000, is_active: true },
+  ];
+
+  it("is the cheapest reward still out of reach", () => {
+    expect(nearestGoal(120, items)).toEqual({ title: "Куртка", missing: 80 });
+    expect(nearestGoal(200, items)).toEqual({ title: "Безрукавка", missing: 300 });
+  });
+
+  it("ignores hidden rewards", () => {
+    expect(nearestGoal(250, items)).toEqual({ title: "Безрукавка", missing: 250 });
+  });
+
+  it("is nothing when everything is affordable", () => {
+    expect(nearestGoal(5000, items)).toBeNull();
+  });
+});
+
+describe("shopVerdict", () => {
+  it("puts what waits for the director first", () => {
+    expect(shopVerdict(1, 4, 0)).toEqual({ text: "1 заказ ждёт выдачи", tone: "warn" });
+    expect(shopVerdict(2, 4, 0)).toEqual({ text: "2 заказа ждут выдачи", tone: "warn" });
+    expect(shopVerdict(5, 4, 0)).toEqual({ text: "5 заказов ждут выдачи", tone: "warn" });
+  });
+
+  it("describes the shelf when nothing waits", () => {
+    expect(shopVerdict(0, 4, 0)).toEqual({ text: "Всё выдано. На витрине 4 награды", tone: "muted" });
+    expect(shopVerdict(0, 1, 2)).toEqual({ text: "Всё выдано. На витрине 1 награда, скрыто 2", tone: "muted" });
+  });
+
+  it("asks for the first reward on an empty shelf", () => {
+    expect(shopVerdict(0, 0, 0).text).toBe("На витрине пока пусто — добавь первую награду");
   });
 });
