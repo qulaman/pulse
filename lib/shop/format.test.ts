@@ -7,8 +7,11 @@ import {
   nearestGoal,
   pointsWord,
   progressPct,
-  shopVerdict,
+  deliveredInPeriod,
+  recentDeliveries,
   shortfall,
+  takenCounts,
+  takenLabel,
   waitingRu,
 } from "./format";
 
@@ -112,19 +115,35 @@ describe("nearestGoal", () => {
   });
 });
 
-describe("shopVerdict", () => {
-  it("puts what waits for the director first", () => {
-    expect(shopVerdict(1, 4, 0)).toEqual({ text: "1 заказ ждёт выдачи", tone: "warn" });
-    expect(shopVerdict(2, 4, 0)).toEqual({ text: "2 заказа ждут выдачи", tone: "warn" });
-    expect(shopVerdict(5, 4, 0)).toEqual({ text: "5 заказов ждут выдачи", tone: "warn" });
+describe("жизнь магазина", () => {
+  const now = new Date("2026-09-17T12:00:00Z");
+  const day = (n: number) => new Date(now.getTime() - n * 86_400_000).toISOString();
+  const orders = [
+    { item_id: "a", status: "delivered" as const, created_at: day(2), delivered_at: day(1) },
+    { item_id: "a", status: "delivered" as const, created_at: day(40), delivered_at: day(38) },
+    { item_id: "a", status: "pending" as const, created_at: day(0), delivered_at: null },
+    { item_id: "b", status: "cancelled" as const, created_at: day(3), delivered_at: null },
+    { item_id: "c", status: "delivered" as const, created_at: day(5), delivered_at: day(4) },
+  ];
+
+  it("counts every order but a cancelled one", () => {
+    expect(takenCounts(orders)).toEqual({ a: 3, c: 1 });
   });
 
-  it("describes the shelf when nothing waits", () => {
-    expect(shopVerdict(0, 4, 0)).toEqual({ text: "Всё выдано. На витрине 4 награды", tone: "muted" });
-    expect(shopVerdict(0, 1, 2)).toEqual({ text: "Всё выдано. На витрине 1 награда, скрыто 2", tone: "muted" });
+  it("counts deliveries inside the window only", () => {
+    expect(deliveredInPeriod(orders, now)).toBe(2);
+    expect(deliveredInPeriod(orders, now, 45)).toBe(3);
   });
 
-  it("asks for the first reward on an empty shelf", () => {
-    expect(shopVerdict(0, 0, 0).text).toBe("На витрине пока пусто — добавь первую награду");
+  it("puts the freshest delivery first", () => {
+    const recent = recentDeliveries(orders, 2);
+    expect(recent.map((o) => o.delivered_at)).toEqual([day(1), day(4)]);
+  });
+
+  it("declines the «взяли» label", () => {
+    expect(takenLabel(0)).toBe("пока не брали");
+    expect(takenLabel(1)).toBe("взяли 1 раз");
+    expect(takenLabel(3)).toBe("взяли 3 раза");
+    expect(takenLabel(5)).toBe("взяли 5 раз");
   });
 });

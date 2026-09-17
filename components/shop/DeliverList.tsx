@@ -20,7 +20,10 @@ export function DeliverList({ orders, meId }: { orders: Order[]; meId?: string }
 
   return (
     <section className="mt-5">
-      <h2 className="eyebrow px-1">Выдать</h2>
+      <div className="flex items-baseline justify-between gap-3 px-1">
+        <h2 className="eyebrow">Выдать</h2>
+        <span className="nums text-[12px] leading-4 text-muted">{open.length}</span>
+      </div>
       <ul className="mt-2 flex flex-col gap-2">
         {open.map((order) => (
           <li key={order.id} className="card px-4 py-3.5" data-testid="queue-order" data-status={order.status}>

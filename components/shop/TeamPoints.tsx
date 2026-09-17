@@ -18,9 +18,10 @@ function Chevron() {
 }
 
 /**
- * Очки команды на пульте директора — итог, а не бухгалтерия: сколько у людей на руках,
- * сколько роздано за месяц, сколько уже унесено в магазин, и трое, кто ближе всех к
- * своей награде. Построчная история — за одним тапом, в шторке.
+ * Очки команды — про людей, а не про бухгалтерию: одна строка движения за месяц и трое,
+ * кто ближе всех к своей награде (это и есть рычаг директора — видно, кого дотянуть).
+ * Крупная цифра «на руках» живёт в герое экрана, здесь её нет намеренно: одна цифра —
+ * одно место. Построчная история — за тапом, в шторке.
  */
 export function TeamPoints({ items }: { items: ShopItem[] }) {
   const summary = useShopSummary(true);
@@ -34,35 +35,32 @@ export function TeamPoints({ items }: { items: ShopItem[] }) {
     <section className="mt-8">
       <h2 className="eyebrow px-1">Очки команды</h2>
 
-      <div className="card mt-2 px-4 py-4">
+      <div className="card mt-2 px-4 py-3.5">
         {summary.isLoading ? (
-          <SkeletonGroup className="space-y-2">
-            <Bone h={46} w={140} />
+          <SkeletonGroup className="space-y-2.5">
             <Bone h={18} />
+            <Bone h={40} />
+            <Bone h={40} />
           </SkeletonGroup>
         ) : (
           <>
-            <p className="text-[13px] leading-4 text-muted">Сейчас на руках у команды</p>
-            <p className="nums mt-0.5 text-[40px] font-bold leading-[44px]" style={{ color: "var(--gold)" }}>
-              {summary.data?.onHands ?? 0}
-            </p>
-            <p className="mt-1 text-[14px] leading-5 text-muted">
-              Роздано за месяц{" "}
-              <span className="nums font-semibold" style={{ color: "var(--text)" }}>
-                {summary.data?.earned30 ?? 0}
-              </span>{" "}
-              · унесено в магазин{" "}
-              <span className="nums font-semibold" style={{ color: "var(--text)" }}>
-                {summary.data?.spent ?? 0}
+            <div className="flex gap-4">
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] leading-4 text-muted">Роздано за месяц</span>
+                <span className="nums block text-[19px] font-bold leading-6">{summary.data?.earned30 ?? 0}</span>
               </span>
-            </p>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] leading-4 text-muted">Унесено в магазин</span>
+                <span className="nums block text-[19px] font-bold leading-6">{summary.data?.spent ?? 0}</span>
+              </span>
+            </div>
 
             {top.length > 0 ? (
-              <ul className="mt-3.5 border-t border-border/70 pt-1">
+              <ul className="mt-3 border-t border-border/70 pt-1">
                 {top.map((row) => {
                   const goal = nearestGoal(row.points, items);
                   return (
-                    <li key={row.userId} className="flex items-center gap-3 py-2" data-testid="saver">
+                    <li key={row.userId} className="flex items-center gap-3 py-2.5" data-testid="saver">
                       <span
                         aria-hidden
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-bg"
@@ -76,7 +74,7 @@ export function TeamPoints({ items }: { items: ShopItem[] }) {
                           {goal ? `ещё ${goal.missing} до «${goal.title}»` : "хватает на любую награду"}
                         </span>
                       </span>
-                      <span className="nums shrink-0 text-[16px] font-bold leading-5" style={{ color: "var(--gold)" }}>
+                      <span className="nums shrink-0 text-[17px] font-bold leading-5" style={{ color: "var(--gold)" }}>
                         {row.points}
                       </span>
                     </li>
@@ -84,7 +82,7 @@ export function TeamPoints({ items }: { items: ShopItem[] }) {
                 })}
               </ul>
             ) : (
-              <p className="mt-3 text-[14px] leading-5 text-muted">
+              <p className="mt-2 text-[14px] leading-5 text-muted">
                 Пока никто не накопил очков — поощрения начисляются на Рейтинге
               </p>
             )}

@@ -74,20 +74,45 @@ export function nearestGoal(
   return ahead ? { title: ahead.title, missing: ahead.price - balance } : null;
 }
 
-/**
- * Строка под заголовком пульта: что с магазином прямо сейчас. Одна мысль, факты —
- * сначала то, что ждёт директора, потом то, чем живёт витрина (тон — DESIGN §5).
- */
-export function shopVerdict(waiting: number, active: number, hidden: number): { text: string; tone: ShopTone } {
-  if (waiting > 0) {
-    const verb = pluralRu(waiting, ["ждёт", "ждут", "ждут"]);
-    const noun = pluralRu(waiting, ["заказ", "заказа", "заказов"]);
-    return { text: `${waiting} ${noun} ${verb} выдачи`, tone: "warn" };
+/* -------------------------------------------------------------------------- */
+/* Жизнь магазина: что берут, что выдали                                       */
+/* -------------------------------------------------------------------------- */
+
+export type OrderFact = {
+  item_id: string;
+  status: OrderStatus;
+  created_at: string;
+  delivered_at: string | null;
+};
+
+/** Сколько раз награду уносили: считается любой заказ, кроме отменённого. */
+export function takenCounts(orders: OrderFact[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const order of orders) {
+    if (order.status === "cancelled") continue;
+    counts[order.item_id] = (counts[order.item_id] ?? 0) + 1;
   }
-  if (active === 0) {
-    return { text: "На витрине пока пусто — добавь первую награду", tone: "muted" };
-  }
-  const hiddenTail = hidden > 0 ? `, скрыто ${hidden}` : "";
-  const noun = pluralRu(active, ["награда", "награды", "наград"]);
-  return { text: `Всё выдано. На витрине ${active} ${noun}${hiddenTail}`, tone: "muted" };
+  return counts;
+}
+
+/** Сколько наград выдано за последние `days` дней — цифра героя экрана. */
+export function deliveredInPeriod(orders: OrderFact[], now: Date = new Date(), days = 30): number {
+  const from = now.getTime() - days * 86_400_000;
+  return orders.filter(
+    (order) => order.status === "delivered" && order.delivered_at !== null && new Date(order.delivered_at).getTime() >= from,
+  ).length;
+}
+
+/** Последние выдачи, свежие первыми — лента «кому что досталось». */
+export function recentDeliveries<T extends OrderFact>(orders: T[], limit = 3): T[] {
+  return orders
+    .filter((order) => order.status === "delivered" && order.delivered_at !== null)
+    .sort((a, b) => new Date(b.delivered_at as string).getTime() - new Date(a.delivered_at as string).getTime())
+    .slice(0, limit);
+}
+
+/** «взяли 3 раза» / «пока не брали» — подпись под ценой на плитке. */
+export function takenLabel(count: number): string {
+  if (count === 0) return "пока не брали";
+  return `взяли ${count} ${pluralRu(count, ["раз", "раза", "раз"])}`;
 }

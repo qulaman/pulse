@@ -1,23 +1,19 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { DeliverList } from "@/components/shop/DeliverList";
 import { ItemEditor } from "@/components/shop/ItemEditor";
+import { RecentDeliveries } from "@/components/shop/RecentDeliveries";
 import { AddRewardTile, RewardTile } from "@/components/shop/RewardTile";
+import { ShopHero } from "@/components/shop/ShopHero";
 import { TeamPoints } from "@/components/shop/TeamPoints";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { isOpenOrder, shopVerdict } from "@/lib/shop/format";
-import { useAllShopItems, useOrders, type ShopItem } from "@/lib/shop/queries";
+import { deliveredInPeriod, isOpenOrder, takenCounts } from "@/lib/shop/format";
+import { useAllShopItems, useOrders, useShopSummary, type ShopItem } from "@/lib/shop/queries";
 import type { Me } from "@/lib/tasks/queries";
-
-const TONE_COLOR: Record<string, string> = {
-  warn: "var(--warn)",
-  muted: "var(--text-muted)",
-  accent: "var(--accent)",
-  ok: "var(--ok)",
-};
 
 function Chevron() {
   return (
@@ -28,67 +24,103 @@ function Chevron() {
 }
 
 /**
- * Магазин глазами директора — пульт, а не витрина (D-71 §12–13). Экран отвечает на три
- * вопроса руководителя в этом порядке: что ждёт меня сейчас (выдать заказ), что вообще
- * можно получить (награды плитками, тап — правка) и что происходит с очками команды
- * (итог, а не бухгалтерия — построчная история за одним тапом). Кнопок «Обменять» тут
- * нет: директор очков не копит, а поощряет людей на Рейтинге.
+ * Появление блоков лесенкой: единственное движение на экране, только transform+opacity,
+ * 40 мс между блоками. Под `prefers-reduced-motion` блоки просто стоят на месте.
+ */
+function Reveal({ index, children }: { index: number; children: ReactNode }) {
+  const reduced = useReducedMotion();
+  if (reduced) return <>{children}</>;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, delay: index * 0.04, ease: [0.2, 0, 0, 1] }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * Магазин глазами директора — пульт, а не витрина (D-71 §12–14). Экран отвечает по
+ * порядку: чем магазин жил месяц (герой), что ждёт выдачи сегодня, что вообще можно
+ * получить и сколько раз это уже брали, кому что досталось, и как идут очки у людей.
+ * Кнопок «Обменять» тут нет: директор очков не копит, а поощряет людей на Рейтинге.
  */
 export function AdminShop({ me }: { me: Me | undefined }) {
   const items = useAllShopItems(true);
   const orders = useOrders();
+  const summary = useShopSummary(true);
   const [editing, setEditing] = useState<ShopItem | "new" | null>(null);
 
   const list = items.data ?? [];
-  const active = list.filter((item) => item.is_active);
-  const waiting = (orders.data ?? []).filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId);
-  const verdict = shopVerdict(waiting.length, active.length, list.length - active.length);
+  const allOrders = orders.data ?? [];
+  const waiting = allOrders.filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId);
+  const taken = takenCounts(allOrders);
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Магазин</h1>
-      <p className="mt-1 text-[15px] leading-5" style={{ color: TONE_COLOR[verdict.tone] }}>
-        {items.isLoading ? " " : verdict.text}
-      </p>
 
-      <DeliverList orders={orders.data ?? []} meId={me?.userId} />
+      <Reveal index={0}>
+        <ShopHero
+          delivered={deliveredInPeriod(allOrders)}
+          onHands={summary.data?.onHands ?? 0}
+          waiting={waiting.length}
+          loading={orders.isLoading || summary.isLoading}
+        />
+      </Reveal>
 
-      <section className="mt-8">
-        <h2 className="eyebrow px-1">Награды</h2>
-        {items.isLoading ? (
-          <SkeletonGroup className="mt-2 grid grid-cols-2 gap-2.5">
-            {Array.from({ length: 4 }, (_, i) => (
-              <Bone key={i} h={148} className="rounded-[16px]" />
-            ))}
-          </SkeletonGroup>
-        ) : (
-          <ul className="mt-2 grid grid-cols-2 gap-2.5">
-            {list.map((item) => (
-              <li key={item.id} className="contents">
-                <RewardTile item={item} onOpen={setEditing} />
+      <Reveal index={1}>
+        <DeliverList orders={allOrders} meId={me?.userId} />
+      </Reveal>
+
+      <Reveal index={2}>
+        <section className="mt-8">
+          <div className="flex items-baseline justify-between gap-3 px-1">
+            <h2 className="eyebrow">Награды</h2>
+            <span className="nums text-[12px] leading-4 text-muted">{list.length}</span>
+          </div>
+          {items.isLoading ? (
+            <SkeletonGroup className="mt-2 grid grid-cols-2 gap-2.5">
+              {Array.from({ length: 4 }, (_, i) => (
+                <Bone key={i} h={176} className="rounded-[16px]" />
+              ))}
+            </SkeletonGroup>
+          ) : (
+            <ul className="mt-2 grid grid-cols-2 gap-2.5">
+              {list.map((item) => (
+                <li key={item.id} className="contents">
+                  <RewardTile item={item} taken={taken[item.id] ?? 0} onOpen={setEditing} />
+                </li>
+              ))}
+              <li className="contents">
+                <AddRewardTile onClick={() => setEditing("new")} />
               </li>
-            ))}
-            <li className="contents">
-              <AddRewardTile onClick={() => setEditing("new")} />
-            </li>
-          </ul>
-        )}
-        <p className="mt-2 px-1 text-[13px] leading-4 text-muted">
-          Тап по награде — цена, описание, остаток
-        </p>
-      </section>
+            </ul>
+          )}
+        </section>
+      </Reveal>
 
-      <TeamPoints items={list} />
+      <Reveal index={3}>
+        <RecentDeliveries orders={allOrders} />
+      </Reveal>
 
-      <Link
-        href="/rating"
-        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px] transition-colors duration-[120ms] active:bg-surface-2"
-      >
-        Поощрить очками
-        <span className="flex items-center gap-1.5 text-[13px] leading-4 text-muted">
-          рейтинг команды <Chevron />
-        </span>
-      </Link>
+      <Reveal index={4}>
+        <TeamPoints items={list} />
+      </Reveal>
+
+      <Reveal index={5}>
+        <Link
+          href="/rating"
+          className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px] transition-colors duration-[120ms] active:bg-surface-2"
+        >
+          Поощрить очками
+          <span className="flex items-center gap-1.5 text-[13px] leading-4 text-muted">
+            рейтинг команды <Chevron />
+          </span>
+        </Link>
+      </Reveal>
 
       <ItemEditor
         key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}
