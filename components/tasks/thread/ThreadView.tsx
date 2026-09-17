@@ -42,7 +42,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   const queryClient = useQueryClient();
   const offsetBottom = useVisualViewport();
 
-  const receipt = useThreadReceipt(taskId, isDirector);
+  const receipt = useThreadReceipt(taskId, isDirector, userId);
   const line = isDirector ? receiptLine(receipt.data) : null;
 
   const rows = messages ?? [];

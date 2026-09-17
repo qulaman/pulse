@@ -53,7 +53,7 @@ export function receiptLine(delivery: DeliveryRow | null | undefined, now: Date 
  * their own receipt and mistake it for the other side’s (§0 п.7 — the employee sees
  * no ticks until the owner says otherwise).
  */
-export function useThreadReceipt(taskId: string, enabled: boolean) {
+export function useThreadReceipt(taskId: string, enabled: boolean, meId: string | undefined) {
   return useRealtimeQuery<DeliveryRow | null, DeliveryRow>({
     queryKey: receiptKeys(taskId),
     queryFn: async () => {
@@ -63,12 +63,15 @@ export function useThreadReceipt(taskId: string, enabled: boolean) {
         .select("*")
         .eq("task_id", taskId)
         .eq("event_kind", "message")
+        // the other side's receipt: after the employee writes, the newest `message` row of
+        // the task is the one addressed to the director, and its seen_at is their own
+        .neq("user_id", meId ?? "")
         .order("created_at", { ascending: false })
         .limit(1);
       if (error) throw new Error(error.message);
       return (data?.[0] ?? null) as DeliveryRow | null;
     },
     channel: { table: "notification_deliveries", filter: `task_id=eq.${taskId}` },
-    enabled,
+    enabled: enabled && Boolean(meId),
   });
 }

@@ -44,7 +44,9 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | `/api/shop/order/:id/(approve\|deliver\|cancel)` | POST | director, shopkeeper; `cancel` в `pending` — также владелец заказа (D-37) | — |
 | `/api/tv/control` | POST | director | — |
 | `/api/push/subscribe` | POST | любая | — |
-| `/api/push/ack` | POST | любая | — |
+| `/api/push/seen` | POST | любая | — («увидел», D-32: из SW при показе уведомления или при открытии приложения) |
+| `/api/push/acted` | POST | любая | — («Прочитал» из шторки уведомления, D-64: `{delivery_id}` своей доставки → `mark_thread_read` под токеном пользователя) |
+| `/api/files/url` | GET | любая | — (`?message_id=` → signed URL файла сообщения на 10 мин; доступ решает RLS `task_messages`, бакет по типу: `photo` → `photos`, `voice` → `voice`; путь в Storage клиент не называет) |
 | `/api/telegram/link-code` | POST | любая | — |
 | `/api/health` | GET | публичный | — |
 | `/api/people` | POST | director | — (создаёт auth-пользователя через admin API service role + профиль; при провале профиля auth-пользователь удаляется; `409 email_exists`) |
@@ -62,7 +64,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 
 ### POST /api/voice/transcribe
 `export const maxDuration = 60`.
-Вход: `{ audio_path, context: 'director_input'|'task_message', client_request_id }`. Аудио уже в Storage — тело запроса без бинарных данных.
+Вход: `{ audio_path, context: 'director_input'|'task_message', client_request_id, duration_ms?, message_id? }`. Аудио уже в Storage — тело запроса без бинарных данных.
 Выход: `{ transcript, audio_path, stt_provider, latency_ms }`.
 
 STT — только через интерфейс `lib/ai/stt.ts`:
@@ -73,7 +75,7 @@ transcribe(audio: Blob|Stream, opts: { language?: string, vocabularyHints: strin
 
 Primary — `gpt-4o-transcribe` с prompt-ростером имён/алиасов сотрудников из БД (`vocabularyHints`). Fallback-провайдер — по env `STT_PROVIDER`; авто-фолбэк при 5xx/timeout primary. Таймаут вызова 30 с, backoff 1 с/3 с, максимум 1 ретрай внутри запроса; дальше — `502 stt_failed`, ретрай с фронта по сохранённому `audio_path` (без перезаписи).
 
-`context='task_message'` (голосовые сотрудников): тот же transcribe, БЕЗ парсинга; результат — в `task_messages(type='voice', content=transcript, file_url=audio_path)`.
+`context='task_message'` (голосовые в треде, любая роль): тот же transcribe, БЕЗ парсинга. Порядок — принцип 5: клиент сначала кладёт аудио в Storage и **сразу** вставляет строку `task_messages(type='voice', file_path=audio_path, content=null)`, затем зовёт transcribe с `message_id` этой строки; роут дописывает `content=transcript` service-клиентом (у `task_messages` нет update-политики), сузив запись до `sender_id` вызывающего и того же `file_path`; тред получает UPDATE по Realtime. STT упал — голосовое остаётся в треде без слов (D-64 §4).
 
 ### POST /api/voice/parse
 Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id }`. Текст и Web Share Target идут сюда же — один парсер на все входы.
@@ -134,7 +136,8 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 | `next_delivery_slot` | `(company uuid, now timestamptz) → timestamptz` | null внутри окна доставки компании, иначе ближайшее открытие окна (Asia/Aqtobe). Общее правило D-38 для всех производителей задач; `reassign_task` кладёт клон как `scheduled` на этот момент |
 | `extend_task_deadline` | `(task_id uuid, new_deadline timestamptz, client_request_id uuid) → jsonb` | «Продлить» (владелец, 2026-09-11): новый срок (null — «без срока») на открытой задаче, системная строка «Срок продлён до DD.MM HH:MM» в треде, outbox `deadline_extended` адресату. Роут `POST /api/tasks/:id/deadline` |
 | `reassign_task` | `(task_id uuid, new_assignee_id uuid, client_request_id uuid) → jsonb` | «Переназначить»: клон задачи новому человеку как свежая `sent` (`parent_task_id` = старая; outbox `task_sent` триггером), старая → `revoked` с системной строкой «Переназначено: Имя». Допустимые исходные статусы: sent/accepted/in_progress/rework/declined. Роут `POST /api/tasks/:id/reassign` |
-| `transition_task` | `(task_id uuid, to_status task_status, payload jsonb, client_request_id uuid) → jsonb` | Единая точка переходов; валидирует матрицу §7 по роли; ошибка `invalid_transition` |
+| `transition_task` | `(task_id uuid, to_status task_status, payload jsonb, client_request_id uuid) → jsonb` | Единая точка переходов; валидирует матрицу §7 по роли; ошибка `invalid_transition`. `payload`: `reason` («Не могу» → строка треда `decline_reason`), `comment` (доработка → `rework_comment`), `report: {text?, file_path?}` (сдача → строка треда `meta.report`, тип `photo` при файле; в той же транзакции, D-64 §3; outbox её пропускает — о сдаче говорит `pending_review`) |
+| `mark_thread_read` | `(task_id uuid, seq bigint) → bigint` | Курсор прочтения треда (D-61/D-64): upsert своей строки `task_reads` с `greatest(old, new)` — назад не ходит (оффлайн-повтор старого «Прочитал» безвреден); та же транзакция закрывает квитанции `message` этого треда до `seq` (`acted_at`). Только своя компания, иначе `task_not_found`. Единственный способ двигать курсор; зовут открытие треда, «Прочитал» на карточке, ответ, `/api/push/acted` |
 | `delete_task` | `(task_id uuid) → jsonb` | Жёсткое удаление (владелец, 2026-09-16): чистка ошибочных и тестовых поручений, без следа; только директор своей компании; `task_messages`/`notification_deliveries` каскадом, `point_transactions` остаются (append-only) с `task_id = null`, у клона-переназначения обнуляется `parent_task_id`. Роут `POST /api/tasks/:id/delete`. Отзыв (D-01) остаётся штатным способом забрать поручение |
 | `purge_closed_tasks` | `() → jsonb` | «Очистить закрытые»: все `done`/`declined`/`revoked` компании директора, те же правила по детям; возвращает `{deleted}`. Роут `POST /api/tasks/purge` |
 | `apply_auto_rule` | `(task_id uuid, rule_code text) → void` | Вызывается только cron/триггерами; идемпотентна partial-unique `(task_id, rule_code)` — повторный done после rework бонуса не даёт (D-31) |
@@ -152,7 +155,7 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 - Edge Function `send-push`: читает пачку queued → web-push → `sent`/`failed(attempts+1, last_error)`.
 
 ### Ack-семантика (D-32)
-«Увидел» = SW шлёт `POST /api/push/ack {delivery_id}` при показе нотификации, ЛИБО открытие приложения (любой авторизованный запрос пользователя закрывает его недавние `sent` → `seen_at`). Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
+«Увидел» = SW шлёт `POST /api/push/seen {delivery_id}` при показе нотификации, ЛИБО открытие приложения (любой авторизованный запрос пользователя закрывает его недавние `sent` → `seen_at`). Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
 
 ### Эскалация (ярусы)
 1. **Ярус 1 — push.** Ошибка отправки (5xx, нет подписок) → Telegram немедленно.
