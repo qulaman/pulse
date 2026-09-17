@@ -261,8 +261,12 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         open={sheet === "report"}
         onClose={close}
         onSubmit={(text, filePath) => {
-          if (text || filePath) actions.sendMessage({ taskId: task.id, companyId, text, filePath });
-          actions.complete({ taskId: task.id, fromStatus: task.status });
+          // one call: the words, the photo and the handover are one transaction (D-64 §3)
+          actions.complete({
+            taskId: task.id,
+            fromStatus: task.status,
+            report: text || filePath ? { text: text || undefined, file_path: filePath ?? undefined } : undefined,
+          });
         }}
       />
 

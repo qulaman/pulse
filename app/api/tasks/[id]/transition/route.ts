@@ -25,6 +25,8 @@ const BodySchema = z.strictObject({
   to_status: z.enum(STATUSES),
   reason: z.string().optional(), // «Не могу» — becomes a visible message
   comment: z.string().optional(), // rework note from the director
+  /** «Выполнено»: the words and the photo travel with the handover, in one transaction (D-64 §3). */
+  report: z.strictObject({ text: z.string().optional(), file_path: z.string().optional() }).optional(),
   client_request_id: z.uuid(),
 });
 
@@ -44,7 +46,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const { data, error } = await supabase.rpc("transition_task", {
       task_id: taskId,
       to_status: body.to_status,
-      payload: { reason: body.reason ?? null, comment: body.comment ?? null },
+      payload: { reason: body.reason ?? null, comment: body.comment ?? null, report: body.report ?? null },
       client_request_id: body.client_request_id,
     });
 
