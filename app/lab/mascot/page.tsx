@@ -11,7 +11,8 @@ export default function LabMascotPage() {
       </Link>
       <h1 className="mt-2 text-[24px] font-bold leading-[30px]">Анимации маскота</h1>
       <p className="mt-1 text-[13px] leading-4 text-muted">
-        Полка для проверки движения: состояния лица, жесты и сцены конвейера рядом, на одном размере и одном фоне
+        Полка для проверки движения: состояния лица, жесты и сцены конвейера рядом, на одном размере и одном фоне. D-45: один SVG,
+        только transform, opacity и цвет
       </p>
       <div className="mt-4">
         <MascotGallery />

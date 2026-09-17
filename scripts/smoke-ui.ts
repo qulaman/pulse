@@ -264,7 +264,9 @@ async function main() {
   await page.goto(`${APP_URL}/nope-${STAMP}`, { waitUntil: "networkidle" });
   record("404: страница «Такой страницы нет»", await page.getByText("Такой страницы нет").isVisible().catch(() => false));
 
-  await page.goto(`${APP_URL}/dev/mascot`, { waitUntil: "networkidle" });
+  await page.goto(`${APP_URL}/lab/mascot`, { waitUntil: "networkidle" });
+  // the bench keeps its controls sticky; a full-page shot would print them over every screenful
+  await page.addStyleTag({ content: ".sticky { position: static !important; }" });
   await page.screenshot({ path: join(SHOTS, "11-mascot.png"), fullPage: true });
 
   // ---- voice: hold the FAB for six seconds of the fake microphone ---------------
