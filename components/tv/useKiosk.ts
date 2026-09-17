@@ -55,3 +55,18 @@ export function useClock(): Date {
   }, []);
   return now;
 }
+
+/**
+ * Размер в пикселях для того, что рисуется числом, а не CSS: маскот принимает `size`
+ * в px, а стена бывает и 720p, и 4K. Ноль до первого измерения — компонент подождёт.
+ */
+export function useVhPx(vh: number): number {
+  const [px, setPx] = useState(0);
+  useEffect(() => {
+    const measure = () => setPx(Math.round((window.innerHeight * vh) / 100));
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [vh]);
+  return px;
+}

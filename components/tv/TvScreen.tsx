@@ -2,8 +2,11 @@
 
 import { PulseMark } from "@/components/brand/PulseMark";
 import { tvDate, tvTime } from "@/lib/tv/clock";
+import { lineOf } from "@/lib/tv/feed";
 import { useTvFeed, useTvSummary } from "@/lib/tv/queries";
+import { speechOf } from "@/lib/tv/voice";
 
+import { PulseLine } from "./PulseLine";
 import { TvCarousel } from "./TvCarousel";
 import { TvFeed } from "./TvFeed";
 import { TvVerdict } from "./TvVerdict";
@@ -26,13 +29,23 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
   useNightReload();
 
   const data = summary.data;
+  const events = feed.data ?? [];
+  const today = data?.today ?? { sent: 0, done: 0, in_work: 0 };
+  // лицо говорит о том же, что показывает лента, и пересчитывается с часами: новость
+  // «стареет» сама, без отдельного таймера
+  const speech = speechOf(
+    events.map((event) => lineOf(event, guest)),
+    today,
+    now,
+  );
 
   return (
-    <div className="grid h-dvh w-full grid-cols-[3fr_2fr] gap-[1.8vh] overflow-hidden p-[2vh]">
+    <div className="relative grid h-dvh w-full grid-cols-[3fr_2fr] gap-[1.8vh] overflow-hidden p-[2vh]">
+
       {/* левые 60%: шапка и живая лента */}
       <div className="flex min-h-0 flex-col gap-[1.6vh]">
-        <header className="flex items-baseline justify-between">
-          <div className="flex items-baseline gap-[1.6vh]">
+        <header className="flex items-center justify-between gap-[2.4vh]">
+          <div className="flex shrink-0 items-baseline gap-[1.6vh]">
             <PulseMark size="tv" />
             <span className="text-[2.4vh] leading-[3vh] text-muted">{company}</span>
             {guest ? (
@@ -41,7 +54,11 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
               </span>
             ) : null}
           </div>
-          <div className="flex items-baseline gap-[1.6vh]">
+
+          {/* пульс продукта в пустой середине шапки: единственное, что движется само по себе */}
+          <PulseLine className="h-[4.6vh] min-w-0 flex-1" />
+
+          <div className="flex shrink-0 items-baseline gap-[1.6vh]">
             {offline ? (
               <span
                 className="rounded-full px-[1.2vh] py-[0.4vh] text-[1.8vh] leading-[2.2vh]"
@@ -56,7 +73,7 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
         </header>
 
         <div className="min-h-0 flex-1">
-          <TvFeed events={feed.data ?? []} guest={guest} />
+          <TvFeed events={events} guest={guest} />
         </div>
       </div>
 
@@ -64,7 +81,8 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
       <div className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.8vh]">
         <TvVerdict
           counts={data?.counts ?? { overdue: 0, declined: 0, review: 0, questions: 0 }}
-          today={data?.today ?? { sent: 0, done: 0, in_work: 0 }}
+          today={today}
+          speech={speech}
         />
         {data ? <TvCarousel summary={data} /> : <section className="rounded-[1.8vh] border border-border bg-surface" />}
       </div>

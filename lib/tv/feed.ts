@@ -35,12 +35,15 @@ export type TvTone = "accent" | "ok" | "gold" | "muted";
 
 export type TvLine = {
   id: string;
+  kind: TvKind;
   /** О ком событие; в гостевом режиме — имя без фамилии. */
   name: string;
   /** Назывная подпись события. */
   label: string;
   /** Вторая строка: заголовок поручения, причина очков, текст объявления — или null. */
   detail: string | null;
+  /** Очки события; у гостя всегда null — цифр он не видит. */
+  amount: number | null;
   tone: TvTone;
   at: Date;
 };
@@ -82,9 +85,11 @@ export function lineOf(event: TvEvent, guest: boolean): TvLine {
   const label = event.kind === "points" && amount ? `+${amount}` : LABEL[event.kind];
   return {
     id: event.id,
+    kind: event.kind,
     name: payload.name?.trim() || "Компания",
     label,
     detail: trim(payload.title),
+    amount,
     tone: TONE[event.kind],
     at: new Date(event.created_at),
   };
