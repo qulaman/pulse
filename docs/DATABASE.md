@@ -109,7 +109,7 @@ orders: id, company_id, user_id, item_id references shop_items on delete restric
         approved_at null, delivered_at null, updated_at
 ```
 `icon` — эмодзи, пока у компании нет фото награды (`photo_path` его перебивает); `description` — одна строка «что человек получает». Стартовая витрина ставится миграцией любой компании, у которой витрины ещё нет (состав и цены — D-71, правятся как данные).
-Товар с заказами не удаляется — `is_active=false`. Отмена pending — сам сотрудник, director, shopkeeper; после approved — только director/shopkeeper (D-37). Мутации — только через RPC ниже.
+Ассортимент правит директор прямо из приложения (экран «Магазин»): запись в `shop_items` идёт **не через RPC, а обычным upsert под RLS** — id выдаётся клиентом заранее, поэтому повтор запроса не создаёт второй товар. Товар с заказами не удаляется — `is_active=false`. Отмена pending — сам сотрудник, director, shopkeeper; после approved — только director/shopkeeper (D-37). Мутации — только через RPC ниже.
 
 ### push_subscriptions
 `id, company_id, user_id, endpoint text unique, p256dh text, auth text, created_at`.

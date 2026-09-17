@@ -20,14 +20,16 @@ export type OrderStatus = Database["public"]["Enums"]["order_status"];
 export const shopKeys = {
   root: ["shop"] as const,
   items: ["shop", "items"] as const,
+  allItems: ["shop", "items", "all"] as const,
   orders: ["shop", "orders"] as const,
+  ledger: ["shop", "ledger"] as const,
   balance: (userId: string) => ["shop", "balance", userId] as const,
 };
 
 const ORDER_SELECT =
   "*, item:shop_items(title, icon), user:profiles!orders_user_id_fkey(full_name)";
 
-/** Витрина: активные товары, дешёвое — первым (sort, затем цена). */
+/** Витрина: активные товары, дешёвое — первым. */
 export function useShopItems() {
   return useRealtimeQuery<ShopItem[]>({
     queryKey: shopKeys.items,
@@ -37,8 +39,27 @@ export function useShopItems() {
         .from("shop_items")
         .select("*")
         .eq("is_active", true)
-        .order("sort")
-        .order("price");
+        .order("price")
+        .order("title");
+      if (error) throw new Error(error.message);
+      return data ?? [];
+    },
+    channel: { table: "shop_items" },
+  });
+}
+
+/** Весь ассортимент, включая скрытые — витрина глазами директора. */
+export function useAllShopItems(enabled: boolean) {
+  return useRealtimeQuery<ShopItem[]>({
+    queryKey: shopKeys.allItems,
+    enabled,
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("shop_items")
+        .select("*")
+        .order("price")
+        .order("title");
       if (error) throw new Error(error.message);
       return data ?? [];
     },
@@ -174,4 +195,137 @@ export function useSetOrderStatus() {
     ({ status }) => (status === "approved" ? "Заказ подтверждён" : "Заказ выдан"),
     "Не получилось обновить заказ",
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Админка директора: ассортимент и очки компании                              */
+/* -------------------------------------------------------------------------- */
+
+export type ItemDraft = {
+  /** Известен заранее: повтор сохранения — тот же upsert, а не второй товар (принцип 7). */
+  id: string;
+  title: string;
+  description: string | null;
+  icon: string | null;
+  price: number;
+  /** null — без ограничения. */
+  stock: number | null;
+  is_active: boolean;
+};
+
+/**
+ * Сохранение награды — upsert по заранее выданному id: экран не знает разницы между
+ * «создать» и «изменить», а доехавший дважды запрос не родит второй товар.
+ */
+export function useSaveShopItem(companyId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (draft: ItemDraft) => {
+      if (!companyId) throw new Error("no company");
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase.from("shop_items").upsert(
+        {
+          id: draft.id,
+          company_id: companyId,
+          title: draft.title.trim(),
+          description: draft.description?.trim() || null,
+          icon: draft.icon?.trim() || null,
+          price: draft.price,
+          stock: draft.stock,
+          is_active: draft.is_active,
+        },
+        { onConflict: "id" },
+      );
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: shopKeys.root });
+      toast("Сохранено");
+    },
+    onError: () => toast("Не получилось сохранить"),
+  });
+}
+
+/** Удаление возможно, только пока награду никто не заказывал: иначе её прячут. */
+export function useDeleteShopItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (item: ShopItem) => {
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase.from("shop_items").delete().eq("id", item.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: shopKeys.root });
+      toast("Награда удалена");
+    },
+    onError: (error) => {
+      const raw = error instanceof Error ? error.message : "";
+      // on delete restrict: заказы ссылаются на товар — история заказов важнее удаления
+      toast(
+        raw.includes("violates foreign key") || raw.includes("23503")
+          ? "Награду уже заказывали — её можно только скрыть"
+          : "Не получилось удалить",
+      );
+    },
+  });
+}
+
+export type LedgerRow = {
+  id: string;
+  user_id: string;
+  amount: number;
+  reason: string;
+  source: string;
+  created_at: string;
+  user: { full_name: string } | null;
+};
+
+/** Очки компании одной лентой — директорское право по RLS, сотруднику придут только свои. */
+export function useCompanyLedger(enabled: boolean, limit = 200) {
+  const query = useQuery({
+    queryKey: [...shopKeys.ledger, limit],
+    enabled,
+    queryFn: async (): Promise<LedgerRow[]> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("point_transactions")
+        .select("id, user_id, amount, reason, source, created_at, user:profiles!point_transactions_user_id_fkey(full_name)")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as unknown as LedgerRow[];
+    },
+  });
+  useRealtimeInvalidate({ table: "point_transactions" }, shopKeys.ledger, enabled);
+  return query;
+}
+
+export type ShopSummary = {
+  /** Столько очков сейчас на руках у людей (сумма всех транзакций компании). */
+  onHands: number;
+  /** Столько унесено в магазин и не вернулось (холды минус возвраты). */
+  spent: number;
+};
+
+/** Две цифры над лентой очков: сколько на руках и сколько уже потрачено в магазине. */
+export function useShopSummary(enabled: boolean) {
+  const query = useQuery({
+    queryKey: [...shopKeys.ledger, "summary"],
+    enabled,
+    queryFn: async (): Promise<ShopSummary> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.from("point_transactions").select("amount, source");
+      if (error) throw new Error(error.message);
+      let onHands = 0;
+      let spent = 0;
+      for (const row of data ?? []) {
+        onHands += row.amount;
+        if (row.source === "shop_hold" || row.source === "shop_release") spent -= row.amount;
+      }
+      return { onHands, spent };
+    },
+  });
+  useRealtimeInvalidate({ table: "point_transactions" }, [...shopKeys.ledger, "summary"], enabled);
+  return query;
 }

@@ -40,7 +40,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | `/api/admin/reset-demo` | POST | director + `DEMO_RESET_ENABLED=1` на инстансе | — |
 | `/api/points` | POST | director | — |
 | `/api/reactions` | POST | любая | 60 |
-| ~~`/api/shop/*`~~ | — | магазин ходит в RPC напрямую из клиента (D-71): `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`. Права и идемпотентность — внутри функций; роутов-обёрток нет | — |
+| ~~`/api/shop/*`~~ | — | магазин ходит в RPC напрямую из клиента (D-71): `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`. Права и идемпотентность — внутри функций; роутов-обёрток нет. Ассортимент (`shop_items`) директор правит обычным upsert под RLS с заранее выданным id | — |
 | `/api/tv/control` | POST | director | — |
 | `/api/push/subscribe` | POST | любая | — |
 | `/api/push/seen` | POST | любая | — («увидел», D-32: из SW при показе уведомления или при открытии приложения) |
