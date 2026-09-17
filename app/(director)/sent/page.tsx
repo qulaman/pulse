@@ -40,7 +40,7 @@ export default function SentPage() {
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
   // open questions mark their capsules — the same stack Пульс reads, already cached
-  const inbox = useDirectorInbox();
+  const inbox = useDirectorInbox(me.data);
   const questionIds = useMemo(() => new Set((inbox.data?.questions ?? []).map((t) => t.id)), [inbox.data]);
   const [filter, setFilter] = useState<Filter>("active");
   const [purging, setPurging] = useState(false);

@@ -31,6 +31,11 @@ function fromWall(wall: Date): Date {
   return new Date(wall.getTime() - OFFSET_MS);
 }
 
+/** Days since the epoch on the Aqtobe wall clock — the bucket key of a per-day strip. */
+export function aqtobeDay(date: Date): number {
+  return Math.floor(toWall(date).getTime() / 86_400_000);
+}
+
 export function toAqtobeIso(date: Date): string {
   const w = toWall(date);
   return (
