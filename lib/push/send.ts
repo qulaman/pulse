@@ -8,7 +8,7 @@ import { createServiceSupabase } from "@/lib/supabase/service";
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
 
-type Payload = { title?: string; body?: string; url?: string };
+type Payload = { title?: string; body?: string; url?: string; tag?: string };
 
 function vapidReady(): boolean {
   const env = getServerEnv();
@@ -65,7 +65,10 @@ export async function sweepDeliveries(): Promise<{ sent: number; failed: number;
       continue;
     }
 
-    const payload = JSON.stringify({ ...(row.meta as Payload), delivery_id: row.id });
+    // `tag` collapses the bubbles of one task on the phone, `kind` tells the worker's
+    // notification from a plain one (a message carries the «Прочитал» button)
+    const meta = row.meta as Payload;
+    const payload = JSON.stringify({ ...meta, tag: meta.tag ?? null, kind: row.event_kind, delivery_id: row.id });
     let delivered = false;
     let lastError = "";
     for (const sub of targets) {

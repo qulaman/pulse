@@ -15,11 +15,20 @@ self.addEventListener("push", (event) => {
     body: data.body || "",
     icon: "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    tag: data.delivery_id || undefined,
-    renotify: false,
-    data: { url: data.url || "/", delivery_id: data.delivery_id || null },
+    // one bubble per task: a newer word replaces the older one instead of stacking
+    tag: data.tag || data.delivery_id || undefined,
+    renotify: Boolean(data.tag),
+    data: { url: data.url || "/", delivery_id: data.delivery_id || null, kind: data.kind || null },
     vibrate: [80, 40, 80],
   };
+  // a word in a thread can be answered from the shade: «Прочитал» moves the read cursor
+  // and never opens the app (iOS shows no action buttons — the notification still works)
+  if (data.kind === "message") {
+    options.actions = [
+      { action: "read", title: "Прочитал" },
+      { action: "open", title: "Открыть" },
+    ];
+  }
   const shown = self.registration.showNotification(title, options);
   // «увидел»: the notification is on the screen (D-32)
   const ack = data.delivery_id
@@ -35,7 +44,20 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/";
+  const info = event.notification.data || {};
+  const url = info.url || "/";
+  if (event.action === "read" && info.delivery_id) {
+    // the cursor moves on the server; the app is not woken for it
+    event.waitUntil(
+      fetch("/api/push/acted", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ delivery_id: info.delivery_id }),
+      }).catch(() => undefined),
+    );
+    return;
+  }
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
       for (const client of list) {

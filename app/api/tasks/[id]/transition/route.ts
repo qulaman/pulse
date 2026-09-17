@@ -71,6 +71,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
           .update({ acted_at: now, seen_at: now })
           .eq("task_id", taskId)
           .eq("user_id", profile.userId)
+          // only the receipt of the order itself: a message of the same task is acted on
+          // by reading it (mark_thread_read), not by taking the task
+          .eq("event_kind", "task_sent")
           .is("acted_at", null);
       }
       kickDeliveries();
