@@ -914,7 +914,7 @@ export type Database = {
       extend_task_deadline: {
         Args: {
           client_request_id?: string
-          new_deadline: string | null
+          new_deadline: string
           task_id: string
         }
         Returns: Json
@@ -930,6 +930,10 @@ export type Database = {
           rank: number
           user_id: string
         }[]
+      }
+      mark_thread_read: {
+        Args: { seq: number; task_id: string }
+        Returns: number
       }
       next_delivery_slot: {
         Args: { p_company: string; p_now?: string }

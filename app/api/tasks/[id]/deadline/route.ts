@@ -26,7 +26,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("extend_task_deadline", {
       task_id: taskId,
-      new_deadline: body.deadline_iso,
+      // «без срока» is null, and the RPC takes it; the generated Args type drops the
+      // nullability of a function argument, so the cast says what the SQL signature says
+      new_deadline: body.deadline_iso as string,
       client_request_id: body.client_request_id,
     });
 

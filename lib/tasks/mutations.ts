@@ -216,12 +216,17 @@ export function useReassign() {
 /* Read cursor — «I have seen this thread up to here» (D-61)                    */
 /* -------------------------------------------------------------------------- */
 
+/** `companyId` is unused by the RPC (it reads the caller's own company) — kept for the callers. */
 export type MarkReadInput = { taskId: string; companyId: string; seq: number };
 
 /**
  * The person's read cursor on a thread: opening the thread, «Прочитал» on the card, a
- * reply. The board row loses its unread mark at once; the upsert follows. Nothing to
+ * reply. The board row loses its unread mark at once; the RPC follows. Nothing to
  * roll back on failure — the next fetch tells the truth.
+ *
+ * The cursor moves through `mark_thread_read` and nowhere else: it takes `greatest(old,
+ * new)`, so a replay of an older «Прочитал» (the outbox after a reconnect, a second tab)
+ * can no longer drag the cursor back and light the row up again.
  */
 export function useMarkRead(me: Me | undefined) {
   const queryClient = useQueryClient();
@@ -230,9 +235,7 @@ export function useMarkRead(me: Me | undefined) {
     mutationFn: async (input: MarkReadInput) => {
       if (!me) return;
       const supabase = createBrowserSupabase();
-      const { error } = await supabase
-        .from("task_reads")
-        .upsert({ task_id: input.taskId, user_id: me.userId, company_id: input.companyId, last_seq: input.seq, seen_at: new Date().toISOString() }, { onConflict: "task_id,user_id" });
+      const { error } = await supabase.rpc("mark_thread_read", { task_id: input.taskId, seq: input.seq });
       if (error) throw new Error(error.message);
     },
     onMutate: (input) => markBoardRead(queryClient, input.taskId, input.seq),
