@@ -42,7 +42,8 @@ function isNight(now: Date): boolean {
   return hour >= 22 || hour < 6;
 }
 
-function about(line: TvLine): string {
+/** Одна фраза о событии — и лицу, и бегущей строке, чтобы они не разошлись в словах. */
+export function phraseOf(line: TvLine): string {
   const name = line.name;
   const title = line.detail;
   switch (line.kind) {
@@ -86,5 +87,5 @@ export function speechOf(
   if (!newest || since > FRESH_MS) return { text: idlePhrase(today), mood: "calm" };
 
   // новость лицо именно проговаривает; за хорошую — радуется
-  return { text: about(newest), mood: GLAD.has(newest.kind) ? "happy" : "speaking" };
+  return { text: phraseOf(newest), mood: GLAD.has(newest.kind) ? "happy" : "speaking" };
 }

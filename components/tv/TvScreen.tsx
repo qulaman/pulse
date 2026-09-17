@@ -4,18 +4,20 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import { lineOf } from "@/lib/tv/feed";
 import { useTvFeed, useTvSummary } from "@/lib/tv/queries";
+import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
-import { PulseLine } from "./PulseLine";
-import { TvCarousel } from "./TvCarousel";
-import { TvFeed } from "./TvFeed";
-import { TvTeam } from "./TvTeam";
-import { TvVerdict } from "./TvVerdict";
+import { DayPulse } from "./DayPulse";
+import { TvMascot } from "./TvMascot";
+import { TvTicker } from "./TvTicker";
 import { useClock, useNightReload, useOffline } from "./useKiosk";
 
 /**
  * Экран 16:9 в кабинете: только наблюдение, ноль интеракций (CONCEPT §3.5).
- * Ни навигации, ни кнопок — киоск нечем «нажать», и нажимать на нём некому.
+ * Композиция владельца (2026-09-17): бегущая строка сверху, лицо посреди экрана — как в
+ * приложении, — и подпись внизу без единой рамки: марка, название компании и часы.
+ * Ниже подписи — дальний слой: кривая настоящего дня компании по часам.
+ *
  * Размеры в `vh`: экран одинаково садится и на 1080p, и на 4K, и на телевизор 55".
  *
  * Пульт директора (канал `tv_control`, режимы фокуса, кнопка «Посетитель») в этой
@@ -30,67 +32,42 @@ export function TvScreen({ company, guest }: { company: string; guest: boolean }
   useNightReload();
 
   const data = summary.data;
-  const events = feed.data ?? [];
-  const today = data?.today ?? { sent: 0, done: 0, in_work: 0 };
-  // лицо говорит о том же, что показывает лента, и пересчитывается с часами: новость
+  const lines = (feed.data ?? []).map((event) => lineOf(event, guest));
+  // лицо говорит о том же, что едет в строке, и пересчитывается с часами: новость
   // «стареет» сама, без отдельного таймера
-  const speech = speechOf(
-    events.map((event) => lineOf(event, guest)),
-    today,
-    now,
-  );
+  const speech = speechOf(lines, data?.today ?? { sent: 0, done: 0, in_work: 0 }, now);
+  const items = tickerItems(lines, data);
 
   return (
-    <div className="relative grid h-dvh w-full grid-cols-[3fr_2fr] gap-[1.8vh] overflow-hidden p-[2vh]">
+    <div className="relative flex h-dvh w-full flex-col overflow-hidden">
+      {/* дальний слой: ритм дня компании по часам, у самого низа экрана */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26vh]">
+        <DayPulse pulse={data?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
+      </div>
 
+      <header className="shrink-0 pt-[2.4vh]">
+        <TvTicker items={items} />
+      </header>
 
-      {/* левые 60%: шапка и живая лента */}
-      <div className="flex min-h-0 flex-col gap-[1.6vh]">
-        <header className="flex items-center justify-between gap-[2.4vh]">
-          <div className="flex shrink-0 items-baseline gap-[1.6vh]">
-            <PulseMark size="tv" />
-            <span className="text-[2.4vh] leading-[3vh] text-muted">{company}</span>
-            {guest ? (
-              <span className="rounded-full bg-surface-2 px-[1.2vh] py-[0.4vh] text-[1.8vh] leading-[2.2vh] text-muted">
-                режим посетителя
-              </span>
-            ) : null}
-          </div>
+      <main className="flex min-h-0 flex-1 items-center justify-center">
+        <TvMascot speech={speech} />
+      </main>
 
-          {/* пульс продукта в пустой середине шапки: единственное, что движется само по себе */}
-          <PulseLine className="h-[4.6vh] min-w-0 flex-1" />
-
-          <div className="flex shrink-0 items-baseline gap-[1.6vh]">
-            {offline ? (
-              <span
-                className="rounded-full px-[1.2vh] py-[0.4vh] text-[1.8vh] leading-[2.2vh]"
-                style={{ color: "var(--warn)", background: "color-mix(in srgb, var(--warn) 14%, transparent)" }}
-              >
-                нет связи
-              </span>
-            ) : null}
-            <span className="text-[2vh] leading-[2.6vh] text-muted first-letter:uppercase">{tvDate(now)}</span>
-            <span className="text-[5vh] font-bold leading-[5.4vh] tabular-nums">{tvTime(now)}</span>
-          </div>
-        </header>
-
-        <div className="min-h-0 flex-1">
-          <TvFeed events={events} guest={guest} />
+      <footer className="relative z-10 flex shrink-0 items-center justify-between gap-[3vh] px-[4vh] pb-[3.4vh]">
+        <div className="flex items-baseline gap-[2vh]">
+          <PulseMark size="tv" />
+          <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
+          {guest ? (
+            <span className="text-[2.2vh] leading-[2.8vh] text-muted">· режим посетителя</span>
+          ) : null}
         </div>
 
-        {/* кто сейчас несёт работу, а кому можно дать */}
-        <TvTeam rows={data?.load ?? []} pulse={data?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
-      </div>
-
-      {/* правые 40%: вердикт с числами дня и карусель */}
-      <div className="grid min-h-0 grid-rows-[auto_1fr] gap-[1.8vh]">
-        <TvVerdict
-          counts={data?.counts ?? { overdue: 0, declined: 0, review: 0, questions: 0 }}
-          today={today}
-          speech={speech}
-        />
-        {data ? <TvCarousel summary={data} /> : <section className="rounded-[1.8vh] border border-border bg-surface" />}
-      </div>
+        <div className="flex items-baseline gap-[2.4vh]">
+          {offline ? <span className="text-[2.2vh] leading-[2.8vh]" style={{ color: "var(--warn)" }}>нет связи</span> : null}
+          <span className="text-[2.6vh] leading-[3.4vh] text-muted first-letter:uppercase">{tvDate(now)}</span>
+          <span className="text-[7vh] font-bold leading-[7.4vh] tabular-nums">{tvTime(now)}</span>
+        </div>
+      </footer>
     </div>
   );
 }
