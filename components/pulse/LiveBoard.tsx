@@ -44,6 +44,8 @@ export type LiveBoardProps = {
   companyId: string;
   /** Who is reading: their own cursor decides what counts as an unread message. */
   meId: string;
+  /** «Ответить» opens the thread over the board (D-64 §5). */
+  onReply?: (task: BoardTask) => void;
   readOnly?: boolean;
   anonymized?: boolean;
 };
@@ -54,7 +56,7 @@ export type LiveBoardProps = {
  * its new lane when its task changes; a closed one flashes its goodbye and leaves. State
  * is the board's; the assistant above only comments.
  */
-export function LiveBoard({ rows, now, since, actions, companyId, meId, readOnly = false, anonymized = false }: LiveBoardProps) {
+export function LiveBoard({ rows, now, since, actions, companyId, meId, onReply, readOnly = false, anonymized = false }: LiveBoardProps) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -151,6 +153,7 @@ export function LiveBoard({ rows, now, since, actions, companyId, meId, readOnly
       lane={lane}
       now={now}
       meId={meId}
+      onReply={onReply}
       fresh={task.updated_at > since}
       leaving={leaving.has(task.id)}
       expanded={expanded === task.id}

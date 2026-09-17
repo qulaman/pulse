@@ -15,12 +15,13 @@ import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/Orb
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
+import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { Button } from "@/components/ui/Button";
 import { useEther } from "@/lib/ether/queries";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, emptyLanes, hasMessage, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type Lanes } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, hasMessage, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -80,6 +81,10 @@ export default function PulsePage() {
   const [panel, setPanel] = useState<OrbitId | null>(null);
   const [wakeKey, setWakeKey] = useState(0);
   const ether = useEther();
+  // the thread opens over the board; Пульс underneath is never unmounted, so the deck,
+  // the balls and the mascot are where they were when the sheet closes (D-64 §5)
+  const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
+  const openThread = (task: BoardTask) => setThread({ id: task.id, title: task.title });
 
   // every open task on the ball (in work included), coloured by the worst of them; messages are counted apart
   const taskCount = counts.overdue + counts.declined + counts.review + counts.work;
@@ -99,6 +104,8 @@ export default function PulsePage() {
   );
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
+  // the thought talks about the newest word on the board — a tap on it opens that thread
+  const thoughtTask = messageTasks[0];
   const questionLanes = useMemo<Lanes>(() => ({ ...emptyLanes(), question: messageTasks }), [messageTasks]);
 
   const pick = (ball: OrbitBall) => {
@@ -229,8 +236,18 @@ export default function PulsePage() {
             {serviceLines}
           </Assistant>
         </div>
-        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} meId={meId} />
+        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} />
         <EtherSection variant="director" />
+        <ThreadSheet
+          open={Boolean(thread)}
+          onClose={() => setThread(null)}
+          taskId={thread?.id ?? null}
+          title={thread?.title ?? ""}
+          companyId={companyId}
+          userId={meId || undefined}
+          actions={actions}
+          isDirector
+        />
       </main>
     );
   }
@@ -250,7 +267,16 @@ export default function PulsePage() {
               {mode === "ring" ? <OrbitBalls key="ring" balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} /> : null}
             </AnimatePresence>
             <AnimatePresence>
-              {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
+              {thought ? (
+                <ThoughtBubble
+                  key={thought.id}
+                  text={thought.text}
+                  tone={thought.tone}
+                  faceSize={faceSize}
+                  onDismiss={() => setExpiredThought(thought.id)}
+                  onOpen={thoughtTask ? () => openThread(thoughtTask) : undefined}
+                />
+              ) : null}
             </AnimatePresence>
           </motion.div>
           <AnimatePresence>
@@ -276,14 +302,14 @@ export default function PulsePage() {
               taskCount === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
               ) : (
-                <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} focus={null} />
+                <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} />
               )
             ) : null}
             {panel === "messages" ? (
               messageTasks.length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
               ) : (
-                <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} focus={null} showWork={false} />
+                <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} />
               )
             ) : null}
             {panel === "ether" ? (
@@ -307,6 +333,17 @@ export default function PulsePage() {
           удержи — говори · тап — задачи · потяни вниз — текст
         </p>
       ) : null}
+
+      <ThreadSheet
+        open={Boolean(thread)}
+        onClose={() => setThread(null)}
+        taskId={thread?.id ?? null}
+        title={thread?.title ?? ""}
+        companyId={companyId}
+        userId={meId || undefined}
+        actions={actions}
+        isDirector
+      />
     </main>
   );
 }

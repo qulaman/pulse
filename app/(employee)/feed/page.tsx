@@ -14,13 +14,16 @@ import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeechWith, type Voice } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
+import { Composer } from "@/components/tasks/thread/Composer";
+import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
+import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { Chip } from "@/components/ui/Chip";
 import { useEther } from "@/lib/ether/queries";
 import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
 import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
 import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
-import { useTaskActions } from "@/lib/tasks/mutations";
+import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import { firstNameOf } from "@/lib/text/normalize";
 
 type Mode = "idle" | "ring" | "panel";
@@ -65,6 +68,8 @@ export default function FeedPage() {
   const [mode, setMode] = useState<Mode>("idle");
   const [panel, setPanel] = useState<OrbitId | null>(null);
   const [wakeKey, setWakeKey] = useState(0);
+  // the thread opens over Лента, the face and the balls stay as they were (D-64 §5)
+  const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
 
   const balls = useMemo<OrbitBall[]>(
     () => [
@@ -189,7 +194,15 @@ export default function FeedPage() {
               ) : (
                 <div className="flex flex-col gap-2">
                   {unread.map((task) => (
-                    <MessageRow key={task.id} task={task} companyId={companyId} onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })} />
+                    <MessageRow
+                      key={task.id}
+                      task={task}
+                      companyId={companyId}
+                      meId={meId}
+                      actions={actions}
+                      onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })}
+                      onOpen={() => setThread({ id: task.id, title: task.title })}
+                    />
                   ))}
                 </div>
               )
@@ -213,29 +226,61 @@ export default function FeedPage() {
           тап — дела, сообщения, эфир
         </p>
       ) : null}
+
+      <ThreadSheet
+        open={Boolean(thread)}
+        onClose={() => setThread(null)}
+        taskId={thread?.id ?? null}
+        title={thread?.title ?? ""}
+        companyId={companyId}
+        userId={meId || undefined}
+        actions={actions}
+      />
     </main>
   );
 }
 
-/** A director's unread word on a task: the words, «Прочитал», and the thread to answer in. */
-function MessageRow({ task, onRead }: { task: BoardTask; companyId: string; onRead: (seq: number) => void }) {
+/**
+ * A director's unread word on a task: the tail of the thread, «Прочитал», and a reply
+ * line right here — the microphone first, because the person answering is usually on a
+ * site with gloves on (D-64 §5). The card opens the thread over Лента, never a page.
+ */
+function MessageRow({
+  task,
+  companyId,
+  meId,
+  actions,
+  onRead,
+  onOpen,
+}: {
+  task: BoardTask;
+  companyId: string;
+  meId: string;
+  actions: TaskActions;
+  onRead: (seq: number) => void;
+  onOpen: () => void;
+}) {
   const last = task.last_message!;
-  const words = last.type === "photo" ? (last.content ? `фото: ${last.content}` : "фото") : last.type === "voice" ? (last.content ? `голосовое: ${last.content}` : "голосовое") : (last.content ?? "");
   return (
     <article className="relative overflow-hidden rounded-[20px] border border-border bg-surface p-4 pl-5" data-testid="message-row">
       <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: "var(--warn)" }} />
       <span className="block text-[13px] leading-4 text-muted">{otherSideOf(task)}</span>
-      <Link href={`/tasks/${task.id}`} className="mt-1 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">
-        {task.title}
-      </Link>
-      <span className="mt-1 block text-[14px] leading-[18px]" style={{ color: "var(--warn)" }}>
-        «{words}»
-      </span>
+      <button type="button" onClick={onOpen} className="mt-1 block w-full text-left">
+        <span className="line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
+      </button>
+      <ThreadTail taskId={task.id} meId={meId} enabled />
       <div className="mt-3 flex flex-wrap gap-2">
         <Chip onClick={() => onRead(last.seq)}>Прочитал</Chip>
-        <Link href={`/tasks/${task.id}`} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
-          Ответить ›
-        </Link>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text"
+        >
+          Открыть переписку ›
+        </button>
+      </div>
+      <div className="mt-2">
+        <Composer taskId={task.id} companyId={companyId} actions={actions} inline micFirst />
       </div>
     </article>
   );

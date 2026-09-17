@@ -17,13 +17,26 @@ const TONE_COLOR: Record<SpeechTone, string> = {
  * while and fades; a tap sends it away sooner. Rendered inside the face's box, so it
  * follows the face wherever the layout puts it.
  */
-export function ThoughtBubble({ text, tone, faceSize, onDismiss }: { text: string; tone?: SpeechTone; faceSize: number; onDismiss: () => void }) {
+export function ThoughtBubble({
+  text,
+  tone,
+  faceSize,
+  onDismiss,
+  onOpen,
+}: {
+  text: string;
+  tone?: SpeechTone;
+  faceSize: number;
+  onDismiss: () => void;
+  /** The thought is about a thread: a tap opens it instead of dismissing (D-64 §5). */
+  onOpen?: () => void;
+}) {
   const color = tone ? TONE_COLOR[tone] : "var(--text-muted)";
   return (
     <motion.button
       type="button"
-      onClick={onDismiss}
-      aria-label="Мысль ассистента, тап — убрать"
+      onClick={onOpen ?? onDismiss}
+      aria-label={onOpen ? "Мысль ассистента, тап — открыть переписку" : "Мысль ассистента, тап — убрать"}
       initial={{ opacity: 0, scale: 0.85, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9, y: 4, transition: { duration: 0.18 } }}

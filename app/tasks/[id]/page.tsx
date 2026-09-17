@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { latestDeclineReason, latestOpenQuestion, TaskDates } from "@/components/tasks/TaskThread";
@@ -56,8 +56,14 @@ export default function TaskThreadPage() {
   const newestSeq = (messages.data ?? []).reduce((max, message) => Math.max(max, message.seq), 0);
   const companyId = me.data?.companyId;
   const markRead = actions.markRead;
+  // once per cursor: `actions` is a new object on every render, and a screen that also
+  // watches the board would otherwise loop through its own mutation
+  const marked = useRef("");
   useEffect(() => {
     if (!companyId || newestSeq === 0) return;
+    const cursor = `${taskId}:${newestSeq}`;
+    if (marked.current === cursor) return;
+    marked.current = cursor;
     markRead({ taskId, companyId, seq: newestSeq });
   }, [taskId, companyId, newestSeq, markRead]);
   const home = me.data ? homeForRole(me.data.role) : "/";

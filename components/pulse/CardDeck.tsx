@@ -50,6 +50,10 @@ export type CardDeckProps = {
   companyId: string;
   /** Who is reading: their own cursor decides what counts as an unread message. */
   meId: string;
+  /** «Ответить» on a card opens the thread over the deck (D-64 §5). */
+  onReply?: (task: BoardTask) => void;
+  /** The «Сообщения» deck: the card in front shows the thread tail and a reply line. */
+  replyLine?: boolean;
   /** A tap on a ball: that task's card comes to the top ("work" — the closing card). */
   focus: { id: string; key: number } | null;
   /** The card on top changed (a swipe): the ball to light up, "work" for the closing card. */
@@ -65,7 +69,7 @@ export type CardDeckProps = {
  * put the card at the end, tap to open the full card, hold for the quick menu. The
  * calm lane is one closing card that opens «Задачи».
  */
-export function CardDeck({ lanes, now, since, actions, companyId, meId, focus, onCurrentChange, showWork = true }: CardDeckProps) {
+export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply, replyLine = false, focus, onCurrentChange, showWork = true }: CardDeckProps) {
   const [postponed, setPostponed] = useState<string[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
@@ -283,6 +287,8 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, focus, o
                   actions={actions}
                   companyId={companyId}
                   meId={meId}
+                  onReply={onReply}
+                  showReply={replyLine && isCurrent}
                 />
               ) : (
                 <WorkCard tasks={item.tasks} />

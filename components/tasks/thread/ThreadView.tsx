@@ -91,7 +91,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
 
   return (
     <>
-      <section className={compact ? "flex-1 overflow-y-auto px-1 pb-2" : "mt-4 pb-28"} data-testid="thread">
+      <section className={compact ? "flex flex-1 flex-col overflow-y-auto px-1 pb-2" : "mt-4 pb-28"} data-testid="thread">
         {rows.length >= THREAD_PAGE && hasMore ? (
           <button
             type="button"
@@ -103,7 +103,8 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
           </button>
         ) : null}
 
-        <div className="flex flex-col gap-2">
+        {/* a short thread sits on the composer, like every messenger; a long one scrolls */}
+        <div className={`flex flex-col gap-2 ${compact ? "mt-auto" : ""}`}>
           {loading && rows.length === 0 ? (
             <p className="text-[14px] leading-[18px] text-muted">Загружаю переписку…</p>
           ) : rows.length === 0 ? (

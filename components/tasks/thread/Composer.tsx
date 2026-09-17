@@ -21,6 +21,8 @@ type Props = {
   actions: TaskActions;
   /** The reply line on a card: one row, no fixed position, no keyboard handling. */
   inline?: boolean;
+  /** The employee answers from a building site: the microphone comes first (D-64 §5). */
+  micFirst?: boolean;
   /** Something was sent from here — the thread scrolls to the end. */
   onSent?: () => void;
 };
@@ -32,7 +34,7 @@ type Props = {
  * STT fails the thread still holds the voice, and the words arrive later over Realtime.
  * The field is never blocked while something is sending — the row carries its own clock.
  */
-export function Composer({ taskId, companyId, actions, inline = false, onSent }: Props) {
+export function Composer({ taskId, companyId, actions, inline = false, micFirst = false, onSent }: Props) {
   const [draft, setDraft] = useState("");
   const [recording, setRecording] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
@@ -150,6 +152,74 @@ export function Composer({ taskId, companyId, actions, inline = false, onSent }:
     void stopRecording(Math.max(dx, dy) > CANCEL_DISTANCE_PX);
   };
 
+  const photoButton = (
+    <button
+      type="button"
+      aria-label={TEXT.photoPick}
+      disabled={uploading}
+      onClick={() => fileInput.current?.click()}
+      className="flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-[12px] text-muted transition-transform duration-[120ms] active:scale-[0.94]"
+    >
+      {uploading ? (
+        <span className="text-[12px] leading-4">…</span>
+      ) : (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      )}
+    </button>
+  );
+
+  const sendButton = (
+    <button
+      type="button"
+      onClick={sendText}
+      aria-label="Отправить"
+      className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-transform duration-[120ms] active:scale-[0.94]"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M4 12h15M13 6l6 6-6 6" />
+      </svg>
+    </button>
+  );
+
+  const voiceButton = (
+    <button
+      type="button"
+      aria-label="Записать голосовое"
+      onPointerDown={(event) => void onPointerDown(event)}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ touchAction: "none" }}
+      className={`flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full transition-transform duration-[120ms] ${
+        recording ? (cancelArmed ? "scale-110 bg-danger text-bg" : "scale-110 bg-accent text-bg") : "bg-surface-2 text-text"
+      }`}
+      data-recording={recording ? "true" : "false"}
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <rect x="9" y="3" width="6" height="11" rx="3" />
+        <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+      </svg>
+    </button>
+  );
+
+  // typing turns the microphone into «Отправить»: one place, never two buttons at once
+  const voiceOrSend = draft.trim() ? sendButton : voiceButton;
+
+  const field = (
+    <textarea
+      className="min-h-[44px] flex-1 field px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
+      rows={1}
+      placeholder={recording ? (cancelArmed ? "Отпусти — отменю" : "Говори…") : TEXT.composerPlaceholder}
+      value={draft}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) sendText();
+      }}
+    />
+  );
+
   return (
     <div className={`flex items-end gap-2 ${inline ? "" : "mx-auto max-w-lg"}`} data-testid="composer">
       <input
@@ -161,64 +231,10 @@ export function Composer({ taskId, companyId, actions, inline = false, onSent }:
         aria-label={TEXT.photoPick}
         onChange={(event) => void pickPhoto(event.target.files?.[0] ?? null)}
       />
-      <button
-        type="button"
-        aria-label={TEXT.photoPick}
-        disabled={uploading}
-        onClick={() => fileInput.current?.click()}
-        className="flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-[12px] text-muted transition-transform duration-[120ms] active:scale-[0.94]"
-      >
-        {uploading ? (
-          <span className="text-[12px] leading-4">…</span>
-        ) : (
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        )}
-      </button>
-
-      <textarea
-        className="min-h-[44px] flex-1 field px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
-        rows={1}
-        placeholder={recording ? (cancelArmed ? "Отпусти — отменю" : "Говори…") : TEXT.composerPlaceholder}
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) sendText();
-        }}
-      />
-
-      {draft.trim() ? (
-        <button
-          type="button"
-          onClick={sendText}
-          aria-label="Отправить"
-          className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full bg-accent text-bg transition-transform duration-[120ms] active:scale-[0.94]"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M4 12h15M13 6l6 6-6 6" />
-          </svg>
-        </button>
-      ) : (
-        <button
-          type="button"
-          aria-label="Записать голосовое"
-          onPointerDown={(event) => void onPointerDown(event)}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          style={{ touchAction: "none" }}
-          className={`flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full transition-transform duration-[120ms] ${
-            recording ? (cancelArmed ? "scale-110 bg-danger text-bg" : "scale-110 bg-accent text-bg") : "bg-surface-2 text-text"
-          }`}
-          data-recording={recording ? "true" : "false"}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <rect x="9" y="3" width="6" height="11" rx="3" />
-            <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-          </svg>
-        </button>
-      )}
+      {/* on a site the thumb finds the microphone first; at a desk the photo does */}
+      {micFirst ? voiceOrSend : photoButton}
+      {field}
+      {micFirst ? photoButton : voiceOrSend}
     </div>
   );
 }

@@ -11,6 +11,8 @@ import { Chip } from "@/components/ui/Chip";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
+import { Composer } from "@/components/tasks/thread/Composer";
+import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
@@ -52,6 +54,10 @@ export type TaskTileProps = {
   companyId: string;
   /** Who is reading: their own cursor decides what the message line says. */
   meId: string;
+  /** «Ответить» opens the thread over the board instead of navigating away (D-64 §5). */
+  onReply?: (task: BoardTask) => void;
+  /** The card in front of the «Сообщения» panel: the tail of the thread and a reply line. */
+  showReply?: boolean;
   /** The TV board: no expansion, no buttons. */
   readOnly?: boolean;
   /** Public screens without consent: no names (FRONTEND «Анонимизация»). */
@@ -81,7 +87,7 @@ function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string
  * of context the lane needs, and the director's quick actions right on the tile. A tap
  * on the text opens the full card in place; the tile never navigates on its own.
  */
-export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, readOnly = false, anonymized = false }: TaskTileProps) {
+export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, onReply, showReply = false, readOnly = false, anonymized = false }: TaskTileProps) {
   const [rework, setRework] = useState(false);
   const tone: Tone = leaving ? (task.status === "done" ? "gold" : "muted") : LANE_TONE[lane];
   const color = TONE_VAR[tone];
@@ -141,9 +147,12 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
             <button type="button" onClick={onToggle} aria-expanded={false} className="block w-full text-left transition-transform duration-[120ms] active:scale-[0.99]">
               {header}
               <span className="mt-1.5 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
-              <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" ? "var(--text-muted)" : color }}>
-                {contextOf(task, lane, now, meId)}
-              </span>
+              {/* with the thread tail below, the one-line context would say it twice */}
+              {showReply ? null : (
+                <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" ? "var(--text-muted)" : color }}>
+                  {contextOf(task, lane, now, meId)}
+                </span>
+              )}
             </button>
           ) : (
             <div>
@@ -158,12 +167,30 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
           {/* the director's quick actions: the ones a tile can carry without a sheet */}
           {interactive && lane === "question" && !task.question ? (
             // a plain message: seen, or the thread to answer in
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Chip onClick={() => actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 })}>Прочитал</Chip>
-              <Link href={`/tasks/${task.id}`} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
-                Ответить ›
-              </Link>
-            </div>
+            <>
+              {showReply ? <ThreadTail taskId={task.id} meId={meId} enabled={showReply} /> : null}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Chip onClick={() => actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 })}>Прочитал</Chip>
+                {onReply ? (
+                  <button
+                    type="button"
+                    onClick={() => onReply(task)}
+                    className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text"
+                  >
+                    Ответить ›
+                  </button>
+                ) : (
+                  <Link href={`/tasks/${task.id}`} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
+                    Ответить ›
+                  </Link>
+                )}
+              </div>
+              {showReply ? (
+                <div className="mt-2">
+                  <Composer taskId={task.id} companyId={companyId} actions={actions} inline />
+                </div>
+              ) : null}
+            </>
           ) : null}
           {interactive && lane === "question" && task.question ? (
             <div className="mt-3 flex flex-wrap gap-2">
