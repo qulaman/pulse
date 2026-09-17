@@ -67,6 +67,7 @@ export default function TaskThreadPage() {
             companyId={me.data?.companyId ?? ""}
             userId={me.data?.userId}
             actions={actions}
+            isDirector={variant === "director"}
           />
         </>
       ) : (

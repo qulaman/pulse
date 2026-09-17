@@ -7,6 +7,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { PhotoMessage } from "./PhotoMessage";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { isPendingMessage, type TaskMessage, type TaskWithPeople } from "@/lib/tasks/queries";
+import { receiptLine, useThreadReceipt } from "@/lib/tasks/receipts";
 import { isOverdue, STATUS_LABEL, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 
 type MessageFlags = {
@@ -187,6 +188,8 @@ function MessageRow({ message, mine }: { message: TaskMessage; mine: boolean }) 
   );
 }
 
+const RECEIPT_TONE = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
+
 export function TaskChat({
   messages,
   loading,
@@ -194,6 +197,7 @@ export function TaskChat({
   companyId,
   userId,
   actions,
+  isDirector = false,
 }: {
   messages: TaskMessage[] | undefined;
   loading: boolean;
@@ -201,9 +205,15 @@ export function TaskChat({
   companyId: string;
   userId: string | undefined;
   actions: TaskActions;
+  /** Receipts are read by the director (принцип 8); the employee sees no ticks (D-64 §6). */
+  isDirector?: boolean;
 }) {
   const [draft, setDraft] = useState("");
   const chat = (messages ?? []).filter((m) => m.type !== "status_change" && m.type !== "system");
+  const receipt = useThreadReceipt(taskId, isDirector);
+  // one line, under the last word that is mine — a receipt per bubble would be noise
+  const lastMine = [...chat].reverse().find((m) => m.sender_id === userId && !isPendingMessage(m));
+  const line = isDirector ? receiptLine(receipt.data) : null;
 
   const send = () => {
     const text = draft.trim();
@@ -222,7 +232,16 @@ export function TaskChat({
           ) : chat.length === 0 ? (
             <p className="text-[14px] leading-[18px] text-muted">Сообщений пока нет. Вопрос или уточнение — сюда</p>
           ) : (
-            chat.map((message) => <MessageRow key={message.id} message={message} mine={message.sender_id === userId} />)
+            chat.map((message) => (
+              <div key={message.id}>
+                <MessageRow message={message} mine={message.sender_id === userId} />
+                {line && lastMine?.id === message.id ? (
+                  <p className="mt-1 pr-1 text-right text-[12px] leading-4" style={{ color: RECEIPT_TONE[line.tone] }} data-testid="thread-receipt">
+                    {line.text}
+                  </p>
+                ) : null}
+              </div>
+            ))
           )}
         </div>
       </section>
