@@ -16,6 +16,7 @@ import {
   type TaskWithPeople,
 } from "./queries";
 import type { TaskStatus } from "./status-text";
+import { markFailed } from "./thread";
 
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
 
@@ -106,6 +107,8 @@ export type TransitionInput = {
   reason?: string;
   /** Rework note from the director, likewise a visible message. */
   comment?: string;
+  /** «Выполнено»: the report rides inside the transition — one call, one transaction (D-64 §3). */
+  report?: { text?: string; file_path?: string };
 };
 
 export function useTransition() {
@@ -117,6 +120,7 @@ export function useTransition() {
         to_status: input.toStatus,
         reason: input.reason,
         comment: input.comment,
+        report: input.report,
         client_request_id: input.requestId,
       });
     },
@@ -301,9 +305,17 @@ export type SendMessageInput = {
   text: string;
   /** `{ is_question: true }` for «Уточнить» (D-03). */
   meta?: Record<string, unknown>;
-  /** Storage path in the `photos` bucket — the message becomes type `photo`, text is the caption. */
+  /** Storage path of the attachment — `photos` for a photo, `voice` for a recording. */
   filePath?: string | null;
+  /** Derived from `filePath` when omitted; a voice message says so itself. */
+  type?: "text" | "photo" | "voice";
+  /** A retry sends the very same row again — same id, so nothing is duplicated (принцип 7). */
+  id?: string;
 };
+
+function typeOf(input: Pick<SendMessageInput, "type" | "filePath">): "text" | "photo" | "voice" {
+  return input.type ?? (input.filePath ? "photo" : "text");
+}
 
 /**
  * The id is generated on the client and inserted explicitly, so the optimistic
@@ -322,7 +334,7 @@ export function useSendMessage(me: Me | undefined) {
         task_id: input.taskId,
         company_id: input.companyId,
         sender_id: me.userId,
-        type: (input.filePath ? "photo" : "text") as "photo" | "text",
+        type: typeOf(input),
         content: input.text || null,
         file_path: input.filePath ?? null,
         meta: (input.meta ?? {}) as Json,
@@ -341,6 +353,9 @@ export function useSendMessage(me: Me | undefined) {
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<TaskMessage[]>(queryKey);
 
+      // a retry of a failed row replaces it in place; a new row goes to the end
+      const withoutRetry = (previous ?? []).filter((message) => message.id !== input.id);
+
       if (me) {
         const pending: TaskMessage = {
           id: input.id,
@@ -349,20 +364,25 @@ export function useSendMessage(me: Me | undefined) {
           sender_id: me.userId,
           // Placeholder ordering only: pending rows are excluded from the cursor.
           seq: (previous?.length ? previous[previous.length - 1].seq : 0) + 0.5,
-          type: input.filePath ? "photo" : "text",
+          type: typeOf(input),
           content: input.text || null,
           file_path: input.filePath ?? null,
           meta: { ...(input.meta ?? {}), pending: true } as Json,
           created_at: new Date().toISOString(),
           sender: { full_name: me.fullName },
         };
-        queryClient.setQueryData<TaskMessage[]>(queryKey, [...(previous ?? []), pending]);
+        queryClient.setQueryData<TaskMessage[]>(queryKey, [...withoutRetry, pending]);
       }
 
       return { previous, queryKey };
     },
-    onError: (_error, _input, context) => {
-      if (context) queryClient.setQueryData(context.queryKey, context.previous);
+    onError: (error, input, context) => {
+      if (!context) return;
+      // No network: the row is in the persisted outbox and will arrive — it stays on
+      // screen with its clock, because taking the words away is the one thing that
+      // would make the person write them twice (принцип 5, DoD «оффлайн»).
+      if (error instanceof NetworkError || isNetworkError(error)) return;
+      queryClient.setQueryData<TaskMessage[]>(context.queryKey, (old) => markFailed(old, input.id));
       toast(GENERIC_ERROR);
     },
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
@@ -376,7 +396,7 @@ export function useSendMessage(me: Me | undefined) {
 export type TaskActions = {
   transition: (input: Omit<TransitionInput, "requestId">) => void;
   /** rework → accepted → pending_review: two calls, two client_request_id. */
-  complete: (input: { taskId: string; fromStatus: TaskStatus }) => void;
+  complete: (input: { taskId: string; fromStatus: TaskStatus; report?: { text?: string; file_path?: string } }) => void;
   revoke: (taskId: string) => void;
   /** «Продлить»: a new deadline (null — «без срока») on an open task. */
   extend: (input: Omit<ExtendInput, "requestId">) => void;
@@ -403,23 +423,25 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
     extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
     reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
-    complete: ({ taskId, fromStatus }) => {
+    complete: ({ taskId, fromStatus, report }) => {
       if (fromStatus === "rework") {
         // The employee taps once; the matrix still demands rework → accepted first.
+        // The report goes with the second call — the one that is the handover.
         transition.mutate(
           { taskId, toStatus: "accepted", requestId: crypto.randomUUID() },
           {
-            onSuccess: () => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID() }),
+            onSuccess: () => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report }),
           },
         );
         return;
       }
-      transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID() });
+      transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report });
     },
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
-    sendMessage: (input) => sendMessage.mutate({ ...input, id: crypto.randomUUID() }),
+    sendMessage: (input) => sendMessage.mutate({ ...input, id: input.id ?? crypto.randomUUID() }),
     remove: (taskId) => remove.mutate({ taskId }),
     markRead: (input) => markRead.mutate(input),
-    busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending || sendMessage.isPending,
+    // sending a message is not «busy»: the composer stays live, the row carries its own clock
+    busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending,
   };
 }

@@ -18,6 +18,8 @@ const BodySchema = z.strictObject({
   client_request_id: z.uuid(),
   /** Real recording length from MediaRecorder; the guard's density checks need it. */
   duration_ms: z.number().positive().optional(),
+  /** A voice message already in the thread: the transcript is written onto that row. */
+  message_id: z.uuid().optional(),
 });
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -151,6 +153,22 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         .update({ status: "transcribed", transcript: result.text })
         .eq("company_id", profile.companyId)
         .eq("client_request_id", body.client_request_id);
+    }
+
+    // A voice message exists in the thread before it is transcribed (принцип 5): the words
+    // land on that row now. task_messages is append-only for clients — there is no update
+    // policy — so the row is written by the service client, narrowed to the caller's own
+    // message and to the very recording that was just transcribed. The thread sees the
+    // change over Realtime as an UPDATE and patches itself (Д-2).
+    if (body.context === "task_message" && body.message_id) {
+      const written = await supabase
+        .from("task_messages")
+        .update({ content: result.text })
+        .eq("id", body.message_id)
+        .eq("sender_id", profile.userId)
+        .eq("file_path", body.audio_path)
+        .select("id");
+      if (written.error) console.error("voice transcript write failed:", written.error.message);
     }
 
     return apiOk({

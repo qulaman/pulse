@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-/** A report photo in the thread: signed on mount (a thread holds a handful, not a feed). */
-export function PhotoMessage({ path }: { path: string }) {
+/** A photo in the thread: signed on mount (a thread holds a handful, not a feed). */
+export function PhotoMessage({ messageId }: { messageId: string }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/files/url?path=${encodeURIComponent(path)}`, { credentials: "include" })
+    fetch(`/api/files/url?message_id=${encodeURIComponent(messageId)}`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("file url failed"))))
       .then((body: { url: string }) => {
         if (!cancelled) setUrl(body.url);
@@ -20,7 +20,7 @@ export function PhotoMessage({ path }: { path: string }) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [messageId]);
 
   if (failed) return <p className="mt-2 text-[13px] leading-4 text-danger">Фото не открылось. Попробуй позже</p>;
 

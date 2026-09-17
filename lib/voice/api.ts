@@ -37,6 +37,16 @@ export type ParseResponse = {
   suspicious?: boolean;
 };
 
+export type TranscribeRequest = {
+  audio_path: string;
+  context: UploadContext;
+  client_request_id: string;
+  /** Real recording length — the STT guard's density checks need it (docs/AI.md §1). */
+  duration_ms?: number;
+  /** The voice message the words belong to: the route writes the transcript onto it. */
+  message_id?: string;
+};
+
 export type ConfirmRequest = {
   client_request_id: string;
   source: IngestSource;
@@ -111,13 +121,7 @@ export interface VoiceApi {
     client_request_id: string;
   }): Promise<UploadUrlResponse>;
   uploadAudio(input: { signed_url: string; blob: Blob; mime: string }): Promise<void>;
-  transcribe(input: {
-    audio_path: string;
-    context: UploadContext;
-    client_request_id: string;
-    /** Real recording length — the STT guard's density checks need it (docs/AI.md §1). */
-    duration_ms?: number;
-  }): Promise<TranscribeResponse>;
+  transcribe(input: TranscribeRequest): Promise<TranscribeResponse>;
   parse(input: {
     transcript: string;
     audio_path: string | null;

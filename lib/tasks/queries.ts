@@ -210,32 +210,66 @@ export function isPendingMessage(message: TaskMessage): boolean {
   return (meta as Record<string, unknown>).pending === true;
 }
 
+/** How many messages the thread opens with, and how many «Показать раньше» adds. */
+export const THREAD_PAGE = 50;
+
+/** One page of older messages, before `beforeSeq` — the button above the thread. */
+export async function fetchEarlierMessages(taskId: string, beforeSeq: number): Promise<TaskMessage[]> {
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase
+    .from("task_messages")
+    .select(MESSAGE_SELECT)
+    .eq("task_id", taskId)
+    .lt("seq", beforeSeq)
+    .order("seq", { ascending: false })
+    .limit(THREAD_PAGE);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as TaskMessage[]).reverse();
+}
+
+/** An older page in front of the cached tail — «Показать раньше» folds it in by seq. */
+export function prependMessages(queryClient: QueryClient, taskId: string, older: TaskMessage[]): void {
+  queryClient.setQueryData<TaskMessage[]>(taskKeys.thread(taskId), (cached) => mergeBySeq(older, cached ?? []));
+}
+
 /**
  * Thread messages with the seq cursor: a refetch after a dead socket asks only
  * for `seq > lastSeq` and folds the answer into the cached page
- * (docs/FRONTEND.md "State management"). An empty cache reads the whole thread.
+ * (docs/FRONTEND.md "State management"). An empty cache reads the tail — the last
+ * THREAD_PAGE messages, the ones a person opens a thread to see; older ones come
+ * page by page through `fetchEarlierMessages`.
  * Optimistic rows are excluded from the cursor — their seq is a placeholder and
  * would otherwise skip the real row that replaces them.
  */
-export function useTaskMessages(taskId: string) {
+export function useTaskMessages(taskId: string, enabled = true) {
   const queryClient = useQueryClient();
   const queryKey = taskKeys.thread(taskId);
 
   return useRealtimeQuery<TaskMessage[], TaskMessageRow>({
     queryKey,
+    enabled,
     queryFn: async () => {
       const cached = queryClient.getQueryData<TaskMessage[]>(queryKey) ?? [];
       const lastSeq = lastSeqOf(cached.filter((message) => !isPendingMessage(message)));
 
       const supabase = createBrowserSupabase();
-      let request = supabase
+      if (lastSeq === 0) {
+        const { data, error } = await supabase
+          .from("task_messages")
+          .select(MESSAGE_SELECT)
+          .eq("task_id", taskId)
+          .order("seq", { ascending: false })
+          .limit(THREAD_PAGE);
+        if (error) throw new Error(error.message);
+        return ((data ?? []) as unknown as TaskMessage[]).reverse();
+      }
+
+      const { data, error } = await supabase
         .from("task_messages")
         .select(MESSAGE_SELECT)
         .eq("task_id", taskId)
+        .gt("seq", lastSeq)
         .order("seq", { ascending: true });
-      if (lastSeq > 0) request = request.gt("seq", lastSeq);
-
-      const { data, error } = await request;
       if (error) throw new Error(error.message);
       return mergeBySeq(cached, (data ?? []) as unknown as TaskMessage[]);
     },

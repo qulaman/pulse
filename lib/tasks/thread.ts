@@ -1,3 +1,4 @@
+import { aqtobeDay } from "@/lib/ai/time";
 import type { TaskMessage, TaskMessageRow } from "./queries";
 
 /**
@@ -33,4 +34,59 @@ export function applyMessageUpdate(messages: TaskMessage[] | undefined, row: Mes
   const copy = [...messages];
   copy[index] = next;
   return copy;
+}
+
+/* -------------------------------------------------------------------------- */
+/* What a row shows: in flight, failed, or in the thread                       */
+/* -------------------------------------------------------------------------- */
+
+export type MessageState = "pending" | "failed" | "sent";
+
+function metaOf(message: Pick<TaskMessage, "meta">): Record<string, unknown> {
+  const meta = message.meta;
+  return meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : {};
+}
+
+/**
+ * A row is `pending` while it is in flight or waiting in the outbox (принцип 7: it will
+ * arrive, so it stays on screen with a clock), `failed` when the server refused it — the
+ * only state that asks the person to do something — and `sent` once the thread holds it.
+ */
+export function messageState(message: TaskMessage): MessageState {
+  const meta = metaOf(message);
+  if (meta.failed === true) return "failed";
+  return meta.pending === true ? "pending" : "sent";
+}
+
+/** The server refused this row: it stays where it is, marked, and a tap sends it again. */
+export function markFailed(messages: TaskMessage[] | undefined, id: string): TaskMessage[] | undefined {
+  if (!messages) return messages;
+  const index = messages.findIndex((message) => message.id === id);
+  if (index === -1) return messages;
+  const current = messages[index]!;
+  const copy = [...messages];
+  copy[index] = { ...current, meta: { ...metaOf(current), failed: true, pending: true } as TaskMessage["meta"] };
+  return copy;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Days                                                                        */
+/* -------------------------------------------------------------------------- */
+
+/** «Сегодня» / «Вчера» / «14.09» — the separator between the days of a thread. */
+export function dayLabel(iso: string, now: Date = new Date()): string {
+  const day = aqtobeDay(new Date(iso));
+  const today = aqtobeDay(now);
+  if (day === today) return "Сегодня";
+  if (day === today - 1) return "Вчера";
+  const wall = new Date(new Date(iso).getTime() + 5 * 3_600_000);
+  const date = `${String(wall.getUTCDate()).padStart(2, "0")}.${String(wall.getUTCMonth() + 1).padStart(2, "0")}`;
+  const nowWall = new Date(now.getTime() + 5 * 3_600_000);
+  return wall.getUTCFullYear() === nowWall.getUTCFullYear() ? date : `${date}.${wall.getUTCFullYear()}`;
+}
+
+/** True when a separator belongs above this row: the first one, or a new Aqtobe day. */
+export function startsNewDay(previous: TaskMessage | undefined, current: TaskMessage): boolean {
+  if (!previous) return true;
+  return aqtobeDay(new Date(previous.created_at)) !== aqtobeDay(new Date(current.created_at));
 }
