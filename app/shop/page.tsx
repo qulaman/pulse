@@ -4,6 +4,7 @@ import { ItemCard } from "@/components/shop/ItemCard";
 import { MyOrders, OrdersQueue } from "@/components/shop/OrderList";
 import { ShopSkeleton } from "@/components/shop/ShopSkeleton";
 import { Mascot } from "@/components/brand/Mascot";
+import { usePointsEnabled } from "@/lib/points/queries";
 import { useBalance, useCreateOrder, useOrders, useShopItems, type ShopItem } from "@/lib/shop/queries";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -19,13 +20,17 @@ export default function ShopPage() {
   const orders = useOrders();
   const createOrder = useCreateOrder();
 
-  const role = me.data?.role;
-  // директор очков не зарабатывает — ему витрина показывает цены, а не кнопки
-  const canOrder = role !== undefined && role !== "director" && role !== "tv";
-  const isKeeper = role === "director" || role === "shopkeeper";
-  const balance = useBalance(canOrder ? me.data?.userId : undefined);
+  const pointsEnabled = usePointsEnabled();
 
-  if (items.isLoading || me.isLoading) return <ShopSkeleton />;
+  const role = me.data?.role;
+  // директор очков не зарабатывает — ему витрина показывает цены, а не кнопки;
+  // выключенные очки компании (D-40в) закрывают обмен всем
+  const spender = role !== undefined && role !== "director" && role !== "tv";
+  const canOrder = spender && pointsEnabled.data === true;
+  const isKeeper = role === "director" || role === "shopkeeper";
+  const balance = useBalance(spender ? me.data?.userId : undefined);
+
+  if (items.isLoading || me.isLoading || pointsEnabled.isLoading) return <ShopSkeleton />;
 
   const list = items.data ?? [];
   const mine = (orders.data ?? []).filter((order) => order.user_id === me.data?.userId);
@@ -36,6 +41,12 @@ export default function ShopPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
       <h1 className="text-[24px] font-bold leading-[30px]">Магазин</h1>
       <p className="mt-1 text-[13px] leading-4 text-muted">Очки за работу превращаются в награды</p>
+
+      {pointsEnabled.data === false ? (
+        <p className="mt-3 text-[14px] leading-5" style={{ color: "var(--warn)" }}>
+          Очки в компании выключены — обмен закрыт. Включаются в «Настройках».
+        </p>
+      ) : null}
 
       {canOrder ? (
         <section className="card mt-4 flex items-center gap-4 px-4 py-3.5">
@@ -81,8 +92,9 @@ export default function ShopPage() {
         </ul>
       )}
 
-      {canOrder ? <MyOrders orders={mine} /> : null}
-      {isKeeper ? <OrdersQueue orders={orders.data ?? []} /> : null}
+      {/* заказы видны и при выключенных очках: сделанный заказ не должен исчезать с экрана */}
+      {spender ? <MyOrders orders={mine} /> : null}
+      {isKeeper ? <OrdersQueue orders={orders.data ?? []} meId={me.data?.userId} /> : null}
     </main>
   );
 }

@@ -391,6 +391,7 @@ export type Database = {
           item_id: string
           price: number
           status: Database["public"]["Enums"]["order_status"]
+          stock_reserved: boolean
           updated_at: string
           user_id: string
         }
@@ -403,6 +404,7 @@ export type Database = {
           item_id: string
           price: number
           status?: Database["public"]["Enums"]["order_status"]
+          stock_reserved?: boolean
           updated_at?: string
           user_id: string
         }
@@ -415,6 +417,7 @@ export type Database = {
           item_id?: string
           price?: number
           status?: Database["public"]["Enums"]["order_status"]
+          stock_reserved?: boolean
           updated_at?: string
           user_id?: string
         }

@@ -78,11 +78,14 @@ export function MyOrders({ orders }: { orders: Order[] }) {
  * Очередь выдачи: директор и завхоз видят чужие заказы. Очки уже списаны при заказе
  * (hold-final, D-10), поэтому выдача — один тап и ни одной новой транзакции.
  */
-export function OrdersQueue({ orders }: { orders: Order[] }) {
+export function OrdersQueue({ orders, meId }: { orders: Order[]; meId?: string }) {
   const setStatus = useSetOrderStatus();
   const cancel = useCancelOrder();
-  const open = orders.filter((order) => isOpenOrder(order.status));
-  const closed = orders.filter((order) => !isOpenOrder(order.status)).slice(0, 10);
+  // завхоз копит очки как все: его собственный заказ живёт в «Моих заказах» и проводит
+  // его директор — сам себе выдать нельзя (то же правило стоит в RPC)
+  const queue = orders.filter((order) => order.user_id !== meId);
+  const open = queue.filter((order) => isOpenOrder(order.status));
+  const closed = queue.filter((order) => !isOpenOrder(order.status)).slice(0, 10);
   const busyId = setStatus.isPending ? setStatus.variables?.order.id : undefined;
 
   return (
