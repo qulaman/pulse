@@ -97,7 +97,7 @@ const TABS: Record<TabRole, Tab[]> = {
 function useTabBadges(role: TabRole): Record<string, number> {
   const me = useMe();
   const mine = useMyTasks(role === "employee" ? me.data?.userId : undefined);
-  const inbox = useDirectorInbox(role === "director");
+  const inbox = useDirectorInbox(me.data, role === "director");
   if (role === "employee") {
     const fresh = (mine.data ?? []).filter((task) => task.status === "sent").length;
     return fresh > 0 ? { "/tasks": fresh } : {};

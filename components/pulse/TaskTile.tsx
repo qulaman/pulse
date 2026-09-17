@@ -50,13 +50,15 @@ export type TaskTileProps = {
   onToggle: () => void;
   actions: TaskActions;
   companyId: string;
+  /** Who is reading: their own cursor decides what the message line says. */
+  meId: string;
   /** The TV board: no expansion, no buttons. */
   readOnly?: boolean;
   /** Public screens without consent: no names (FRONTEND «Анонимизация»). */
   anonymized?: boolean;
 };
 
-function contextOf(task: BoardTask, lane: Lane, now: Date): string {
+function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string {
   const due = task.deadline ? `до ${humanAqtobe(new Date(task.deadline), now)}` : TEXT.noDeadline;
   switch (lane) {
     case "overdue":
@@ -64,7 +66,7 @@ function contextOf(task: BoardTask, lane: Lane, now: Date): string {
     case "declined":
       return task.decline_reason ? task.decline_reason : "без причины";
     case "question":
-      return `«${messageOf(task) ?? ""}»`;
+      return `«${messageOf(task, meId) ?? ""}»`;
     case "review":
       return task.completed_at ? `сдана ${humanAqtobe(new Date(task.completed_at), now)}` : "сдана";
     default:
@@ -79,7 +81,7 @@ function contextOf(task: BoardTask, lane: Lane, now: Date): string {
  * of context the lane needs, and the director's quick actions right on the tile. A tap
  * on the text opens the full card in place; the tile never navigates on its own.
  */
-export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, readOnly = false, anonymized = false }: TaskTileProps) {
+export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, readOnly = false, anonymized = false }: TaskTileProps) {
   const [rework, setRework] = useState(false);
   const tone: Tone = leaving ? (task.status === "done" ? "gold" : "muted") : LANE_TONE[lane];
   const color = TONE_VAR[tone];
@@ -140,7 +142,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
               {header}
               <span className="mt-1.5 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
               <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" ? "var(--text-muted)" : color }}>
-                {contextOf(task, lane, now)}
+                {contextOf(task, lane, now, meId)}
               </span>
             </button>
           ) : (
@@ -148,7 +150,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
               {header}
               <span className="mt-1.5 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
               <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" || leaving ? "var(--text-muted)" : color }}>
-                {contextOf(task, lane, now)}
+                {contextOf(task, lane, now, meId)}
               </span>
             </div>
           )}

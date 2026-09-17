@@ -22,6 +22,8 @@ import {
 
 // 2026-09-11 09:30 Aqtobe (UTC+5)
 const NOW = new Date("2026-09-11T04:30:00Z");
+/** Who reads the board in these tests: the director, author of every fixture row. */
+const ME = "d";
 
 let seq = 0;
 
@@ -63,21 +65,21 @@ function row(
 
 describe("laneOf", () => {
   it("sorts by what the task needs, in D-05 order", () => {
-    expect(laneOf(row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-10T13:00:00Z" }), NOW)).toBe("overdue");
-    expect(laneOf(row("b", "Смета", "Ерлан", "declined"), NOW)).toBe("declined");
-    expect(laneOf(row("c", "КП", "Динара", "accepted", { question: "Когда?", question_id: "m1" }), NOW)).toBe("question");
-    expect(laneOf(row("d", "КП", "Марат", "pending_review"), NOW)).toBe("review");
-    expect(laneOf(row("e", "КП", "Марат", "sent"), NOW)).toBe("work");
-    expect(laneOf(row("f", "КП", "Марат", "done"), NOW)).toBeNull();
+    expect(laneOf(row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-10T13:00:00Z" }), NOW, ME)).toBe("overdue");
+    expect(laneOf(row("b", "Смета", "Ерлан", "declined"), NOW, ME)).toBe("declined");
+    expect(laneOf(row("c", "КП", "Динара", "accepted", { question: "Когда?", question_id: "m1" }), NOW, ME)).toBe("question");
+    expect(laneOf(row("d", "КП", "Марат", "pending_review"), NOW, ME)).toBe("review");
+    expect(laneOf(row("e", "КП", "Марат", "sent"), NOW, ME)).toBe("work");
+    expect(laneOf(row("f", "КП", "Марат", "done"), NOW, ME)).toBeNull();
   });
 
   it("an overdue task with a question is overdue first", () => {
     const task = row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-10T13:00:00Z", question: "Что?", question_id: "m" });
-    expect(laneOf(task, NOW)).toBe("overdue");
+    expect(laneOf(task, NOW, ME)).toBe("overdue");
   });
 
   it("a task on review is never overdue", () => {
-    expect(laneOf(row("a", "Отчёт", "Марат", "pending_review", { deadline: "2026-09-10T13:00:00Z" }), NOW)).toBe("review");
+    expect(laneOf(row("a", "Отчёт", "Марат", "pending_review", { deadline: "2026-09-10T13:00:00Z" }), NOW, ME)).toBe("review");
   });
 });
 
@@ -90,6 +92,7 @@ describe("lanesOf / countsOf", () => {
         row("soon", "Скоро", "Марат", "accepted", { deadline: "2026-09-11T13:00:00Z" }),
       ],
       NOW,
+      ME,
     );
     expect(lanes.work.map((t) => t.id)).toEqual(["soon", "late", "none"]);
     expect(countsOf(lanes)).toEqual({ overdue: 0, declined: 0, question: 0, review: 0, work: 3, attention: 0 });
@@ -150,26 +153,26 @@ describe("applyMessage", () => {
   const board = [row("a", "КП", "Марат", "accepted")];
 
   it("opens a question, then closes it on its answered update", () => {
-    const opened = applyMessage(board, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" }) as BoardTask[];
+    const opened = applyMessage(board, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" }, ME) as BoardTask[];
     expect(opened[0]!.question).toBe("Какой формат?");
     expect(opened[0]!.question_id).toBe("m1");
     // the same insert echoed by the settle snapshot is not a change
-    expect(applyMessage(opened, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" })).toBeNull();
-    const closed = applyMessage(opened, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true, answered_at: "2026-09-11T04:05:00Z" }, created_at: "2026-09-11T04:00:00Z" }) as BoardTask[];
+    expect(applyMessage(opened, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" }, ME)).toBeNull();
+    const closed = applyMessage(opened, { id: "m1", task_id: "a", content: "Какой формат?", meta: { is_question: true, answered_at: "2026-09-11T04:05:00Z" }, created_at: "2026-09-11T04:00:00Z" }, ME) as BoardTask[];
     expect(closed[0]!.question).toBeNull();
   });
 
   it("an older question never replaces a newer one", () => {
     const withNew = [row("a", "КП", "Марат", "accepted", { question: "Новый?", question_id: "m2", question_at: "2026-09-11T04:10:00Z" })];
-    expect(applyMessage(withNew, { id: "m1", task_id: "a", content: "Старый?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" })).toBeNull();
+    expect(applyMessage(withNew, { id: "m1", task_id: "a", content: "Старый?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" }, ME)).toBeNull();
   });
 
   it("lands a decline reason and ignores messages of tasks off the board", () => {
-    const rows = applyMessage(board, { id: "r1", task_id: "a", content: "Занят срочным", meta: { decline_reason: true }, created_at: "2026-09-11T04:00:00Z" }) as BoardTask[];
+    const rows = applyMessage(board, { id: "r1", task_id: "a", content: "Занят срочным", meta: { decline_reason: true }, created_at: "2026-09-11T04:00:00Z" }, ME) as BoardTask[];
     expect(rows[0]!.decline_reason).toBe("Занят срочным");
-    expect(applyMessage(board, { id: "x", task_id: "zzz", content: "?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" })).toBeNull();
+    expect(applyMessage(board, { id: "x", task_id: "zzz", content: "?", meta: { is_question: true }, created_at: "2026-09-11T04:00:00Z" }, ME)).toBeNull();
     // plain chat is not a board fact
-    expect(applyMessage(board, { id: "c", task_id: "a", content: "Ок", meta: {}, created_at: "2026-09-11T04:00:00Z" })).toBeNull();
+    expect(applyMessage(board, { id: "c", task_id: "a", content: "Ок", meta: {}, created_at: "2026-09-11T04:00:00Z" }, ME)).toBeNull();
   });
 });
 
@@ -177,44 +180,44 @@ describe("describeChange", () => {
   const sent = row("a", "КП по Казхрому", "Марат", "sent");
 
   it("agrees the verb with «задача», never with the person", () => {
-    expect(describeChange(sent, { ...sent, status: "accepted" }, NOW)?.text).toBe("Марат: задача «КП по Казхрому» принята в работу");
-    expect(describeChange(sent, { ...sent, status: "pending_review" }, NOW)?.text).toBe("Марат: задача «КП по Казхрому» сдана, ждёт приёмки");
-    expect(describeChange(sent, { ...sent, status: "rework" }, NOW)?.text).toBe("Марат: задача «КП по Казхрому» на доработке");
+    expect(describeChange(sent, { ...sent, status: "accepted" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» принята в работу");
+    expect(describeChange(sent, { ...sent, status: "pending_review" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» сдана, ждёт приёмки");
+    expect(describeChange(sent, { ...sent, status: "rework" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» на доработке");
   });
 
   it("a refusal carries its reason in running text, also when the reason lands later", () => {
     const declined = { ...sent, status: "declined" as const };
-    expect(describeChange(sent, declined, NOW)).toEqual({ text: "Марат не может «КП по Казхрому»", tone: "warn" });
+    expect(describeChange(sent, declined, NOW, ME)).toEqual({ text: "Марат не может «КП по Казхрому»", tone: "warn" });
     const reasoned = { ...declined, decline_reason: "Занят срочным" };
-    expect(describeChange(declined, reasoned, NOW)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
-    expect(describeChange(sent, reasoned, NOW)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
+    expect(describeChange(declined, reasoned, NOW, ME)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
+    expect(describeChange(sent, reasoned, NOW, ME)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
   });
 
   it("a question quotes the words, its answer closes it", () => {
     const asked = { ...sent, question: "Какой формат?", question_id: "m1", question_at: "x" };
-    expect(describeChange(sent, asked, NOW)?.text).toBe("Марат спрашивает по «КП по Казхрому»: «Какой формат?»");
-    expect(describeChange(asked, sent, NOW)?.text).toBe("Марат: вопрос по «КП по Казхрому» закрыт");
+    expect(describeChange(sent, asked, NOW, ME)?.text).toBe("Марат спрашивает по «КП по Казхрому»: «Какой формат?»");
+    expect(describeChange(asked, sent, NOW, ME)?.text).toBe("Марат: вопрос по «КП по Казхрому» закрыт");
   });
 
   it("the director's own steps read as done deeds", () => {
     const review = { ...sent, status: "pending_review" as const };
-    expect(describeChange(review, { ...review, status: "done" }, NOW)).toEqual({ text: "Принято: «КП по Казхрому»", tone: "ok" });
-    expect(describeChange(sent, { ...sent, status: "revoked" }, NOW)?.text).toBe("Задача «КП по Казхрому» отозвана");
-    expect(describeChange({ ...sent, status: "declined" }, sent, NOW)?.text).toBe("Марат: задача «КП по Казхрому» отправлена снова");
-    expect(describeChange(sent, { ...sent, deadline: "2026-09-12T08:00:00Z" }, NOW)?.text).toBe("Марат: задача «КП по Казхрому» до завтра 13:00");
+    expect(describeChange(review, { ...review, status: "done" }, NOW, ME)).toEqual({ text: "Принято: «КП по Казхрому»", tone: "ok" });
+    expect(describeChange(sent, { ...sent, status: "revoked" }, NOW, ME)?.text).toBe("Задача «КП по Казхрому» отозвана");
+    expect(describeChange({ ...sent, status: "declined" }, sent, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» отправлена снова");
+    expect(describeChange(sent, { ...sent, deadline: "2026-09-12T08:00:00Z" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» до завтра 13:00");
   });
 
   it("a new task on the board, nothing for a pruned row or an untouched one", () => {
-    expect(describeChange(undefined, sent, NOW)?.text).toBe("Марат: новая задача «КП по Казхрому»");
-    expect(describeChange(undefined, { ...sent, status: "done" }, NOW)).toBeNull();
-    expect(describeChange(sent, undefined, NOW)).toBeNull();
-    expect(describeChange(sent, { ...sent }, NOW)).toBeNull();
+    expect(describeChange(undefined, sent, NOW, ME)?.text).toBe("Марат: новая задача «КП по Казхрому»");
+    expect(describeChange(undefined, { ...sent, status: "done" }, NOW, ME)).toBeNull();
+    expect(describeChange(sent, undefined, NOW, ME)).toBeNull();
+    expect(describeChange(sent, { ...sent }, NOW, ME)).toBeNull();
   });
 
   it("describeChanges walks the whole board in order", () => {
     const before = [sent, row("b", "Смета", "Ерлан", "accepted")];
     const after = [{ ...before[0]!, status: "accepted" as const }, { ...before[1]!, status: "pending_review" as const }];
-    expect(describeChanges(before, after, NOW).map((p) => p.text)).toEqual([
+    expect(describeChanges(before, after, NOW, ME).map((p) => p.text)).toEqual([
       "Марат: задача «КП по Казхрому» принята в работу",
       "Ерлан: задача «Смета» сдана, ждёт приёмки",
     ]);
@@ -230,12 +233,13 @@ describe("openingLine", () => {
         row("r2", "Смета", "Марат", "pending_review"),
       ],
       NOW,
+      ME,
     );
     expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 просрочка, 2 на приёмке.", tone: "danger" });
   });
 
   it("greets and says it is quiet otherwise, with the nearest deadline", () => {
-    const lanes = lanesOf([row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-11T13:00:00Z" })], NOW);
+    const lanes = lanesOf([row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-11T13:00:00Z" })], NOW, ME);
     expect(openingLine(lanes, NOW, "Асхат")).toEqual({
       text: "Доброе утро, Асхат. Пока тихо. 1 задача в работе, ближайший срок сегодня 18:00 (Марат, «Отчёт»).",
       tone: "ok",
@@ -262,39 +266,59 @@ describe("messages of the thread (D-61)", () => {
 
   it("an employee's last word above the cursor is unread; the director's last word is not", () => {
     const task = row("a", "Отчёт", "Марат", "accepted", { last_message: said("m1", marat, 3), seen_seq: 2 });
-    expect(hasUnread(task)).toBe(true);
-    expect(laneOf(task, NOW)).toBe("question");
-    expect(messageOf(task)).toBe("Готово, отчёт в папке");
-    expect(hasUnread({ ...task, seen_seq: 3 })).toBe(false);
-    expect(hasUnread({ ...task, last_message: said("m2", director, 4) })).toBe(false);
+    expect(hasUnread(task, ME)).toBe(true);
+    expect(laneOf(task, NOW, ME)).toBe("question");
+    expect(messageOf(task, ME)).toBe("Готово, отчёт в папке");
+    expect(hasUnread({ ...task, seen_seq: 3 }, ME)).toBe(false);
+    expect(hasUnread({ ...task, last_message: said("m2", director, 4) }, ME)).toBe(false);
+  });
+
+  it("a manager's word counts too; my own never does", () => {
+    const dinara = "u-Динара";
+    const task = row("a", "Отчёт", "Марат", "accepted", { last_message: said("m1", dinara, 3, "Сроки сдвинулись"), seen_seq: 2 });
+    // the sender is neither me nor the assignee — a manager writes in the thread as well (§0 п.6)
+    expect(hasUnread(task, ME)).toBe(true);
+    expect(messageOf(task, ME)).toBe("Сроки сдвинулись");
+    expect(hasUnread({ ...task, last_message: said("m2", ME, 4, "Понял") }, ME)).toBe(false);
+    // and the employee reading the same row sees the manager's word as unread too
+    expect(hasUnread(task, marat)).toBe(true);
+  });
+
+  it("my own message moves my cursor, somebody else's does not", () => {
+    const board = [row("a", "Отчёт", "Марат", "accepted", { seen_seq: 1 })];
+    const mine = applyMessage(board, { id: "m1", task_id: "a", content: "Жду отчёт", meta: {}, created_at: "2026-09-11T04:02:00Z", type: "text", sender_id: ME, seq: 2 }, ME) as BoardTask[];
+    expect(mine[0]!.seen_seq).toBe(2);
+    const theirs = applyMessage(mine, { id: "m2", task_id: "a", content: "Готово", meta: {}, created_at: "2026-09-11T04:03:00Z", type: "text", sender_id: marat, seq: 3 }, ME) as BoardTask[];
+    expect(theirs[0]!.seen_seq).toBe(2);
+    expect(hasUnread(theirs[0]!, ME)).toBe(true);
   });
 
   it("a plain message over the socket becomes the last word; the director's reply moves the cursor", () => {
     const board = [row("a", "Отчёт", "Марат", "accepted", { seen_seq: 1 })];
-    const heard = applyMessage(board, { id: "m1", task_id: "a", content: "Сделал", meta: {}, created_at: "2026-09-11T04:02:00Z", type: "text", sender_id: marat, seq: 2 }) as BoardTask[];
+    const heard = applyMessage(board, { id: "m1", task_id: "a", content: "Сделал", meta: {}, created_at: "2026-09-11T04:02:00Z", type: "text", sender_id: marat, seq: 2 }, ME) as BoardTask[];
     expect(heard[0]!.last_message?.id).toBe("m1");
-    expect(hasUnread(heard[0]!)).toBe(true);
-    const replied = applyMessage(heard, { id: "m2", task_id: "a", content: "Ок", meta: {}, created_at: "2026-09-11T04:03:00Z", type: "text", sender_id: director, seq: 3 }) as BoardTask[];
+    expect(hasUnread(heard[0]!, ME)).toBe(true);
+    const replied = applyMessage(heard, { id: "m2", task_id: "a", content: "Ок", meta: {}, created_at: "2026-09-11T04:03:00Z", type: "text", sender_id: director, seq: 3 }, ME) as BoardTask[];
     expect(replied[0]!.last_message?.id).toBe("m2");
     expect(replied[0]!.seen_seq).toBe(3);
-    expect(hasUnread(replied[0]!)).toBe(false);
+    expect(hasUnread(replied[0]!, ME)).toBe(false);
     // a status line is not a word of the thread
-    expect(applyMessage(replied, { id: "s", task_id: "a", content: null, meta: { new_status: "done" }, created_at: "2026-09-11T04:04:00Z", type: "status_change", sender_id: marat, seq: 4 })).toBeNull();
+    expect(applyMessage(replied, { id: "s", task_id: "a", content: null, meta: { new_status: "done" }, created_at: "2026-09-11T04:04:00Z", type: "status_change", sender_id: marat, seq: 4 }, ME)).toBeNull();
   });
 
   it("«Прочитал» moves the cursor and nothing else", () => {
     const board = [row("a", "Отчёт", "Марат", "accepted", { last_message: said("m1", marat, 3), seen_seq: 0 })];
     const read = applyRead(board, "a", 3) as BoardTask[];
     expect(read[0]!.seen_seq).toBe(3);
-    expect(hasUnread(read[0]!)).toBe(false);
+    expect(hasUnread(read[0]!, ME)).toBe(false);
     expect(applyRead(read, "a", 2)).toBeNull();
   });
 
   it("the assistant quotes an unread message, but not the question twice", () => {
     const before = row("a", "Отчёт", "Марат", "accepted");
     const after = { ...before, last_message: said("m1", marat, 3, "Готово, отчёт в папке на диске") };
-    expect(describeChange(before, after, NOW)?.text).toBe("Марат пишет по «Отчёт»: «Готово, отчёт в папке на диске»");
+    expect(describeChange(before, after, NOW, ME)?.text).toBe("Марат пишет по «Отчёт»: «Готово, отчёт в папке на диске»");
     const asked = { ...before, question: "Какой формат?", question_id: "m9", question_at: "x", last_message: said("m9", marat, 4, "Какой формат?") };
-    expect(describeChange(before, asked, NOW)?.text).toBe("Марат спрашивает по «Отчёт»: «Какой формат?»");
+    expect(describeChange(before, asked, NOW, ME)?.text).toBe("Марат спрашивает по «Отчёт»: «Какой формат?»");
   });
 });

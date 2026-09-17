@@ -1,5 +1,5 @@
 import { greeting, quoteTitle } from "./briefing";
-import { CHAT_TYPES, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
+import { hasUnread, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -16,12 +16,6 @@ export function isTodo(task: Pick<BoardTask, "status">): boolean {
 /** «Дела»: everything the person has on their hands — to accept, to redo, in work. */
 export function isOpenFor(task: Pick<BoardTask, "status">): boolean {
   return task.status === "sent" || task.status === "rework" || task.status === "accepted" || task.status === "in_progress";
-}
-
-/** An unread word from the other side of the thread: not mine, above my cursor. */
-export function hasUnreadFor(task: Pick<BoardTask, "last_message" | "seen_seq">, meId: string): boolean {
-  const last = task.last_message;
-  return Boolean(last && CHAT_TYPES.includes(last.type) && last.sender_id !== meId && last.seq > task.seen_seq);
 }
 
 const WORDS_MAX = 80;
@@ -75,7 +69,7 @@ export function describeForEmployee(prev: BoardTask | undefined, next: BoardTask
     }
   }
   if (next.deadline !== prev.deadline && next.deadline) return { text: `Срок ${title} перенесён`, tone: "muted" };
-  if (hasUnreadFor(next, meId) && next.last_message!.id !== prev.last_message?.id) {
+  if (hasUnread(next, meId) && next.last_message!.id !== prev.last_message?.id) {
     const last = next.last_message!;
     const words = last.type === "photo" ? "фото" : last.type === "voice" ? "голосовое" : (last.content ?? "");
     return { text: `Директор пишет по ${title}: «${short(words)}»`, tone: "warn" };

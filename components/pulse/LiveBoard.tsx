@@ -42,6 +42,8 @@ export type LiveBoardProps = {
   since: string;
   actions: TaskActions;
   companyId: string;
+  /** Who is reading: their own cursor decides what counts as an unread message. */
+  meId: string;
   readOnly?: boolean;
   anonymized?: boolean;
 };
@@ -52,12 +54,12 @@ export type LiveBoardProps = {
  * its new lane when its task changes; a closed one flashes its goodbye and leaves. State
  * is the board's; the assistant above only comments.
  */
-export function LiveBoard({ rows, now, since, actions, companyId, readOnly = false, anonymized = false }: LiveBoardProps) {
+export function LiveBoard({ rows, now, since, actions, companyId, meId, readOnly = false, anonymized = false }: LiveBoardProps) {
   const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const open = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status)), [rows]);
-  const lanes = useMemo(() => lanesOf(open, now), [open, now]);
+  const lanes = useMemo(() => lanesOf(open, now, meId), [open, now, meId]);
   const counts = countsOf(lanes);
 
   // A closed row is remembered here for its goodbye, independently of the cache: the
@@ -148,6 +150,7 @@ export function LiveBoard({ rows, now, since, actions, companyId, readOnly = fal
       task={task}
       lane={lane}
       now={now}
+      meId={meId}
       fresh={task.updated_at > since}
       leaving={leaving.has(task.id)}
       expanded={expanded === task.id}

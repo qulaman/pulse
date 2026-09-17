@@ -26,6 +26,7 @@ import {
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 import { isOverdue, type TaskStatus } from "./status-text";
+import { applyMessageUpdate } from "./thread";
 
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 export type TaskMessageRow = Database["public"]["Tables"]["task_messages"]["Row"];
@@ -239,9 +240,16 @@ export function useTaskMessages(taskId: string) {
       return mergeBySeq(cached, (data ?? []) as unknown as TaskMessage[]);
     },
     channel: { table: "task_messages", filter: `task_id=eq.${taskId}` },
-    onEvent: (_payload, client) => {
-      // The payload carries no joined sender name, and an UPDATE may be the
-      // answered_at stamp on an older question — go back through the cursor.
+    onEvent: (payload, client) => {
+      if (payload.eventType === "UPDATE") {
+        // An UPDATE is the answered_at stamp on a question (or a transcript landing on a
+        // voice message): the payload is the whole row, so the cached row is patched in
+        // place. An invalidate here would repaint the thread the person is reading (Д-2).
+        client.setQueryData<TaskMessage[]>(queryKey, (old) => applyMessageUpdate(old, payload.new as TaskMessageRow));
+        return;
+      }
+      // An INSERT carries no joined sender name, a DELETE carries no row at all —
+      // go back through the cursor.
       void client.invalidateQueries({ queryKey });
     },
   });
@@ -285,13 +293,17 @@ type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage
  * Everything on the board in one request: tasks in work or waiting for the director,
  * each with the messages that matter to the board (open questions, decline reasons).
  * Company scoping is RLS's job — a director sees their company and nothing else.
+ * An employee asks for their own rows only: RLS would also hand a manager their
+ * subordinates', and Лента is about the person (the same narrowing as useMyTasks).
  */
-async function fetchBoard(): Promise<BoardTask[]> {
+async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
   const supabase = createBrowserSupabase();
-  const { data, error } = await supabase
+  let request = supabase
     .from("tasks")
     .select(BOARD_SELECT)
-    .in("status", [...BOARD_STATUSES])
+    .in("status", [...BOARD_STATUSES]);
+  if (assigneeId) request = request.eq("assignee_id", assigneeId);
+  const { data, error } = await request
     .or("meta->>is_question.eq.true,meta->>decline_reason.eq.true", { referencedTable: "notes" })
     .order("created_at", { referencedTable: "notes", ascending: false })
     .in("last.type", [...CHAT_TYPES])
@@ -320,15 +332,20 @@ function scheduleBoardRefetch(queryClient: QueryClient) {
  * `task_messages` event lands a question or a reason the same way. Closed rows keep
  * their closed status until the screen has said goodbye (`pruneClosed`).
  */
-export function usePulseBoard(enabled = true) {
+export function usePulseBoard(me: Me | undefined, enabled = true) {
   const queryKey = taskKeys.board();
   const queryClient = useQueryClient();
+  const meId = me?.userId ?? "";
+  // the employee's own rows, on the socket as in the query; the director and the
+  // manager take the whole company and let RLS decide
+  const assigneeId = me?.role === "employee" ? meId : undefined;
+  const live = enabled && Boolean(me);
 
   const query = useRealtimeQuery<BoardTask[], TaskRow>({
     queryKey,
-    queryFn: fetchBoard,
-    channel: { table: "tasks" },
-    enabled,
+    queryFn: () => fetchBoard(assigneeId),
+    channel: { table: "tasks", filter: assigneeId ? `assignee_id=eq.${assigneeId}` : undefined },
+    enabled: live,
     onEvent: (payload, client) => {
       if (payload.eventType === "DELETE") {
         const id = (payload.old as Partial<TaskRow>).id;
@@ -344,6 +361,10 @@ export function usePulseBoard(enabled = true) {
     },
   });
 
+  // No filter on this channel on purpose: a `task_messages` row carries no assignee_id,
+  // so there is nothing to narrow it by. RLS cuts it on the server — the socket only ever
+  // delivers messages of threads the reader is part of — and applyMessage drops whatever
+  // belongs to a task the board does not hold.
   useRealtimeListener<TaskMessageRow>(
     { table: "task_messages" },
     (payload) => {
@@ -351,13 +372,13 @@ export function usePulseBoard(enabled = true) {
       const message = payload.new as TaskMessageRow;
       const cached = queryClient.getQueryData<BoardTask[]>(queryKey);
       if (!cached) return;
-      const next = applyMessage(cached, message);
+      const next = applyMessage(cached, message, meId);
       if (next) queryClient.setQueryData(queryKey, next);
     },
     // the settle snapshot after a (re)subscribe belongs to the tasks channel; nothing to do here
     () => {},
     "board-messages",
-    enabled,
+    live,
   );
 
   return query;
@@ -374,8 +395,8 @@ export function pruneClosed(queryClient: QueryClient, taskId: string) {
 }
 
 /** The board as the four stacks of D-05 — derived, never fetched on its own. */
-export function inboxOf(rows: readonly BoardTask[], now: Date): DirectorInbox {
-  const lanes = lanesOf(rows, now);
+export function inboxOf(rows: readonly BoardTask[], now: Date, meId: string): DirectorInbox {
+  const lanes = lanesOf(rows, now, meId);
   return {
     overdue: lanes.overdue,
     declined: lanes.declined,
@@ -385,10 +406,11 @@ export function inboxOf(rows: readonly BoardTask[], now: Date): DirectorInbox {
   };
 }
 
-export function useDirectorInbox(enabled = true) {
-  const board = usePulseBoard(enabled);
+export function useDirectorInbox(me: Me | undefined, enabled = true) {
+  const board = usePulseBoard(me, enabled);
   const rows = board.data;
-  const data = useMemo(() => (rows ? inboxOf(rows, new Date()) : undefined), [rows]);
+  const meId = me?.userId ?? "";
+  const data = useMemo(() => (rows ? inboxOf(rows, new Date(), meId) : undefined), [rows, meId]);
   return { data, isLoading: board.isLoading, isError: board.isError };
 }
 

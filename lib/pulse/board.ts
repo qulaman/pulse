@@ -22,7 +22,7 @@ export type BoardTask = TaskWithPeople & {
   decline_reason: string | null;
   /** The newest message of the thread that is not a status line — who wrote it and what. */
   last_message: BoardMessage | null;
-  /** The director's read cursor on the thread (D-61): messages above it are unread. */
+  /** The reader's own read cursor on the thread (D-61): messages above it are unread. */
   seen_seq: number;
 };
 
@@ -94,24 +94,25 @@ export function toBoardTask(task: TaskWithPeople, notes: BoardNote[], last: Boar
 }
 
 /**
- * An employee's message the director has not seen: the thread's last real message is
- * the assignee's and sits above the director's cursor. A message from the director
- * (or a manager) closes the matter — the last word is theirs.
+ * A word of the thread the reader has not seen: the last real message is somebody
+ * else's and sits above their cursor. Whoever reads the board asks for themselves —
+ * the director, the manager who also writes in the thread, the employee on Лента.
+ * One's own last word is never unread, and a status line is not a word at all.
  */
-export function hasUnread(task: Pick<BoardTask, "last_message" | "seen_seq" | "assignee_id">): boolean {
+export function hasUnread(task: Pick<BoardTask, "last_message" | "seen_seq">, meId: string): boolean {
   const last = task.last_message;
-  return Boolean(last && last.sender_id === task.assignee_id && last.seq > task.seen_seq);
+  return Boolean(last && CHAT_TYPES.includes(last.type) && last.sender_id !== meId && last.seq > task.seen_seq);
 }
 
-/** The task carries a message for the director: an open question, or an unread one. */
-export function hasMessage(task: BoardTask): boolean {
-  return Boolean(task.question) || hasUnread(task);
+/** The task carries a message for the reader: an open question, or an unread one. */
+export function hasMessage(task: BoardTask, meId: string): boolean {
+  return Boolean(task.question) || hasUnread(task, meId);
 }
 
 /** What the card shows as the message: the open question first, else the unread words. */
-export function messageOf(task: BoardTask): string | null {
+export function messageOf(task: BoardTask, meId: string): string | null {
   if (task.question) return task.question;
-  if (!hasUnread(task)) return null;
+  if (!hasUnread(task, meId)) return null;
   const last = task.last_message!;
   if (last.type === "photo") return last.content ? `фото: ${last.content}` : "фото";
   if (last.type === "voice") return last.content ? `голосовое: ${last.content}` : "голосовое";
@@ -119,11 +120,11 @@ export function messageOf(task: BoardTask): string | null {
 }
 
 /** Where a task sits; null once it has left the board. First match wins, in D-05 order. */
-export function laneOf(task: BoardTask, now: Date): Lane | null {
+export function laneOf(task: BoardTask, now: Date, meId: string): Lane | null {
   if (!isOnBoard(task.status)) return null;
   if (isOverdue(task, now)) return "overdue";
   if (task.status === "declined") return "declined";
-  if (hasMessage(task)) return "question";
+  if (hasMessage(task, meId)) return "question";
   if (task.status === "pending_review") return "review";
   return "work";
 }
@@ -145,10 +146,10 @@ export function emptyLanes(): Lanes {
   return { overdue: [], declined: [], question: [], review: [], work: [] };
 }
 
-export function lanesOf(rows: readonly BoardTask[], now: Date): Lanes {
+export function lanesOf(rows: readonly BoardTask[], now: Date, meId: string): Lanes {
   const lanes = emptyLanes();
   for (const task of rows) {
-    const lane = laneOf(task, now);
+    const lane = laneOf(task, now, meId);
     if (lane) lanes[lane].push(task);
   }
   for (const lane of LANE_ORDER) lanes[lane].sort((a, b) => compareUrgency(a, b, now));
@@ -235,17 +236,18 @@ export function withoutTask(board: readonly BoardTask[], taskId: string): BoardT
 export function applyMessage(
   board: readonly BoardTask[],
   message: Pick<TaskMessageRow, "id" | "task_id" | "content" | "meta" | "created_at"> & Partial<Pick<TaskMessageRow, "type" | "sender_id" | "seq">>,
+  meId: string,
 ): BoardTask[] | null {
   const index = board.findIndex((task) => task.id === message.task_id);
   if (index === -1) return null;
   const current = board[index]!;
   let next: BoardTask | null = null;
 
-  // any real message becomes the thread's last word; the director's own word also moves the cursor
+  // any real message becomes the thread's last word; my own word also moves my cursor
   if (message.type && CHAT_TYPES.includes(message.type) && message.sender_id && typeof message.seq === "number") {
     if (!current.last_message || message.seq > current.last_message.seq) {
       const last: BoardMessage = { id: message.id, content: message.content, type: message.type, sender_id: message.sender_id, seq: message.seq, created_at: message.created_at };
-      next = { ...current, last_message: last, seen_seq: message.sender_id === current.assignee_id ? current.seen_seq : Math.max(current.seen_seq, message.seq) };
+      next = { ...current, last_message: last, seen_seq: message.sender_id === meId ? Math.max(current.seen_seq, message.seq) : current.seen_seq };
     }
   }
   const base = next ?? current;
@@ -303,7 +305,7 @@ function lowerFirst(text: string): string {
  * happened, the tile shows the state. Every verb agrees with «задача», never with
  * the person («задача сдана», not «Марат сдал»): names give no gender.
  */
-export function describeChange(prev: BoardTask | undefined, next: BoardTask | undefined, now: Date): Phrase | null {
+export function describeChange(prev: BoardTask | undefined, next: BoardTask | undefined, now: Date, meId: string): Phrase | null {
   if (!prev && !next) return null;
   if (!prev && next) {
     if (!isOnBoard(next.status)) return null;
@@ -349,8 +351,8 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
   if (!after.question && before.question) {
     return { text: `${who}: вопрос по ${title} закрыт`, tone: "muted" };
   }
-  if (hasUnread(after) && after.last_message!.id !== before.last_message?.id && after.last_message!.id !== after.question_id) {
-    const words = messageOf(after) ?? "";
+  if (hasUnread(after, meId) && after.last_message!.id !== before.last_message?.id && after.last_message!.id !== after.question_id) {
+    const words = messageOf(after, meId) ?? "";
     return { text: `${who} пишет по ${title}: «${shortQuestion(words)}»`, tone: "warn" };
   }
   if (after.deadline !== before.deadline) {
@@ -364,11 +366,11 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
 }
 
 /** Every change between two boards, in board order — the last one is what the assistant says. */
-export function describeChanges(prev: readonly BoardTask[], next: readonly BoardTask[], now: Date): Phrase[] {
+export function describeChanges(prev: readonly BoardTask[], next: readonly BoardTask[], now: Date, meId: string): Phrase[] {
   const before = new Map(prev.map((task) => [task.id, task]));
   const phrases: Phrase[] = [];
   for (const task of next) {
-    const phrase = describeChange(before.get(task.id), task, now);
+    const phrase = describeChange(before.get(task.id), task, now, meId);
     if (phrase) phrases.push(phrase);
   }
   return phrases;

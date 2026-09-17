@@ -50,11 +50,12 @@ const THOUGHT_MS = 9_000;
  */
 export default function PulsePage() {
   const me = useMe();
-  const board = usePulseBoard();
+  const board = usePulseBoard(me.data);
   const since = useLastVisit();
   const now = useNow();
   const actions = useTaskActions(me.data);
   const companyId = me.data?.companyId ?? "";
+  const meId = me.data?.userId ?? "";
   const directorName = firstNameOf(me.data?.fullName);
 
   const stage = useIngestStore((state) => state.stage);
@@ -68,9 +69,9 @@ export default function PulsePage() {
 
   const loading = me.isLoading || board.isLoading;
   const rows = board.data;
-  const lanes = useMemo(() => lanesOf(rows ?? [], now), [rows, now]);
+  const lanes = useMemo(() => lanesOf(rows ?? [], now, meId), [rows, now, meId]);
   const counts = countsOf(lanes);
-  const speech = useSpeech(rows, lanes, now, directorName);
+  const speech = useSpeech(rows, lanes, now, directorName, meId);
   const wide = useMediaQuery("(min-width: 640px)");
   const showHint = useLeverHint();
 
@@ -82,7 +83,7 @@ export default function PulsePage() {
 
   // every open task on the ball (in work included), coloured by the worst of them; messages are counted apart
   const taskCount = counts.overdue + counts.declined + counts.review + counts.work;
-  const messageTasks = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status) && hasMessage(task)), [rows]);
+  const messageTasks = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status) && hasMessage(task, meId)), [rows, meId]);
   const balls = useMemo<OrbitBall[]>(
     () => [
       {
@@ -228,7 +229,7 @@ export default function PulsePage() {
             {serviceLines}
           </Assistant>
         </div>
-        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} />
+        <LiveBoard rows={rows} now={now} since={since} actions={actions} companyId={companyId} meId={meId} />
         <EtherSection variant="director" />
       </main>
     );
@@ -275,14 +276,14 @@ export default function PulsePage() {
               taskCount === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
               ) : (
-                <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} />
+                <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} focus={null} />
               )
             ) : null}
             {panel === "messages" ? (
               messageTasks.length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
               ) : (
-                <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} focus={null} showWork={false} />
+                <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} focus={null} showWork={false} />
               )
             ) : null}
             {panel === "ether" ? (

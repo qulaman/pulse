@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase } from "@/lib/pulse/board";
 
@@ -24,10 +24,13 @@ export type Voice = {
 };
 
 /** The director's voice: the verdict on opening, the board's changes as facts. */
-const DIRECTOR_VOICE: Voice = { opening: openingLine, describe: describeChanges };
-
-export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string) {
-  return useSpeechWith(rows, lanes, now, directorName, DIRECTOR_VOICE);
+export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string, meId: string) {
+  // «Марат пишет по …» is a message the reader has not seen — the reader is the director
+  const voice = useMemo<Voice>(
+    () => ({ opening: openingLine, describe: (prev, next, at) => describeChanges(prev, next, at, meId) }),
+    [meId],
+  );
+  return useSpeechWith(rows, lanes, now, directorName, voice);
 }
 
 export function useSpeechWith(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string, voice: Voice) {

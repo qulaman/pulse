@@ -48,6 +48,8 @@ export type CardDeckProps = {
   since: string;
   actions: TaskActions;
   companyId: string;
+  /** Who is reading: their own cursor decides what counts as an unread message. */
+  meId: string;
   /** A tap on a ball: that task's card comes to the top ("work" — the closing card). */
   focus: { id: string; key: number } | null;
   /** The card on top changed (a swipe): the ball to light up, "work" for the closing card. */
@@ -63,7 +65,7 @@ export type CardDeckProps = {
  * put the card at the end, tap to open the full card, hold for the quick menu. The
  * calm lane is one closing card that opens «Задачи».
  */
-export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurrentChange, showWork = true }: CardDeckProps) {
+export function CardDeck({ lanes, now, since, actions, companyId, meId, focus, onCurrentChange, showWork = true }: CardDeckProps) {
   const [postponed, setPostponed] = useState<string[]>([]);
   const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
@@ -280,6 +282,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, focus, onCurre
                   onToggle={() => setOpen(item.task)}
                   actions={actions}
                   companyId={companyId}
+                  meId={meId}
                 />
               ) : (
                 <WorkCard tasks={item.tasks} />

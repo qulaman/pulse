@@ -16,8 +16,8 @@ import { PushCard } from "@/components/push/PushCard";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { Chip } from "@/components/ui/Chip";
 import { useEther } from "@/lib/ether/queries";
-import { isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
-import { describeForEmployeeAll, employeeOpening, hasUnreadFor, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
+import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
+import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
 import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -41,7 +41,7 @@ const THOUGHT_MS = 9_000;
 export default function FeedPage() {
   const me = useMe();
   const meId = me.data?.userId ?? "";
-  const board = usePulseBoard(Boolean(meId)); // RLS narrows the board to the person's own tasks
+  const board = usePulseBoard(me.data); // the query and the socket ask for the person's own tasks
   const now = useNow();
   const actions = useTaskActions(me.data);
   const companyId = me.data?.companyId ?? "";
@@ -51,7 +51,7 @@ export default function FeedPage() {
   const rows = board.data;
   const loading = me.isLoading || board.isLoading;
   const open = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status)), [rows]);
-  const lanes = useMemo(() => lanesOf(open, now), [open, now]);
+  const lanes = useMemo(() => lanesOf(open, now, meId), [open, now, meId]);
   const voice = useMemo<Voice>(() => ({ opening: employeeOpening, describe: (prev, next) => describeForEmployeeAll(prev, next, meId) }), [meId]);
   const speech = useSpeechWith(rows, lanes, now, name, voice);
 
@@ -59,7 +59,7 @@ export default function FeedPage() {
   const todo = useMemo(() => sortByUrgency(open.filter(isTodo), now), [open, now]);
   const inWork = useMemo(() => sortByUrgency(open.filter((task) => isOpenFor(task) && !isTodo(task)), now), [open, now]);
   const onReview = useMemo(() => sortByUrgency(open.filter((task) => task.status === "pending_review"), now), [open, now]);
-  const unread = useMemo(() => open.filter((task) => hasUnreadFor(task, meId)), [open, meId]);
+  const unread = useMemo(() => open.filter((task) => hasUnread(task, meId)), [open, meId]);
   const unacked = useMemo(() => (ether.data ?? []).filter((item) => !item.acks.some((ack) => ack.user_id === meId)), [ether.data, meId]);
 
   const [mode, setMode] = useState<Mode>("idle");
