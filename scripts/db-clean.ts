@@ -60,6 +60,14 @@ async function main() {
   await wipe("notification_deliveries");
   await wipe("push_subscriptions");
 
+  // tv_state is state, not activity: the wall goes back to the ether instead of vanishing
+  const { error: tvError } = await supabase
+    .from("tv_state")
+    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null })
+    .neq("company_id", ALL);
+  if (tvError) throw new Error(`tv_state: ${tvError.message}`);
+  console.log(`  ${"tv_state".padEnd(20)} → эфир`);
+
   const { data: companies } = await supabase.from("companies").select("id");
   for (const bucket of ["voice", "photos"] as const) {
     console.log(`${bucket} objects…`);

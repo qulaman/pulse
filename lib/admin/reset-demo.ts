@@ -42,6 +42,14 @@ export async function resetCompanyDemo(admin: SupabaseClient<Database>, companyI
     rows[table] = count ?? 0;
   }
 
+  // the wall is state, not activity: a reset sends it back to the ether, it is not deleted
+  // (D-76) — the kiosk keeps its row, its heartbeat and its scene.
+  const { error: wall } = await admin
+    .from("tv_state")
+    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null })
+    .eq("company_id", companyId);
+  if (wall) warnings.push(`tv_state: ${wall.message}`);
+
   // objects live under <company>/<user>/<file>: two levels of listing, one remove per folder
   let files = 0;
   for (const bucket of BUCKETS) {
