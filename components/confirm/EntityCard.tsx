@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { Chip, type ChipTone } from "@/components/ui/Chip";
 import { formatDeadline } from "@/components/confirm/format";
+import { ParticipantsPicker } from "@/components/confirm/ParticipantsPicker";
+import { WhenSheet } from "@/components/confirm/WhenSheet";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
 import { shortNames } from "@/lib/people/aliases";
-import type { EntityPatch } from "@/lib/store/ingest";
+import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
 
 const ICON_STROKE = {
   fill: "none",
@@ -23,6 +25,7 @@ const ICONS: Record<Entity["kind"], { color: string; path: React.ReactNode }> = 
   announcement: { color: "var(--gold)", path: <><path d="M4 10v4h3l6 4V6l-6 4z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></> },
   points: { color: "var(--gold)", path: <><circle cx="12" cy="12" r="8" /><path d="M12 8.5v7M8.5 12h7" /></> },
   reminder: { color: "var(--warn)", path: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 0 0 4 0" /></> },
+  event: { color: "var(--accent)", path: <><rect x="3.5" y="5.5" width="17" height="14" rx="3" /><path d="M8 3.5v4M16 3.5v4M3.5 10.5h17" /></> },
   note: { color: "var(--text-muted)", path: <><path d="M6 4h8l4 4v12H6z" /><polyline points="14,4 14,8 18,8" /><path d="M9 12.5h6M9 16h4" /></> },
   recurrence: { color: "var(--accent)", path: <><path d="M4 12a8 8 0 0 1 13.5-5.8" /><polyline points="18,3 18,7 14,7" /><path d="M20 12a8 8 0 0 1-13.5 5.8" /><polyline points="6,21 6,17 10,17" /></> },
   delegation: { color: "var(--accent)", path: <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="15" r="3" /><path d="M11 8h3.5a2.5 2.5 0 0 1 0 5H13" /></> },
@@ -50,6 +53,7 @@ function mainField(
     case "task":
     case "recurrence":
     case "delegation":
+    case "event":
       return { key: "title", value: entity.title };
     case "announcement":
     case "reminder":
@@ -131,23 +135,34 @@ export function EntityCard({
   nameOf,
 }: Props) {
   const field = mainField(entity);
-  const [editing, setEditing] = useState(false);
+  // an event has a second editable line — the place; everything else edits its main text
+  const [editKey, setEditKey] = useState<null | "main" | "location">(null);
+  const editing = editKey !== null;
   const shortLabels = shortNames(people.map((p) => ({ id: p.user_id, full_name: p.full_name })));
+  const location = entity.kind === "event" ? (entity.location ?? "") : "";
+  const editedValue = editKey === "location" ? location : field.value;
   const [draft, setDraft] = useState(field.value);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [whenOpen, setWhenOpen] = useState(false);
+  const [whoOpen, setWhoOpen] = useState(false);
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
-  const startEditing = () => {
-    setDraft(field.value);
-    setEditing(true);
+  const startEditing = (key: "main" | "location" = "main") => {
+    setDraft(key === "location" ? location : field.value);
+    setEditKey(key);
   };
 
   const commit = () => {
-    setEditing(false);
+    const key = editKey;
+    setEditKey(null);
     const value = draft.trim();
+    if (key === "location") {
+      if (value !== location) onPatch({ location: value || null } as EntityPatch);
+      return;
+    }
     if (value && value !== field.value) onPatch({ [field.key]: value } as EntityPatch);
     else setDraft(field.value);
   };
@@ -194,8 +209,8 @@ export function EntityCard({
               onKeyDown={(event) => {
                 if (event.key === "Enter") commit();
                 if (event.key === "Escape") {
-                  setDraft(field.value);
-                  setEditing(false);
+                  setDraft(editedValue);
+                  setEditKey(null);
                 }
               }}
               className="w-full rounded-[12px] border border-accent bg-surface-2 px-2 py-1 text-[16px] leading-[22px] outline-none"
@@ -212,7 +227,17 @@ export function EntityCard({
             </button>
           )}
 
-          {collapsed ? (
+          {collapsed && entity.kind === "event" ? (
+            <p className="mt-1 truncate text-[13px] leading-4 text-muted">
+              {entity.starts_at_iso ? (
+                formatDeadline(entity.starts_at_iso)
+              ) : (
+                <span style={{ color: TONE_COLOR.danger }}>Когда?</span>
+              )}
+              {" · "}
+              {describeParticipants(entity, nameOf)}
+            </p>
+          ) : collapsed ? (
             <p className="mt-1 truncate text-[13px] leading-4 text-muted">
               {chip ? <span style={{ color: TONE_COLOR[chip.tone] }}>{chip.label}</span> : null}
               {deadline ? (chip ? " · " : "") : null}
@@ -239,6 +264,11 @@ export function EntityCard({
                     до {formatDeadline(deadline.iso)}
                     {deadline.sourceText ? ` · „${deadline.sourceText}“` : ""}
                   </Chip>
+                ) : entity.kind === "task" && entity.priority === "high" ? (
+                  // «срочно» без времени: один чип вместо двух спорящих, и он же ставит срок
+                  <Chip tone="warn" onClick={onOpenDeadline}>
+                    срочно · задать срок
+                  </Chip>
                 ) : (
                   <Chip tone="muted" onClick={onOpenDeadline}>
                     без срока
@@ -246,10 +276,38 @@ export function EntityCard({
                 )
               ) : null}
 
-              {entity.kind === "task" && entity.priority === "high" ? (
+              {entity.kind === "task" && entity.priority === "high" && deadline?.iso ? (
                 <Chip tone="danger" interactive={false}>
                   срочно
                 </Chip>
+              ) : null}
+
+              {entity.kind === "event" ? (
+                <>
+                  {entity.starts_at_iso ? (
+                    <Chip
+                      tone={(entity.time_confidence ?? 1) < 0.8 ? "warn" : "neutral"}
+                      onClick={() => setWhenOpen(true)}
+                    >
+                      {formatDeadline(entity.starts_at_iso)}
+                      {(entity.time_confidence ?? 1) < 0.8 && entity.time_source_text
+                        ? ` · „${entity.time_source_text}“`
+                        : ""}
+                    </Chip>
+                  ) : (
+                    <Chip tone="danger" onClick={() => setWhenOpen(true)}>
+                      Когда?
+                    </Chip>
+                  )}
+
+                  <Chip tone="neutral" onClick={() => setWhoOpen(true)}>
+                    {describeParticipants(entity, nameOf)}
+                  </Chip>
+
+                  <Chip tone={entity.location ? "neutral" : "muted"} onClick={() => startEditing("location")}>
+                    {entity.location || "Место?"}
+                  </Chip>
+                </>
               ) : null}
 
               {entity.kind === "reminder" && entity.remind_at_iso ? (
@@ -296,6 +354,47 @@ export function EntityCard({
               ) : null}
             </div>
           )}
+
+          {entity.kind === "event" && !collapsed ? (
+            <>
+              {(entity.participants ?? []).some((p) => p.match.status !== "matched") ? (
+                <p className="mt-2 text-[13px] leading-4 text-warn">
+                  Не нашёл в списке:{" "}
+                  {(entity.participants ?? [])
+                    .filter((p) => p.match.status !== "matched")
+                    .map((p) => p.name ?? p.query)
+                    .join(", ")}
+                </p>
+              ) : null}
+
+              {entity.body ? (
+                <p className="mt-2 text-[14px] leading-5 text-muted">{entity.body}</p>
+              ) : null}
+
+              <WhenSheet
+                open={whenOpen}
+                onClose={() => setWhenOpen(false)}
+                currentIso={entity.starts_at_iso}
+                onPick={(iso) =>
+                  onPatch({
+                    starts_at_iso: iso,
+                    time_confidence: 1,
+                    time_source_text: null,
+                    blocked: undefined,
+                  } as EntityPatch)
+                }
+              />
+              <ParticipantsPicker
+                open={whoOpen}
+                onClose={() => setWhoOpen(false)}
+                everyone={entity.everyone}
+                selectedIds={entity.participant_ids}
+                onDone={({ everyone, ids }) =>
+                  onPatch({ everyone, participant_ids: ids } as EntityPatch)
+                }
+              />
+            </>
+          ) : null}
 
           {hasAssignee(entity) && entity.assignee?.status !== "matched" && !collapsed ? (
             <div className="mt-3 rounded-[12px] border border-warn/40 bg-warn/10 px-3 py-2">

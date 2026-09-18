@@ -30,21 +30,6 @@ export function aqtobeIsoAt(dayShift: number, hours: number, minutes: number, no
   );
 }
 
-/** "2026-08-14T13:00" from <input type="datetime-local"> is Aqtobe wall clock by contract. */
-export function localInputToAqtobeIso(value: string): string | null {
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value) ? `${value}:00+05:00` : null;
-}
-
-export function aqtobeIsoToLocalInput(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return "";
-  const w = wall(date);
-  return (
-    `${w.getUTCFullYear()}-${pad(w.getUTCMonth() + 1)}-${pad(w.getUTCDate())}` +
-    `T${pad(w.getUTCHours())}:${pad(w.getUTCMinutes())}`
-  );
-}
-
 export function pluralRu(count: number, forms: [string, string, string]): string {
   const mod100 = count % 100;
   if (mod100 >= 11 && mod100 <= 14) return forms[2];
@@ -59,6 +44,7 @@ const KIND_FORMS: Record<Entity["kind"], [string, string, string]> = {
   announcement: ["объявление", "объявления", "объявлений"],
   reminder: ["напоминание", "напоминания", "напоминаний"],
   note: ["заметка", "заметки", "заметок"],
+  event: ["мероприятие", "мероприятия", "мероприятий"],
   recurrence: ["повторяющаяся задача", "повторяющиеся задачи", "повторяющихся задач"],
   delegation: ["поручение", "поручения", "поручений"],
   points: ["начисление", "начисления", "начислений"],
@@ -69,6 +55,7 @@ const KIND_ORDER: Entity["kind"][] = [
   "task",
   "delegation",
   "announcement",
+  "event",
   "reminder",
   "note",
   "recurrence",

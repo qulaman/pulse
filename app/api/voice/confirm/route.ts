@@ -12,7 +12,7 @@ import { kickDeliveries } from "@/lib/push/send";
  * fields postprocess() added. They are stripped here — the RPC contract is the
  * parser schema, nothing else.
  */
-const SERVICE_FIELDS = new Set(["assignee", "blocked"]);
+const SERVICE_FIELDS = new Set(["assignee", "participants", "blocked"]);
 
 const IncomingEntity = z.preprocess((value) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
@@ -30,6 +30,7 @@ const BodySchema = z.strictObject({
   confirmed_entities: z.array(IncomingEntity),
   force_now: z.boolean().optional(),
   inbox_id: z.uuid().optional(),
+  note_id: z.uuid().optional(),
 });
 
 export const POST = withAuth<z.infer<typeof BodySchema>>(
@@ -52,6 +53,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         edit_fields,
         force_now: body.force_now ?? false,
         inbox_id: body.inbox_id ?? null,
+        note_id: body.note_id ?? null,
       },
       client_request_id: body.client_request_id,
     });
@@ -59,6 +61,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     if (error) {
       if (error.message.includes("assignee_required")) {
         return apiError(400, "assignee_required", "Не понял, кому задача — выбери исполнителя");
+      }
+      if (error.message.includes("event_time_required")) {
+        return apiError(400, "event_time_required", "Не понял, когда мероприятие — выбери время");
       }
       if (error.message.includes("forbidden")) {
         return apiError(403, "forbidden", "Нет доступа");

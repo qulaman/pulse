@@ -3,11 +3,12 @@ import { create } from "zustand";
 import { toast } from "@/components/ui/Toast";
 import { pluralRu } from "@/components/confirm/format";
 import { softDeleteNotes } from "@/lib/notes/mutations";
-import type { BlockedReason, PostprocessedEntity } from "../ai/postprocess";
+import type { BlockedReason, ParticipantMatch, PostprocessedEntity } from "../ai/postprocess";
 import type {
   AnnouncementEntity,
   DelegationEntity,
   Entity,
+  EventEntity,
   PointsEntity,
   QueryEntity,
   RecurrenceEntity,
@@ -70,7 +71,12 @@ export type EntityPatch = Partial<
     Omit<ReminderEntity, "kind"> &
     Omit<RecurrenceEntity, "kind"> &
     Omit<DelegationEntity, "kind"> &
-    Omit<QueryEntity, "kind"> & { assignee: AssigneeMatch; blocked: BlockedReason | undefined }
+    Omit<QueryEntity, "kind"> &
+    Omit<EventEntity, "kind"> & {
+      assignee: AssigneeMatch;
+      participants: ParticipantMatch[];
+      blocked: BlockedReason | undefined;
+    }
 >;
 
 /** Anything shorter is a slip of the finger, not speech (docs/AI.md §11). */
@@ -104,7 +110,16 @@ type IngestState = {
   transcript: string;
   /** The director's question when the phrase held nothing to send (stage «question»). */
   question: string | null;
+  /**
+   * Whom the phrase is for, when the director started it from somebody's own orb on the
+   * waiting screen: «Динаре, ». It is glued to the front of the transcript before the parser
+   * sees it, so the phrase he speaks can be just the task («подготовь КП до пятницы») and the
+   * addressee still lands — one pipeline, no second way of assigning (D-72).
+   */
+  address: string | null;
   source: IngestSource;
+  /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
+  noteId: string | null;
   /** Editable copy shown on /confirm. */
   entities: PostprocessedEntity[];
   /** Untouched parser output — the diff behind the "share of edits" metric (D-35). */
@@ -113,7 +128,8 @@ type IngestState = {
 };
 
 type IngestActions = {
-  startVoice: () => Promise<void>;
+  /** `address` — «Динаре, », glued to the front of the transcript before it is parsed. */
+  startVoice: (address?: string) => Promise<void>;
   stopVoice: () => Promise<void>;
   cancelVoice: () => void;
   submitText: (text: string) => Promise<void>;
@@ -121,6 +137,12 @@ type IngestActions = {
   runTranscribe: () => Promise<void>;
   runParse: () => Promise<void>;
   startManual: () => void;
+  startManualEvent: () => void;
+  /** A note the director hands out: one entity built by hand, then the usual confirm screen. */
+  startFromNote: (
+    note: { id: string; text: string; audio_path: string | null },
+    as: "task" | "announcement",
+  ) => void;
   /** The director corrected the transcript by hand: parse it again, same request. */
   reparse: (text: string) => Promise<void>;
   /** Hand a question to the assistant on Пульс (a query-only phrase, or the questions of a sent batch). */
@@ -143,7 +165,9 @@ const initialState: IngestState = {
   inboxId: null,
   transcript: "",
   question: null,
+  address: null,
   source: "voice",
+  noteId: null,
   entities: [],
   parsedEntities: [],
   suspicious: false,
@@ -184,6 +208,7 @@ function retryTargetFor(code: IngestErrorCode, from: RetryFrom): RetryFrom | nul
 function strip(entity: PostprocessedEntity): Entity {
   const wire: Record<string, unknown> = { ...entity };
   delete wire.assignee;
+  delete wire.participants;
   delete wire.blocked;
   return wire as unknown as Entity;
 }
@@ -202,6 +227,21 @@ export function isCountable(entity: PostprocessedEntity, pointsEnabled = false):
   if (entity.kind === "query") return false;
   if (entity.kind === "points") return pointsEnabled;
   return true;
+}
+
+/**
+ * The «Кто» chip of an event card: «Все» / «Только я» / «Марат, Айгуль» / «Марат +2».
+ * The author is always in the meeting, so an empty list is not «nobody» but «only me».
+ */
+export function describeParticipants(
+  entity: { everyone: boolean; participant_ids: string[] },
+  nameOf: (id: string) => string | undefined,
+): string {
+  if (entity.everyone) return "Все";
+  const names = entity.participant_ids.map((id) => nameOf(id) ?? "?");
+  if (names.length === 0) return "Только я";
+  if (names.length <= 2) return names.join(", ");
+  return `${names[0]} +${names.length - 1}`;
 }
 
 export function isSendable(entity: PostprocessedEntity, pointsEnabled = false): boolean {
@@ -243,7 +283,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
   return {
     ...initialState,
 
-    async startVoice() {
+    async startVoice(address) {
       const stage = get().stage;
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
       if (stage !== "idle" && stage !== "error" && stage !== "question") return;
@@ -255,6 +295,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         ...initialState,
         stage: "recording",
         source: "voice",
+        address: address ?? null,
         clientRequestId: crypto.randomUUID(),
         recordingStartedAt: Date.now(),
       });
@@ -356,8 +397,10 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           client_request_id: clientRequestId,
           ...(get().audio ? { duration_ms: get().audio!.durationMs } : {}),
         });
+        // the addressee the director picked before he spoke goes in front of what he said
+        const address = get().address;
         set({
-          transcript: res.transcript,
+          transcript: address && res.transcript.trim() ? `${address}${res.transcript}` : res.transcript,
           inboxId: res.inbox_id ?? get().inboxId,
           suspicious: res.suspicious ?? false,
         });
@@ -471,6 +514,83 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       set({ entities: [manual], parsedEntities: [], stage: "confirm", error: null, retryFrom: null });
     },
 
+    /**
+     * «+» on /calendar: the same confirm screen, started from an empty meeting card.
+     * There is no second way to create an event — one parser, one screen (principle 1).
+     */
+    startManualEvent() {
+      const transcript = get().transcript.trim();
+      const manual: PostprocessedEntity = {
+        kind: "event",
+        title: transcript,
+        body: null,
+        location: null,
+        starts_at_iso: null,
+        ends_at_iso: null,
+        time_confidence: null,
+        time_source_text: null,
+        participant_queries: [],
+        participant_names: [],
+        participant_ids: [],
+        everyone: false,
+        remind_before_min: null,
+        source_span: transcript,
+        participants: [],
+        blocked: "time_missing",
+      };
+      set({
+        ...initialState,
+        clientRequestId: crypto.randomUUID(),
+        source: "typed",
+        transcript,
+        entities: [manual],
+        parsedEntities: [],
+        stage: "confirm",
+      });
+    },
+
+    /**
+     * «Поручить» / «Объявить» on a note. The parser is not called: the text is already
+     * combed, and a second parse would only invent a deadline. The entity is built by
+     * hand and confirmed on the usual screen, where the director picks the assignee.
+     */
+    startFromNote(note, as) {
+      const text = note.text.trim();
+      const manual: PostprocessedEntity =
+        as === "task"
+          ? {
+              kind: "task",
+              assignee_queries: [],
+              assignee_id: null,
+              assignee_name: null,
+              assignee_confidence: 0,
+              group_id: null,
+              title: text,
+              body: null,
+              deadline_iso: null,
+              deadline_confidence: null,
+              deadline_source_text: null,
+              priority: "normal",
+              scheduled_send_at: null,
+              source_span: text,
+              assignee: { status: "unmatched", user_id: null, candidates: [], flag: "check" },
+              blocked: "assignee_unmatched",
+            }
+          : { kind: "announcement", text, source_span: text };
+      set({
+        ...initialState,
+        clientRequestId: crypto.randomUUID(),
+        source: "typed",
+        transcript: text,
+        // the recording of the thought follows it into the task (principle 5)
+        audioPath: note.audio_path,
+        noteId: note.id,
+        stage: "confirm",
+        entities: [manual],
+        parsedEntities: [],
+      });
+    },
+
     async retry() {
       const { retryFrom, audio } = get();
       switch (retryFrom) {
@@ -505,7 +625,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     async send(forceNow = false, pointsEnabled = false) {
-      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId } = get();
+      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId, noteId } = get();
       const confirmed = entities.filter((entity) => isSendable(entity, pointsEnabled)).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
@@ -520,6 +640,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           confirmed_entities: confirmed,
           ...(forceNow ? { force_now: true } : {}),
           ...(inboxId ? { inbox_id: inboxId } : {}),
+          ...(noteId ? { note_id: noteId } : {}),
         });
         set({ stage: "done" });
         return res;

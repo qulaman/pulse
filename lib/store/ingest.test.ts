@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PostprocessedEntity } from "../ai/postprocess";
 import { VoiceApiError, type VoiceApi } from "../voice/api";
-import { isNotesOnly, useIngestStore } from "./ingest";
+import { describeParticipants, isNotesOnly, useIngestStore } from "./ingest";
 
 // Hoisted: vi.mock runs before the imports it replaces.
 const api = vi.hoisted(() => ({
@@ -210,5 +210,29 @@ describe("isNotesOnly", () => {
 
   it("is false for an empty parse", () => {
     expect(isNotesOnly([])).toBe(false);
+  });
+});
+
+describe("describeParticipants", () => {
+  const nameOf = (id: string) => ({ "u-003": "Марат", "u-005": "Айгуль", "u-001": "Ерлан" })[id];
+
+  it("says «Все» when the whole company is invited", () => {
+    expect(describeParticipants({ everyone: true, participant_ids: [] }, nameOf)).toBe("Все");
+  });
+
+  it("says «Только я» when nobody else is in it — the author always is", () => {
+    expect(describeParticipants({ everyone: false, participant_ids: [] }, nameOf)).toBe("Только я");
+  });
+
+  it("names two people in full", () => {
+    expect(describeParticipants({ everyone: false, participant_ids: ["u-003", "u-005"] }, nameOf)).toBe(
+      "Марат, Айгуль",
+    );
+  });
+
+  it("counts the rest after the first name", () => {
+    expect(
+      describeParticipants({ everyone: false, participant_ids: ["u-003", "u-005", "u-001"] }, nameOf),
+    ).toBe("Марат +2");
   });
 });
