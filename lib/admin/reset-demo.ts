@@ -17,6 +17,7 @@ const ACTIVITY_TABLES = [
   "point_transactions",
   "announcements", // announcement_acks cascade
   "tasks", // notification_deliveries of tasks cascade
+  "notes", // converted_* of a deleted task are nulled, the note itself goes here
   "reminders",
   "recurrence_rules",
   "inbox_items",
