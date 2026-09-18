@@ -44,6 +44,7 @@
 /app                    # Next.js App Router
   /(director)/pulse     # дашборд Пульс
   /(director)/confirm   # экран подтверждения распознанного голосового
+  /(director)/notes     # заметки директора — видит только автор (D-75)
   /(employee)/feed      # лента личного канала
   /(employee)/tasks     # «Мои дела»
   /ether                # Эфир (общая лента + рейтинг)
