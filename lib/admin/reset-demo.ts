@@ -18,6 +18,7 @@ const ACTIVITY_TABLES = [
   "announcements", // announcement_acks cascade
   "tasks", // notification_deliveries of tasks cascade
   "notes", // converted_* of a deleted task are nulled, the note itself goes here
+  "events", // event_participants cascade with the event row
   "reminders",
   "recurrence_rules",
   "inbox_items",
