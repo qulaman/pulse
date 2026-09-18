@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PostprocessedEntity } from "../ai/postprocess";
 import { VoiceApiError, type VoiceApi } from "../voice/api";
-import { useIngestStore } from "./ingest";
+import { isNotesOnly, useIngestStore } from "./ingest";
 
 // Hoisted: vi.mock runs before the imports it replaces.
 const api = vi.hoisted(() => ({
@@ -48,6 +48,10 @@ function taskEntity(overrides: Partial<PostprocessedEntity> = {}): Postprocessed
 }
 
 const audio = { blob: new Blob(["x"]), mime: "audio/webm;codecs=opus", durationMs: 4200 };
+
+function noteEntity(text = "Сделать акцию для Альфы"): PostprocessedEntity {
+  return { kind: "note", text, source_span: text } as PostprocessedEntity;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -168,5 +172,43 @@ describe("ingest store", () => {
     expect(payload.parsed_entities[0]).not.toHaveProperty("assignee");
     expect(payload.parsed_entities[0].assignee_id).toBeNull(); // the diff keeps what the model said
     expect(useIngestStore.getState().stage).toBe("done");
+  });
+
+  it("saves a notes-only phrase without the confirm screen", async () => {
+    api.parse.mockResolvedValue({ entities: [noteEntity()] });
+    api.confirm.mockResolvedValue({ result: { note_ids: ["n-1"] }, duplicate: false });
+
+    await useIngestStore.getState().submitText("запиши мысль: сделать акцию для Альфы");
+
+    expect(api.confirm).toHaveBeenCalledTimes(1);
+    expect(api.confirm.mock.calls[0][0].confirmed_entities).toHaveLength(1);
+    // the toast said «Записал» and the pipeline is free for the next phrase
+    expect(useIngestStore.getState().stage).toBe("idle");
+    expect(useIngestStore.getState().entities).toEqual([]);
+  });
+
+  it("keeps a mixed phrase on the confirm screen", async () => {
+    const task = taskEntity({ blocked: undefined, assignee_id: "u-1" });
+    api.parse.mockResolvedValue({ entities: [noteEntity(), task] });
+
+    await useIngestStore.getState().submitText("запиши мысль про акцию и Марат позвони Альфе");
+
+    expect(api.confirm).not.toHaveBeenCalled();
+    expect(useIngestStore.getState().stage).toBe("confirm");
+    expect(useIngestStore.getState().entities).toHaveLength(2);
+  });
+});
+
+describe("isNotesOnly", () => {
+  it("is true for notes alone", () => {
+    expect(isNotesOnly([noteEntity(), noteEntity("Подумать про склад")])).toBe(true);
+  });
+
+  it("is false when a task rides along", () => {
+    expect(isNotesOnly([noteEntity(), taskEntity()])).toBe(false);
+  });
+
+  it("is false for an empty parse", () => {
+    expect(isNotesOnly([])).toBe(false);
   });
 });

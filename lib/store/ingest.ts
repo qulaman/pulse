@@ -1,5 +1,8 @@
 import { create } from "zustand";
 
+import { toast } from "@/components/ui/Toast";
+import { pluralRu } from "@/components/confirm/format";
+import { softDeleteNotes } from "@/lib/notes/mutations";
 import type { BlockedReason, PostprocessedEntity } from "../ai/postprocess";
 import type {
   AnnouncementEntity,
@@ -205,6 +208,22 @@ export function isSendable(entity: PostprocessedEntity, pointsEnabled = false): 
   return isCountable(entity, pointsEnabled) && entity.blocked === undefined;
 }
 
+/**
+ * A phrase that held nothing but thoughts needs no confirm screen (D-75 §3): there is
+ * no assignee to pick and no deadline to check, so the note is saved straight away and
+ * the toast offers «Отменить». An empty parse is not «notes only» — that is the
+ * «ничего не нашёл» screen.
+ */
+export function isNotesOnly(entities: PostprocessedEntity[]): boolean {
+  return entities.length > 0 && entities.every((entity) => entity.kind === "note");
+}
+
+/** note_ids of the batch — what «Отменить» in the toast soft-deletes. */
+function noteIdsOf(result: Record<string, unknown>): string[] {
+  const ids = result.note_ids;
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+}
+
 export const useIngestStore = create<IngestState & IngestActions>((set, get) => {
   function fail(cause: unknown, from: RetryFrom) {
     const code = classify(cause);
@@ -379,6 +398,22 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         if (entities.every((entity) => entity.kind === "query")) {
           const question = entities.map((entity) => (entity.kind === "query" ? entity.question : "")).join(" ").trim();
           set({ entities: [], parsedEntities: entities, question: question || transcript, stage: "question", error: null, retryFrom: null });
+          return;
+        }
+        // only thoughts: nothing to confirm — they are already saved, «Отменить» undoes it
+        if (isNotesOnly(entities)) {
+          set({ entities, parsedEntities: entities, error: null, retryFrom: null });
+          const res = await get().send(false, false);
+          if (!res) return; // send() already left the overlay on «повторить»
+          const ids = noteIdsOf(res.result);
+          const count = entities.length;
+          toast(
+            count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
+            ids.length > 0
+              ? { action: { label: "Отменить", onClick: () => void softDeleteNotes(ids) } }
+              : undefined,
+          );
+          get().reset();
           return;
         }
         set({ entities, parsedEntities: entities, stage: "confirm", error: null, retryFrom: null });
