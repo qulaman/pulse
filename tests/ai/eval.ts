@@ -142,6 +142,8 @@ function pair(
 function deadlineOf(entity: PostprocessedEntity): string | null {
   if (entity.kind === "task") return entity.deadline_iso;
   if (entity.kind === "reminder") return entity.remind_at_iso;
+  // a meeting's moment lives in its own field, and expected.deadline_iso checks it (D-78)
+  if (entity.kind === "event") return entity.starts_at_iso;
   return null;
 }
 
