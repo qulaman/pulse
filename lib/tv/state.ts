@@ -14,6 +14,9 @@ export type TvScene = "face" | "clock" | "team";
 
 export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team"];
 
+/** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
+export const FOCUS_MS = 10 * 60_000;
+
 /**
  * Режим по часам киоска: фокус живёт до `expires_at` и гаснет сам, без cron и без
  * таймера на пульте (D-76 §5). Режим `task` схемой допущен заранее, но UI его пока

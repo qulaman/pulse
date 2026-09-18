@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import type { TvScene } from "./state";
+import { FOCUS_MS, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -25,8 +25,6 @@ const OFFLINE = "Нет связи с сервером, экран не пере
  * сейчас — команда абсолютна, повтор безопаснее молчания.
  */
 const TIMEOUT_MS = 12_000;
-/** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
-const FOCUS_MS = 10 * 60_000;
 
 export type TvControlInput = {
   mode?: "ether" | "employee";

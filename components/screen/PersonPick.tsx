@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 
-import { Chip } from "@/components/ui/Chip";
+import { haptic } from "@/lib/haptics";
 import { ROLE_LABEL, initialsOf, type Person } from "@/lib/people/queries";
 
+import { channelOnClass, Led } from "./Remote";
+
 /**
- * «Показать сотрудника»: тап по человеку — и он на стене. Один тап, без листа
- * подтверждения (принцип 1: ценность = количество убранных действий).
+ * «Кого показать»: the channel list under the remote. Tap a person — they are on the
+ * wall. One tap, no confirmation sheet (principle 1: value = actions removed).
  *
- * Поиск — тот же, что на `/people`: подстрока по имени, должности и алиасам.
- * Роль `tv` и неработающие из списка исключены — киоск не показывают на киоске.
+ * Search is the one from `/people`: substring over name, position and aliases.
+ * Role `tv` and inactive people are excluded — the kiosk is not shown on the kiosk.
  */
 
 function normalise(s: string): string {
@@ -26,11 +28,14 @@ function matches(person: Person, query: string): boolean {
 export function PersonPick({
   people,
   onScreenId,
+  remainingMinutes,
   onPick,
 }: {
   people: Person[];
-  /** Кто на стене прямо сейчас: у него чип «на экране», повторный тап продлевает. */
+  /** Who is on the wall right now: their row is lit, a second tap extends the time. */
   onScreenId: string | null;
+  /** Minutes the current focus has left; shown next to the lit row. */
+  remainingMinutes: number;
   onPick: (person: Person) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -64,32 +69,46 @@ export function PersonPick({
         <p className="mt-3 text-[14px] leading-[18px] text-muted">Никого не нашёл</p>
       ) : (
         <ul className="mt-2 card overflow-hidden [&>*+*]:border-t [&>*+*]:border-border/70">
-          {list.map((person) => (
-            <li key={person.id}>
-              <button
-                type="button"
-                onClick={() => onPick(person)}
-                className="flex min-h-[58px] w-full items-center gap-3 px-4 text-left transition-colors duration-[120ms] ease-out active:bg-surface-2"
-              >
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-bg"
-                  style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)" }}
+          {list.map((person) => {
+            const onAir = person.id === onScreenId;
+            return (
+              <li key={person.id}>
+                <button
+                  type="button"
+                  onPointerDown={() => haptic(10)}
+                  onClick={() => onPick(person)}
+                  aria-pressed={onAir || undefined}
+                  className={[
+                    "flex min-h-[58px] w-full items-center gap-3 px-4 text-left transition-colors duration-[120ms] ease-out active:bg-surface-2",
+                    onAir ? channelOnClass : "",
+                  ].join(" ")}
                 >
-                  {initialsOf(person.full_name)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[16px] leading-[22px]">{person.full_name}</span>
-                  {person.position ? (
-                    <span className="block truncate text-[13px] leading-4 text-muted">{person.position}</span>
+                  <span
+                    aria-hidden
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-bg"
+                    style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)" }}
+                  >
+                    {initialsOf(person.full_name)}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[16px] leading-[22px]">{person.full_name}</span>
+                    {person.position ? (
+                      <span className="block truncate text-[13px] leading-4 text-muted">{person.position}</span>
+                    ) : null}
+                  </span>
+                  {onAir ? (
+                    <span className="flex shrink-0 items-center gap-2 font-display text-[12px] font-semibold leading-4 tracking-[-0.01em] text-accent">
+                      <Led tone="ok" />
+                      <span>
+                        на стене
+                        <span className="nums font-normal text-muted"> · {remainingMinutes} мин</span>
+                      </span>
+                    </span>
                   ) : null}
-                </span>
-                {person.id === onScreenId ? (
-                  <Chip tone="accent" interactive={false}>на экране</Chip>
-                ) : null}
-              </button>
-            </li>
-          ))}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

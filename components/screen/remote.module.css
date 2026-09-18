@@ -1,0 +1,278 @@
+/*
+ * The remote's hardware: body, IR lens, LCD window, rubber keys, slide switch.
+ *
+ * Feel rules: a key is a face sitting in a dark well; pressing it drops the face by
+ * 3px (transform only) and nothing else moves. Glows are static box-shadows that change
+ * colour, never animate (DESIGN §2 perf contract); the only animation is the LED blink,
+ * an opacity pulse, and it stops under prefers-reduced-motion.
+ */
+
+.body {
+  position: relative;
+  border-radius: 32px;
+  padding: 14px 14px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(140% 60% at 50% -12%, rgba(255, 255, 255, 0.07), transparent 60%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--surface-2) 92%, white) 0%,
+      var(--surface) 46%,
+      color-mix(in srgb, var(--surface) 84%, black) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.45),
+    0 24px 48px rgba(0, 0, 0, 0.5),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+/* the dark glass at the top of every remote; the LED sits behind it */
+.lens {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 14px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #03060a, #0a1017);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.95),
+    0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.led {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--led);
+  /* a static glow in the LED's own colour; it swaps with the colour, it does not tween */
+  box-shadow:
+    0 0 7px 1px color-mix(in srgb, var(--led) 65%, transparent),
+    inset 0 0 1px rgba(255, 255, 255, 0.55);
+  transition: background-color 150ms var(--ease-out);
+}
+.ledOff {
+  box-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
+}
+.blink {
+  animation: led-blink 900ms var(--ease-in-out) infinite;
+}
+@keyframes led-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* the display window: a recessed pane tinted towards the brand, text reads as backlit */
+.lcd {
+  border-radius: 18px;
+  padding: 12px 14px 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%),
+    linear-gradient(180deg, #06110f 0%, #0a1916 55%, #0b1b19 100%);
+  box-shadow:
+    inset 0 3px 9px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.045);
+  color: color-mix(in srgb, var(--accent) 78%, white);
+}
+.lcdDim {
+  color: color-mix(in srgb, var(--accent) 38%, var(--text-muted));
+}
+
+/* the strip that shows how much of the ten minutes is left; scaleX only */
+.gauge {
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.gaugeFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transform-origin: left center;
+  transition: transform 600ms var(--ease-out);
+}
+
+/* a key: the button is the well, the face sits on it and drops when pressed */
+.key {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  padding: 0;
+  border: 0;
+  border-radius: 18px;
+  background: #060a0f;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+.key:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.9),
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.face {
+  position: absolute;
+  inset: 0 0 4px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-2) 82%, white) 0%,
+    var(--surface-2) 55%,
+    color-mix(in srgb, var(--surface-2) 86%, black) 100%
+  );
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+  font-family: var(--font-display);
+  font-size: 13px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition:
+    transform 80ms var(--ease-out),
+    color 120ms var(--ease-out),
+    opacity 120ms var(--ease-out);
+  will-change: transform;
+}
+.key[data-pressed] .face {
+  transform: translateY(3px);
+}
+.keyOn .face {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 40%, var(--surface-2)) 0%,
+    color-mix(in srgb, var(--accent) 24%, var(--surface-2)) 55%,
+    color-mix(in srgb, var(--accent) 18%, black) 100%
+  );
+  color: color-mix(in srgb, var(--accent) 88%, white);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4);
+}
+.key:disabled {
+  cursor: default;
+}
+.key:disabled .face {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.round {
+  width: 60px;
+  min-height: 60px;
+  flex: none;
+  border-radius: 999px;
+}
+.round .face {
+  border-radius: 999px;
+}
+.tall {
+  min-height: 66px;
+}
+
+/* indicator dot under a key — lives on the body, not on the face, so it does not move */
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  transition: background-color 150ms var(--ease-out);
+}
+.dotOn {
+  background: var(--accent);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 80%, transparent);
+}
+
+/* a recessed panel inside the body (the switch row) */
+.panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px;
+  padding: 10px 12px 10px 14px;
+  border: 0;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--text);
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.panel:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+/* slide switch: dark track, machined knob, warm track when on */
+.track {
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: #060a0f;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  transition: background-color 150ms var(--ease-out);
+}
+.trackOn {
+  background: color-mix(in srgb, var(--warn) 55%, #060a0f);
+}
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f3f7fb, #b7c3cf);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.25),
+    0 2px 3px rgba(0, 0, 0, 0.55);
+  transition: transform 150ms var(--ease-out);
+  will-change: transform;
+}
+.trackOn .knob {
+  transform: translateX(22px);
+}
+
+/* the channel list below the remote: the person on air gets a lit row */
+.channelOn {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .blink {
+    animation: none;
+    opacity: 0.7;
+  }
+  .face,
+  .knob,
+  .gaugeFill {
+    transition: none;
+  }
+}
