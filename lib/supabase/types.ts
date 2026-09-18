@@ -1152,6 +1152,83 @@ export type Database = {
           },
         ]
       }
+      tv_state: {
+        Row: {
+          applied_version: number | null
+          company_id: string
+          employee_id: string | null
+          expires_at: string | null
+          guest: boolean
+          mode: string
+          reload_requested_at: string | null
+          scene: string
+          seen_at: string | null
+          task_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          applied_version?: number | null
+          company_id: string
+          employee_id?: string | null
+          expires_at?: string | null
+          guest?: boolean
+          mode?: string
+          reload_requested_at?: string | null
+          scene?: string
+          seen_at?: string | null
+          task_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          applied_version?: number | null
+          company_id?: string
+          employee_id?: string | null
+          expires_at?: string | null
+          guest?: boolean
+          mode?: string
+          reload_requested_at?: string | null
+          scene?: string
+          seen_at?: string | null
+          task_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tv_state_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_state_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_state_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_state_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -1240,6 +1317,37 @@ export type Database = {
         }
         Returns: Json
       }
+      tv_control: {
+        Args: {
+          p_employee_id?: string
+          p_guest?: boolean
+          p_mode?: string
+          p_reload?: boolean
+          p_scene?: string
+          p_task_id?: string
+        }
+        Returns: {
+          applied_version: number | null
+          company_id: string
+          employee_id: string | null
+          expires_at: string | null
+          guest: boolean
+          mode: string
+          reload_requested_at: string | null
+          scene: string
+          seen_at: string | null
+          task_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tv_state"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       tv_emit: {
         Args: {
           p_actor: string
@@ -1253,6 +1361,8 @@ export type Database = {
         Returns: undefined
       }
       tv_events_prune: { Args: { p_days?: number }; Returns: number }
+      tv_focus: { Args: never; Returns: Json }
+      tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
