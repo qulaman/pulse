@@ -1,0 +1,103 @@
+"use client";
+
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { toast } from "@/components/ui/Toast";
+import { createBrowserSupabase } from "@/lib/supabase/client";
+
+import { tvKeys, type TvState } from "./queries";
+import type { TvScene } from "./state";
+
+/**
+ * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
+ * Роут и service role не нужны — проверка роли живёт внутри функции.
+ *
+ * **Идемпотентности по `client_request_id` здесь намеренно нет** — сознательное
+ * исключение из принципа 7 CLAUDE.md (D-76 §3): команда абсолютна, повтор даёт ту же
+ * строку. По той же причине пульт не ставит команды в оффлайн-очередь: без сети
+ * кнопка честно говорит «нет связи», а не обещает переключить экран когда-нибудь.
+ */
+
+const OFFLINE = "Нет связи с сервером, экран не переключён";
+/**
+ * Потолок ожидания. Без него телефон с умирающей сетью крутит кнопку бесконечно:
+ * supabase-js вне сети не отвечает вовсе (замерено на 25 с), а пульту нужен ответ
+ * сейчас — команда абсолютна, повтор безопаснее молчания.
+ */
+const TIMEOUT_MS = 12_000;
+/** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
+const FOCUS_MS = 10 * 60_000;
+
+export type TvControlInput = {
+  mode?: "ether" | "employee";
+  employeeId?: string;
+  scene?: TvScene;
+  guest?: boolean;
+  reload?: boolean;
+};
+
+function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
+  if (!old) return old ?? null;
+  const next: TvState = { ...old };
+  if (input.mode === "employee" && input.employeeId) {
+    next.mode = "employee";
+    next.employee_id = input.employeeId;
+    next.task_id = null;
+    next.expires_at = new Date(now.getTime() + FOCUS_MS).toISOString();
+  } else if (input.mode === "ether") {
+    next.mode = "ether";
+    next.employee_id = null;
+    next.task_id = null;
+    next.expires_at = null;
+  }
+  if (input.scene) next.scene = input.scene;
+  if (input.guest !== undefined) next.guest = input.guest;
+  return next;
+}
+
+export function useTvControl() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    // `always` перебивает глобальный `offlineFirst` (QueryProvider): без него команда
+    // встала бы в очередь и переключила экран через полчаса, когда сеть вернулась, —
+    // ровно то, чего пульт делать не должен (D-76 §3).
+    networkMode: "always",
+    mutationFn: async (input: TvControlInput): Promise<TvState> => {
+      // браузер уже знает, что сети нет — не делаем вид, что пробуем
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error(OFFLINE);
+
+      const supabase = createBrowserSupabase();
+      const call = supabase.rpc("tv_control", {
+        p_mode: input.mode,
+        p_employee_id: input.employeeId,
+        p_scene: input.scene,
+        p_guest: input.guest,
+        p_reload: input.reload ?? false,
+      });
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),
+      );
+      const { data, error } = await Promise.race([call, timeout]);
+      if (error) throw new Error(error.message);
+      return data as unknown as TvState;
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: tvKeys.state });
+      const snapshot = queryClient.getQueryData<TvState | null>(tvKeys.state);
+      queryClient.setQueryData<TvState | null>(tvKeys.state, (old) => patch(old, input, new Date()));
+      return { snapshot };
+    },
+    onSuccess: (row) => {
+      // RPC вернул итоговую строку — берём её, а не гадаем и не перечитываем
+      queryClient.setQueryData<TvState | null>(tvKeys.state, row);
+    },
+    onError: (_error, _input, context) => {
+      if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
+      toast(OFFLINE);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: tvKeys.state });
+    },
+  });
+}
