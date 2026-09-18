@@ -260,9 +260,101 @@
   transform: translateX(22px);
 }
 
-/* the channel list below the remote: the person on air gets a lit row */
-.channelOn {
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
+/* a groove across the body, between the control block and the channel keys */
+.seam {
+  height: 2px;
+  margin: 16px -2px 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.55) 12%, rgba(0, 0, 0, 0.55) 88%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* a label printed on the body */
+.print {
+  font-family: var(--font-display);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+/* the search slot: a recessed field in the body, same well as the switch panel */
+.slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 12px 0 14px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+  color: var(--text-muted);
+  transition: box-shadow 120ms var(--ease-out);
+}
+.slot:focus-within {
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.slot input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 22px;
+}
+.slot input::placeholder {
+  color: var(--text-muted);
+}
+
+/* the channel keys: one per person, as many per row as fit 72px */
+.pad {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 8px;
+}
+.person {
+  min-height: 84px;
+}
+.person .face {
+  gap: 6px;
+  padding: 0 4px;
+}
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  color: var(--bg);
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+}
+.keyOn .avatar {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--bg) 70%, black);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.personName {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 14px;
 }
 
 @media (prefers-reduced-motion: reduce) {

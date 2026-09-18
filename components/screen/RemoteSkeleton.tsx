@@ -32,6 +32,13 @@ export function RemoteSkeleton() {
       <div className="mt-2 flex h-[5px] justify-around" />
       <Bone h={16} w={180} className="mt-2" />
       <Bone h={60} className="mt-3 rounded-[18px]" />
+      <div className={`${s.seam}`} />
+      <Bone h={16} w={120} className="mt-3 ml-1" />
+      <div className={`${s.pad} mt-2`}>
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <Bone key={i} h={84} className="rounded-[18px]" />
+        ))}
+      </div>
     </SkeletonGroup>
   );
 }
@@ -43,21 +50,6 @@ export function ScreenPageSkeleton() {
       <h1 className="text-[24px] font-bold leading-[30px]">Экран в кабинете</h1>
       <p className="mt-1 text-[13px] leading-[18px] text-muted">Пульт от телевизора: что сейчас на стене и что показать</p>
       <RemoteSkeleton />
-      <h2 className="eyebrow mt-6 px-1">Кого показать</h2>
-      <SkeletonGroup className="mt-2">
-        <Bone h={44} className="rounded-[12px]" />
-        <div className="mt-2 card overflow-hidden">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="flex min-h-[58px] items-center gap-3 px-4">
-              <Bone h={36} w={36} round />
-              <div className="flex-1">
-                <Bone h={16} w="60%" />
-                <Bone h={12} w="40%" className="mt-1.5" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </SkeletonGroup>
     </main>
   );
 }

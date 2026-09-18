@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { PersonPick } from "@/components/screen/PersonPick";
-import { Dot, Gauge, Key, Lcd, LcdDim, Lens, RemoteBody, Switch, type LedTone } from "@/components/screen/Remote";
+import { PersonPad } from "@/components/screen/PersonPad";
+import { Dot, Gauge, Key, Lcd, LcdDim, Lens, RemoteBody, Seam, Switch, type LedTone } from "@/components/screen/Remote";
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
 import { toast } from "@/components/ui/Toast";
 import { usePeople } from "@/lib/people/queries";
@@ -18,7 +18,7 @@ import { effectiveMode, FOCUS_MS, focusRemainingMs, guestOf, sceneOf, TV_SCENES,
  *
  * Жест, ради которого он существует: сотрудник зашёл в кабинет — директор нажал
  * его имя — на стене в коридоре его дела (CONCEPT §9, демо-сцена продажи). Поэтому
- * список людей идёт сразу под пультом и работает в один тап, без листа подтверждения.
+ * люди — клавиши на самом пульте и работают в один тап, без листа подтверждения.
  *
  * Сам пульт собран как устройство: линза с диодом-квитанцией, дисплей «что на стене»,
  * резиновые клавиши и ползунок. Директор не видит телевизор из кабинета и обязан узнать
@@ -160,24 +160,22 @@ export default function ScreenPage() {
             onToggle={(next) => show({ guest: next }, next ? "Посетитель включён" : "Посетитель выключен")}
           />
         </div>
+        <Seam label="Кого показать" />
+        <div className="mt-2">
+          <PersonPad
+            people={people.data ?? []}
+            onScreenId={onScreenId}
+            onPick={(person) =>
+              show(
+                { mode: "employee", employeeId: person.id },
+                person.id === onScreenId
+                  ? "Ещё 10 минут"
+                  : `На стене — ${person.full_name.split(/\s+/)[0]} · 10 мин`,
+              )
+            }
+          />
+        </div>
       </RemoteBody>
-
-      <h2 className="eyebrow mt-6 px-1">Кого показать</h2>
-      <div className="mt-2">
-        <PersonPick
-          people={people.data ?? []}
-          onScreenId={onScreenId}
-          remainingMinutes={Math.ceil(remainingMs / 60_000)}
-          onPick={(person) =>
-            show(
-              { mode: "employee", employeeId: person.id },
-              person.id === onScreenId
-                ? "Ещё 10 минут"
-                : `На стене — ${person.full_name.split(/\s+/)[0]} · 10 мин`,
-            )
-          }
-        />
-      </div>
     </main>
   );
 }

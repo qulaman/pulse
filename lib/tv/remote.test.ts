@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvState } from "./queries";
-import { SCENE_LABEL, wallNow, wallReceipt } from "./remote";
+import { SCENE_LABEL, keyLabels, wallNow, wallReceipt } from "./remote";
 
 const NOW = new Date("2026-09-18T09:00:00Z"); // 14:00 в Актобе
 
@@ -75,5 +75,20 @@ describe("wallNow", () => {
 describe("SCENE_LABEL", () => {
   it("даёт русское имя каждой сцене", () => {
     expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда" });
+  });
+});
+
+describe("keyLabels", () => {
+  it("подписывает клавишу именем, тёзок — с буквой фамилии", () => {
+    const labels = keyLabels([
+      { id: "a", full_name: "Ерлан Байжанов" },
+      { id: "b", full_name: "Ерлан Досов" },
+      { id: "c", full_name: "Марат Оспанов" },
+      { id: "d", full_name: "Айгуль" },
+    ]);
+    expect(labels.get("a")).toBe("Ерлан Б.");
+    expect(labels.get("b")).toBe("Ерлан Д.");
+    expect(labels.get("c")).toBe("Марат");
+    expect(labels.get("d")).toBe("Айгуль");
   });
 });

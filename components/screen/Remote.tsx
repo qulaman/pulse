@@ -205,5 +205,33 @@ export function Switch({
   );
 }
 
-/** A list row that is lit while its person is on the wall. */
-export const channelOnClass = s.channelOn;
+/** A groove across the body and a label printed on it: the seam before the channel keys. */
+export function Seam({ label }: { label: string }) {
+  return (
+    <>
+      <div className={s.seam} aria-hidden />
+      <p className={`${s.print} mt-3 px-1`}>{label}</p>
+    </>
+  );
+}
+
+/** The recessed search slot; the input is the caller's, the well is the body's. */
+export function Slot({ children }: { children: ReactNode }) {
+  return <label className={s.slot}>{children}</label>;
+}
+
+/** The keypad grid and the parts of a person key. */
+export const padClass = s.pad;
+export const personKeyClass = s.person;
+
+export function Avatar({ initials }: { initials: string }) {
+  return (
+    <span aria-hidden className={s.avatar}>
+      {initials}
+    </span>
+  );
+}
+
+export function PersonName({ children }: { children: ReactNode }) {
+  return <span className={s.personName}>{children}</span>;
+}
