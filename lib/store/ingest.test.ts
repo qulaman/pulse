@@ -187,6 +187,24 @@ describe("ingest store", () => {
     expect(useIngestStore.getState().entities).toEqual([]);
   });
 
+  it("retries a failed notes-only send and still says «Записал»", async () => {
+    api.parse.mockResolvedValue({ entities: [noteEntity()] });
+    api.confirm
+      .mockRejectedValueOnce(new VoiceApiError("network", 0, null))
+      .mockResolvedValueOnce({ result: { note_ids: ["n-1"] }, duplicate: false });
+
+    await useIngestStore.getState().submitText("запиши мысль: сделать акцию для Альфы");
+    expect(useIngestStore.getState().stage).toBe("error");
+    expect(useIngestStore.getState().retryFrom).toBe("send");
+
+    await useIngestStore.getState().retry();
+
+    expect(api.confirm).toHaveBeenCalledTimes(2);
+    // the second attempt ends exactly like the first would have: saved, toasted, pipeline free
+    expect(useIngestStore.getState().stage).toBe("idle");
+    expect(useIngestStore.getState().entities).toEqual([]);
+  });
+
   it("keeps a mixed phrase on the confirm screen", async () => {
     const task = taskEntity({ blocked: undefined, assignee_id: "u-1" });
     api.parse.mockResolvedValue({ entities: [noteEntity(), task] });

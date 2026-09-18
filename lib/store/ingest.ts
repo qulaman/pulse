@@ -233,6 +233,23 @@ function noteIdsOf(result: Record<string, unknown>): string[] {
 }
 
 export const useIngestStore = create<IngestState & IngestActions>((set, get) => {
+  /**
+   * A phrase of nothing but thoughts (D-75 §3): send it, say «Записал» with a way back,
+   * and free the pipeline. Shared by the parse path and «повторить» after a failed
+   * send — the retry must not sit at stage «done» with no toast.
+   */
+  async function captureNotes(): Promise<void> {
+    const count = get().entities.length;
+    const res = await get().send(false, false);
+    if (!res) return; // send() already left the overlay on «повторить»
+    const ids = noteIdsOf(res.result);
+    toast(
+      count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
+      ids.length > 0 ? { action: { label: "Отменить", onClick: () => void softDeleteNotes(ids) } } : undefined,
+    );
+    get().reset();
+  }
+
   function fail(cause: unknown, from: RetryFrom) {
     const code = classify(cause);
     const body =
@@ -411,17 +428,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         // only thoughts: nothing to confirm — they are already saved, «Отменить» undoes it
         if (isNotesOnly(entities)) {
           set({ entities, parsedEntities: entities, error: null, retryFrom: null });
-          const res = await get().send(false, false);
-          if (!res) return; // send() already left the overlay on «повторить»
-          const ids = noteIdsOf(res.result);
-          const count = entities.length;
-          toast(
-            count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
-            ids.length > 0
-              ? { action: { label: "Отменить", onClick: () => void softDeleteNotes(ids) } }
-              : undefined,
-          );
-          get().reset();
+          await captureNotes();
           return;
         }
         set({ entities, parsedEntities: entities, stage: "confirm", error: null, retryFrom: null });
@@ -535,7 +542,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           await get().runParse();
           return;
         case "send":
-          await get().send();
+          // a notes-only batch must end the same way it would have from the parse path
+          if (isNotesOnly(get().entities)) await captureNotes();
+          else await get().send();
           return;
         default:
           get().reset();
