@@ -135,7 +135,7 @@ export function EntityCard({
   nameOf,
 }: Props) {
   const field = mainField(entity);
-  // an event has a second editable line — the place; everything else edits its main text
+  // an event has a second editable line -- the place; everything else edits its main text
   const [editKey, setEditKey] = useState<null | "main" | "location">(null);
   const editing = editKey !== null;
   const shortLabels = shortNames(people.map((p) => ({ id: p.user_id, full_name: p.full_name })));
@@ -264,11 +264,6 @@ export function EntityCard({
                     до {formatDeadline(deadline.iso)}
                     {deadline.sourceText ? ` · „${deadline.sourceText}“` : ""}
                   </Chip>
-                ) : entity.kind === "task" && entity.priority === "high" ? (
-                  // «срочно» без времени: один чип вместо двух спорящих, и он же ставит срок
-                  <Chip tone="warn" onClick={onOpenDeadline}>
-                    срочно · задать срок
-                  </Chip>
                 ) : (
                   <Chip tone="muted" onClick={onOpenDeadline}>
                     без срока
@@ -276,7 +271,7 @@ export function EntityCard({
                 )
               ) : null}
 
-              {entity.kind === "task" && entity.priority === "high" && deadline?.iso ? (
+              {entity.kind === "task" && entity.priority === "high" ? (
                 <Chip tone="danger" interactive={false}>
                   срочно
                 </Chip>
