@@ -206,6 +206,130 @@ export type Database = {
         }
         Relationships: []
       }
+      event_participants: {
+        Row: {
+          created_at: string
+          event_id: string
+          reason: string | null
+          responded_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          reason?: string | null
+          responded_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          reason?: string | null
+          responded_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_participants_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      events: {
+        Row: {
+          audio_path: string | null
+          author_id: string
+          body: string | null
+          cancelled_at: string | null
+          company_id: string
+          created_at: string
+          ends_at: string | null
+          everyone: boolean
+          id: string
+          inbox_item_id: string | null
+          location: string | null
+          remind_before_min: number
+          reminded_at: string | null
+          source_transcript: string | null
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          audio_path?: string | null
+          author_id: string
+          body?: string | null
+          cancelled_at?: string | null
+          company_id: string
+          created_at?: string
+          ends_at?: string | null
+          everyone?: boolean
+          id?: string
+          inbox_item_id?: string | null
+          location?: string | null
+          remind_before_min?: number
+          reminded_at?: string | null
+          source_transcript?: string | null
+          starts_at: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          audio_path?: string | null
+          author_id?: string
+          body?: string | null
+          cancelled_at?: string | null
+          company_id?: string
+          created_at?: string
+          ends_at?: string | null
+          everyone?: boolean
+          id?: string
+          inbox_item_id?: string | null
+          location?: string | null
+          remind_before_min?: number
+          reminded_at?: string | null
+          source_transcript?: string | null
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inbox_items: {
         Row: {
           audio_path: string | null
@@ -1245,6 +1369,7 @@ export type Database = {
         }
         Returns: Json
       }
+      can_see_event: { Args: { p_event: string }; Returns: boolean }
       cancel_shop_order: {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
@@ -1258,6 +1383,7 @@ export type Database = {
         Returns: Json
       }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      events_due_reminders: { Args: { p_now?: string }; Returns: number }
       extend_task_deadline: {
         Args: {
           client_request_id?: string
@@ -1278,6 +1404,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_event_participant: { Args: { p_event: string }; Returns: boolean }
       mark_thread_read: {
         Args: { seq: number; task_id: string }
         Returns: number
@@ -1295,9 +1422,30 @@ export type Database = {
         }
         Returns: Json
       }
+      respond_event: {
+        Args: { p_event: string; p_reason?: string; p_status: string }
+        Returns: {
+          created_at: string
+          event_id: string
+          reason: string | null
+          responded_at: string | null
+          status: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "event_participants"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       revoke_task: {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
+      }
+      set_event_participants: {
+        Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
+        Returns: undefined
       }
       set_shop_order_status: {
         Args: {
