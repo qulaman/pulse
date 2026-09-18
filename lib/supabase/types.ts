@@ -302,6 +302,96 @@ export type Database = {
           },
         ]
       }
+      notes: {
+        Row: {
+          audio_path: string | null
+          client_request_id: string | null
+          company_id: string
+          converted_announcement_id: string | null
+          converted_at: string | null
+          converted_task_id: string | null
+          created_at: string
+          deleted_at: string | null
+          id: string
+          inbox_item_id: string | null
+          pinned: boolean
+          raw_transcript: string | null
+          text: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          audio_path?: string | null
+          client_request_id?: string | null
+          company_id: string
+          converted_announcement_id?: string | null
+          converted_at?: string | null
+          converted_task_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          pinned?: boolean
+          raw_transcript?: string | null
+          text: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          audio_path?: string | null
+          client_request_id?: string | null
+          company_id?: string
+          converted_announcement_id?: string | null
+          converted_at?: string | null
+          converted_task_id?: string | null
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          pinned?: boolean
+          raw_transcript?: string | null
+          text?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_converted_announcement_id_fkey"
+            columns: ["converted_announcement_id"]
+            isOneToOne: false
+            referencedRelation: "announcements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_converted_task_id_fkey"
+            columns: ["converted_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_deliveries: {
         Row: {
           acted_at: string | null
