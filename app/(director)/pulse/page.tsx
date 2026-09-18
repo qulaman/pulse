@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
+import { CalendarList } from "@/components/calendar/CalendarList";
+import { EventSheet } from "@/components/calendar/EventSheet";
 import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
@@ -16,6 +18,9 @@ import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { Button } from "@/components/ui/Button";
+import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
+import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
+import { nextEventLine } from "@/lib/calendar/say";
 import { useEther } from "@/lib/ether/queries";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -71,7 +76,12 @@ export default function PulsePage() {
   const rows = board.data;
   const lanes = useMemo(() => lanesOf(rows ?? [], now, meId), [rows, now, meId]);
   const counts = countsOf(lanes);
-  const speech = useSpeech(rows, lanes, now, directorName, meId);
+  const calendar = useCalendar();
+  const events = useMemo(() => calendar.data ?? [], [calendar.data]);
+  // the calendar is news too: an answer, a move and the reminder the tick has just written
+  const speech = useSpeech(rows, lanes, now, directorName, meId, calendar.data);
+  const eventSoon = startsSoon(nextEvent(events, now), now);
+  const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const showHint = useLeverHint();
 
   // ---- the balls and the panels ------------------------------------------------------------
@@ -97,8 +107,14 @@ export default function PulsePage() {
       },
       { id: "messages", label: "Сообщения", count: messageTasks.length, tone: "var(--warn)" },
       { id: "ether", label: "Эфир", count: (ether.data ?? []).length, tone: "var(--gold)" },
+      {
+        id: "calendar",
+        label: "Календарь",
+        count: todayCount(events, now),
+        tone: eventSoon ? "var(--warn)" : "var(--accent)",
+      },
     ],
-    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data],
+    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon],
   );
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
@@ -174,8 +190,10 @@ export default function PulsePage() {
     // on the phone a change is a thought (above), never a line (below); the summary shows once awake
     if (!speech.line.opening) return [];
     if (mode === "idle") return [];
-    return [speech.line];
-  }, [exchange, speech.line, mode]);
+    // the greeting is followed by the nearest meeting of the day, when there is one
+    const soonest = nextEventLine(events, now);
+    return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
+  }, [exchange, speech.line, mode, events, now]);
 
   const onFaceTap = () => {
     closeExchange();
@@ -244,7 +262,8 @@ export default function PulsePage() {
                   tone={thought.tone}
                   faceSize={faceSize}
                   onDismiss={() => setExpiredThought(thought.id)}
-                  onOpen={thoughtTask ? () => openThread(thoughtTask) : undefined}
+                  // a thought about the calendar opens no thread — there is none behind it
+                  onOpen={!thought.source && thoughtTask ? () => openThread(thoughtTask) : undefined}
                 />
               ) : null}
             </AnimatePresence>
@@ -282,6 +301,15 @@ export default function PulsePage() {
                 <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} />
               )
             ) : null}
+            {panel === "calendar" ? (
+              events.length === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">
+                  Мероприятий нет. Скажи «планёрка завтра в 10 со всеми».
+                </p>
+              ) : (
+                <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
+              )
+            ) : null}
             {panel === "ether" ? (
               (ether.data ?? []).length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>
@@ -303,6 +331,8 @@ export default function PulsePage() {
           удержи — говори · тап — задачи · потяни вниз — текст
         </p>
       ) : null}
+
+      <EventSheet event={openEvent} onClose={() => setOpenEvent(null)} meId={meId} isDirector />
 
       <ThreadSheet
         open={Boolean(thread)}

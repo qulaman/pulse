@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
-export type OrbitId = "tasks" | "messages" | "ether";
+export type OrbitId = "tasks" | "messages" | "ether" | "calendar";
 
 export type OrbitBall = {
   id: OrbitId;
@@ -42,6 +42,12 @@ const ICON: Record<OrbitId, ReactNode> = {
     <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <path d="M4 10v4h3l6 4V6l-6 4z" />
       <path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" />
+    </svg>
+  ),
+  calendar: (
+    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <rect x="3.5" y="5.5" width="17" height="14" rx="3" />
+      <path d="M8 3.5v4M16 3.5v4M3.5 10.5h17" />
     </svg>
   ),
 };

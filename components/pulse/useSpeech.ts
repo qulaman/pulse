@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { describeCalendar } from "@/lib/calendar/say";
+import type { CalendarEvent } from "@/lib/calendar/queries";
 import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase } from "@/lib/pulse/board";
 
 /** How long the mascot's mouth moves after a new line. */
@@ -21,19 +23,39 @@ const nextId = () => `say:${++counter}`;
 export type Voice = {
   opening: (lanes: Lanes, now: Date, name: string) => Phrase;
   describe: (prev: readonly BoardTask[], next: readonly BoardTask[], now: Date) => Phrase[];
+  /** The calendar is a second source of news, on its own tables and its own diff. */
+  describeCalendar?: (prev: readonly CalendarEvent[], next: readonly CalendarEvent[], now: Date) => Phrase[];
 };
 
 /** The director's voice: the verdict on opening, the board's changes as facts. */
-export function useSpeech(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string, meId: string) {
+export function useSpeech(
+  rows: BoardTask[] | undefined,
+  lanes: Lanes,
+  now: Date,
+  directorName: string,
+  meId: string,
+  calendar?: CalendarEvent[],
+) {
   // «Марат пишет по …» is a message the reader has not seen — the reader is the director
   const voice = useMemo<Voice>(
-    () => ({ opening: openingLine, describe: (prev, next, at) => describeChanges(prev, next, at, meId) }),
+    () => ({
+      opening: openingLine,
+      describe: (prev, next, at) => describeChanges(prev, next, at, meId),
+      describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
+    }),
     [meId],
   );
-  return useSpeechWith(rows, lanes, now, directorName, voice);
+  return useSpeechWith(rows, lanes, now, directorName, voice, calendar);
 }
 
-export function useSpeechWith(rows: BoardTask[] | undefined, lanes: Lanes, now: Date, directorName: string, voice: Voice) {
+export function useSpeechWith(
+  rows: BoardTask[] | undefined,
+  lanes: Lanes,
+  now: Date,
+  directorName: string,
+  voice: Voice,
+  calendar?: CalendarEvent[],
+) {
   const [line, setLine] = useState<SpokenLine | null>(null);
   const [speaking, setSpeaking] = useState(false);
   const previous = useRef<BoardTask[] | undefined>(undefined);
@@ -68,6 +90,20 @@ export function useSpeechWith(rows: BoardTask[] | undefined, lanes: Lanes, now: 
       say(phrases[phrases.length - 1]!);
     }
   }, [rows, directorName, say, voice]);
+
+  // The calendar: the first feed is the baseline, every later change is a word of its own
+  const calendarBefore = useRef<CalendarEvent[] | undefined>(undefined);
+  useEffect(() => {
+    if (!calendar || !voice.describeCalendar) return;
+    const before = calendarBefore.current;
+    calendarBefore.current = calendar;
+    if (!before) return;
+    const phrases = voice.describeCalendar(before, calendar, nowRef.current);
+    if (phrases.length > 0) {
+      opening.current = null;
+      say(phrases[phrases.length - 1]!);
+    }
+  }, [calendar, say, voice]);
 
   useEffect(() => {
     if (!opening.current || opening.current.name === directorName) return;

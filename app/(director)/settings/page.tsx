@@ -47,6 +47,13 @@ export default function SettingsPage() {
         Экран
         <span className="text-[13px] leading-4 text-muted">пульт от телевизора ›</span>
       </Link>
+      <Link
+        href="/calendar"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
+      >
+        Календарь
+        <span className="text-[13px] leading-4 text-muted">мероприятия и участники ›</span>
+      </Link>
       <div className="mt-4">
         <CompanyForm />
       </div>

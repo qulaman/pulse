@@ -9,6 +9,8 @@ import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { MascotLever } from "@/components/pulse/MascotLever";
+import { CalendarList } from "@/components/calendar/CalendarList";
+import { EventSheet } from "@/components/calendar/EventSheet";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeechWith, type Voice } from "@/components/pulse/useSpeech";
@@ -18,6 +20,9 @@ import { Composer } from "@/components/tasks/thread/Composer";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { Chip } from "@/components/ui/Chip";
+import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
+import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
+import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
 import { useEther } from "@/lib/ether/queries";
 import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
 import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
@@ -55,8 +60,18 @@ export default function FeedPage() {
   const loading = me.isLoading || board.isLoading;
   const open = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status)), [rows]);
   const lanes = useMemo(() => lanesOf(open, now, meId), [open, now, meId]);
-  const voice = useMemo<Voice>(() => ({ opening: employeeOpening, describe: (prev, next) => describeForEmployeeAll(prev, next, meId) }), [meId]);
-  const speech = useSpeechWith(rows, lanes, now, name, voice);
+  const calendar = useCalendar();
+  const events = useMemo(() => calendar.data ?? [], [calendar.data]);
+  const voice = useMemo<Voice>(
+    () => ({
+      opening: employeeOpening,
+      describe: (prev, next) => describeForEmployeeAll(prev, next, meId),
+      // an invitation, a move and «скоро начнётся» are news for the person too
+      describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
+    }),
+    [meId],
+  );
+  const speech = useSpeechWith(rows, lanes, now, name, voice, calendar.data);
 
   // «Дела»: what to accept or redo first, then what is in work, then what waits for the director
   const todo = useMemo(() => sortByUrgency(open.filter(isTodo), now), [open, now]);
@@ -76,9 +91,17 @@ export default function FeedPage() {
       { id: "tasks", label: "Дела", count: todo.length + inWork.length, tone: lanes.overdue.length > 0 ? "var(--danger)" : todo.length > 0 ? "var(--warn)" : "var(--accent)" },
       { id: "messages", label: "Сообщения", count: unread.length, tone: "var(--warn)" },
       { id: "ether", label: "Эфир", count: unacked.length, tone: "var(--gold)" },
+      {
+        id: "calendar",
+        label: "Календарь",
+        count: todayCount(events, now),
+        tone: startsSoon(nextEvent(events, now), now) ? "var(--warn)" : "var(--accent)",
+      },
     ],
-    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length],
+    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length, events, now],
   );
+
+  const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
 
   const pick = (ball: OrbitBall) => {
     if (mode === "panel" && panel === ball.id) {
@@ -115,8 +138,10 @@ export default function FeedPage() {
 
   const lines = useMemo<AssistantLine[]>(() => {
     if (!speech.line || !speech.line.opening || mode === "idle") return [];
-    return [speech.line];
-  }, [speech.line, mode]);
+    // the greeting is followed by the nearest meeting of the day, when there is one
+    const soonest = nextEventLine(events, now);
+    return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
+  }, [speech.line, mode, events, now]);
 
   const awake: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : todo.length > 0 || lanes.overdue.length > 0 ? "calm" : "happy";
   const mascot: MascotState = thought ? "surprised" : mode === "idle" ? "sleeping" : awake;
@@ -207,6 +232,13 @@ export default function FeedPage() {
                 </div>
               )
             ) : null}
+            {panel === "calendar" ? (
+              events.length === 0 ? (
+                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
+              ) : (
+                <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
+              )
+            ) : null}
             {panel === "ether" ? (
               (ether.data ?? []).length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
@@ -223,9 +255,11 @@ export default function FeedPage() {
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}
         >
-          тап — дела, сообщения, эфир
+          тап — дела, сообщения, эфир, календарь
         </p>
       ) : null}
+
+      <EventSheet event={openEvent} onClose={() => setOpenEvent(null)} meId={meId} isDirector={false} />
 
       <ThreadSheet
         open={Boolean(thread)}
