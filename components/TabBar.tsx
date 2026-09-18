@@ -60,6 +60,14 @@ const ICONS = {
       <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
     </svg>
   ),
+  notes: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <path d="M6 3.5h7.5L19 9v11.5H6z" />
+      <polyline points="13.5,3.5 13.5,9 19,9" />
+      <line x1="9" y1="13" x2="15.5" y2="13" />
+      <line x1="9" y1="16.5" x2="13" y2="16.5" />
+    </svg>
+  ),
   lab: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <path d="M9.5 3h5M10 3v6.2L4.8 18.3A2 2 0 0 0 6.5 21h11a2 2 0 0 0 1.7-2.7L14 9.2V3" />
@@ -76,6 +84,7 @@ const TABS: Record<TabRole, Tab[]> = {
   director: [
     { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
+    { href: "/notes", label: "Заметки", icon: ICONS.notes },
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
     LAB_TAB,
@@ -121,7 +130,7 @@ export function TabBar({ role }: { role: TabRole }) {
         {TABS[role].map((tab) => {
           const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
           return (
-            <li key={tab.href} className="flex-1">
+            <li key={tab.href} className="min-w-0 flex-1">
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
@@ -129,7 +138,7 @@ export function TabBar({ role }: { role: TabRole }) {
                 style={{ color: active ? "var(--accent)" : "var(--text-muted)", fontWeight: active ? 600 : 500 }}
               >
                 <span
-                  className="relative flex h-8 w-12 items-center justify-center rounded-full transition-colors duration-[120ms]"
+                  className="relative flex h-8 w-12 max-w-full items-center justify-center rounded-full transition-colors duration-[120ms]"
                   style={{ background: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
                 >
                   {tab.icon}
@@ -143,7 +152,7 @@ export function TabBar({ role }: { role: TabRole }) {
                     </span>
                   ) : null}
                 </span>
-                {tab.label}
+                <span className="w-full truncate px-0.5 text-center">{tab.label}</span>
               </Link>
             </li>
           );

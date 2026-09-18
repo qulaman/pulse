@@ -30,6 +30,7 @@ const BodySchema = z.strictObject({
   confirmed_entities: z.array(IncomingEntity),
   force_now: z.boolean().optional(),
   inbox_id: z.uuid().optional(),
+  note_id: z.uuid().optional(),
 });
 
 export const POST = withAuth<z.infer<typeof BodySchema>>(
@@ -52,6 +53,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         edit_fields,
         force_now: body.force_now ?? false,
         inbox_id: body.inbox_id ?? null,
+        note_id: body.note_id ?? null,
       },
       client_request_id: body.client_request_id,
     });

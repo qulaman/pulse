@@ -105,6 +105,8 @@ type IngestState = {
   /** The director's question when the phrase held nothing to send (stage «question»). */
   question: string | null;
   source: IngestSource;
+  /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
+  noteId: string | null;
   /** Editable copy shown on /confirm. */
   entities: PostprocessedEntity[];
   /** Untouched parser output — the diff behind the "share of edits" metric (D-35). */
@@ -121,6 +123,11 @@ type IngestActions = {
   runTranscribe: () => Promise<void>;
   runParse: () => Promise<void>;
   startManual: () => void;
+  /** A note the director hands out: one entity built by hand, then the usual confirm screen. */
+  startFromNote: (
+    note: { id: string; text: string; audio_path: string | null },
+    as: "task" | "announcement",
+  ) => void;
   /** The director corrected the transcript by hand: parse it again, same request. */
   reparse: (text: string) => Promise<void>;
   /** Hand a question to the assistant on Пульс (a query-only phrase, or the questions of a sent batch). */
@@ -144,6 +151,7 @@ const initialState: IngestState = {
   transcript: "",
   question: null,
   source: "voice",
+  noteId: null,
   entities: [],
   parsedEntities: [],
   suspicious: false,
@@ -471,6 +479,48 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       set({ entities: [manual], parsedEntities: [], stage: "confirm", error: null, retryFrom: null });
     },
 
+    /**
+     * «Поручить» / «Объявить» on a note. The parser is not called: the text is already
+     * combed, and a second parse would only invent a deadline. The entity is built by
+     * hand and confirmed on the usual screen, where the director picks the assignee.
+     */
+    startFromNote(note, as) {
+      const text = note.text.trim();
+      const manual: PostprocessedEntity =
+        as === "task"
+          ? {
+              kind: "task",
+              assignee_queries: [],
+              assignee_id: null,
+              assignee_name: null,
+              assignee_confidence: 0,
+              group_id: null,
+              title: text,
+              body: null,
+              deadline_iso: null,
+              deadline_confidence: null,
+              deadline_source_text: null,
+              priority: "normal",
+              scheduled_send_at: null,
+              source_span: text,
+              assignee: { status: "unmatched", user_id: null, candidates: [], flag: "check" },
+              blocked: "assignee_unmatched",
+            }
+          : { kind: "announcement", text, source_span: text };
+      set({
+        ...initialState,
+        clientRequestId: crypto.randomUUID(),
+        source: "typed",
+        transcript: text,
+        // the recording of the thought follows it into the task (principle 5)
+        audioPath: note.audio_path,
+        noteId: note.id,
+        stage: "confirm",
+        entities: [manual],
+        parsedEntities: [],
+      });
+    },
+
     async retry() {
       const { retryFrom, audio } = get();
       switch (retryFrom) {
@@ -505,7 +555,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     async send(forceNow = false, pointsEnabled = false) {
-      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId } = get();
+      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId, noteId } = get();
       const confirmed = entities.filter((entity) => isSendable(entity, pointsEnabled)).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
@@ -520,6 +570,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           confirmed_entities: confirmed,
           ...(forceNow ? { force_now: true } : {}),
           ...(inboxId ? { inbox_id: inboxId } : {}),
+          ...(noteId ? { note_id: noteId } : {}),
         });
         set({ stage: "done" });
         return res;
