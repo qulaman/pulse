@@ -16,6 +16,7 @@ export const TV_KINDS = [
   "points",
   "announcement",
   "merch",
+  "event",
 ] as const;
 
 export type TvKind = (typeof TV_KINDS)[number];
@@ -56,6 +57,7 @@ const LABEL: Record<TvKind, string> = {
   points: "Очки",
   announcement: "Объявление",
   merch: "Награда",
+  event: "Скоро",
 };
 
 const TONE: Record<TvKind, TvTone> = {
@@ -66,6 +68,7 @@ const TONE: Record<TvKind, TvTone> = {
   points: "gold",
   announcement: "accent",
   merch: "gold",
+  event: "accent",
 };
 
 /** Длинный текст объявления на экране режется — читают его с двух метров. */
@@ -86,6 +89,7 @@ export function lineOf(event: TvEvent, guest: boolean): TvLine {
   return {
     id: event.id,
     kind: event.kind,
+    // у мероприятия нет актора: оно не про человека, а про всех, кто придёт
     name: payload.name?.trim() || "Компания",
     label,
     detail: trim(payload.title),

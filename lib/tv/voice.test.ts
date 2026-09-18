@@ -63,4 +63,16 @@ describe("speechOf", () => {
     );
     expect(speechOf([guest], TODAY, NOON).text).toBe("Марат получает очки");
   });
+
+  it("о мероприятии лицо говорит «Скоро», а гостю — обезличенно", () => {
+    const meeting = {
+      id: "e1",
+      kind: "event" as const,
+      created_at: "2026-09-17T06:59:30Z",
+      payload: { name: null, title: "Планёрка", amount: null },
+      payload_guest: { name: null, title: null, amount: null },
+    };
+    expect(speechOf([lineOf(meeting, false)], TODAY, NOON).text).toBe("Скоро — «Планёрка»");
+    expect(speechOf([lineOf(meeting, true)], TODAY, NOON).text).toBe("Скоро — мероприятие");
+  });
 });

@@ -73,6 +73,15 @@ export type TvLoadRow = { name: string; active: number; overdue: number };
 export type TvWeekDay = { day: string; done: number };
 export type TvMerchRow = { name: string; title: string; at: string };
 
+/** Ближайшие встречи для бегущей строки и сцены «часы» (D-78). */
+export type TvEventRow = {
+  id: string;
+  title: string | null;
+  starts_at: string;
+  location: string | null;
+  people: number;
+};
+
 export type TvSummary = {
   guest: boolean;
   points_enabled: boolean;
@@ -85,6 +94,7 @@ export type TvSummary = {
   load: TvLoadRow[];
   week: TvWeekDay[];
   merch: TvMerchRow[];
+  events: TvEventRow[];
 };
 
 const EMPTY_SUMMARY: TvSummary = {
@@ -98,6 +108,7 @@ const EMPTY_SUMMARY: TvSummary = {
   load: [],
   week: [],
   merch: [],
+  events: [],
 };
 
 /**

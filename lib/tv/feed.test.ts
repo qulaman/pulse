@@ -34,4 +34,18 @@ describe("lineOf", () => {
     expect(line.name).toBe("Компания");
     expect(line.label).toBe("Объявление");
   });
+
+  it("мероприятие — событие без актора, и гостю оно без названия (D-78, D-33)", () => {
+    const event = {
+      ...base,
+      kind: "event" as const,
+      payload: { name: null, title: "Планёрка", amount: null },
+      payload_guest: { name: null, title: null, amount: null },
+    };
+    const line = lineOf(event, false);
+    expect(line.label).toBe("Скоро");
+    expect(line.detail).toBe("Планёрка");
+    expect(line.name).toBe("Компания");
+    expect(lineOf(event, true).detail).toBeNull();
+  });
 });

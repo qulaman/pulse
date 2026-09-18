@@ -61,6 +61,9 @@ export function phraseOf(line: TvLine): string {
       return title ? `Объявление: ${title}` : "Объявление для всех";
     case "merch":
       return title ? `${name} забирает награду: ${title}` : `${name} забирает награду`;
+    case "event":
+      // гостю названия не досталось уже в данных (D-33) — лицо говорит обезличенно
+      return title ? `Скоро — «${title}»` : "Скоро — мероприятие";
   }
 }
 

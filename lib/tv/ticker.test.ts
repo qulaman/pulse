@@ -28,6 +28,7 @@ const SUMMARY: TvSummary = {
   load: [],
   week: [{ day: "2026-09-16", done: 2 }, { day: "2026-09-17", done: 3 }],
   merch: [{ name: "Марат Оспанов", title: "Худи", at: "2026-09-17T08:00:00Z" }],
+  events: [],
 };
 
 describe("tickerItems", () => {
@@ -64,5 +65,44 @@ describe("tickerItems", () => {
     const items = tickerItems([line("task_done")], undefined);
     expect(items).toHaveLength(1);
     expect(items[0]!.text).toContain("Марат Оспанов — принято");
+  });
+});
+
+describe("tickerItems: мероприятия", () => {
+  const meeting = {
+    id: "e-1",
+    title: "Планёрка",
+    starts_at: "2026-09-17T11:00:00Z", // 16:00 по Актобе, почти через полтора часа
+    location: "в офисе",
+    people: 6,
+  };
+
+  it("ставит ближайшие встречи после вердикта, с днём, местом и числом людей", () => {
+    const items = tickerItems([], { ...SUMMARY, events: [meeting] });
+    const row = items.find((item) => item.id === "meeting:e-1");
+    expect(row?.text).toBe("Сегодня 16:00 · Планёрка · в офисе · 6 чел.");
+    expect(row?.tone).toBe("accent");
+  });
+
+  it("за полчаса до начала строка становится жёлтой", () => {
+    const items = tickerItems([], {
+      ...SUMMARY,
+      now: "2026-09-17T10:45:00Z",
+      events: [meeting],
+    });
+    expect(items.find((item) => item.id === "meeting:e-1")?.tone).toBe("warn");
+  });
+
+  it("завтрашняя встреча так и называется, а гость не видит названия", () => {
+    const items = tickerItems([], {
+      ...SUMMARY,
+      events: [{ ...meeting, id: "e-2", starts_at: "2026-09-18T05:00:00Z", title: null, location: null }],
+    });
+    expect(items.find((item) => item.id === "meeting:e-2")?.text).toBe("Завтра 10:00 · Мероприятие · 6 чел.");
+  });
+
+  it("без мероприятий строк не добавляет", () => {
+    const items = tickerItems([], SUMMARY);
+    expect(items.some((item) => item.id.startsWith("meeting:"))).toBe(false);
   });
 });

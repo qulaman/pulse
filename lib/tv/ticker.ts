@@ -1,8 +1,8 @@
 import { verdict } from "@/lib/tasks/status-text";
 
-import { tvTime } from "./clock";
+import { tvTime, tvWeekday } from "./clock";
 import type { TvLine } from "./feed";
-import type { TvSummary } from "./queries";
+import type { TvEventRow, TvSummary } from "./queries";
 import { phraseOf } from "./voice";
 
 /**
@@ -35,6 +35,15 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
 
     const line = verdict(counts);
     items.push({ id: "verdict", text: line.text, tone: line.tone === "ok" ? "ok" : line.tone });
+
+    // что впереди у всей компании: три ближайшие встречи, гостю — без названий (D-33)
+    for (const event of (summary.events ?? []).slice(0, EVENTS_AHEAD)) {
+      items.push({
+        id: `meeting:${event.id}`,
+        text: meetingText(event, new Date(summary.now)),
+        tone: startsWithin(event, new Date(summary.now), SOON_MS) ? "warn" : "accent",
+      });
+    }
   }
 
   for (const line of lines.slice(0, EVENTS)) {
@@ -64,6 +73,34 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   }
 
   return items;
+}
+
+/** Сколько встреч едет в строке: дальше это уже расписание, а не новость. */
+const EVENTS_AHEAD = 3;
+/** За полчаса до начала строка становится жёлтой. */
+const SOON_MS = 30 * 60_000;
+const DAY_MS = 86_400_000;
+const AQTOBE_OFFSET_MS = 5 * 3_600_000;
+
+function startsWithin(event: TvEventRow, now: Date, withinMs: number): boolean {
+  const left = new Date(event.starts_at).getTime() - now.getTime();
+  return left <= withinMs;
+}
+
+/** День по стенным часам Актобе — та же арифметика, что в lib/tv/clock.ts. */
+function dayIndex(iso: string | Date): number {
+  const ms = (typeof iso === "string" ? new Date(iso) : iso).getTime();
+  return Math.floor((ms + AQTOBE_OFFSET_MS) / DAY_MS);
+}
+
+function meetingText(event: TvEventRow, now: Date): string {
+  const diff = dayIndex(event.starts_at) - dayIndex(now);
+  const day = diff <= 0 ? "Сегодня" : diff === 1 ? "Завтра" : tvWeekday(new Date(event.starts_at));
+  const title = event.title ?? "Мероприятие";
+  const parts = [`${day} ${tvTime(new Date(event.starts_at))}`, title];
+  if (event.location) parts.push(event.location);
+  parts.push(`${event.people} чел.`);
+  return parts.join(" · ");
 }
 
 function pluralOrders(count: number): string {

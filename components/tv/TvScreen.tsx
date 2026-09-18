@@ -30,6 +30,7 @@ const EMPTY_TEAM: TvSummary = {
   load: [],
   week: [],
   merch: [],
+  events: [],
 };
 
 /**
@@ -108,7 +109,7 @@ export function TvScreen({
             {focused ? (
               <TvFocus focus={focused} state={state.data ?? null} now={now} />
             ) : scene === "clock" ? (
-              <TvClock company={company} logoUrl={logoUrl} now={now} />
+              <TvClock company={company} logoUrl={logoUrl} now={now} next={data?.events[0] ?? null} />
             ) : scene === "team" ? (
               <TvTeam summary={data ?? EMPTY_TEAM} guest={guest} />
             ) : (
