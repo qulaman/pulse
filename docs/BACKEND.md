@@ -220,13 +220,14 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 
 ## 8. ТВ-режим
 
-**Статус (2026-09-17):** экран `/tv` построен и работает на данных `tv_events` + `tv_summary()`; пульт, канал `tv_control` и `POST /api/tv/control` — ещё нет, гостевой режим включается стартовым `?guest=1`.
+**Статус (2026-09-18):** экран `/tv` работает на `tv_events` + `tv_summary()`; пульт директора `/screen` построен (наряд 013, D-76): состояние стены — строка `tv_state`, команды — RPC. Роут `POST /api/tv/control` и broadcast `tv_control` не строятся.
 
-- Киоск — **auth-пользователь роли `tv`** (не anon), RLS-доступ только к `tv_events` (предмаскированный `payload_guest`) и вызову `tv_summary(p_guest boolean)`. Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
-- Канал `tv_control:{company_id}` — **private broadcast**; подписка — участники компании, публикация — только service role.
-- **Публикация ТОЛЬКО через `POST /api/tv/control`** (role=director): `{ mode:'ether'|'employee_focus'|'task_focus'|'week_summary'|'compare', employee_id?, task_id?, guest: boolean }`.
-- Guest-режим — состояние канала `tv_control` (кнопка в пульте директора, D-33), НЕ query-параметр; `?guest=1` — лишь стартовое значение до первой команды.
-- Авто-возврат в `ether` через 10 мин без команд — таймер на клиенте ТВ. Heartbeat киоска → `/api/health` (индикация «ТВ завис»).
+- Киоск — **auth-пользователь роли `tv`** (не anon), RLS-доступ только к `tv_events` (предмаскированный `payload_guest`), `tv_state` своей компании и вызовам `tv_summary(p_guest)`, `tv_focus()`, `tv_heartbeat(p_applied_version)`. Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
+- **Состояние стены — строка `tv_state`** (одна на компанию, миграция `20260918100000`): `mode` (`ether | employee | task`), `employee_id`, `scene` (`face | clock | team`), `guest`, `expires_at`, `version`, `reload_requested_at`, `seen_at`, `applied_version`. Политик на запись нет вовсе; киоск и пульт слушают строку через Postgres Changes под RLS (D-76 §1).
+- **Команды — только RPC `tv_control(p_mode, p_employee_id, p_task_id, p_scene, p_guest, p_reload)`** (security definer, роль `director`): абсолютное состояние, `null` = «не трогать», повтор безвреден — `client_request_id` не заводится (исключение из принципа 7, D-76 §2–3). Фокус живёт 10 минут (`expires_at`), возврат в эфир считает киоск по своим часам, без cron. Режим `task` схемой допущен, UI не строит.
+- **Данные фокуса — RPC `tv_focus()`** (роли `tv`/`director`): сотрудник и до 8 открытых дел (`sent, accepted, in_progress, rework, pending_review`), маска гостя в БД (имя без фамилии, `title = null`), просрочка не помечается (D-45).
+- Guest-режим — поле `tv_state.guest` (кнопка «Посетитель» на пульте, D-33); `?guest=1` — лишь стартовое значение до прихода строки.
+- **Квитанция экрана** — `tv_heartbeat(p_applied_version)` от роли `tv` раз в минуту и после каждого применённого состояния; пульт показывает «На стене» / «Отправлено, экран ещё не показал» / «Экран не отвечает с 9:14» (принцип 8). Перезапуск с пульта — `reload_requested_at`; киоск сравнивает отметку с временем своей загрузки.
 
 ## 9. Контракт ошибок AI-конвейера (для фронта)
 
