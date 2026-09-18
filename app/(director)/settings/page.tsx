@@ -40,6 +40,13 @@ export default function SettingsPage() {
         Задачи
         <span className="text-[13px] leading-4 text-muted">все поручения списком ›</span>
       </Link>
+      <Link
+        href="/screen"
+        className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
+      >
+        Экран
+        <span className="text-[13px] leading-4 text-muted">пульт от телевизора ›</span>
+      </Link>
       <div className="mt-4">
         <CompanyForm />
       </div>
