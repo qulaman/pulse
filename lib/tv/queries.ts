@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import type { Json } from "@/lib/supabase/types";
+import type { Database, Json } from "@/lib/supabase/types";
 
 import { isTvKind, type TvEvent, type TvPayload } from "./feed";
 
@@ -18,6 +18,8 @@ import { isTvKind, type TvEvent, type TvPayload } from "./feed";
 export const tvKeys = {
   feed: ["tv", "feed"] as const,
   summary: (guest: boolean) => ["tv", "summary", guest] as const,
+  state: ["tv", "state"] as const,
+  focus: ["tv", "focus"] as const,
 };
 
 /**
@@ -115,5 +117,73 @@ export function useTvSummary(guest: boolean) {
   });
   // событие меняет и числа, и карусель — сводка обновляется вместе с лентой
   useRealtimeInvalidate({ table: "tv_events" }, tvKeys.summary(guest));
+  return query;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Пульт: что показывать и кого показывать                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Строка состояния экрана — одна на компанию (миграция 20260918100000, D-76). Она
+ * пережила бы и ночной перезапуск киоска, и деплой: команда с пульта не эфемерна.
+ * RLS отдаёт строку своей компании, поэтому фильтра по `company_id` здесь нет.
+ */
+export type TvState = Database["public"]["Tables"]["tv_state"]["Row"];
+
+export function useTvState() {
+  return useRealtimeQuery<TvState | null>({
+    queryKey: tvKeys.state,
+    queryFn: async (): Promise<TvState | null> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.from("tv_state").select("*").limit(1).maybeSingle();
+      if (error) throw new Error(error.message);
+      return data ?? null;
+    },
+    channel: { table: "tv_state" },
+  });
+}
+
+export type TvFocusTask = {
+  id: string;
+  /** Гостю заголовков не отдают вовсе — экран скажет «Поручение» (D-33). */
+  title: string | null;
+  status: string;
+  deadline: string | null;
+};
+
+export type TvFocusEmployee = {
+  mode: "employee";
+  guest: boolean;
+  expires_at: string;
+  employee: { id: string; name: string; position: string | null };
+  tasks: TvFocusTask[];
+};
+
+export type TvFocus = { mode: "ether" } | TvFocusEmployee;
+
+/** Страховка на случай, если realtime промолчал: фокус живёт всего 10 минут. */
+const FOCUS_REFRESH_MS = 30_000;
+
+/**
+ * Данные фокуса одним вызовом `tv_focus()`: роль `tv` не читает ни `tasks`, ни
+ * `profiles` — функция сама берёт строку своей компании и отдаёт уже готовое.
+ * Обновляется и от смены цели (`tv_state`), и от событий по задачам (`tv_events`):
+ * сотрудник принял задачу, пока стоит на стене — стена это показала.
+ */
+export function useTvFocus(enabled: boolean) {
+  const query = useQuery({
+    queryKey: tvKeys.focus,
+    enabled,
+    refetchInterval: FOCUS_REFRESH_MS,
+    queryFn: async (): Promise<TvFocus> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("tv_focus");
+      if (error) throw new Error(error.message);
+      return (data ?? { mode: "ether" }) as unknown as TvFocus;
+    },
+  });
+  useRealtimeInvalidate({ table: "tv_events" }, tvKeys.focus, enabled);
+  useRealtimeInvalidate({ table: "tv_state" }, tvKeys.focus, enabled);
   return query;
 }
