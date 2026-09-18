@@ -62,7 +62,7 @@ describe("ENTITIES_JSON_SCHEMA: discriminator", () => {
 
     const items = (ENTITIES_JSON_SCHEMA.properties as Node).entities as Node;
     const variants = (items.items as Node).anyOf as Node[];
-    expect(variants).toHaveLength(7);
+    expect(variants).toHaveLength(8); // + note (D-75)
     for (const variant of variants) {
       const kind = (variant.properties as Node).kind as Node;
       expect(typeof kind.const).toBe("string");

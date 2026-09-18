@@ -46,3 +46,11 @@
 {"id": "ev-14", "source": "voice", "transcript": "Айгуль, закажи пиццу в офис на обед, человек на десять", "frozen_now": "2026-08-13T11:32:00+05:00", "expected": {"entities": [{"kind": "task", "assignee_id": "u-005"}]}}
 {"id": "ev-15", "source": "voice", "transcript": "Динара, сгоняй в аптеку, купи цитрамон, голова раскалывается", "frozen_now": "2026-08-13T11:32:00+05:00", "expected": {"entities": [{"kind": "task", "assignee_id": "u-006", "deadline_iso": null}]}}
 {"id": "ev-16", "source": "typed", "transcript": "надо купить воду в офис", "frozen_now": "2026-08-13T11:32:00+05:00", "expected": {"entities": [{"kind": "task", "assignee_id": null, "deadline_iso": null}]}}
+{"id": "nt-01", "source": "voice", "transcript": "Запиши мысль: сделать скидку постоянным клиентам", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}]}}
+{"id": "nt-02", "source": "voice", "transcript": "Идея: поставить кофемашину на втором складе", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}]}}
+{"id": "nt-03", "source": "voice", "transcript": "Не забыть посмотреть договор аренды по второму объекту", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}]}}
+{"id": "nt-04", "source": "voice", "transcript": "Заметка: подумать про склад. И Марат, позвони Альфе сегодня до шести", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}, {"kind": "task", "assignee_id": "u-003", "deadline_iso": "2026-08-13T18:00:00+05:00"}]}}
+{"id": "nt-05", "source": "voice", "transcript": "Запиши Марату: позвонить Альфе", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "task", "assignee_id": "u-003"}]}}
+{"id": "nt-06", "source": "voice", "transcript": "Напомни мне завтра позвонить в банк", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "reminder"}]}}
+{"id": "nt-07", "source": "voice", "transcript": "Жазып қой: қойманы тексеру керек", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}]}}
+{"id": "nt-08", "source": "typed", "transcript": "мысль: скидки оптовикам", "frozen_now": "2026-08-13T16:32:00+05:00", "expected": {"entities": [{"kind": "note"}]}}

@@ -56,6 +56,16 @@ const ModelPointsEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
+/**
+ * A thought the director keeps for himself (D-75): no assignee, no time, nobody else
+ * ever reads it. `text` is already combed — the model drops «запиши», «заметка», «мысль».
+ */
+export const NoteEntitySchema = z.strictObject({
+  kind: z.literal("note"),
+  text: z.string(),
+  source_span: z.string(),
+});
+
 export const ReminderEntitySchema = z.strictObject({
   kind: z.literal("reminder"),
   text: z.string(),
@@ -95,6 +105,7 @@ export const EntitySchema = z.discriminatedUnion("kind", [
   TaskEntitySchema,
   PointsEntitySchema,
   ReminderEntitySchema,
+  NoteEntitySchema,
   RecurrenceEntitySchema,
   DelegationEntitySchema,
   QueryEntitySchema,
@@ -108,6 +119,7 @@ export const ModelEntitySchema = z.discriminatedUnion("kind", [
   ModelTaskEntitySchema,
   ModelPointsEntitySchema,
   ReminderEntitySchema,
+  NoteEntitySchema,
   ModelRecurrenceEntitySchema,
   ModelDelegationEntitySchema,
   QueryEntitySchema,
@@ -124,6 +136,7 @@ export type AnnouncementEntity = z.infer<typeof AnnouncementEntitySchema>;
 export type TaskEntity = z.infer<typeof TaskEntitySchema>;
 export type PointsEntity = z.infer<typeof PointsEntitySchema>;
 export type ReminderEntity = z.infer<typeof ReminderEntitySchema>;
+export type NoteEntity = z.infer<typeof NoteEntitySchema>;
 export type RecurrenceEntity = z.infer<typeof RecurrenceEntitySchema>;
 export type DelegationEntity = z.infer<typeof DelegationEntitySchema>;
 export type QueryEntity = z.infer<typeof QueryEntitySchema>;

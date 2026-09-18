@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ParseResult } from "./schema";
 
 /**
- * Few-shot pairs П1–П9 (docs/AI.md §4), mapped onto the single demo roster
+ * Few-shot pairs П1–П11 (docs/AI.md §4), mapped onto the single demo roster
  * tests/stt/roster.json: Айгуль → u-005, Ерлан → u-001 (spoken as «Ерлану Б.», otherwise
  * the two Erlans are ambiguous), Марат → u-003, Сакен → u-004, Тимур → u-009, Жандос → u-010.
  * Context of every example: четверг, 13.08.2026 16:32 (+05:00), источник voice.
@@ -329,6 +329,48 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
           priority: "normal",
           scheduled_send_at: null,
           source_span: "кто-нибудь сходите за сигаретами",
+        },
+      ],
+    },
+  },
+  // П10. Заметка директора самому себе: ни исполнителя, ни времени (D-75).
+  {
+    user: "Запиши мысль: сделать акцию для Альфы к сезону",
+    assistant: {
+      entities: [
+        {
+          kind: "note",
+          text: "Сделать акцию для Альфы к сезону",
+          source_span: "Запиши мысль: сделать акцию для Альфы к сезону",
+        },
+      ],
+    },
+  },
+  // П11. Заметка и поручение в одной фразе: имя разводит их по разным типам.
+  {
+    user: "Заметка: подумать про склад. И Марат, позвони Альфе сегодня до шести",
+    assistant: {
+      entities: [
+        {
+          kind: "note",
+          text: "Подумать про склад",
+          source_span: "Заметка: подумать про склад",
+        },
+        {
+          kind: "task",
+          assignee_queries: ["Марат"],
+          assignee_id: null,
+          assignee_name: "Марат Оспанов",
+          assignee_confidence: 0.98,
+          group_id: null,
+          title: "Позвонить Альфе",
+          body: null,
+          deadline_iso: "2026-08-13T18:00:00+05:00",
+          deadline_confidence: 0.9,
+          deadline_source_text: "сегодня до шести",
+          priority: "normal",
+          scheduled_send_at: null,
+          source_span: "Марат, позвони Альфе сегодня до шести",
         },
       ],
     },

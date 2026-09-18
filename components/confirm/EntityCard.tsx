@@ -23,6 +23,7 @@ const ICONS: Record<Entity["kind"], { color: string; path: React.ReactNode }> = 
   announcement: { color: "var(--gold)", path: <><path d="M4 10v4h3l6 4V6l-6 4z" /><path d="M16.5 9.5a3.5 3.5 0 0 1 0 5" /></> },
   points: { color: "var(--gold)", path: <><circle cx="12" cy="12" r="8" /><path d="M12 8.5v7M8.5 12h7" /></> },
   reminder: { color: "var(--warn)", path: <><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20a2 2 0 0 0 4 0" /></> },
+  note: { color: "var(--text-muted)", path: <><path d="M6 4h8l4 4v12H6z" /><polyline points="14,4 14,8 18,8" /><path d="M9 12.5h6M9 16h4" /></> },
   recurrence: { color: "var(--accent)", path: <><path d="M4 12a8 8 0 0 1 13.5-5.8" /><polyline points="18,3 18,7 14,7" /><path d="M20 12a8 8 0 0 1-13.5 5.8" /><polyline points="6,21 6,17 10,17" /></> },
   delegation: { color: "var(--accent)", path: <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="15" r="3" /><path d="M11 8h3.5a2.5 2.5 0 0 1 0 5H13" /></> },
   query: { color: "var(--text-muted)", path: <><circle cx="12" cy="12" r="8.5" /><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7" /><circle cx="12" cy="17" r=".6" fill="currentColor" /></> },
@@ -52,6 +53,7 @@ function mainField(
       return { key: "title", value: entity.title };
     case "announcement":
     case "reminder":
+    case "note":
       return { key: "text", value: entity.text };
     case "query":
       return { key: "question", value: entity.question };
@@ -253,6 +255,12 @@ export function EntityCard({
               {entity.kind === "reminder" && entity.remind_at_iso ? (
                 <Chip tone="neutral" interactive={false}>
                   {formatDeadline(entity.remind_at_iso)}
+                </Chip>
+              ) : null}
+
+              {entity.kind === "note" ? (
+                <Chip tone="muted" interactive={false}>
+                  заметка — видишь только ты
                 </Chip>
               ) : null}
 
