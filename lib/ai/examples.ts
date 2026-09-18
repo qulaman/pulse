@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ParseResult } from "./schema";
 
 /**
- * Few-shot pairs П1–П11 (docs/AI.md §4), mapped onto the single demo roster
+ * Few-shot pairs П1–П12 (docs/AI.md §4), mapped onto the single demo roster
  * tests/stt/roster.json: Айгуль → u-005, Ерлан → u-001 (spoken as «Ерлану Б.», otherwise
  * the two Erlans are ambiguous), Марат → u-003, Сакен → u-004, Тимур → u-009, Жандос → u-010.
  * Context of every example: четверг, 13.08.2026 16:32 (+05:00), источник voice.
@@ -37,7 +37,7 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
       ],
     },
   },
-  // П2. Мульти-сущность: объявление + 2 задачи + очки.
+  // П2. Мульти-сущность: мероприятие всем + 2 задачи + очки.
   {
     user:
       "Так, всем: завтра в десять общее собрание в офисе, не опаздывать. " +
@@ -47,8 +47,19 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
     assistant: {
       entities: [
         {
-          kind: "announcement",
-          text: "Завтра в 10:00 общее собрание в офисе, не опаздывать",
+          kind: "event",
+          title: "Общее собрание",
+          body: "Не опаздывать",
+          location: "в офисе",
+          starts_at_iso: "2026-08-14T10:00:00+05:00",
+          ends_at_iso: null,
+          time_confidence: 0.95,
+          time_source_text: "завтра в десять",
+          participant_queries: [],
+          participant_names: [],
+          participant_ids: [],
+          everyone: true,
+          remind_before_min: null,
           source_span: "всем: завтра в десять общее собрание в офисе, не опаздывать",
         },
         {
@@ -375,7 +386,48 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
       ],
     },
   },
+  // П12. Мероприятие с участниками по именам, местом и явным напоминанием (D-78).
+  {
+    user: "Встреча с Альфой в четверг в три у них в офисе, идут Марат и Айгуль. Напомни за час",
+    assistant: {
+      entities: [
+        {
+          kind: "event",
+          title: "Встреча с Альфой",
+          body: null,
+          location: "у них в офисе",
+          starts_at_iso: "2026-08-20T15:00:00+05:00",
+          ends_at_iso: null,
+          time_confidence: 0.9,
+          time_source_text: "в четверг в три",
+          participant_queries: ["Марат", "Айгуль"],
+          participant_names: ["Марат Оспанов", "Айгуль Сапарова"],
+          participant_ids: [],
+          everyone: false,
+          remind_before_min: 60,
+          source_span:
+            "Встреча с Альфой в четверг в три у них в офисе, идут Марат и Айгуль. Напомни за час",
+        },
+      ],
+    },
+  },
 ];
+
+/** The model's form of an event: nothing unsaid is null, it is "" or 0 (D-78, schema.ts). */
+function toModelShape(entity: ParseResult["entities"][number]): unknown {
+  if (entity.kind !== "event") return entity;
+  return {
+    kind: entity.kind,
+    title: entity.title,
+    location: entity.location ?? "",
+    starts_at_iso: entity.starts_at_iso,
+    time_confidence: entity.time_confidence ?? 0,
+    time_source_text: entity.time_source_text ?? "",
+    participant_names: entity.participant_names,
+    everyone: entity.everyone,
+    source_span: entity.source_span,
+  };
+}
 
 /** Context line shared by every few-shot user turn (docs/AI.md §4). */
 export const FEW_SHOT_CONTEXT = "Сейчас: четверг, 13.08.2026 16:32 (+05:00). Источник: voice.";
@@ -391,8 +443,12 @@ export function fewShotMessages(): Anthropic.MessageParam[] {
       role: "user",
       content: `${FEW_SHOT_CONTEXT}\n<input>\n${pair.user}\n</input>`,
     });
-    // the id is the server's field, not the model's: it never appears in an example
-    const text = JSON.stringify(pair.assistant, (key, value) => (key === "assignee_id" ? undefined : value));
+    // ids are the server's fields, not the model's: they never appear in an example,
+    // and an event is shown in the model's form — "" and 0 instead of null (schema.ts)
+    const shown = { entities: pair.assistant.entities.map(toModelShape) };
+    const text = JSON.stringify(shown, (key, value) =>
+      key === "assignee_id" || key === "participant_ids" ? undefined : value,
+    );
     messages.push({
       role: "assistant",
       content:

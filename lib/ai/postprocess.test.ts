@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { postprocess } from "./postprocess";
-import type { Entity, PointsEntity, TaskEntity } from "./schema";
+import type { Entity, EventEntity, PointsEntity, TaskEntity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 const ROSTER: RosterUser[] = [
@@ -42,6 +42,26 @@ function points(overrides: Partial<PointsEntity> = {}): PointsEntity {
     amount: 10,
     reason: null,
     source_span: "Марату плюс десять",
+    ...overrides,
+  };
+}
+
+function event(overrides: Partial<EventEntity> = {}): EventEntity {
+  return {
+    kind: "event",
+    title: "Планёрка",
+    body: null,
+    location: "в офисе",
+    starts_at_iso: "2026-08-14T10:00:00+05:00",
+    ends_at_iso: null,
+    time_confidence: 0.95,
+    time_source_text: "завтра в десять",
+    participant_queries: ["Марат", "Айгуль"],
+    participant_names: ["Марат Оспанов", "Айгуль Сапарова"],
+    participant_ids: [],
+    everyone: false,
+    remind_before_min: null,
+    source_span: "завтра в десять планёрка, Марат и Айгуль",
     ...overrides,
   };
 }
@@ -88,6 +108,37 @@ describe("postprocess", () => {
     expect(entity.assignee).toMatchObject({ status: "matched", user_id: "u-005" });
     expect(entity.kind === "task" && entity.assignee_id).toBe("u-005");
     expect(entity.blocked).toBeUndefined();
+  });
+
+  it("resolves every participant of an event into an id (D-56)", () => {
+    const [entity] = run([event()]);
+    expect(entity.kind === "event" && entity.participant_ids).toEqual(["u-003", "u-005"]);
+    expect(entity.participants).toHaveLength(2);
+    expect(entity.blocked).toBeUndefined();
+  });
+
+  it("keeps an event sendable when one of the names is nobody in the roster", () => {
+    const [entity] = run([
+      event({
+        participant_queries: ["Марат", "Сакеном"],
+        participant_names: ["Марат Оспанов", "Сакен Абаев"],
+      }),
+    ]);
+    expect(entity.kind === "event" && entity.participant_ids).toEqual(["u-003"]);
+    expect(entity.participants?.[1].match.status).not.toBe("matched");
+    expect(entity.blocked).toBeUndefined();
+  });
+
+  it("blocks an event that has no time at all", () => {
+    const [entity] = run([event({ starts_at_iso: null, time_confidence: null })]);
+    expect(entity.blocked).toBe("time_missing");
+  });
+
+  it("nulls an unparsable start together with its confidence, and blocks the card", () => {
+    const [entity] = run([event({ starts_at_iso: "в пятницу", time_confidence: 0.5 })]);
+    expect(entity.kind === "event" && entity.starts_at_iso).toBeNull();
+    expect(entity.kind === "event" && entity.time_confidence).toBeNull();
+    expect(entity.blocked).toBe("time_missing");
   });
 
   it("clears the model id when the bare name has namesakes (D-16, wrong assignee = never)", () => {

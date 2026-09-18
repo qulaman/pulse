@@ -3,10 +3,14 @@ import type { ParseSource } from "./prompt";
 import type { Entity } from "./schema";
 import { matchName, type AssigneeMatch, type RosterUser } from "../matchName";
 
-export type BlockedReason = "points_blocked" | "assignee_unmatched";
+export type BlockedReason = "points_blocked" | "assignee_unmatched" | "time_missing";
+
+/** One participant of an event: what was heard, what the model copied, what matched. */
+export type ParticipantMatch = { query: string; name: string | null; match: AssigneeMatch };
 
 export type PostprocessedEntity = Entity & {
   assignee?: AssigneeMatch;
+  participants?: ParticipantMatch[];
   blocked?: BlockedReason;
 };
 
@@ -38,7 +42,13 @@ export function postprocess(
       entity.assignee_id = null;
     }
 
-    for (const field of ["deadline_iso", "remind_at_iso", "scheduled_send_at"] as const) {
+    for (const field of [
+      "deadline_iso",
+      "remind_at_iso",
+      "scheduled_send_at",
+      "starts_at_iso",
+      "ends_at_iso",
+    ] as const) {
       if (field in entity) {
         const holder = entity as unknown as Record<string, unknown>;
         const value = holder[field];
@@ -46,6 +56,9 @@ export function postprocess(
           holder[field] = null;
           if (field === "deadline_iso" && "deadline_confidence" in entity) {
             holder.deadline_confidence = null;
+          }
+          if (field === "starts_at_iso" && "time_confidence" in entity) {
+            holder.time_confidence = null;
           }
         }
       }
@@ -55,6 +68,36 @@ export function postprocess(
       if (entity.amount === 0) continue; // nothing to award, nothing to show
       // Taking points away by voice is forbidden (D-30); shared text may not award any (D-36).
       if (source === "shared" || entity.amount < 0) entity.blocked = "points_blocked";
+    }
+
+    if (entity.kind === "event") {
+      // the meeting is one row with many people: every name is matched on its own, and a
+      // name nobody recognised is a yellow chip, not a blocked card (D-78 §0.3)
+      const participants: ParticipantMatch[] = entity.participant_names.map((name, index) => ({
+        query: entity.participant_queries[index] ?? name,
+        name,
+        match: matchName(
+          {
+            assignee_name: name,
+            assignee_id: null,
+            assignee_queries: [entity.participant_queries[index] ?? name],
+            assignee_confidence: 0.9,
+          },
+          roster,
+          matchingConfig,
+        ),
+      }));
+      entity.participants = participants;
+      entity.participant_ids = [
+        ...new Set(
+          participants
+            .filter((p) => p.match.status === "matched" && p.match.user_id !== null)
+            .map((p) => p.match.user_id as string),
+        ),
+      ];
+      // a meeting nobody can put in a calendar is not sendable: the time is the one field
+      // the director has to fill in on /confirm
+      if (entity.starts_at_iso === null) entity.blocked = "time_missing";
     }
 
     if (HAS_ASSIGNEE_FIELDS.has(entity.kind)) {

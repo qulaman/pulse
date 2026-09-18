@@ -62,7 +62,11 @@ describe("ENTITIES_JSON_SCHEMA: discriminator", () => {
 
     const items = (ENTITIES_JSON_SCHEMA.properties as Node).entities as Node;
     const variants = (items.items as Node).anyOf as Node[];
-    expect(variants).toHaveLength(8); // + note (D-75)
+    // eight, and eight only: the API refuses a ninth variant, so `event` took the
+    // place of `delegation` (D-78, schema.ts)
+    expect(variants).toHaveLength(8);
+    expect(variants.some((v) => ((v.properties as Node).kind as Node).const === "event")).toBe(true);
+    expect(variants.some((v) => ((v.properties as Node).kind as Node).const === "delegation")).toBe(false);
     for (const variant of variants) {
       const kind = (variant.properties as Node).kind as Node;
       expect(typeof kind.const).toBe("string");
