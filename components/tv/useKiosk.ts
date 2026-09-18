@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { createBrowserSupabase } from "@/lib/supabase/client";
 import { msUntilNightReload } from "@/lib/tv/clock";
+import type { TvState } from "@/lib/tv/queries";
+import { shouldReload } from "@/lib/tv/state";
 
 /**
  * Appliance-часть киоска (docs/FRONTEND.md «ТВ-режим»): экран работает месяцами без рук.
@@ -69,4 +72,42 @@ export function useVhPx(vh: number): number {
     return () => window.removeEventListener("resize", measure);
   }, [vh]);
   return px;
+}
+
+/**
+ * Квитанция экрана (принцип 8 для ТВ, D-76 §9). Расписывается только киоск: директор,
+ * открывший `/tv` с ноутбука, за стену в кабинете не отвечает — и RPC ему откажет.
+ *
+ * Три повода отметиться: поднялись, применили новое состояние, прошла минута. Ошибку
+ * гасим в консоль: пульт увидит «экран не отвечает», а стена от неё моргать не должна.
+ */
+const HEARTBEAT_MS = 60_000;
+
+export function useHeartbeat(role: string, appliedVersion: number | null): void {
+  useEffect(() => {
+    if (role !== "tv") return;
+    const supabase = createBrowserSupabase();
+    const beat = () => {
+      void supabase
+        .rpc("tv_heartbeat", { p_applied_version: appliedVersion ?? undefined })
+        .then(({ error }) => {
+          if (error) console.warn("tv_heartbeat:", error.message);
+        });
+    };
+    beat();
+    const timer = setInterval(beat, HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [role, appliedVersion]);
+}
+
+/**
+ * Перезапуск с пульта: «Перезапустить экран» ставит отметку в строке, киоск видит её
+ * через Realtime и перезагружается сам. Сравниваем с временем загрузки страницы, иначе
+ * поднявшийся киоск увидел бы ту же отметку и ушёл в петлю перезагрузок.
+ */
+export function useRemoteReload(state: TvState | null): void {
+  const bootedAt = useRef(new Date());
+  useEffect(() => {
+    if (shouldReload(state, bootedAt.current)) window.location.reload();
+  }, [state]);
 }
