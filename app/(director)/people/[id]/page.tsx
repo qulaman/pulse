@@ -11,6 +11,7 @@ import { PersonSkeleton } from "@/components/ui/PageSkeletons";
 import { Bone, RowListBone, SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import {
   AVAILABILITY_LABEL,
@@ -21,6 +22,9 @@ import {
 } from "@/lib/people/queries";
 import { balanceOf, useAwardPoints, usePointHistory, usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
+import { useTvControl } from "@/lib/tv/mutations";
+import { useTvState } from "@/lib/tv/queries";
+import { effectiveMode } from "@/lib/tv/state";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STATUS_LABEL, isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
@@ -62,6 +66,9 @@ export default function PersonPage() {
   const pointsEnabled = usePointsEnabled().data === true;
   const award = useAwardPoints();
   const [awardTarget, setAwardTarget] = useState<AwardTarget | null>(null);
+  // пульт ТВ прямо с карточки: жест «сотрудник зашёл — я нажал — его дела на стене» (D-76 §10)
+  const wall = useTvState();
+  const tv = useTvControl();
 
   // the clock is read once per mount: a lazy initializer is allowed where render is not
   const [now] = useState(() => Date.now());
@@ -90,6 +97,8 @@ export default function PersonPage() {
 
   const p = person.data;
   const dative = p.aliases[0] ?? p.full_name.split(/\s+/)[0] ?? p.full_name;
+  const wallRow = wall.data ?? null;
+  const onWall = effectiveMode(wallRow, new Date()) === "employee" && wallRow?.employee_id === p.id;
 
   const renderList = (list: TaskWithPeople[]) => (
     <div className="flex flex-col gap-3">
@@ -154,6 +163,22 @@ export default function PersonPage() {
               </Button>
             </Link>
           </div>
+          {/* киоск на киоске не показывают, уволенного — тоже */}
+          {p.is_active && p.role !== "tv" ? (
+            <Button
+              block
+              variant="secondary"
+              loading={tv.isPending}
+              onClick={() =>
+                tv.mutate(onWall ? { mode: "ether" } : { mode: "employee", employeeId: p.id }, {
+                  onSuccess: () =>
+                    toast(onWall ? "Убрал с экрана" : `На стене — ${dative} · 10 мин`),
+                })
+              }
+            >
+              {onWall ? "Убрать с экрана" : "На экран"}
+            </Button>
+          ) : null}
         </div>
         {!pointsEnabled ? (
           <p className="mt-2 text-[12px] leading-4 text-muted">Очки выключены — включаются в Настройках</p>
