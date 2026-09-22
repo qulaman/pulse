@@ -19,6 +19,7 @@ const ACTIVITY_TABLES = [
   "tasks", // notification_deliveries of tasks cascade
   "notes", // converted_* of a deleted task are nulled, the note itself goes here
   "events", // event_participants cascade with the event row
+  "errands", // their outbox rows go with notification_deliveries below
   "reminders",
   "recurrence_rules",
   "inbox_items",

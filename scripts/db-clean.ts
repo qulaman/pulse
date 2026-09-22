@@ -53,6 +53,7 @@ async function main() {
   await wipe("tasks");
   await wipe("notes");
   await wipe("events");
+  await wipe("errands");
   await wipe("reminders");
   await wipe("recurrence_rules");
   await wipe("inbox_items");
