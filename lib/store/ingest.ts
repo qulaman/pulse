@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { toast } from "@/components/ui/Toast";
 import { pluralRu } from "@/components/confirm/format";
+import { askSecretary } from "@/lib/errands/pending";
 import { softDeleteNotes } from "@/lib/notes/mutations";
 import type { BlockedReason, ParticipantMatch, PostprocessedEntity } from "../ai/postprocess";
 import type {
@@ -411,6 +412,24 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         const entities = res.entities ?? [];
         if (res.inbox_id) set({ inboxId: res.inbox_id });
         if (res.suspicious !== undefined) set({ suspicious: res.suspicious });
+
+        // «Кофе» — заявка секретарю, а не сущность: ни /confirm, ни модели (D-79).
+        // Пять секунд тост держит «Отменить», запись уже лежит в Storage (принцип 5).
+        if (res.errand) {
+          askSecretary(
+            { code: res.errand.code, label: res.errand.label, icon: "" },
+            res.errand.note,
+            () => undefined,
+            {
+              id: clientRequestId,
+              audioPath,
+              transcript,
+              inboxId: get().inboxId,
+            },
+          );
+          get().reset();
+          return;
+        }
 
         // nothing found: /confirm shows the raw words with a way out (fix the text, make a task, close)
         if (entities.length === 0) {

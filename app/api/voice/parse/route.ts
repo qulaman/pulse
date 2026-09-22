@@ -4,7 +4,8 @@ import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { ParseError, parseTranscript, providerOf } from "@/lib/ai/parse";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
-import { loadCompanySettings, loadRoster } from "@/lib/roster";
+import { matchErrand } from "@/lib/errands/matcher";
+import { hasActiveSecretary, loadCompanySettings, loadRoster } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/types";
@@ -71,6 +72,18 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
 
     const roster = await loadRoster(profile.companyId);
     const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
+
+    // «Кофе» до модели (D-79): короткая фраза без имени из ростера, совпавшая с кнопкой
+    // каталога, — это заявка, а не поручение. Ни токена, ни экрана подтверждения.
+    const errand = matchErrand(
+      body.transcript,
+      settings.secretary.actions,
+      roster,
+      await hasActiveSecretary(profile.companyId),
+    );
+    if (errand) {
+      return apiOk({ entities: [], errand, model: "matcher", escalated: false, latency_ms: 0 });
+    }
 
     let outcome;
     try {

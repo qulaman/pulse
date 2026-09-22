@@ -39,6 +39,24 @@ export async function loadRoster(companyId: string): Promise<RosterProfile[]> {
 export type CompanySettings = Record<string, unknown> | null;
 
 /** Everything client-specific lives here, never in code (V-02, docs/BACKEND.md §0.5). */
+/**
+ * Есть ли кому отвечать на заявки (D-79 §4): матчер «кофе» и шарик «Секретарь»
+ * включены ровно тогда, когда в компании есть активный секретарь.
+ */
+export async function hasActiveSecretary(companyId: string): Promise<boolean> {
+  const supabase = createServiceSupabase();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("company_id", companyId)
+    .eq("role", "secretary")
+    .eq("is_active", true)
+    .limit(1);
+
+  if (error) throw new Error(`secretary lookup failed: ${error.message}`);
+  return (data?.length ?? 0) > 0;
+}
+
 export async function loadCompanySettings(companyId: string): Promise<CompanySettings> {
   const supabase = createServiceSupabase();
   const { data, error } = await supabase

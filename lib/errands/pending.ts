@@ -22,6 +22,10 @@ export type PendingErrand = {
   label: string;
   icon: string;
   note: string | null;
+  /** Голосовой путь (D-79, фаза D): запись уже в Storage, её нельзя потерять (принцип 5). */
+  audioPath?: string | null;
+  transcript?: string | null;
+  inboxId?: string | null;
 };
 
 type PendingState = {
@@ -47,6 +51,9 @@ export async function postErrand(errand: PendingErrand): Promise<boolean> {
       kind: errand.code,
       note: errand.note ?? undefined,
       client_request_id: errand.id,
+      audio_path: errand.audioPath ?? undefined,
+      source_transcript: errand.transcript ?? undefined,
+      inbox_item_id: errand.inboxId ?? undefined,
     }),
   });
   return res.ok;
@@ -56,13 +63,22 @@ export async function postErrand(errand: PendingErrand): Promise<boolean> {
  * Tap → the line appears at once, the toast counts five seconds, then the row is
  * written. `onSent` refreshes the list the row belongs to.
  */
-export function askSecretary(action: SecretaryAction, note: string | null, onSent: () => void): string {
+export function askSecretary(
+  action: Pick<SecretaryAction, "code" | "label" | "icon">,
+  note: string | null,
+  onSent: () => void,
+  voice?: { id?: string; audioPath?: string | null; transcript?: string | null; inboxId?: string | null },
+): string {
   const errand: PendingErrand = {
-    id: crypto.randomUUID(),
+    // голос приносит свой ключ запроса: повтор той же фразы не купит второй кофе
+    id: voice?.id ?? crypto.randomUUID(),
     code: action.code,
     label: action.label,
     icon: action.icon,
     note,
+    audioPath: voice?.audioPath ?? null,
+    transcript: voice?.transcript ?? null,
+    inboxId: voice?.inboxId ?? null,
   };
   usePendingErrands.getState().add(errand);
 

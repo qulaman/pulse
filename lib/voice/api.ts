@@ -35,6 +35,8 @@ export type ParseResponse = {
   transcript?: string;
   inbox_id?: string | null;
   suspicious?: boolean;
+  /** «Кофе» поймал матчер до модели (D-79): это заявка секретарю, не сущность. */
+  errand?: { code: string; label: string; note: string | null } | null;
 };
 
 export type TranscribeRequest = {
