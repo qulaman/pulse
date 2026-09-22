@@ -2,15 +2,18 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/Button";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { usePeople } from "@/lib/people/queries";
 import {
   PARSER_MODEL_LABEL,
   PARSER_MODELS,
   STT_PROVIDER_LABEL,
   STT_PROVIDERS,
+  withSecretaryCodes,
   type CompanySettings,
   type SettingsPatch,
 } from "@/lib/settings";
@@ -84,6 +87,9 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
 export function SettingsForm() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  // the catalogue matters only where somebody answers it: no active secretary — no module (D-79 §4)
+  const people = usePeople();
+  const secretaries = (people.data ?? []).filter((p) => p.role === "secretary" && p.is_active);
   // Edits live in `edited`; until the first edit the form mirrors the server value.
   const [edited, setEdited] = useState<CompanySettings | null>(null);
   const [vocabularyEdited, setVocabularyEdited] = useState<string | null>(null);
@@ -115,6 +121,13 @@ export function SettingsForm() {
   const update = (patch: Partial<CompanySettings>) => setDraft({ ...draft, ...patch });
   const updateConvention = (index: number, patch: Partial<CompanySettings["conventions"][number]>) =>
     update({ conventions: draft.conventions.map((row, i) => (i === index ? { ...row, ...patch } : row)) });
+  const updateAction = (index: number, patch: Partial<CompanySettings["secretary"]["actions"][number]>) =>
+    update({
+      secretary: {
+        ...draft.secretary,
+        actions: draft.secretary.actions.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      },
+    });
 
   const submit = () => {
     const vocabulary = vocabularyText
@@ -129,6 +142,11 @@ export function SettingsForm() {
       points_enabled: draft.points_enabled,
       rating_mode: draft.rating_mode,
       delivery_window: draft.delivery_window,
+      secretary: {
+        escalate_after_min: draft.secretary.escalate_after_min,
+        // an empty row is scratch space; a new row gets its code here, once and for good
+        actions: withSecretaryCodes(draft.secretary.actions),
+      },
     });
   };
 
@@ -235,6 +253,101 @@ export function SettingsForm() {
         >
           Добавить слово
         </Button>
+      </Section>
+
+      <Section
+        title="Секретарь"
+        hint="Кнопки, которыми ты зовёшь секретаря. Заявка — не задача: без срока, без приёмки, живёт минуты."
+      >
+        <p className="text-[13px] leading-4 text-muted">
+          {secretaries.length ? (
+            <>
+              Сейчас это {secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")}. Роль меняется в{" "}
+              <Link href="/people" className="underline">
+                карточке человека
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              Назначь роль «Секретарь» в{" "}
+              <Link href="/people" className="underline">
+                карточке человека
+              </Link>{" "}
+              — тогда на Пульсе появится шарик.
+            </>
+          )}
+        </p>
+        <div className="flex flex-col gap-3">
+          {draft.secretary.actions.map((row, index) => (
+            <div key={index} className="grid grid-cols-[56px_1fr_44px] gap-2">
+              <input
+                className={`${FIELD} px-0 text-center`}
+                aria-label="Значок"
+                maxLength={4}
+                placeholder="☕"
+                value={row.icon}
+                onChange={(e) => updateAction(index, { icon: e.target.value })}
+              />
+              <input
+                className={FIELD}
+                aria-label="Надпись"
+                placeholder="Кофе"
+                value={row.label}
+                onChange={(e) => updateAction(index, { label: e.target.value })}
+              />
+              <button
+                type="button"
+                aria-label="Убрать действие"
+                className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
+                onClick={() =>
+                  update({
+                    secretary: {
+                      ...draft.secretary,
+                      actions: draft.secretary.actions.filter((_, i) => i !== index),
+                    },
+                  })
+                }
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+        <Button
+          variant="secondary"
+          block
+          disabled={draft.secretary.actions.length >= 12}
+          onClick={() =>
+            update({
+              secretary: {
+                ...draft.secretary,
+                // the code is filled on save: the director names the button, not its id
+                actions: [...draft.secretary.actions, { code: "", label: "", icon: "", synonyms: [] }],
+              },
+            })
+          }
+        >
+          Добавить действие
+        </Button>
+        <Field label="Повторить пуш через, минут">
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={60}
+            className={FIELD}
+            value={draft.secretary.escalate_after_min}
+            onChange={(e) =>
+              update({
+                secretary: {
+                  ...draft.secretary,
+                  escalate_after_min: Math.min(60, Math.max(1, Number(e.target.value) || 1)),
+                },
+              })
+            }
+          />
+        </Field>
       </Section>
 
       <Section title="Очки и рейтинг" hint="Во время пилота очки выключены (D-40). Включи, когда команда привыкнет к задачам.">

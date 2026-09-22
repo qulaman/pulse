@@ -42,6 +42,48 @@ export const DeliveryWindowSchema = z.object({
   to: z.string().regex(/^\d{2}:\d{2}$/).default("21:00"),
 });
 
+/**
+ * D-79: the secretary's catalogue is data, never code — the buttons of one company
+ * live in its settings (V-02). `code` is what an errand keeps forever, `label` is the
+ * snapshot shown at the moment of asking, `synonyms` feed the voice matcher. There is
+ * no `enabled` flag: the module is on exactly when the company has an active secretary.
+ */
+export const SecretaryActionSchema = z.object({
+  code: z.string().trim().min(1).max(32),
+  label: z.string().trim().min(1).max(40),
+  icon: z.string().trim().max(8).default(""),
+  synonyms: z.array(z.string().trim().min(1)).max(12).default([]),
+});
+
+export type SecretaryAction = z.infer<typeof SecretaryActionSchema>;
+
+export const DEFAULT_SECRETARY_ACTIONS: SecretaryAction[] = [
+  { code: "coffee", label: "Кофе", icon: "☕", synonyms: ["кофе", "кофейку"] },
+  { code: "tea", label: "Чай", icon: "🍵", synonyms: ["чай", "чайку"] },
+  { code: "doctor", label: "Врач", icon: "🩺", synonyms: ["врач", "врача", "доктор"] },
+  { code: "come", label: "Зайди ко мне", icon: "🚪", synonyms: ["зайди", "зайди ко мне", "подойди"] },
+];
+
+/** Two rows with one code would make the history of an errand ambiguous. */
+const SecretaryActionsSchema = z
+  .array(SecretaryActionSchema)
+  .max(12)
+  .superRefine((actions, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, action] of actions.entries()) {
+      if (seen.has(action.code)) {
+        ctx.addIssue({ code: "custom", message: "Код действия повторяется", path: [index, "code"] });
+      }
+      seen.add(action.code);
+    }
+  });
+
+export const SecretarySettingsSchema = z.object({
+  /** One repeat push of an errand nobody took (D-79 §7). */
+  escalate_after_min: z.number().int().min(1).max(60).default(3),
+  actions: SecretaryActionsSchema.default(DEFAULT_SECRETARY_ACTIONS),
+});
+
 /** D-44: the only client customisation — a logo, an optional accent, a tagline. */
 export const BrandSchema = z.object({
   logo_url: z.url().nullable().default(null),
@@ -73,9 +115,53 @@ export const CompanySettingsSchema = z.object({
   points_enabled: z.boolean().default(false),
   rating_mode: z.enum(["top5", "full"]).default("top5"),
   delivery_window: DeliveryWindowSchema.prefault({}),
+  /** The secretary's buttons and the repeat-push timeout (D-79). */
+  secretary: SecretarySettingsSchema.prefault({}),
 });
 
 export type CompanySettings = z.infer<typeof CompanySettingsSchema>;
+
+const TRANSLIT: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  ә: "a", ғ: "g", қ: "k", ң: "n", ө: "o", ұ: "u", ү: "u", һ: "h", і: "i",
+};
+
+/**
+ * The code of a catalogue button is the director's label in latin letters — it never
+ * changes afterwards, because an errand keeps it forever while the label may be
+ * renamed (D-79 §4). A label with nothing to transliterate falls back to action_N.
+ */
+export function secretaryActionCode(label: string, taken: readonly string[] = []): string {
+  const base =
+    label
+      .toLowerCase()
+      .split("")
+      .map((ch) => TRANSLIT[ch] ?? (/[a-z0-9]/.test(ch) ? ch : " "))
+      .join("")
+      .trim()
+      .replace(/\s+/g, "_")
+      .slice(0, 32) || `action_${taken.length + 1}`;
+  let code = base;
+  for (let n = 2; taken.includes(code); n += 1) code = `${base}_${n}`.slice(0, 32);
+  return code;
+}
+
+/**
+ * What the form sends: empty rows are the editor's scratch space, and a row the
+ * director just added gets its code here, once.
+ */
+export function withSecretaryCodes(actions: readonly SecretaryAction[]): SecretaryAction[] {
+  const result: SecretaryAction[] = [];
+  for (const action of actions) {
+    const label = action.label.trim();
+    if (!label) continue;
+    const code = action.code.trim() || secretaryActionCode(label, result.map((a) => a.code));
+    result.push({ ...action, label, code });
+  }
+  return result;
+}
 
 /** Defaults applied on top of whatever the row holds; malformed sections fall back to defaults. */
 export function parseCompanySettings(raw: unknown): CompanySettings {
@@ -95,6 +181,7 @@ export const SettingsPatchSchema = z
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
     delivery_window: DeliveryWindowSchema.partial(),
+    secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,
   })
   .partial()
