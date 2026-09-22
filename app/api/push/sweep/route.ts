@@ -16,7 +16,15 @@ export async function POST(req: Request) {
     const service = createServiceSupabase();
     const due = await service.rpc("events_due_reminders");
     if (due.error) console.error("events_due_reminders failed:", due.error.message);
-    return apiOk({ ...(await sweepDeliveries()), reminders: due.data ?? 0 });
+    // and the one repeat push of an errand nobody took (D-79): same rule — a failing
+    // tick is logged, the queue still goes out
+    const escalated = await service.rpc("errands_due_escalation");
+    if (escalated.error) console.error("errands_due_escalation failed:", escalated.error.message);
+    return apiOk({
+      ...(await sweepDeliveries()),
+      reminders: due.data ?? 0,
+      escalations: escalated.data ?? 0,
+    });
   } catch (err) {
     console.error("sweep failed:", err instanceof Error ? err.message : err);
     return apiError(500, "internal", "Что-то пошло не так, попробуй ещё раз");
