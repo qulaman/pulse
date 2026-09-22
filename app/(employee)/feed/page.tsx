@@ -23,6 +23,9 @@ import { Chip } from "@/components/ui/Chip";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
+import { ErrandCards } from "@/components/secretary/ErrandCards";
+import { useErrands } from "@/lib/errands/queries";
+import { describeErrandsForSecretary } from "@/lib/errands/say";
 import { useEther } from "@/lib/ether/queries";
 import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
 import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
@@ -62,16 +65,22 @@ export default function FeedPage() {
   const lanes = useMemo(() => lanesOf(open, now, meId), [open, now, meId]);
   const calendar = useCalendar();
   const events = useMemo(() => calendar.data ?? [], [calendar.data]);
+  // заявки читает только секретарь: остальным ролям RLS не отдаёт ни строки (D-79 §8)
+  const isSecretary = me.data?.role === "secretary";
+  const errands = useErrands(isSecretary);
+  const errandRows = useMemo(() => errands.data ?? [], [errands.data]);
   const voice = useMemo<Voice>(
     () => ({
       opening: employeeOpening,
       describe: (prev, next) => describeForEmployeeAll(prev, next, meId),
       // an invitation, a move and «скоро начнётся» are news for the person too
       describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
+      // «Директор просит: кофе» — the errand arrives as a thought above the head
+      describeErrands: (prev, next) => describeErrandsForSecretary(prev, next, meId),
     }),
     [meId],
   );
-  const speech = useSpeechWith(rows, lanes, now, name, voice, calendar.data);
+  const speech = useSpeechWith(rows, lanes, now, name, voice, calendar.data, isSecretary ? errands.data : undefined);
 
   // «Дела»: what to accept or redo first, then what is in work, then what waits for the director
   const todo = useMemo(() => sortByUrgency(open.filter(isTodo), now), [open, now]);
@@ -79,6 +88,12 @@ export default function FeedPage() {
   const onReview = useMemo(() => sortByUrgency(open.filter((task) => task.status === "pending_review"), now), [open, now]);
   const unread = useMemo(() => open.filter((task) => hasUnread(task, meId)), [open, meId]);
   const unacked = useMemo(() => (ether.data ?? []).filter((item) => !item.acks.some((ack) => ack.user_id === meId)), [ether.data, meId]);
+
+  // живые заявки секретаря: ничьи и свои принятые — чужая принятая гаснет сама
+  const mineErrands = useMemo(
+    () => errandRows.filter((e) => e.status === "sent" || (e.status === "accepted" && e.claimed_by === meId)),
+    [errandRows, meId],
+  );
 
   const [mode, setMode] = useState<Mode>("idle");
   const [panel, setPanel] = useState<OrbitId | null>(null);
@@ -97,8 +112,19 @@ export default function FeedPage() {
         count: todayCount(events, now),
         tone: startsSoon(nextEvent(events, now), now) ? "var(--warn)" : "var(--accent)",
       },
+      // пятый шарик только у секретаря: «Заявки» — свои и ничьи ещё (D-79)
+      ...(isSecretary
+        ? [
+            {
+              id: "secretary" as const,
+              label: "Заявки",
+              count: mineErrands.length,
+              tone: mineErrands.some((e) => e.status === "sent") ? "var(--warn)" : "var(--ok)",
+            },
+          ]
+        : []),
     ],
-    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length, events, now],
+    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length, events, now, isSecretary, mineErrands],
   );
 
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
@@ -239,6 +265,7 @@ export default function FeedPage() {
                 <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
               )
             ) : null}
+            {panel === "secretary" ? <ErrandCards errands={errandRows} meId={meId} now={now} /> : null}
             {panel === "ether" ? (
               (ether.data ?? []).length === 0 ? (
                 <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
