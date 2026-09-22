@@ -15,6 +15,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   manager: "Руководитель",
   employee: "Сотрудник",
   shopkeeper: "Завхоз магазина",
+  secretary: "Секретарь",
   tv: "ТВ-экран",
 };
 

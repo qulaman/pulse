@@ -206,6 +206,98 @@ export type Database = {
         }
         Relationships: []
       }
+      errands: {
+        Row: {
+          accepted_at: string | null
+          audio_path: string | null
+          author_id: string
+          claimed_by: string | null
+          client_request_id: string | null
+          company_id: string
+          created_at: string
+          decline_reason: string | null
+          done_at: string | null
+          escalated_at: string | null
+          id: string
+          inbox_item_id: string | null
+          kind: string
+          label: string
+          note: string | null
+          source_transcript: string | null
+          status: Database["public"]["Enums"]["errand_status"]
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          audio_path?: string | null
+          author_id: string
+          claimed_by?: string | null
+          client_request_id?: string | null
+          company_id: string
+          created_at?: string
+          decline_reason?: string | null
+          done_at?: string | null
+          escalated_at?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          kind: string
+          label: string
+          note?: string | null
+          source_transcript?: string | null
+          status?: Database["public"]["Enums"]["errand_status"]
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          audio_path?: string | null
+          author_id?: string
+          claimed_by?: string | null
+          client_request_id?: string | null
+          company_id?: string
+          created_at?: string
+          decline_reason?: string | null
+          done_at?: string | null
+          escalated_at?: string | null
+          id?: string
+          inbox_item_id?: string | null
+          kind?: string
+          label?: string
+          note?: string | null
+          source_transcript?: string | null
+          status?: Database["public"]["Enums"]["errand_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "errands_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errands_claimed_by_fkey"
+            columns: ["claimed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errands_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "errands_inbox_item_id_fkey"
+            columns: ["inbox_item_id"]
+            isOneToOne: false
+            referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_participants: {
         Row: {
           created_at: string
@@ -1383,6 +1475,7 @@ export type Database = {
         Returns: Json
       }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      errands_due_escalation: { Args: { p_now?: string }; Returns: number }
       events_due_reminders: { Args: { p_now?: string }; Returns: number }
       extend_task_deadline: {
         Args: {
@@ -1456,6 +1549,19 @@ export type Database = {
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }
+      team_role: {
+        Args: { r: Database["public"]["Enums"]["user_role"] }
+        Returns: boolean
+      }
+      transition_errand: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+          p_reason?: string
+          p_to: string
+        }
+        Returns: Json
+      }
       transition_task: {
         Args: {
           client_request_id?: string
@@ -1522,6 +1628,7 @@ export type Database = {
       availability_t: "active" | "vacation" | "sick"
       delivery_channel: "push" | "telegram" | "sms"
       delivery_status: "queued" | "sent" | "failed"
+      errand_status: "sent" | "accepted" | "done" | "declined" | "cancelled"
       inbox_status:
         | "recorded"
         | "transcribed"
@@ -1547,7 +1654,13 @@ export type Database = {
         | "rework"
         | "declined"
         | "revoked"
-      user_role: "director" | "manager" | "employee" | "shopkeeper" | "tv"
+      user_role:
+        | "director"
+        | "manager"
+        | "employee"
+        | "shopkeeper"
+        | "tv"
+        | "secretary"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1681,6 +1794,7 @@ export const Constants = {
       availability_t: ["active", "vacation", "sick"],
       delivery_channel: ["push", "telegram", "sms"],
       delivery_status: ["queued", "sent", "failed"],
+      errand_status: ["sent", "accepted", "done", "declined", "cancelled"],
       inbox_status: [
         "recorded",
         "transcribed",
@@ -1709,7 +1823,14 @@ export const Constants = {
         "declined",
         "revoked",
       ],
-      user_role: ["director", "manager", "employee", "shopkeeper", "tv"],
+      user_role: [
+        "director",
+        "manager",
+        "employee",
+        "shopkeeper",
+        "tv",
+        "secretary",
+      ],
     },
   },
 } as const
