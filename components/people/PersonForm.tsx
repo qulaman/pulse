@@ -16,7 +16,7 @@ import {
 const FIELD =
   "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
 
-const ROLES: Role[] = ["employee", "manager", "shopkeeper", "director", "tv"];
+const ROLES: Role[] = ["employee", "manager", "secretary", "shopkeeper", "director", "tv"];
 const AVAILABILITIES: Availability[] = ["active", "vacation", "sick"];
 
 export type PersonDraft = {

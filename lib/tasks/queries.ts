@@ -372,7 +372,8 @@ export function usePulseBoard(me: Me | undefined, enabled = true) {
   const meId = me?.userId ?? "";
   // the employee's own rows, on the socket as in the query; the director and the
   // manager take the whole company and let RLS decide
-  const assigneeId = me?.role === "employee" ? meId : undefined;
+  // the secretary is an employee with an extra pile of cards: the same private filter
+  const assigneeId = me?.role === "employee" || me?.role === "secretary" ? meId : undefined;
   const live = enabled && Boolean(me);
 
   const query = useRealtimeQuery<BoardTask[], TaskRow>({

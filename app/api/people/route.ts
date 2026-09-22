@@ -10,7 +10,7 @@ const BodySchema = z.strictObject({
   email: z.email(),
   password: z.string().min(6).max(72),
   full_name: z.string().trim().min(2).max(120),
-  role: z.enum(["director", "manager", "employee", "shopkeeper", "tv"]),
+  role: z.enum(["director", "manager", "employee", "shopkeeper", "secretary", "tv"]),
   position: z.string().trim().max(120).optional(),
   aliases: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
   manager_id: z.guid().nullable().optional(), // guid: seed ids are not RFC-4122

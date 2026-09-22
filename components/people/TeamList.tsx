@@ -19,7 +19,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "free", label: "Свободны" },
 ];
 
-const ROLE_ORDER: Record<string, number> = { director: 0, manager: 1, employee: 2, shopkeeper: 2, tv: 9 };
+const ROLE_ORDER: Record<string, number> = { director: 0, manager: 1, employee: 2, shopkeeper: 2, secretary: 2, tv: 9 };
 const GROUP_LABEL: Record<string, string> = { lead: "Руководство", staff: "Сотрудники", tv: "Экраны" };
 
 function groupOf(p: Person): "lead" | "staff" | "tv" {

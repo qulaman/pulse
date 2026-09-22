@@ -7,6 +7,7 @@ import { useState } from "react";
 import { AnnouncementCard } from "@/components/ether/AnnouncementCard";
 import { EtherListBone } from "@/components/ui/PageSkeletons";
 import { useAcknowledge, useDeleteAnnouncement, useEther, type Announcement } from "@/lib/ether/queries";
+import { TEAM_ROLES } from "@/lib/routes";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
@@ -22,7 +23,7 @@ function useTeamSize() {
         .from("profiles")
         .select("id", { count: "exact", head: true })
         .eq("is_active", true)
-        .in("role", ["employee", "manager", "shopkeeper"]);
+        .in("role", [...TEAM_ROLES]);
       return count ?? 0;
     },
   });
