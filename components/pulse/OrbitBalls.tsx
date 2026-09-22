@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
-export type OrbitId = "tasks" | "messages" | "ether" | "calendar";
+export type OrbitId = "tasks" | "messages" | "ether" | "calendar" | "secretary";
 
 export type OrbitBall = {
   id: OrbitId;
@@ -50,6 +50,14 @@ const ICON: Record<OrbitId, ReactNode> = {
       <path d="M8 3.5v4M16 3.5v4M3.5 10.5h17" />
     </svg>
   ),
+  // a cup: the errands of D-79 are coffee, tea and a knock on the door
+  secretary: (
+    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <path d="M5 8h11v6a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4z" />
+      <path d="M16 9.5h1.5a2.5 2.5 0 0 1 0 5H16" />
+      <path d="M8 3.5c0 1.2 1 1.6 1 2.8M12 3.5c0 1.2 1 1.6 1 2.8" />
+    </svg>
+  ),
 };
 
 /**
@@ -78,7 +86,7 @@ export function OrbitBalls({
   return (
     // plain divs carry the ring: the CSS orbit owns their transforms, framer only enters and exits the buttons
     <div
-      className={spinning ? "pointer-events-none absolute inset-0" : "flex justify-center gap-4"}
+      className={spinning ? "pointer-events-none absolute inset-0" : "flex justify-center gap-2"}
       style={spinning ? { animation: `orbit-spin ${ORBIT_S}s linear infinite` } : undefined}
       data-testid="orbit"
       data-mode={mode}

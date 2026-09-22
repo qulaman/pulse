@@ -21,7 +21,9 @@ import { Button } from "@/components/ui/Button";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
+import { SecretaryPanel } from "@/components/secretary/SecretaryPanel";
 import { useEther } from "@/lib/ether/queries";
+import { activeCount, ballTone, useErrands, useSecretaryActions } from "@/lib/errands/queries";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
@@ -78,8 +80,12 @@ export default function PulsePage() {
   const counts = countsOf(lanes);
   const calendar = useCalendar();
   const events = useMemo(() => calendar.data ?? [], [calendar.data]);
-  // the calendar is news too: an answer, a move and the reminder the tick has just written
-  const speech = useSpeech(rows, lanes, now, directorName, meId, calendar.data);
+  const errands = useErrands();
+  const errandRows = useMemo(() => errands.data ?? [], [errands.data]);
+  const catalogue = useSecretaryActions();
+  // the calendar and the errands are news too: an answer, a move, the reminder the tick
+  // has just written, «Айгуль · кофе принят»
+  const speech = useSpeech(rows, lanes, now, directorName, meId, calendar.data, errands.data);
   const eventSoon = startsSoon(nextEvent(events, now), now);
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const showHint = useLeverHint();
@@ -93,6 +99,9 @@ export default function PulsePage() {
   // the balls and the mascot are where they were when the sheet closes (D-64 §5)
   const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
   const openThread = (task: BoardTask) => setThread({ id: task.id, title: task.title });
+
+  const people = usePeople();
+  const hasSecretary = (people.data ?? []).some((p) => p.role === "secretary" && p.is_active);
 
   // every open task on the ball (in work included), coloured by the worst of them; messages are counted apart
   const taskCount = counts.overdue + counts.declined + counts.review + counts.work;
@@ -113,8 +122,19 @@ export default function PulsePage() {
         count: todayCount(events, now),
         tone: eventSoon ? "var(--warn)" : "var(--accent)",
       },
+      // the fifth ball exists only when the company has somebody to ask (D-79 §4)
+      ...(hasSecretary
+        ? [
+            {
+              id: "secretary" as const,
+              label: "Секретарь",
+              count: activeCount(errandRows),
+              tone: ballTone(errandRows),
+            },
+          ]
+        : []),
     ],
-    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon],
+    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, hasSecretary, errandRows],
   );
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
@@ -134,7 +154,6 @@ export default function PulsePage() {
   };
 
   // ---- a question the phrase turned out to be ---------------------------------------------
-  const people = usePeople();
   const asked = stage === "question" && question ? question : null;
   // the closed list (200 rows, two joins) is fetched only while a question needs it
   const sent = useSentTasks(asked ? me.data?.userId : undefined);
@@ -309,6 +328,14 @@ export default function PulsePage() {
               ) : (
                 <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
               )
+            ) : null}
+            {panel === "secretary" ? (
+              <SecretaryPanel
+                actions={catalogue.data ?? []}
+                errands={errandRows}
+                now={now}
+                onRefresh={() => void errands.refetch()}
+              />
             ) : null}
             {panel === "ether" ? (
               (ether.data ?? []).length === 0 ? (
