@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 
-import { Mascot, type MascotState } from "@/components/brand/Mascot";
+import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { TextSheet } from "@/components/voice/TextSheet";
 import { haptic } from "@/lib/haptics";
 import { useComposeStore } from "@/lib/store/compose";
@@ -77,8 +77,11 @@ export function MascotLever({
   voice = true,
   label,
   caption = true,
+  act = null,
 }: {
   state: MascotState;
+  /** a one-shot over the resting face (D-82); the pipeline, once it runs, drops it */
+  act?: MascotAct | null;
   onTap: () => void;
   size?: number;
   /** bumped when the face wakes up: a one-shot stretch */
@@ -284,7 +287,7 @@ export function MascotLever({
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
               style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
             >
-              <Mascot state={face} size={BASE} level={recording ? level : 0} />
+              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline ? null : act} />
             </span>
           </button>
         </motion.div>
