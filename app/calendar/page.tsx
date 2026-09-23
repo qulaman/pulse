@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { CalendarList } from "@/components/calendar/CalendarList";
+import { CalendarOnWall } from "@/components/calendar/CalendarOnWall";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { CalendarListBone } from "@/components/ui/PageSkeletons";
 import { useCalendar, useEvent, type CalendarEvent } from "@/lib/calendar/queries";
@@ -46,8 +47,10 @@ export default function CalendarPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
-      <div className="flex items-start justify-between gap-3">
-        <h1 className="text-[24px] font-bold leading-[30px]">Календарь</h1>
+      <div className="flex items-start gap-1">
+        <h1 className="mr-auto text-[24px] font-bold leading-[30px]">Календарь</h1>
+        {/* the week on the office wall, one tap (D-96) */}
+        {isDirector ? <CalendarOnWall /> : null}
         {isDirector ? (
           <button
             type="button"

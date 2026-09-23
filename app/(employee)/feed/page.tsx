@@ -27,6 +27,8 @@ import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
 import { ErrandCards } from "@/components/secretary/ErrandCards";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
+import { ReceptionCards } from "@/components/visits/ReceptionCards";
+import { VisitorButton } from "@/components/visits/VisitorButton";
 import { useErrands, type Errand } from "@/lib/errands/queries";
 import { deskLine, sceneOf } from "@/lib/errands/scene";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
@@ -39,6 +41,7 @@ import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import { firstNameOf } from "@/lib/text/normalize";
+import { useVisits } from "@/lib/visits/queries";
 
 type Mode = "idle" | "ring" | "panel";
 
@@ -108,7 +111,14 @@ export default function FeedPage() {
     [errandRows, meId],
   );
   // the request the secretary's face acts out, and the cheer after «Готово» (D-87)
-  const desk = useDeskFocus(errandRows, meId);
+  const errandDesk = useDeskFocus(errandRows, meId);
+  // «К вам посетитель» (D-96): the reception's own cards, and the director's «пусть заходит»
+  // plays the guest scene — the door opens — unless a new request is ringing
+  const visits = useVisits(isSecretary);
+  const visitRows = useMemo(() => visits.data ?? [], [visits.data]);
+  const letIn = visitRows.find((v) => v.status === "invited" && !v.closed_at) ?? null;
+  const desk = letIn && errandDesk.phase !== "asked" ? { ...errandDesk, scene: "guest" as const, phase: "doing" as const } : errandDesk;
+  const deskText = letIn && errandDesk.phase !== "asked" ? "Приглашаю посетителя в кабинет" : deskLine(errandDesk);
 
   const [mode, setMode] = useState<Mode>("idle");
   const [panel, setPanel] = useState<OrbitId | null>(null);
@@ -275,9 +285,15 @@ export default function FeedPage() {
               data-testid="desk-line"
               data-phase={desk.phase}
             >
-              {deskLine(desk)}
+              {deskText}
               {desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
             </p>
+          ) : null}
+          {/* «Посетитель» (D-96): a person at the desk — one tap, and the director's wall says so */}
+          {isSecretary && mode === "idle" && !loading ? (
+            <div className="mt-2">
+              <VisitorButton visits={visitRows} />
+            </div>
           ) : null}
         </div>
 
@@ -291,6 +307,7 @@ export default function FeedPage() {
           ) : null}
           <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
+            {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
             {isSecretary && mode === "idle" ? <DeskCards errands={errandRows} mine={mineErrands} meId={meId} now={now} /> : null}
             {mode !== "idle" ? (
               <>
@@ -367,7 +384,7 @@ export default function FeedPage() {
       </LayoutGroup>
 
       {/* the hint never lies over the secretary's cards */}
-      {mode === "idle" && !(isSecretary && mineErrands.length > 0) ? (
+      {mode === "idle" && !(isSecretary && (mineErrands.length > 0 || visitRows.some((v) => !v.closed_at))) ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}

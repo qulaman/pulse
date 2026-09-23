@@ -24,13 +24,20 @@ export function RemoteSkeleton() {
         <Bone h={60} className="rounded-[18px]" />
         <Bone h={60} w={60} className="shrink-0 rounded-full" />
       </div>
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      {/* four scenes two by two, each with its dot (D-96) */}
+      <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-[17px]">
+        <Bone h={66} className="rounded-[18px]" />
         <Bone h={66} className="rounded-[18px]" />
         <Bone h={66} className="rounded-[18px]" />
         <Bone h={66} className="rounded-[18px]" />
       </div>
-      <div className="mt-2 flex h-[5px] justify-around" />
-      <Bone h={16} w={180} className="mt-2" />
+      <Bone h={16} w={180} className="mx-auto mt-3" />
+      <div className={`${s.seam}`} />
+      <Bone h={16} w={120} className="mt-3 ml-1" />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Bone h={60} className="rounded-[18px]" />
+        <Bone h={60} className="rounded-[18px]" />
+      </div>
       <Bone h={60} className="mt-3 rounded-[18px]" />
       <div className={`${s.seam}`} />
       <Bone h={16} w={120} className="mt-3 ml-1" />
