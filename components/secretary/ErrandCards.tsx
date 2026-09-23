@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DECLINE_REASONS, useErrandActions, useErrandLink } from "@/lib/errands/mutations";
 import { isActive, waitedFor, type Errand } from "@/lib/errands/queries";
-import { etaLeftMin, etaLine, QUESTIONS, RESULTS, sceneOf, untilLine, type DeskScene } from "@/lib/errands/scene";
+import { atLine, etaLeftMin, etaLine, QUESTIONS, RESULTS, sceneOf, untilLine, type DeskScene } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 import { firstNameOf } from "@/lib/text/normalize";
 
@@ -87,6 +87,13 @@ function ErrandCard({ errand, meId, now, scene }: { errand: Errand; meId: string
       </p>
       <p className="mt-0.5 pl-2 text-[17px] font-semibold leading-[22px]" style={alarm ? { color: "var(--danger)" } : undefined}>
         {alarm ? "Вызови охрану!" : errand.label}
+        {/* «к 18:00» (D-106 §8): the time it is needed by, as loud as the request itself */}
+        {!alarm && errand.due_at ? (
+          <span style={{ color: "var(--accent)" }} data-testid="errand-due">
+            {" "}
+            · {atLine(errand.due_at)}
+          </span>
+        ) : null}
       </p>
       {errand.note ? <p className="mt-0.5 pl-2 text-[15px] leading-5 text-muted">{errand.note}</p> : null}
       {taken && eta ? <p className="mt-0.5 pl-2 text-[13px] leading-4 text-muted">Обещано: {eta}</p> : null}

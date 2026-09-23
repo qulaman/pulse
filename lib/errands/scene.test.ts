@@ -4,6 +4,10 @@ import type { Errand } from "@/lib/errands/queries";
 import {
   absenceLine,
   askedDetails,
+  atLine,
+  dueFromWall,
+  dueSlots,
+  isPlanned,
   daypartOf,
   deskFocus,
   deskLine,
@@ -304,5 +308,44 @@ describe("absenceLine — who is away, for the toast of a request that went (D-1
 
   it("every secretary is away — the earliest return", () => {
     expect(absenceLine([aigul, marat], now)).toBe("никого нет на месте до 14:10");
+  });
+});
+
+describe("requests for a time (D-106 §8)", () => {
+  const now = new Date("2026-09-23T09:10:00Z"); // 14:10 in Aqtobe
+
+  it("«к 18:00» on the Aqtobe clock", () => {
+    expect(atLine("2026-09-23T13:00:00Z", now)).toBe("к 18:00");
+    expect(atLine("2026-09-24T12:30:00Z", now)).toBe("завтра к 17:30");
+  });
+
+  it("the sheet offers the next half-hours at least a quarter of an hour ahead", () => {
+    expect(dueSlots(now).map((slot) => atLine(slot, now))).toEqual(["к 14:30", "к 15:00", "к 15:30", "к 16:00"]);
+    expect(atLine(dueSlots(new Date("2026-09-23T09:20:00Z"))[0], now)).toBe("к 15:00");
+    const late = new Date("2026-09-23T18:40:00Z"); // 23:40
+    expect(dueSlots(late).map((slot) => atLine(slot, late))).toEqual(["завтра к 00:00", "завтра к 00:30", "завтра к 01:00", "завтра к 01:30"]);
+  });
+
+  it("a time typed in the field is today while ahead, tomorrow once it has passed", () => {
+    expect(dueFromWall("17:30", now)).toBe("2026-09-23T12:30:00.000Z");
+    expect(dueFromWall("09:00", now)).toBe("2026-09-24T04:00:00.000Z");
+    expect(dueFromWall("14:20", now)).toBe("2026-09-23T09:20:00.000Z");
+    expect(dueFromWall("14:10", now)).toBe("2026-09-24T09:10:00.000Z");
+    expect(dueFromWall("25:00", now)).toBeNull();
+    expect(dueFromWall("", now)).toBeNull();
+  });
+
+  it("taken for a time far ahead, it is planned — the desk rests until it is near", () => {
+    const taxi = errand({ id: "t", kind: "taxi", label: "Такси", status: "accepted", claimed_by: "s1", due_at: "2026-09-23T13:00:00Z" });
+    expect(isPlanned(taxi, now)).toBe(true);
+    expect(deskFocus([taxi], null, [], now).phase).toBe("rest");
+    const near = new Date("2026-09-23T12:50:00Z");
+    expect(isPlanned(taxi, near)).toBe(false);
+    expect(deskFocus([taxi], null, [], near)).toMatchObject({ phase: "doing", scene: "taxi" });
+  });
+
+  it("asked for a time, the line says it", () => {
+    const taxi = errand({ id: "t", kind: "taxi", label: "Такси", status: "sent", due_at: "2026-09-23T13:00:00Z" });
+    expect(deskLine(deskFocus([taxi], "s1", [], now), now)).toBe("Директор просит: такси · к 18:00");
   });
 });

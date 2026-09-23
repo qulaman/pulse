@@ -206,7 +206,7 @@ export default function PulsePage() {
   const catalogue = useSecretaryActions(hasSecretary);
   // what the secretaries are doing about the requests, for the small secretary at the desk:
   // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
-  const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS);
+  const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS, now);
   // the request nobody has taken yet: has the secretary opened it? The desk nods (D-106 §8)
   const askedErrand = deskStage.phase === "asked" ? deskStage.errand : null;
   const askedReceipt = useErrandReceipt(askedErrand?.id ?? null, askedErrand !== null);

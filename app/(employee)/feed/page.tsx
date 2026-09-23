@@ -135,7 +135,7 @@ export default function FeedPage() {
   const [presenceOpen, setPresenceOpen] = useState(false);
   // what to pass back after «Готово» (D-99): this secretary's jobs of the last ten minutes
   const [skipped, setSkipped] = useState<string[]>([]);
-  const errandDesk = useDeskFocus(errandRows, meId, catalogue.data ?? NO_ACTIONS);
+  const errandDesk = useDeskFocus(errandRows, meId, catalogue.data ?? NO_ACTIONS, now);
   // «К вам посетитель» (D-96): the reception's own cards, and the director's «пусть заходит»
   // plays the guest scene — the door opens — unless a new request is ringing
   const visits = useVisits(isSecretary);

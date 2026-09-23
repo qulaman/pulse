@@ -66,3 +66,19 @@ describe("keptErrands — only well-formed entries come back from the phone", ()
     expect(keptErrands(JSON.stringify([null, 1, { id: "b", code: "tea" }, good]))).toEqual([good]);
   });
 });
+
+describe("requests for a time on the phone (D-106 §8)", () => {
+  const now = Date.parse("2026-09-23T09:10:00Z");
+
+  it("a taxi for the evening asked in the morning still goes after a long outage", () => {
+    expect(isStale({ at: now - 3 * 60 * 60_000, dueAt: "2026-09-23T13:00:00Z" }, now)).toBe(false);
+  });
+
+  it("but not once its time is five minutes away", () => {
+    expect(isStale({ at: now - 60_000, dueAt: "2026-09-23T09:14:00Z" }, now)).toBe(true);
+  });
+
+  it("the toast says the time", () => {
+    expect(sentLine("Такси", null, null, "2026-09-23T13:00:00Z")).toBe("Такси · к 18:00 · отправлено");
+  });
+});
