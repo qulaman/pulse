@@ -16,7 +16,7 @@
 - Materialized views **не используем**; допустимы только обычные view `with (security_invoker = on)`. Сейчас view в БД нет ни одного: Пульс читает задачи одним запросом с вложенными сообщениями (D-57 §3).
 - Партиционирование **не нужно**; порог пересмотра — 10 млн строк в task_messages. `company_id` — первым столбцом составных индексов.
 - `point_balance_checkpoints (user_id, as_of, balance)` — зарезервировано, не строить.
-- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются на всём флоте. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `events`, `event_participants`, `errands`.
+- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются на всём флоте. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `events`, `event_participants`, `errands`, `profiles` (клиент слушает только строки секретарей, `role=eq.secretary` — «на месте / не на месте до …» без перезагрузки, D-99; миграция `20260923235500`).
 
 ## Enum-типы
 

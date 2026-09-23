@@ -113,15 +113,18 @@ export function useSecretarySetup(enabled = true) {
 
 export type SecretaryPerson = { id: string; full_name: string; away_until: string | null };
 
+export const secretaryKeys = { all: ["secretaries"] as const };
+
 /**
  * Секретари компании и кто из них отошёл (D-99): стол директора показывает пустой стул,
- * карточка — кто на месте. Профили без Realtime — перечитываются раз в полминуты.
+ * карточка — кто на месте. Живьём: «не на месте» / «на месте» приходит по Realtime на
+ * строки профилей секретарей (миграция 20260923235500), без перезагрузки экрана.
  */
 export function useSecretaries(enabled = true) {
-  return useQuery({
-    queryKey: ["secretaries"],
+  return useRealtimeQuery<SecretaryPerson[], Database["public"]["Tables"]["profiles"]["Row"]>({
+    queryKey: secretaryKeys.all,
     enabled,
-    refetchInterval: 30_000,
+    channel: { table: "profiles", filter: "role=eq.secretary" },
     queryFn: async (): Promise<SecretaryPerson[]> => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase

@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
-import { errandKeys, type ErrandStatus } from "@/lib/errands/queries";
+import { errandKeys, secretaryKeys, type ErrandStatus, type SecretaryPerson } from "@/lib/errands/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type ErrandTransition = {
@@ -148,10 +148,24 @@ export function useSetAway(meId: string) {
       const { error } = await supabase.from("profiles").update({ away_until: until }).eq("id", meId);
       if (error) throw new Error(error.message);
     },
+    // the chip turns at the tap: the secretary sees the new state before the server answers
+    onMutate: async (until) => {
+      await queryClient.cancelQueries({ queryKey: secretaryKeys.all });
+      const before = queryClient.getQueryData<SecretaryPerson[]>(secretaryKeys.all);
+      queryClient.setQueryData<SecretaryPerson[]>(secretaryKeys.all, (list) =>
+        (list ?? []).map((person) => (person.id === meId ? { ...person, away_until: until } : person)),
+      );
+      return { before };
+    },
     onSuccess: (_data, until) => {
       toast(until ? "Отметил: не на месте" : "Отметил: на месте");
-      void queryClient.invalidateQueries({ queryKey: ["secretaries"] });
     },
-    onError: () => toast("Не получилось. Попробуй ещё раз"),
+    onError: (_error, _until, context) => {
+      if (context?.before) queryClient.setQueryData(secretaryKeys.all, context.before);
+      toast("Не получилось. Попробуй ещё раз");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: secretaryKeys.all });
+    },
   });
 }
