@@ -146,6 +146,8 @@ async function main() {
 
     // ---- search ---------------------------------------------------------------
     await page.getByRole("button", { name: "Свернуть" }).click();
+    // search sits behind the magnifier in the title row (D-93)
+    await page.getByTestId("notes-search-toggle").click();
     await page.getByLabel("Поиск по заметкам").fill(STAMP);
     const marks = await page.locator("mark").count();
     record("the search marks the hit", marks > 0, `${marks} marks`);
@@ -187,6 +189,10 @@ async function main() {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     record("no horizontal scroll at 320 px", !overflow);
     await shot(page, "11-320");
+  } catch (error) {
+    // the screen at the moment of the failure says more than the locator log
+    await shot(page, "zz-failure").catch(() => undefined);
+    record("smoke:notes", false, error instanceof Error ? error.message.split(String.fromCharCode(10))[0] : String(error));
   } finally {
     record("no page errors", errors.length === 0, errors.join(" | "));
     if (admin && created.size > 0) {

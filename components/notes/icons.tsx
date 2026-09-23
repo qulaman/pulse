@@ -20,7 +20,9 @@ export type NoteIconName =
   | "trash"
   | "restore"
   | "search"
-  | "wave";
+  | "wave"
+  | "lock"
+  | "note";
 
 const PATHS: Record<NoteIconName, ReactNode> = {
   mic: (
@@ -62,6 +64,13 @@ const PATHS: Record<NoteIconName, ReactNode> = {
     </>
   ),
   wave: <path d="M4 12h1.5M8 8v8M11.5 5v14M15 9v6M18.5 11v2" />,
+  lock: (
+    <>
+      <rect x="5" y="10.5" width="14" height="10" rx="2.5" />
+      <path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    </>
+  ),
+  note: <path d="M6.5 3.5h7l4 4v13h-11zM13.5 3.5v4h4M9 12.5h6M9 16h4" />,
 };
 
 export function NoteIcon({ name, size = 16, className = "" }: { name: NoteIconName; size?: number; className?: string }) {

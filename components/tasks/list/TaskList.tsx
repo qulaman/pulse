@@ -142,6 +142,7 @@ export function TaskColumn<T extends { id: string }>({
               row.kind === "head" ? (
                 <motion.div
                   key={row.key}
+                  data-group={row.section.key}
                   layout="position"
                   transition={CARD_SPRING}
                   initial={{ opacity: 0 }}
@@ -210,6 +211,7 @@ export function CardShell({
   children,
   testId,
   status,
+  headData,
 }: {
   id: string;
   open: boolean;
@@ -219,6 +221,8 @@ export function CardShell({
   children: ReactNode;
   testId?: string;
   status?: TaskStatus;
+  /** Extra `data-*` of the head button — what a test or a screen needs to find it by. */
+  headData?: Record<`data-${string}`, string>;
 }) {
   return (
     <motion.article
@@ -236,6 +240,7 @@ export function CardShell({
           aria-expanded={open}
           data-testid={testId}
           data-status={status}
+          {...headData}
           onClick={onToggle}
           className="flex w-full items-start gap-3 px-3.5 pb-3 pt-3.5 text-left transition-transform duration-[120ms] active:scale-[0.99]"
         >

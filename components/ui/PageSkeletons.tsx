@@ -5,7 +5,6 @@
  * Server-safe.
  */
 import { Mascot } from "@/components/brand/Mascot";
-import device from "@/components/ui/device/device.module.css";
 
 import {
   AnnouncementBone,
@@ -299,61 +298,63 @@ export function FeedSkeleton() {
 }
 
 /** «Заметки»: a printed day label and cards of a heading, a line and the time. */
-export function NotesListBone() {
-  return (
-    <SkeletonGroup className="mt-4">
-      <Bone h={16} w={72} className="mx-1" />
-      <div className="mt-2 flex flex-col gap-2.5">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="card px-3.5 pb-2.5 pt-3">
-            <Bone h={22} w={i === 1 ? "58%" : "76%"} />
-            <Bone h={20} w="88%" className="mt-1" />
-            <Bone h={12} w={44} className="mt-4" />
-          </div>
-        ))}
-      </div>
-    </SkeletonGroup>
-  );
-}
-
 /**
- * «Заметки» while the feed loads: the dictaphone of components/notes/NotesDevice.tsx
- * with grey where the words will be, then the privacy line, the search and the feed.
+ * «Заметки» while the feed loads (D-93): the title, the status screen with the field and the
+ * microphone, the tabs and a column of closed cards — the boxes of the real ones.
  */
 export function NotesSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
-      <SkeletonGroup className={`${device.body} mx-auto w-full max-w-[380px]`}>
-        <Bone h={14} w={64} className="mx-auto rounded-full" />
-        <div className={`${device.lcd} mt-3`}>
-          <div className="min-h-[102px]">
-            <div className="flex items-center justify-between">
-              <Bone h={12} w={80} />
-              <Bone h={12} w={40} />
-            </div>
-            <Bone h={26} w="46%" className="mt-3" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+      <div className="flex items-end justify-between gap-3 px-0.5">
+        <div>
+          <SkeletonGroup>
+            <Bone h={16} w={148} />
+          </SkeletonGroup>
+          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Заметки</h1>
+        </div>
+        <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" />
+      </div>
+      <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
+        <div className="flex items-center justify-between">
+          <Bone h={16} w={110} />
+          <Bone h={16} w={80} />
+        </div>
+        <div className="mt-2.5 flex min-h-[64px] items-center gap-3.5">
+          <Bone h={46} w={46} className="rounded-[14px]" />
+          <div className="flex-1">
+            <Bone h={20} w="40%" />
             <Bone h={14} w="70%" className="mt-2" />
-            <Bone h={14} w="44%" className="mt-1.5" />
           </div>
         </div>
-        <div className="mt-3 flex gap-2">
-          <Bone h={60} className="flex-1 rounded-[18px]" />
-          <Bone h={60} w={60} className="shrink-0 rounded-full" />
+        <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
+          <Bone h={56} className="flex-1 rounded-[18px]" />
+          <Bone h={56} w={56} round className="shrink-0" />
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[0, 1, 2].map((i) => (
-            <Bone key={i} h={60} className="rounded-[18px]" />
-          ))}
+        <Bone h={14} w="70%" className="mx-auto mt-2" />
+      </SkeletonGroup>
+      <div className="mt-2">
+        <div aria-hidden className="h-px" />
+        <div className="py-2">
+          <SkeletonGroup className="seg rounded-[14px] p-1">
+            <Bone h={40} w="33%" className="rounded-[10px]" />
+          </SkeletonGroup>
         </div>
-        <div className="mt-2 h-[5px]" />
+      </div>
+      <SkeletonGroup className="mt-1 flex flex-col gap-2">
+        <div className="px-1 pb-0.5 pt-4">
+          <Bone h={16} w={90} />
+        </div>
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
+            <Bone h={22} w={22} round className="shrink-0" />
+            <div className="flex-1">
+              <Bone h={21} w={i === 1 ? "58%" : "76%"} />
+              <Bone h={16} w="88%" className="mt-1.5" />
+              <Bone h={12} w={60} className="mt-2" />
+            </div>
+          </div>
+        ))}
       </SkeletonGroup>
-      <SkeletonGroup className="mt-2 flex justify-center">
-        <Bone h={16} w={180} />
-      </SkeletonGroup>
-      <SkeletonGroup className="mt-3">
-        <Bone h={44} className="rounded-[12px]" />
-      </SkeletonGroup>
-      <NotesListBone />
     </main>
   );
 }
