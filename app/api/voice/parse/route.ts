@@ -3,6 +3,7 @@ import { z } from "zod";
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { ParseError, parseTranscript, providerOf } from "@/lib/ai/parse";
+import { pinAssignee } from "@/lib/ai/pin";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
 import { matchErrand } from "@/lib/errands/matcher";
 import { hasActiveSecretary, loadCompanySettings, loadRoster } from "@/lib/roster";
@@ -19,6 +20,12 @@ const BodySchema = z.strictObject({
   client_request_id: z.uuid(),
   /** Guard verdict from /transcribe: low speech density (AI.md §1 (ж)). */
   suspicious: z.boolean().optional(),
+  /**
+   * The person the director chose before speaking (a circle on the waiting screen, «Дать
+   * задачу» on a card): the parser does not guess who, the id is stamped on (D-84). Seed ids
+   * are not RFC 4122, hence `guid`, not `uuid`.
+   */
+  assignee_id: z.guid().optional(),
 });
 
 const SUSPICIOUS_CONFIDENCE_CAP = 0.5;
@@ -116,7 +123,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const processed = postprocess(outcome.entities, roster, body.source, settings.matching);
-    const entities = body.suspicious ? capSuspicious(processed) : processed;
+    // a name the guard doubts turns yellow; a person the director tapped is not a name heard
+    const entities = pinAssignee(body.suspicious ? capSuspicious(processed) : processed, roster, body.assignee_id);
 
     const raw = outcome.raw as { usage?: Json; stop_reason?: Json } | null;
     await supabase.from("ai_logs").insert({

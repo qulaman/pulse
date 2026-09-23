@@ -1778,3 +1778,10 @@ select,
   background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
 }
 .task-card[data-closed]:not([data-open]) { background: color-mix(in srgb, var(--surface) 60%, transparent); }
+
+/* The picked person (D-84): a ring breathes out of the circle and of the card's face —
+   a beacon for where the mascot is looking. Transform and opacity only. */
+@keyframes pick-pulse {
+  0% { transform: scale(1); opacity: 0.65; }
+  80%, 100% { transform: scale(1.32); opacity: 0; }
+}

@@ -2,7 +2,6 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { CatchCard } from "@/components/pulse/CatchCard";
 import { TOUCHES, type DreamId } from "@/components/pulse/DreamOrbit";
 import { StarCard } from "@/components/pulse/StarCard";
 import { haptic } from "@/lib/haptics";
@@ -46,8 +45,9 @@ const RIM = 90;
  * volume of work in the air, and it reads at a glance.
  *
  * **Below** — the idlers, circles with their initials, drifting. Nothing is on them, and a
- * tap **catches** one: the typed input opens with his name already in it, so giving an idler
- * a task is one tap from the screen the director opens on, instead of four.
+ * tap **picks** one (D-84): the face turns to look at them and the ways to give them a task
+ * come out over its head — the screen owns that card, this layer only says who was picked.
+ * The picked circle is ringed, the others step back.
  *
  * Between the two — the flight. The moment a task lands on an idler his circle dives into the
  * face and is spat out above as a star; when his last task closes, the star sinks back down.
@@ -66,6 +66,8 @@ export function PeopleField({
   reach,
   dream,
   chase,
+  picked = null,
+  onPick,
 }: {
   people: Person[];
   loads: Record<string, Load>;
@@ -78,8 +80,11 @@ export function PeopleField({
   /** the dream in the air right now, and the line it flies — the room reacts to it (D-77) */
   dream?: { id: DreamId; key: number } | null;
   chase?: Chase | null;
+  /** the id of the circle picked on this screen; the screen keeps it, this layer draws it */
+  picked?: string | null;
+  /** a tap on a circle: that person, or null when the picked one is tapped again */
+  onPick?: (orb: Orb | null) => void;
 }) {
-  const [caught, setCaught] = useState<Orb | null>(null);
   const [opened, setOpened] = useState<Orb | null>(null);
   // the layout is redone when the team, their day or the screen changes — not on every tick
   // of the clock; the ten-minute step is there so a deadline going yellow still lands
@@ -150,11 +155,10 @@ export function PeopleField({
     return byId.size ? { css: css.join(" "), byId } : null;
   }, [orbs, chase, dream, base]);
 
-  // catching one does not give him a task by itself: it asks. «Записать» starts the recording
-  // with his name already in front of the phrase (D-72).
+  // picking one does not give him a task by itself: the face turns to him and asks (D-84)
   const grab = (orb: Orb) => {
     haptic([12, 24, 12]);
-    setCaught(orb);
+    onPick?.(picked === orb.id ? null : orb);
   };
 
   if (!orbs.length) return null;
@@ -166,6 +170,7 @@ export function PeopleField({
       data-idlers={orbs.filter((o) => !o.working).length}
     >
       {wake ? <style>{wake.css}</style> : null}
+      <LookLine orb={orbs.find((o) => o.id === picked && !o.working) ?? null} />
       {orbs.map((orb) => {
         const flight = flying.get(orb.id);
         // somebody mid-flight is busy being thrown across the screen: the dream does not get him
@@ -174,16 +179,9 @@ export function PeopleField({
         return orb.working ? (
           <Star key={orb.id} orb={orb} brush={brush} onOpen={() => setOpened(orb)} />
         ) : (
-          <Idler key={orb.id} orb={orb} brush={brush} caught={caught?.id === orb.id} onCatch={() => grab(orb)} />
+          <Idler key={orb.id} orb={orb} brush={brush} caught={picked === orb.id} dimmed={picked !== null && picked !== orb.id} onCatch={() => grab(orb)} />
         );
       })}
-      {/* The question sits at the foot of the screen, under the rows: anywhere nearer the
-          middle and it lands on the face, which is busy listening at exactly that moment. */}
-      {caught ? (
-        <div className="absolute left-1/2 block" style={{ top: `calc(50% + ${hy}px)`, transform: "translate(-50%, -100%)" }}>
-          <CatchCard name={caught.name} address={caught.address} onClose={() => setCaught(null)} />
-        </div>
-      ) : null}
       {/* the card of a star hangs at the top of the sky, out of the way of the face */}
       {opened ? (
         <div className="absolute left-1/2 block" style={{ top: `calc(50% - ${hy}px)`, transform: "translateX(-50%)" }}>
@@ -255,8 +253,46 @@ function Star({ orb, brush, onOpen }: { orb: Orb; brush?: string; onOpen: () => 
   );
 }
 
+/**
+ * The face's look made visible (D-84): a faint dashed line from the rim of the head to the
+ * picked circle — who the face is looking at, and who the task will be for. It fades in once
+ * and holds still; the ring on the circle is the only thing that keeps moving.
+ */
+function LookLine({ orb }: { orb: Orb | null }) {
+  if (!orb) return null;
+  const length = Math.hypot(orb.x, orb.y) || 1;
+  const from = RIM - 14;
+  const to = length - orb.size / 2 - 10;
+  if (to <= from) return null;
+  const ux = orb.x / length;
+  const uy = orb.y / length;
+  return (
+    <svg
+      key={orb.id}
+      aria-hidden
+      data-testid="look-line"
+      className="absolute left-1/2 top-1/2 overflow-visible"
+      width="1"
+      height="1"
+      style={{ animation: "overlay-in 360ms var(--ease-out) both" }}
+    >
+      <line
+        x1={ux * from}
+        y1={uy * from}
+        x2={ux * to}
+        y2={uy * to}
+        stroke="var(--accent)"
+        strokeOpacity="0.5"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="1 7"
+      />
+    </svg>
+  );
+}
+
 /** A person with nothing on them: a circle with his initials, drifting, waiting to be caught. */
-function Idler({ orb, brush, caught, onCatch }: { orb: Orb; brush?: string; caught: boolean; onCatch: () => void }) {
+function Idler({ orb, brush, caught, dimmed, onCatch }: { orb: Orb; brush?: string; caught: boolean; dimmed: boolean; onCatch: () => void }) {
   const hit = Math.max(40, orb.size + 10);
   return (
     <button
@@ -266,7 +302,9 @@ function Idler({ orb, brush, caught, onCatch }: { orb: Orb; brush?: string; caug
       data-tone={orb.tone}
       data-working="0"
       onClick={onCatch}
-      aria-label={`${orb.name}: без задач — дать задачу`}
+      aria-label={caught ? `${orb.name}: выбран — снять выбор` : `${orb.name}: без задач — дать задачу`}
+      aria-pressed={caught}
+      data-picked={caught ? "1" : undefined}
       className="pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full"
       style={{
         width: hit,
@@ -274,6 +312,9 @@ function Idler({ orb, brush, caught, onCatch }: { orb: Orb; brush?: string; caug
         marginLeft: -hit / 2,
         marginTop: -hit / 2,
         transform: `translate(${orb.x}px, ${orb.y}px)`,
+        // the others step back while one is picked: the room looks where the face looks
+        opacity: dimmed ? 0.38 : 1,
+        transition: "opacity 240ms var(--ease-out)",
         touchAction: "manipulation",
         WebkitTapHighlightColor: "transparent",
       }}
@@ -282,7 +323,7 @@ function Idler({ orb, brush, caught, onCatch }: { orb: Orb; brush?: string; caug
           under this one */}
       <span className="block" style={{ animation: brush }}>
         <span
-          className="block"
+          className="relative block"
           style={
             {
               "--orb-dx": `${orb.dx}px`,
@@ -298,12 +339,21 @@ function Idler({ orb, brush, caught, onCatch }: { orb: Orb; brush?: string; caug
               height: orb.size,
               fontSize: Math.round(orb.size * 0.36),
               color: "var(--bg)",
-              background: TONE.idle,
+              // picked: the brand colour — the same one the face looks at it with
+              background: caught ? "var(--accent)" : TONE.idle,
+              transition: "background-color 240ms var(--ease-out)",
               animation: caught ? "orb-caught 640ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "orb-breathe 5.2s ease-in-out infinite",
             }}
           >
             {orb.initials}
           </span>
+          {/* the ring of the picked one: it keeps breathing out, a beacon for the face's look */}
+          {caught ? (
+            <>
+              <span aria-hidden className="absolute rounded-full border-2 border-accent" style={{ inset: -5 }} />
+              <span aria-hidden className="absolute rounded-full border-2 border-accent" style={{ inset: -5, animation: "pick-pulse 1.6s ease-out infinite" }} />
+            </>
+          ) : null}
         </span>
       </span>
     </button>

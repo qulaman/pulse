@@ -7,7 +7,7 @@ import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mas
 import { TextSheet } from "@/components/voice/TextSheet";
 import { haptic } from "@/lib/haptics";
 import { useComposeStore } from "@/lib/store/compose";
-import { subscribeIngestLevel, useIngestStore } from "@/lib/store/ingest";
+import { subscribeIngestLevel, useIngestStore, type Pin } from "@/lib/store/ingest";
 import { STAGE_FACE, STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
 
 /** Hold longer than this and it is speech, not a tap (docs/DESIGN.md «Жесты»). */
@@ -78,6 +78,9 @@ export function MascotLever({
   label,
   caption = true,
   act = null,
+  pin = null,
+  gaze = null,
+  onHold,
 }: {
   state: MascotState;
   /** a one-shot over the resting face (D-82); the pipeline, once it runs, drops it */
@@ -92,6 +95,15 @@ export function MascotLever({
   label?: string;
   /** false when the screen says the stage itself — two «Отправляю…» would collide */
   caption?: boolean;
+  /**
+   * Somebody picked on the waiting screen (D-84): holding the face records a task for them —
+   * their name in front of the phrase, their id to the parser.
+   */
+  pin?: (Pin & { address: string }) | null;
+  /** where the resting face looks (the picked circle); the pipeline takes the eyes back */
+  gaze?: { x: number; y: number } | null;
+  /** the finger is on the face and the microphone is open — the pick card says so (D-84) */
+  onHold?: (held: boolean) => void;
 }) {
   const stage = useIngestStore((s) => s.stage);
   // a recording started from somebody's orb on the waiting screen has its own card, with its
@@ -114,6 +126,8 @@ export function MascotLever({
   );
 
   const [shaking, setShaking] = useState(false);
+  // this face is being held with the microphone open — the screen may want to know
+  const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
   const [cancelArmed, setCancelArmed] = useState(false);
   // the voice swells the blob; throttled to ~20 fps, and only while the microphone is open
   const [level, setLevel] = useState(0);
@@ -172,11 +186,12 @@ export function MascotLever({
         setShaking(true);
         setTimeout(() => setShaking(false), 220);
         haptic([15, 30, 15]);
-        startPromise.current = startVoice();
+        setHeld(true);
+        startPromise.current = pin ? startVoice(pin.address, { id: pin.id, name: pin.name }) : startVoice();
         bumpUses();
       }, HOLD_MS);
     },
-    [busy, clearHold, startVoice, voice],
+    [busy, clearHold, startVoice, voice, pin, setHeld],
   );
 
   const onPointerMove = useCallback(
@@ -211,6 +226,7 @@ export function MascotLever({
       return;
     }
     holdFired.current = false;
+    setHeld(false);
     // The microphone permission promise may still be in flight — never stop before it lands.
     await startPromise.current;
     startPromise.current = null;
@@ -220,7 +236,7 @@ export function MascotLever({
       return;
     }
     await stopVoice();
-  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice]);
+  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice, setHeld]);
 
   const onPointerCancel = useCallback(() => {
     clearHold();
@@ -229,8 +245,9 @@ export function MascotLever({
       holdFired.current = false;
       cancelVoice();
     }
+    setHeld(false);
     setCancelArmed(false);
-  }, [cancelVoice, clearHold]);
+  }, [cancelVoice, clearHold, setHeld]);
 
   // The pipeline plays on this face, where the director is already looking: no second
   // mascot over the screen, the same one listens, saves, reads, sorts and throws (D-60).
@@ -238,7 +255,9 @@ export function MascotLever({
   // throws it, even though holding is off at that moment (the phrase is already in hand)
   const pipeline = STAGE_FACE[stage];
   const face: MascotState = pipeline ?? state;
-  const stageLine = caption && !(fromOrb && recording) ? STAGE_LINE[stage] : undefined;
+  // a recording for a picked person has the pick card as its caption (timer, «Готово»); the
+  // face keeps only the red «Отпусти, чтобы отменить» of its own gesture
+  const stageLine = caption && (cancelArmed || !(fromOrb && recording)) ? STAGE_LINE[stage] : undefined;
 
   return (
     <div className="flex flex-col items-center">
@@ -287,7 +306,7 @@ export function MascotLever({
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
               style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
             >
-              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline ? null : act} />
+              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} />
             </span>
           </button>
         </motion.div>

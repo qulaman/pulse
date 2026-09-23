@@ -133,6 +133,8 @@ export interface VoiceApi {
     source: IngestSource;
     client_request_id: string;
     suspicious?: boolean;
+    /** Chosen before speaking — stamped on the entities instead of guessed (D-84). */
+    assignee_id?: string;
   }): Promise<ParseResponse>;
   confirm(input: ConfirmRequest): Promise<ConfirmResponse>;
 }

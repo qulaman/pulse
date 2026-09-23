@@ -77,6 +77,45 @@ describe("ingest store", () => {
     expect(state.error).toBeNull();
   });
 
+  it("a person picked before speaking goes to the parser by id (D-84)", async () => {
+    api.parse.mockResolvedValue({ entities: [taskEntity()] });
+
+    await useIngestStore.getState().submitText("Динаре, подготовь КП", { id: "u-dinara", name: "Динара Ахметова" });
+
+    expect(api.parse).toHaveBeenCalledWith(expect.objectContaining({ transcript: "Динаре, подготовь КП", assignee_id: "u-dinara" }));
+    expect(useIngestStore.getState().pinned).toEqual({ id: "u-dinara", name: "Динара Ахметова" });
+  });
+
+  it("a recording started for a picked person carries the pin through transcription", async () => {
+    api.uploadUrl.mockResolvedValue({ signed_url: "https://s", audio_path: "c/u/a.webm", inbox_id: "i-1" });
+    api.uploadAudio.mockResolvedValue(undefined);
+    api.transcribe.mockResolvedValue({ transcript: "подготовь КП до пятницы", inbox_id: "i-1" });
+    api.parse.mockResolvedValue({ entities: [taskEntity()] });
+    useIngestStore.setState({ address: "Динаре, ", pinned: { id: "u-dinara", name: "Динара Ахметова" }, clientRequestId: crypto.randomUUID() });
+
+    await useIngestStore.getState().ingestAudio(audio);
+
+    expect(api.parse).toHaveBeenCalledWith(
+      expect.objectContaining({ transcript: "Динаре, подготовь КП до пятницы", assignee_id: "u-dinara" }),
+    );
+  });
+
+  it("no pin — no assignee_id in the call", async () => {
+    api.parse.mockResolvedValue({ entities: [taskEntity()] });
+    await useIngestStore.getState().submitText("Ерлану КП");
+    expect(api.parse.mock.calls[0]![0]).not.toHaveProperty("assignee_id");
+  });
+
+  it("«Сделать задачей» after an empty parse keeps the picked person", async () => {
+    api.parse.mockResolvedValue({ entities: [] });
+    await useIngestStore.getState().submitText("Динаре, что-то невнятное", { id: "u-dinara", name: "Динара Ахметова" });
+    useIngestStore.getState().startManual();
+    const [manual] = useIngestStore.getState().entities as (PostprocessedEntity & { assignee_id: string | null })[];
+    expect(manual!.assignee_id).toBe("u-dinara");
+    expect(manual!.assignee?.status).toBe("matched");
+    expect(manual!.blocked).toBeUndefined();
+  });
+
   it("surfaces empty_transcript without calling the parser", async () => {
     api.uploadUrl.mockResolvedValue({ audio_path: "c/u/1.webm", signed_url: "https://s", token: "t" });
     api.uploadAudio.mockResolvedValue(undefined);
