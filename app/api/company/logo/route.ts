@@ -14,7 +14,7 @@ const EXT: Record<string, string> = {
 };
 
 /**
- * Director uploads the company logo (multipart, ≤ 2 MB). The file lands in the public
+ * Director or secretary (D-104) uploads the company logo (multipart, ≤ 2 MB). The file lands in the public
  * `brand` bucket under the company folder; the public URL goes to settings.brand.logo_url.
  * Not wrapped in withAuth: the body is a form, not JSON.
  */
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   let profile;
   try {
     profile = await getSessionProfile(req);
-    requireRole(profile, "director");
+    requireRole(profile, "director", "secretary");
   } catch (error) {
     if (error instanceof AuthError) return apiError(error.status, error.code, authErrorMessageRu(error.code));
     throw error;

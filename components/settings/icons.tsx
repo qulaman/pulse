@@ -153,3 +153,31 @@ export const LoadIcon = () => (
     <path d="M4 16.5V11M8 16.5V5.5M12 16.5V8.5M16 16.5V3.5" />
   </svg>
 );
+
+export const PersonIcon = () => (
+  <svg {...stroke}>
+    <circle cx="10" cy="7" r="3" />
+    <path d="M4.5 16.5a5.5 5.5 0 0 1 11 0" />
+  </svg>
+);
+
+export const CrownIcon = () => (
+  <svg {...stroke}>
+    <path d="M3.5 14.5 2.8 6.5l4.2 3.2L10 4.5l3 5.2 4.2-3.2-.7 8z" />
+    <line x1="4" y1="16.8" x2="16" y2="16.8" />
+  </svg>
+);
+
+export const KeyIcon = () => (
+  <svg {...stroke}>
+    <circle cx="6.8" cy="12.8" r="3.3" />
+    <path d="m9.2 10.4 6.8-6.8M13.4 6.2l2 2M11.6 8l1.6 1.6" />
+  </svg>
+);
+
+export const MailIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.8" y="4.5" width="14.4" height="11" rx="2.2" />
+    <path d="m3.4 5.6 6.6 5.2 6.6-5.2" />
+  </svg>
+);

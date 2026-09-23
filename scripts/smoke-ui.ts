@@ -259,15 +259,20 @@ async function main() {
   await page.getByLabel("Имя и фамилия").fill("Смоук Тестов");
   await page.getByLabel("Должность").fill("Испытатель");
   await page.getByLabel("Как называет директор").fill("Смоук");
-  await page.getByRole("button", { name: "Добавить сотрудника" }).click();
+  await page.getByRole("button", { name: "Добавить", exact: true }).click();
+  // D-104: the login is handed over in a sheet, «Готово» goes back to the list
+  await page.getByTestId("credentials").waitFor({ timeout: 20_000 });
+  await page.getByRole("button", { name: "Готово" }).first().click();
+  await page.getByText("Смоук Тестов").first().click();
   await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}$/.test(url.pathname), { timeout: 20_000 });
-  record("сотрудник создан → карточка", true, page.url());
+  record("сотрудник создан → вход в шторке → карточка", true, page.url());
   await page.getByRole("heading", { name: "Смоук Тестов" }).waitFor({ timeout: 10_000 });
   await page.getByRole("button", { name: "Дать задачу" }).waitFor({ timeout: 5_000 });
   await page.screenshot({ path: join(SHOTS, "13b-person-card.png"), fullPage: true });
   await page.getByRole("link", { name: "Изменить" }).click();
   await page.waitForURL((url) => /^\/people\/[0-9a-f-]{36}\/edit$/.test(url.pathname), { timeout: 10_000 });
   await page.getByLabel("Должность").fill("Старший испытатель");
+  // the save bar floats in only once something differs (D-104)
   await page.getByRole("button", { name: "Сохранить", exact: true }).click();
   await page.getByText("Сохранил").waitFor({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "14-person-edit.png"), fullPage: true });

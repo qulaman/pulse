@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
-import { homeForRole } from "@/lib/routes";
+import { homeForRole, tabBarRole } from "@/lib/routes";
 
 /**
  * Заявки директора секретарю (D-79). Один маршрут на две роли, как у магазина (D-71);
@@ -24,7 +24,7 @@ export default async function SecretaryLayout({ children }: { children: React.Re
     <div className="flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
-      <TabBar role={profile.role === "director" ? "director" : "employee"} />
+      <TabBar role={tabBarRole(profile.role)} />
     </div>
   );
 }

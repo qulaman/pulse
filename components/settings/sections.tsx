@@ -292,7 +292,7 @@ export function SecretarySection() {
           {secretaries.length ? (
             <>
               Сейчас это {secretaries.map((p) => p.full_name.split(" ")[0]).join(", ")}. Роль меняется в{" "}
-              <Link href="/people" className="underline">
+              <Link href="/settings?tab=team" className="underline">
                 карточке человека
               </Link>
               .
@@ -300,7 +300,7 @@ export function SecretarySection() {
           ) : (
             <>
               Назначь роль «Секретарь» в{" "}
-              <Link href="/people" className="underline">
+              <Link href="/settings?tab=team" className="underline">
                 карточке человека
               </Link>{" "}
               — тогда на Пульсе появится секретарь за столом.

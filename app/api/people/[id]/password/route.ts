@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { canResetLogin } from "@/lib/people/access";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const BodySchema = z.strictObject({
@@ -9,13 +10,13 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * Director sets a new password for a person of the company (forgot it, phone lost).
- * Service role is needed for the admin API; the target is checked against the
- * director's own company first, and another director's login is never touched.
- * Told in person like the first password — until the QR+PIN onboarding of D-06.
+ * Director or secretary (D-104) sets a new password for a person of the company (forgot
+ * it, phone lost). Service role is needed for the admin API; the target is checked against
+ * the caller's own company first, and a director's login is touched only by that director
+ * (`canResetLogin`). Handed over in person or by a message — until the QR+PIN of D-06.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
-  ["director"],
+  ["director", "secretary"],
   async ({ profile, body, params }) => {
     const id = z.guid().safeParse(params.id); // guid: seed ids are not RFC-4122
     if (!id.success) return apiError(404, "not_found", "Сотрудник не найден");
@@ -30,8 +31,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     if (!target || target.company_id !== profile.companyId) {
       return apiError(404, "not_found", "Сотрудник не найден");
     }
-    if (target.role === "director" && target.id !== profile.userId) {
-      return apiError(403, "forbidden", "Пароль другого директора меняет только он сам");
+    if (!canResetLogin({ id: profile.userId, role: profile.role }, target)) {
+      return apiError(403, "forbidden", "Пароль директора меняет только он сам");
     }
 
     const updated = await service.auth.admin.updateUserById(target.id, { password: body.password });

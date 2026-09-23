@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { assignableRoles } from "@/lib/people/access";
 import { suggestAliases } from "@/lib/people/aliases";
 import { loadRoster } from "@/lib/roster";
 import { createServiceSupabase } from "@/lib/supabase/service";
@@ -17,14 +18,18 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * Director creates a login + profile in one go. Auth user via the admin API (service role),
- * profile insert right after; if the profile fails, the auth user is removed again so a
- * retry with the same email does not hit "already registered".
+ * Director or secretary (D-104) creates a login + profile in one go — the secretary never
+ * a director (the role picker's rule, lib/people/access.ts). Auth user via the admin API
+ * (service role), profile insert right after; if the profile fails, the auth user is
+ * removed again so a retry with the same email does not hit "already registered".
  * The QR-invite + PIN flow of D-06 replaces the password field in the onboarding order.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
-  ["director"],
+  ["director", "secretary"],
   async ({ profile, body }) => {
+    if (!assignableRoles(profile.role, null).includes(body.role)) {
+      return apiError(403, "forbidden", "Директора добавляет только директор");
+    }
     const service = createServiceSupabase();
 
     const created = await service.auth.admin.createUser({

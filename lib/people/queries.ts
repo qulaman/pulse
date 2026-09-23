@@ -19,6 +19,16 @@ export const ROLE_LABEL: Record<Role, string> = {
   tv: "ТВ-экран",
 };
 
+/** What a role means in one line — the role picker says it under the name (D-104). */
+export const ROLE_ABOUT: Record<Role, string> = {
+  employee: "Получает задачи и отчитывается",
+  manager: "Как сотрудник, и видит задачи своих людей",
+  secretary: "Заявки директора, настройки и команда",
+  shopkeeper: "Выдаёт награды из магазина",
+  director: "Раздаёт задачи и принимает работу",
+  tv: "Экран на стене — только показывает",
+};
+
 export const AVAILABILITY_LABEL: Record<Availability, string> = {
   active: "На месте",
   vacation: "В отпуске",
@@ -85,14 +95,19 @@ export type PersonPatch = Partial<
   Pick<Person, "full_name" | "position" | "role" | "aliases" | "manager_id" | "availability" | "is_active">
 >;
 
-/** Direct update under RLS: the director policy plus trg_profiles_guard decide what is allowed. */
+/**
+ * Direct update under RLS: the director and secretary policies plus trg_profiles_guard
+ * decide what is allowed (D-104). A row the caller may not touch is filtered out silently,
+ * so the updated ids come back and an empty answer is a refusal, not a «Сохранил».
+ */
 export function useUpdatePerson() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: PersonPatch }) => {
       const supabase = createBrowserSupabase();
-      const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+      const { data, error } = await supabase.from("profiles").update(patch).eq("id", id).select("id");
       if (error) throw new Error(error.message);
+      if (!data?.length) throw new Error("not_permitted");
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
@@ -101,7 +116,13 @@ export function useUpdatePerson() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "";
-      toast(message.includes("forbidden_field_update") ? "Это поле менять нельзя" : "Не получилось сохранить");
+      toast(
+        message.includes("forbidden_field_update")
+          ? "Это поле менять нельзя"
+          : message.includes("not_permitted")
+            ? "Эту карточку тебе менять нельзя"
+            : "Не получилось сохранить",
+      );
     },
   });
 }
@@ -131,11 +152,65 @@ export function useCreatePerson() {
       if (!res.ok || !body.id) throw new Error(body.error?.message_ru ?? "Не получилось создать");
       return { id: body.id };
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: peopleKeys.all });
-      toast("Сотрудник добавлен");
-    },
+    // no toast on success: the screen hands the login over in a sheet that says it
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: peopleKeys.all }),
     onError: (error) => toast(error instanceof Error ? error.message : "Не получилось создать"),
+  });
+}
+
+/** Reads `{ error: { message_ru } }` of a failed API call (BACKEND §0), or the fallback. */
+async function failure(res: Response, fallback: string): Promise<Error> {
+  const body = (await res.json().catch(() => ({}))) as { error?: { message_ru?: string } };
+  return new Error(body.error?.message_ru ?? fallback);
+}
+
+export type PersonLogin = { email: string | null; last_sign_in_at: string | null };
+
+/** The email a person signs in with and their last sign-in — for whoever may reset it (D-104). */
+export function usePersonLogin(id: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["people", id, "login"],
+    enabled,
+    queryFn: async (): Promise<PersonLogin> => {
+      const res = await fetch(`/api/people/${id}/login`, { credentials: "include" });
+      if (!res.ok) throw await failure(res, "Не удалось прочитать вход");
+      return (await res.json()) as PersonLogin;
+    },
+  });
+}
+
+/** A new password set by the director or the secretary; the caller shows it once. */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: async ({ id, password }: { id: string; password: string }) => {
+      const res = await fetch(`/api/people/${id}/password`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) throw await failure(res, "Не получилось сменить пароль");
+    },
+  });
+}
+
+/** Fixes the login email typed wrong at creation. */
+export function useChangeLoginEmail() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, email }: { id: string; email: string }): Promise<string> => {
+      const res = await fetch(`/api/people/${id}/login`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) throw await failure(res, "Не получилось сменить почту");
+      return ((await res.json()) as { email: string }).email;
+    },
+    onSuccess: (email, { id }) => {
+      queryClient.setQueryData<PersonLogin>(["people", id, "login"], (old) => ({ last_sign_in_at: null, ...old, email }));
+    },
   });
 }
 

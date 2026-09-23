@@ -4,18 +4,18 @@ import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings, SettingsPatchSchema, type SettingsPatch } from "@/lib/settings";
 import type { Json } from "@/lib/supabase/types";
 
-/** Director reads the effective settings (defaults applied). */
-export const GET = withAuth(["director"], async ({ profile }) => {
+/** Director or secretary (D-104) reads the effective settings (defaults applied). */
+export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
   const raw = await loadCompanySettings(profile.companyId);
   return apiOk({ settings: parseCompanySettings(raw) });
 });
 
 /**
- * Director changes a subset of sections. Sections are merged shallowly by the RPC
+ * Director or secretary (D-104) changes a subset of sections. Sections are merged shallowly by the RPC
  * (jsonb ||), so a section arrives whole: the client sends the full section it edited.
  */
 export const PATCH = withAuth<SettingsPatch>(
-  ["director"],
+  ["director", "secretary"],
   async ({ req, profile, body }) => {
     const current = parseCompanySettings(await loadCompanySettings(profile.companyId));
     // Fill partial sections from the current values so the stored section stays complete.
