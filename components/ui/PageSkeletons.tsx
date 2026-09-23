@@ -412,6 +412,14 @@ export function CalendarSkeleton() {
   return (
     <main className={MAIN}>
       <Title text="Календарь" />
+      {/* the geometry of MonthGrid: arrows row, weekdays, five weeks of 48px (most months) */}
+      <SkeletonGroup className="card mt-4 px-2 pb-2 pt-1">
+        <div className="flex h-11 items-center justify-center">
+          <Bone h={20} w="36%" />
+        </div>
+        <div className="h-4" />
+        <div className="mt-1 h-[240px]" />
+      </SkeletonGroup>
       <CalendarListBone />
     </main>
   );

@@ -178,6 +178,11 @@ select is(
 -- ---------------------------------------------------------------------------
 -- 7. Перенос: отметка напоминания гаснет, участники узнают, сотрудник не переносит
 -- ---------------------------------------------------------------------------
+-- the invitations have reached the phones: a line still waiting for the window would
+-- be rewritten by the move instead of followed by «Перенос» (D-94, 023_calendar_edit)
+set local role postgres;
+update notification_deliveries set status = 'sent', sent_at = now() where event_kind = 'event_invite';
+set local role authenticated;
 select is(
   (with moved as (
      update events set starts_at = starts_at + interval '1 hour' returning 1)

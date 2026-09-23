@@ -1474,8 +1474,54 @@ export type Database = {
         Args: { client_request_id?: string; p_item_id: string }
         Returns: Json
       }
+      delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      edit_event: {
+        Args: {
+          p_body?: string
+          p_ends_at?: string
+          p_event: string
+          p_everyone?: boolean
+          p_location?: string
+          p_participant_ids?: string[]
+          p_remind_before_min?: number
+          p_starts_at: string
+          p_title: string
+        }
+        Returns: {
+          audio_path: string | null
+          author_id: string
+          body: string | null
+          cancelled_at: string | null
+          company_id: string
+          created_at: string
+          ends_at: string | null
+          everyone: boolean
+          id: string
+          inbox_item_id: string | null
+          location: string | null
+          remind_before_min: number
+          reminded_at: string | null
+          source_transcript: string | null
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       errands_due_escalation: { Args: { p_now?: string }; Returns: number }
+      event_release: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_users: string[]
+        }
+        Returns: undefined
+      }
       events_due_reminders: { Args: { p_now?: string }; Returns: number }
       extend_task_deadline: {
         Args: {
