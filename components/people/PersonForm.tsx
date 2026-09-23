@@ -311,8 +311,8 @@ export function PersonForm({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 16 }}
               transition={{ duration: 0.18, ease: [0.2, 0, 0, 1] }}
-              className="fixed inset-x-0 z-[15] mx-auto w-full max-w-lg px-4"
-              style={{ bottom: "calc(68px + env(safe-area-inset-bottom))" }}
+              className="above-tabbar fixed inset-x-0 z-[15] mx-auto w-full max-w-lg px-4"
+              style={{ bottom: "calc(var(--tabbar-space) + 4px)" }}
             >
               <div className="card flex items-center gap-2 p-2 shadow-[0_10px_30px_rgba(0,0,0,.35)]" data-testid="save-bar">
                 <Button variant="ghost" onClick={() => setDraft(baseline)} disabled={pending}>

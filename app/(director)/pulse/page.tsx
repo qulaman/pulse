@@ -768,7 +768,7 @@ export default function PulsePage() {
       {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
-          style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}
+          style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
           data-testid="lever-hint"
         >
           удержи — говори · тап — задачи · потяни вниз — текст

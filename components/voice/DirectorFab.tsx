@@ -38,8 +38,8 @@ export function DirectorFab() {
     <>
       {onConfirm ? null : draft ? (
         <div
-          className="fixed inset-x-0 z-30 flex justify-center px-4"
-          style={{ bottom: "calc(72px + env(safe-area-inset-bottom))" }}
+          className="above-tabbar fixed inset-x-0 z-30 flex justify-center px-4"
+          style={{ bottom: "calc(var(--tabbar-space) + 8px)" }}
         >
           <div
             className="flex items-center gap-3 rounded-full border border-border bg-surface py-2 pl-2 pr-2"

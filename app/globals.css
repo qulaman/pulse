@@ -33,6 +33,13 @@
   --accent-2: #1FA88F;
   --accent-glow: 0 8px 22px color-mix(in srgb, var(--accent) 28%, transparent);
 
+  /* The floating tab bar (D-112, components/TabBar.module.css): its gap to the screen's
+     bottom edge, the room it takes above it, and how far its top edge sinks when it
+     folds. Whatever docks above the bar sits at --tabbar-space and wears .above-tabbar. */
+  --tabbar-gap: max(10px, calc(env(safe-area-inset-bottom) - 4px));
+  --tabbar-space: calc(var(--tabbar-gap) + 70px);
+  --tabbar-fold-drop: 11px;
+
   /* Dark theme is the only theme in v1 (docs/FRONTEND.md). */
   color-scheme: dark;
 }
@@ -2159,6 +2166,20 @@ select,
   transform-origin: left;
   animation: bar-grow 700ms var(--ease-out) both;
 }
+/* docked above the floating tab bar: sinks with it when the bar folds on scroll, lands on
+   the keyboard when the bar steps away (D-112). The bar says which through an attribute
+   on <html> — a custom property there would restyle the whole page on every fold.
+   `translate`, not `transform` — a framer-animated bar keeps its own transform. */
+.above-tabbar {
+  transition: translate 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+html[data-tabbar="folded"] .above-tabbar { translate: 0 var(--tabbar-fold-drop); }
+/* the keyboard came up: land on it at once — sliding down to it would read as a lag */
+html[data-tabbar="away"] .above-tabbar { translate: 0 var(--tabbar-space); transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .above-tabbar { transition: none; }
+}
+
 .seg {
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
   background: color-mix(in srgb, var(--surface) 80%, transparent);

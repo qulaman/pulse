@@ -698,7 +698,7 @@ export default function FeedPage() {
       {mode === "idle" && !(isSecretary && (mineErrands.length > 0 || visitRows.some((v) => !v.closed_at))) ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
-          style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}
+          style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
         >
           {isSecretary
             ? "тап — дела, сообщения, эфир, календарь, заявки"
