@@ -6,7 +6,7 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
 /**
- * The people a director hands work to or invites (D-107): every active profile but the
+ * The people a director hands work to or invites (D-108): every active profile but the
  * TV kiosk, read under the director's own RLS. One list for every picker of the app — the
  * assignee of a task, the new owner of a reassigned one, the people of a meeting, the
  * owner of a board's point — so a name, a photo or an order cannot differ between them.
