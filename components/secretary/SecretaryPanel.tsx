@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
 import { haptic } from "@/lib/haptics";
+import { countHold, holdsLearned, orderFor, rememberSend, usualNote } from "@/lib/errands/habits";
 import { askSecretary, cancelAsked, usePendingErrands } from "@/lib/errands/pending";
 import { useErrandActions, useErrandLink, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
@@ -107,9 +108,18 @@ export function SecretaryPanel({
       (e.result || (thanks && !e.thanked_at)),
   );
   const nobodyHere = secretaries !== undefined && secretaries.length > 0 && secretaries.every((p) => isAway(p, now));
+  // habits of this browser (D-106 §4–6): the order this part of the day asks for, what a hold
+  // of each button usually goes with, whether the hold is learned — read once per open
+  const ordered = useMemo(() => orderFor(actions, (action) => sceneOfAction(action) === "security"), [actions]);
+  const usual = useMemo(
+    () => new Map(actions.map((action) => [action.code, sceneOfAction(action) === "security" ? null : usualNote(action.code)])),
+    [actions],
+  );
+  const [learned] = useState(holdsLearned);
 
   const ask = (action: SecretaryAction, text: string | null, untilMin?: number) => {
     if (text) rememberNote(action.code, text);
+    rememberSend(action.code, text);
     // a card that stays shows «отправляю…» itself; a card that closes on the send leaves the
     // word to the toast — no button is under it any more
     askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: !onSent });
@@ -143,7 +153,7 @@ export function SecretaryPanel({
           wrap into rows — a fixed grid cut «Не беспокоить» and «Пригласи гостя» on a narrow
           phone (D-87); a label never truncates, a very long one wraps inside its pill */}
       <div className={compact ? "flex flex-wrap gap-2" : "grid grid-cols-2 gap-3"}>
-        {actions.map((action) => {
+        {ordered.map((action) => {
           const alarm = sceneOfAction(action) === "security";
           return (
             <HoldButton
@@ -151,16 +161,24 @@ export function SecretaryPanel({
               action={action}
               compact={compact}
               alarm={alarm}
-              onSend={() => ask(action, null)}
+              usual={usual.get(action.code) ?? null}
+              onSend={() => {
+                countHold();
+                // a hold sends «как обычно»: the words this button went with the last three times
+                ask(action, usual.get(action.code) ?? null);
+              }}
               onTap={() => (alarm ? say("Удержите «Охрану» 2 секунды — случайное касание её не вызывает") : openSheet(action))}
               onHint={say}
             />
           );
         })}
       </div>
-      <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`} style={hint ? { color: "var(--warn)" } : undefined} data-testid="panel-hint">
-        {hint ?? "Держать 2 секунды — отправить · тап — примечание"}
-      </p>
+      {/* the rule of the buttons, until the hold is learned; a hint is always said here */}
+      {hint || !learned ? (
+        <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`} style={hint ? { color: "var(--warn)" } : undefined} data-testid="panel-hint">
+          {hint ?? "Держать 2 секунды — отправить · тап — примечание"}
+        </p>
+      ) : null}
       {nobodyHere ? (
         <p className="px-1 text-center text-[13px] leading-4" style={{ color: "var(--warn)" }} data-testid="nobody-here">
           Сейчас никого нет на месте — просьба дождётся
@@ -276,6 +294,7 @@ export function SecretaryPanel({
  */
 function HoldButton({
   action,
+  usual,
   compact,
   alarm,
   onSend,
@@ -283,6 +302,8 @@ function HoldButton({
   onHint,
 }: {
   action: SecretaryAction;
+  /** what a hold sends with — shown under the label (D-106 §4) */
+  usual: string | null;
   compact: boolean;
   alarm: boolean;
   onSend: () => void;
@@ -307,7 +328,7 @@ function HoldButton({
       data-code={action.code}
       data-alarm={alarm ? "1" : undefined}
       data-holding={holding ? "1" : "0"}
-      aria-label={`${action.label}: удержите две секунды, чтобы отправить`}
+      aria-label={`${action.label}${usual ? `, ${usual}` : ""}: удержите две секунды, чтобы отправить`}
       onPointerDown={() => {
         sent.current = false;
         tapped.current = false;
@@ -373,6 +394,11 @@ function HoldButton({
         data-label
       >
         {action.label}
+        {usual ? (
+          <span className="block truncate text-[12px] font-medium leading-4 text-muted" data-usual>
+            {usual}
+          </span>
+        ) : null}
       </span>
     </button>
   );
