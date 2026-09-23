@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { Glyph, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
@@ -13,6 +13,12 @@ export const DESK_H = 72;
 export const DESK_FACE = { x: 30, y: 34 };
 
 const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
+/** How long the walk out of the frame or back to the chair takes (D-103). */
+const MOVE_MS = 1_600;
+/** Standing at the job: this far to the right of the chair, and this much bigger. */
+const STAND_X = 30;
+const STAND_SCALE = 1.2;
+const FADE = "opacity 400ms var(--ease-out)";
 
 /**
  * The secretary on the waiting screen (D-85): not a circle among the idlers and not a ball on
@@ -23,6 +29,12 @@ const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
  * Three layers, so the face sits between them: the desk, monitor and mug behind, the small
  * face, the keyboard in front of it. Everything moves on transform and opacity; the desk's
  * own motion stops while the secretary is looking at the director's face.
+ *
+ * The director sees the job itself (D-103): taken, the small secretary gets up from the chair
+ * to the coffee machine, the teapot, the door, the printer — the same scenes as on the
+ * secretary's own screen — and the monitor and the keyboard step back meanwhile. Stepped away
+ * («не на месте»), it walks out of the frame and the chair is left empty; back, it walks in
+ * and sits down.
  */
 export function SecretaryDesk({
   attending,
@@ -82,6 +94,22 @@ export function SecretaryDesk({
   // the monitor shows the job while there is one; the typing lines otherwise
   const working = (phase === "asked" || phase === "doing") && scene !== null;
   const handing = phase === "done" && !attending;
+  // a job is done standing up at its place, left of the secretary (D-103)
+  const standing = phase === "doing" && scene !== null && !attending;
+  // «ушёл / вернулся»: the moment the presence turns, the secretary walks out of the frame or
+  // back to the chair — the chair is shown empty only once the walk out is over
+  const [seenAway, setSeenAway] = useState(Boolean(away));
+  const [move, setMove] = useState<"leave" | "arrive" | null>(null);
+  if (seenAway !== Boolean(away)) {
+    setSeenAway(Boolean(away));
+    setMove(away ? "leave" : "arrive");
+  }
+  useEffect(() => {
+    if (!move) return;
+    const timer = setTimeout(() => setMove(null), MOVE_MS);
+    return () => clearTimeout(timer);
+  }, [move]);
+  const gone = Boolean(away) && move !== "leave";
   return (
     <button
       type="button"
@@ -133,7 +161,9 @@ export function SecretaryDesk({
           />
         ))}
 
-        {/* the monitor: a stand, a dark screen, and the work on it */}
+        {/* the monitor: a stand, a dark screen, and the work on it — stepping back while the
+            secretary stands at the job (D-103) */}
+        <g style={{ opacity: standing ? 0 : 1, transition: FADE }} data-testid="desk-monitor">
         <path d="M71 44 H79 L81 52 H69 Z" fill={EDGE} />
         <rect x="56" y="17" width="38" height="27" rx="4" fill="var(--surface)" stroke={SECRETARY_TONE} strokeWidth="1.6" />
         {working && scene ? (
@@ -189,9 +219,10 @@ export function SecretaryDesk({
             <rect x="74" y="34" width="2" height="4" rx="0.6" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
           </>
         )}
+        </g>
       </svg>
 
-      {away ? (
+      {gone ? (
         // nobody at the desk (D-99): the chair is empty, the caption says until when
         <svg aria-hidden width={DESK_W} height={DESK_H} viewBox={`0 0 ${DESK_W} ${DESK_H}`} className="absolute inset-0 overflow-visible" data-testid="desk-empty">
           <rect x="20" y="22" width="20" height="18" rx="4" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.2" />
@@ -205,34 +236,59 @@ export function SecretaryDesk({
       ) : null}
       {/* the small face: the secretary's own character (D-87) — headset, bow tie — smaller */}
       <span
-        hidden={Boolean(away)}
+        hidden={gone}
         className="absolute block"
         style={{ left: DESK_FACE.x - 20, top: DESK_FACE.y - 20, width: 40, height: 40, "--accent": SECRETARY_TONE } as CSSProperties}
+        data-testid="desk-secretary"
+        data-standing={standing ? "1" : "0"}
+        data-move={move ?? undefined}
       >
+        {/* up from the chair to the job and back: one transform, the spring of a step (D-103) */}
         <span
           className="block"
           style={{
             transformOrigin: "50% 100%",
-            // typing; the small hop of turning round to the big face; or, after «Готово», the
-            // walk over to the big face with the job in hand and back (D-97)
-            animation: attending
-              ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
-              : handing
-                ? "smc-handoff 2.2s ease-in-out both"
-                : working
-                  ? "none"
-                  : "sec-type 0.95s ease-in-out infinite",
+            transform: standing && !move ? `translateX(${STAND_X}px) scale(${STAND_SCALE})` : "none",
+            transition: "transform 600ms cubic-bezier(0.34, 1.2, 0.64, 1)",
           }}
         >
-          <SecretaryMascot
-            mini
-            size={40}
-            scene={attending ? null : scene}
-            phase={attending ? "rest" : phase}
-            urgency={urgency}
-            // looking at the big face, or at the monitor while typing; a job has its own look
-            look={attending || listening ? { x: -1, y: -0.2 } : working || handing ? null : { x: 0.95, y: 0.1 }}
-          />
+          <span
+            className="block"
+            style={{
+              transformOrigin: "50% 100%",
+              // walking out or in; typing; the small hop of turning round to the big face; or,
+              // after «Готово», the walk over to the big face with the job in hand and back (D-97)
+              animation: move
+                ? `${move === "leave" ? "smc-desk-leave" : "smc-desk-arrive"} ${MOVE_MS}ms ease-in-out both`
+                : attending
+                  ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
+                  : handing
+                    ? "smc-handoff 2.2s ease-in-out both"
+                    : working
+                      ? "none"
+                      : "sec-type 0.95s ease-in-out infinite",
+            }}
+          >
+            <SecretaryMascot
+              mini
+              room={standing && !move}
+              size={40}
+              // walking out of the frame or back in: steps, eyes on the way
+              scene={move ? "come" : attending ? null : scene}
+              phase={move ? "doing" : attending ? "rest" : phase}
+              urgency={urgency}
+              // looking at the big face, or at the monitor while typing; a job has its own look
+              look={
+                move
+                  ? { x: move === "leave" ? 1 : -1, y: 0 }
+                  : attending || listening
+                    ? { x: -1, y: -0.2 }
+                    : working || handing
+                      ? null
+                      : { x: 0.95, y: 0.1 }
+              }
+            />
+          </span>
         </span>
         {asking ? (
           // a question waits for the director's answer: «?» over the small head
@@ -247,7 +303,14 @@ export function SecretaryDesk({
       </span>
 
       {/* in front: the keyboard under the small face's hands */}
-      <svg aria-hidden width={DESK_W} height={DESK_H} viewBox={`0 0 ${DESK_W} ${DESK_H}`} className={`pointer-events-none absolute inset-0 overflow-visible ${still}`}>
+      <svg
+        aria-hidden
+        width={DESK_W}
+        height={DESK_H}
+        viewBox={`0 0 ${DESK_W} ${DESK_H}`}
+        className={`pointer-events-none absolute inset-0 overflow-visible ${still}`}
+        style={{ opacity: standing ? 0 : 1, transition: FADE }}
+      >
         <rect x="36" y="48" width="24" height="5" rx="1.6" fill="color-mix(in srgb, var(--surface-2) 70%, white 10%)" stroke={EDGE} strokeWidth="0.8" />
         {[0, 1, 2, 3].map((key) => (
           <rect

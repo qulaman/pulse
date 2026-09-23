@@ -84,7 +84,8 @@ export function askSecretary(
     untilMin: options?.untilMin ?? null,
   };
   usePendingErrands.getState().add(errand);
-  // the card of the secretary shows the line itself; elsewhere (voice, a guest, a meeting) a toast
+  // a panel that stays open shows the line itself; elsewhere (voice, a guest, a meeting, the
+  // card over the face that closes on the send, D-101 §5) a toast
   if (!options?.quiet) toast(`${action.label} · отправлено`);
   void send(errand, onSent);
   return errand.id;

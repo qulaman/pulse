@@ -156,6 +156,7 @@ export function SecretaryMascot({
   daypart = "day",
   look = null,
   cheer = false,
+  room: roomOn,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
@@ -171,10 +172,15 @@ export function SecretaryMascot({
   look?: { x: number; y: number } | null;
   /** a quick job was just closed — confetti (the caller asks only after the D-40 gate) */
   cheer?: boolean;
+  /**
+   * The room of the job even in `mini` (D-103): the small secretary at the director's desk
+   * stands up to the coffee machine, the teapot, the door — the director sees the job itself.
+   */
+  room?: boolean;
 }) {
   // below avatar size the room and the props are noise: the body and the headset still read
   const detailed = size >= 40;
-  const room = detailed && !bare && !mini;
+  const room = detailed && !bare && (roomOn ?? !mini);
   const rest = !bare && phase === "rest";
   const asleep = rest && daypart === "night";
   const job: DeskScene | null = !bare && phase === "doing" ? scene : null;
@@ -304,16 +310,16 @@ export function SecretaryMascot({
         >
           <g key={`${bare ? "bare" : phase}-${job ?? ""}-${asleep ? "z" : ""}`} style={{ transformOrigin: "32px 44px", animation: body }}>
             {/* arms, drawn before the body so the body covers their roots */}
-            {show("coffee") && !mini ? (
+            {show("coffee") && room ? (
               <g style={{ animation: "smc-press 2.6s ease-in-out infinite" }}>
                 <Arm d="M10 35 Q2 28 -3.5 24" hand={{ cx: -5.5, cy: 23, rx: 3.6, ry: 3 }} />
               </g>
             ) : null}
-            {(show("tea") || show("water")) && !mini ? <Arm d="M10 38 Q3 34 -1 31" /> : null}
+            {(show("tea") || show("water")) && room ? <Arm d="M10 38 Q3 34 -1 31" /> : null}
             {show("dnd") ? <Arm d="M52 41 Q60 39 63 31.5" /> : null}
             {show("guest") ? <Arm d="M10 41 Q4 45 -1 43.5" hand={{ cx: -2.8, cy: 43, rx: 3.6, ry: 2.6 }} /> : null}
-            {show("print") && !mini ? <Arm d="M10 36 Q2 33 -4 31" /> : null}
-            {show("meeting") && !mini ? <Arm d="M10 40 Q2 38 -6 37.5" /> : null}
+            {show("print") && room ? <Arm d="M10 36 Q2 33 -4 31" /> : null}
+            {show("meeting") && room ? <Arm d="M10 40 Q2 38 -6 37.5" /> : null}
             {act === "stretch" && detailed ? (
               <g style={{ animation: "smc-arms-up 2.4s ease-in-out both" }}>
                 <Arm d="M12 26 Q6 14 5 4" />
@@ -383,7 +389,7 @@ export function SecretaryMascot({
             {show("other") ? <Writing /> : null}
             {show("lunch") || show("courier") ? <Carried scene={job!} /> : null}
             {/* the small secretary at the director's desk holds the job itself (D-97) */}
-            {mini && detailed && job && ["coffee", "tea", "water", "print", "meeting"].includes(job) ? <Carried scene={job} /> : null}
+            {mini && !room && detailed && job && ["coffee", "tea", "water", "print", "meeting"].includes(job) ? <Carried scene={job} /> : null}
             {detailed && finish && CARRY_OUT.has(finish) ? <Carried scene={finish} /> : null}
             {act === "headset" && detailed ? <Mitten cx={8} cy={46} rx={3.2} ry={2.8} style={{ animation: "smc-hand-ear 2.2s ease-in-out both", opacity: 0 }} /> : null}
           </g>
