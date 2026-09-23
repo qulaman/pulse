@@ -80,9 +80,13 @@ export default function PulsePage() {
   const counts = countsOf(lanes);
   const calendar = useCalendar();
   const events = useMemo(() => calendar.data ?? [], [calendar.data]);
-  const errands = useErrands();
+  // the fifth ball, its socket and the catalogue exist only when the company has
+  // somebody to ask (D-79 §4)
+  const people = usePeople();
+  const hasSecretary = (people.data ?? []).some((p) => p.role === "secretary" && p.is_active);
+  const errands = useErrands(hasSecretary);
   const errandRows = useMemo(() => errands.data ?? [], [errands.data]);
-  const catalogue = useSecretaryActions();
+  const catalogue = useSecretaryActions(hasSecretary);
   // the calendar and the errands are news too: an answer, a move, the reminder the tick
   // has just written, «Айгуль · кофе принят»
   const speech = useSpeech(rows, lanes, now, directorName, meId, calendar.data, errands.data);
@@ -99,9 +103,6 @@ export default function PulsePage() {
   // the balls and the mascot are where they were when the sheet closes (D-64 §5)
   const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
   const openThread = (task: BoardTask) => setThread({ id: task.id, title: task.title });
-
-  const people = usePeople();
-  const hasSecretary = (people.data ?? []).some((p) => p.role === "secretary" && p.is_active);
 
   // every open task on the ball (in work included), coloured by the worst of them; messages are counted apart
   const taskCount = counts.overdue + counts.declined + counts.review + counts.work;

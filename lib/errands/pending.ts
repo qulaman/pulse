@@ -92,16 +92,36 @@ export function askSecretary(
 
   timers.set(
     errand.id,
-    setTimeout(async () => {
+    setTimeout(() => {
       timers.delete(errand.id);
-      const ok = await postErrand(errand);
-      usePendingErrands.getState().drop(errand.id);
-      if (!ok) toast("Не получилось отправить. Попробуй ещё раз");
-      onSent();
+      void send(errand, onSent);
     }, HOLD_MS),
   );
 
   return errand.id;
+}
+
+/**
+ * The row leaves the pending list only once the server has it. A failed post (no
+ * network, a 5xx) keeps the line on the screen with «Повторить»: the request id is the
+ * same, so a retry after the network is back buys one cup, not two (principle 7).
+ */
+async function send(errand: PendingErrand, onSent: () => void): Promise<void> {
+  let ok = false;
+  try {
+    ok = await postErrand(errand);
+  } catch {
+    ok = false;
+  }
+  if (ok) {
+    usePendingErrands.getState().drop(errand.id);
+    onSent();
+    return;
+  }
+  toast("Не получилось отправить", {
+    lifetimeMs: 10_000,
+    action: { label: "Повторить", onClick: () => void send(errand, onSent) },
+  });
 }
 
 export function cancelErrand(id: string, toastId?: number): void {
