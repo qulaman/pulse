@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import { DESK_SCENES, SCENE_NAME, type Daypart, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
@@ -74,7 +76,11 @@ const DESKS: {
 }[] = [
   { caption: "Печатает", scene: null, phase: "rest" },
   { caption: "Просьба ждёт", scene: "coffee", phase: "asked", urgency: 1 },
-  { caption: "Варит кофе", scene: "coffee", phase: "doing" },
+  { caption: "Варит кофе — стоя у машины", scene: "coffee", phase: "doing" },
+  { caption: "Заваривает чай", scene: "tea", phase: "doing" },
+  { caption: "Приглашает гостя", scene: "guest", phase: "doing" },
+  { caption: "Печатает", scene: "print", phase: "doing" },
+  { caption: "Вызывает машину", scene: "taxi", phase: "doing" },
   { caption: "Не беспокоить", scene: "dnd", phase: "doing" },
   { caption: "Несёт чашку", scene: "coffee", phase: "done" },
   { caption: "Смотрит на директора", scene: null, phase: "rest", attending: true },
@@ -84,8 +90,10 @@ const DESKS: {
   { caption: "Никого нет на месте", scene: null, phase: "rest", away: "2026-09-23T09:30:00Z" },
 ];
 
-/** /dev/secretary — every scene of the secretary's face on one screen (dev only, D-87, D-97). */
+/** /dev/secretary — every scene of the secretary's face on one screen (dev only, D-87, D-97, D-103). */
 export default function SecretarySandboxPage() {
+  // «ушёл / вернулся»: a desk whose presence a button flips, to watch the walk out and in
+  const [away, setAway] = useState<string | null>(null);
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
       <h1 className="text-[24px] font-bold leading-[30px]">Маскот секретаря</h1>
@@ -120,6 +128,22 @@ export default function SecretarySandboxPage() {
           </div>
         </section>
       ))}
+      <section className="mt-6">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Ушёл / вернулся</h2>
+        <div className="mt-2 flex items-center gap-4 rounded-[20px] border border-border bg-surface/40 px-6 pb-8 pt-8" data-testid="desk-away-demo">
+          <div className="flex h-[96px] items-center justify-center pl-10">
+            <SecretaryDesk attending={false} count={0} tone="var(--ok)" label="Ушёл / вернулся" away={away} onTap={() => undefined} />
+          </div>
+          <button
+            type="button"
+            data-testid="toggle-away"
+            className="min-h-[44px] rounded-full border border-border px-4 text-[14px] font-semibold"
+            onClick={() => setAway((v) => (v ? null : new Date(Date.now() + 30 * 60_000).toISOString()))}
+          >
+            {away ? "Вернулся" : "Ушёл"}
+          </button>
+        </div>
+      </section>
       <section className="mt-6">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Стол секретаря у директора</h2>
         <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
