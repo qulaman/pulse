@@ -13,7 +13,7 @@ import { isCountable, useIngestStore } from "@/lib/store/ingest";
 
 /**
  * What the director's screens share around the input (docs/FRONTEND.md "FAB"). The floating
- * microphone is gone (D-89): the director speaks to the face on Пульс, and only there. What
+ * microphone is gone (D-92): the director speaks to the face on Пульс, and only there. What
  * stays on the other screens: a parsed but unsent batch waits in a draft pill instead of
  * dragging the director back on every navigation; the typed input opens on request
  * («Дать задачу» on a person's card, D-84); the overlay shows a pipeline that is still running
