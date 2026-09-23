@@ -32,7 +32,15 @@ import { VisitAsk } from "@/components/visits/VisitAsk";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useEther } from "@/lib/ether/queries";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
-import { activeCount, isActive, useErrands, useSecretaries, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
+import {
+  activeCount,
+  isActive,
+  useErrandReceipt,
+  useErrands,
+  useSecretaries,
+  useSecretaryActions,
+  useSecretarySetup,
+} from "@/lib/errands/queries";
 import { askSecretary, setDeskAbsence, usePendingErrands } from "@/lib/errands/pending";
 import { absenceLine, etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
@@ -199,6 +207,12 @@ export default function PulsePage() {
   // what the secretaries are doing about the requests, for the small secretary at the desk:
   // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
   const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS);
+  // the request nobody has taken yet: has the secretary opened it? The desk nods (D-106 §8)
+  const askedErrand = deskStage.phase === "asked" ? deskStage.errand : null;
+  const askedReceipt = useErrandReceipt(askedErrand?.id ?? null, askedErrand !== null);
+  // null while the receipt of this request is still loading: a screen opened after «увидел» does not nod
+  const deskSeen =
+    askedErrand === null ? false : askedReceipt.isSuccess ? Boolean(askedReceipt.data?.seen_at || askedReceipt.data?.acted_at) : null;
   const secretarySetup = useSecretarySetup(hasSecretary);
   // who of the secretaries is at the desk (D-99): all away — an empty chair and «до 14:00»
   const secretaryPeople = useSecretaries(hasSecretary);
@@ -601,6 +615,7 @@ export default function PulsePage() {
                     urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3)}
                     count={activeCount(errandRows) + waitingErrands}
                     away={awayUntil}
+                    seen={deskSeen}
                     waiting={waitingErrands}
                     etaLeft={deskStage.phase === "doing" ? etaLeftMin(deskStage.errand, now) : null}
                     asking={errandRows.some((e) => isActive(e) && e.question && !e.answer)}

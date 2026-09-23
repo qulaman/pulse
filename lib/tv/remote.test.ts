@@ -19,6 +19,7 @@ function state(patch: Partial<TvState> = {}): TvState {
     board_id: null,
     board_until: null,
     board_guest: false,
+    awake_until: null,
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -85,6 +86,15 @@ describe("wallNow", () => {
   it("истёкший фокус — уже эфир", () => {
     const row = state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T08:55:00Z" });
     expect(wallNow(row, PEOPLE, NOW)).toBe("Эфир · лицо");
+  });
+
+  it("ночью спящая стена — тусклые часы, разбуженная — снова сцена (D-105)", () => {
+    const night = new Date("2026-09-18T17:00:00Z"); // 22:00 в Актобе
+    expect(wallNow(state({ scene: "team" }), PEOPLE, night)).toBe("Ночь · тусклые часы");
+    expect(wallNow(state({ scene: "team", awake_until: "2026-09-18T19:00:00Z" }), PEOPLE, night)).toBe("Эфир · команда");
+    // человек на стене ночь перебивает и без пульта
+    const focus = state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T17:07:00Z" });
+    expect(wallNow(focus, PEOPLE, night)).toBe("Марат Ахметов · ещё 7 мин");
   });
 });
 

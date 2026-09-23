@@ -1,6 +1,15 @@
 import { tvTime } from "./clock";
 import type { TvState } from "./queries";
-import { calendarViewOf, effectiveMode, focusRemainingMs, sceneOf, type CalendarView, type ClockStyle, type TvScene } from "./state";
+import {
+  calendarViewOf,
+  effectiveMode,
+  focusRemainingMs,
+  sceneOf,
+  wallAsleep,
+  type CalendarView,
+  type ClockStyle,
+  type TvScene,
+} from "./state";
 
 /**
  * Что пульт говорит директору о стене. Чистые функции: формулировки — часть продукта,
@@ -64,8 +73,9 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
 }
 
 /**
- * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин» или
- * «Доска «Планёрка» · до 21:00» (D-102) — названия досок пульт отдаёт списком.
+ * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин»,
+ * «Доска «Планёрка» · до 21:00» (D-102) — названия досок пульт отдаёт списком — или
+ * «Ночь · тусклые часы», пока стена спит (D-105): иначе пульт ночью обещал бы лицо.
  */
 export function wallNow(
   state: TvState | null,
@@ -78,6 +88,7 @@ export function wallNow(
     const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
     return `${person?.full_name ?? "Сотрудник"} · ещё ${minutes} мин`;
   }
+  if (wallAsleep(state, now)) return "Ночь · тусклые часы";
   const scene = sceneOf(state, now);
   if (scene === "calendar" && calendarViewOf(state) === "month") return "Эфир · календарь · месяц";
   if (scene === "board" && state?.board_until) {

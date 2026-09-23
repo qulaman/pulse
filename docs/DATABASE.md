@@ -195,6 +195,7 @@ calendar_view text not null default 'week' check (calendar_view in ('week','mont
 board_id uuid null → mind_boards on delete set null,   -- доска на стене при scene = 'board', D-102
 board_until timestamptz null,     -- доска уходит со стены: 21:00 Актобе, поставленная после 21:00 — через 2 часа
 board_guest bool not null default false,   -- «Показать гостю»; сбрасывают новая доска и выключенный гость
+awake_until timestamptz null,     -- разбудка с пульта: ночь не гасит стену до этой отметки, D-105
 expires_at timestamptz null,      -- фокус гаснет по часам киоска, без cron
 version int not null default 0,   -- поднимает каждый tv_control; киоск квитирует
 reload_requested_at, seen_at timestamptz null, applied_version int null,
@@ -207,6 +208,8 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 **Месяц на стене (D-98, миграция `20260923233000_tv_calendar_month`):** `calendar_view` (`week | month`) — вид заставки «Календарь»; `tv_control(..., p_calendar)` пересоздан; `tv_calendar(p_guest, p_days, p_from)` отдаёт до 42 дней с `p_from` (по умолчанию сегодня по Актобе) — сетка месяца с понедельника первой недели. pgTAP — `024_tv_calendar_month.test.sql`.
 
 **Доска на стене (D-102, миграция `20260924090000_mind_boards`):** сцену `board` ставит только `tv_control(..., p_board)` — автор своей живой доски (`p_scene => 'board'` отклоняется, `bad_scene`; чужая или удалённая — `bad_board`); любая другая `p_scene` снимает доску; `p_board_guest` — «Показать гостю». `tv_board(p_guest)` (tv/director) отдаёт `{board, hidden}`: доску, стоящую на стене и живую по `board_until`, с пунктами по `position` (непустые, не удалённые) и нейтральными пометками (`assignee` — имя без фамилии исполнителя поручения, кроме `revoked`; `handed_done`); при госте без `board_guest` — `hidden: true`, если доску показали гостю — без имён. Правка доски на стене поднимает версию строки (`tv_touch`) — киоск перечитывает `tv_board`. pgTAP — `025_mind_boards.test.sql`.
+
+**Разбудка ночью (D-105, миграция `20260924095000_tv_wake`):** `tv_control(..., p_wake)` пересоздан: `true` ставит `awake_until = now() + 2 часа` (повтор — от нового «сейчас»), `false` — `null`; остальные команды колонку не трогают. Ночь (21:00–08:00) киоск считает по своим часам, пока `awake_until` впереди — стена в эфире. pgTAP — `027_tv_wake.test.sql`.
 
 ### inbox_items — staging голосового конвейера
 `id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, created_at, updated_at`. Заводит `/api/voice/upload-url` (`director_input`), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
@@ -373,7 +376,7 @@ close_visit(p_id uuid) returns visits
 visits_due_expiry(p_now timestamptz default now()) returns int           -- только service_role
 
 -- ТВ (D-76)
-tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text, p_board uuid, p_board_guest boolean) returns tv_state   -- p_board* — D-102
+tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text, p_board uuid, p_board_guest boolean, p_wake boolean) returns tv_state   -- p_board* — D-102, p_wake — D-105
 tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102
 tv_focus() returns jsonb
 tv_heartbeat(p_applied_version int default null) returns void
@@ -497,5 +500,6 @@ pg_cron и pg_net не подключены. Единственное распи
 | `023_visits.test.sql` | «К вам посетитель»: объявляет секретарь, отвечает директор, квитанция стены, маска гостя, истечение |
 | `024_tv_calendar_month.test.sql` | календарь на стене: «Неделя / Месяц» пультом, шесть недель для киоска |
 | `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
+| `027_tv_wake.test.sql` | разбудка стены: два часа от «сейчас», `false` усыпляет, другие команды не трогают, будит только директор |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).

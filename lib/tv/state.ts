@@ -125,12 +125,36 @@ export function aqtobeHour(now: Date): number {
 
 /**
  * Ночью в пустом кабинете стена гаснет до тусклых часов: статичная картинка часами
- * подряд выжигает матрицу, а смотреть на неё некому (D-96). Фокус и надпись о
- * посетителе ночь перебивают — их поставил человек, значит, в кабинете кто-то есть.
+ * подряд выжигает матрицу, а смотреть на неё некому (D-96). Фокус, доска, надпись о
+ * посетителе и разбудка с пульта ночь перебивают — их поставил человек, значит, в
+ * кабинете кто-то есть. Это просто часы; спит ли стена — `wallAsleep`.
  */
 export function isNight(now: Date): boolean {
   const hour = aqtobeHour(now);
   return hour >= NIGHT_FROM_HOUR || hour < NIGHT_TO_HOUR;
+}
+
+/** Разбудка с пульта живёт два часа — то же число, что в `tv_control(p_wake)` (D-105). */
+export const WAKE_MS = 2 * HOUR_MS;
+
+/**
+ * До какого времени директор разбудил стену (D-105): ночь её не гасит, пока отметка
+ * впереди. Гаснет по часам киоска сама, как фокус; истёкшая и снятая — null.
+ */
+export function awakeUntil(state: TvState | null, now: Date): Date | null {
+  if (!state?.awake_until) return null;
+  const at = new Date(state.awake_until);
+  return at.getTime() > now.getTime() ? at : null;
+}
+
+/**
+ * Стена сейчас спит — тусклые часы (D-96 §8): ночь, никто не будил, и на стене нет того,
+ * что ночь перебивает, — фокуса на человеке и доски. Надпись о посетителе тоже будит
+ * стену, но ненадолго; о ней пульт говорит отдельной строкой.
+ */
+export function wallAsleep(state: TvState | null, now: Date): boolean {
+  if (!isNight(now) || awakeUntil(state, now)) return false;
+  return effectiveMode(state, now) !== "employee" && sceneOf(state, now) !== "board";
 }
 
 /** Шаг сдвига против выгорания: раз в 10 минут. */

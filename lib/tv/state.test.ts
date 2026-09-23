@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TvState } from "./queries";
 import {
+  awakeUntil,
   boardLive,
   boardUntilFrom,
   burnInShift,
@@ -15,6 +16,7 @@ import {
   sceneOf,
   shouldReload,
   SHIFT_STEP_MS,
+  wallAsleep,
 } from "./state";
 
 const NOW = new Date("2026-09-18T09:00:00Z");
@@ -33,6 +35,7 @@ function state(patch: Partial<TvState> = {}): TvState {
     board_id: null,
     board_until: null,
     board_guest: false,
+    awake_until: null,
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -149,6 +152,35 @@ describe("isNight", () => {
     expect(isNight(new Date("2026-09-18T02:59:00Z"))).toBe(true);
     expect(isNight(new Date("2026-09-18T03:00:00Z"))).toBe(false);
     expect(isNight(new Date("2026-09-18T15:59:00Z"))).toBe(false);
+  });
+});
+
+describe("разбудка с пульта (D-105)", () => {
+  // 22:00 Актобе
+  const NIGHT = new Date("2026-09-18T17:00:00Z");
+
+  it("ночью пустая стена спит, днём — нет", () => {
+    expect(wallAsleep(state(), NIGHT)).toBe(true);
+    expect(wallAsleep(null, NIGHT)).toBe(true);
+    expect(wallAsleep(state(), NOW)).toBe(false);
+  });
+
+  it("разбуженная стена не спит до отметки, потом засыпает сама", () => {
+    const row = state({ awake_until: "2026-09-18T19:00:00Z" });
+    expect(awakeUntil(row, NIGHT)?.toISOString()).toBe("2026-09-18T19:00:00.000Z");
+    expect(wallAsleep(row, NIGHT)).toBe(false);
+    // 00:00 Актобе — два часа прошли, снова ночь
+    expect(awakeUntil(row, new Date("2026-09-18T19:00:00Z"))).toBeNull();
+    expect(wallAsleep(row, new Date("2026-09-18T19:00:00Z"))).toBe(true);
+    expect(awakeUntil(state(), NIGHT)).toBeNull();
+  });
+
+  it("фокус и живая доска будят стену и без пульта", () => {
+    expect(wallAsleep(state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T17:05:00Z" }), NIGHT)).toBe(false);
+    expect(wallAsleep(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T18:00:00Z" }), NIGHT)).toBe(false);
+    // истёкшие — уже нет
+    expect(wallAsleep(state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T16:55:00Z" }), NIGHT)).toBe(true);
+    expect(wallAsleep(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T16:00:00Z" }), NIGHT)).toBe(true);
   });
 });
 

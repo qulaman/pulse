@@ -4,7 +4,7 @@ import { lineOf } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
 import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvState, useTvSummary } from "@/lib/tv/queries";
 import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
-import { calendarViewOf, clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
+import { awakeUntil, calendarViewOf, clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
@@ -21,7 +21,8 @@ import { useClock, useHeartbeat, useNightReload, useOffline, useRemoteReload } f
  * Строка переживает и ночной перезапуск, и деплой, поэтому команда с пульта не теряется,
  * пока экран моргает. Посетитель от секретаря приходит той же строкой: визит поднимает её
  * версию, киоск перечитывает надпись `tv_overlay()`. Доска директора — тоже: правка доски на
- * стене поднимает версию строки, киоск перечитывает `tv_board()` (D-102).
+ * стене поднимает версию строки, киоск перечитывает `tv_board()` (D-102). Ночь стена
+ * считает по своим часам, но разбудка с пульта — отметка `awake_until` в той же строке (D-105).
  */
 export function TvScreen({
   company,
@@ -77,7 +78,8 @@ export function TvScreen({
         guest={guest}
         scene={scene}
         clock={clockStyleOf(row)}
-        night={isNight(now)}
+        // the director woke the wall from the remote: the night waits till the mark (D-105)
+        night={isNight(now) && !awakeUntil(row, now)}
         offline={offline}
         items={tickerItems(lines, data)}
         speech={speech}

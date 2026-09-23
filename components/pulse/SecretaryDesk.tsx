@@ -15,6 +15,8 @@ export const DESK_FACE = { x: 30, y: 34 };
 const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
 /** How long the walk out of the frame or back to the chair takes (D-103). */
 const MOVE_MS = 1_600;
+/** The nod of «увидел» (D-106 §8). */
+const NOD_MS = 1_400;
 /** Standing at the job: this far to the right of the chair, and this much bigger. */
 const STAND_X = 30;
 const STAND_SCALE = 1.2;
@@ -45,6 +47,7 @@ export function SecretaryDesk({
   phase = "rest",
   urgency = 0,
   away = null,
+  seen = false,
   waiting = 0,
   etaLeft = null,
   asking = false,
@@ -69,6 +72,11 @@ export function SecretaryDesk({
   urgency?: Urgency;
   /** every secretary has stepped away — until when (D-99): an empty chair, a caption */
   away?: string | null;
+  /**
+   * the secretary has opened the request nobody has taken yet (D-106 §8): a nod to the big
+   * face the moment it happens, then a check on the monitor; null — not known yet (loading)
+   */
+  seen?: boolean | null;
   /** requests kept on the phone without network (D-106): «ждёт связи» under the desk */
   waiting?: number;
   /** minutes left of what the secretary promised on «Принял»; the monitor counts them down */
@@ -113,6 +121,25 @@ export function SecretaryDesk({
     return () => clearTimeout(timer);
   }, [move]);
   const gone = Boolean(away) && move !== "leave";
+  // «увидел»: the nod plays on the turn from unseen to seen, not on a screen opened after it —
+  // the first value known (after loading, or for a new request) is only where counting starts
+  const saw = seen === true && phase === "asked";
+  const [sawBefore, setSawBefore] = useState<boolean | null>(seen === null ? null : saw);
+  const [nod, setNod] = useState(false);
+  if (seen === null) {
+    if (sawBefore !== null) setSawBefore(null);
+  } else if (sawBefore === null) {
+    setSawBefore(saw);
+  } else if (sawBefore !== saw) {
+    setSawBefore(saw);
+    if (saw) setNod(true);
+  }
+  useEffect(() => {
+    if (!nod) return;
+    const timer = setTimeout(() => setNod(false), NOD_MS);
+    return () => clearTimeout(timer);
+  }, [nod]);
+  const nodding = nod && saw && !move && !attending;
   return (
     <button
       type="button"
@@ -173,6 +200,7 @@ export function SecretaryDesk({
           // the job on the screen: its picture, and a pulsing frame while nobody has taken it
           <g>
             {phase === "asked" ? (
+              // seen and not late: the frame calms down to a still green — the secretary is on it
               <rect
                 x="57.5"
                 y="18.5"
@@ -180,10 +208,17 @@ export function SecretaryDesk({
                 height="24"
                 rx="3"
                 fill="none"
-                stroke={urgency === 2 ? "var(--danger)" : "var(--warn)"}
+                stroke={urgency === 2 ? "var(--danger)" : saw ? "var(--ok)" : "var(--warn)"}
                 strokeWidth="1.4"
-                style={{ animation: `smc-glow ${urgency === 2 ? "0.6s" : "1.2s"} ease-in-out infinite` }}
+                style={saw && urgency < 2 ? { opacity: 0.7 } : { animation: `smc-glow ${urgency === 2 ? "0.6s" : "1.2s"} ease-in-out infinite` }}
               />
+            ) : null}
+            {saw ? (
+              // «увидел»: a small check in the corner of the monitor
+              <g data-testid="desk-seen">
+                <circle cx="61.5" cy="22.5" r="3.4" fill="var(--ok)" />
+                <path d="M59.9 22.6 l1.1 1.1 l2.1 -2.3" fill="none" stroke="var(--bg)" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" />
+              </g>
             ) : null}
             <g transform={`translate(75 ${etaLeft !== null ? 28 : 30.5}) scale(${etaLeft !== null ? 1 : 1.25})`}>
               <Glyph scene={scene} />
@@ -256,6 +291,7 @@ export function SecretaryDesk({
         data-testid="desk-secretary"
         data-standing={standing ? "1" : "0"}
         data-move={move ?? undefined}
+        data-nod={nodding ? "1" : undefined}
       >
         {/* up from the chair to the job and back: one transform, the spring of a step (D-103) */}
         <span
@@ -274,13 +310,15 @@ export function SecretaryDesk({
               // after «Готово», the walk over to the big face with the job in hand and back (D-97)
               animation: move
                 ? `${move === "leave" ? "smc-desk-leave" : "smc-desk-arrive"} ${MOVE_MS}ms ease-in-out both`
-                : attending
-                  ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
-                  : handing
-                    ? "smc-handoff 2.2s ease-in-out both"
-                    : working
-                      ? "none"
-                      : "sec-type 0.95s ease-in-out infinite",
+                : nodding
+                  ? `smc-desk-nod ${NOD_MS}ms ease-in-out both`
+                  : attending
+                    ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
+                    : handing
+                      ? "smc-handoff 2.2s ease-in-out both"
+                      : working
+                        ? "none"
+                        : "sec-type 0.95s ease-in-out infinite",
             }}
           >
             <SecretaryMascot
@@ -295,7 +333,7 @@ export function SecretaryDesk({
               look={
                 move
                   ? { x: move === "leave" ? 1 : -1, y: 0 }
-                  : attending || listening
+                  : attending || listening || nodding
                     ? { x: -1, y: -0.2 }
                     : working || handing
                       ? null
