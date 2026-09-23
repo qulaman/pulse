@@ -10,14 +10,14 @@ import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/types";
 
 /**
- * The developer's lab (D-63): the model switches and the cost of every director
- * recognition, priced from ai_logs. Any signed-in profile of the company may read
- * and switch — the owner asked for no role check while the comparison runs.
+ * The lab (D-63): the model switches and the cost of every director recognition,
+ * priced from ai_logs. The director and the secretary only — the same people who
+ * run the instance's settings (ADMIN_ROLES).
  */
 
 const LOG_LIMIT = 400;
 
-export const GET = withAuth("any", async ({ profile }) => {
+export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
   const supabase = createServiceSupabase();
   const [settings, logs] = await Promise.all([
     loadCompanySettings(profile.companyId).then(parseCompanySettings),
@@ -53,9 +53,9 @@ function asRecord(value: unknown): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, Json | undefined>) : {};
 }
 
-/** Same shallow section merge as update_company_settings, minus its director check (owner's call, D-63). */
+/** Same shallow section merge as update_company_settings, for the director and the secretary (D-63). */
 export const PATCH = withAuth<z.infer<typeof PatchSchema>>(
-  "any",
+  ["director", "secretary"],
   async ({ profile, body }) => {
     const supabase = createServiceSupabase();
     const raw = await loadCompanySettings(profile.companyId);
