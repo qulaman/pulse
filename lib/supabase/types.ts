@@ -1377,76 +1377,6 @@ export type Database = {
           },
         ]
       }
-      visits: {
-        Row: {
-          answered_at: string | null
-          answered_by: string | null
-          author_id: string
-          client_request_id: string | null
-          closed_at: string | null
-          company_id: string
-          created_at: string
-          id: string
-          note: string | null
-          shown_at: string | null
-          status: string
-          tv_version: number | null
-          updated_at: string
-        }
-        Insert: {
-          answered_at?: string | null
-          answered_by?: string | null
-          author_id: string
-          client_request_id?: string | null
-          closed_at?: string | null
-          company_id: string
-          created_at?: string
-          id?: string
-          note?: string | null
-          shown_at?: string | null
-          status?: string
-          tv_version?: number | null
-          updated_at?: string
-        }
-        Update: {
-          answered_at?: string | null
-          answered_by?: string | null
-          author_id?: string
-          client_request_id?: string | null
-          closed_at?: string | null
-          company_id?: string
-          created_at?: string
-          id?: string
-          note?: string | null
-          shown_at?: string | null
-          status?: string
-          tv_version?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "visits_answered_by_fkey"
-            columns: ["answered_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "visits_author_id_fkey"
-            columns: ["author_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "visits_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tv_state: {
         Row: {
           applied_version: number | null
@@ -1530,11 +1460,129 @@ export type Database = {
           },
         ]
       }
+      visits: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id?: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      announce_visit: {
+        Args: { client_request_id?: string; p_note?: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      answer_visit: {
+        Args: { p_answer: string; p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auth_company_id: { Args: never; Returns: string }
       auth_role: { Args: never; Returns: string }
       award_points: {
@@ -1550,6 +1598,30 @@ export type Database = {
       cancel_shop_order: {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
+      }
+      close_visit: {
+        Args: { p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       confirm_voice_batch: {
         Args: { client_request_id: string; p_now?: string; payload: Json }
@@ -1687,10 +1759,7 @@ export type Database = {
         Returns: boolean
       }
       thank_errand: {
-        Args: {
-          client_request_id?: string
-          p_id: string
-        }
+        Args: { client_request_id?: string; p_id: string }
         Returns: Json
       }
       transition_errand: {
@@ -1711,82 +1780,10 @@ export type Database = {
         }
         Returns: Json
       }
-      announce_visit: {
-        Args: { client_request_id?: string; p_note?: string }
-        Returns: {
-          answered_at: string | null
-          answered_by: string | null
-          author_id: string
-          client_request_id: string | null
-          closed_at: string | null
-          company_id: string
-          created_at: string
-          id: string
-          note: string | null
-          shown_at: string | null
-          status: string
-          tv_version: number | null
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "visits"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+      tv_calendar: {
+        Args: { p_days?: number; p_guest?: boolean }
+        Returns: Json
       }
-      answer_visit: {
-        Args: { p_answer: string; p_id: string }
-        Returns: {
-          answered_at: string | null
-          answered_by: string | null
-          author_id: string
-          client_request_id: string | null
-          closed_at: string | null
-          company_id: string
-          created_at: string
-          id: string
-          note: string | null
-          shown_at: string | null
-          status: string
-          tv_version: number | null
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "visits"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      close_visit: {
-        Args: { p_id: string }
-        Returns: {
-          answered_at: string | null
-          answered_by: string | null
-          author_id: string
-          client_request_id: string | null
-          closed_at: string | null
-          company_id: string
-          created_at: string
-          id: string
-          note: string | null
-          shown_at: string | null
-          status: string
-          tv_version: number | null
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "visits"
-          isOneToOne: true
-          isSetofReturn: false
-        }
-      }
-      tv_calendar: { Args: { p_days?: number; p_guest?: boolean }; Returns: Json }
-      tv_overlay: { Args: never; Returns: Json }
-      tv_touch: { Args: { p_company: string; p_guest_minutes?: number }; Returns: number }
-      visits_due_expiry: { Args: { p_now?: string }; Returns: number }
       tv_control: {
         Args: {
           p_clock?: string
@@ -1835,10 +1832,20 @@ export type Database = {
       }
       tv_events_prune: { Args: { p_days?: number }; Returns: number }
       tv_focus: { Args: never; Returns: Json }
+      tv_guest_on: {
+        Args: { p_state: Database["public"]["Tables"]["tv_state"]["Row"] }
+        Returns: boolean
+      }
       tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
+      tv_overlay: { Args: never; Returns: Json }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
+      tv_touch: {
+        Args: { p_company: string; p_guest_minutes?: number }
+        Returns: number
+      }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
+      visits_due_expiry: { Args: { p_now?: string }; Returns: number }
     }
     Enums: {
       absence_kind: "vacation" | "sick" | "other"
