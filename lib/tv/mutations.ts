@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { boardUntilFrom, FOCUS_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
+import { boardUntilFrom, FOCUS_MS, WAKE_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -40,6 +40,8 @@ export type TvControlInput = {
   board?: string;
   /** «Показать гостю» — доска на стене и при госте в кабинете (D-102 §7). */
   boardGuest?: boolean;
+  /** Разбудить стену ночью на два часа (`true`) или вернуть ночь (`false`) (D-105). */
+  wake?: boolean;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -77,6 +79,7 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
   if (input.boardGuest !== undefined && input.guest !== false) next.board_guest = input.boardGuest;
   if (input.clock) next.clock_style = input.clock;
   if (input.calendar) next.calendar_view = input.calendar;
+  if (input.wake !== undefined) next.awake_until = input.wake ? new Date(now.getTime() + WAKE_MS).toISOString() : null;
   return next;
 }
 
@@ -103,6 +106,7 @@ export function useTvControl() {
         p_calendar: input.calendar,
         p_board: input.board,
         p_board_guest: input.boardGuest,
+        p_wake: input.wake,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),

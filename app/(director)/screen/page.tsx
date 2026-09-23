@@ -17,6 +17,7 @@ import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
 import { CALENDAR_LABEL, CLOCK_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
+  awakeUntil,
   CALENDAR_VIEWS,
   calendarViewOf,
   CLOCK_STYLES,
@@ -26,8 +27,10 @@ import {
   focusRemainingMs,
   guestEndsAt,
   guestOf,
+  isNight,
   sceneOf,
   TV_SCENES,
+  WAKE_MS,
   type CalendarView,
   type ClockStyle,
   type TvScene,
@@ -55,6 +58,9 @@ import { awaitingDirector, waitedSince } from "@/lib/visits/text";
  *
  * С D-102: шов «Доска на стене» — три последние доски директора клавишами, горит стоящая
  * на стене; при госте в кабинете — ползунок «Показать гостю».
+ *
+ * С D-105: ночью, с 21:00 до 08:00, под дисплеем ползунок «Разбудить экран» — стена
+ * возвращается из тусклых часов в эфир на два часа; тот же ползунок усыпляет её сразу.
  */
 
 /** Клавиш досок на пульте — три последние: мышечной памяти хватает, остальное — в «Заметках». */
@@ -100,6 +106,8 @@ export default function ScreenPage() {
   const calendarView = calendarViewOf(row);
   const guest = guestOf(row, false, now);
   const guestEnds = guestEndsAt(row, now);
+  const night = isNight(now);
+  const awake = awakeUntil(row, now);
   const receipt = wallReceipt(row, now);
   const remainingMs = focusRemainingMs(row, now);
   const onScreenId = mode === "employee" ? row?.employee_id ?? null : null;
@@ -182,6 +190,25 @@ export default function ScreenPage() {
                 </Key>
               ))}
             </div>
+          </div>
+        ) : null}
+
+        {/* the night dims the wall to its clock (D-96 §8); the director working late wakes it
+            for two hours, and the same switch puts it back to sleep (D-105) */}
+        {night ? (
+          <div className="mt-3">
+            <Switch
+              on={awake !== null}
+              icon={<SunIcon />}
+              title={awake ? "Экран не спит" : "Разбудить экран"}
+              value={awake ? `до ${tvTime(awake)}, потом снова ночь` : "ночь: тусклые часы до 08:00"}
+              onToggle={(next) =>
+                show(
+                  { wake: next },
+                  next ? `Экран проснулся до ${tvTime(new Date(Date.now() + WAKE_MS))}` : "Экран снова спит",
+                )
+              }
+            />
           </div>
         ) : null}
 
@@ -369,6 +396,13 @@ const RefreshIcon = () => (
   <svg {...icon}>
     <path d="M16.4 8.4A6.6 6.6 0 1 0 16 12.4" />
     <path d="M16.8 4.2v4.4h-4.4" />
+  </svg>
+);
+
+const SunIcon = () => (
+  <svg {...icon}>
+    <circle cx="10" cy="10" r="3.4" />
+    <path d="M10 2.6v1.8M10 15.6v1.8M2.6 10h1.8M15.6 10h1.8M4.8 4.8l1.3 1.3M13.9 13.9l1.3 1.3M4.8 15.2l1.3-1.3M13.9 6.1l1.3-1.3" />
   </svg>
 );
 

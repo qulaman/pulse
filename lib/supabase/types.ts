@@ -1474,6 +1474,7 @@ export type Database = {
       tv_state: {
         Row: {
           applied_version: number | null
+          awake_until: string | null
           board_guest: boolean
           board_id: string | null
           board_until: string | null
@@ -1495,6 +1496,7 @@ export type Database = {
         }
         Insert: {
           applied_version?: number | null
+          awake_until?: string | null
           board_guest?: boolean
           board_id?: string | null
           board_until?: string | null
@@ -1516,6 +1518,7 @@ export type Database = {
         }
         Update: {
           applied_version?: number | null
+          awake_until?: string | null
           board_guest?: boolean
           board_id?: string | null
           board_until?: string | null
@@ -1940,9 +1943,11 @@ export type Database = {
           p_reload?: boolean
           p_scene?: string
           p_task_id?: string
+          p_wake?: boolean
         }
         Returns: {
           applied_version: number | null
+          awake_until: string | null
           board_guest: boolean
           board_id: string | null
           board_until: string | null

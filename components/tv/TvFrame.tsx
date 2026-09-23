@@ -44,7 +44,10 @@ export type TvFrameProps = {
   guest: boolean;
   scene: TvScene;
   clock: ClockStyle;
-  /** 21:00–08:00 and nobody put anything on the wall: the screen dims to its clock (D-96). */
+  /**
+   * 21:00–08:00 and the remote has not woken the wall (D-105): the screen dims to its clock
+   * unless a person, a board or a notice is on it (D-96).
+   */
   night: boolean;
   offline: boolean;
   items: TickerItem[];
