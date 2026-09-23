@@ -15,6 +15,7 @@ import { latestDeclineReason, latestOpenQuestion, messageFlags } from "@/compone
 import { ThreadView } from "@/components/tasks/thread/ThreadView";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { HeadButton } from "@/components/ui/HeadButton";
 import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
 import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -112,19 +113,7 @@ export function TaskDetail({
           Назад
         </button>
         {isDirector ? (
-          <button
-            type="button"
-            aria-label="Все действия"
-            data-testid="task-more"
-            onClick={() => director.more(task)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border/80 bg-surface text-muted transition-transform duration-[120ms] active:scale-95"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-              <circle cx="5.5" cy="12" r="1.7" />
-              <circle cx="12" cy="12" r="1.7" />
-              <circle cx="18.5" cy="12" r="1.7" />
-            </svg>
-          </button>
+          <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} />
         ) : null}
       </div>
 

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
+import { PageHead } from "@/components/ui/PageHead";
 import type { BoardTask } from "@/lib/pulse/board";
 import { compareTasks } from "@/lib/tasks/grouping";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -82,10 +83,7 @@ export function EmployeeTasksView({
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24 pt-3">
-      <div className="px-0.5">
-        <p className="text-[13px] font-medium leading-4 text-muted first-letter:uppercase">{DATE_LINE.format(now)}</p>
-        <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Мои дела</h1>
-      </div>
+      <PageHead eyebrow={DATE_LINE.format(now)} title="Мои дела" />
 
       <div className="mt-3">
         <StatusScreen screen={screen} now={now} onNearest={showNearest} />

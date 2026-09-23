@@ -10,6 +10,7 @@ import { RecentDeliveries } from "@/components/shop/RecentDeliveries";
 import { AddRewardTile, RewardTile } from "@/components/shop/RewardTile";
 import { ShopHero } from "@/components/shop/ShopHero";
 import { TeamPoints } from "@/components/shop/TeamPoints";
+import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { deliveredInPeriod, isOpenOrder, takenCounts } from "@/lib/shop/format";
 import { useAllShopItems, useOrders, useShopSummary, type ShopItem } from "@/lib/shop/queries";
@@ -60,7 +61,7 @@ export function AdminShop({ me }: { me: Me | undefined }) {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Магазин</h1>
+      <PageHead title="Магазин" />
 
       <Reveal index={0}>
         <ShopHero

@@ -1,6 +1,7 @@
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 
 import s from "@/components/ui/device/device.module.css";
+import { PageHead } from "@/components/ui/PageHead";
 
 /**
  * The remote before its state arrives: the same body, the same boxes, grey where the
@@ -61,8 +62,7 @@ export function RemoteSkeleton() {
 export function ScreenPageSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Экран в кабинете</h1>
-      <p className="mt-1 text-[13px] leading-[18px] text-muted">Пульт от телевизора: что сейчас на стене и что показать</p>
+      <PageHead title="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
       <RemoteSkeleton />
     </main>
   );

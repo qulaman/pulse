@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SettingsTabs } from "@/components/settings/SettingsTabs";
+import { PageHead } from "@/components/ui/PageHead";
 import { AuthError, getSessionProfile } from "@/lib/auth";
 import { parseSettingsTab } from "@/lib/settings-tabs";
 
@@ -22,10 +23,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   );
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <h1 className="text-[24px] font-bold leading-[30px]">Настройки</h1>
-      <p className="mt-1 text-[13px] leading-[18px] text-muted">
-        Всё здесь — конфигурация компании: код одинаков для всех клиентов
-      </p>
+      <PageHead title="Настройки" sub="Всё здесь — конфигурация компании: код одинаков для всех клиентов" />
       {/* keyed by the tab: a link to another ?tab= from inside the page (the secretary
           section's «карточке человека») opens that tab instead of keeping the old one */}
       <SettingsTabs key={parseSettingsTab(tab)} initialTab={parseSettingsTab(tab)} role={role} />

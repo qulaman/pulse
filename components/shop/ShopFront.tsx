@@ -4,6 +4,7 @@ import { Mascot } from "@/components/brand/Mascot";
 import { ItemCard } from "@/components/shop/ItemCard";
 import { MyOrders, OrdersQueue } from "@/components/shop/OrderList";
 import { ShopSkeleton } from "@/components/shop/ShopSkeleton";
+import { PageHead } from "@/components/ui/PageHead";
 import { useBalance, useCreateOrder, useOrders, useShopItems, type ShopItem } from "@/lib/shop/queries";
 import type { Me } from "@/lib/tasks/queries";
 
@@ -31,8 +32,7 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Магазин</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">Очки за работу превращаются в награды</p>
+      <PageHead title="Магазин" sub="Очки за работу превращаются в награды" />
 
       {!pointsEnabled ? (
         <p className="mt-3 text-[14px] leading-5" style={{ color: "var(--warn)" }}>

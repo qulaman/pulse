@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Credentials } from "@/components/people/Credentials";
 import { PersonForm, draftOf } from "@/components/people/PersonForm";
+import { PageHead } from "@/components/ui/PageHead";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { Sheet } from "@/components/ui/Sheet";
 import { assignableRoles } from "@/lib/people/access";
@@ -35,10 +35,7 @@ export default function NewPersonPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <Link href="/settings?tab=team" className="text-[13px] leading-4 text-muted">
-        ← Сотрудники
-      </Link>
-      <h1 className="mt-2 text-[24px] font-bold leading-[30px]">Новый сотрудник</h1>
+      <PageHead back={{ href: "/settings?tab=team", label: "Сотрудники" }} title="Новый сотрудник" />
       <div className="mt-5">
         {/* mounted only in the browser, once the roster is in: the ready password is random
             and must not be rendered twice (server and client), and the aliases need the roster */}

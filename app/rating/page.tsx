@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { RatingList } from "@/components/rating/RatingList";
+import { PageHead } from "@/components/ui/PageHead";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -13,8 +14,7 @@ export default function RatingPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Рейтинг</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">Очки за закрытые в срок задачи и поощрения директора</p>
+      <PageHead title="Рейтинг" sub="Очки за закрытые в срок задачи и поощрения директора" />
 
       {/* куда очки тратятся — сразу под тем, где они считаются (D-71) */}
       <Link

@@ -2,6 +2,7 @@
 
 import { Mascot } from "@/components/brand/Mascot";
 import { EtherSection } from "@/components/ether/EtherSection";
+import { PageHead } from "@/components/ui/PageHead";
 import { useEther } from "@/lib/ether/queries";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -17,10 +18,10 @@ export default function EtherPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Эфир</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
-        {isDirector ? "Скажи «всем: …» — объявление появится здесь у каждого" : "Объявления директора для всей компании"}
-      </p>
+      <PageHead
+        title="Эфир"
+        sub={isDirector ? "Скажи «всем: …» — объявление появится здесь у каждого" : "Объявления директора для всей компании"}
+      />
 
       {empty ? (
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">

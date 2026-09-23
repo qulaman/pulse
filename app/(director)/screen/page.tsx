@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
+import { PageHead } from "@/components/ui/PageHead";
 import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { PersonPad } from "@/components/ui/device/PersonPad";
 import { toast } from "@/components/ui/Toast";
@@ -124,10 +125,7 @@ export default function ScreenPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Экран в кабинете</h1>
-      <p className="mt-1 text-[13px] leading-[18px] text-muted">
-        Пульт от телевизора: что сейчас на стене и что показать
-      </p>
+      <PageHead title="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
 
       <Body className="mx-auto mt-4 w-full max-w-[380px]">
         <Lens tone={led} blink={inFlight} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { NoteIcon } from "@/components/notes/icons";
+import { HeadButton } from "@/components/ui/HeadButton";
 import { toast } from "@/components/ui/Toast";
 import { boardOnWall } from "@/lib/mindboard/list";
 import { useTvControl } from "@/lib/tv/mutations";
@@ -19,13 +19,14 @@ export function BoardOnWall({ boardId, now }: { boardId: string; now: Date }) {
   const control = useTvControl();
   const onWall = boardOnWall(state.data, boardId, now);
 
+  // the round button of the screen head (D-109): the diode is lit while the board is on the wall
   return (
-    <button
-      type="button"
-      aria-label={onWall ? "Убрать доску со стены" : "Показать доску на стене"}
-      aria-pressed={onWall}
+    <HeadButton
+      label={onWall ? "Убрать доску со стены" : "Показать доску на стене"}
+      icon="wall"
+      live={onWall}
       disabled={control.isPending}
-      data-testid="board-on-wall"
+      testId="board-on-wall"
       onClick={() =>
         control.mutate(onWall ? { scene: "face" } : { board: boardId }, {
           onSuccess: (row) => {
@@ -34,11 +35,6 @@ export function BoardOnWall({ boardId, now }: { boardId: string; now: Date }) {
           },
         })
       }
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-[transform,background-color,color] duration-[120ms] active:scale-95 disabled:opacity-50 ${
-        onWall ? "border-accent/60 bg-accent/15 text-accent" : "border-border/80 bg-surface text-muted"
-      }`}
-    >
-      <NoteIcon name="wall" size={20} />
-    </button>
+    />
   );
 }

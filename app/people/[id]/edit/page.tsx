@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { use } from "react";
 
 import { LoginCard } from "@/components/people/LoginCard";
 import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
-import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { PageHead } from "@/components/ui/PageHead";
+import { Bone, SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { assignableRoles, canChangeAccess, canEditPerson, canResetLogin } from "@/lib/people/access";
 import { ROLE_LABEL, initialsOf, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
 import { useMe } from "@/lib/tasks/queries";
@@ -31,42 +31,51 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40 pt-5">
-      <Link href={back.href} className="text-[13px] leading-4 text-muted">
-        ← {back.label}
-      </Link>
       {loading ? (
-        <SkeletonGroup className="mt-4 flex flex-col gap-4">
-          <SectionBone fields={3} />
-          <SectionBone fields={4} />
-          <SectionBone fields={2} />
-        </SkeletonGroup>
+        <PageHead
+          back={back}
+          heading={
+            <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+              <Bone h={30} w="62%" />
+            </SkeletonGroup>
+          }
+        />
       ) : !p || !editor ? (
-        <p className="mt-4 text-[16px] leading-[22px] text-muted">Сотрудник не найден</p>
-      ) : !canEditPerson(editor, p) ? (
-        <p className="mt-4 card px-4 py-6 text-center text-[16px] leading-[22px] text-muted">Карточку директора меняет только директор</p>
+        <PageHead back={back} title="Сотрудник не найден" />
       ) : (
-        <>
-          <div className="mt-3 flex items-center gap-3">
+        // the head of the screen (D-109): the name, what the person is, the face on the right
+        <PageHead
+          back={back}
+          title={p.full_name}
+          sub={[
+            ROLE_LABEL[p.role],
+            p.position?.toLowerCase() === ROLE_LABEL[p.role].toLowerCase() ? null : p.position,
+            p.is_active ? null : "не работает",
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+          actions={
             <span
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[19px] font-semibold text-bg"
+              aria-hidden
+              className="flex h-[42px] w-[42px] items-center justify-center rounded-full text-[15px] font-semibold text-bg"
               style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)", opacity: p.is_active ? 1 : 0.55 }}
             >
               {initialsOf(p.full_name)}
             </span>
-            <div className="min-w-0">
-              <h1 className="truncate text-[24px] font-bold leading-[30px]">{p.full_name}</h1>
-              <p className="truncate text-[13px] leading-4 text-muted">
-                {[
-                  ROLE_LABEL[p.role],
-                  p.position?.toLowerCase() === ROLE_LABEL[p.role].toLowerCase() ? null : p.position,
-                  p.is_active ? null : "не работает",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            </div>
-          </div>
-          <div className="mt-6">
+          }
+        />
+      )}
+      {loading ? (
+        <SkeletonGroup className="mt-5 flex flex-col gap-4">
+          <SectionBone fields={3} />
+          <SectionBone fields={4} />
+          <SectionBone fields={2} />
+        </SkeletonGroup>
+      ) : !p || !editor ? null : !canEditPerson(editor, p) ? (
+        <p className="mt-4 card px-4 py-6 text-center text-[16px] leading-[22px] text-muted">Карточку директора меняет только директор</p>
+      ) : (
+        <>
+          <div className="mt-5">
             <PersonForm
               key={p.id}
               mode="edit"

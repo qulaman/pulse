@@ -9,6 +9,8 @@ import { SendBar } from "@/components/confirm/SendBar";
 import { entitiesSummary } from "@/components/confirm/format";
 import { useSendBatch } from "@/components/confirm/useSendBatch";
 import { Button } from "@/components/ui/Button";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { useIngestStore } from "@/lib/store/ingest";
@@ -38,10 +40,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   if (entities.length === 0 && transcript.trim() && stage !== "parsing") {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
-        <div className="flex items-center gap-3">
-          <Mascot state="thinking" size={44} />
-          <h1 className="text-[24px] font-bold leading-[30px]">Не разобрал</h1>
-        </div>
+        <PageHead title="Не разобрал" actions={<Mascot state="thinking" size={44} />} />
         <p className="mt-4 text-[13px] leading-4 text-muted">Услышал так:</p>
         <p className="mt-1 rounded-[12px] bg-surface-2 px-3 py-2 text-[16px] leading-[22px]">«{transcript}»</p>
         <p className="mt-4 text-[16px] leading-[22px] text-muted">
@@ -93,8 +92,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   if (entities.length === 0) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
-        <h1 className="text-[24px] font-bold leading-[30px]">Пока нечего подтверждать</h1>
-        <p className="mt-2 text-[16px] leading-[22px] text-muted">
+        <PageHead title="Пока нечего подтверждать" />
+        <p className="mt-3 text-[16px] leading-[22px] text-muted">
           Зажми кнопку на экране Пульса и скажи, что нужно сделать.
         </p>
         <div className="mt-6">
@@ -117,18 +116,15 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5">
-        <div className="flex items-center gap-3">
-          <Mascot state={sendableCount === countable && countable > 0 ? "happy" : "thinking"} size={44} />
-          <h1 className="min-w-0 flex-1 text-[24px] font-bold leading-[30px]">Понял так: {entitiesSummary(entities)}</h1>
-          <button
-            type="button"
-            onClick={close}
-            aria-label="Закрыть"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-border text-[20px] leading-none text-muted transition-transform duration-[120ms] active:scale-[0.96]"
-          >
-            ×
-          </button>
-        </div>
+        <PageHead
+          title={`Понял так: ${entitiesSummary(entities)}`}
+          actions={
+            <>
+              <Mascot state={sendableCount === countable && countable > 0 ? "happy" : "thinking"} size={44} />
+              <HeadButton label="Закрыть" icon="close" onClick={close} />
+            </>
+          }
+        />
 
         <div className="mt-4">
           <ConfirmList assigneeIndex={assigneeIndex} onAssigneeIndex={setAssigneeIndex} />

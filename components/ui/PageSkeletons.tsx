@@ -5,6 +5,8 @@
  * Server-safe.
  */
 import { Mascot } from "@/components/brand/Mascot";
+import { HeadButtonBone } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 
 import {
   AnnouncementBone,
@@ -22,14 +24,17 @@ import {
 
 const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5";
 
+/** The screen head (D-109) as the page draws it; `sub=" "` keeps the room of a line that loads. */
 function Title({ text, sub }: { text: string; sub?: string }) {
-  return (
-    <>
-      <h1 className="text-[24px] font-bold leading-[30px]">{text}</h1>
-      {sub ? <p className="mt-1 text-[13px] leading-4 text-muted">{sub}</p> : null}
-    </>
-  );
+  return <PageHead title={text} sub={sub} />;
 }
+
+/** The date above the title, still grey: the phone's «now» draws it (D-109). */
+const DATE_BONE = (
+  <SkeletonGroup>
+    <Bone h={16} w={148} />
+  </SkeletonGroup>
+);
 
 /* ---- director ---------------------------------------------------------------- */
 
@@ -67,15 +72,7 @@ export function PulseSkeleton() {
 function CardsSkeleton({ title, director }: { title: string; director: boolean }) {
   return (
     <main className={`mx-auto w-full max-w-lg flex-1 px-4 pt-3 ${director ? "pb-36" : "pb-24"}`}>
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div>
-          <SkeletonGroup>
-            <Bone h={16} w={148} />
-          </SkeletonGroup>
-          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">{title}</h1>
-        </div>
-        {director ? <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" /> : null}
-      </div>
+      <PageHead eyebrow={DATE_BONE} title={title} actions={director ? <HeadButtonBone /> : null} />
 
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-0.5 pt-3">
         <div className="flex items-center justify-between">
@@ -167,10 +164,7 @@ export function TeamListBone() {
 export function PeopleSkeleton() {
   return (
     <main className={MAIN}>
-      <div className="flex items-end justify-between gap-3">
-        <Title text="Команда" sub=" " />
-        <Bone h={44} w={128} className="rounded-[12px]" />
-      </div>
+      <PageHead title="Команда" sub=" " actions={<HeadButtonBone />} />
       <SkeletonGroup className="mt-7">
         <Bone h={24} w={80} />
         <div className="mt-3">
@@ -190,15 +184,21 @@ export function PeopleSkeleton() {
 export function PersonSkeleton() {
   return (
     <main className={MAIN}>
-      <p className="text-[13px] leading-4 text-muted">← Сотрудники</p>
+      <PageHead
+        back={{ href: "/people", label: "Команда" }}
+        heading={
+          <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+            <Bone h={30} w="62%" />
+          </SkeletonGroup>
+        }
+        sub=" "
+      />
       <SkeletonGroup>
-        <section className="mt-3 card p-4">
-          <div className="flex items-start gap-3">
+        <section className="mt-4 card p-4">
+          <div className="flex items-center gap-3">
             <Bone round w={64} h={64} className="shrink-0" />
             <div className="min-w-0 flex-1">
-              <Bone h={30} w="70%" />
-              <Bone h={22} w="45%" className="mt-1" />
-              <Bone h={28} w={96} className="mt-2 rounded-full" />
+              <Bone h={28} w={96} className="rounded-full" />
             </div>
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2">
@@ -207,10 +207,12 @@ export function PersonSkeleton() {
             <StatBone label="закрыто за 30 дн." />
             <StatBone label="очков" />
           </div>
-          <div className="mt-4 flex gap-2">
+          <div className="mt-4 flex flex-col gap-2">
             <Bone h={44} className="rounded-[12px]" />
-            <Bone h={44} w={110} className="rounded-[12px]" />
-            <Bone h={44} w={100} className="rounded-[12px]" />
+            <div className="grid grid-cols-2 gap-2">
+              <Bone h={44} className="rounded-[12px]" />
+              <Bone h={44} className="rounded-[12px]" />
+            </div>
           </div>
         </section>
         <div className="mt-6">
@@ -305,15 +307,7 @@ export function FeedSkeleton() {
 export function NotesSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div>
-          <SkeletonGroup>
-            <Bone h={16} w={148} />
-          </SkeletonGroup>
-          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Заметки</h1>
-        </div>
-        <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" />
-      </div>
+      <PageHead eyebrow={DATE_BONE} title="Заметки" actions={<HeadButtonBone />} />
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
         <div className="flex items-center justify-between">
           <Bone h={16} w={110} />
@@ -363,15 +357,15 @@ export function NotesSkeleton() {
 export function BoardSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div className="min-w-0 flex-1">
-          <SkeletonGroup>
-            <Bone h={16} w={96} />
-            <Bone h={30} w="62%" className="mt-1.5" />
+      <PageHead
+        back={{ href: "/notes?tab=boards", label: "Заметки · доски" }}
+        heading={
+          <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+            <Bone h={30} w="62%" />
           </SkeletonGroup>
-        </div>
-        <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" />
-      </div>
+        }
+        actions={<HeadButtonBone />}
+      />
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
         <div className="flex items-center justify-between">
           <Bone h={16} w={110} />
@@ -473,10 +467,7 @@ export function CalendarListBone() {
 export function CalendarSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="px-0.5">
-        <Bone h={16} w={150} />
-        <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Календарь</h1>
-      </div>
+      <PageHead eyebrow={DATE_BONE} title="Календарь" />
       <SkeletonGroup className="mt-3">
         <div className="h-[223px] rounded-[22px] border border-border/70 bg-surface px-4 pt-3">
           <Bone h={16} w="34%" />

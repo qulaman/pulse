@@ -1,19 +1,15 @@
-import Link from "next/link";
-
 import { MascotGallery } from "@/components/lab/MascotGallery";
+import { PageHead } from "@/components/ui/PageHead";
 
 /** The animation bench: every motion of «Капля» that exists, on one screen (D-45). */
 export default function LabMascotPage() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <Link href="/lab" className="text-[13px] leading-4 text-muted">
-        ‹ Лаборатория
-      </Link>
-      <h1 className="mt-2 text-[24px] font-bold leading-[30px]">Анимации маскота</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
-        Полка для проверки движения: состояния лица, жесты и сцены конвейера рядом, на одном размере и одном фоне. D-45: один SVG,
-        только transform, opacity и цвет
-      </p>
+      <PageHead
+        back={{ href: "/lab", label: "Лаборатория" }}
+        title="Анимации маскота"
+        sub="Полка для проверки движения: состояния лица, жесты и сцены конвейера рядом, на одном размере и одном фоне. D-45: один SVG, только transform, opacity и цвет"
+      />
       <div className="mt-4">
         <MascotGallery />
       </div>

@@ -11,6 +11,8 @@ import { PersonSkeleton } from "@/components/ui/PageSkeletons";
 import { Bone, RowListBone, SkeletonGroup, TaskListBone } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import {
@@ -89,8 +91,7 @@ export function PersonCard() {
   if (!person.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-        <Link href="/people" className="text-[13px] leading-4 text-muted">← Сотрудники</Link>
-        <p className="mt-4 text-[16px] leading-[22px] text-muted">Сотрудник не найден</p>
+        <PageHead back={{ href: "/people", label: "Команда" }} title="Сотрудник не найден" />
       </main>
     );
   }
@@ -112,10 +113,32 @@ export function PersonCard() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <Link href="/people" className="text-[13px] leading-4 text-muted">← Сотрудники</Link>
+      {/* «На экран» is the head's round TV button (D-109): the diode is lit while the person is on the wall;
+          the kiosk is not shown on the kiosk, a person who left — neither */}
+      <PageHead
+        back={{ href: "/people", label: "Команда" }}
+        title={p.full_name}
+        sub={p.position || undefined}
+        actions={
+          p.is_active && p.role !== "tv" ? (
+            <HeadButton
+              label={onWall ? "Убрать с экрана" : "Показать на экране"}
+              icon="tv"
+              live={onWall}
+              disabled={tv.isPending}
+              testId="person-on-wall"
+              onClick={() =>
+                tv.mutate(onWall ? { mode: "ether" } : { mode: "employee", employeeId: p.id }, {
+                  onSuccess: () => toast(onWall ? "Убрал с экрана" : `На стене — ${dative} · 10 мин`),
+                })
+              }
+            />
+          ) : null
+        }
+      />
 
-      <section className="mt-3 card p-4">
-        <div className="flex items-start gap-3">
+      <section className="mt-4 card p-4">
+        <div className="flex items-center gap-3">
           <span
             className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-[22px] font-semibold text-bg"
             style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)" }}
@@ -123,9 +146,7 @@ export function PersonCard() {
             {initialsOf(p.full_name)}
           </span>
           <div className="min-w-0 flex-1">
-            <h1 className="text-[24px] font-bold leading-[30px]">{p.full_name}</h1>
-            {p.position ? <p className="text-[16px] leading-[22px] text-muted">{p.position}</p> : null}
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5">
               <Chip tone="neutral" interactive={false}>{ROLE_LABEL[p.role]}</Chip>
               {p.availability !== "active" ? (
                 <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[p.availability]}</Chip>
@@ -164,22 +185,6 @@ export function PersonCard() {
               </Button>
             </Link>
           </div>
-          {/* киоск на киоске не показывают, уволенного — тоже */}
-          {p.is_active && p.role !== "tv" ? (
-            <Button
-              block
-              variant="secondary"
-              loading={tv.isPending}
-              onClick={() =>
-                tv.mutate(onWall ? { mode: "ether" } : { mode: "employee", employeeId: p.id }, {
-                  onSuccess: () =>
-                    toast(onWall ? "Убрал с экрана" : `На стене — ${dative} · 10 мин`),
-                })
-              }
-            >
-              {onWall ? "Убрать с экрана" : "На экран"}
-            </Button>
-          ) : null}
         </div>
         {!pointsEnabled ? (
           <p className="mt-2 text-[12px] leading-4 text-muted">Очки выключены — включаются в Настройках</p>

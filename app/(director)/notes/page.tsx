@@ -14,6 +14,8 @@ import { RemindSheet } from "@/components/notes/RemindSheet";
 import { Tabs } from "@/components/tasks/list/Tabs";
 import { TaskColumn, useAccordion, useMinute, useRevealOpen } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { NotesSkeleton } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -347,27 +349,22 @@ export default function NotesPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div className="min-w-0">
-          <p className="text-[13px] font-medium leading-4 text-muted first-letter:uppercase">{DATE_LINE.format(now)}</p>
-          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Заметки</h1>
-        </div>
-        <button
-          type="button"
-          aria-label={searchOpen ? "Закрыть поиск" : "Искать в заметках"}
-          aria-pressed={searchOpen}
-          data-testid="notes-search-toggle"
-          onClick={() => {
-            if (searchOpen) setQuery("");
-            setSearchOpen((open) => !open);
-          }}
-          className={`mb-0.5 flex h-10 w-10 items-center justify-center rounded-full border transition-[transform,background-color,color] duration-[120ms] active:scale-95 ${
-            searchOpen ? "border-accent/60 bg-accent/15 text-accent" : "border-border/80 bg-surface text-muted"
-          }`}
-        >
-          <NoteIcon name={searchOpen ? "x" : "search"} size={18} />
-        </button>
-      </div>
+      <PageHead
+        eyebrow={DATE_LINE.format(now)}
+        title="Заметки"
+        actions={
+          <HeadButton
+            label={searchOpen ? "Закрыть поиск" : "Искать в заметках"}
+            icon={searchOpen ? "close" : "search"}
+            pressed={searchOpen}
+            testId="notes-search-toggle"
+            onClick={() => {
+              if (searchOpen) setQuery("");
+              setSearchOpen((open) => !open);
+            }}
+          />
+        }
+      />
 
       <div className="mt-3">
         <NotesRecorder hero={hero} receipt={receipt} dictation={dictation} writing={writing} onWrite={write} onCapture={toFeed} />

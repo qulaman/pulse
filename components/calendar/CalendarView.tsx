@@ -8,6 +8,8 @@ import { EventEditor } from "@/components/calendar/EventEditor";
 import { MonthGrid, type DayMark } from "@/components/calendar/MonthGrid";
 import { Mascot } from "@/components/brand/Mascot";
 import { CARD_SPRING, useRevealOpen } from "@/components/tasks/list/TaskList";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { CalendarListBone, CalendarSkeleton } from "@/components/ui/PageSkeletons";
 import { hhmm, isOver, ymdOfEvent, agendaFrom } from "@/lib/calendar/agenda";
 import { awaitingAnswer, calendarScreen } from "@/lib/calendar/overview";
@@ -142,28 +144,20 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div className="min-w-0">
-          <p className="text-[13px] font-medium leading-4 text-muted first-letter:uppercase">{DATE_LINE.format(now)}</p>
-          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Календарь</h1>
-        </div>
-        <div className="mb-0.5 flex items-center gap-1.5">
-          {headExtra}
-          {isDirector ? (
-            <button
-              type="button"
-              aria-label="Новое мероприятие"
-              data-testid="event-new"
-              onClick={() => setCreating(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-accent/60 bg-accent/15 text-accent transition-transform duration-[120ms] active:scale-95"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden>
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-            </button>
-          ) : null}
-        </div>
-      </div>
+      <PageHead
+        eyebrow={DATE_LINE.format(now)}
+        title="Календарь"
+        actions={
+          headExtra || isDirector ? (
+            <>
+              {headExtra}
+              {isDirector ? (
+                <HeadButton label="Новое мероприятие" icon="plus" tone="accent" testId="event-new" onClick={() => setCreating(true)} />
+              ) : null}
+            </>
+          ) : null
+        }
+      />
 
       <div className="mt-3">
         <CalendarStatus screen={screen} onNearest={showNearest} />

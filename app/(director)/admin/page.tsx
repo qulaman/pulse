@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { DataTable, type TableSpec } from "@/components/admin/DataTable";
 import { Chip } from "@/components/ui/Chip";
+import { PageHead } from "@/components/ui/PageHead";
 
 /**
  * Admin: the company's tables as readable grids. Read-only, under the director's RLS —
@@ -158,10 +159,7 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Данные</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
-        Таблицы компании как есть, только чтение. Под правами директора: чужих компаний здесь нет
-      </p>
+      <PageHead title="Данные" sub="Таблицы компании как есть, только чтение. Под правами директора: чужих компаний здесь нет" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         {TABLES.map((t) => (

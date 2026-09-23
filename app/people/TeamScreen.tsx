@@ -4,7 +4,8 @@ import Link from "next/link";
 
 import { TeamList } from "@/components/people/TeamList";
 import { PeopleGrid } from "@/components/pulse/PeopleGrid";
-import { Button } from "@/components/ui/Button";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { TeamListBone } from "@/components/ui/PageSkeletons";
 import { useTeamLoads } from "@/lib/people/loads";
 import { usePeople } from "@/lib/people/queries";
@@ -47,15 +48,11 @@ export function TeamScreen() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <div className="flex items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[24px] font-bold leading-[30px]">Команда</h1>
-          <p className="nums mt-1 min-h-4 truncate text-[13px] leading-4 text-muted">{summary}</p>
-        </div>
-        <Link href="/people/new" className="shrink-0">
-          <Button>+ Добавить</Button>
-        </Link>
-      </div>
+      <PageHead
+        title="Команда"
+        sub={<span className="nums block min-h-[18px] truncate">{summary}</span>}
+        actions={<HeadButton label="Добавить сотрудника" icon="plus" tone="accent" href="/people/new" />}
+      />
 
       <PeopleGrid title="Сейчас" />
 

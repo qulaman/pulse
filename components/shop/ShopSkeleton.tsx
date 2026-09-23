@@ -1,4 +1,5 @@
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { PageHead } from "@/components/ui/PageHead";
 
 /**
  * Скелет магазина: заголовок и подпись настоящие, пульсирует только то, что придёт
@@ -8,8 +9,7 @@ import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 export function ShopSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Магазин</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">Очки за работу превращаются в награды</p>
+      <PageHead title="Магазин" sub="Очки за работу превращаются в награды" />
       <SkeletonGroup className="mt-4 space-y-2">
         <Bone h={92} className="rounded-[16px]" />
         {Array.from({ length: 4 }, (_, i) => (

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
+import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { DeskReason } from "@/lib/tasks/desk";
@@ -153,33 +155,21 @@ export function DirectorTasksView({
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div className="min-w-0">
-          <p className="text-[13px] font-medium leading-4 text-muted first-letter:uppercase">{DATE_LINE.format(now)}</p>
-          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Задачи</h1>
-        </div>
-        <button
-          type="button"
-          aria-label={searchOpen ? "Закрыть поиск" : "Поиск по задачам"}
-          aria-pressed={searchOpen}
-          onClick={() => {
-            if (searchOpen) setQuery("");
-            setSearchOpen((open) => !open);
-          }}
-          className={`mb-0.5 flex h-10 w-10 items-center justify-center rounded-full border transition-[transform,background-color,color] duration-[120ms] active:scale-95 ${
-            searchOpen ? "border-accent/60 bg-accent/15 text-accent" : "border-border/80 bg-surface text-muted"
-          }`}
-        >
-          {searchOpen ? (
-            <Icon name="x" size={18} />
-          ) : (
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden>
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" />
-            </svg>
-          )}
-        </button>
-      </div>
+      <PageHead
+        eyebrow={DATE_LINE.format(now)}
+        title="Задачи"
+        actions={
+          <HeadButton
+            label={searchOpen ? "Закрыть поиск" : "Поиск по задачам"}
+            icon={searchOpen ? "close" : "search"}
+            pressed={searchOpen}
+            onClick={() => {
+              if (searchOpen) setQuery("");
+              setSearchOpen((open) => !open);
+            }}
+          />
+        }
+      />
 
       <div className="mt-3">
         <StatusScreen screen={screen} now={now} title={person ? person.name : undefined} onNearest={showNearest} />

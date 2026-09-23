@@ -1,5 +1,6 @@
 "use client";
 
+import { HeadButton } from "@/components/ui/HeadButton";
 import { toast } from "@/components/ui/Toast";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
@@ -15,28 +16,20 @@ export function CalendarOnWall() {
   const control = useTvControl();
   const onWall = sceneOf(state.data ?? null) === "calendar";
 
+  // the round button of the screen head (D-109): the diode is lit while the calendar is on the wall
   return (
-    <button
-      type="button"
-      aria-label={onWall ? "Убрать календарь со стены" : "Показать календарь на стене"}
-      aria-pressed={onWall}
+    <HeadButton
+      label={onWall ? "Убрать календарь со стены" : "Показать календарь на стене"}
+      icon="tv"
+      live={onWall}
       disabled={control.isPending}
+      testId="calendar-on-wall"
       onClick={() =>
         control.mutate(
           { scene: onWall ? "face" : "calendar" },
           { onSuccess: () => toast(onWall ? "Календарь убран со стены" : "Календарь на стене · неделя вперёд") },
         )
       }
-      // the round button of the screen heads («Задачи», «Заметки», «Календарь»)
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-[transform,background-color,color] duration-[120ms] active:scale-95 disabled:opacity-50 ${
-        onWall ? "border-accent/60 bg-accent/15 text-accent" : "border-border/80 bg-surface text-muted"
-      }`}
-      data-testid="calendar-on-wall"
-    >
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="3" y="4.5" width="18" height="12" rx="2" />
-        <path d="M9 20.5h6M12 16.5v4" />
-      </svg>
-    </button>
+    />
   );
 }

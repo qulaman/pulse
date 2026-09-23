@@ -14,6 +14,7 @@ import { NotesRecorder, type RecorderWords } from "@/components/notes/NotesRecor
 import { Mascot } from "@/components/brand/Mascot";
 import { useAccordion, useMinute, useRevealOpen } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
+import { HeadTrace, PageHead } from "@/components/ui/PageHead";
 import { BoardSkeleton } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -230,14 +231,9 @@ export default function BoardPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
-      <div className="flex items-end justify-between gap-3 px-0.5">
-        <div className="min-w-0 flex-1">
-          <Link href="/notes?tab=boards" className="inline-flex min-h-[24px] items-center gap-1 text-[13px] font-medium leading-4 text-muted" data-testid="board-back">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M15 5.5 8.5 12 15 18.5" />
-            </svg>
-            Заметки · доски
-          </Link>
+      <PageHead
+        back={{ href: "/notes?tab=boards", label: "Заметки · доски", testId: "board-back" }}
+        heading={
           <BoardTitle
             key={board.title}
             title={board.title}
@@ -245,11 +241,9 @@ export default function BoardPage() {
               if (title !== board.title) rename.mutate({ id: board.id, title });
             }}
           />
-        </div>
-        <span className="mb-0.5">
-          <BoardOnWall boardId={board.id} now={now} />
-        </span>
-      </div>
+        }
+        actions={<BoardOnWall boardId={board.id} now={now} />}
+      />
 
       <div className="mt-3">
         <NotesRecorder
@@ -399,20 +393,22 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
         }}
         aria-label="Название доски"
         data-testid="board-title-input"
-        className="mt-0.5 w-full rounded-[10px] bg-surface-2/60 px-2 text-[26px] font-bold leading-[36px] outline-none"
+        className="-ml-2 min-w-0 flex-1 rounded-[10px] bg-surface-2/60 px-2 font-display text-[30px] font-extrabold leading-[36px] tracking-[-0.03em] outline-none"
       />
     );
   }
+  // the head's title (D-109): the same face and the pulse trace after the last word
   return (
-    <h1 className="mt-0.5">
+    <h1 className="page-head-title">
       <button
         type="button"
         onClick={() => setEditing(true)}
         data-testid="board-title"
         aria-label={`${title} — переименовать`}
-        className="line-clamp-2 text-left text-[26px] font-bold leading-[32px] tracking-[-0.02em]"
+        className="line-clamp-2 text-left"
       >
         {title}
+        <HeadTrace />
       </button>
     </h1>
   );

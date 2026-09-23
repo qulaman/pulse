@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useMemo, useState } from "react";
 
 import { ErrandCards } from "@/components/secretary/ErrandCards";
+import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
@@ -65,10 +66,10 @@ function SecretaryScreen() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Заявки</h1>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
-        {isDirector ? "Кофе, чай, врач — без срока и приёмки, живут минуты" : "Что просит директор прямо сейчас"}
-      </p>
+      <PageHead
+        title="Заявки"
+        sub={isDirector ? "Кофе, чай, врач — без срока и приёмки, живут минуты" : "Что просит директор прямо сейчас"}
+      />
 
       {isDirector ? (
         <>
