@@ -118,7 +118,7 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
           {isDirector ? (
             <>
               Очки выключены на время пилота.{" "}
-              <Link href="/settings" className="underline underline-offset-2">
+              <Link href="/settings?tab=team" className="underline underline-offset-2">
                 Включить в Настройках
               </Link>
             </>

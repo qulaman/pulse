@@ -98,7 +98,7 @@ function SecretaryScreen() {
             </ul>
           )}
           <Link
-            href="/settings"
+            href="/settings?tab=app"
             className="mt-4 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]"
           >
             Каталог кнопок

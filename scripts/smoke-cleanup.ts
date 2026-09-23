@@ -129,7 +129,7 @@ async function main() {
     await page.screenshot({ path: join(SHOTS, "c3-purged.png") });
 
     // ---- the reset button (RESET=1 only: it wipes the whole company's activity) --------
-    await page.goto(`${APP_URL}/settings`, { waitUntil: "networkidle" });
+    await page.goto(`${APP_URL}/settings?tab=app`, { waitUntil: "networkidle" });
     const resetButton = page.getByRole("button", { name: /^Обнулить/ });
     const visible = await resetButton.isVisible().catch(() => false);
     record("настройки: раздел «Демо» с кнопкой обнуления виден (NEXT_PUBLIC_DEMO_MODE=1)", visible);

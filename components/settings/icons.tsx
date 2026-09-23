@@ -99,3 +99,57 @@ export const TrashIcon = () => (
     <path d="M8.6 9v5M11.4 9v5" />
   </svg>
 );
+
+/** «Программа»: the app's modules, four squares. */
+export const AppsIcon = () => (
+  <svg {...stroke}>
+    <rect x="3.2" y="3.2" width="5.6" height="5.6" rx="1.6" />
+    <rect x="11.2" y="3.2" width="5.6" height="5.6" rx="1.6" />
+    <rect x="3.2" y="11.2" width="5.6" height="5.6" rx="1.6" />
+    <rect x="11.2" y="11.2" width="5.6" height="5.6" rx="1.6" />
+  </svg>
+);
+
+/** «ИИ-модель»: a large spark and a small one. */
+export const SparkIcon = () => (
+  <svg {...stroke}>
+    <path d="M8.4 3.2c.5 3 1.6 4.1 4.6 4.6-3 .5-4.1 1.6-4.6 4.6-.5-3-1.6-4.1-4.6-4.6 3-.5 4.1-1.6 4.6-4.6z" />
+    <path d="M14.6 11.6c.3 1.7.9 2.3 2.6 2.6-1.7.3-2.3.9-2.6 2.6-.3-1.7-.9-2.3-2.6-2.6 1.7-.3 2.3-.9 2.6-2.6z" />
+  </svg>
+);
+
+export const GiftIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.8" y="8.4" width="14.4" height="8.4" rx="1.4" />
+    <path d="M2 6.2h16v2.2H2zM10 6.2v10.6" />
+    <path d="M10 6.2C8.6 6.2 6.4 6 6 4.6A1.8 1.8 0 0 1 8.4 2.6c1.2.5 1.6 2.3 1.6 3.6zM10 6.2c1.4 0 3.6-.2 4-1.6A1.8 1.8 0 0 0 11.6 2.6C10.4 3.1 10 4.9 10 6.2z" />
+  </svg>
+);
+
+export const TvIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.6" y="3.6" width="14.8" height="10" rx="1.6" />
+    <path d="M7 16.4h6M10 13.6v2.8" />
+  </svg>
+);
+
+export const CalendarIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.8" y="4.4" width="14.4" height="12" rx="1.6" />
+    <path d="M6.8 2.6v3.6M13.2 2.6v3.6M2.8 8.6h14.4" />
+  </svg>
+);
+
+/** Рейтинг: a three-step podium. */
+export const PodiumIcon = () => (
+  <svg {...stroke}>
+    <path d="M7.4 16.6V6.8h5.2v9.8M2.8 16.6v-6h4.6M17.2 16.6v-4.2h-4.6M2 16.6h16" />
+  </svg>
+);
+
+/** Загрузка команды: bars of how busy people are. */
+export const LoadIcon = () => (
+  <svg {...stroke}>
+    <path d="M4 16.5V11M8 16.5V5.5M12 16.5V8.5M16 16.5V3.5" />
+  </svg>
+);

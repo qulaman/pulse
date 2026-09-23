@@ -230,16 +230,14 @@ export function SettingsSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
       <Title text="Настройки" sub="Всё здесь — конфигурация компании: код одинаков для всех клиентов" />
-      <h2 className="eyebrow mt-6 px-1">Компания</h2>
-      <div className="mt-2">
-        <SettingsSectionsBone count={1} />
-      </div>
-      <SkeletonGroup className="mt-2">
-        <Bone h={176} className="rounded-[16px]" />
+      {/* the four tab tiles, then the closed sections of whichever tab opens */}
+      <SkeletonGroup className="mt-5 grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <Bone key={i} h={104} className="rounded-[16px]" />
+        ))}
       </SkeletonGroup>
-      <h2 className="eyebrow mt-6 px-1">Правила работы</h2>
-      <div className="mt-2">
-        <SettingsSectionsBone />
+      <div className="mt-5">
+        <SettingsSectionsBone count={3} />
       </div>
     </main>
   );

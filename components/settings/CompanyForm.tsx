@@ -21,12 +21,13 @@ async function readCompany(): Promise<Company> {
 }
 
 /**
- * «Компания»: the name, a logo, a tagline and an optional accent (D-44 — the only
- * customisation a client gets). Closed, the section says what the header shows today;
+ * «Название и логотип»: the name, a logo, a tagline and an optional accent (D-44 — the
+ * only customisation a client gets). Closed, the section says what the header shows today;
  * open, it previews the header live. The accent is honoured only above 4.5:1 on the app
- * background; the readout says so before the director saves.
+ * background; the readout says so before the director saves. `onDirtyChange` lets the
+ * «Компания» tile mark unsaved edits while another tab is open.
  */
-export function CompanyForm() {
+export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean) => void }) {
   const [company, setCompany] = useState<Company | null>(null);
   const [name, setName] = useState("");
   const [tagline, setTagline] = useState("");
@@ -114,17 +115,20 @@ export function CompanyForm() {
     } else toast("Не получилось убрать логотип");
   };
 
-  if (!company) return <SettingsSectionsBone count={1} />;
-
   const dirty =
-    name.trim() !== company.name ||
-    tagline.trim() !== (company.brand.tagline ?? "") ||
-    (accent.trim() ? accentHex.toUpperCase() : null) !== company.brand.accent;
+    company !== null &&
+    (name.trim() !== company.name ||
+      tagline.trim() !== (company.brand.tagline ?? "") ||
+      (accent.trim() ? accentHex.toUpperCase() : null) !== company.brand.accent);
+
+  useEffect(() => onDirtyChange?.(dirty), [dirty, onDirtyChange]);
+
+  if (!company) return <SettingsSectionsBone count={1} />;
 
   return (
     <Disclosure
       icon={<BuildingIcon />}
-      title="Компания"
+      title="Название и логотип"
       dirty={dirty}
       summary={`${company.name} · ${company.brand.logo_url ? "логотип есть" : "без логотипа"}${company.brand.accent ? " · свой акцент" : ""}`}
       hint="Название и логотип видят все в шапке и на экране входа. Стиль Pulse остаётся, меняется только акцент"

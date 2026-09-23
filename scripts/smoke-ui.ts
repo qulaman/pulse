@@ -199,7 +199,7 @@ async function main() {
   record("объявление: «всем: …» → Эфир директора", await annCard.getByText(/Ознакомились 0\//).isVisible().catch(() => false));
 
   // ---- settings: the director switches points on --------------------------------
-  await page.goto(`${APP_URL}/settings`, { waitUntil: "networkidle" });
+  await page.goto(`${APP_URL}/settings?tab=team`, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Настройки" }).waitFor({ timeout: 10_000 });
   // the sections start closed and say their current value; the switch lives inside one
   await page.getByRole("button", { name: /Очки и рейтинг/ }).click();

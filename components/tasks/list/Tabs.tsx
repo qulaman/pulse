@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { useHeaderHeight } from "@/lib/useHeaderHeight";
 
 export type TabItem<K extends string> = {
   key: K;
@@ -14,21 +15,6 @@ export type TabItem<K extends string> = {
 };
 
 const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
-
-/** The app header's height: the tabs stick right under it. */
-function useHeaderHeight(): number {
-  const [height, setHeight] = useState(0);
-  useEffect(() => {
-    const header = document.querySelector("header");
-    if (!header) return;
-    const measure = () => setHeight(header.getBoundingClientRect().height);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(header);
-    return () => observer.disconnect();
-  }, []);
-  return height;
-}
 
 /**
  * The three piles of the list as one segmented control (iOS-style): a raised thumb slides
