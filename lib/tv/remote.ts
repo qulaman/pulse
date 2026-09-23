@@ -24,6 +24,7 @@ export const SCENE_LABEL: Record<TvScene, string> = {
   clock: "Часы",
   team: "Команда",
   calendar: "Календарь",
+  board: "Доска",
 };
 
 /** Переключатель часов на пульте (D-96): как на стене, так и на клавише. */
@@ -43,6 +44,7 @@ const SCENE_NOW: Record<TvScene, string> = {
   clock: "Эфир · часы",
   team: "Эфир · команда",
   calendar: "Эфир · календарь",
+  board: "Эфир · доска",
 };
 
 export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
@@ -61,19 +63,27 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
   return { tone: "ok", text: "На стене" };
 }
 
-/** Что показывается прямо сейчас: «Эфир · часы» или «Марат Ахметов · ещё 7 мин». */
+/**
+ * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин» или
+ * «Доска «Планёрка» · до 21:00» (D-102) — названия досок пульт отдаёт списком.
+ */
 export function wallNow(
   state: TvState | null,
   people: { id: string; full_name: string }[],
   now: Date,
+  boards: { id: string; title: string }[] = [],
 ): string {
   if (effectiveMode(state, now) === "employee" && state?.employee_id) {
     const person = people.find((p) => p.id === state.employee_id);
     const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
     return `${person?.full_name ?? "Сотрудник"} · ещё ${minutes} мин`;
   }
-  const scene = sceneOf(state);
+  const scene = sceneOf(state, now);
   if (scene === "calendar" && calendarViewOf(state) === "month") return "Эфир · календарь · месяц";
+  if (scene === "board" && state?.board_until) {
+    const title = boards.find((board) => board.id === state.board_id)?.title;
+    return `${title ? `Доска «${title}»` : "Доска"} · до ${tvTime(new Date(state.board_until))}`;
+  }
   return SCENE_NOW[scene];
 }
 

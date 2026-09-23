@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import type { TvBoard as TvBoardData } from "@/lib/tv/board";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { OverlayView } from "@/lib/tv/overlay";
 import type { TvCalendar as TvCalendarData, TvFocusEmployee, TvSummary } from "@/lib/tv/queries";
@@ -11,6 +12,7 @@ import type { TickerItem } from "@/lib/tv/ticker";
 import type { TvSpeech } from "@/lib/tv/voice";
 
 import { DayPulse } from "./DayPulse";
+import { TvBoard } from "./TvBoard";
 import { TvAnalogClock } from "./TvAnalogClock";
 import { TvCalendar } from "./TvCalendar";
 import { TvClock } from "./TvClock";
@@ -53,6 +55,8 @@ export type TvFrameProps = {
   calendar: TvCalendarData | null;
   /** «Сегодня» с неделей или месяц сеткой (D-98). */
   calendarView: CalendarView;
+  /** Доска на стене (D-102): пункты, или «скрыта — гость», или ничего. */
+  board?: TvBoardData | null;
   overlay: OverlayView;
   /** The kiosk rings for a visitor; the sandbox and a laptop preview keep quiet. */
   sound: boolean;
@@ -76,8 +80,10 @@ export function TvFrame(props: TvFrameProps) {
   const { company, logoUrl, now, guest, scene, clock, night, offline, items, speech, summary, focus, calendar, overlay, sound } =
     props;
   const shift = burnInShift(now);
-  // a person on the wall or a notice wakes the night up: somebody is in the office
-  const dim = night && !focus && !overlay.banner;
+  // a board to show: its points, or the honest «скрыта» for a guest (D-102)
+  const board = scene === "board" && (props.board?.board || props.board?.hidden) ? props.board : null;
+  // a person, a board or a notice on the wall wakes the night up: somebody is in the office
+  const dim = night && !focus && !overlay.banner && !board;
   // the scene key: changing it plays the transition, everything else updates in place
   const sceneKey = dim
     ? "night"
@@ -85,7 +91,9 @@ export function TvFrame(props: TvFrameProps) {
       ? `focus:${focus.employee.id}`
       : scene === "calendar"
         ? `calendar:${props.calendarView}`
-        : scene;
+        : scene === "board"
+          ? `board:${board?.board?.id ?? (board?.hidden ? "hidden" : "none")}`
+          : scene;
 
   return (
     <div className="relative h-full w-full overflow-hidden" data-scene={sceneKey} data-clock={clock} data-guest={guest || undefined}>
@@ -125,6 +133,8 @@ export function TvFrame(props: TvFrameProps) {
                 <TvTeam summary={summary ?? EMPTY_SUMMARY} guest={guest} />
               ) : scene === "calendar" ? (
                 <TvCalendar calendar={calendar} now={now} view={props.calendarView} />
+              ) : board ? (
+                <TvBoard data={board} now={now} />
               ) : (
                 <TvMascot speech={speech} />
               )}

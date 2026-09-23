@@ -10,12 +10,15 @@ import type { TvState } from "./queries";
  */
 
 export type TvMode = "ether" | "employee";
-export type TvScene = "face" | "clock" | "team" | "calendar";
+export type TvScene = "face" | "clock" | "team" | "calendar" | "board";
 export type ClockStyle = "digital" | "analog";
 /** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
 export type CalendarView = "week" | "month";
 
+/** The four scene keys of the remote; the board comes on the wall only with a board (D-102). */
 export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar"];
+/** Every scene the wall can show. */
+export const WALL_SCENES: readonly TvScene[] = [...TV_SCENES, "board"];
 export const CLOCK_STYLES: readonly ClockStyle[] = ["digital", "analog"];
 export const CALENDAR_VIEWS: readonly CalendarView[] = ["week", "month"];
 
@@ -57,10 +60,33 @@ export function guestEndsAt(state: TvState | null, now: Date): Date | null {
   return at.getTime() > now.getTime() ? at : null;
 }
 
-/** Заставка эфира. Незнакомая сцена — лицо: экран старше базы не должен чернеть. */
-export function sceneOf(state: TvState | null): TvScene {
+/**
+ * Заставка эфира. Незнакомая сцена — лицо: экран старше базы не должен чернеть. Доска —
+ * только пока она жива: истёк её срок или её нет — лицо (D-102 §6).
+ */
+export function sceneOf(state: TvState | null, now: Date = new Date()): TvScene {
   const scene = state?.scene;
-  return TV_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
+  if (scene === "board") return boardLive(state, now) ? "board" : "face";
+  return WALL_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
+}
+
+/** Доска на стене жива: сцена доски, доска есть, её время не вышло (D-102 §6). */
+export function boardLive(state: TvState | null, now: Date): boolean {
+  if (!state || state.scene !== "board" || !state.board_id || !state.board_until) return false;
+  return new Date(state.board_until).getTime() > now.getTime();
+}
+
+/**
+ * До какого времени доска стоит на стене — то же правило, что в `tv_control`: до сегодняшних
+ * 21:00 по Актобе; поставленная после 21:00 — на два часа (D-102 §6).
+ */
+export function boardUntilFrom(now: Date): Date {
+  if (aqtobeHour(now) < NIGHT_FROM_HOUR) {
+    const local = new Date(now.getTime() + AQTOBE_OFFSET_MS);
+    const day = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+    return new Date(day + NIGHT_FROM_HOUR * HOUR_MS - AQTOBE_OFFSET_MS);
+  }
+  return new Date(now.getTime() + 2 * HOUR_MS);
 }
 
 /** Цифры или стрелки — везде, где стена рисует часы (D-96). Незнакомое — цифры. */

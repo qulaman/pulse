@@ -2,7 +2,7 @@
 
 import { lineOf } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
-import { useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvState, useTvSummary } from "@/lib/tv/queries";
+import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvState, useTvSummary } from "@/lib/tv/queries";
 import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
 import { calendarViewOf, clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
@@ -20,7 +20,8 @@ import { useClock, useHeartbeat, useNightReload, useOffline, useRemoteReload } f
  * часы, команда или календарь — не истекает вовсе, вид часов — цифры или стрелки (D-96).
  * Строка переживает и ночной перезапуск, и деплой, поэтому команда с пульта не теряется,
  * пока экран моргает. Посетитель от секретаря приходит той же строкой: визит поднимает её
- * версию, киоск перечитывает надпись `tv_overlay()`.
+ * версию, киоск перечитывает надпись `tv_overlay()`. Доска директора — тоже: правка доски на
+ * стене поднимает версию строки, киоск перечитывает `tv_board()` (D-102).
  */
 export function TvScreen({
   company,
@@ -39,7 +40,7 @@ export function TvScreen({
 
   const mode = effectiveMode(row, now);
   const guest = guestOf(row, initialGuest, now);
-  const scene = sceneOf(row);
+  const scene = sceneOf(row, now);
 
   const feed = useTvFeed();
   const summary = useTvSummary(guest);
@@ -52,6 +53,8 @@ export function TvScreen({
     calendarView === "month" ? { from: monthGridFrom(now), days: MONTH_DAYS } : { from: null, days: 7 },
   );
   const overlay = useTvOverlay();
+  // the director's board, only while it is on the wall (D-102)
+  const board = useTvBoard(guest, scene === "board");
   const offline = useOffline(summary.dataUpdatedAt);
 
   useNightReload();
@@ -83,6 +86,7 @@ export function TvScreen({
         focusRemainingMs={focusRemainingMs(row, now)}
         calendar={calendar.data ?? null}
         calendarView={calendarView}
+        board={scene === "board" ? (board.data ?? null) : null}
         overlay={overlayOf(overlay.data, data?.events ?? [], now)}
         // only the kiosk rings: the director peeking at /tv from a laptop is not the wall
         sound={role === "tv"}

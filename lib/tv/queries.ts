@@ -6,6 +6,7 @@ import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealt
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/types";
 
+import type { TvBoard } from "./board";
 import { isTvKind, type TvEvent, type TvPayload } from "./feed";
 
 /**
@@ -22,6 +23,7 @@ export const tvKeys = {
   focus: ["tv", "focus"] as const,
   calendar: (guest: boolean, from: string, days: number) => ["tv", "calendar", guest, from, days] as const,
   overlay: ["tv", "overlay"] as const,
+  board: (guest: boolean) => ["tv", "board", guest] as const,
 };
 
 /**
@@ -256,6 +258,32 @@ export function useTvCalendar(guest: boolean, enabled: boolean, range: { from: s
     },
   });
   useRealtimeInvalidate({ table: "tv_events" }, key, enabled);
+  return query;
+}
+
+/** Страховка, если сокет промолчал: доска на стене не должна отставать от телефона дольше. */
+const BOARD_REFRESH_MS = 30_000;
+
+/**
+ * Доска на стене (D-102): роль `tv` таблиц `notes` и `mind_boards` не читает — функция
+ * отдаёт только доску, которую автор сам поставил на стену, с маской гостя. Правка такой
+ * доски поднимает версию `tv_state`, которую киоск и так слушает, — отдельного сокета нет.
+ */
+export function useTvBoard(guest: boolean, enabled: boolean) {
+  const key = tvKeys.board(guest);
+  const query = useQuery({
+    queryKey: key,
+    enabled,
+    refetchInterval: BOARD_REFRESH_MS,
+    queryFn: async (): Promise<TvBoard> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("tv_board", { p_guest: guest });
+      if (error) throw new Error(error.message);
+      const value = (data ?? {}) as Partial<TvBoard>;
+      return { board: value.board ?? null, hidden: value.hidden ?? false };
+    },
+  });
+  useRealtimeInvalidate({ table: "tv_state" }, key, enabled);
   return query;
 }
 

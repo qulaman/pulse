@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { TvState } from "./queries";
 import {
+  boardLive,
+  boardUntilFrom,
   burnInShift,
   calendarViewOf,
   clockStyleOf,
@@ -28,6 +30,9 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest_until: null,
     clock_style: "digital",
     calendar_view: "week",
+    board_id: null,
+    board_until: null,
+    board_guest: false,
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -158,5 +163,32 @@ describe("burnInShift", () => {
       expect(Math.abs(x)).toBeLessThanOrEqual(6);
       expect(Math.abs(y)).toBeLessThanOrEqual(6);
     }
+  });
+});
+
+describe("board on the wall (D-102)", () => {
+  const up = (patch: Partial<TvState> = {}) =>
+    state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T16:00:00Z", ...patch });
+
+  it("shows the board while it lives, else the face", () => {
+    expect(sceneOf(up(), NOW)).toBe("board");
+    expect(boardLive(up(), NOW)).toBe(true);
+    // its time is over: the face, not a board nobody put up today
+    expect(sceneOf(up({ board_until: "2026-09-18T08:59:00Z" }), NOW)).toBe("face");
+    // the board was deleted (board_id set null by the database)
+    expect(sceneOf(up({ board_id: null }), NOW)).toBe("face");
+    expect(boardLive(state(), NOW)).toBe(false);
+  });
+
+  it("keeps the board till 21:00 Aqtobe, two hours when put up later", () => {
+    // 20:59 Aqtobe → 21:00 the same evening
+    expect(boardUntilFrom(new Date("2026-09-18T15:59:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
+    // 07:30 Aqtobe, before the working day → 21:00 that day
+    expect(boardUntilFrom(new Date("2026-09-18T02:30:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
+    // 21:00 and later → two hours
+    expect(boardUntilFrom(new Date("2026-09-18T16:00:00Z")).toISOString()).toBe("2026-09-18T18:00:00.000Z");
+    expect(boardUntilFrom(new Date("2026-09-18T18:00:00Z")).toISOString()).toBe("2026-09-18T20:00:00.000Z");
+    // 00:30 Aqtobe (19:30 UTC the day before) is still before 21:00 of the new day
+    expect(boardUntilFrom(new Date("2026-09-17T19:30:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
   });
 });

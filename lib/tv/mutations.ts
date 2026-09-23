@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { FOCUS_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
+import { boardUntilFrom, FOCUS_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -36,6 +36,10 @@ export type TvControlInput = {
   clock?: ClockStyle;
   /** «Неделя» или «Месяц» в заставке «Календарь» (D-98). */
   calendar?: CalendarView;
+  /** Поставить эту доску на стену (D-102). */
+  board?: string;
+  /** «Показать гостю» — доска на стене и при госте в кабинете (D-102 §7). */
+  boardGuest?: boolean;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -52,12 +56,25 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.task_id = null;
     next.expires_at = null;
   }
-  if (input.scene) next.scene = input.scene;
+  if (input.board) {
+    next.scene = "board";
+    next.board_id = input.board;
+    next.board_until = boardUntilFrom(now).toISOString();
+    next.board_guest = false;
+  } else if (input.scene) {
+    // another scene takes the board off the wall (same rule as tv_control)
+    next.scene = input.scene;
+    next.board_id = null;
+    next.board_until = null;
+    next.board_guest = false;
+  }
   if (input.guest !== undefined) {
     next.guest = input.guest;
     // a hand on the switch owns guest mode: no timer after it (same rule as tv_control)
     next.guest_until = null;
+    if (!input.guest) next.board_guest = false;
   }
+  if (input.boardGuest !== undefined && input.guest !== false) next.board_guest = input.boardGuest;
   if (input.clock) next.clock_style = input.clock;
   if (input.calendar) next.calendar_view = input.calendar;
   return next;
@@ -84,6 +101,8 @@ export function useTvControl() {
         p_reload: input.reload ?? false,
         p_clock: input.clock,
         p_calendar: input.calendar,
+        p_board: input.board,
+        p_board_guest: input.boardGuest,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),

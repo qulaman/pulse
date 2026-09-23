@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
@@ -7,7 +8,10 @@ import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } 
 import { PersonPad } from "@/components/ui/device/PersonPad";
 import { toast } from "@/components/ui/Toast";
 import { ANSWERS } from "@/components/visits/VisitAsk";
+import { boardOnWall, splitBoards } from "@/lib/mindboard/list";
+import { useBoards } from "@/lib/mindboard/queries";
 import { usePeople } from "@/lib/people/queries";
+import { useMe } from "@/lib/tasks/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
@@ -48,13 +52,20 @@ import { awaitingDirector, waitedSince } from "@/lib/visits/text";
  * С D-96: четыре заставки (плюс «Календарь»), переключатель часов «Цифры / Стрелки»,
  * «Гость в кабинете» вместо «Посетителя» (посетитель теперь — событие от секретаря) и
  * ответ посетителю прямо с пульта, когда он ждёт.
+ *
+ * С D-102: шов «Доска на стене» — три последние доски директора клавишами, горит стоящая
+ * на стене; при госте в кабинете — ползунок «Показать гостю».
  */
+
+/** Клавиш досок на пульте — три последние: мышечной памяти хватает, остальное — в «Заметках». */
+const BOARD_KEYS = 3;
 
 const SCENE_HINT: Record<TvScene, string> = {
   face: "Лицо говорит о последних событиях",
   clock: "Тихие часы: для совещаний",
   team: "Кто чем занят",
   calendar: "Неделя вперёд: что запланировано",
+  board: "Пункты директора — до 21:00",
 };
 
 const RECEIPT_COLOR = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
@@ -76,12 +87,15 @@ export default function ScreenPage() {
   const control = useTvControl();
   const visits = useVisits();
   const answer = useAnswerVisit();
+  const me = useMe();
+  const boards = useBoards(me.data?.userId);
 
   if (state.isLoading || people.isLoading) return <ScreenPageSkeleton />;
 
   const row = state.data ?? null;
   const mode = effectiveMode(row, now);
-  const scene = sceneOf(row);
+  const scene = sceneOf(row, now);
+  const lastBoards = splitBoards(boards.data ?? [], now).live.slice(0, BOARD_KEYS);
   const clock = clockStyleOf(row);
   const calendarView = calendarViewOf(row);
   const guest = guestOf(row, false, now);
@@ -127,7 +141,7 @@ export default function ScreenPage() {
           ) : (
             <>
               <p className="mt-2 truncate font-display text-[21px] font-bold leading-7 tracking-[-0.02em]">
-                {wallNow(row, people.data ?? [], now)}
+                {wallNow(row, people.data ?? [], now, boards.data ?? [])}
               </p>
               <p className="mt-1 text-[13px] leading-[18px]" style={{ color: RECEIPT_COLOR[receipt.tone] }}>
                 {receipt.text}
@@ -229,6 +243,49 @@ export default function ScreenPage() {
             </Key>
           ))}
         </div>
+
+        {/* the director's boards (D-102): the latest three as keys, the one on the wall lit; a tap
+            on the lit one gives the wall back to the face */}
+        <Seam label="Доска на стене" />
+        {lastBoards.length > 0 ? (
+          <div className="mt-2 grid grid-cols-1 gap-2" data-testid="remote-boards">
+            {lastBoards.map((board) => {
+              const lit = boardOnWall(row, board.id, now);
+              return (
+                <Key
+                  key={board.id}
+                  on={lit}
+                  icon={<BoardIcon />}
+                  aria-pressed={lit}
+                  data-testid="remote-board"
+                  onClick={() =>
+                    lit ? show({ scene: "face" }, "Доска убрана со стены") : show({ board: board.id }, `На стене — «${board.title}»`)
+                  }
+                >
+                  <span className="block min-w-0 truncate">{board.title}</span>
+                </Key>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-2 px-1 text-center text-[13px] leading-[18px] text-muted">
+            Досок пока нет —{" "}
+            <Link href="/notes?tab=boards" className="font-semibold text-accent">
+              создать в «Заметках»
+            </Link>
+          </p>
+        )}
+        {guest && scene === "board" ? (
+          <div className="mt-2">
+            <Switch
+              on={row?.board_guest ?? false}
+              icon={<BoardIcon />}
+              title="Показать гостю"
+              value={row?.board_guest ? "доска видна гостю" : "доска скрыта, пока гость здесь"}
+              onToggle={(next) => show({ boardGuest: next }, next ? "Доска видна гостю" : "Доска скрыта от гостя")}
+            />
+          </div>
+        ) : null}
 
         {/* the clock on the wall: digits or hands, everywhere it is drawn (D-96) */}
         <Seam label="Часы на стене" />
@@ -352,7 +409,15 @@ const DigitsIcon = () => (
   </svg>
 );
 
+const BoardIcon = () => (
+  <svg {...icon}>
+    <rect x="2.8" y="3.4" width="14.4" height="13.2" rx="2.2" />
+    <path d="M6 7.6h.01M8.8 7.6h5.2M6 10.6h.01M8.8 10.6h5.2M6 13.6h.01M8.8 13.6h3.4" strokeWidth="1.8" />
+  </svg>
+);
+
 const SCENE_ICON: Record<TvScene, React.ReactNode> = {
+  board: <BoardIcon />,
   face: (
     <svg {...icon}>
       <circle cx="10" cy="10" r="7" />

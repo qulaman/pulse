@@ -16,6 +16,9 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest_until: null,
     clock_style: "digital",
     calendar_view: "week",
+    board_id: null,
+    board_until: null,
+    board_guest: false,
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -66,6 +69,14 @@ describe("wallNow", () => {
     expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · лицо");
   });
 
+  it("называет доску на стене и до скольки она там (D-102)", () => {
+    const row = state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T16:00:00Z" });
+    expect(wallNow(row, PEOPLE, NOW, [{ id: "b-1", title: "Планёрка" }])).toBe("Доска «Планёрка» · до 21:00");
+    expect(wallNow(row, PEOPLE, NOW)).toBe("Доска · до 21:00");
+    // истёкшая доска — снова лицо
+    expect(wallNow(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T08:00:00Z" }), PEOPLE, NOW)).toBe("Эфир · лицо");
+  });
+
   it("в фокусе — имя и сколько осталось", () => {
     const row = state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T09:07:00Z" });
     expect(wallNow(row, PEOPLE, NOW)).toBe("Марат Ахметов · ещё 7 мин");
@@ -79,7 +90,7 @@ describe("wallNow", () => {
 
 describe("SCENE_LABEL", () => {
   it("даёт русское имя каждой сцене", () => {
-    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь" });
+    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь", board: "Доска" });
   });
 });
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { TvFrame } from "@/components/tv/TvFrame";
 import { useClock } from "@/components/tv/useKiosk";
+import type { TvBoard, TvBoardItem } from "@/lib/tv/board";
 import { lineOf, type TvEvent } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
 import type { TvCalendar, TvFocusEmployee, TvOverlay, TvSummary } from "@/lib/tv/queries";
@@ -18,6 +19,10 @@ export type WallCase =
   | "calendar"
   | "calendar-month"
   | "calendar-empty"
+  | "board"
+  | "board-two"
+  | "board-pages"
+  | "board-hidden"
   | "focus"
   | "focus-empty"
   | "visit"
@@ -124,6 +129,55 @@ function fixtures(base: number, guest: boolean) {
   return { events, summary, focus, calendar };
 }
 
+const BOARD_POINTS = [
+  "Отгрузка Казхром до пятницы",
+  "Новый прайс на мерч — согласовать с бухгалтерией",
+  "Отпуск бухгалтера в октябре",
+  "Ремонт склада: смета к среде",
+  "Кого берём на выставку в Алматы",
+  "Проверить договор аренды второго офиса",
+  "Закупка ноутбуков для отдела продаж",
+  "Тренинг по технике безопасности",
+  "Итоги квартала — к пятнице",
+  "Новые визитки для команды",
+  "Встреча с банком по кредитной линии",
+  "Корпоратив: дата и место",
+  "Перевести склад на новую систему учёта",
+  "Обновить сайт компании",
+  "Сверка с поставщиками бетона",
+  "План продаж на ноябрь",
+  "Парковка для гостей",
+  "Отчёт инвестору",
+  "Кондиционеры в переговорной",
+  "Стажёры на зиму",
+];
+
+/** The board of D-102 on fixtures: five points (two ticked, one handed over, one just said), eleven, twenty. */
+function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | null {
+  if (wallCase === "board-hidden") return { board: null, hidden: true };
+  const count = wallCase === "board-pages" ? 20 : wallCase === "board-two" ? 11 : wallCase === "board" ? 5 : 0;
+  if (count === 0) return null;
+  const items: TvBoardItem[] = BOARD_POINTS.slice(0, count).map((text, index) => ({
+    id: `p${index + 1}`,
+    text,
+    done: index === 2 || index === 5,
+    created_at: index === count - 1 ? new Date(base).toISOString() : at(base, -60 + index),
+    assignee: guest ? null : index === 0 ? "Марат" : index === 3 ? "Асель" : null,
+    handed_done: index === 3,
+  }));
+  return {
+    hidden: false,
+    board: {
+      id: "b1",
+      title: "Планёрка · понедельник",
+      total: items.length,
+      done: items.filter((item) => item.done).length,
+      updated_at: new Date(base).toISOString(),
+      items,
+    },
+  };
+}
+
 function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay {
   const note = guest ? null : "Иванов, по поставкам бетона";
   if (wallCase === "visit") {
@@ -152,7 +206,9 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
       ? wallCase
       : wallCase === "calendar" || wallCase === "calendar-month" || wallCase === "calendar-empty"
         ? "calendar"
-        : "face";
+        : wallCase.startsWith("board")
+          ? "board"
+          : "face";
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
   const summary = wallCase === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
 
@@ -174,6 +230,7 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
         focusRemainingMs={7 * MIN}
         calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
         calendarView={wallCase === "calendar-month" ? "month" : "week"}
+        board={boardFor(wallCase, base, guest)}
         overlay={overlayOf(overlayFor(wallCase, base, guest), summary.events, new Date(base))}
         sound={false}
       />
