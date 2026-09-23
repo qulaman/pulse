@@ -9,9 +9,9 @@ import {
 } from "@/lib/settings";
 
 describe("secretary settings (D-79)", () => {
-  it("gives a fresh company the four default buttons", () => {
+  it("gives a fresh company the six default buttons (D-87 added «не беспокоить» and the guest)", () => {
     const settings = parseCompanySettings({});
-    expect(settings.secretary.actions.map((a) => a.code)).toEqual(["coffee", "tea", "doctor", "come"]);
+    expect(settings.secretary.actions.map((a) => a.code)).toEqual(["coffee", "tea", "dnd", "guest", "doctor", "come"]);
     expect(settings.secretary.escalate_after_min).toBe(3);
   });
 

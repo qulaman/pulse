@@ -30,6 +30,19 @@ describe("matchErrand", () => {
     expect(match("зайди ко мне")).toEqual({ code: "come", label: "Зайди ко мне", note: null });
   });
 
+  it("catches the two buttons of D-87", () => {
+    expect(match("не беспокоить")).toEqual({ code: "dnd", label: "Не беспокоить", note: null });
+    expect(match("никого не пускай")).toEqual({ code: "dnd", label: "Не беспокоить", note: null });
+    expect(match("гостя в кабинет")).toEqual({ code: "guest", label: "Пригласи гостя", note: null });
+    expect(match("пригласи гостя")).toEqual({ code: "guest", label: "Пригласи гостя", note: null });
+  });
+
+  it("does not take «пригласи» alone for the guest button", () => {
+    // «пригласи всех» is not a visitor at the door
+    expect(match("пригласи всех")).toBeNull();
+    expect(match("пригласи Марата")).toBeNull();
+  });
+
   it("refuses a phrase with a name in it — that is an order to a person", () => {
     expect(match("Марат кофе")).toBeNull();
   });

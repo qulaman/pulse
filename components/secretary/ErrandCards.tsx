@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DECLINE_REASONS, useErrandActions } from "@/lib/errands/mutations";
 import { isActive, waitedFor, type Errand } from "@/lib/errands/queries";
+import { sceneOf } from "@/lib/errands/scene";
 import { firstNameOf } from "@/lib/text/normalize";
 
 /**
@@ -33,6 +34,8 @@ function ErrandCard({ errand, meId, now }: { errand: Errand; meId: string; now: 
   const transition = useErrandActions();
   const [reasons, setReasons] = useState(false);
   const taken = errand.status === "accepted" && errand.claimed_by === meId;
+  // «не беспокоить» is a state of the director's door, not a job: it is lifted, not done (D-87)
+  const guard = sceneOf(errand) === "dnd";
 
   return (
     <article className="relative overflow-hidden card px-4 py-3" data-testid="errand-card" data-status={errand.status}>
@@ -50,7 +53,7 @@ function ErrandCard({ errand, meId, now }: { errand: Errand; meId: string; now: 
       {taken ? (
         <div className="mt-3">
           <Button block loading={transition.isPending} onClick={() => transition.mutate({ id: errand.id, to: "done" })}>
-            Готово
+            {guard ? "Снять «не беспокоить»" : "Готово"}
           </Button>
         </div>
       ) : (

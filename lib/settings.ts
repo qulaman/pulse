@@ -57,9 +57,15 @@ export const SecretaryActionSchema = z.object({
 
 export type SecretaryAction = z.infer<typeof SecretaryActionSchema>;
 
+/**
+ * «Не беспокоить» and «Пригласи гостя» joined the defaults with D-87; a catalogue saved before
+ * them got them appended by the migration 20260923160000.
+ */
 export const DEFAULT_SECRETARY_ACTIONS: SecretaryAction[] = [
   { code: "coffee", label: "Кофе", icon: "☕", synonyms: ["кофе", "кофейку"] },
   { code: "tea", label: "Чай", icon: "🍵", synonyms: ["чай", "чайку"] },
+  { code: "dnd", label: "Не беспокоить", icon: "🔕", synonyms: ["не беспокоить", "никого не пускай", "никого не пускать"] },
+  { code: "guest", label: "Пригласи гостя", icon: "🤝", synonyms: ["пригласи гостя", "гостя в кабинет", "пусть гость заходит", "пусть заходит"] },
   { code: "doctor", label: "Врач", icon: "🩺", synonyms: ["врач", "врача", "доктор"] },
   { code: "come", label: "Зайди ко мне", icon: "🚪", synonyms: ["зайди", "зайди ко мне", "подойди"] },
 ];
