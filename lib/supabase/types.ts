@@ -225,6 +225,7 @@ export type Database = {
           note: string | null
           source_transcript: string | null
           status: Database["public"]["Enums"]["errand_status"]
+          thanked_at: string | null
           updated_at: string
         }
         Insert: {
@@ -245,6 +246,7 @@ export type Database = {
           note?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
+          thanked_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -265,6 +267,7 @@ export type Database = {
           note?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
+          thanked_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1598,6 +1601,13 @@ export type Database = {
       team_role: {
         Args: { r: Database["public"]["Enums"]["user_role"] }
         Returns: boolean
+      }
+      thank_errand: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+        }
+        Returns: Json
       }
       transition_errand: {
         Args: {

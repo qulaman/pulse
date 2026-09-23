@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
+import { DESK_SCENES } from "@/lib/errands/scene";
 
 /**
  * company.settings — everything client-specific lives here, never in code (V-02).
@@ -53,6 +54,8 @@ export const SecretaryActionSchema = z.object({
   label: z.string().trim().min(1).max(40),
   icon: z.string().trim().max(8).default(""),
   synonyms: z.array(z.string().trim().min(1)).max(12).default([]),
+  /** What the secretary's face plays for this button (D-97); absent — read off the code and the label. */
+  scene: z.enum(DESK_SCENES).optional(),
 });
 
 export type SecretaryAction = z.infer<typeof SecretaryActionSchema>;

@@ -20,6 +20,7 @@ export function SecretaryCard({
   errands,
   now,
   onRefresh,
+  thanks = false,
   onClose,
 }: {
   names: string;
@@ -27,6 +28,8 @@ export function SecretaryCard({
   errands: readonly Errand[];
   now: Date;
   onRefresh: () => void;
+  /** «Спасибо ♥» for what was just closed — after the adaptation gate (D-40, D-97) */
+  thanks?: boolean;
   onClose: () => void;
 }) {
   // The card hangs over the face and must never slide under the app header. When the room
@@ -106,7 +109,7 @@ export function SecretaryCard({
           </button>
         </div>
         <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto">
-          <SecretaryPanel actions={actions} errands={errands} now={now} onRefresh={onRefresh} compact />
+          <SecretaryPanel actions={actions} errands={errands} now={now} onRefresh={onRefresh} compact thanks={thanks} />
         </div>
       </div>
       {/* the tail, towards the desk on the right of the face — gone while the card has come

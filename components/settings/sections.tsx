@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { ScenePicker } from "@/components/secretary/ScenePicker";
 import { useDraft } from "@/components/settings/draft";
 import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
@@ -302,43 +303,47 @@ export function SecretarySection() {
               <Link href="/people" className="underline">
                 карточке человека
               </Link>{" "}
-              — тогда на Пульсе появится шарик.
+              — тогда на Пульсе появится секретарь за столом.
             </>
           )}
         </p>
         <div className="flex flex-col gap-3">
           {draft.secretary.actions.map((row, index) => (
-            <div key={index} className="grid grid-cols-[56px_1fr_44px] gap-2">
-              <input
-                className={`${FIELD} px-0 text-center`}
-                aria-label="Значок"
-                maxLength={4}
-                placeholder="☕"
-                value={row.icon}
-                onChange={(e) => updateAction(index, { icon: e.target.value })}
-              />
-              <input
-                className={FIELD}
-                aria-label="Надпись"
-                placeholder="Кофе"
-                value={row.label}
-                onChange={(e) => updateAction(index, { label: e.target.value })}
-              />
-              <button
-                type="button"
-                aria-label="Убрать действие"
-                className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
-                onClick={() =>
-                  update({
-                    secretary: {
-                      ...draft.secretary,
-                      actions: draft.secretary.actions.filter((_, i) => i !== index),
-                    },
-                  })
-                }
-              >
-                ×
-              </button>
+            // the button, and what the secretary's face plays for it (D-97)
+            <div key={index} className="flex flex-col gap-1.5">
+              <div className="grid grid-cols-[56px_1fr_44px] gap-2">
+                <input
+                  className={`${FIELD} px-0 text-center`}
+                  aria-label="Значок"
+                  maxLength={4}
+                  placeholder="☕"
+                  value={row.icon}
+                  onChange={(e) => updateAction(index, { icon: e.target.value })}
+                />
+                <input
+                  className={FIELD}
+                  aria-label="Надпись"
+                  placeholder="Кофе"
+                  value={row.label}
+                  onChange={(e) => updateAction(index, { label: e.target.value })}
+                />
+                <button
+                  type="button"
+                  aria-label="Убрать действие"
+                  className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
+                  onClick={() =>
+                    update({
+                      secretary: {
+                        ...draft.secretary,
+                        actions: draft.secretary.actions.filter((_, i) => i !== index),
+                      },
+                    })
+                  }
+                >
+                  ×
+                </button>
+              </div>
+              <ScenePicker action={row} className={FIELD} onChange={(scene) => updateAction(index, { scene })} />
             </div>
           ))}
         </div>

@@ -50,5 +50,27 @@ export function useErrandActions() {
   });
 }
 
+/**
+ * «Спасибо» директора за закрытую заявку (D-97) — реакция, не статус. Повтор безвреден: RPC
+ * держит время первого «спасибо», ключ идемпотентности — на каждом вызове (принцип 7).
+ */
+export function useThankErrand() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("thank_errand", { p_id: id, client_request_id: crypto.randomUUID() });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: errandKeys.root });
+    },
+    onError: () => {
+      toast("Не получилось. Попробуй ещё раз");
+    },
+  });
+}
+
 /** Причины «Не могу» — чипами, как у задач (принцип 2); без рода (docs/DESIGN.md). */
 export const DECLINE_REASONS = ["Сейчас не могу", "Не на месте", "Закончилось"] as const;

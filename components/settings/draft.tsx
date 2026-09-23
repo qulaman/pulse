@@ -72,6 +72,8 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["settings"], settings);
       // the rating, the team list and the award buttons read the switch on their own
       if (patch.points_enabled !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_enabled"] });
+      // the secretary's buttons and their scenes are read by Пульс and the secretary's screen (D-97)
+      if (patch.secretary !== undefined) void queryClient.invalidateQueries({ queryKey: ["company"] });
       toast("Сохранил настройки");
     },
     onError: () => toast("Не получилось сохранить. Попробуй ещё раз"),

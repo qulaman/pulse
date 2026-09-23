@@ -21,14 +21,20 @@ import { Composer } from "@/components/tasks/thread/Composer";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { Chip } from "@/components/ui/Chip";
-import { hhmm, nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
+import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
 import { ErrandCards } from "@/components/secretary/ErrandCards";
+import { DndLamp } from "@/components/secretary/DndLamp";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
-import { useErrands, type Errand } from "@/lib/errands/queries";
-import { deskLine, sceneOf } from "@/lib/errands/scene";
+import { useSecretaryActs } from "@/components/secretary/useSecretaryActs";
+import { haptic } from "@/lib/haptics";
+import { useErrandActions } from "@/lib/errands/mutations";
+import { useErrands, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
+import { askedDetails, daypartOf, deskLine, quickStreak, sceneOf, todayTally, urgencyOf } from "@/lib/errands/scene";
+import { usePointsEnabled } from "@/lib/points/queries";
+import type { SecretaryAction } from "@/lib/settings";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
 import { useEther } from "@/lib/ether/queries";
 import { describeEtherForEmployee } from "@/lib/pulse/ether";
@@ -46,6 +52,8 @@ const FACE = 128;
 const FACE_SMALL = 88;
 const RING_RADIUS = 124;
 const THOUGHT_MS = 9_000;
+const NO_ACTIONS: SecretaryAction[] = [];
+const OFFICE_HOURS = { from: "08:00", to: "21:00" };
 
 /**
  * Лента — the employee's home (D-62): the same sleeping face in the middle of the
@@ -64,7 +72,9 @@ export default function FeedPage() {
   const me = useMe();
   const meId = me.data?.userId ?? "";
   const board = usePulseBoard(me.data); // the query and the socket ask for the person's own tasks
-  const now = useNow();
+  // the secretary's face calls harder by the minute and counts how long the door is shut:
+  // its clock ticks every ten seconds, everybody else's every minute
+  const now = useNow(me.data?.role === "secretary" ? 10_000 : 60_000);
   const actions = useTaskActions(me.data);
   const companyId = me.data?.companyId ?? "";
   const name = firstNameOf(me.data?.fullName);
@@ -107,8 +117,23 @@ export default function FeedPage() {
     () => errandRows.filter((e) => e.status === "sent" || (e.status === "accepted" && e.claimed_by === meId)),
     [errandRows, meId],
   );
-  // the request the secretary's face acts out, and the cheer after «Готово» (D-87)
-  const desk = useDeskFocus(errandRows, meId);
+  // the request the secretary's face acts out, the finish after «Готово», the nod on
+  // «Принял» and the hearts of a thank-you (D-87, D-97)
+  const catalogue = useSecretaryActions(isSecretary);
+  const secretarySetup = useSecretarySetup(isSecretary);
+  const pointsEnabled = usePointsEnabled().data === true;
+  const errandActions = useErrandActions();
+  const desk = useDeskFocus(errandRows, meId, catalogue.data ?? NO_ACTIONS);
+  const urgency = urgencyOf(desk.phase === "asked" ? desk.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3);
+  const daypart = daypartOf(now, secretarySetup.data?.window ?? OFFICE_HOURS);
+  // «не беспокоить», whoever of the secretaries took it: the whole screen says so
+  const guarded = useMemo(
+    () => errandRows.find((e) => e.status === "accepted" && sceneOf(e, catalogue.data ?? NO_ACTIONS) === "dnd") ?? null,
+    [errandRows, catalogue.data],
+  );
+  const tally = useMemo(() => todayTally(errandRows, meId, now, catalogue.data ?? NO_ACTIONS), [errandRows, meId, now, catalogue.data]);
+  // the game feel waits for the adaptation gate — the same switch as the points (D-40, D-48)
+  const streak = pointsEnabled && desk.phase === "done" ? quickStreak(errandRows, meId, now) : 0;
 
   const [mode, setMode] = useState<Mode>("idle");
   const [panel, setPanel] = useState<OrbitId | null>(null);
@@ -153,7 +178,14 @@ export default function FeedPage() {
     setPanel(ball.id);
     setMode("panel");
   };
+  // while a request is calling, the face itself is the biggest «Принял» on the screen (D-97)
+  const acceptByFace = isSecretary && mode === "idle" && desk.phase === "asked" && desk.errand !== null;
   const onFaceTap = () => {
+    if (acceptByFace && desk.errand) {
+      haptic(20);
+      errandActions.mutate({ id: desk.errand.id, to: "accepted" });
+      return;
+    }
     if (mode === "idle") {
       setWakeKey((key) => key + 1);
       speech.replay();
@@ -216,6 +248,13 @@ export default function FeedPage() {
   const mascot: MascotState = thought ? "processing" : mode === "idle" ? restFace : awake;
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
+  // the small things at the desk play only at rest, on the waiting screen (D-97)
+  const secretaryAct = useSecretaryActs({
+    idle: isSecretary && mode === "idle" && desk.phase === "rest" && !thought && !loading,
+    daypart,
+    acceptKey: desk.acceptKey,
+    thanksKey: desk.thanksKey,
+  });
 
   return (
     // three bands, and the middle one never moves: the face sits in the centre of the screen
@@ -226,6 +265,13 @@ export default function FeedPage() {
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
     >
+      {isSecretary && guarded ? (
+        <DndLamp
+          since={guarded.accepted_at ?? guarded.created_at}
+          who={guarded.claimed_by !== meId ? firstNameOf(guarded.claimed?.full_name ?? "") || null : null}
+          now={now}
+        />
+      ) : null}
       <LayoutGroup>
         {/* above the head: what the assistant says */}
         <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
@@ -247,7 +293,12 @@ export default function FeedPage() {
                 wakeKey={wakeKey}
                 talking={mode !== "idle" && speech.speaking}
                 bare={mode !== "idle"}
-                label="Секретарь: тап — дела, сообщения, эфир, календарь, заявки"
+                label={acceptByFace && desk.errand ? `Принять: ${desk.errand.label}` : "Секретарь: тап — дела, сообщения, эфир, календарь, заявки"}
+                act={secretaryAct}
+                urgency={urgency}
+                queue={desk.queue}
+                daypart={daypart}
+                cheer={pointsEnabled && desk.phase === "done" && desk.quick}
                 onTap={onFaceTap}
               />
             ) : (
@@ -263,21 +314,50 @@ export default function FeedPage() {
               {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
             </AnimatePresence>
           </motion.div>
-          {/* what the secretary is doing, in a few words, right under the face (D-87) */}
+          {/* what the secretary is doing, in a few words, right under the face (D-87, D-97) */}
           {isSecretary && mode === "idle" && !loading ? (
-            <p
-              key={`${desk.phase}-${desk.errand?.id ?? ""}`}
-              className="card-in -mt-1 max-w-full truncate rounded-full px-3 py-1 text-center text-[15px] font-medium leading-5"
-              style={{
-                background: "color-mix(in srgb, var(--surface) 88%, transparent)",
-                color: desk.phase === "asked" ? "var(--warn)" : desk.phase === "rest" ? "var(--text-muted)" : "var(--text)",
-              }}
-              data-testid="desk-line"
-              data-phase={desk.phase}
-            >
-              {deskLine(desk)}
-              {desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
-            </p>
+            <div className="-mt-1 flex max-w-full flex-col items-center gap-0.5">
+              <p
+                key={`${desk.phase}-${desk.errand?.id ?? ""}-${secretaryAct === "thanks" ? "t" : ""}`}
+                className="card-in max-w-full truncate rounded-full px-3 py-1 text-center text-[15px] font-medium leading-5"
+                style={{
+                  background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+                  color:
+                    secretaryAct === "thanks"
+                      ? "var(--danger)"
+                      : desk.phase === "asked"
+                        ? urgency === 2
+                          ? "var(--danger)"
+                          : "var(--warn)"
+                        : desk.phase === "rest"
+                          ? "var(--text-muted)"
+                          : "var(--text)",
+                }}
+                data-testid="desk-line"
+                data-phase={desk.phase}
+                data-urgency={desk.phase === "asked" ? urgency : undefined}
+              >
+                {secretaryAct === "thanks" ? "Директор: спасибо ♥" : deskLine(desk)}
+                {secretaryAct !== "thanks" && desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
+                {streak >= 2 ? <span className="text-muted"> · {streak} подряд быстрее двух минут</span> : null}
+              </p>
+              {acceptByFace ? (
+                <p className="text-[12px] leading-4 text-muted" data-testid="desk-hint">
+                  {[askedDetails(desk, now), "тап по лицу — принять"].filter(Boolean).join(" · ")}
+                </p>
+              ) : desk.phase === "rest" && tally.total > 0 ? (
+                // what this secretary closed today, by button — the day's work at a glance
+                <p className="nums text-[12px] leading-4 text-muted" data-testid="desk-tally">
+                  Сегодня:{" "}
+                  {tally.items.map((item) => (
+                    <span key={item.kind} className="ml-1">
+                      {item.icon || item.label} {item.count}
+                    </span>
+                  ))}
+                  {tally.averageMin !== null ? <span> · в среднем {tally.averageMin} мин</span> : null}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
 
@@ -291,7 +371,7 @@ export default function FeedPage() {
           ) : null}
           <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
-            {isSecretary && mode === "idle" ? <DeskCards errands={errandRows} mine={mineErrands} meId={meId} now={now} /> : null}
+            {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} /> : null}
             {mode !== "idle" ? (
               <>
                 <PushCard bubble />
@@ -392,29 +472,14 @@ export default function FeedPage() {
 }
 
 /**
- * The secretary's requests on the waiting screen (D-87): the live cards, and «не беспокоить»
- * that another secretary took as a quiet strip — the director's door is guarded all the same.
+ * The secretary's requests on the waiting screen (D-87): the live cards, «Принял» in one tap.
+ * «Не беспокоить» another secretary took is the lamp at the top of the screen (D-97).
  */
-function DeskCards({ errands, mine, meId, now }: { errands: readonly Errand[]; mine: readonly Errand[]; meId: string; now: Date }) {
-  const guarded = errands.find((e) => e.status === "accepted" && e.claimed_by !== meId && sceneOf(e) === "dnd");
-  if (!guarded && mine.length === 0) return null;
-  const who = firstNameOf(guarded?.claimed?.full_name ?? "");
+function DeskCards({ mine, meId, now }: { mine: readonly Errand[]; meId: string; now: Date }) {
+  if (mine.length === 0) return null;
   return (
     <div className="flex flex-col gap-2" data-testid="desk-cards">
-      {guarded ? (
-        <p className="card-in flex items-center gap-2.5 card px-4 py-3 text-[15px] leading-5" data-testid="dnd-strip">
-          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--danger)" }} />
-          <span>
-            Директор просит не беспокоить
-            <span className="text-muted">
-              {" "}
-              · с {hhmm(guarded.accepted_at ?? guarded.created_at)}
-              {who ? ` · ${who}` : ""}
-            </span>
-          </span>
-        </p>
-      ) : null}
-      {mine.length > 0 ? <ErrandCards errands={mine} meId={meId} now={now} /> : null}
+      <ErrandCards errands={mine} meId={meId} now={now} />
     </div>
   );
 }
