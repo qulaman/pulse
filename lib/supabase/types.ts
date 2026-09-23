@@ -212,12 +212,6 @@ export type Database = {
           answer: string | null
           answered_at: string | null
           asked_at: string | null
-          eta_at: string | null
-          nudged_at: string | null
-          question: string | null
-          result: string | null
-          until_at: string | null
-          urgent: boolean
           audio_path: string | null
           author_id: string
           claimed_by: string | null
@@ -227,27 +221,27 @@ export type Database = {
           decline_reason: string | null
           done_at: string | null
           escalated_at: string | null
+          eta_at: string | null
           id: string
           inbox_item_id: string | null
           kind: string
           label: string
           note: string | null
+          nudged_at: string | null
+          question: string | null
+          result: string | null
           source_transcript: string | null
           status: Database["public"]["Enums"]["errand_status"]
           thanked_at: string | null
+          until_at: string | null
           updated_at: string
+          urgent: boolean
         }
         Insert: {
           accepted_at?: string | null
           answer?: string | null
           answered_at?: string | null
           asked_at?: string | null
-          eta_at?: string | null
-          nudged_at?: string | null
-          question?: string | null
-          result?: string | null
-          until_at?: string | null
-          urgent?: boolean
           audio_path?: string | null
           author_id: string
           claimed_by?: string | null
@@ -257,27 +251,27 @@ export type Database = {
           decline_reason?: string | null
           done_at?: string | null
           escalated_at?: string | null
+          eta_at?: string | null
           id?: string
           inbox_item_id?: string | null
           kind: string
           label: string
           note?: string | null
+          nudged_at?: string | null
+          question?: string | null
+          result?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
           thanked_at?: string | null
+          until_at?: string | null
           updated_at?: string
+          urgent?: boolean
         }
         Update: {
           accepted_at?: string | null
           answer?: string | null
           answered_at?: string | null
           asked_at?: string | null
-          eta_at?: string | null
-          nudged_at?: string | null
-          question?: string | null
-          result?: string | null
-          until_at?: string | null
-          urgent?: boolean
           audio_path?: string | null
           author_id?: string
           claimed_by?: string | null
@@ -287,15 +281,21 @@ export type Database = {
           decline_reason?: string | null
           done_at?: string | null
           escalated_at?: string | null
+          eta_at?: string | null
           id?: string
           inbox_item_id?: string | null
           kind?: string
           label?: string
           note?: string | null
+          nudged_at?: string | null
+          question?: string | null
+          result?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
           thanked_at?: string | null
+          until_at?: string | null
           updated_at?: string
+          urgent?: boolean
         }
         Relationships: [
           {
@@ -926,8 +926,8 @@ export type Database = {
         Row: {
           aliases: string[]
           availability: Database["public"]["Enums"]["availability_t"]
-          away_until: string | null
           avatar_url: string | null
+          away_until: string | null
           company_id: string
           created_at: string
           full_name: string
@@ -944,8 +944,8 @@ export type Database = {
         Insert: {
           aliases?: string[]
           availability?: Database["public"]["Enums"]["availability_t"]
-          away_until?: string | null
           avatar_url?: string | null
+          away_until?: string | null
           company_id: string
           created_at?: string
           full_name: string
@@ -962,8 +962,8 @@ export type Database = {
         Update: {
           aliases?: string[]
           availability?: Database["public"]["Enums"]["availability_t"]
-          away_until?: string | null
           avatar_url?: string | null
+          away_until?: string | null
           company_id?: string
           created_at?: string
           full_name?: string
@@ -1785,42 +1785,32 @@ export type Database = {
         }
       }
       errand_answer: {
-        Args: {
-          client_request_id?: string
-          p_answer: string
-          p_id: string
-        }
+        Args: { client_request_id?: string; p_answer: string; p_id: string }
         Returns: Json
       }
       errand_ask: {
-        Args: {
-          client_request_id?: string
-          p_id: string
-          p_question: string
-        }
+        Args: { client_request_id?: string; p_id: string; p_question: string }
         Returns: Json
       }
       errand_eta: {
-        Args: {
-          client_request_id?: string
-          p_id: string
-          p_min: number
-        }
+        Args: { client_request_id?: string; p_id: string; p_min: number }
         Returns: Json
       }
       errand_nudge: {
-        Args: {
-          client_request_id?: string
-          p_id: string
-        }
+        Args: { client_request_id?: string; p_id: string }
         Returns: Json
       }
+      errand_recipients: {
+        Args: { p_author: string; p_company: string }
+        Returns: string[]
+      }
+      errand_remember: {
+        Args: { p_crid: string; p_result: Json }
+        Returns: Json
+      }
+      errand_replay: { Args: { p_crid: string }; Returns: Json }
       errand_result: {
-        Args: {
-          client_request_id?: string
-          p_id: string
-          p_result: string
-        }
+        Args: { client_request_id?: string; p_id: string; p_result: string }
         Returns: Json
       }
       errands_due_escalation: { Args: { p_now?: string }; Returns: number }
@@ -1933,11 +1923,11 @@ export type Database = {
         }
         Returns: Json
       }
+      tv_board: { Args: { p_guest?: boolean }; Returns: Json }
       tv_calendar: {
         Args: { p_days?: number; p_from?: string; p_guest?: boolean }
         Returns: Json
       }
-      tv_board: { Args: { p_guest?: boolean }; Returns: Json }
       tv_control: {
         Args: {
           p_board?: string
