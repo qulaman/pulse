@@ -236,7 +236,7 @@ export default function FeedPage() {
 
         <div className="relative flex shrink-0 flex-col items-center">
           <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            {/* the same waiting screen the director has (D-68): dust and a dream behind the
+            {/* the same waiting screen the director has (D-89): dust and a dream behind the
                 head while the board is at rest, gone at the first touch */}
             {isSecretary ? (
               // the secretary does not sleep and dream: it sits at work, and its face is the job

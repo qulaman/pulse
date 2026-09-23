@@ -38,7 +38,7 @@ const RING = 136;
 const RIM = 90;
 
 /**
- * The team on the waiting screen (D-71). Two halves with the face between them:
+ * The team on the waiting screen (D-91). Two halves with the face between them:
  *
  * **Above** — everyone who has work on them, as small glowing points. A bigger, brighter,
  * quicker point is a more loaded person; red is overdue. Nobody is named: the top is the
