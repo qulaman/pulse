@@ -2,18 +2,17 @@
 
 import { create } from "zustand";
 
-import { dismissToast, toast } from "@/components/ui/Toast";
+import { toast } from "@/components/ui/Toast";
 import type { SecretaryAction } from "@/lib/settings";
 
 /**
- * «Кофе» уходит не сразу: пять секунд тост держит «Отменить», и только по их
- * истечении строка появляется в базе (D-79 §6). Причина — квитанции: пуш секретарю
- * летит сразу после вставки, отменять его было бы поздно, поэтому отменяется не пуш,
- * а сама отправка. Таймер живёт вне React: директор может уйти с экрана, заявка всё
- * равно уедет ровно один раз.
+ * «Кофе» уходит сразу (D-101): случайную просьбу теперь не даёт отправить удержание кнопки
+ * две секунды, а не пять секунд «Отменить» после тапа (так было по D-79 §5). Строка
+ * «отправляю…» висит, пока сервер не принял просьбу; уже ушедшую директор снимает
+ * «Отменить» в строке живой заявки (переход `cancelled`, очередь пушей снимается).
+ * Отправка живёт вне React: директор может уйти с экрана, заявка всё равно уедет ровно
+ * один раз.
  */
-
-const HOLD_MS = 5_000;
 
 export type PendingErrand = {
   /** The client request id: the same uuid the row will carry, so a retry is idempotent. */
@@ -42,8 +41,6 @@ export const usePendingErrands = create<PendingState>((set) => ({
   drop: (id) => set((state) => ({ pending: state.pending.filter((p) => p.id !== id) })),
 }));
 
-const timers = new Map<string, ReturnType<typeof setTimeout>>();
-
 export async function postErrand(errand: PendingErrand): Promise<boolean> {
   const res = await fetch("/api/errands", {
     method: "POST",
@@ -63,15 +60,16 @@ export async function postErrand(errand: PendingErrand): Promise<boolean> {
 }
 
 /**
- * Tap → the line appears at once, the toast counts five seconds, then the row is
- * written. `onSent` refreshes the list the row belongs to.
+ * The request leaves at once: the line «отправляю…» shows until the server has the row,
+ * a short toast says it went (`quiet` — the card that shows the line needs none). `onSent`
+ * refreshes the list the row belongs to.
  */
 export function askSecretary(
   action: Pick<SecretaryAction, "code" | "label" | "icon">,
   note: string | null,
   onSent: () => void,
   voice?: { id?: string; audioPath?: string | null; transcript?: string | null; inboxId?: string | null },
-  options?: { untilMin?: number | null; now?: boolean },
+  options?: { untilMin?: number | null; quiet?: boolean },
 ): string {
   const errand: PendingErrand = {
     // голос приносит свой ключ запроса: повтор той же фразы не купит второй кофе
@@ -86,31 +84,9 @@ export function askSecretary(
     untilMin: options?.untilMin ?? null,
   };
   usePendingErrands.getState().add(errand);
-
-  // an alarm leaves at once (D-99): five seconds of «Отменить» are five seconds nobody runs
-  // for the guards; a false alarm is taken back with «Ложная тревога» on the live row
-  if (options?.now) {
-    toast(`${action.label} · отправлено`);
-    void send(errand, onSent);
-    return errand.id;
-  }
-
-  const toastId = toast(`${action.label} · отправляю`, {
-    lifetimeMs: HOLD_MS,
-    action: {
-      label: "Отменить",
-      onClick: () => cancelErrand(errand.id, toastId),
-    },
-  });
-
-  timers.set(
-    errand.id,
-    setTimeout(() => {
-      timers.delete(errand.id);
-      void send(errand, onSent);
-    }, HOLD_MS),
-  );
-
+  // the card of the secretary shows the line itself; elsewhere (voice, a guest, a meeting) a toast
+  if (!options?.quiet) toast(`${action.label} · отправлено`);
+  void send(errand, onSent);
   return errand.id;
 }
 
@@ -135,13 +111,4 @@ async function send(errand: PendingErrand, onSent: () => void): Promise<void> {
     lifetimeMs: 10_000,
     action: { label: "Повторить", onClick: () => void send(errand, onSent) },
   });
-}
-
-export function cancelErrand(id: string, toastId?: number): void {
-  const timer = timers.get(id);
-  if (timer) clearTimeout(timer);
-  timers.delete(id);
-  usePendingErrands.getState().drop(id);
-  if (toastId !== undefined) dismissToast(toastId);
-  toast("Отменил");
 }

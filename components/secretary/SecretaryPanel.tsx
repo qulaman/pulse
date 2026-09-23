@@ -5,9 +5,8 @@ import { useRef, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
-import { askSecretary, cancelErrand, usePendingErrands } from "@/lib/errands/pending";
+import { askSecretary, usePendingErrands } from "@/lib/errands/pending";
 import { useErrandActions, useErrandLink, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
 import { etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
@@ -15,10 +14,14 @@ import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
 import { firstNameOf } from "@/lib/text/normalize";
 
-/** Долгий тап — второй слой: примечание к просьбе («без сахара»), срок «не беспокоить». */
-const HOLD_MS = 500;
-/** Тревогу держат дольше: случайное касание охрану не вызывает (D-99). */
-const ALARM_HOLD_MS = 900;
+/**
+ * Кнопку держат две секунды — и просьба уходит сразу (D-101): случайное касание ничего не
+ * отправляет, пяти секунд «Отменить» после тапа больше нет. Короткий тап — второй слой:
+ * примечание («без сахара»), «как обычно», срок «не беспокоить».
+ */
+const HOLD_SEND_MS = 2_000;
+/** Shorter than this is a tap: it opens the sheet. */
+const TAP_MS = 350;
 /** Закрытое свежее — четверть часа: результат и «спасибо» ещё к месту. */
 const RECENT_MS = 15 * 60_000;
 /** Никто не взял две минуты — у директора появляется «Напомнить ещё раз». */
@@ -51,11 +54,11 @@ function rememberNote(code: string, note: string): void {
 }
 
 /**
- * Кнопки секретаря у директора (D-79, D-86): один тап — и просьба ушла, пять секунд висит
- * «Отменить», и только потом строка появляется в базе. Под кнопками — что сейчас в работе:
+ * Кнопки секретаря у директора (D-79, D-86): держать две секунды — просьба ушла сразу; тап —
+ * шторка с примечанием и сроком (D-101). Под кнопками — что сейчас в работе:
  * квитанция «увидел / не открывал», обещание «будет через 4 мин», вопрос секретаря с ответом
  * одним тапом, «Напомнить ещё раз»; закрытое — с тем, что секретарь передал (D-99).
- * «Охрана» — тревога: держать, уходит сразу, снимается «Ложной тревогой».
+ * «Охрана» — тревога: та же кнопка в красном, снимается «Ложной тревогой».
  */
 export function SecretaryPanel({
   actions,
@@ -83,8 +86,14 @@ export function SecretaryPanel({
   const pending = usePendingErrands((state) => state.pending);
   const [noteFor, setNoteFor] = useState<SecretaryAction | null>(null);
   const [note, setNote] = useState("");
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const held = useRef(false);
+  // a hint in the line under the buttons, not a toast: toasts come down over the first row
+  const [hint, setHint] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const say = (text: string) => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setHint(text);
+    hintTimer.current = setTimeout(() => setHint(null), 2_500);
+  };
 
   const active = errands.filter(isActive);
   const recent = errands.filter(
@@ -98,22 +107,13 @@ export function SecretaryPanel({
 
   const ask = (action: SecretaryAction, text: string | null, untilMin?: number) => {
     if (text) rememberNote(action.code, text);
-    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null });
+    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: true });
   };
 
-  const startHold = (action: SecretaryAction) => {
-    held.current = false;
-    holdTimer.current = setTimeout(() => {
-      held.current = true;
-      setNote("");
-      setNoteFor(action);
-    }, HOLD_MS);
-  };
-  const endHold = (action: SecretaryAction) => {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-    if (held.current) return; // the long press opened the note sheet — no errand yet
-    ask(action, null);
+  // a short tap: the sheet with the note, «как обычно» and the spans of «не беспокоить»
+  const openSheet = (action: SecretaryAction) => {
+    setNote("");
+    setNoteFor(action);
   };
 
   if (actions.length === 0) {
@@ -137,41 +137,24 @@ export function SecretaryPanel({
           wrap into rows — a fixed grid cut «Не беспокоить» and «Пригласи гостя» on a narrow
           phone (D-87); a label never truncates, a very long one wraps inside its pill */}
       <div className={compact ? "flex flex-wrap gap-2" : "grid grid-cols-2 gap-3"}>
-        {actions.map((action) =>
-          sceneOfAction(action) === "security" ? (
-            <AlarmButton key={action.code} action={action} compact={compact} onFire={() => askSecretary(action, null, onRefresh, undefined, { now: true })} />
-          ) : (
-            <button
+        {actions.map((action) => {
+          const alarm = sceneOfAction(action) === "security";
+          return (
+            <HoldButton
               key={action.code}
-              type="button"
-              data-testid="errand-button"
-              data-code={action.code}
-              onPointerDown={() => startHold(action)}
-              onPointerUp={() => endHold(action)}
-              onPointerLeave={() => {
-                if (holdTimer.current) clearTimeout(holdTimer.current);
-                holdTimer.current = null;
-              }}
-              onContextMenu={(e) => e.preventDefault()}
-              className={
-                compact
-                  ? // a row of pills stretches to fill the line, like the keys of a keyboard
-                    "flex min-h-[44px] max-w-full flex-auto items-center justify-center gap-1.5 rounded-full border border-border/80 bg-surface-2/70 py-1.5 pl-2 pr-2.5 text-center transition-transform duration-[120ms] active:scale-[0.96]"
-                  : "flex min-h-[92px] flex-col items-center justify-center gap-1 card px-3 py-4 text-center active:scale-[0.98]"
-              }
-              style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
-            >
-              <span aria-hidden className={`${compact ? "shrink-0 text-[18px]" : "text-[28px]"} leading-none`}>
-                {action.icon || "•"}
-              </span>
-              <span className={`${compact ? "min-w-0 break-words text-[15px] leading-5" : "text-[16px] leading-[22px]"} font-semibold`} data-label>
-                {action.label}
-              </span>
-            </button>
-          ),
-        )}
+              action={action}
+              compact={compact}
+              alarm={alarm}
+              onSend={() => ask(action, null)}
+              onTap={() => (alarm ? say("Удержите «Охрану» 2 секунды — случайное касание её не вызывает") : openSheet(action))}
+              onHint={say}
+            />
+          );
+        })}
       </div>
-      <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`}>Долгий тап — примечание и срок</p>
+      <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`} style={hint ? { color: "var(--warn)" } : undefined} data-testid="panel-hint">
+        {hint ?? "Держать 2 секунды — отправить · тап — примечание"}
+      </p>
       {nobodyHere ? (
         <p className="px-1 text-center text-[13px] leading-4" style={{ color: "var(--warn)" }} data-testid="nobody-here">
           Сейчас никого нет на месте — просьба дождётся
@@ -179,13 +162,10 @@ export function SecretaryPanel({
       ) : null}
 
       {pending.map((row) => (
-        <div key={row.id} className={`card-in flex items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`}>
+        <div key={row.id} className={`card-in flex min-h-[44px] items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`}>
           <span className="text-[15px] leading-5">
             {row.label} · <span className="text-muted">отправляю…</span>
           </span>
-          <button type="button" className="min-h-[44px] text-[14px] text-accent" onClick={() => cancelErrand(row.id)}>
-            Отменить
-          </button>
         </div>
       ))}
 
@@ -264,70 +244,99 @@ export function SecretaryPanel({
 }
 
 /**
- * «Охрана» (D-99): держать почти секунду — полоса заполняется; отпустил раньше — ничего не
- * ушло. Дойдя до конца, тревога уходит сразу, без окна отмены.
+ * Кнопка каталога (D-101): держать две секунды — полоса заполняется слева направо, дойдя до
+ * конца, просьба уходит сразу; отпустил раньше — ничего не ушло, короткий тап — `onTap`.
+ * «Охрана» (D-99) — та же кнопка в красном.
  */
-function AlarmButton({ action, compact, onFire }: { action: SecretaryAction; compact: boolean; onFire: () => void }) {
+function HoldButton({
+  action,
+  compact,
+  alarm,
+  onSend,
+  onTap,
+  onHint,
+}: {
+  action: SecretaryAction;
+  compact: boolean;
+  alarm: boolean;
+  onSend: () => void;
+  onTap: () => void;
+  onHint: (text: string) => void;
+}) {
   const [holding, setHolding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sent = useRef(false);
+  const pressedAt = useRef(0);
   const stop = () => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
     setHolding(false);
   };
+  const tone = alarm ? "var(--danger)" : "var(--accent)";
   return (
     <button
       type="button"
       data-testid="errand-button"
       data-code={action.code}
-      data-alarm
-      aria-label={`${action.label}: удержите, чтобы вызвать`}
+      data-alarm={alarm ? "1" : undefined}
+      data-holding={holding ? "1" : "0"}
+      aria-label={`${action.label}: удержите две секунды, чтобы отправить`}
       onPointerDown={() => {
+        sent.current = false;
+        pressedAt.current = Date.now();
         setHolding(true);
         timer.current = setTimeout(() => {
           timer.current = null;
+          sent.current = true;
           setHolding(false);
-          haptic([60, 40, 60]);
-          onFire();
-        }, ALARM_HOLD_MS);
+          haptic(alarm ? [60, 40, 60] : 30);
+          onSend();
+        }, HOLD_SEND_MS);
       }}
       onPointerUp={() => {
-        if (timer.current) toast("Удержите «Охрану» — случайное касание её не вызывает");
+        const early = timer.current !== null;
         stop();
+        if (!early || sent.current) return;
+        // a tap is a tap; a hold let go half-way is a change of mind — only a hint, no sheet
+        if (Date.now() - pressedAt.current < TAP_MS) onTap();
+        else onHint(`Держите «${action.label}» 2 секунды, чтобы отправить`);
       }}
       onPointerLeave={stop}
       onPointerCancel={stop}
       onContextMenu={(e) => e.preventDefault()}
-      className={`relative flex max-w-full items-center justify-center gap-1.5 overflow-hidden rounded-full border text-center transition-transform duration-[120ms] active:scale-[0.96] ${
-        compact ? "min-h-[44px] flex-auto py-1.5 pl-2 pr-2.5" : "min-h-[92px] flex-col px-3 py-4"
+      className={`relative flex max-w-full items-center justify-center gap-1.5 overflow-hidden border text-center transition-transform duration-[120ms] active:scale-[0.96] ${
+        compact ? "min-h-[44px] flex-auto rounded-full py-1.5 pl-2 pr-2.5" : "min-h-[92px] flex-col rounded-[20px] px-3 py-4"
       }`}
       style={{
-        borderColor: "color-mix(in srgb, var(--danger) 60%, var(--border))",
-        background: "color-mix(in srgb, var(--danger) 14%, var(--surface-2))",
+        borderColor: alarm ? "color-mix(in srgb, var(--danger) 60%, var(--border))" : "color-mix(in srgb, var(--border) 80%, transparent)",
+        background: alarm ? "color-mix(in srgb, var(--danger) 14%, var(--surface-2))" : "color-mix(in srgb, var(--surface-2) 70%, transparent)",
         touchAction: "none",
         WebkitTapHighlightColor: "transparent",
         WebkitUserSelect: "none",
         userSelect: "none",
       }}
     >
-      {/* the hold fills the pill from the left; transform only */}
+      {/* the hold fills the button from the left; transform only */}
       <span
         aria-hidden
         className="absolute inset-0 origin-left"
         style={
           {
-            background: "color-mix(in srgb, var(--danger) 45%, transparent)",
+            background: `color-mix(in srgb, ${tone} ${alarm ? 45 : 32}%, transparent)`,
             transform: holding ? "scaleX(1)" : "scaleX(0)",
-            transition: holding ? `transform ${ALARM_HOLD_MS}ms linear` : "transform 150ms var(--ease-out)",
+            transition: holding ? `transform ${HOLD_SEND_MS}ms linear` : "transform 150ms var(--ease-out)",
           } as CSSProperties
         }
       />
       <span aria-hidden className={`relative ${compact ? "shrink-0 text-[18px]" : "text-[28px]"} leading-none`}>
-        {action.icon || "🚨"}
+        {action.icon || (alarm ? "🚨" : "•")}
       </span>
-      <span className={`relative ${compact ? "text-[15px] leading-5" : "text-[16px] leading-[22px]"} font-semibold`} style={{ color: "var(--danger)" }} data-label>
+      <span
+        className={`relative ${compact ? "min-w-0 break-words text-[15px] leading-5" : "text-[16px] leading-[22px]"} font-semibold`}
+        style={alarm ? { color: "var(--danger)" } : undefined}
+        data-label
+      >
         {action.label}
-        <span className="ml-1 text-[11px] font-medium text-muted">держать</span>
       </span>
     </button>
   );
