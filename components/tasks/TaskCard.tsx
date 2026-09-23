@@ -7,18 +7,18 @@ import { useState, type ReactNode } from "react";
 import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskHead, TaskRail } from "@/components/tasks/TaskChrome";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
+import { QUICK_ANSWERS } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
 import { toneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
-import { AssigneePicker } from "@/components/confirm/AssigneePicker";
-import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
-import { AskSheet, DeclineSheet, ReportSheet, ReworkSheet } from "./TaskSheets";
+import { directorSheetOf, DirectorSheets } from "./desk/DirectorSheets";
+import { Icon } from "./desk/icons";
+import { AskSheet, DeclineSheet, ReportSheet } from "./TaskSheets";
 
 export type TaskCardVariant = "employee" | "director";
 
@@ -44,41 +44,6 @@ export type TaskCardProps = {
 };
 
 type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign" | "delete";
-
-/* -------------------------------------------------------------------------- */
-/* Icons: stroke family, 16px, inherit colour                                  */
-/* -------------------------------------------------------------------------- */
-
-const STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-
-function Icon({ name, size = 16 }: { name: "clock" | "check" | "question" | "x" | "rotate" | "undo" | "flame" | "quote" | "hand"; size?: number }) {
-  const paths: Record<typeof name, ReactNode> = {
-    clock: (
-      <>
-        <circle cx="12" cy="12" r="8.5" />
-        <path d="M12 7.5V12l3 2" />
-      </>
-    ),
-    check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
-    question: (
-      <>
-        <path d="M9 9.5a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4" />
-        <circle cx="12" cy="18" r="0.6" fill="currentColor" />
-      </>
-    ),
-    x: <path d="M6 6l12 12M18 6L6 18" />,
-    rotate: <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />,
-    undo: <path d="M9 14 4 9l5-5M4 9h9a6 6 0 0 1 0 12h-3" />,
-    flame: <path d="M12 3s5 4.5 5 9.5a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 1.5.8 2.5 2 3 0-3 1-5.5 1-8z" />,
-    quote: <path d="M8 6h8M6 12h12M8 18h8" />,
-    hand: <path d="M7 11V6.5a1.5 1.5 0 0 1 3 0V11m0-6a1.5 1.5 0 0 1 3 0v6m0-4.5a1.5 1.5 0 0 1 3 0V12m0-1a1.5 1.5 0 0 1 3 0v4a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-5.2-3L4.5 13a1.6 1.6 0 0 1 2.6-1.8L9 13" />,
-  };
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" {...STROKE} aria-hidden className="shrink-0">
-      {paths[name]}
-    </svg>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 
@@ -235,79 +200,21 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         }}
       />
 
-      <ReworkSheet open={sheet === "rework"} onClose={close} onSubmit={(comment) => actions.transition({ taskId: task.id, toStatus: "rework", comment })} />
-
       {variant === "director" ? (
-        <>
-          <DeadlineSheet
-            open={sheet === "extend"}
-            onClose={close}
-            currentIso={task.deadline}
-            onPick={(iso) => actions.extend({ taskId: task.id, deadlineIso: iso })}
-          />
-          <AssigneePicker
-            open={sheet === "reassign"}
-            onClose={close}
-            title="Кому передать?"
-            hint="Задача уйдёт этому человеку как новая, у прежнего исполнителя закроется с пометкой"
-            candidates={[]}
-            onPick={(user) => {
-              actions.reassign({ taskId: task.id, assigneeId: user.user_id, assigneeName: user.full_name });
-              close();
-            }}
-          />
-        </>
-      ) : null}
-
-      <Sheet open={sheet === "revoke"} onClose={close} title={BUTTON.revoke}>
-        <p className="text-[16px] leading-[22px] text-muted">{TEXT.revokeConfirm}</p>
-        <div className="mt-4 flex gap-2">
-          <Button
-            variant="danger"
-            block
-            onClick={() => {
-              actions.revoke(task.id);
-              close();
-            }}
-          >
-            {BUTTON.revoke}
-          </Button>
-          <Button variant="secondary" block onClick={close}>
-            Не сейчас
-          </Button>
-        </div>
-      </Sheet>
-
-      {variant === "director" ? (
-        <Sheet open={sheet === "delete"} onClose={close} title={BUTTON.remove}>
-          <p className="text-[16px] leading-[22px] text-muted">{TEXT.removeConfirm}</p>
-          <div className="mt-4 flex gap-2">
-            <Button
-              variant="danger"
-              block
-              onClick={() => {
-                actions.remove(task.id);
-                close();
-                // on the task's own page there is nothing left to look at
-                if (!href) router.back();
-              }}
-            >
-              {BUTTON.remove}
-            </Button>
-            <Button variant="secondary" block onClick={close}>
-              Не сейчас
-            </Button>
-          </div>
-        </Sheet>
+        <DirectorSheets
+          task={task}
+          open={directorSheetOf(sheet)}
+          onClose={close}
+          actions={actions}
+          // on the task's own page there is nothing left to look at
+          afterRemove={href ? undefined : () => router.back()}
+        />
       ) : null}
     </article>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-
-/** Quick answers of the swipe table (FRONTEND «Вопросы»), as chips; anything longer — in the thread. */
-const QUICK_ANSWERS = ["Да", "Нет", "Позже", "Действуй сам"] as const;
 
 function QuestionBanner({ question, onAnswer }: { question: string; onAnswer: (text: string) => void }) {
   return (
