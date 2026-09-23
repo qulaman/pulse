@@ -168,7 +168,16 @@ export function SecretaryDesk({
       data-attending={attending ? "1" : "0"}
       className="relative block transition-transform duration-[120ms] active:scale-[0.96]"
       data-away={away ? "1" : "0"}
-      style={{ width: DESK_W, height: DESK_H, touchAction: "none", WebkitTapHighlightColor: "transparent", WebkitUserSelect: "none", userSelect: "none" }}
+      style={{
+        width: DESK_W,
+        height: DESK_H,
+        touchAction: "none",
+        // iOS: a hold to dictate must not open the callout menu or the magnifier (D-106 §9)
+        WebkitTouchCallout: "none",
+        WebkitTapHighlightColor: "transparent",
+        WebkitUserSelect: "none",
+        userSelect: "none",
+      }}
     >
       {/* behind: the desk, the monitor and the mug */}
       <svg aria-hidden width={DESK_W} height={DESK_H} viewBox={`0 0 ${DESK_W} ${DESK_H}`} className={`absolute inset-0 overflow-visible ${still}`}>
