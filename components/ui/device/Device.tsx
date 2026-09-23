@@ -26,11 +26,12 @@ export function Body({ children, className = "" }: { children: ReactNode; classN
   return <div className={`${s.body} ${className}`}>{children}</div>;
 }
 
-export type LedTone = "ok" | "warn" | "muted" | "accent" | "off";
+export type LedTone = "ok" | "warn" | "danger" | "muted" | "accent" | "off";
 
 const LED_COLOR: Record<LedTone, string> = {
   ok: "var(--ok)",
   warn: "var(--warn)",
+  danger: "var(--danger)",
   muted: "var(--text-muted)",
   accent: "var(--accent)",
   off: "rgba(255,255,255,.12)",

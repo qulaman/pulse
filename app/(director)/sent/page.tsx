@@ -1,20 +1,22 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { TaskCapsule } from "@/components/tasks/TaskCapsule";
-import { isUrgentNow } from "@/components/tasks/TaskChrome";
+import { useTaskDelivery } from "@/components/tasks/DeliveryStatus";
+import { Desk, useDesk } from "@/components/tasks/desk/Desk";
+import { isUrgentNow, TaskHead } from "@/components/tasks/TaskChrome";
 import { Trace, TraceHeading, TraceLeaf, TraceNow } from "@/components/tasks/Trace";
-import { SentListBone } from "@/components/ui/PageSkeletons";
+import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { humanAqtobe } from "@/lib/ai/time";
-import { GROUP_LABEL, groupTasks, nearestDeadline, overdueCount, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
-import { usePurgeClosed } from "@/lib/tasks/mutations";
-import { useDirectorInbox, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, pluralRu, STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
+import { queueOf } from "@/lib/tasks/desk";
+import { GROUP_LABEL, groupTasks, overdueCount, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
+import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
+import { useMe, usePulseBoard, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
+import { isOverdue, STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 import { toneOf, type Tone } from "@/lib/tasks/tone";
 
 type Filter = "active" | "review" | "closed" | "all";
@@ -40,11 +42,17 @@ const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
 /** «Просрочено» and «Срочно» burn, «Сегодня» is the day itself, the rest are quiet piles. */
 const HEAD_TONE: Record<string, Tone> = { overdue: "danger", urgent: "warn", review: "warn", today: "accent" };
 
+const EMPTY: TaskWithPeople[] = [];
+
 function matches(task: TaskWithPeople, filter: Filter): boolean {
   if (filter === "all") return true;
   if (filter === "review") return task.status === "pending_review";
   if (filter === "closed") return CLOSED.includes(task.status);
   return ACTIVE.includes(task.status);
+}
+
+function firstName(full: string | undefined | null): string {
+  return full?.trim().split(/\s+/)[0] ?? "";
 }
 
 function SortIcon() {
@@ -64,17 +72,18 @@ function CheckIcon() {
 }
 
 /**
- * «Задачи»: everything the director has handed out. A list of handed-out work is a plan,
- * not a feed, so it is grouped the way a planner groups: просрочено → сегодня → завтра →
- * на неделе → позже → без срока, closed work at the bottom; «по людям» is one tap away.
- * Buttons stay in the thread and in Пульс (docs/FRONTEND.md) — here one reads and finds.
+ * «Задачи» as a desk (D-80): the head is a device — a display that says whose move it is
+ * and holds one task, three keys for that task's commands — and the list below is the
+ * trace of everything handed out, grouped the way a planner groups. A tap on a row puts
+ * the task on the display; a second tap opens its thread. The director's buttons live
+ * on the desk now, three at most, every one an existing action (useTaskActions).
  */
 export default function SentPage() {
+  const router = useRouter();
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
-  // open questions mark their capsules — the same stack Пульс reads, already cached
-  const inbox = useDirectorInbox(me.data);
-  const questionIds = useMemo(() => new Set((inbox.data?.questions ?? []).map((t) => t.id)), [inbox.data]);
+  const board = usePulseBoard(me.data);
+  const actions = useTaskActions(me.data);
   const [filter, setFilter] = useState<Filter>("active");
   const [purging, setPurging] = useState(false);
   const purge = usePurgeClosed();
@@ -82,6 +91,19 @@ export default function SentPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>("deadline");
   const [grouping, setGrouping] = useState(false);
   const now = useMemo(() => new Date(), []);
+
+  const all = tasks.data ?? EMPTY;
+  const meId = me.data?.userId;
+  // the board holds the whole company; the desk answers for what this director handed
+  // out — only the author's reply closes a question, so only the author's tasks are «ваш ход»
+  const mine = useMemo(() => (board.data ?? []).filter((task) => task.author_id === meId), [board.data, meId]);
+  const boardById = useMemo(() => new Map(mine.map((task) => [task.id, task])), [mine]);
+  const queue = useMemo(() => queueOf(mine, now), [mine, now]);
+  const questionIds = useMemo(() => new Set(mine.filter((task) => task.question).map((task) => task.id)), [mine]);
+
+  const loading = me.isLoading || tasks.isLoading || board.isLoading;
+  const desk = useDesk({ tasks: all, queue, ready: !loading });
+  const delivery = useTaskDelivery(desk.selectedId);
 
   // the choice is this phone's habit, not company data; read after the first paint so
   // the server pass and the client pass agree (same trick as the push row in Профиль)
@@ -109,22 +131,22 @@ export default function SentPage() {
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return (tasks.data ?? []).filter(
+    return all.filter(
       (t) =>
         matches(t, filter) &&
         (!needle || t.title.toLowerCase().includes(needle) || (t.assignee?.full_name ?? "").toLowerCase().includes(needle)),
     );
-  }, [tasks.data, filter, query]);
+  }, [all, filter, query]);
 
-  const counts = useMemo(() => {
-    const all = tasks.data ?? [];
-    return {
+  const counts = useMemo(
+    () => ({
       active: all.filter((t) => matches(t, "active")).length,
       review: all.filter((t) => matches(t, "review")).length,
       closed: all.filter((t) => matches(t, "closed")).length,
       all: all.length,
-    };
-  }, [tasks.data]);
+    }),
+    [all],
+  );
 
   // grouping by deadline inside «Закрытые» would be one pile called «Закрытые»
   const effectiveGroup: GroupBy = filter === "closed" && groupBy === "deadline" ? "none" : groupBy;
@@ -134,34 +156,32 @@ export default function SentPage() {
   const nowIndex =
     effectiveGroup === "deadline" ? groups.findIndex((group) => TIME_BUCKETS.includes(group.key as never)) : -1;
 
-  const loading = me.isLoading || tasks.isLoading;
-  const overdue = useMemo(() => overdueCount(tasks.data ?? [], now), [tasks.data, now]);
-  const soonest = useMemo(() => nearestDeadline(tasks.data ?? [], now), [tasks.data, now]);
-  const summary =
-    overdue > 0
-      ? `${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`
-      : soonest
-        ? `ближайший срок ${humanAqtobe(new Date(soonest), now)}`
-        : "сроков нет";
+  if (loading || !me.data) return <SentSkeleton />;
+
+  // a tap puts the task on the display; a tap on the task already there opens its thread
+  const tap = (task: TaskWithPeople) => {
+    if (desk.selectedId === task.id) router.push(`/tasks/${task.id}`);
+    else desk.select(task.id);
+  };
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <h1 className="text-[24px] font-bold leading-[30px]">Задачи</h1>
-      <p className="mt-1 text-[13px] leading-4">
-        {loading ? (
-          " "
-        ) : (
-          <>
-            <span className="text-muted">
-              {counts.all} {pluralRu(counts.all, ["задача", "задачи", "задач"])} ·{" "}
-            </span>
-            <span style={{ color: overdue > 0 ? "var(--danger)" : "var(--text-muted)" }}>{summary}</span>
-          </>
-        )}
-      </p>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
+      <h1 className="sr-only">Задачи</h1>
+
+      <Desk
+        me={me.data}
+        tasks={all}
+        board={boardById}
+        queue={queue}
+        selectedId={desk.selectedId}
+        onSelect={desk.select}
+        flash={desk.flash}
+        delivery={delivery.data}
+        actions={desk.wrap(actions)}
+      />
 
       {/* a hairline, not a filled box: above a list with no boxes a solid field shouts */}
-      <label className="mt-4 flex min-h-[44px] items-center gap-2 rounded-[12px] border border-border/70 px-3 transition-colors duration-[120ms] focus-within:border-accent/60">
+      <label className="mt-1 flex min-h-[44px] items-center gap-2 rounded-[12px] border border-border/70 px-3 transition-colors duration-[120ms] focus-within:border-accent/60">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-muted" aria-hidden>
           <circle cx="11" cy="11" r="6.5" />
           <path d="M16 16l4.5 4.5" />
@@ -185,7 +205,7 @@ export default function SentPage() {
       <div className="no-bar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
         {FILTERS.map((f) => (
           <Chip key={f.key} tone={filter === f.key ? "accent" : "neutral"} onClick={() => setFilter(f.key)}>
-            {f.label} <span className="nums opacity-70">{loading ? "" : counts[f.key]}</span>
+            {f.label} <span className="nums opacity-70">{counts[f.key]}</span>
           </Chip>
         ))}
       </div>
@@ -204,20 +224,18 @@ export default function SentPage() {
         </button>
 
         {/* cleanup of the closed stack: wrong and test orders go for good, in one tap */}
-        {!loading && filter === "closed" && counts.closed > 0 ? (
+        {filter === "closed" && counts.closed > 0 ? (
           <Button variant="ghost" size="sm" className="!text-danger/80" onClick={() => setPurging(true)}>
             Очистить закрытые ({counts.closed})
           </Button>
         ) : null}
       </div>
 
-      {loading ? (
-        <SentListBone />
-      ) : groups.length === 0 ? (
+      {groups.length === 0 ? (
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={64} />
           <p className="mt-4 text-[16px] leading-[22px]">
-            {query ? "Ничего не нашёл" : filter === "all" ? "Пока ничего не отправлено" : "В этой стопке пусто"}
+            {query ? "Ничего не нашёл" : all.length === 0 ? "Пока ничего не отправлено" : "В этой стопке пусто"}
           </p>
           <p className="mt-1 text-[13px] leading-4 text-muted">Зажми кнопку и скажи, что нужно сделать</p>
         </div>
@@ -248,20 +266,36 @@ export default function SentPage() {
                   const question = questionIds.has(task.id);
                   const overdue = isOverdue(task, now);
                   const burning = overdue || isUrgentNow(task);
+                  const selected = desk.selectedId === task.id;
+                  const closed = CLOSED.includes(task.status);
                   return (
-                    <div key={task.id} className="card-in" data-testid="sent-task" data-status={task.status}>
+                    <div key={task.id} className="card-in">
                       <TraceLeaf
                         tone={overdue ? "danger" : question || isUrgentNow(task) ? "warn" : toneOf(task.status, false)}
                         hollow={task.status === "pending_review" || task.status === "scheduled"}
-                        halo={burning}
+                        halo={burning || selected}
                       >
-                        <TaskCapsule
-                          task={task}
-                          now={now}
-                          question={question}
-                          showPerson={effectiveGroup !== "person"}
-                          showStatus={group.key !== "overdue" && group.key !== "review"}
-                        />
+                        <button
+                          type="button"
+                          data-testid="sent-task"
+                          data-status={task.status}
+                          aria-pressed={selected}
+                          onClick={() => tap(task)}
+                          className={[
+                            "-mx-2 block w-[calc(100%+1rem)] rounded-[12px] px-2 py-1.5 text-left transition-colors duration-[120ms] active:bg-surface",
+                            closed ? "opacity-55" : "",
+                            // the task on the display: its title takes the accent
+                            selected ? "[&_h2]:text-accent" : "",
+                          ].join(" ")}
+                        >
+                          <TaskHead
+                            task={task}
+                            now={now}
+                            question={question}
+                            showStatus={group.key !== "overdue" && group.key !== "review"}
+                            person={effectiveGroup !== "person" ? firstName(task.assignee?.full_name) || "без исполнителя" : undefined}
+                          />
+                        </button>
                         <p className="sr-only">{STATUS_LABEL[task.status]}</p>
                       </TraceLeaf>
                     </div>
