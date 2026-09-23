@@ -20,10 +20,14 @@ export async function POST(req: Request) {
     // tick is logged, the queue still goes out
     const escalated = await service.rpc("errands_due_escalation");
     if (escalated.error) console.error("errands_due_escalation failed:", escalated.error.message);
+    // and a visitor nobody answered leaves the wall (D-96): the same rule again
+    const expired = await service.rpc("visits_due_expiry");
+    if (expired.error) console.error("visits_due_expiry failed:", expired.error.message);
     return apiOk({
       ...(await sweepDeliveries()),
       reminders: due.data ?? 0,
       escalations: escalated.data ?? 0,
+      visits_expired: expired.data ?? 0,
     });
   } catch (err) {
     console.error("sweep failed:", err instanceof Error ? err.message : err);

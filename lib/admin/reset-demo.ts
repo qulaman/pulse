@@ -20,6 +20,7 @@ const ACTIVITY_TABLES = [
   "notes", // converted_* of a deleted task are nulled, the note itself goes here
   "events", // event_participants cascade with the event row
   "errands", // their outbox rows go with notification_deliveries below
+  "visits", // «к вам посетитель» (D-96): its outbox rows go the same way
   "reminders",
   "recurrence_rules",
   "inbox_items",
@@ -48,7 +49,7 @@ export async function resetCompanyDemo(admin: SupabaseClient<Database>, companyI
   // (D-76) — the kiosk keeps its row, its heartbeat and its scene.
   const { error: wall } = await admin
     .from("tv_state")
-    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null })
+    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null, guest: false, guest_until: null })
     .eq("company_id", companyId);
   if (wall) warnings.push(`tv_state: ${wall.message}`);
 

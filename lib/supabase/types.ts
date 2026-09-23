@@ -1368,13 +1368,85 @@ export type Database = {
           },
         ]
       }
+      visits: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id?: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tv_state: {
         Row: {
           applied_version: number | null
+          clock_style: string
           company_id: string
           employee_id: string | null
           expires_at: string | null
           guest: boolean
+          guest_until: string | null
           mode: string
           reload_requested_at: string | null
           scene: string
@@ -1386,10 +1458,12 @@ export type Database = {
         }
         Insert: {
           applied_version?: number | null
+          clock_style?: string
           company_id: string
           employee_id?: string | null
           expires_at?: string | null
           guest?: boolean
+          guest_until?: string | null
           mode?: string
           reload_requested_at?: string | null
           scene?: string
@@ -1401,10 +1475,12 @@ export type Database = {
         }
         Update: {
           applied_version?: number | null
+          clock_style?: string
           company_id?: string
           employee_id?: string | null
           expires_at?: string | null
           guest?: boolean
+          guest_until?: string | null
           mode?: string
           reload_requested_at?: string | null
           scene?: string
@@ -1571,8 +1647,85 @@ export type Database = {
         }
         Returns: Json
       }
+      announce_visit: {
+        Args: { client_request_id?: string; p_note?: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      answer_visit: {
+        Args: { p_answer: string; p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      close_visit: {
+        Args: { p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      tv_calendar: { Args: { p_days?: number; p_guest?: boolean }; Returns: Json }
+      tv_overlay: { Args: never; Returns: Json }
+      tv_touch: { Args: { p_company: string; p_guest_minutes?: number }; Returns: number }
+      visits_due_expiry: { Args: { p_now?: string }; Returns: number }
       tv_control: {
         Args: {
+          p_clock?: string
           p_employee_id?: string
           p_guest?: boolean
           p_mode?: string
@@ -1582,10 +1735,12 @@ export type Database = {
         }
         Returns: {
           applied_version: number | null
+          clock_style: string
           company_id: string
           employee_id: string | null
           expires_at: string | null
           guest: boolean
+          guest_until: string | null
           mode: string
           reload_requested_at: string | null
           scene: string
