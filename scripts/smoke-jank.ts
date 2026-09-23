@@ -139,7 +139,8 @@ async function main() {
     await measure(page, "директор: второй тап → карточка задачи", async () => {
       await row.click();
       await page.waitForURL((url) => url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
-      await page.locator("article").first().waitFor({ timeout: 10_000 });
+      // the thread opens with its card folded to a head: the composer says the page is there
+      await page.getByPlaceholder(/Написать/).waitFor({ timeout: 10_000 });
     });
     await page.screenshot({ path: join(SHOTS, "j2-thread-director.png") });
     const tabBar = page.getByRole("navigation", { name: "Основная навигация" });
