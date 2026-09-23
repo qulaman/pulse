@@ -94,7 +94,7 @@ const ICONS = {
   ),
 };
 
-/** The developer's lab (D-63): every role sees it for now, no role check by design. */
+/** The lab (D-63): the model bench and the unit costs — the director's and the secretary's bars only. */
 const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
 /** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
@@ -106,7 +106,6 @@ const EMPLOYEE_TABS: Tab[] = [
   CALENDAR_TAB,
   { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
   { href: "/profile", label: "Профиль", icon: ICONS.profile },
-  LAB_TAB,
 ];
 
 const TABS: Record<TabRole, Tab[]> = {
@@ -127,6 +126,7 @@ const TABS: Record<TabRole, Tab[]> = {
     ...EMPLOYEE_TABS.slice(0, 4),
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
     ...EMPLOYEE_TABS.slice(4),
+    LAB_TAB,
   ],
 };
 

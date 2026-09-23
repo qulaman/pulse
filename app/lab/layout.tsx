@@ -2,10 +2,10 @@ import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
-import { AuthError, getSessionProfile } from "@/lib/auth";
-import { tabBarRole } from "@/lib/routes";
+import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
+import { canManageTeam, tabBarRole } from "@/lib/routes";
 
-/** Any signed-in profile: the lab has no role check while the model comparison runs (D-63). */
+/** The lab (D-63): the director and the secretary, the people who run the instance; everyone else goes home. */
 export default async function LabLayout({ children }: { children: React.ReactNode }) {
   let profile;
   try {
@@ -14,6 +14,7 @@ export default async function LabLayout({ children }: { children: React.ReactNod
     if (error instanceof AuthError) redirect("/login");
     throw error;
   }
+  if (!canManageTeam(profile.role)) redirect(homeForRole(profile.role));
 
   return (
     <div className="flex min-h-dvh flex-col">
