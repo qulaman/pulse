@@ -38,7 +38,7 @@ export function DeskKeys({
         if (!action) return <Key key={`empty-${slot}`} tall disabled aria-hidden tabIndex={-1} />;
         return (
           <Key key={action} tall icon={<Icon name={KEY_ICON[action]} size={18} />} data-testid={`desk-key-${action}`} onClick={() => onPress(action)}>
-            <span className="max-w-full px-1 tracking-[-0.02em]">{KEY_LABEL[action]}</span>
+            <span className="max-w-full text-[12px] tracking-[-0.02em]">{KEY_LABEL[action]}</span>
           </Key>
         );
       })}
