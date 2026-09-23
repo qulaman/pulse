@@ -2,8 +2,10 @@
 
 
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { toast } from "@/components/ui/Toast";
+import { useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type RatingPeriod = "week" | "month" | "all";
@@ -92,6 +94,28 @@ export function useTeamBalances(enabled: boolean) {
       return sums;
     },
   });
+}
+
+/**
+ * Points that have just come in to the person (D-110, game feel behind `points_enabled`): the
+ * face on Лента catches a coin and «+N» floats up. Only an award — a deduction is dry UI, the
+ * face stays neutral (D-45). The socket is narrowed to the person; RLS narrows it again.
+ */
+export function usePointsArrival(userId: string | undefined, enabled: boolean): { amount: number; key: number } {
+  const [arrival, setArrival] = useState({ amount: 0, key: 0 });
+  useRealtimeListener<{ amount?: number }>(
+    { table: "point_transactions", filter: userId ? `user_id=eq.${userId}` : undefined },
+    (payload) => {
+      if (payload.eventType !== "INSERT") return;
+      const amount = Number((payload.new as { amount?: number }).amount ?? 0);
+      if (amount > 0) setArrival((current) => ({ amount, key: current.key + 1 }));
+    },
+    // a missed award after a reconnect is not replayed: the balance on Профиль has it
+    () => {},
+    "points-arrival",
+    enabled && Boolean(userId),
+  );
+  return arrival;
 }
 
 export function balanceOf(rows: PointRow[] | undefined): number {

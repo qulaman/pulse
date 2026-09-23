@@ -1,11 +1,15 @@
 "use client";
 
+import { motion, MotionConfig, useReducedMotion, useSpring, useTransform, useVelocity } from "framer-motion";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 import type { TabBarRole } from "@/lib/routes";
 import { inboxCounts, useDirectorInbox, useMe, useMyTasks } from "@/lib/tasks/queries";
+import { useVisualViewport } from "@/lib/ui/useVisualViewport";
+
+import styles from "./TabBar.module.css";
 
 type TabRole = TabBarRole;
 
@@ -127,6 +131,27 @@ const TABS: Record<TabRole, Tab[]> = {
 };
 
 /**
+ * A screen without a tab of its own lights the tab it is entered from, so the bar always
+ * says where one is (D-112): a task opens from «Задачи», «Команда» lives in «Настройки»,
+ * the announcements in Пульс and Лента, the shop behind «Рейтинг» (D-59, docs/FRONTEND.md).
+ */
+const SECTIONS: Record<TabRole, Record<string, string>> = {
+  director: { "/tasks": "/sent", "/people": "/settings", "/shop": "/settings", "/ether": "/pulse", "/confirm": "/pulse" },
+  employee: { "/ether": "/feed", "/shop": "/rating" },
+  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings" },
+};
+
+/** The lit tab and whether the screen is that tab's own (`page`) or lives inside it. */
+function activeTab(role: TabRole, pathname: string): { index: number; own: boolean } {
+  const tabs = TABS[role];
+  const within = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
+  const own = tabs.findIndex((tab) => within(tab.href));
+  if (own >= 0) return { index: own, own: true };
+  const section = Object.entries(SECTIONS[role]).find(([base]) => within(base));
+  return { index: section ? tabs.findIndex((tab) => tab.href === section[1]) : -1, own: false };
+}
+
+/**
  * What each role should not miss, as a count on its tab: the employee's tasks not yet
  * accepted on «Дела», everything waiting for the director on «Пульс». Live through the
  * same queries the screens use, so the number never disagrees with the list behind it.
@@ -143,49 +168,230 @@ function useTabBadges(role: TabRole): Record<string, number> {
   return total > 0 ? { "/pulse": total } : {};
 }
 
-/** Bottom navigation: icon + label, 44px targets, safe-area aware (docs/FRONTEND.md). */
+/** Scroll travel (px) that folds the bar, and back up that unfolds it; near the top it is always open. */
+const FOLD_AFTER = 28;
+const UNFOLD_AFTER = 14;
+const TOP_ZONE = 24;
+
+/**
+ * What docks above the bar follows it (`.above-tabbar` in globals.css): an attribute on
+ * <html> says whether the bar stepped away for the keyboard or folded. An attribute, not a
+ * custom property — changing one of those on <html> restyles the whole page.
+ */
+function syncDocked(nav: HTMLElement) {
+  const root = document.documentElement;
+  const state = nav.hasAttribute("data-away") ? "away" : nav.hasAttribute("data-folded") ? "folded" : null;
+  if (state) root.dataset.tabbar = state;
+  else delete root.dataset.tabbar;
+}
+
+/**
+ * Scrolling down folds the bar into its slim form, scrolling up — or back at the top —
+ * unfolds it (D-112). Every icon stays a live target in both forms: the fold hides the
+ * word, never a destination, so it adds no tap. A new screen starts unfolded. Driven by
+ * scroll, so it writes the attribute itself: no React render on the way.
+ */
+function useFold(nav: RefObject<HTMLElement | null>, pathname: string) {
+  useEffect(() => {
+    const node = nav.current;
+    if (!node) return;
+    const set = (on: boolean) => {
+      if (node.hasAttribute("data-folded") === on) return;
+      node.toggleAttribute("data-folded", on);
+      syncDocked(node);
+    };
+    set(false);
+    const clampedY = () => {
+      const max = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      // iOS rubber-banding reports past both ends; the bounce is not the reader's intent
+      return Math.min(Math.max(window.scrollY, 0), max);
+    };
+    let last = clampedY();
+    let travel = 0;
+    let frame = 0;
+    const read = () => {
+      frame = 0;
+      const y = clampedY();
+      const dy = y - last;
+      last = y;
+      if (y < TOP_ZONE) {
+        travel = 0;
+        set(false);
+        return;
+      }
+      if (dy === 0) return;
+      travel = Math.sign(dy) === Math.sign(travel) ? travel + dy : dy;
+      if (travel > FOLD_AFTER) set(true);
+      else if (travel < -UNFOLD_AFTER) set(false);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(read);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, [nav, pathname]);
+}
+
+/**
+ * The on-screen keyboard is up (the visual viewport lost its bottom to it). The capsule
+ * steps away and what docks above it lands on the keyboard instead of floating a bar's
+ * height over it (D-112) — the keyboard leaves little enough room as it is.
+ */
+function useKeyboardUp(): boolean {
+  return useVisualViewport() > 0;
+}
+
+/**
+ * Where the thumb stood last. A tab in another layout mounts a new bar, and the thumb
+ * slides on from here instead of appearing in place; a count that changed pops once,
+ * one that is merely re-mounted does not.
+ */
+let lastIndex = -1;
+const seenBadges = new Map<string, number>();
+
+const THUMB = { stiffness: 520, damping: 38, mass: 0.9 };
+
+/**
+ * The thumb rides a spring measured in columns and stretches with its own speed — a drop
+ * of light pulled across the glass, round again when it lands. Transform only.
+ */
+function useThumb(index: number, from: number) {
+  const reduce = useReducedMotion();
+  const pos = useSpring(Math.max(from, 0), THUMB);
+  useEffect(() => {
+    if (index < 0) return;
+    if (reduce) pos.jump(index);
+    else pos.set(index);
+  }, [index, reduce, pos]);
+  const x = useTransform(pos, (column) => `${column * 100}%`);
+  const speed = useVelocity(pos);
+  const stretch = useTransform(speed, (v) => 1 + Math.min(Math.abs(v) * 0.03, 0.34));
+  return { x, stretch };
+}
+
+/**
+ * Bottom navigation (D-112): a floating glass capsule over the screen. A raised accent
+ * thumb slides to the chosen tab the moment it is tapped (the route catches up), the
+ * chosen icon rises and says its name; the others are icons with their names for
+ * assistive tech — eight tabs never truncate to «Кале…». Scrolling down folds the capsule.
+ * Everything that docks above the bar sits at `--tabbar-space` and wears `.above-tabbar`.
+ */
 export function TabBar({ role }: { role: TabRole }) {
   const pathname = usePathname();
   const badges = useTabBadges(role);
+  const nav = useRef<HTMLElement>(null);
+  useFold(nav, pathname);
+  const away = useKeyboardUp();
+  const tabs = TABS[role];
+
+  // the thumb answers the tap, not the network: it leaves before the next screen arrives.
+  // The tap is forgotten once the route moves — back from «Дела» to «Лента» in the same
+  // layout must not find the thumb still on «Дела»
+  const [tapped, setTapped] = useState<number | null>(null);
+  const [tappedOn, setTappedOn] = useState(pathname);
+  if (tappedOn !== pathname) {
+    setTappedOn(pathname);
+    setTapped(null);
+  }
+  const route = activeTab(role, pathname);
+  const index = tapped ?? route.index;
+  const [from] = useState(() => (lastIndex >= 0 ? lastIndex : index));
+  const thumb = useThumb(index, from);
+
+  useEffect(() => {
+    if (index >= 0) lastIndex = index;
+  }, [index]);
+
+  useEffect(() => {
+    for (const tab of tabs) seenBadges.set(tab.href, badges[tab.href] ?? 0);
+  });
+
+  // before paint, in the same commit as the composer's own keyboard offset: no frame of it
+  // hanging a bar's height over the keyboard
+  useLayoutEffect(() => {
+    if (nav.current) syncDocked(nav.current);
+  }, [away]);
+  useEffect(
+    () => () => {
+      delete document.documentElement.dataset.tabbar;
+    },
+    [],
+  );
 
   return (
-    <nav
-      className="sticky bottom-0 z-10 border-t border-border bg-surface"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-      aria-label="Основная навигация"
-    >
-      <ul className="mx-auto flex max-w-lg">
-        {TABS[role].map((tab) => {
-          const active = pathname === tab.href || pathname.startsWith(`${tab.href}/`);
-          return (
-            <li key={tab.href} className="min-w-0 flex-1">
-              <Link
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                className="flex min-h-[58px] flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 font-display text-[11px] leading-4 tracking-[-0.01em] transition-colors duration-[120ms]"
-                style={{ color: active ? "var(--accent)" : "var(--text-muted)", fontWeight: active ? 600 : 500 }}
-              >
-                <span
-                  className="relative flex h-8 w-12 max-w-full items-center justify-center rounded-full transition-colors duration-[120ms]"
-                  style={{ background: active ? "color-mix(in srgb, var(--accent) 16%, transparent)" : "transparent" }}
-                >
-                  {tab.icon}
-                  {badges[tab.href] ? (
-                    <span
-                      className="nums absolute -right-0.5 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface px-1 font-display text-[10px] font-bold leading-none"
-                      style={{ background: "var(--accent)", color: "var(--bg)" }}
-                      aria-label={`${badges[tab.href]} требуют внимания`}
-                    >
-                      {badges[tab.href] > 99 ? "99+" : badges[tab.href]}
+    <>
+      {/* the capsule floats; this keeps its room at the end of the page so nothing ends under it */}
+      <div aria-hidden className={styles.spacer} />
+      <div aria-hidden className={styles.scrim} data-away={away ? "" : undefined} />
+      <MotionConfig reducedMotion="user">
+        <nav
+          ref={nav}
+          aria-label="Основная навигация"
+          className={styles.capsule}
+          data-away={away ? "" : undefined}
+          style={{ "--n": tabs.length } as CSSProperties}
+        >
+          <motion.span
+            aria-hidden
+            className={styles.thumb}
+            style={{ x: thumb.x }}
+            initial={{ opacity: index >= 0 ? 1 : 0 }}
+            animate={{ opacity: index >= 0 ? 1 : 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <motion.span className={styles.stretch} style={{ scaleX: thumb.stretch }}>
+              <span className={styles.lamp} />
+              <span className={styles.pill} />
+            </motion.span>
+          </motion.span>
+          <ul className={styles.row}>
+            {tabs.map((tab, i) => {
+              const active = i === index;
+              const count = badges[tab.href] ?? 0;
+              const seen = seenBadges.get(tab.href);
+              const pop = seen !== undefined && seen !== count;
+              return (
+                <li key={tab.href} className="min-w-0">
+                  <Link
+                    href={tab.href}
+                    aria-label={count > 0 ? `${tab.label}, ${count} требуют внимания` : tab.label}
+                    aria-current={i === route.index ? (route.own ? "page" : "true") : undefined}
+                    data-active={active ? "" : undefined}
+                    className={styles.cell}
+                    onClick={(event) => {
+                      // a new browser tab or window leaves this screen where it is
+                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                      if (pathname === tab.href) {
+                        // the tab of this very screen takes it back to the top, as on every phone
+                        event.preventDefault();
+                        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                        window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+                        return;
+                      }
+                      if (i !== index) setTapped(i);
+                    }}
+                  >
+                    <span className={styles.icon}>
+                      {tab.icon}
+                      {count > 0 ? (
+                        <span key={count} className={`nums ${styles.badge} ${pop ? styles.badgePop : ""}`} aria-hidden>
+                          {count > 99 ? "99+" : count}
+                        </span>
+                      ) : null}
                     </span>
-                  ) : null}
-                </span>
-                <span className="w-full truncate px-0.5 text-center">{tab.label}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+                    <span className={styles.label} aria-hidden>
+                      {tab.label}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </MotionConfig>
+    </>
   );
 }

@@ -1,5 +1,8 @@
+import type { MascotState } from "@/components/brand/Mascot";
 import { greeting, quoteTitle } from "./briefing";
-import { hasUnread, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
+import { hasUnread, isOnBoard, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
+import type { EtherPost } from "./ether";
+import { alarmOf, DEADLINE_SOON_MS } from "./mood";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -72,7 +75,7 @@ export function describeForEmployee(prev: BoardTask | undefined, next: BoardTask
   if (hasUnread(next, meId) && next.last_message!.id !== prev.last_message?.id) {
     const last = next.last_message!;
     const words = last.type === "photo" ? "фото" : last.type === "voice" ? "голосовое" : (last.content ?? "");
-    return { text: `Директор пишет по ${title}: «${short(words)}»`, tone: "warn" };
+    return { text: `Директор пишет по ${title}: «${short(words)}»`, tone: "warn", message: true };
   }
   return null;
 }
@@ -90,4 +93,213 @@ export function describeForEmployeeAll(prev: readonly BoardTask[], next: readonl
 /** The director as the person sees them in a thread — for the messages card. */
 export function otherSideOf(task: Pick<BoardTask, "author">): string {
   return whoOf({ assignee: task.author }) === "Без исполнителя" ? "Директор" : whoOf({ assignee: task.author });
+}
+
+/* -------------------------------------------------------------------------- */
+/* The face that carries the work (D-110)                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the employee's face holds at rest, heaviest first (D-110). The director's «Капля»
+ * hands the work out; the employee's carries it:
+ *   todo      an order to accept or to redo — it calls, the card over its head
+ *   deadline  a deadline within the hour or past — it panics over the hot card of its stack
+ *   unread    a word of the director not read yet — nervous, an envelope bobs by the head
+ *   working   orders in work, nothing burning — it holds the stack and does not sleep
+ *   review    everything handed over — an hourglass, a glance up at the director now and then
+ *   free      nothing in the hands — the only time it sleeps and dreams
+ */
+export type EmployeeRest = "todo" | "deadline" | "unread" | "working" | "review" | "free";
+
+export type EmployeeLoad = {
+  rest: EmployeeRest;
+  /** orders in work: the height of the stack in the face's hands */
+  carry: number;
+  /** one of them is due within the hour or overdue: the top card of the stack burns */
+  hot: boolean;
+};
+
+function inHands(task: Pick<BoardTask, "status">): boolean {
+  return task.status === "accepted" || task.status === "in_progress";
+}
+
+function burning(task: Pick<BoardTask, "deadline">, now: Date): boolean {
+  return Boolean(task.deadline) && new Date(task.deadline!).getTime() - now.getTime() <= DEADLINE_SOON_MS;
+}
+
+/**
+ * The load of the person's board. Closed rows may linger in the cache until the screen says
+ * goodbye to them — only the statuses count. The deadline alarm is `alarmOf`'s (D-68), but the
+ * unread one is the director's word alone: the person's own open question is not news to them.
+ */
+export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: string): EmployeeLoad {
+  const carried = tasks.filter(inHands);
+  const hot = carried.some((task) => burning(task, now));
+  const onBoard = tasks.filter((task) => isOnBoard(task.status));
+  const rest: EmployeeRest = onBoard.some(isTodo)
+    ? "todo"
+    : alarmOf(onBoard, now, meId) === "deadline"
+      ? "deadline"
+      : onBoard.some((task) => hasUnread(task, meId))
+        ? "unread"
+        : carried.length > 0
+          ? "working"
+          : onBoard.some((task) => task.status === "pending_review")
+            ? "review"
+            : "free";
+  return { rest, carry: carried.length, hot };
+}
+
+/** What the face shows for the load. Free and asleep at rest; free and awake — glad of it. */
+const REST_FACE: Record<EmployeeRest, MascotState> = {
+  todo: "calling",
+  deadline: "panicking",
+  unread: "nervous",
+  working: "working",
+  review: "awaiting",
+  free: "sleeping",
+};
+
+export function employeeFace(rest: EmployeeRest, awake: boolean): MascotState {
+  return awake && rest === "free" ? "happy" : REST_FACE[rest];
+}
+
+/**
+ * Where a tap on the resting face leads (D-110): a face that is worried about something opens
+ * the reason itself — the order to accept, the burning one, the unread word — so the person
+ * gets there in one tap instead of face → ball → card. null — the balls, as before.
+ */
+export function reasonOf(rest: EmployeeRest): "tasks" | "messages" | null {
+  return rest === "todo" || rest === "deadline" ? "tasks" : rest === "unread" ? "messages" : null;
+}
+
+/**
+ * What has just happened to the person's work (D-110), read off two consecutive lists — the
+ * face plays it over whatever it holds. Unlike the thought above the head, the person's own
+ * taps count: «Принял» is a nod, «Сдать» throws the card up to the director. An optimistic
+ * update lands in the same list, so a tap here and a tap on the task screen play alike.
+ */
+export type EmployeeEvent =
+  | "approved"
+  | "rework"
+  | "revoked"
+  | "insisted"
+  | "arrived"
+  | "handed"
+  | "declined"
+  | "asked"
+  | "accepted"
+  | "moved"
+  | "message"
+  | "announced"
+  | "read"
+  | "acked";
+
+/** Several changes in one go: the face plays the weightiest (the order of this list). */
+export const EVENT_WEIGHT: readonly EmployeeEvent[] = [
+  "approved",
+  "rework",
+  "revoked",
+  "insisted",
+  "arrived",
+  "handed",
+  "declined",
+  "asked",
+  "accepted",
+  "moved",
+  "message",
+  "announced",
+  "read",
+  "acked",
+];
+
+function statusEvent(prev: BoardTask, next: BoardTask): EmployeeEvent | null {
+  switch (next.status) {
+    case "done":
+      return "approved";
+    case "rework":
+      return "rework";
+    case "revoked":
+      return "revoked";
+    case "declined":
+      return "declined";
+    case "pending_review":
+      return "handed";
+    case "sent":
+      // back from «Не могу» — the director insists; anything else is a rolled-back tap
+      return prev.status === "declined" ? "insisted" : null;
+    case "accepted":
+      // rework → accepted is the first half of «Сдать», not a second «Принял»
+      return prev.status === "sent" ? "accepted" : null;
+    default:
+      return null;
+  }
+}
+
+/** A later deadline, or none at all, is a relief; an earlier one is only said, not played. */
+function eased(prev: BoardTask, next: BoardTask): boolean {
+  if (next.deadline === prev.deadline || !prev.deadline) return false;
+  return !next.deadline || new Date(next.deadline).getTime() > new Date(prev.deadline).getTime();
+}
+
+function taskEvent(prev: BoardTask | undefined, next: BoardTask, meId: string): EmployeeEvent | null {
+  if (!prev) return next.status === "sent" ? "arrived" : null;
+  if (next.status !== prev.status) return statusEvent(prev, next);
+  if (!prev.question && next.question) return "asked";
+  if (eased(prev, next)) return "moved";
+  if (hasUnread(next, meId) && next.last_message!.id !== prev.last_message?.id) return "message";
+  if (hasUnread(prev, meId) && !hasUnread(next, meId)) return "read";
+  return null;
+}
+
+export function employeeEvents(prev: readonly BoardTask[], next: readonly BoardTask[], meId: string): EmployeeEvent[] {
+  const before = new Map(prev.map((task) => [task.id, task]));
+  const events: EmployeeEvent[] = [];
+  for (const task of next) {
+    const event = taskEvent(before.get(task.id), task, meId);
+    if (event) events.push(event);
+  }
+  return events;
+}
+
+/** Эфир from the person's side: a word to everyone has come, or they have just said «Ознакомился». */
+export function etherEvents(prev: readonly EtherPost[], next: readonly EtherPost[], meId: string): EmployeeEvent[] {
+  const before = new Map(prev.map((post) => [post.id, post]));
+  const events: EmployeeEvent[] = [];
+  for (const post of next) {
+    const was = before.get(post.id);
+    if (!was) {
+      if (post.author_id !== meId) events.push("announced");
+      continue;
+    }
+    const mine = (item: EtherPost) => item.acks.some((ack) => ack.user_id === meId);
+    if (!mine(was) && mine(post)) events.push("acked");
+  }
+  return events;
+}
+
+export function weightiest(events: readonly EmployeeEvent[]): EmployeeEvent | null {
+  let best: EmployeeEvent | null = null;
+  for (const event of events) {
+    if (best === null || EVENT_WEIGHT.indexOf(event) < EVENT_WEIGHT.indexOf(best)) best = event;
+  }
+  return best;
+}
+
+/**
+ * «N подряд в срок» (D-110, game feel behind `points_enabled`): the person's latest accepted
+ * orders that had a deadline, newest first, counted until the first one handed over late.
+ * An order without a deadline neither counts nor breaks the run; «в срок» is the handover
+ * (`completed_at`), not the director's acceptance — the wait for the director is not theirs.
+ */
+export function onTimeStreak(tasks: readonly Pick<BoardTask, "status" | "deadline" | "completed_at" | "closed_at">[]): number {
+  const closed = tasks
+    .filter((task) => task.status === "done" && task.deadline && task.completed_at && task.closed_at)
+    .sort((a, b) => (a.closed_at! < b.closed_at! ? 1 : a.closed_at! > b.closed_at! ? -1 : 0));
+  let streak = 0;
+  for (const task of closed) {
+    if (new Date(task.completed_at!).getTime() > new Date(task.deadline!).getTime()) break;
+    streak += 1;
+  }
+  return streak;
 }

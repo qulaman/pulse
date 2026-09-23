@@ -10,6 +10,7 @@ import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
 import {
   AppsIcon,
+  BookIcon,
   BuildingIcon,
   CalendarIcon,
   CupIcon,
@@ -24,11 +25,11 @@ import {
 } from "@/components/settings/icons";
 import {
   ConventionsSection,
+  DictionarySection,
   ParserSection,
   PointsSection,
   SecretarySection,
   SttSection,
-  VocabularySection,
   WindowSection,
 } from "@/components/settings/sections";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
@@ -111,7 +112,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
     company: companyDirty || !!sections.window,
     app: !!sections.secretary,
     team: !!sections.points,
-    ai: !!(sections.stt || sections.parser || sections.vocabulary || sections.conventions),
+    ai: !!(sections.stt || sections.parser || sections.conventions),
   };
 
   const top = useHeaderHeight();
@@ -332,6 +333,8 @@ function TeamPanel({ director }: { director: boolean }) {
           {director ? <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" /> : null}
           <Row icon={<PodiumIcon />} title="Рейтинг" value="очки и динамика" href="/rating" />
           <Row icon={<GiftIcon />} title="Магазин" value="награды и выдача" href="/shop" />
+          {/* how the director calls people lives with the words of the dictionary (D-111) */}
+          <Row icon={<BookIcon />} title="Имена в речи" value="как вы их зовёте" href="/settings/dictionary?tab=names&from=team" />
         </RowGroup>
       </div>
 
@@ -358,7 +361,7 @@ function AiPanel() {
       <div className="flex flex-col gap-2">
         <SttSection />
         <ParserSection />
-        <VocabularySection />
+        <DictionarySection />
         <ConventionsSection />
       </div>
     </SettingsReady>

@@ -14,8 +14,6 @@ import { MessageRow } from "./MessageRow";
 import { SystemRow } from "./SystemRow";
 
 const RECEIPT_TONE = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
-/** The tab bar the thread sits above, like every other screen. */
-const TAB_BAR_PX = 56;
 
 export type ThreadViewProps = {
   taskId: string;
@@ -139,9 +137,9 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
         </div>
       ) : (
         <div
-          className="fixed inset-x-0 z-20 border-t border-border bg-bg px-4 pb-3 pt-3"
-          // above the tab bar, and above the keyboard when it is out (D-60: nothing hides the field)
-          style={{ bottom: `calc(${offsetBottom}px + ${TAB_BAR_PX}px + env(safe-area-inset-bottom))` }}
+          className="above-tabbar fixed inset-x-0 z-20 border-t border-border bg-bg px-4 pb-3 pt-3"
+          // above the tab bar (D-112), and above the keyboard when it is out (D-60: nothing hides the field)
+          style={{ bottom: `calc(${offsetBottom}px + var(--tabbar-space))` }}
         >
           <Composer taskId={taskId} companyId={companyId} actions={actions} onSent={scrollToEnd} />
         </div>
