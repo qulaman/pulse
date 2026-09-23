@@ -275,26 +275,47 @@ export default function FeedPage() {
     thanksKey: desk.thanksKey,
   });
 
+  // the top of the secretary's screen: the lamp of the director's door and the day's count —
+  // laid over the screen, out of the flow, so the face keeps the very middle (D-87 доводка)
+  const showTally = isSecretary && mode === "idle" && !loading && tally.total > 0;
+  const topInset = isSecretary ? (guarded ? 40 : 0) + (showTally ? 24 : 0) : 0;
+
   return (
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, what it says grows upwards above it and the cards downwards under it.
     // The bands scroll inside themselves, so the page itself is always one screen (D-60).
     <main
-      className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
+      className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
     >
-      {isSecretary && guarded ? (
-        <DndLamp
-          since={guarded.accepted_at ?? guarded.created_at}
-          who={guarded.claimed_by !== meId ? firstNameOf(guarded.claimed?.full_name ?? "") || null : null}
-          now={now}
-        />
+      {isSecretary && (guarded || showTally) ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col items-center px-4" data-testid="secretary-top">
+          {guarded ? (
+            <DndLamp
+              since={guarded.accepted_at ?? guarded.created_at}
+              who={guarded.claimed_by !== meId ? firstNameOf(guarded.claimed?.full_name ?? "") || null : null}
+              now={now}
+            />
+          ) : null}
+          {showTally ? (
+            // what this secretary closed today, by button — the day's work at a glance
+            <p className="nums max-w-full truncate pt-2 text-center text-[12px] leading-4 text-muted" data-testid="desk-tally">
+              Сегодня:{" "}
+              {tally.items.map((item) => (
+                <span key={item.kind} className="ml-1">
+                  {item.icon || item.label} {item.count}
+                </span>
+              ))}
+              {tally.averageMin !== null ? <span> · в среднем {tally.averageMin} мин</span> : null}
+            </p>
+          ) : null}
+        </div>
       ) : null}
       <LayoutGroup>
         {/* above the head: what the assistant says */}
         <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
-          <div className="mt-auto pb-3 pt-2">
+          <div className="mt-auto pb-3 pt-2" style={topInset ? { paddingTop: 8 + topInset } : undefined}>
             <Assistant lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines} />
           </div>
         </div>
@@ -333,76 +354,67 @@ export default function FeedPage() {
               {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
             </AnimatePresence>
           </motion.div>
-          {/* what the secretary is doing, in a few words, right under the face (D-87, D-97) */}
-          {isSecretary && mode === "idle" && !loading ? (
-            <div className="-mt-1 flex max-w-full flex-col items-center gap-0.5">
-              <p
-                key={`${desk.phase}-${desk.errand?.id ?? ""}-${secretaryAct === "thanks" ? "t" : ""}`}
-                className="card-in max-w-full truncate rounded-full px-3 py-1 text-center text-[15px] font-medium leading-5"
-                style={{
-                  background: "color-mix(in srgb, var(--surface) 88%, transparent)",
-                  color:
-                    secretaryAct === "thanks"
-                      ? "var(--danger)"
-                      : desk.phase === "asked"
-                        ? urgency === 2
-                          ? "var(--danger)"
-                          : "var(--warn)"
-                        : desk.phase === "rest"
-                          ? "var(--text-muted)"
-                          : "var(--text)",
-                }}
-                data-testid="desk-line"
-                data-phase={desk.phase}
-                data-urgency={desk.phase === "asked" ? urgency : undefined}
-              >
-                {secretaryAct === "thanks" ? "Директор: спасибо ♥" : showsGuest ? "Приглашаю посетителя в кабинет" : deskLine(desk)}
-                {secretaryAct !== "thanks" && desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
-                {streak >= 2 ? <span className="text-muted"> · {streak} подряд быстрее двух минут</span> : null}
-              </p>
-              <button
-                type="button"
-                onClick={() => setPresenceOpen(true)}
-                className="mt-0.5 inline-flex min-h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-semibold leading-4"
-                style={{
-                  borderColor: away ? "color-mix(in srgb, var(--warn) 55%, var(--border))" : "var(--border)",
-                  color: away ? "var(--warn)" : "var(--text-muted)",
-                }}
-                data-testid="presence-chip"
-                data-away={away ? "1" : "0"}
-              >
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: away ? "var(--warn)" : "var(--ok)" }} />
-                {away && meAtDesk?.away_until ? `Не на месте ${untilLine(meAtDesk.away_until)}` : "На месте"}
-              </button>
-              {acceptByFace ? (
-                <p className="text-[12px] leading-4 text-muted" data-testid="desk-hint">
-                  {[askedDetails(desk, now), "тап по лицу — принять"].filter(Boolean).join(" · ")}
-                </p>
-              ) : desk.phase === "rest" && tally.total > 0 ? (
-                // what this secretary closed today, by button — the day's work at a glance
-                <p className="nums text-[12px] leading-4 text-muted" data-testid="desk-tally">
-                  Сегодня:{" "}
-                  {tally.items.map((item) => (
-                    <span key={item.kind} className="ml-1">
-                      {item.icon || item.label} {item.count}
-                    </span>
-                  ))}
-                  {tally.averageMin !== null ? <span> · в среднем {tally.averageMin} мин</span> : null}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-          {/* «Посетитель» (D-96): a person at the desk — one tap, and the director's wall says so */}
-          {isSecretary && mode === "idle" && !loading ? (
-            <div className="mt-2">
-              <VisitorButton visits={visitRows} />
-            </div>
-          ) : null}
         </div>
 
         {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
             so a ball walking down from the orbit is never clipped on its way in. */}
         <div className="flex min-h-0 flex-1 flex-col" data-band="cards">
+          {/* right under the face: what the secretary is doing, «на месте», and a little lower
+              «Посетитель» — out of the face's band, so the face stays in the middle (D-87 доводка) */}
+          {isSecretary && mode === "idle" && !loading ? (
+            <div className="flex shrink-0 flex-col items-center" data-testid="desk-under">
+              {/* what the secretary is doing, in a few words, right under the face (D-87, D-97) */}
+              <div className="-mt-1 flex max-w-full flex-col items-center gap-0.5">
+                <p
+                  key={`${desk.phase}-${desk.errand?.id ?? ""}-${secretaryAct === "thanks" ? "t" : ""}`}
+                  className="card-in max-w-full truncate rounded-full px-3 py-1 text-center text-[15px] font-medium leading-5"
+                  style={{
+                    background: "color-mix(in srgb, var(--surface) 88%, transparent)",
+                    color:
+                      secretaryAct === "thanks"
+                        ? "var(--danger)"
+                        : desk.phase === "asked"
+                          ? urgency === 2
+                            ? "var(--danger)"
+                            : "var(--warn)"
+                          : desk.phase === "rest"
+                            ? "var(--text-muted)"
+                            : "var(--text)",
+                  }}
+                  data-testid="desk-line"
+                  data-phase={desk.phase}
+                  data-urgency={desk.phase === "asked" ? urgency : undefined}
+                >
+                  {secretaryAct === "thanks" ? "Директор: спасибо ♥" : showsGuest ? "Приглашаю посетителя в кабинет" : deskLine(desk)}
+                  {secretaryAct !== "thanks" && desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
+                  {streak >= 2 ? <span className="text-muted"> · {streak} подряд быстрее двух минут</span> : null}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setPresenceOpen(true)}
+                  className="mt-0.5 inline-flex min-h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-semibold leading-4"
+                  style={{
+                    borderColor: away ? "color-mix(in srgb, var(--warn) 55%, var(--border))" : "var(--border)",
+                    color: away ? "var(--warn)" : "var(--text-muted)",
+                  }}
+                  data-testid="presence-chip"
+                  data-away={away ? "1" : "0"}
+                >
+                  <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: away ? "var(--warn)" : "var(--ok)" }} />
+                  {away && meAtDesk?.away_until ? `Не на месте ${untilLine(meAtDesk.away_until)}` : "На месте"}
+                </button>
+                {acceptByFace ? (
+                  <p className="text-[12px] leading-4 text-muted" data-testid="desk-hint">
+                    {[askedDetails(desk, now), "тап по лицу — принять"].filter(Boolean).join(" · ")}
+                  </p>
+                ) : null}
+              </div>
+              {/* «Посетитель» (D-96): a person at the desk — one tap, and the director's wall says so */}
+              <div className="mt-4">
+                <VisitorButton visits={visitRows} />
+              </div>
+            </div>
+          ) : null}
           {mode === "panel" ? (
             <div className="mt-1 w-full shrink-0">
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
