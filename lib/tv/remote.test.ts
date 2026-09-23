@@ -13,6 +13,8 @@ function state(patch: Partial<TvState> = {}): TvState {
     task_id: null,
     scene: "face",
     guest: false,
+    guest_until: null,
+    clock_style: "digital",
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -58,6 +60,7 @@ describe("wallNow", () => {
     expect(wallNow(state(), PEOPLE, NOW)).toBe("Эфир · лицо");
     expect(wallNow(state({ scene: "clock" }), PEOPLE, NOW)).toBe("Эфир · часы");
     expect(wallNow(state({ scene: "team" }), PEOPLE, NOW)).toBe("Эфир · команда");
+    expect(wallNow(state({ scene: "calendar" }), PEOPLE, NOW)).toBe("Эфир · календарь");
     expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · лицо");
   });
 
@@ -74,7 +77,7 @@ describe("wallNow", () => {
 
 describe("SCENE_LABEL", () => {
   it("даёт русское имя каждой сцене", () => {
-    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда" });
+    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь" });
   });
 });
 

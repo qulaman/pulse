@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { focusRows } from "./focus";
+import { focusCard, focusRows, initialsOfName, PER_LANE } from "./focus";
 import type { TvFocusEmployee, TvFocusTask } from "./queries";
 
 const NOW = new Date("2026-09-18T09:00:00Z"); // 14:00 в Актобе
@@ -60,5 +60,56 @@ describe("focusRows", () => {
     const rows = focusRows(focus([{ title: null, deadline: null }], true), NOW);
     expect(rows[0].deadline).toBeNull();
     expect(rows[0].title).toBe("Поручение");
+  });
+});
+
+describe("focusCard — колонки по стадиям (D-96)", () => {
+  it("раскладывает дела на «Новые / В работе / На проверке», доработку — в работу", () => {
+    const card = focusCard(
+      focus([{ status: "sent" }, { status: "accepted" }, { status: "rework" }, { status: "pending_review" }]),
+      NOW,
+    );
+    expect(card.lanes.map((lane) => [lane.label, lane.count])).toEqual([
+      ["Новые", 1],
+      ["В работе", 2],
+      ["На проверке", 1],
+    ]);
+    expect(card.total).toBe(4);
+  });
+
+  it("числа над колонками — из базы, по всем делам; лишнее — «+ ещё N»", () => {
+    const many = focus(Array.from({ length: PER_LANE + 1 }, () => ({ status: "accepted" })));
+    many.counts = { new: 0, work: 9, review: 0 };
+    const work = focusCard(many, NOW).lanes[1];
+    expect(work.count).toBe(9);
+    expect(work.rows).toHaveLength(PER_LANE);
+    expect(work.more).toBe(9 - PER_LANE);
+  });
+
+  it("срок сегодня впереди подсвечен, прошедший — нет (D-45)", () => {
+    const card = focusCard(
+      focus([
+        { id: "ahead", status: "sent", deadline: "2026-09-18T13:00:00Z" },
+        { id: "past", status: "sent", deadline: "2026-09-18T05:00:00Z" },
+      ]),
+      NOW,
+    );
+    const rows = card.lanes[0].rows;
+    expect(rows.find((r) => r.id === "ahead")?.soon).toBe(true);
+    expect(rows.find((r) => r.id === "past")?.soon).toBe(false);
+  });
+
+  it("сданное сегодня: гостю без названий", () => {
+    const f = focus([], true);
+    f.done_today = { count: 2, titles: [null, null] };
+    expect(focusCard(f, NOW).done).toEqual({ count: 2, titles: ["Поручение", "Поручение"] });
+  });
+});
+
+describe("initialsOfName", () => {
+  it("две буквы — имя и фамилия, одна часть — первые две буквы", () => {
+    expect(initialsOfName("Марат Ахметов")).toBe("МА");
+    expect(initialsOfName("Марат")).toBe("МА");
+    expect(initialsOfName("  ")).toBe("");
   });
 });

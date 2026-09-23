@@ -20,6 +20,8 @@ export const tvKeys = {
   summary: (guest: boolean) => ["tv", "summary", guest] as const,
   state: ["tv", "state"] as const,
   focus: ["tv", "focus"] as const,
+  calendar: (guest: boolean) => ["tv", "calendar", guest] as const,
+  overlay: ["tv", "overlay"] as const,
 };
 
 /**
@@ -163,12 +165,21 @@ export type TvFocusTask = {
   deadline: string | null;
 };
 
+/** Числа над колонками карточки — по всем открытым делам, а не по показанным (D-96). */
+export type TvFocusCounts = { new: number; work: number; review: number };
+
 export type TvFocusEmployee = {
   mode: "employee";
   guest: boolean;
   expires_at: string;
-  employee: { id: string; name: string; position: string | null };
+  /** Поля v2 необязательны: киоск новее базы между деплоем и миграцией не падает. */
+  employee: { id: string; name: string; position: string | null; avatar_url?: string | null };
   tasks: TvFocusTask[];
+  counts?: TvFocusCounts;
+  /** Что директор принял сегодня: позитив по имени на стену можно (D-45). */
+  done_today?: { count: number; titles: (string | null)[] };
+  /** Очки недели — только при включённых очках и без гостя (D-33, D-40). */
+  points_week?: number | null;
 };
 
 export type TvFocus = { mode: "ether" } | TvFocusEmployee;
@@ -196,5 +207,85 @@ export function useTvFocus(enabled: boolean) {
   });
   useRealtimeInvalidate({ table: "tv_events" }, tvKeys.focus, enabled);
   useRealtimeInvalidate({ table: "tv_state" }, tvKeys.focus, enabled);
+  return query;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Неделя мероприятий и надпись поверх сцены (D-96)                          */
+/* -------------------------------------------------------------------------- */
+
+export type TvCalendarEvent = {
+  id: string;
+  /** Гостю названий и мест не отдают (D-33): экран скажет «Мероприятие». */
+  title: string | null;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  everyone: boolean;
+  people: number;
+  going: number;
+};
+
+export type TvCalendar = { from: string; days: number; events: TvCalendarEvent[] };
+
+/** Календарь живёт медленно: раз в минуту хватает, напоминание приходит своей строкой. */
+const CALENDAR_REFRESH_MS = 60_000;
+
+/**
+ * Неделя вперёд для заставки «Календарь» — одним вызовом `tv_calendar()`: роль `tv`
+ * не читает `events` (D-78 §4). Сокета на мероприятия у киоска нет, поэтому раз в
+ * минуту и по каждому событию стены (напоминание пишет `tv_events` вида `event`).
+ */
+export function useTvCalendar(guest: boolean, enabled: boolean) {
+  const query = useQuery({
+    queryKey: tvKeys.calendar(guest),
+    enabled,
+    refetchInterval: CALENDAR_REFRESH_MS,
+    queryFn: async (): Promise<TvCalendar> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("tv_calendar", { p_guest: guest, p_days: 7 });
+      if (error) throw new Error(error.message);
+      const value = (data ?? {}) as Partial<TvCalendar>;
+      return { from: value.from ?? new Date().toISOString(), days: value.days ?? 7, events: value.events ?? [] };
+    },
+  });
+  useRealtimeInvalidate({ table: "tv_events" }, tvKeys.calendar(guest), enabled);
+  return query;
+}
+
+export type TvVisitStatus = "waiting" | "wait" | "invited";
+
+export type TvOverlayVisit = {
+  id: string;
+  status: TvVisitStatus;
+  /** Слова секретаря; гостю не приезжают (D-33). */
+  note: string | null;
+  created_at: string;
+  answered_at: string | null;
+};
+
+export type TvOverlay = { visit: TvOverlayVisit | null; waiting: number };
+
+/** Страховка, если сокет промолчал: посетитель у стола не должен ждать дольше. */
+const OVERLAY_REFRESH_MS = 20_000;
+
+/**
+ * «К вам посетитель» (D-96): роль `tv` таблицу `visits` не читает — функция отдаёт
+ * готовую надпись с маской гостя. Каждое изменение визита поднимает версию `tv_state`,
+ * которую киоск и так слушает, поэтому отдельного сокета здесь нет.
+ */
+export function useTvOverlay() {
+  const query = useQuery({
+    queryKey: tvKeys.overlay,
+    refetchInterval: OVERLAY_REFRESH_MS,
+    queryFn: async (): Promise<TvOverlay> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("tv_overlay");
+      if (error) throw new Error(error.message);
+      const value = (data ?? {}) as Partial<TvOverlay>;
+      return { visit: value.visit ?? null, waiting: value.waiting ?? 0 };
+    },
+  });
+  useRealtimeInvalidate({ table: "tv_state" }, tvKeys.overlay);
   return query;
 }

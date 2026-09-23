@@ -9,7 +9,7 @@ import type { TvSummary } from "@/lib/tv/queries";
  *
  * Поле `overdue` в этих строках есть, и оно здесь не используется намеренно:
  * просрочка по именам на стену не выносится ни числом, ни цветом (D-45). Точка
- * слева говорит только «занят / свободен».
+ * слева говорит только «есть дела / дел нет» — без рода: имя его не даёт.
  */
 
 /** Шесть в ряд, четыре ряда: на 24 плитках имя ещё читается с двух метров. */
@@ -55,7 +55,7 @@ export function TvTeam({ summary, guest }: { summary: TvSummary; guest: boolean 
             <p className="truncate text-[2.2vh] leading-[3vh] text-muted">
               {row.active > 0
                 ? `${row.active} ${pluralRu(row.active, ["дело", "дела", "дел"])}`
-                : "свободен"}
+                : "дел нет"}
             </p>
           </div>
         </div>

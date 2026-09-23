@@ -1,0 +1,63 @@
+/*
+ * The wall's own motion (D-96). Transform and opacity only — the perf contract of a
+ * screen that runs for months (D-45). Everything here also has a still fallback: the
+ * global reduced-motion rule cuts animations to nothing, and the components then draw
+ * the same state from React instead.
+ */
+
+/* Clock hands: one turn per cycle; the phase is set by a negative animation-delay, so the
+   hands move with zero React renders — a second hand at 60 fps costs the compositor only. */
+.hand {
+  transform-box: view-box;
+  transform-origin: 100px 100px;
+  animation-name: tv-turn;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes tv-turn {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* «К вам посетитель»: a soft ring breathing around the door, opacity and scale only */
+.ring {
+  animation: tv-ring 2.4s var(--ease-in-out) infinite;
+}
+
+@keyframes tv-ring {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.06);
+  }
+}
+
+/* The running meeting in the calendar glows once in a while — slow, not a blinker */
+.live {
+  animation: tv-live 3s var(--ease-in-out) infinite;
+}
+
+@keyframes tv-live {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* How long the focus has left, shrinking from the right: scaleX only */
+.gauge {
+  transform-origin: left center;
+  transition: transform 10s linear;
+}
