@@ -20,6 +20,9 @@ export async function POST(req: Request) {
     // tick is logged, the queue still goes out
     const escalated = await service.rpc("errands_due_escalation");
     if (escalated.error) console.error("errands_due_escalation failed:", escalated.error.message);
+    // a request with an end («не беспокоить на 30 мин», D-99) ends by itself on the tick
+    const ended = await service.rpc("errands_expire");
+    if (ended.error) console.error("errands_expire failed:", ended.error.message);
     // the director's own «напомни мне» — a note with a time (D-95) — and the bin of notes,
     // which keeps a deleted thought three days; same rule, a failure is logged, not fatal
     const noted = await service.rpc("notes_due_reminders");

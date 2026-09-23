@@ -26,6 +26,7 @@ import {
   SECRETARY_TONE,
   ShutDoor,
   Sign,
+  Siren,
   TEA,
   TypingHands,
   WATER,
@@ -72,6 +73,7 @@ const LOOK: Record<DeskScene, Look> = {
   tea: { x: -3, y: 1.6 },
   water: { x: -3, y: 1.6 },
   dnd: { x: 1.2, y: 0.2 },
+  security: { x: 0, y: -0.4, loop: "mascot-scan 1.6s ease-in-out infinite" },
   guest: { x: 0, y: 0, loop: "smc-guest-look 4.2s ease-in-out infinite" },
   meeting: { x: -3.4, y: 1.2 },
   doctor: { x: 1.4, y: -0.6 },
@@ -89,6 +91,8 @@ const BODY: Record<DeskScene, string> = {
   tea: "smc-pour-body 3.2s ease-in-out infinite",
   water: "smc-pour-body 3.2s ease-in-out infinite",
   dnd: "smc-guard 4.2s ease-in-out infinite",
+  // on the phone to the guards, fast
+  security: "mascot-talk 0.7s ease-in-out infinite",
   guest: "smc-invite 4.2s ease-in-out infinite",
   meeting: "mascot-serve 3.2s ease-in-out infinite",
   doctor: "mascot-talk 1.1s ease-in-out infinite",
@@ -180,6 +184,8 @@ export function SecretaryMascot({
   const inRoom = (what: DeskScene) => room && job === what;
   const finish = done && scene ? scene : null;
   const glad = done || act === "thanks";
+  // «вызови охрану» (D-99): a siren on the head while it calls and while the guards are called
+  const alarm = scene === "security" && (asked || job === "security");
 
   const base: Look = look
     ? { x: look.x * 4, y: look.y * 3 }
@@ -197,8 +203,8 @@ export function SecretaryMascot({
     ? "scale(0.9, 0.16)"
     : glad
       ? "scale(0.85, 0.42)"
-      : asked
-        ? `scale(1.1, ${urgency === 2 ? 1.2 : 1.14})`
+      : asked || alarm
+        ? `scale(1.1, ${urgency === 2 || alarm ? 1.2 : 1.14})`
         : job === "dnd"
           ? "scale(0.95, 0.6)"
           : "scale(1, 1)";
@@ -208,7 +214,7 @@ export function SecretaryMascot({
   const body = talking
     ? "mascot-talk 1.1s ease-in-out infinite"
     : asked
-      ? urgency === 2
+      ? urgency === 2 || alarm
         ? "smc-run 0.36s ease-in-out infinite"
         : `mascot-call ${urgency === 1 ? "1.25s" : "1.9s"} cubic-bezier(0.3, 0, 0.2, 1) infinite`
       : done
@@ -226,15 +232,15 @@ export function SecretaryMascot({
   // (the director's desk walks its small secretary over to the big face instead — SecretaryDesk)
   const outer = act && ACT_BODY[act] ? ACT_BODY[act] : finish && CARRY_OUT.has(finish) && !mini ? `smc-carry-out ${FINISH_MS}ms ease-in-out both` : "none";
 
-  const danger = asked && urgency === 2;
+  const danger = (asked && urgency === 2) || alarm;
   const ringTone = danger ? "var(--danger)" : "var(--warn)";
-  const lightTone = act === "accept" ? "var(--ok)" : asked ? ringTone : talking || job === "doctor" || job === "taxi" ? "var(--ok)" : "var(--accent)";
-  const lightLoop = asked
+  const lightTone = act === "accept" ? "var(--ok)" : asked || alarm ? ringTone : talking || job === "doctor" || job === "taxi" ? "var(--ok)" : "var(--accent)";
+  const lightLoop = asked || alarm
     ? `smc-light ${danger ? "0.3s" : "0.6s"} steps(1) infinite`
     : talking || job === "doctor" || job === "taxi"
       ? "smc-light 1.1s steps(1) infinite"
       : "smc-glow 3.4s ease-in-out infinite";
-  const bubbleMotion = urgency === 2 ? "smc-shake 0.3s ease-in-out infinite" : urgency === 1 ? "smc-shake 0.5s ease-in-out infinite" : "smc-bubble 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite";
+  const bubbleMotion = urgency === 2 || alarm ? "smc-shake 0.3s ease-in-out infinite" : urgency === 1 ? "smc-shake 0.5s ease-in-out infinite" : "smc-bubble 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite";
 
   return (
     <svg
@@ -340,6 +346,7 @@ export function SecretaryMascot({
             <path d="M6.6 36.5 C7.6 45.5 13 49.6 21.5 49.2" fill="none" stroke={GEAR} strokeWidth="1.7" strokeLinecap="round" />
             <ellipse cx="23.2" cy="49.1" rx="2.6" ry="2" fill={GEAR} />
             <circle cx="6.6" cy="29" r="1.25" fill={lightTone} style={{ animation: asleep ? "none" : lightLoop }} />
+            {alarm && detailed ? <Siren /> : null}
 
             {glad ? (
               <g fill="#ffffff" opacity="0.22">
@@ -368,7 +375,7 @@ export function SecretaryMascot({
               </g>
             </g>
 
-            <Mouth talking={talking || job === "doctor" || job === "taxi"} asked={asked} glad={glad} job={job} rest={rest && !asleep} />
+            <Mouth talking={talking || job === "doctor" || job === "taxi" || job === "security"} asked={asked} alarm={alarm} glad={glad} job={job} rest={rest && !asleep} />
 
             {/* ---- what is held in front of the body ---- */}
             {show("dnd") ? <Hush /> : null}
@@ -397,14 +404,14 @@ export function SecretaryMascot({
       {inRoom("water") ? <Pourer kind="carafe" /> : null}
 
       {/* doctor and taxi: the call goes out of the microphone, its subject over the head */}
-      {show("doctor") || show("taxi") ? (
+      {show("doctor") || show("taxi") || show("security") ? (
         <>
-          <g fill="none" stroke="var(--ok)" strokeWidth="1.3" strokeLinecap="round">
+          <g fill="none" stroke={job === "security" ? "var(--danger)" : "var(--ok)"} strokeWidth="1.3" strokeLinecap="round">
             {["M15 51 Q12 54 15 57", "M11 49 Q6.5 54 11 59"].map((d, i) => (
               <path key={d} d={d} style={{ transformBox: "fill-box", transformOrigin: "100% 50%", animation: `smc-ring 1.1s ease-out ${i * 0.28}s infinite`, opacity: 0 }} />
             ))}
           </g>
-          <Bubble tone={job === "doctor" ? "var(--danger)" : "var(--gold)"} motion="none">
+          <Bubble tone={job === "taxi" ? "var(--gold)" : "var(--danger)"} motion={job === "security" ? "smc-shake 0.3s ease-in-out infinite" : "none"}>
             <Glyph scene={job!} />
           </Bubble>
         </>
@@ -451,10 +458,12 @@ function Delayed({ ms, children }: { ms: number; children: ReactNode }) {
   return <g style={{ animation: `smc-fade-in 0.01s linear ${ms}ms both` }}>{children}</g>;
 }
 
-function Mouth({ talking, asked, glad, job, rest }: { talking: boolean; asked: boolean; glad: boolean; job: DeskScene | null; rest: boolean }) {
+function Mouth({ talking, asked, alarm, glad, job, rest }: { talking: boolean; asked: boolean; alarm: boolean; glad: boolean; job: DeskScene | null; rest: boolean }) {
   if (talking) {
     return <ellipse cx="32" cy="45" rx="3.8" ry="2.8" fill="var(--bg)" style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }} />;
   }
+  // an alarm is a round mouth of fright, not a smile
+  if (asked && alarm) return <ellipse cx="32" cy="46.4" rx="2.6" ry="3.2" fill="var(--bg)" />;
   // an eager open smile — «да-да, слушаю»
   if (asked) return <path d="M27.6 43.6 Q32 44.6 36.4 43.6 Q35.6 49 32 49 Q28.4 49 27.6 43.6 Z" fill="var(--bg)" />;
   if (glad) return <path d="M26 43 Q32 48.6 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />;

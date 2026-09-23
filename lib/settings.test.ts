@@ -9,9 +9,9 @@ import {
 } from "@/lib/settings";
 
 describe("secretary settings (D-79)", () => {
-  it("gives a fresh company the six default buttons (D-87 added «не беспокоить» and the guest)", () => {
+  it("gives a fresh company the seven default buttons (D-87: «не беспокоить», the guest; D-99: «охрана»)", () => {
     const settings = parseCompanySettings({});
-    expect(settings.secretary.actions.map((a) => a.code)).toEqual(["coffee", "tea", "dnd", "guest", "doctor", "come"]);
+    expect(settings.secretary.actions.map((a) => a.code)).toEqual(["coffee", "tea", "dnd", "guest", "security", "doctor", "come"]);
     expect(settings.secretary.escalate_after_min).toBe(3);
   });
 
@@ -78,5 +78,17 @@ describe("withSecretaryCodes", () => {
   it("never rewrites the code of a button that already exists", () => {
     const [row] = withSecretaryCodes([{ code: "coffee", label: "Кофе с молоком", icon: "", synonyms: [] }]);
     expect(row.code).toBe("coffee");
+  });
+});
+
+describe("the guards' phone (D-99)", () => {
+  it("takes a phone number and keeps the rest of the settings", () => {
+    const settings = parseCompanySettings({ secretary: { security_phone: "+7 (700) 123-45-67" }, points_enabled: true });
+    expect(settings.secretary.security_phone).toBe("+7 (700) 123-45-67");
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("refuses letters in it", () => {
+    expect(SecretarySettingsSchema.safeParse({ security_phone: "позвонить Ивану" }).success).toBe(false);
   });
 });

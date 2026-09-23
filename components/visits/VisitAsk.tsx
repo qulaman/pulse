@@ -1,6 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
+import { askSecretary } from "@/lib/errands/pending";
+import type { SecretaryAction } from "@/lib/settings";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import type { Visit, VisitAnswer } from "@/lib/visits/queries";
 import { awaitingDirector, waitedSince } from "@/lib/visits/text";
@@ -18,8 +23,23 @@ export const ANSWERS: { value: VisitAnswer; label: string }[] = [
   { value: "declined", label: "Не приму" },
 ];
 
-export function VisitAsk({ visits, now }: { visits: readonly Visit[]; now: Date }) {
+/**
+ * `hospitality` — the tea and coffee buttons of the secretary's catalogue (D-99): chips on the
+ * card, and the picked ones go to the secretary with «Пусть заходит» — «гостю».
+ */
+export function VisitAsk({
+  visits,
+  now,
+  hospitality = [],
+  onErrand,
+}: {
+  visits: readonly Visit[];
+  now: Date;
+  hospitality?: readonly SecretaryAction[];
+  onErrand?: () => void;
+}) {
   const answer = useAnswerVisit();
+  const [treat, setTreat] = useState<Record<string, string[]>>({});
   const open = awaitingDirector(visits);
   if (open.length === 0) return null;
 
@@ -52,13 +72,44 @@ export function VisitAsk({ visits, now }: { visits: readonly Visit[]; now: Date 
                   key={option.value}
                   variant={option.value === "invited" ? "primary" : "secondary"}
                   disabled={busy || (option.value === "wait" && !waiting)}
-                  onClick={() => answer.mutate({ id: visit.id, answer: option.value })}
+                  onClick={() => {
+                    answer.mutate({ id: visit.id, answer: option.value });
+                    // the guest is invited in: the tea or the coffee picked on the card goes too (D-99)
+                    if (option.value === "invited") {
+                      for (const code of treat[visit.id] ?? []) {
+                        const action = hospitality.find((a) => a.code === code);
+                        if (action) askSecretary(action, "гостю", onErrand ?? (() => undefined));
+                      }
+                    }
+                  }}
                   className={option.value === "invited" ? "col-span-2" : ""}
                 >
                   {option.label}
                 </Button>
               ))}
             </div>
+            {hospitality.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2" data-testid="visit-treat">
+                {hospitality.map((action) => {
+                  const on = (treat[visit.id] ?? []).includes(action.code);
+                  return (
+                    <Chip
+                      key={action.code}
+                      tone={on ? "accent" : "neutral"}
+                      aria-pressed={on}
+                      onClick={() =>
+                        setTreat((prev) => {
+                          const list = prev[visit.id] ?? [];
+                          return { ...prev, [visit.id]: on ? list.filter((c) => c !== action.code) : [...list, action.code] };
+                        })
+                      }
+                    >
+                      {on ? "✓" : "+"} {action.label.toLowerCase()} гостю
+                    </Chip>
+                  );
+                })}
+              </div>
+            ) : null}
           </article>
         );
       })}

@@ -5,7 +5,14 @@ import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { kickDeliveries } from "@/lib/push/send";
 import { loadCompanySettings } from "@/lib/roster";
+import { sceneOf } from "@/lib/errands/scene";
 import { parseCompanySettings } from "@/lib/settings";
+
+/**
+ * A request said into the small secretary's desk (D-99): not a button of the catalogue, the
+ * director's own words — the label is their first words, the whole phrase is the note.
+ */
+const FREE_KIND = "free";
 
 const BodySchema = z.strictObject({
   /** The catalogue code; the label is the server's, never the client's (D-56). */
@@ -16,6 +23,8 @@ const BodySchema = z.strictObject({
   audio_path: z.string().trim().max(400).optional(),
   source_transcript: z.string().trim().max(2000).optional(),
   inbox_item_id: z.uuid().optional(),
+  /** «Не беспокоить на 30 мин» (D-99): the request ends by itself after this many minutes. */
+  until_min: z.number().int().min(5).max(12 * 60).optional(),
 });
 
 /**
@@ -29,8 +38,15 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],
   async ({ req, profile, body }) => {
     const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
-    const action = settings.secretary.actions.find((a) => a.code === body.kind);
+    const free = body.kind === FREE_KIND;
+    const words = (body.note || body.source_transcript || "").trim();
+    if (free && !words) return apiError(400, "empty_request", "Пустая просьба");
+    const action = free
+      ? { code: FREE_KIND, label: words.split(/\s+/).slice(0, 5).join(" ").slice(0, 40) }
+      : settings.secretary.actions.find((a) => a.code === body.kind);
     if (!action) return apiError(400, "unknown_kind", "Такой кнопки нет в каталоге");
+    // an alarm is known by its scene, never by what the client says (D-99)
+    const urgent = !free && sceneOf({ kind: action.code, label: action.label }, settings.secretary.actions) === "security";
 
     const supabase = await userSupabase(req);
     const { data, error } = await supabase
@@ -45,6 +61,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         source_transcript: body.source_transcript || null,
         inbox_item_id: body.inbox_item_id || null,
         client_request_id: body.client_request_id,
+        urgent,
+        until_at: body.until_min ? new Date(Date.now() + body.until_min * 60_000).toISOString() : null,
       })
       .select("id, status")
       .single();

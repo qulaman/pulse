@@ -124,6 +124,12 @@ type IngestState = {
   address: string | null;
   /** Whom it is for, by id — stamped on the parsed entities by the server (D-84). */
   pinned: Pin | null;
+  /**
+   * The phrase was said into the secretary's desk (D-99): after the words are heard it goes
+   * to the secretary as the director's own request — no parser, no /confirm. The recording is
+   * in Storage before anything else, as always (principle 5).
+   */
+  toSecretary: boolean;
   source: IngestSource;
   /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
   noteId: string | null;
@@ -139,7 +145,7 @@ type IngestActions = {
    * `address` — «Динаре, », glued to the front of the transcript before it is parsed;
    * `pin` — the same person by id, so the parser does not have to guess who (D-84).
    */
-  startVoice: (address?: string, pin?: Pin) => Promise<void>;
+  startVoice: (address?: string, pin?: Pin, target?: "secretary") => Promise<void>;
   stopVoice: () => Promise<void>;
   cancelVoice: () => void;
   submitText: (text: string, pin?: Pin) => Promise<void>;
@@ -176,6 +182,7 @@ const initialState: IngestState = {
   question: null,
   address: null,
   pinned: null,
+  toSecretary: false,
   source: "voice",
   noteId: null,
   entities: [],
@@ -310,7 +317,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
   return {
     ...initialState,
 
-    async startVoice(address, pin) {
+    async startVoice(address, pin, target) {
       const stage = get().stage;
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
       if (stage !== "idle" && stage !== "error" && stage !== "question") return;
@@ -324,6 +331,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         source: "voice",
         address: address ?? null,
         pinned: pin ?? null,
+        toSecretary: target === "secretary",
         clientRequestId: crypto.randomUUID(),
         recordingStartedAt: Date.now(),
       });
@@ -447,6 +455,19 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     async runParse() {
       const { transcript, audioPath, source, clientRequestId, pinned } = get();
       if (!transcript || !clientRequestId) return;
+
+      // said into the secretary's desk: the director's own words are the request (D-99)
+      if (get().toSecretary) {
+        const words = transcript.trim();
+        askSecretary(
+          { code: "free", label: words.split(/\s+/).slice(0, 5).join(" ").slice(0, 40), icon: "" },
+          words,
+          () => undefined,
+          { id: clientRequestId, audioPath, transcript: words, inboxId: get().inboxId },
+        );
+        get().reset();
+        return;
+      }
       set({ stage: "parsing", error: null, retryFrom: null });
 
       try {

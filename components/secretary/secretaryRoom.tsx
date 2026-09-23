@@ -305,6 +305,21 @@ export function ShutDoor() {
   );
 }
 
+/** «вызови охрану» (D-99): a police light on the crown, its beams turning, the dome blinking. */
+export function Siren() {
+  return (
+    <g>
+      <g style={{ transformOrigin: "32px 0px", animation: "smc-spin 0.9s linear infinite" }}>
+        <path d="M32 0 L12 -9 L12 -3 Z" fill="var(--danger)" opacity="0.4" />
+        <path d="M32 0 L52 9 L52 3 Z" fill="var(--danger)" opacity="0.4" />
+      </g>
+      <rect x="25.5" y="0.6" width="13" height="3.4" rx="1.2" fill={GEAR} />
+      <path d="M27.4 1 Q27.4 -6.4 32 -6.4 Q36.6 -6.4 36.6 1 Z" fill="var(--danger)" style={{ animation: "smc-light 0.5s steps(1) infinite" }} />
+      <ellipse cx="30.4" cy="-3" rx="1.1" ry="1.7" fill="#ffffff" opacity="0.6" />
+    </g>
+  );
+}
+
 /** A finger on the lips and «тсс» floating off them. */
 export function Hush() {
   return (
@@ -560,6 +575,12 @@ export function Glyph({ scene }: { scene: DeskScene }) {
           <circle cx="-4" cy="-4.4" r="2.2" fill="var(--text-muted)" />
           <circle cx="4" cy="-4.4" r="2.2" fill="var(--text-muted)" />
         </g>
+      );
+    case "security":
+      return (
+        <text y="2.6" textAnchor="middle" fontSize="8.2" fontWeight="900" fill="var(--danger)" letterSpacing="0.4">
+          SOS
+        </text>
       );
     case "doctor":
       return (

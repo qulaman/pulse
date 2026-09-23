@@ -16,6 +16,7 @@ export const DESK_SCENES = [
   "tea",
   "water",
   "dnd",
+  "security",
   "guest",
   "meeting",
   "doctor",
@@ -35,6 +36,7 @@ export const SCENE_NAME: Record<DeskScene, string> = {
   tea: "Заваривает чай",
   water: "Наливает воду",
   dnd: "Не беспокоить",
+  security: "Вызывает охрану",
   guest: "Приглашает гостя",
   meeting: "Готовит переговорную",
   doctor: "Звонит врачу",
@@ -57,6 +59,7 @@ const BY_CODE: Partial<Record<string, DeskScene>> = {
   coffee: "coffee",
   tea: "tea",
   dnd: "dnd",
+  security: "security",
   guest: "guest",
   doctor: "doctor",
   come: "come",
@@ -64,6 +67,8 @@ const BY_CODE: Partial<Record<string, DeskScene>> = {
 
 /** Word starts, checked on the normalised label: «Кофе с молоком», «Чайку», «Гостя в кабинет». */
 const BY_WORD: [RegExp, DeskScene][] = [
+  // an alarm first: «охрана» must never be read as anything calmer
+  [/(^| )(охран|секьюрит|тревог|sos)/, "security"],
   [/(^| )(коф|латте|капуч|эспрессо|американо)/, "coffee"],
   [/(^| )ча[йюяе]/, "tea"],
   // the driver before the water: «водитель» starts like «вода»
@@ -110,6 +115,10 @@ const oldestFirst = (a: Errand, b: Errand) => a.created_at.localeCompare(b.creat
  */
 export function deskFocus(errands: readonly Errand[], meId: string | null, catalogue: readonly SecretaryAction[] = []): DeskFocus {
   const scene = (e: Errand) => sceneOf(e, catalogue);
+  // «вызови охрану» outranks everything: nobody took it — it calls; taken — it is the job (D-99)
+  const alarm = errands.filter((e) => (e.status === "sent" || e.status === "accepted") && scene(e) === "security").sort(oldestFirst)[0];
+  if (alarm?.status === "sent") return { scene: "security", phase: "asked", errand: alarm, queue: errands.filter((e) => e.status === "sent").length - 1 };
+  if (alarm && (meId === null || alarm.claimed_by === meId)) return { scene: "security", phase: "doing", errand: alarm, queue: 0 };
   const sent = errands.filter((e) => e.status === "sent").sort(oldestFirst);
   if (sent[0]) return { scene: scene(sent[0]), phase: "asked", errand: sent[0], queue: sent.length - 1 };
 
@@ -252,6 +261,7 @@ const DOING: Record<DeskScene, string> = {
   tea: "Завариваю чай",
   water: "Наливаю воду",
   dnd: "К директору никого не пускаю",
+  security: "Вызываю охрану",
   guest: "Приглашаю гостя в кабинет",
   meeting: "Готовлю переговорную",
   doctor: "Вызываю врача",
@@ -267,7 +277,7 @@ const DOING: Record<DeskScene, string> = {
 export function deskLine(focus: DeskFocus): string {
   const { errand, phase, scene } = focus;
   if (phase === "rest" || !errand || !scene) return "Заявок нет — на месте";
-  if (phase === "asked") return `Директор просит: ${lower(errand.label)}`;
+  if (phase === "asked") return scene === "security" ? "Директор: вызови охрану!" : `Директор просит: ${lower(errand.label)}`;
   if (phase === "done") return `Готово · ${lower(errand.label)}`;
   return DOING[scene] || `В работе: ${lower(errand.label)}`;
 }
@@ -280,4 +290,78 @@ export function askedDetails(focus: DeskFocus, now: Date): string {
   if (focus.phase !== "asked" || !focus.errand) return "";
   const minutes = Math.floor((now.getTime() - new Date(focus.errand.created_at).getTime()) / 60_000);
   return [minutes >= 1 ? `ждёт ${minutes} мин` : "", focus.queue > 0 ? `ещё ${focus.queue}` : ""].filter(Boolean).join(" · ");
+}
+
+// ---- the link between the two desks (D-99) ----------------------------------------------
+
+/**
+ * What the secretary may ask about a request before or while doing it — one tap, the director
+ * answers with one tap too («Да» / «Нет» or a word). The last line of each list is general.
+ */
+export const QUESTIONS: Record<DeskScene, string[]> = {
+  coffee: ["С сахаром?", "С молоком?", "Куда принести?"],
+  tea: ["Чёрный или зелёный?", "С сахаром?", "Куда принести?"],
+  water: ["С газом?", "Куда принести?"],
+  dnd: ["Надолго?", "А если срочно?"],
+  security: ["Что случилось?", "Куда вызывать?"],
+  guest: ["Сколько человек?", "Предложить чай или кофе?"],
+  meeting: ["На сколько человек?", "К какому времени?"],
+  doctor: ["Что случилось?", "Вызвать скорую?"],
+  come: ["Взять документы?", "Сейчас подойти?"],
+  taxi: ["Куда ехать?", "На какое время?"],
+  print: ["Сколько экземпляров?", "Цветную?"],
+  lunch: ["Что заказать?", "К какому времени?"],
+  courier: ["Куда отправить?", "Что передать?"],
+  other: ["Когда нужно?", "Уточните, пожалуйста"],
+};
+
+/** Questions a «Да» or a «Нет» answers — the director gets those two chips for them. */
+export function isYesNo(question: string): boolean {
+  return !/^(что|куда|когда|сколько|на сколько|к какому|чёрный или|черный или|уточните|надолго)/i.test(question.trim());
+}
+
+/**
+ * What the secretary may pass back with «Готово» — the result the director was waiting for:
+ * «Врач будет в 15:00», «Такси: белая Camry». Chips first, a free word always possible.
+ */
+export const RESULTS: Record<DeskScene, string[]> = {
+  coffee: ["На столе", "В переговорной"],
+  tea: ["На столе", "В переговорной"],
+  water: ["На столе", "В переговорной"],
+  dnd: [],
+  security: ["Охрана на месте", "Охрана идёт"],
+  guest: ["Гость у вас", "Гость ждёт в приёмной"],
+  meeting: ["Переговорная готова", "Переговорная занята"],
+  doctor: ["Врач едет", "Врач на месте"],
+  come: [],
+  taxi: ["Машина у входа", "Машина будет через 10 мин"],
+  print: ["Лежит у вас на столе", "Лежит в приёмной"],
+  lunch: ["Обед на столе", "Привезут через 30 мин"],
+  courier: ["Курьер забрал", "Курьер будет через час"],
+  other: ["Сделано"],
+};
+
+/** Minutes left until what the secretary promised on «Принял» («через 5 мин»); null — no promise. */
+export function etaLeftMin(errand: Pick<Errand, "eta_at" | "status"> | null, now: Date): number | null {
+  if (!errand?.eta_at || errand.status !== "accepted") return null;
+  return Math.round((new Date(errand.eta_at).getTime() - now.getTime()) / 60_000);
+}
+
+/** «через 4 мин» / «вот-вот» / «опаздывает на 2 мин» — the promise, told the way a person would. */
+export function etaLine(left: number | null): string | null {
+  if (left === null) return null;
+  if (left > 0) return `будет через ${left} мин`;
+  if (left >= -1) return "вот-вот";
+  return `опаздывает на ${-left} мин`;
+}
+
+/** Stepped away — «не на месте до 14:00»: requests go to a secretary who is there (D-99). */
+export function isAway(person: { away_until?: string | null }, now: Date): boolean {
+  return Boolean(person.away_until) && new Date(person.away_until as string).getTime() > now.getTime();
+}
+
+/** «до 14:05» on the Aqtobe wall clock. */
+export function untilLine(iso: string): string {
+  const wall = new Date(new Date(iso).getTime() + AQTOBE_OFFSET_MS);
+  return `до ${String(wall.getUTCHours()).padStart(2, "0")}:${String(wall.getUTCMinutes()).padStart(2, "0")}`;
 }

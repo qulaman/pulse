@@ -6,13 +6,20 @@ import {
   daypartOf,
   deskFocus,
   deskLine,
+  etaLeftMin,
+  etaLine,
+  isAway,
   isQuick,
+  isYesNo,
   justDone,
   justThanked,
+  QUESTIONS,
   quickStreak,
+  RESULTS,
   sceneOf,
   sceneOfAction,
   todayTally,
+  untilLine,
   urgencyOf,
 } from "@/lib/errands/scene";
 
@@ -36,6 +43,15 @@ function errand(patch: Partial<Errand> = {}): Errand {
     client_request_id: null,
     escalated_at: null,
     thanked_at: null,
+    result: null,
+    eta_at: null,
+    question: null,
+    asked_at: null,
+    answer: null,
+    answered_at: null,
+    until_at: null,
+    urgent: false,
+    nudged_at: null,
     created_at: "2026-09-23T09:00:00Z",
     accepted_at: null,
     done_at: null,
@@ -223,5 +239,50 @@ describe("deskLine", () => {
     expect(deskLine({ scene: "taxi", phase: "doing", errand: errand({ kind: "taxi", label: "Такси" }), queue: 0 })).toBe("Вызываю машину");
     const other = errand({ kind: "zamok", label: "Замок" });
     expect(deskLine({ scene: "other", phase: "doing", errand: other, queue: 0 })).toBe("В работе: замок");
+  });
+});
+
+describe("the link between the two desks (D-99)", () => {
+  it("knows «Охрана» by code and by word, and puts the alarm above everything", () => {
+    expect(sceneOf({ kind: "security", label: "Охрана" })).toBe("security");
+    expect(sceneOf({ kind: "trevoga", label: "Тревога!" })).toBe("security");
+    const coffee = errand({ id: "a", created_at: "2026-09-23T09:00:00Z" });
+    const alarm = errand({ id: "b", kind: "security", label: "Охрана", created_at: "2026-09-23T09:05:00Z" });
+    expect(deskFocus([coffee, alarm], AIGUL)).toMatchObject({ scene: "security", phase: "asked", queue: 1 });
+    const taken = { ...alarm, status: "accepted" as const, claimed_by: AIGUL };
+    expect(deskFocus([coffee, taken], AIGUL)).toMatchObject({ scene: "security", phase: "doing" });
+    expect(deskLine({ scene: "security", phase: "asked", errand: alarm, queue: 0 })).toBe("Директор: вызови охрану!");
+  });
+
+  it("tells a yes-no question from one that needs a word", () => {
+    expect(isYesNo("С сахаром?")).toBe(true);
+    expect(isYesNo("Вызвать скорую?")).toBe(true);
+    expect(isYesNo("Куда принести?")).toBe(false);
+    expect(isYesNo("Сколько человек?")).toBe(false);
+    expect(isYesNo("Чёрный или зелёный?")).toBe(false);
+  });
+
+  it("counts the promise down and says when it is late", () => {
+    const taken = errand({ status: "accepted", claimed_by: AIGUL, eta_at: "2026-09-23T09:05:00Z" });
+    expect(etaLeftMin(taken, new Date("2026-09-23T09:01:30Z"))).toBe(4);
+    expect(etaLine(4)).toBe("будет через 4 мин");
+    expect(etaLine(0)).toBe("вот-вот");
+    expect(etaLine(-3)).toBe("опаздывает на 3 мин");
+    expect(etaLeftMin(errand(), new Date())).toBeNull();
+  });
+
+  it("reads a secretary as away only until the time is up", () => {
+    const now = new Date("2026-09-23T09:00:00Z");
+    expect(isAway({ away_until: "2026-09-23T09:30:00Z" }, now)).toBe(true);
+    expect(isAway({ away_until: "2026-09-23T08:30:00Z" }, now)).toBe(false);
+    expect(isAway({ away_until: null }, now)).toBe(false);
+    // 09:30Z is 14:30 in Aqtobe
+    expect(untilLine("2026-09-23T09:30:00Z")).toBe("до 14:30");
+  });
+
+  it("has a question for every scene and a result for every scene that ends with one", () => {
+    for (const scene of Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[]) expect(QUESTIONS[scene].length).toBeGreaterThan(0);
+    expect(RESULTS.doctor).toContain("Врач едет");
+    expect(RESULTS.dnd).toEqual([]);
   });
 });

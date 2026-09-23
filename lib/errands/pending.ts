@@ -26,6 +26,8 @@ export type PendingErrand = {
   audioPath?: string | null;
   transcript?: string | null;
   inboxId?: string | null;
+  /** «не беспокоить на 30 мин» — the request ends by itself (D-99) */
+  untilMin?: number | null;
 };
 
 type PendingState = {
@@ -54,6 +56,7 @@ export async function postErrand(errand: PendingErrand): Promise<boolean> {
       audio_path: errand.audioPath ?? undefined,
       source_transcript: errand.transcript ?? undefined,
       inbox_item_id: errand.inboxId ?? undefined,
+      until_min: errand.untilMin ?? undefined,
     }),
   });
   return res.ok;
@@ -68,6 +71,7 @@ export function askSecretary(
   note: string | null,
   onSent: () => void,
   voice?: { id?: string; audioPath?: string | null; transcript?: string | null; inboxId?: string | null },
+  options?: { untilMin?: number | null; now?: boolean },
 ): string {
   const errand: PendingErrand = {
     // голос приносит свой ключ запроса: повтор той же фразы не купит второй кофе
@@ -79,8 +83,17 @@ export function askSecretary(
     audioPath: voice?.audioPath ?? null,
     transcript: voice?.transcript ?? null,
     inboxId: voice?.inboxId ?? null,
+    untilMin: options?.untilMin ?? null,
   };
   usePendingErrands.getState().add(errand);
+
+  // an alarm leaves at once (D-99): five seconds of «Отменить» are five seconds nobody runs
+  // for the guards; a false alarm is taken back with «Ложная тревога» on the live row
+  if (options?.now) {
+    toast(`${action.label} · отправлено`);
+    void send(errand, onSent);
+    return errand.id;
+  }
 
   const toastId = toast(`${action.label} · отправляю`, {
     lifetimeMs: HOLD_MS,

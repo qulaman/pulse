@@ -209,6 +209,15 @@ export type Database = {
       errands: {
         Row: {
           accepted_at: string | null
+          answer: string | null
+          answered_at: string | null
+          asked_at: string | null
+          eta_at: string | null
+          nudged_at: string | null
+          question: string | null
+          result: string | null
+          until_at: string | null
+          urgent: boolean
           audio_path: string | null
           author_id: string
           claimed_by: string | null
@@ -230,6 +239,15 @@ export type Database = {
         }
         Insert: {
           accepted_at?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          asked_at?: string | null
+          eta_at?: string | null
+          nudged_at?: string | null
+          question?: string | null
+          result?: string | null
+          until_at?: string | null
+          urgent?: boolean
           audio_path?: string | null
           author_id: string
           claimed_by?: string | null
@@ -251,6 +269,15 @@ export type Database = {
         }
         Update: {
           accepted_at?: string | null
+          answer?: string | null
+          answered_at?: string | null
+          asked_at?: string | null
+          eta_at?: string | null
+          nudged_at?: string | null
+          question?: string | null
+          result?: string | null
+          until_at?: string | null
+          urgent?: boolean
           audio_path?: string | null
           author_id?: string
           claimed_by?: string | null
@@ -835,6 +862,7 @@ export type Database = {
         Row: {
           aliases: string[]
           availability: Database["public"]["Enums"]["availability_t"]
+          away_until: string | null
           avatar_url: string | null
           company_id: string
           created_at: string
@@ -852,6 +880,7 @@ export type Database = {
         Insert: {
           aliases?: string[]
           availability?: Database["public"]["Enums"]["availability_t"]
+          away_until?: string | null
           avatar_url?: string | null
           company_id: string
           created_at?: string
@@ -869,6 +898,7 @@ export type Database = {
         Update: {
           aliases?: string[]
           availability?: Database["public"]["Enums"]["availability_t"]
+          away_until?: string | null
           avatar_url?: string | null
           company_id?: string
           created_at?: string
@@ -1674,7 +1704,47 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      errand_answer: {
+        Args: {
+          client_request_id?: string
+          p_answer: string
+          p_id: string
+        }
+        Returns: Json
+      }
+      errand_ask: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+          p_question: string
+        }
+        Returns: Json
+      }
+      errand_eta: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+          p_min: number
+        }
+        Returns: Json
+      }
+      errand_nudge: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+        }
+        Returns: Json
+      }
+      errand_result: {
+        Args: {
+          client_request_id?: string
+          p_id: string
+          p_result: string
+        }
+        Returns: Json
+      }
       errands_due_escalation: { Args: { p_now?: string }; Returns: number }
+      errands_expire: { Args: { p_now?: string }; Returns: number }
       event_release: {
         Args: {
           p_event: Database["public"]["Tables"]["events"]["Row"]

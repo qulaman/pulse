@@ -363,6 +363,16 @@ export function SecretarySection() {
         >
           Добавить действие
         </Button>
+        <Field label="Телефон охраны — для кнопки «Позвонить охране»">
+          <input
+            type="tel"
+            inputMode="tel"
+            className={FIELD}
+            placeholder="+7 700 000 00 00"
+            value={draft.secretary.security_phone}
+            onChange={(e) => update({ secretary: { ...draft.secretary, security_phone: e.target.value } })}
+          />
+        </Field>
         <Field label="Повторить пуш через, минут">
           <input
             type="number"
@@ -389,6 +399,7 @@ export function SecretarySection() {
             save({
               secretary: {
                 escalate_after_min: draft.secretary.escalate_after_min,
+                security_phone: draft.secretary.security_phone.trim(),
                 // an empty row is scratch space; a new row gets its code here, once and for good
                 actions: withSecretaryCodes(draft.secretary.actions),
               },

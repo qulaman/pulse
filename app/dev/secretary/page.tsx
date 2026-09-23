@@ -42,6 +42,7 @@ const SECTIONS: { title: string; cells: Cell[] }[] = [
       { caption: "Ждёт минуту · ещё 1", scene: "tea", phase: "asked", urgency: 1, queue: 1 },
       { caption: "Повторный пуш · ещё 2", scene: "guest", phase: "asked", urgency: 2, queue: 2 },
       { caption: "«Есть!» на «Принял»", scene: "coffee", phase: "doing", act: "accept" },
+      { caption: "Вызови охрану!", scene: "security", phase: "asked", urgency: 2 },
     ],
   },
   {
@@ -61,13 +62,26 @@ const SECTIONS: { title: string; cells: Cell[] }[] = [
   },
 ];
 
-const DESKS: { caption: string; scene: DeskScene | null; phase: DeskPhase; urgency?: Urgency; attending?: boolean }[] = [
+const DESKS: {
+  caption: string;
+  scene: DeskScene | null;
+  phase: DeskPhase;
+  urgency?: Urgency;
+  attending?: boolean;
+  away?: string;
+  etaLeft?: number;
+  asking?: boolean;
+}[] = [
   { caption: "Печатает", scene: null, phase: "rest" },
   { caption: "Просьба ждёт", scene: "coffee", phase: "asked", urgency: 1 },
   { caption: "Варит кофе", scene: "coffee", phase: "doing" },
   { caption: "Не беспокоить", scene: "dnd", phase: "doing" },
   { caption: "Несёт чашку", scene: "coffee", phase: "done" },
   { caption: "Смотрит на директора", scene: null, phase: "rest", attending: true },
+  { caption: "Будет через 4 мин", scene: "tea", phase: "doing", etaLeft: 4 },
+  { caption: "Секретарь спрашивает", scene: "coffee", phase: "doing", asking: true },
+  { caption: "Тревога", scene: "security", phase: "asked", urgency: 2 },
+  { caption: "Никого нет на месте", scene: null, phase: "rest", away: "2026-09-23T09:30:00Z" },
 ];
 
 /** /dev/secretary — every scene of the secretary's face on one screen (dev only, D-87, D-97). */
@@ -120,6 +134,9 @@ export default function SecretarySandboxPage() {
                   scene={desk.scene}
                   phase={desk.phase}
                   urgency={desk.urgency}
+                  away={desk.away ?? null}
+                  etaLeft={desk.etaLeft ?? null}
+                  asking={desk.asking}
                   onTap={() => undefined}
                 />
               </div>

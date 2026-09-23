@@ -1,10 +1,10 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import { useRef, type CSSProperties } from "react";
 
 import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { Glyph, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
-import type { DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
+import { untilLine, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
 
 /** The desk is drawn in this box; the screen places the box, not its parts. */
 export const DESK_W = 100;
@@ -32,7 +32,12 @@ export function SecretaryDesk({
   scene = null,
   phase = "rest",
   urgency = 0,
+  away = null,
+  etaLeft = null,
+  asking = false,
+  listening = false,
   onTap,
+  onHold,
 }: {
   /** turned to the big face: the typing stops, the eyes go left */
   attending: boolean;
@@ -49,8 +54,30 @@ export function SecretaryDesk({
   scene?: DeskScene | null;
   phase?: DeskPhase;
   urgency?: Urgency;
+  /** every secretary has stepped away — until when (D-99): an empty chair, a caption */
+  away?: string | null;
+  /** minutes left of what the secretary promised on «Принял»; the monitor counts them down */
+  etaLeft?: number | null;
+  /** the secretary has asked something and waits for the director's answer */
+  asking?: boolean;
+  /** the director is saying a request into the desk right now */
+  listening?: boolean;
   onTap: () => void;
+  /** holding the desk: the director says a request to the secretary in his own words (D-99) */
+  onHold?: (down: boolean) => void;
 }) {
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const held = useRef(false);
+  const release = () => {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+    if (held.current) {
+      held.current = false;
+      onHold?.(false);
+      return true;
+    }
+    return false;
+  };
   const still = attending ? "sec-paused" : "";
   // the monitor shows the job while there is one; the typing lines otherwise
   const working = (phase === "asked" || phase === "doing") && scene !== null;
@@ -58,13 +85,32 @@ export function SecretaryDesk({
   return (
     <button
       type="button"
-      onClick={onTap}
+      // a tap asks with the buttons; a hold (≥350 ms) records a request in the director's own
+      // words; the keyboard still gets the tap
+      onClick={(event) => {
+        if (event.detail === 0) onTap();
+      }}
+      onPointerDown={() => {
+        held.current = false;
+        if (!onHold) return;
+        holdTimer.current = setTimeout(() => {
+          holdTimer.current = null;
+          held.current = true;
+          onHold(true);
+        }, 350);
+      }}
+      onPointerUp={() => {
+        if (!release()) onTap();
+      }}
+      onPointerCancel={() => void release()}
+      onContextMenu={(event) => event.preventDefault()}
       aria-label={label}
       aria-pressed={attending}
       data-testid="secretary-desk"
       data-attending={attending ? "1" : "0"}
       className="relative block transition-transform duration-[120ms] active:scale-[0.96]"
-      style={{ width: DESK_W, height: DESK_H, touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
+      data-away={away ? "1" : "0"}
+      style={{ width: DESK_W, height: DESK_H, touchAction: "none", WebkitTapHighlightColor: "transparent", WebkitUserSelect: "none", userSelect: "none" }}
     >
       {/* behind: the desk, the monitor and the mug */}
       <svg aria-hidden width={DESK_W} height={DESK_H} viewBox={`0 0 ${DESK_W} ${DESK_H}`} className={`absolute inset-0 overflow-visible ${still}`}>
@@ -106,9 +152,23 @@ export function SecretaryDesk({
                 style={{ animation: `smc-glow ${urgency === 2 ? "0.6s" : "1.2s"} ease-in-out infinite` }}
               />
             ) : null}
-            <g transform="translate(75 30.5) scale(1.25)">
+            <g transform={`translate(75 ${etaLeft !== null ? 28 : 30.5}) scale(${etaLeft !== null ? 1 : 1.25})`}>
               <Glyph scene={scene} />
             </g>
+            {etaLeft !== null ? (
+              // the promise counting down: «4 мин», then «вот-вот», then late in the warning colour
+              <text
+                x="75"
+                y="41"
+                textAnchor="middle"
+                fontSize="6.4"
+                fontWeight="800"
+                fill={etaLeft < -1 ? "var(--warn)" : "var(--text)"}
+                data-testid="desk-eta"
+              >
+                {etaLeft > 0 ? `${etaLeft} мин` : etaLeft >= -1 ? "вот-вот" : `+${-etaLeft} мин`}
+              </text>
+            ) : null}
           </g>
         ) : (
           <>
@@ -131,8 +191,21 @@ export function SecretaryDesk({
         )}
       </svg>
 
+      {away ? (
+        // nobody at the desk (D-99): the chair is empty, the caption says until when
+        <svg aria-hidden width={DESK_W} height={DESK_H} viewBox={`0 0 ${DESK_W} ${DESK_H}`} className="absolute inset-0 overflow-visible" data-testid="desk-empty">
+          <rect x="20" y="22" width="20" height="18" rx="4" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.2" />
+          <rect x="18" y="40" width="24" height="6" rx="2.5" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.2" />
+        </svg>
+      ) : null}
+      {away ? (
+        <span className="absolute left-0 top-full mt-0.5 whitespace-nowrap text-[11px] font-medium leading-3" style={{ color: "var(--warn)" }}>
+          не на месте {untilLine(away)}
+        </span>
+      ) : null}
       {/* the small face: the secretary's own character (D-87) — headset, bow tie — smaller */}
       <span
+        hidden={Boolean(away)}
         className="absolute block"
         style={{ left: DESK_FACE.x - 20, top: DESK_FACE.y - 20, width: 40, height: 40, "--accent": SECRETARY_TONE } as CSSProperties}
       >
@@ -158,9 +231,19 @@ export function SecretaryDesk({
             phase={attending ? "rest" : phase}
             urgency={urgency}
             // looking at the big face, or at the monitor while typing; a job has its own look
-            look={attending ? { x: -1, y: -0.2 } : working || handing ? null : { x: 0.95, y: 0.1 }}
+            look={attending || listening ? { x: -1, y: -0.2 } : working || handing ? null : { x: 0.95, y: 0.1 }}
           />
         </span>
+        {asking ? (
+          // a question waits for the director's answer: «?» over the small head
+          <span
+            className="absolute -right-2 -top-3 flex h-4 w-4 items-center justify-center rounded-full text-[11px] font-black leading-none text-bg"
+            style={{ background: "var(--warn)", animation: "smc-glow 1.2s ease-in-out infinite" }}
+            data-testid="desk-question"
+          >
+            ?
+          </span>
+        ) : null}
       </span>
 
       {/* in front: the keyboard under the small face's hands */}

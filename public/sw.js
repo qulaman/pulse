@@ -21,6 +21,14 @@ self.addEventListener("push", (event) => {
     data: { url: data.url || "/", delivery_id: data.delivery_id || null, kind: data.kind || null },
     vibrate: [80, 40, 80],
   };
+  // an alarm («вызови охрану», D-99) stays on the screen until it is touched and shakes the
+  // phone long enough to be felt through a pocket
+  if (data.urgent) {
+    options.requireInteraction = true;
+    options.renotify = true;
+    options.tag = options.tag || "errand-alarm";
+    options.vibrate = [400, 150, 400, 150, 400, 150, 800];
+  }
   // a word in a thread can be answered from the shade: «Прочитал» moves the read cursor
   // and never opens the app (iOS shows no action buttons — the notification still works)
   if (data.kind === "message") {

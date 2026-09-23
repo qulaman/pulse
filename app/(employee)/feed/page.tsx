@@ -24,7 +24,8 @@ import { Chip } from "@/components/ui/Chip";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
-import { ErrandCards } from "@/components/secretary/ErrandCards";
+import { ErrandCards, ResultCard } from "@/components/secretary/ErrandCards";
+import { Sheet } from "@/components/ui/Sheet";
 import { DndLamp } from "@/components/secretary/DndLamp";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
@@ -32,9 +33,9 @@ import { ReceptionCards } from "@/components/visits/ReceptionCards";
 import { VisitorButton } from "@/components/visits/VisitorButton";
 import { useSecretaryActs } from "@/components/secretary/useSecretaryActs";
 import { haptic } from "@/lib/haptics";
-import { useErrandActions } from "@/lib/errands/mutations";
-import { useErrands, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
-import { askedDetails, daypartOf, deskLine, quickStreak, sceneOf, todayTally, urgencyOf } from "@/lib/errands/scene";
+import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
+import { useErrands, useSecretaries, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
+import { askedDetails, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { usePointsEnabled } from "@/lib/points/queries";
 import type { SecretaryAction } from "@/lib/settings";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
@@ -126,6 +127,14 @@ export default function FeedPage() {
   const secretarySetup = useSecretarySetup(isSecretary);
   const pointsEnabled = usePointsEnabled().data === true;
   const errandActions = useErrandActions();
+  // «не на месте до 14:00» (D-99): the secretary's own row among the secretaries
+  const secretaryPeople = useSecretaries(isSecretary);
+  const meAtDesk = (secretaryPeople.data ?? []).find((p) => p.id === meId) ?? null;
+  const away = meAtDesk !== null && isAway(meAtDesk, now);
+  const setAway = useSetAway(meId);
+  const [presenceOpen, setPresenceOpen] = useState(false);
+  // what to pass back after «Готово» (D-99): this secretary's jobs of the last ten minutes
+  const [skipped, setSkipped] = useState<string[]>([]);
   const errandDesk = useDeskFocus(errandRows, meId, catalogue.data ?? NO_ACTIONS);
   // «К вам посетитель» (D-96): the reception's own cards, and the director's «пусть заходит»
   // plays the guest scene — the door opens — unless a new request is ringing
@@ -351,6 +360,20 @@ export default function FeedPage() {
                 {secretaryAct !== "thanks" && desk.phase === "asked" && desk.errand?.note ? <span className="text-muted"> · {desk.errand.note}</span> : null}
                 {streak >= 2 ? <span className="text-muted"> · {streak} подряд быстрее двух минут</span> : null}
               </p>
+              <button
+                type="button"
+                onClick={() => setPresenceOpen(true)}
+                className="mt-0.5 inline-flex min-h-[28px] items-center gap-1.5 rounded-full border px-2.5 text-[12px] font-semibold leading-4"
+                style={{
+                  borderColor: away ? "color-mix(in srgb, var(--warn) 55%, var(--border))" : "var(--border)",
+                  color: away ? "var(--warn)" : "var(--text-muted)",
+                }}
+                data-testid="presence-chip"
+                data-away={away ? "1" : "0"}
+              >
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: away ? "var(--warn)" : "var(--ok)" }} />
+                {away && meAtDesk?.away_until ? `Не на месте ${untilLine(meAtDesk.away_until)}` : "На месте"}
+              </button>
               {acceptByFace ? (
                 <p className="text-[12px] leading-4 text-muted" data-testid="desk-hint">
                   {[askedDetails(desk, now), "тап по лицу — принять"].filter(Boolean).join(" · ")}
@@ -388,7 +411,24 @@ export default function FeedPage() {
           <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
             {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
-            {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} /> : null}
+            {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
+            {isSecretary && mode === "idle"
+              ? errandRows
+                  .filter(
+                    (e) =>
+                      e.status === "done" &&
+                      e.claimed_by === meId &&
+                      !e.result &&
+                      e.done_at &&
+                      now.getTime() - new Date(e.done_at).getTime() <= 10 * 60_000 &&
+                      !skipped.includes(e.id) &&
+                      RESULTS[sceneOf(e, catalogue.data ?? NO_ACTIONS)].length > 0,
+                  )
+                  .slice(0, 1)
+                  .map((e) => (
+                    <ResultCard key={e.id} errand={e} scene={sceneOf(e, catalogue.data ?? NO_ACTIONS)} onSkip={() => setSkipped((list) => [...list, e.id])} />
+                  ))
+              : null}
             {mode !== "idle" ? (
               <>
                 <PushCard bubble />
@@ -449,7 +489,7 @@ export default function FeedPage() {
                     <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
                   )
                 ) : null}
-                {panel === "secretary" ? <ErrandCards errands={errandRows} meId={meId} now={now} /> : null}
+                {panel === "secretary" ? <ErrandCards errands={errandRows} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
                 {panel === "ether" ? (
                   (ether.data ?? []).length === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
@@ -475,6 +515,49 @@ export default function FeedPage() {
 
       <EventSheet event={openEvent} onClose={() => setOpenEvent(null)} meId={meId} isDirector={false} />
 
+      {isSecretary ? (
+        // stepped away (D-99): requests go to the secretaries who are here; nobody — they wait
+        <Sheet open={presenceOpen} onClose={() => setPresenceOpen(false)} title={away ? "Вы не на месте" : "Отойти"}>
+          <div className="flex flex-col gap-2" data-testid="presence-sheet">
+            {away ? (
+              <button
+                type="button"
+                className="min-h-[52px] rounded-[16px] bg-accent text-[16px] font-semibold text-bg"
+                onClick={() => {
+                  setAway.mutate(null);
+                  setPresenceOpen(false);
+                }}
+              >
+                Я на месте
+              </button>
+            ) : null}
+            {[
+              { label: "На 15 минут", min: 15 },
+              { label: "На 30 минут", min: 30 },
+              { label: "На час", min: 60 },
+              { label: "До конца дня", min: 0 },
+            ].map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                className="min-h-[48px] rounded-[16px] border border-border bg-surface-2/70 text-[15px] font-semibold"
+                onClick={() => {
+                  // «до конца дня» — until 21:00 Aqtobe, the end of the delivery window (D-38)
+                  const until = option.min
+                    ? new Date(Date.now() + option.min * 60_000)
+                    : new Date(new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10) + "T16:00:00Z");
+                  setAway.mutate(until.toISOString());
+                  setPresenceOpen(false);
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+            <p className="px-1 text-[13px] leading-4 text-muted">Пока вас нет, просьбы директора уходят тем, кто на месте; если никого — ждут вас.</p>
+          </div>
+        </Sheet>
+      ) : null}
+
       <ThreadSheet
         open={Boolean(thread)}
         onClose={() => setThread(null)}
@@ -492,11 +575,11 @@ export default function FeedPage() {
  * The secretary's requests on the waiting screen (D-87): the live cards, «Принял» in one tap.
  * «Не беспокоить» another secretary took is the lamp at the top of the screen (D-97).
  */
-function DeskCards({ mine, meId, now }: { mine: readonly Errand[]; meId: string; now: Date }) {
+function DeskCards({ mine, meId, now, catalogue }: { mine: readonly Errand[]; meId: string; now: Date; catalogue: readonly SecretaryAction[] }) {
   if (mine.length === 0) return null;
   return (
     <div className="flex flex-col gap-2" data-testid="desk-cards">
-      <ErrandCards errands={mine} meId={meId} now={now} />
+      <ErrandCards errands={mine} meId={meId} now={now} catalogue={catalogue} />
     </div>
   );
 }

@@ -61,14 +61,16 @@ export const SecretaryActionSchema = z.object({
 export type SecretaryAction = z.infer<typeof SecretaryActionSchema>;
 
 /**
- * «Не беспокоить» and «Пригласи гостя» joined the defaults with D-87; a catalogue saved before
- * them got them appended by the migration 20260923160000.
+ * «Не беспокоить» and «Пригласи гостя» joined the defaults with D-87, «Охрана» with D-99; a
+ * catalogue saved before them got them appended by the migrations 20260923160000 and
+ * 20260923235000.
  */
 export const DEFAULT_SECRETARY_ACTIONS: SecretaryAction[] = [
   { code: "coffee", label: "Кофе", icon: "☕", synonyms: ["кофе", "кофейку"] },
   { code: "tea", label: "Чай", icon: "🍵", synonyms: ["чай", "чайку"] },
   { code: "dnd", label: "Не беспокоить", icon: "🔕", synonyms: ["не беспокоить", "никого не пускай", "никого не пускать"] },
   { code: "guest", label: "Пригласи гостя", icon: "🤝", synonyms: ["пригласи гостя", "гостя в кабинет", "пусть гость заходит", "пусть заходит"] },
+  { code: "security", label: "Охрана", icon: "🚨", synonyms: ["охрана", "охрану", "вызови охрану", "вызвать охрану"] },
   { code: "doctor", label: "Врач", icon: "🩺", synonyms: ["врач", "врача", "доктор"] },
   { code: "come", label: "Зайди ко мне", icon: "🚪", synonyms: ["зайди", "зайди ко мне", "подойди"] },
 ];
@@ -91,6 +93,8 @@ export const SecretarySettingsSchema = z.object({
   /** One repeat push of an errand nobody took (D-79 §7). */
   escalate_after_min: z.number().int().min(1).max(60).default(3),
   actions: SecretaryActionsSchema.default(DEFAULT_SECRETARY_ACTIONS),
+  /** «Позвонить охране» on the secretary's alarm screen (D-99); empty — no call button. */
+  security_phone: z.string().trim().max(24).regex(/^[+\d\s()-]*$/).default(""),
 });
 
 /** D-44: the only client customisation — a logo, an optional accent, a tagline. */

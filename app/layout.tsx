@@ -5,6 +5,7 @@ import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { loadBrand } from "@/lib/brand";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
@@ -48,6 +49,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <OfflineBanner />
           <OutboxReplay />
           <MascotPower />
+          {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}
+          <SecretaryAlarmGate />
         </QueryProvider>
       </body>
     </html>

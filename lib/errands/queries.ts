@@ -97,12 +97,41 @@ export function useSecretarySetup(enabled = true) {
     queryKey: ["company", "secretary-setup"],
     enabled,
     staleTime: 5 * 60_000,
-    queryFn: async (): Promise<{ escalateAfterMin: number; window: { from: string; to: string } }> => {
+    queryFn: async (): Promise<{ escalateAfterMin: number; window: { from: string; to: string }; securityPhone: string }> => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
       if (error) throw new Error(error.message);
       const settings = parseCompanySettings(data?.settings);
-      return { escalateAfterMin: settings.secretary.escalate_after_min, window: settings.delivery_window };
+      return {
+        escalateAfterMin: settings.secretary.escalate_after_min,
+        window: settings.delivery_window,
+        securityPhone: settings.secretary.security_phone,
+      };
+    },
+  });
+}
+
+export type SecretaryPerson = { id: string; full_name: string; away_until: string | null };
+
+/**
+ * Секретари компании и кто из них отошёл (D-99): стол директора показывает пустой стул,
+ * карточка — кто на месте. Профили без Realtime — перечитываются раз в полминуты.
+ */
+export function useSecretaries(enabled = true) {
+  return useQuery({
+    queryKey: ["secretaries"],
+    enabled,
+    refetchInterval: 30_000,
+    queryFn: async (): Promise<SecretaryPerson[]> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, away_until")
+        .eq("role", "secretary")
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw new Error(error.message);
+      return data ?? [];
     },
   });
 }

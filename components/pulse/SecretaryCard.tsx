@@ -5,7 +5,9 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { SecretaryPanel } from "@/components/secretary/SecretaryPanel";
-import type { Errand } from "@/lib/errands/queries";
+import type { Errand, SecretaryPerson } from "@/lib/errands/queries";
+import { isAway, untilLine } from "@/lib/errands/scene";
+import { firstNameOf } from "@/lib/text/normalize";
 import type { SecretaryAction } from "@/lib/settings";
 
 /**
@@ -21,6 +23,8 @@ export function SecretaryCard({
   now,
   onRefresh,
   thanks = false,
+  secretaries,
+  meetingEndsAt = null,
   onClose,
 }: {
   names: string;
@@ -30,6 +34,9 @@ export function SecretaryCard({
   onRefresh: () => void;
   /** «Спасибо ♥» for what was just closed — after the adaptation gate (D-40, D-97) */
   thanks?: boolean;
+  /** who is at the desk (D-99): the header says it, the panel warns when nobody is */
+  secretaries?: readonly SecretaryPerson[];
+  meetingEndsAt?: string | null;
   onClose: () => void;
 }) {
   // The card hangs over the face and must never slide under the app header. When the room
@@ -96,7 +103,19 @@ export function SecretaryCard({
           </span>
           <span className="min-w-0 flex-1">
             <span className="block font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em]">Секретарь</span>
-            <span className="block truncate text-[13px] leading-[18px] text-muted">{names}</span>
+            <span className="block truncate text-[13px] leading-[18px] text-muted" data-testid="secretary-presence">
+              {secretaries && secretaries.length > 0
+                ? secretaries.map((person, index) => (
+                    <span key={person.id}>
+                      {index > 0 ? ", " : ""}
+                      {firstNameOf(person.full_name)}
+                      {isAway(person, now) ? (
+                        <span style={{ color: "var(--warn)" }}> · не на месте {untilLine(person.away_until as string)}</span>
+                      ) : null}
+                    </span>
+                  ))
+                : names}
+            </span>
           </span>
           <button
             type="button"
@@ -109,7 +128,16 @@ export function SecretaryCard({
           </button>
         </div>
         <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto">
-          <SecretaryPanel actions={actions} errands={errands} now={now} onRefresh={onRefresh} compact thanks={thanks} />
+          <SecretaryPanel
+            actions={actions}
+            errands={errands}
+            now={now}
+            onRefresh={onRefresh}
+            compact
+            thanks={thanks}
+            secretaries={secretaries}
+            meetingEndsAt={meetingEndsAt}
+          />
         </div>
       </div>
       {/* the tail, towards the desk on the right of the face — gone while the card has come

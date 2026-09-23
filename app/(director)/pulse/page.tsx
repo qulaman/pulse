@@ -32,8 +32,9 @@ import { VisitAsk } from "@/components/visits/VisitAsk";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useEther } from "@/lib/ether/queries";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
-import { activeCount, useErrands, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
-import { urgencyOf } from "@/lib/errands/scene";
+import { activeCount, isActive, useErrands, useSecretaries, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
+import { askSecretary } from "@/lib/errands/pending";
+import { etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector } from "@/lib/visits/text";
@@ -199,6 +200,31 @@ export default function PulsePage() {
   // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
   const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS);
   const secretarySetup = useSecretarySetup(hasSecretary);
+  // who of the secretaries is at the desk (D-99): all away — an empty chair and «до 14:00»
+  const secretaryPeople = useSecretaries(hasSecretary);
+  const awayUntil = useMemo(() => {
+    const list = secretaryPeople.data ?? [];
+    if (list.length === 0 || !list.every((p) => isAway(p, now))) return null;
+    return list.map((p) => p.away_until as string).sort()[0] ?? null;
+  }, [secretaryPeople.data, now]);
+  // the director is in a meeting right now: «не беспокоить до конца встречи?» (D-99)
+  const meetingNow = useMemo(() => {
+    const at = now.getTime();
+    return (
+      events.find((e) => {
+        const start = new Date(e.starts_at).getTime();
+        const end = e.ends_at ? new Date(e.ends_at).getTime() : start + 60 * 60_000;
+        return !e.cancelled_at && start <= at && at < end;
+      }) ?? null
+    );
+  }, [events, now]);
+  const meetingEndsAt = meetingNow ? (meetingNow.ends_at ?? new Date(new Date(meetingNow.starts_at).getTime() + 60 * 60_000).toISOString()) : null;
+  const dndAction = (catalogue.data ?? NO_ACTIONS).find((a) => sceneOfAction(a) === "dnd") ?? null;
+  const dndLive = errandRows.some((e) => isActive(e) && e.kind === dndAction?.code);
+  const [dndOffered, setDndOffered] = useState<string | null>(null);
+  const offerDnd = meetingNow !== null && dndAction !== null && !dndLive && dndOffered !== meetingNow.id;
+  // the director is saying a request into the desk (D-99)
+  const toSecretary = useIngestStore((state) => state.toSecretary);
   // «К вам посетитель» (D-96): somebody at the secretary's desk waits for an answer — the card
   // sits under the face even on the waiting screen, a person is standing there
   const visits = useVisits(hasSecretary);
@@ -566,6 +592,22 @@ export default function PulsePage() {
                     phase={deskStage.phase}
                     urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3)}
                     count={activeCount(errandRows)}
+                    away={awayUntil}
+                    etaLeft={deskStage.phase === "doing" ? etaLeftMin(deskStage.errand, now) : null}
+                    asking={errandRows.some((e) => isActive(e) && e.question && !e.answer)}
+                    listening={stage === "recording" && toSecretary}
+                    onHold={(down) => {
+                      // hold the desk — say it to the secretary in your own words (D-99)
+                      if (down) {
+                        // the desk is on the waiting screen only: here the pipeline is idle or recording
+                        if (stage === "idle") {
+                          setDeskOpen(false);
+                          void startVoice(undefined, undefined, "secretary");
+                        }
+                      } else if (useIngestStore.getState().stage === "recording") {
+                        void stopVoice();
+                      }
+                    }}
                     tone={errandRows.some((e) => e.status === "accepted") ? "var(--ok)" : "var(--warn)"}
                     label={asking ? "Секретарь: убрать кнопки" : `Секретарь${secretaries.length ? `: ${secretaries.map((p) => firstNameOf(p.full_name)).join(", ")}` : ""} — попросить`}
                     onTap={() => {
@@ -576,6 +618,27 @@ export default function PulsePage() {
                     }}
                   />
                   </div>
+                  {offerDnd && meetingNow && meetingEndsAt && dndAction && !asking ? (
+                    // a meeting is on: one tap guards the door until it ends (D-99)
+                    // right-aligned under the desk: the desk sits right of the face, a centred pill ran off the screen
+                    <div className="absolute right-0 top-full mt-5 flex items-center gap-1 whitespace-nowrap" data-testid="dnd-offer">
+                      <button
+                        type="button"
+                        className="card-in rounded-full border px-3 py-1.5 text-[13px] font-semibold leading-4"
+                        style={{ borderColor: "color-mix(in srgb, var(--danger) 45%, var(--border))", background: "var(--surface)" }}
+                        onClick={() => {
+                          const left = Math.max(5, Math.ceil((new Date(meetingEndsAt).getTime() - Date.now()) / 60_000));
+                          askSecretary(dndAction, "на встречу", () => void errands.refetch(), undefined, { untilMin: left });
+                          setDndOffered(meetingNow.id);
+                        }}
+                      >
+                        🔕 Не беспокоить {untilLine(meetingEndsAt)}?
+                      </button>
+                      <button type="button" aria-label="Не надо" className="h-8 w-8 text-[16px] text-muted" onClick={() => setDndOffered(meetingNow.id)}>
+                        ×
+                      </button>
+                    </div>
+                  ) : null}
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -590,6 +653,8 @@ export default function PulsePage() {
                     onRefresh={() => void errands.refetch()}
                     // «спасибо» for a closed request waits for the adaptation gate (D-40, D-97)
                     thanks={pointsEnabled}
+                    secretaries={secretaryPeople.data}
+                    meetingEndsAt={meetingEndsAt}
                     onClose={() => setDeskOpen(false)}
                   />
                 </div>
@@ -627,7 +692,13 @@ export default function PulsePage() {
           <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
             {confirming ? <ConfirmInline ref={confirmRef} /> : null}
-            {!phraseInHand && visitorsWaiting ? <VisitAsk visits={visitRows} now={now} /> : null}
+            {!phraseInHand && visitorsWaiting ? <VisitAsk
+                visits={visitRows}
+                now={now}
+                // tea or coffee for the guest goes with «Пусть заходит» (D-99)
+                hospitality={(catalogue.data ?? NO_ACTIONS).filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
+                onErrand={() => void errands.refetch()}
+              /> : null}
             {/* service cards only once the face has been tapped — the idle screen is the face alone */}
             {!phraseInHand && mode !== "idle" ? serviceLines : null}
             {mode === "panel" && !phraseInHand ? (
