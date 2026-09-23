@@ -323,7 +323,8 @@ export function CardHead({
   if (closed) {
     when = <span className="text-muted">{humanAqtobe(new Date(task.closed_at ?? task.updated_at), now)}</span>;
   } else if (task.deadline) {
-    const tone = deadlineToneOf(task, now);
+    // handed-in work has met its deadline: the date stays, the alarm goes
+    const tone = task.status === "pending_review" ? "muted" : deadlineToneOf(task, now);
     when = <span style={{ color: tone === "accent" ? "var(--text-muted)" : TONE_VAR[tone] }}>{humanAqtobe(new Date(task.deadline), now)}</span>;
   } else if (urgentNow) {
     when = (
