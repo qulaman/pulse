@@ -6,7 +6,7 @@ import {
   firstLine,
   groupNotes,
   markMatches,
-  notesSummary,
+  notesHero,
   noteTime,
   restLines,
   splitNotes,
@@ -151,32 +151,22 @@ describe("markMatches", () => {
   });
 });
 
-describe("notesSummary", () => {
-  it("counts the feed, the pinned and the latest", () => {
+describe("notesHero", () => {
+  it("counts the thoughts, the pinned, the latest, the week and the voice", () => {
     const piles = splitNotes([
-      note({ pinned: true, created_at: "2026-09-01T10:00:00Z" }),
-      note({ created_at: "2026-09-23T04:14:00Z", audio_path: "c/u/a.webm" }),
-      note({ created_at: "2026-09-20T10:00:00Z" }),
+      note({ id: "a", created_at: "2026-09-23T04:14:00Z", pinned: true }),
+      note({ id: "b", created_at: "2026-09-22T04:00:00Z", audio_path: "c/u/b.webm" }),
+      note({ id: "c", created_at: "2026-09-01T04:00:00Z" }),
     ]);
-
-    expect(notesSummary(piles, "active", NOW)).toEqual({
-      eyebrow: "Заметки",
-      headline: "3 заметки",
-      line: "1 закреплена · последняя сегодня 09:14",
+    expect(notesHero(piles, NOW)).toEqual({
+      value: 3,
+      label: "заметки",
+      detail: "1 закреплена · последняя сегодня 09:14",
       second: "2 за 7 дней · 1 голосом",
     });
   });
 
-  it("names what the notes became and what waits in the bin", () => {
-    const piles = splitNotes([
-      note({ converted_task_id: "t-1" }),
-      note({ converted_task_id: "t-2" }),
-      note({ converted_announcement_id: "a-1" }),
-      note({ deleted_at: "2026-09-20T10:00:00Z" }),
-    ]);
-
-    expect(notesSummary(piles, "converted", NOW).line).toBe("2 задачи · 1 объявление");
-    expect(notesSummary(piles, "trash", NOW).headline).toBe("1 в корзине");
-    expect(notesSummary(splitNotes([]), "active", NOW).headline).toBe("Пусто");
+  it("says what to do when there is nothing yet", () => {
+    expect(notesHero(splitNotes([]), NOW).value).toBeNull();
   });
 });

@@ -29,6 +29,7 @@ export function Tabs<K extends string>({
   onChange,
   children,
   className = "",
+  testIdPrefix = "tab-",
 }: {
   id: string;
   items: readonly TabItem<K>[];
@@ -37,6 +38,8 @@ export function Tabs<K extends string>({
   children?: ReactNode;
   /** Spacing above the band; the band itself must stay a direct child of the long page, or it cannot stick. */
   className?: string;
+  /** `data-testid` of each tab is this plus its key. */
+  testIdPrefix?: string;
 }) {
   const top = useHeaderHeight();
   const sentinel = useRef<HTMLDivElement>(null);
@@ -69,7 +72,7 @@ export function Tabs<K extends string>({
                 type="button"
                 role="tab"
                 aria-selected={active}
-                data-testid={`tab-${item.key}`}
+                data-testid={`${testIdPrefix}${item.key}`}
                 onClick={() => onChange(item.key)}
                 className={`relative min-h-[40px] rounded-[10px] px-1 font-display text-[14px] font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
                   active ? "text-text" : "text-muted active:text-text"

@@ -189,58 +189,33 @@ export function markMatches(text: string, query: string): Segment[] {
 }
 
 /* -------------------------------------------------------------------------- */
-/* The display                                                                  */
+/* The status screen                                                            */
 /* -------------------------------------------------------------------------- */
 
 export type NoteFilter = "active" | "converted" | "trash";
 
-export type NotesSummary = { eyebrow: string; headline: string; line: string; second: string };
+/** The status screen of «Заметки» (D-93): one number, its word, and two quiet lines. */
+export type NotesHero = { value: number | null; label: string; detail: string; second: string };
 
-/** What the display says while nothing is being recorded: the chosen pile, in numbers. */
-export function notesSummary(piles: NotePiles, filter: NoteFilter, now: Date): NotesSummary {
-  if (filter === "converted") {
-    const tasks = piles.converted.filter((note) => note.converted_task_id !== null).length;
-    const announcements = piles.converted.length - tasks;
-    const parts = [
-      tasks > 0 ? `${tasks} ${pluralRu(tasks, ["задача", "задачи", "задач"])}` : "",
-      announcements > 0 ? `${announcements} ${pluralRu(announcements, ["объявление", "объявления", "объявлений"])}` : "",
-    ].filter(Boolean);
-    return {
-      eyebrow: "В деле",
-      headline: piles.converted.length > 0 ? `${piles.converted.length} в деле` : "Пока ничего",
-      line: parts.length > 0 ? parts.join(" · ") : "Сюда уходит заметка,",
-      second: parts.length > 0 ? "Что стало с мыслью — на карточке" : "ставшая задачей или объявлением",
-    };
-  }
-
-  if (filter === "trash") {
-    const count = piles.trash.length;
-    return {
-      eyebrow: "Корзина",
-      headline: count > 0 ? `${count} в корзине` : "Корзина пуста",
-      line: count > 0 ? "Вернуть можно в любой момент" : "Удалённая заметка ждёт здесь,",
-      second: count > 0 ? "Голос и текст на месте" : "пока её не удалят навсегда",
-    };
-  }
-
+/**
+ * What the head of the screen says about the thoughts, whatever tab is open below — the
+ * way the status screen of «Задачи» speaks for all of them: how many, pinned, the latest,
+ * the week, how many were spoken.
+ */
+export function notesHero(piles: NotePiles, now: Date): NotesHero {
   const { active } = piles;
   if (active.length === 0) {
-    return { eyebrow: "Заметки", headline: "Пусто", line: "Нажми микрофон и скажи мысль —", second: "запишу слово в слово" };
+    return { value: null, label: "Пока пусто", detail: "Зажмите микрофон и скажите мысль —", second: "запишу слово в слово" };
   }
-
   const pinned = active.filter((note) => note.pinned).length;
   const latest = active.reduce((a, b) => (time(b.created_at) > time(a.created_at) ? b : a));
   const weekStart = aqtobeDay(now) - 6;
   const week = active.filter((note) => aqtobeDay(new Date(note.created_at)) >= weekStart).length;
   const voiced = active.filter((note) => note.audio_path !== null).length;
-
   return {
-    eyebrow: "Заметки",
-    headline: `${active.length} ${pluralRu(active.length, ["заметка", "заметки", "заметок"])}`,
-    line: [
-      pinned > 0 ? `${pinned} ${pluralRu(pinned, ["закреплена", "закреплены", "закреплено"])}` : "",
-      `последняя ${whenRu(latest.created_at, now)}`,
-    ]
+    value: active.length,
+    label: pluralRu(active.length, ["заметка", "заметки", "заметок"]),
+    detail: [pinned > 0 ? `${pinned} ${pluralRu(pinned, ["закреплена", "закреплены", "закреплено"])}` : "", `последняя ${whenRu(latest.created_at, now)}`]
       .filter(Boolean)
       .join(" · "),
     second: [`${week} за 7 дней`, voiced > 0 ? `${voiced} голосом` : ""].filter(Boolean).join(" · "),

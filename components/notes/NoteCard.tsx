@@ -4,17 +4,17 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
+import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
+import { CardShell } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
-import { Key, Led } from "@/components/ui/device/Device";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import { awaitsWords, firstLine, markMatches, noteTime, restLines, type NoteGroupKey } from "@/lib/notes/list";
+import { awaitsWords, firstLine, markMatches, noteTime, restLines, whenRu, type NoteGroupKey } from "@/lib/notes/list";
 import { useNoteSaveState } from "@/lib/notes/mutations";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { SHORT_STATUS } from "@/lib/tasks/status-text";
-import { TONE_VAR, toneOf } from "@/lib/tasks/tone";
+import { isOverdue, SHORT_STATUS } from "@/lib/tasks/status-text";
 
 import { NoteIcon } from "./icons";
 import css from "./notes.module.css";
@@ -38,20 +38,24 @@ function Marked({ text, query }: { text: string; query: string }) {
   );
 }
 
+/** A small status dot: breathing while something is on its way, still once it has landed. */
+function Dot({ tone, pulse = false }: { tone: "ok" | "warn" | "accent"; pulse?: boolean }) {
+  const color = tone === "ok" ? "var(--ok)" : tone === "warn" ? "var(--warn)" : "var(--accent)";
+  return (
+    <span
+      aria-hidden
+      className="inline-block h-[7px] w-[7px] shrink-0 rounded-full"
+      style={{ background: color, boxShadow: `0 0 8px ${color}`, animation: pulse ? "shimmer 1s ease-in-out infinite" : undefined }}
+    />
+  );
+}
+
 /**
  * The textarea of an open note: as tall as the thought, saved on a pause and on blur,
  * never by a «Сохранить» button (D-75 §6). It tells the card while a pause is pending,
  * so the receipt says «Сохраняю» from the first keystroke, not 600 ms later.
  */
-function NoteEditor({
-  text,
-  onChangeText,
-  onDirty,
-}: {
-  text: string;
-  onChangeText: (text: string) => void;
-  onDirty: (dirty: boolean) => void;
-}) {
+function NoteEditor({ text, onChangeText, onDirty }: { text: string; onChangeText: (text: string) => void; onDirty: (dirty: boolean) => void }) {
   const [draft, setDraft] = useState(text);
   const area = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -111,19 +115,19 @@ function NoteEditor({
       aria-label="Текст заметки"
       placeholder="Что было сказано…"
       data-testid="note-editor"
-      className="mt-2 w-full resize-none bg-transparent text-[16px] leading-[22px] text-text outline-none placeholder:text-muted"
+      className="w-full resize-none rounded-[14px] bg-surface-2/60 px-3 py-2.5 text-[16px] leading-[22px] text-text outline-none placeholder:text-muted focus:bg-surface-2"
       rows={1}
     />
   );
 }
 
-/** The receipt of the autosave, next to the date: the same lens language as the device. */
+/** The receipt of the autosave, in the same dot language as the status screen. */
 function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: boolean }) {
   const state = useNoteSaveState(id);
   if (state === "offline") {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] leading-4" style={{ color: "var(--warn)" }}>
-        <Led tone="warn" />
+        <Dot tone="warn" />
         Сохраню, как появится связь
       </span>
     );
@@ -131,7 +135,7 @@ function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: 
   if (dirty || state === "saving") {
     return (
       <span className="inline-flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-        <Led tone="accent" blink />
+        <Dot tone="accent" pulse />
         Сохраняю
       </span>
     );
@@ -139,7 +143,7 @@ function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: 
   if (!saved) return null;
   return (
     <span data-testid="note-saved" className="inline-flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-      <Led tone="ok" />
+      <Dot tone="ok" />
       Сохранено
     </span>
   );
@@ -150,32 +154,39 @@ function Original({ raw }: { raw: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="inline-flex min-h-[36px] items-center gap-1.5 text-[13px] leading-4 text-muted"
-      >
+      <button type="button" aria-expanded={open} onClick={() => setOpen((value) => !value)} className="inline-flex min-h-[36px] items-center gap-1.5 text-[13px] leading-4 text-muted">
         Как было сказано
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden
-          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 120ms" }}
-        >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform 120ms" }}>
           <polyline points="3.5,6 8,10.5 12.5,6" />
         </svg>
       </button>
-      {open ? (
-        <p className="mt-1 whitespace-pre-line border-l-2 border-border pl-3 text-[14px] italic leading-5 text-muted">{raw}</p>
-      ) : null}
+      {open ? <p className="mt-1 whitespace-pre-line border-l-2 border-border pl-3 text-[14px] italic leading-5 text-muted">{raw}</p> : null}
     </div>
+  );
+}
+
+/** The mark at the head of a note: pinned, spoken or written — read before any word. */
+function NoteGlyph({ note, waiting }: { note: Note; waiting: boolean }) {
+  const name = note.pinned ? "pin" : waiting || note.audio_path ? "wave" : "note";
+  const color = note.pinned ? "var(--accent)" : waiting ? "var(--warn)" : "var(--text-muted)";
+  return (
+    <span
+      aria-hidden
+      className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
+      style={{ background: `color-mix(in srgb, ${color} 14%, transparent)`, color }}
+    >
+      <NoteIcon name={name} size={13} />
+    </span>
+  );
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <span aria-hidden className="mt-1 shrink-0 text-muted/70 transition-transform duration-[200ms] ease-out" style={{ transform: open ? "rotate(-90deg)" : "rotate(90deg)" }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 5.5 15.5 12 9 18.5" />
+      </svg>
+    </span>
   );
 }
 
@@ -198,15 +209,21 @@ type CardProps = {
 };
 
 /**
- * One thought. Closed, it is a heading, up to three lines and the time; a dictated one
- * whose words are still on their way says «Распознаю». Opened, it is a textarea that
- * saves itself, the recording, and three keys — hand it out, announce it, pin it — with
- * copy, share and delete as quiet icons under them (D-75, D-81).
+ * One thought, as a card of «Задачи» is one task (D-93): closed — the mark (pinned, spoken,
+ * written), the first line, up to two more, the time; open, in place — the text that saves
+ * itself, the recording, «Поручить / Объявить / Закрепить», and copy, share, delete.
  */
 export function NoteCard(props: CardProps) {
-  const { note, group, now, query, open, busy, onToggle, onRetranscribe } = props;
-  const card = useRef<HTMLElement>(null);
+  const { note, group, now, query, open, busy, onToggle, onChangeText, onPin, onDelete, onAssign, onAnnounce, onRetranscribe } = props;
   const waiting = awaitsWords(note);
+  const head = firstLine(note.text);
+  const rest = restLines(note.text);
+  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [canShare] = useState(() => typeof navigator !== "undefined" && typeof navigator.share === "function");
+  const empty = !note.text.trim();
+  const raw = note.raw_transcript?.trim() ?? "";
+  const edited = raw !== "" && raw !== note.text.trim();
 
   // pinning moves an open card to the top of the feed: the eye follows it there
   const pinned = note.pinned;
@@ -216,95 +233,8 @@ export function NoteCard(props: CardProps) {
       first.current = false;
       return;
     }
-    if (open) card.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [pinned, open]);
-
-  if (open) return <OpenCard {...props} cardRef={card} />;
-
-  const head = firstLine(note.text);
-  const rest = restLines(note.text);
-
-  return (
-    <article ref={card} className={`card ${css.press}`} data-testid="note-card" data-note-id={note.id}>
-      <button type="button" onClick={onToggle} aria-expanded={false} className="block w-full px-3.5 pb-2 pt-3 text-left">
-        {waiting ? (
-          busy ? (
-            <span className="block" data-testid="note-transcribing">
-              <span className="flex items-center gap-2 font-display text-[15px] font-semibold leading-[22px] text-muted">
-                <Led tone="accent" blink />
-                Распознаю…
-              </span>
-              <Bone h={14} w="84%" className="mt-2" />
-              <Bone h={14} w="56%" className="mt-1.5" />
-            </span>
-          ) : (
-            <span className="block">
-              <span className="block font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">Голосовая заметка</span>
-              <span className="mt-1 block text-[14px] leading-5" style={{ color: "var(--warn)" }}>
-                Не расслышал. Голос сохранён
-              </span>
-            </span>
-          )
-        ) : (
-          <>
-            <span className="flex items-start gap-2">
-              <span className="line-clamp-2 min-w-0 flex-1 font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">
-                <Marked text={head || "Без текста"} query={query} />
-              </span>
-              {note.pinned ? <NoteIcon name="pin" size={14} className="mt-1 text-accent" /> : null}
-            </span>
-            {rest ? (
-              <span className="mt-1 line-clamp-3 block whitespace-pre-line text-[14px] leading-5 text-muted">
-                <Marked text={rest} query={query} />
-              </span>
-            ) : null}
-          </>
-        )}
-      </button>
-
-      <div className="flex min-h-[32px] items-center gap-2 px-3.5 pb-2.5 text-[12px] leading-4 text-muted">
-        <span className="nums">{noteTime(note.created_at, group, now)}</span>
-        {note.audio_path ? (
-          <span className="inline-flex items-center gap-1">
-            <NoteIcon name="wave" size={13} />
-            голос
-          </span>
-        ) : null}
-        {waiting && !busy ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="ml-auto"
-            icon={<NoteIcon name="retry" size={14} />}
-            data-testid="note-retranscribe"
-            onClick={onRetranscribe}
-          >
-            Распознать
-          </Button>
-        ) : null}
-      </div>
-    </article>
-  );
-}
-
-function OpenCard({
-  note,
-  busy,
-  onToggle,
-  onChangeText,
-  onPin,
-  onDelete,
-  onAssign,
-  onAnnounce,
-  onRetranscribe,
-  cardRef,
-}: CardProps & { cardRef: React.RefObject<HTMLElement | null> }) {
-  const [dirty, setDirty] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [canShare] = useState(() => typeof navigator !== "undefined" && typeof navigator.share === "function");
-  const empty = !note.text.trim();
-  const raw = note.raw_transcript?.trim() ?? "";
-  const edited = raw !== "" && raw !== note.text.trim();
+    if (open) document.querySelector<HTMLElement>(`[data-task-id="${note.id}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [pinned, open, note.id]);
 
   const copy = async () => {
     try {
@@ -314,7 +244,6 @@ function OpenCard({
       toast("Не получилось скопировать");
     }
   };
-
   const share = async () => {
     try {
       await navigator.share({ text: note.text });
@@ -323,17 +252,89 @@ function OpenCard({
     }
   };
 
-  return (
-    <article ref={cardRef} className={`card ${css.open}`} data-testid="note-card" data-note-id={note.id} data-open>
-      <div className="px-3.5 pb-2 pt-3">
-        <div className="flex min-h-[20px] items-center justify-between gap-2 text-[12px] leading-4 text-muted">
-          <span className="nums">
-            {humanAqtobe(new Date(note.created_at))}
-            {note.audio_path ? " · голосом" : ""}
-          </span>
-          <SaveReceipt id={note.id} dirty={dirty} saved={saved} />
-        </div>
+  const heading = waiting ? (
+    busy ? (
+      <span className="block" data-testid="note-transcribing">
+        <span className="flex items-center gap-2 font-display text-[16px] font-semibold leading-[21px] text-muted">
+          <Dot tone="accent" pulse />
+          Распознаю…
+        </span>
+        {open ? null : (
+          <>
+            <Bone h={13} w="84%" className="mt-2" />
+            <Bone h={13} w="56%" className="mt-1.5" />
+          </>
+        )}
+      </span>
+    ) : (
+      <span className="block">
+        <span className="block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">Голосовая заметка</span>
+        <span className="mt-0.5 block text-[13px] leading-[18px]" style={{ color: "var(--warn)" }}>
+          Не расслышал — голос сохранён
+        </span>
+      </span>
+    )
+  ) : (
+    <>
+      <span className={`${open ? "" : "line-clamp-2"} block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]`}>
+        <Marked text={head || "Без текста"} query={query} />
+      </span>
+      {rest && !open ? (
+        <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">
+          <Marked text={rest} query={query} />
+        </span>
+      ) : null}
+    </>
+  );
 
+  return (
+    <CardShell
+      id={note.id}
+      open={open}
+      onToggle={onToggle}
+      testId="note-card"
+      headData={{ "data-note-id": note.id }}
+      head={
+        <>
+          <NoteGlyph note={note} waiting={waiting} />
+          <span className="min-w-0 flex-1">
+            {heading}
+            <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+              <span className="nums">{noteTime(note.created_at, group, now)}</span>
+              {note.audio_path ? (
+                <>
+                  <span aria-hidden className="opacity-40">
+                    ·
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <NoteIcon name="wave" size={12} />
+                    голос
+                  </span>
+                </>
+              ) : null}
+              {note.pinned ? (
+                <>
+                  <span aria-hidden className="opacity-40">
+                    ·
+                  </span>
+                  <span className="text-accent">закреплена</span>
+                </>
+              ) : null}
+            </span>
+          </span>
+          <Chevron open={open} />
+        </>
+      }
+    >
+      <div className="flex min-h-[20px] items-center justify-between gap-2 text-[12px] leading-4 text-muted">
+        <span className="nums">
+          {humanAqtobe(new Date(note.created_at))}
+          {note.audio_path ? " · голосом" : ""}
+        </span>
+        <SaveReceipt id={note.id} dirty={dirty} saved={saved} />
+      </div>
+
+      <div className="mt-2">
         {/* remounted per note: the editor is born with the text it edits */}
         <NoteEditor
           key={note.id}
@@ -344,74 +345,69 @@ function OpenCard({
             onChangeText(text);
           }}
         />
-
-        {empty && note.audio_path ? (
-          <div className="mt-1 flex items-center gap-2 text-[13px] leading-4" style={{ color: busy ? "var(--text-muted)" : "var(--warn)" }}>
-            {busy ? <Led tone="accent" blink /> : null}
-            {busy ? "Распознаю…" : "Не расслышал — впиши сам или распознай ещё раз"}
-            {busy ? null : (
-              <Button variant="secondary" size="sm" className="ml-auto" onClick={onRetranscribe}>
-                Распознать
-              </Button>
-            )}
-          </div>
-        ) : null}
-
-        {note.audio_path ? <AudioOriginal path={note.audio_path} /> : null}
-        {edited ? <Original raw={raw} /> : null}
-
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          <Key icon={<NoteIcon name="task" size={18} />} disabled={empty} data-testid="note-assign" onClick={onAssign}>
-            Поручить
-          </Key>
-          <Key icon={<NoteIcon name="megaphone" size={18} />} disabled={empty} data-testid="note-announce" onClick={onAnnounce}>
-            Объявить
-          </Key>
-          <Key on={note.pinned} icon={<NoteIcon name="pin" size={18} />} data-testid="note-pin" onClick={onPin}>
-            {note.pinned ? "Закреплена" : "Закрепить"}
-          </Key>
-        </div>
-
-        <div className="mt-1.5 flex items-center">
-          <button
-            type="button"
-            aria-label="Скопировать текст"
-            title="Скопировать"
-            disabled={empty}
-            onClick={() => void copy()}
-            className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors duration-[120ms] hover:text-text disabled:opacity-40"
-          >
-            <NoteIcon name="copy" size={18} />
-          </button>
-          {canShare ? (
-            <button
-              type="button"
-              aria-label="Поделиться"
-              title="Поделиться"
-              disabled={empty}
-              onClick={() => void share()}
-              className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors duration-[120ms] hover:text-text disabled:opacity-40"
-            >
-              <NoteIcon name="share" size={18} />
-            </button>
-          ) : null}
-          <button
-            type="button"
-            aria-label="Удалить заметку"
-            title="Удалить"
-            data-testid="note-delete"
-            onClick={onDelete}
-            className="flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-[120ms]"
-            style={{ color: "color-mix(in srgb, var(--danger) 80%, transparent)" }}
-          >
-            <NoteIcon name="trash" size={18} />
-          </button>
-          <button type="button" onClick={onToggle} className="ml-auto min-h-[44px] px-1 text-[13px] leading-4 text-muted">
-            Свернуть
-          </button>
-        </div>
       </div>
-    </article>
+
+      {empty && note.audio_path ? (
+        <div className="mt-2 flex items-center gap-2 text-[13px] leading-4" style={{ color: busy ? "var(--text-muted)" : "var(--warn)" }}>
+          {busy ? <Dot tone="accent" pulse /> : null}
+          {busy ? "Распознаю…" : "Не расслышал — впишите сами или распознайте ещё раз"}
+          {busy ? null : (
+            <Button variant="secondary" size="sm" className="ml-auto" icon={<NoteIcon name="retry" size={14} />} data-testid="note-retranscribe" onClick={onRetranscribe}>
+              Распознать
+            </Button>
+          )}
+        </div>
+      ) : null}
+
+      {note.audio_path ? <AudioOriginal path={note.audio_path} /> : null}
+      {edited ? <Original raw={raw} /> : null}
+
+      {/* what the thought can become — the same three-button row as a task's card */}
+      <div className="mt-4 grid grid-cols-3 gap-2">
+        <Button className="!px-2 whitespace-nowrap !text-[14px]" icon={<NoteIcon name="task" size={16} />} disabled={empty} data-testid="note-assign" onClick={onAssign}>
+          Поручить
+        </Button>
+        <Button variant="secondary" className="!px-2 whitespace-nowrap !text-[14px]" icon={<NoteIcon name="megaphone" size={16} />} disabled={empty} data-testid="note-announce" onClick={onAnnounce}>
+          Объявить
+        </Button>
+        <Button
+          variant="secondary"
+          className={`!px-2 whitespace-nowrap !text-[14px] ${note.pinned ? "!border-accent/60 !text-accent" : ""}`}
+          icon={<NoteIcon name="pin" size={16} />}
+          aria-pressed={note.pinned}
+          data-testid="note-pin"
+          onClick={onPin}
+        >
+          {note.pinned ? "Открепить" : "Закрепить"}
+        </Button>
+      </div>
+
+      <div className="-mx-1.5 mt-2 flex items-center">
+        <IconButton label="Скопировать текст" icon="copy" disabled={empty} onClick={() => void copy()} />
+        {canShare ? <IconButton label="Поделиться" icon="share" disabled={empty} onClick={() => void share()} /> : null}
+        <IconButton label="Удалить заметку" icon="trash" danger testId="note-delete" onClick={onDelete} />
+        <button type="button" onClick={onToggle} className="ml-auto min-h-[40px] rounded-[10px] px-2 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-white/[0.05]">
+          Свернуть
+        </button>
+      </div>
+    </CardShell>
+  );
+}
+
+function IconButton({ label, icon, onClick, disabled, danger, testId }: { label: string; icon: "copy" | "share" | "trash"; onClick: () => void; disabled?: boolean; danger?: boolean; testId?: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      data-testid={testId}
+      onClick={onClick}
+      className="flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-[120ms] active:bg-white/[0.06] disabled:opacity-40"
+      style={{ color: danger ? "color-mix(in srgb, var(--danger) 80%, transparent)" : "var(--text-muted)" }}
+    >
+      <NoteIcon name={icon} size={18} />
+    </button>
   );
 }
 
@@ -419,68 +415,81 @@ function firstName(full: string | null | undefined): string {
   return full?.trim().split(/\s+/)[0] ?? "";
 }
 
-/** A note that became something: what it became, and how that is doing now. */
+/** A note that became something (D-81 §6): what it became, and how that is doing — a card like a task's, a tap to it. */
 export function ConvertedCard({ note, task, now, query }: { note: Note; task: TaskWithPeople | undefined; now: Date; query: string }) {
-  const tone = task ? toneOf(task.status, false) : "muted";
   const label = note.converted_task_id
-    ? ["Задача", firstName(task?.assignee?.full_name), task ? SHORT_STATUS[task.status].toLowerCase() : ""].filter(Boolean).join(" · ")
+    ? ["Задача", firstName(task?.assignee?.full_name), task ? (isOverdue(task, now) ? "просрочена" : SHORT_STATUS[task.status]) : ""].filter(Boolean).join(" · ")
     : "Объявление";
 
   const body = (
     <>
-      <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em]">
-        <Marked text={firstLine(note.text) || "Без текста"} query={query} />
+      {note.converted_task_id && task ? (
+        <span className="mt-[1px]">
+          <StatusGlyph status={task.status} overdue={isOverdue(task, now)} />
+        </span>
+      ) : (
+        <span aria-hidden className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
+          <NoteIcon name={note.converted_task_id ? "task" : "megaphone"} size={13} />
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
+          <Marked text={firstLine(note.text) || "Без текста"} query={query} />
+        </span>
+        <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+          <span className="min-w-0 truncate">{label}</span>
+          <span className="nums ml-auto shrink-0">{whenRu(note.converted_at ?? note.created_at, now)}</span>
+        </span>
       </span>
-      <span className="mt-2 flex items-center gap-2 text-[12px] leading-4">
-        <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: TONE_VAR[note.converted_task_id ? tone : "accent"] }} />
-        <span className="min-w-0 truncate">{label}</span>
-        <span className="nums ml-auto shrink-0 text-muted">{humanAqtobe(new Date(note.converted_at ?? note.created_at), now)}</span>
-      </span>
+      {note.converted_task_id ? (
+        <span aria-hidden className="mt-1 shrink-0 text-muted/70">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 5.5 15.5 12 9 18.5" />
+          </svg>
+        </span>
+      ) : null}
     </>
   );
 
   return note.converted_task_id ? (
-    <Link href={`/tasks/${note.converted_task_id}`} className={`card block px-3.5 py-3 ${css.press}`} data-testid="note-converted">
+    <Link
+      href={`/tasks/${note.converted_task_id}`}
+      className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5 transition-transform duration-[120ms] active:scale-[0.99]"
+      data-testid="note-converted"
+    >
       {body}
     </Link>
   ) : (
-    <div className="card px-3.5 py-3" data-testid="note-converted">
+    <div className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5" data-testid="note-converted">
       {body}
     </div>
   );
 }
 
 /** A deleted note in the bin: the way back, and the way out for good. */
-export function TrashCard({
-  note,
-  now,
-  query,
-  onRestore,
-  onPurge,
-}: {
-  note: Note;
-  now: Date;
-  query: string;
-  onRestore: () => void;
-  onPurge: () => void;
-}) {
+export function TrashCard({ note, now, query, onRestore, onPurge }: { note: Note; now: Date; query: string; onRestore: () => void; onPurge: () => void }) {
   return (
-    <div className="card px-3.5 pb-2.5 pt-3" data-testid="note-trashed">
-      <p className="line-clamp-2 font-display text-[16px] font-semibold leading-[22px] tracking-[-0.01em] text-muted">
-        <Marked text={firstLine(note.text) || (note.audio_path ? "Голосовая заметка" : "Без текста")} query={query} />
-      </p>
-      <p className="mt-1 text-[12px] leading-4 text-muted">
-        Удалена {humanAqtobe(new Date(note.deleted_at ?? note.updated_at), now)}
-        {note.audio_path ? " · с голосом" : ""}
-      </p>
-      <div className="mt-2.5 flex items-center gap-2">
-        <Button variant="secondary" size="sm" icon={<NoteIcon name="restore" size={14} />} data-testid="note-restore" onClick={onRestore}>
-          Вернуть
-        </Button>
-        <Button variant="ghost" size="sm" className="!text-danger/80" onClick={onPurge}>
-          Удалить навсегда
-        </Button>
-      </div>
+    <div className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5" data-closed data-testid="note-trashed">
+      <span aria-hidden className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
+        <NoteIcon name="trash" size={13} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">
+          <Marked text={firstLine(note.text) || (note.audio_path ? "Голосовая заметка" : "Без текста")} query={query} />
+        </span>
+        <span className="mt-1 block text-[12px] leading-4 text-muted">
+          Удалена {whenRu(note.deleted_at ?? note.updated_at, now)}
+          {note.audio_path ? " · с голосом" : ""}
+        </span>
+        <span className="mt-3 flex items-center gap-2">
+          <Button variant="secondary" size="sm" icon={<NoteIcon name="restore" size={14} />} data-testid="note-restore" onClick={onRestore}>
+            Вернуть
+          </Button>
+          <Button variant="ghost" size="sm" className="!text-danger/80" onClick={onPurge}>
+            Удалить навсегда
+          </Button>
+        </span>
+      </span>
     </div>
   );
 }
