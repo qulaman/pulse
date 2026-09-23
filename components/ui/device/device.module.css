@@ -1,5 +1,5 @@
 /*
- * The remote's hardware: body, IR lens, LCD window, rubber keys, slide switch.
+ * The device kit: body, lens, LCD, rubber keys, slide switch, seam, slot, keypad. Shared by the TV remote (`/screen`) and «Задачи».
  *
  * Feel rules: a key is a face sitting in a dark well; pressing it drops the face by
  * 3px (transform only) and nothing else moves. Glows are static box-shadows that change

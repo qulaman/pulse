@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { PersonPad } from "@/components/screen/PersonPad";
-import { Dot, Gauge, Key, Lcd, LcdDim, Lens, RemoteBody, Seam, Switch, type LedTone } from "@/components/screen/Remote";
+import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
 import { toast } from "@/components/ui/Toast";
 import { usePeople } from "@/lib/people/queries";
@@ -77,7 +77,7 @@ export default function ScreenPage() {
         Пульт от телевизора: что сейчас на стене и что показать
       </p>
 
-      <RemoteBody className="mx-auto mt-4 w-full max-w-[380px]">
+      <Body className="mx-auto mt-4 w-full max-w-[380px]">
         <Lens tone={led} blink={inFlight} />
 
         <Lcd className="mt-3">
@@ -175,7 +175,7 @@ export default function ScreenPage() {
             }
           />
         </div>
-      </RemoteBody>
+      </Body>
     </main>
   );
 }

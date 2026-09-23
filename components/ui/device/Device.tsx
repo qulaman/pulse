@@ -10,7 +10,7 @@ import {
 
 import { haptic } from "@/lib/haptics";
 
-import s from "./remote.module.css";
+import s from "./device.module.css";
 
 /**
  * The parts of a physical remote, as components. The page composes them; nothing here
@@ -22,7 +22,7 @@ import s from "./remote.module.css";
  * — the same reason a real remote has no touchscreen.
  */
 
-export function RemoteBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`${s.body} ${className}`}>{children}</div>;
 }
 

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { ROLE_LABEL, initialsOf, type Person } from "@/lib/people/queries";
 import { keyLabels } from "@/lib/tv/remote";
 
-import { Avatar, Key, PersonName, Slot, padClass, personKeyClass } from "./Remote";
+import { Avatar, Key, PersonName, Slot, padClass, personKeyClass } from "@/components/ui/device/Device";
 
 /**
  * The channel keys: one rubber key per person, on the body of the remote. Tap a key —
