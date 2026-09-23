@@ -253,6 +253,8 @@ decline_reason text null, audio_path null, source_transcript null,
 inbox_item_id uuid null → inbox_items (set null), client_request_id uuid null (unique где not null),
 escalated_at timestamptz null,          -- один повторный push ушёл
 thanked_at timestamptz null,            -- «Спасибо ♥» директора (D-97), ставит thank_errand
+due_at timestamptz null,                -- «к 18:00» — к какому моменту нужно (D-106 §8)
+due_reminded_at timestamptz null,       -- одно напоминание за 10 мин до due_at ушло (errands_due_remind)
 created_at, accepted_at null, done_at null, updated_at
 ```
 Автомат `sent → accepted → done | declined | cancelled` — только RPC `transition_errand`; вставка — `/api/errands` под RLS. Очков, стены и ТВ у заявок нет (D-45, D-79 §10).
@@ -367,6 +369,7 @@ notes_purge_trash(p_now timestamptz default now()) returns int           -- то
 -- заявки (D-79)
 transition_errand(p_id uuid, p_to text, p_reason text default null, client_request_id uuid default null) returns jsonb
 errands_due_escalation(p_now timestamptz default now()) returns int      -- только service_role
+errands_due_remind(p_now timestamptz default now()) returns int          -- только service_role; D-106 §8
 thank_errand(p_id uuid, client_request_id uuid default null) returns jsonb   -- D-97
 
 -- посетители (D-96)
@@ -457,7 +460,7 @@ errands (company_id, created_at desc) where status in ('sent','accepted');  erra
 
 ## Расписание — минутный тик (вместо pg_cron)
 
-pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `events_due_reminders()`, `errands_due_escalation()`, `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
+pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `events_due_reminders()`, `errands_due_escalation()`, `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
 
 Исполнителя нет `[не построено]` у: `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `notes.reminded_at`.
 
