@@ -410,7 +410,7 @@ errands (company_id, created_at desc) where status in ('sent','accepted');  erra
 
 pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `events_due_reminders()`, `errands_due_escalation()`, затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
 
-Исполнителя нет `[не построено]` у: `reminders` и `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Тик, который появится, обязан быть идемпотентным отметкой в самой строке — как `events.reminded_at` и `errands.escalated_at`.
+Исполнителя нет `[не построено]` у: `reminders` и `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`.
 
 ## Миграции — дисциплина
 
