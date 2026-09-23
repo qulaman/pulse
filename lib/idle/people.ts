@@ -1,7 +1,7 @@
 import { between, rng } from "@/lib/idle/random";
 
 /**
- * The team on the waiting screen (D-69, rebuilt for a real company in D-71).
+ * The team on the waiting screen (D-90, rebuilt for a real company in D-91).
  *
  * The screen has two halves and the face sits between them:
  *

@@ -55,7 +55,7 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
 }
 
 /**
- * The idle screen of a home board (D-67, D-68). While the face sleeps the screen is a scene,
+ * The idle screen of a home board (D-67, D-89). While the face sleeps the screen is a scene,
  * not an empty panel: pen dust over the whole board, and the assistant's dream flying through
  * it — the drop with something after him, out of the middle of his head, across the screen and
  * gone. Everything here is decoration and nothing takes a tap: the layers are transparent to

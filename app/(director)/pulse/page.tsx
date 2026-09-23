@@ -419,7 +419,7 @@ export default function PulsePage() {
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
   // the secretaries sit at the desk, not among the circles (D-85)
   const secretaries = team.filter((p) => p.role === "secretary");
-  // the waiting screen's own view of the team: who is carrying what right now (D-69)
+  // the waiting screen's own view of the team: who is carrying what right now (D-90)
   const field = useMemo(
     () => ({
       people: team
@@ -495,7 +495,7 @@ export default function PulsePage() {
         {/* the face, and the balls orbiting it (ring) or in a row under it (panel) */}
         <div className="relative flex shrink-0 flex-col items-center">
           <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
-            {/* The waiting screen (D-68, D-71): drawn before the face, so the team and the
+            {/* The waiting screen (D-89, D-91): drawn before the face, so the team and the
                 dream pass behind the head. It belongs to the screen being at rest, not to one
                 pose of the face — since D-70 the resting face is a barometer and only sleeps
                 when nothing waits. The team also stays while the director is recording a task

@@ -21,7 +21,7 @@ export type DreamId = (typeof DREAMS)[number];
 type Actor = { key: string; size: number; track: "lead" | "chase"; trail: number; figure: ReactNode };
 
 /**
- * The figures of the dream and the flight they ride (D-67, D-68).
+ * The figures of the dream and the flight they ride (D-67, D-89).
  *
  * The line comes in already simulated (lib/idle/flight.ts): a runner and something after him,
  * both steering — wandering off their own course, turning away from the edges of the screen,
