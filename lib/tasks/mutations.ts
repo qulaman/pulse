@@ -242,7 +242,16 @@ export function useMarkRead(me: Me | undefined) {
       const { error } = await supabase.rpc("mark_thread_read", { task_id: input.taskId, seq: input.seq });
       if (error) throw new Error(error.message);
     },
-    onMutate: (input) => markBoardRead(queryClient, input.taskId, input.seq),
+    // a board request already in flight carries the old cursor: it must not land over the
+    // optimistic one (the employee's face went back to «nervous» after «Прочитал», D-110), so
+    // it is cancelled here and the board asks again once the server has the cursor
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.board() });
+      markBoardRead(queryClient, input.taskId, input.seq);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.board() });
+    },
   });
 }
 

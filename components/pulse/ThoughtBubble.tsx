@@ -23,6 +23,7 @@ export function ThoughtBubble({
   faceSize,
   onDismiss,
   onOpen,
+  openLabel = "открыть переписку",
 }: {
   text: string;
   tone?: SpeechTone;
@@ -30,13 +31,15 @@ export function ThoughtBubble({
   onDismiss: () => void;
   /** The thought is about a thread: a tap opens it instead of dismissing (D-64 §5). */
   onOpen?: () => void;
+  /** what `onOpen` opens, for the screen reader — on Лента the ball the thought is about (D-110) */
+  openLabel?: string;
 }) {
   const color = tone ? TONE_COLOR[tone] : "var(--text-muted)";
   return (
     <motion.button
       type="button"
       onClick={onOpen ?? onDismiss}
-      aria-label={onOpen ? "Мысль ассистента, тап — открыть переписку" : "Мысль ассистента, тап — убрать"}
+      aria-label={onOpen ? `Мысль ассистента, тап — ${openLabel}` : "Мысль ассистента, тап — убрать"}
       initial={{ opacity: 0, scale: 0.85, y: 8 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9, y: 4, transition: { duration: 0.18 } }}

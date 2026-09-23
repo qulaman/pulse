@@ -1373,6 +1373,405 @@ h1 { letter-spacing: -0.025em; }
   100% { transform: translate(0, 0); }
 }
 
+/* ---- the employee's face carries the work (D-110) ------------------------------------------
+   The director's «Капля» hands the task out as a card; the employee's catches that card, holds
+   it, hands it back up, gets it back or gets a medal for it. States first, then the acts. */
+/* working — holds the stack and breathes over it; once a cycle a look down at the cards */
+@keyframes mascot-work {
+  0%, 30% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  46% { transform: translateY(-1.2px) rotate(-0.8deg) scale(1.02, 0.985); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  58% { transform: translateY(0.9px) rotate(1.6deg) scale(1.025, 0.98); animation-timing-function: cubic-bezier(0.45, 0, 0.5, 1); }
+  70% { transform: translateY(0.9px) rotate(1.4deg) scale(1.02, 0.985); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  84% { transform: translateY(-0.4px) rotate(0deg) scale(0.995, 1.006); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+@keyframes mascot-work-look {
+  0%, 44% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  52%, 72% { transform: translate(2.4px, 2.6px); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  80%, 100% { transform: translate(0, 0); }
+}
+/* awaiting — everything is with the director: the sand runs, the eyes go up now and then */
+@keyframes mascot-await-look {
+  0%, 20% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  28%, 46% { transform: translate(1.8px, -2.8px); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  54%, 62% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  70%, 84% { transform: translate(2.4px, 2.2px); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  92%, 100% { transform: translate(0, 0); }
+}
+@keyframes mascot-sand-top {
+  0% { transform: scaleY(1); }
+  86%, 100% { transform: scaleY(0.08); }
+}
+@keyframes mascot-sand-bottom {
+  0% { transform: scaleY(0.08); }
+  86%, 100% { transform: scaleY(1); }
+}
+@keyframes mascot-sand-stream {
+  0%, 84% { opacity: 0.9; }
+  88%, 100% { opacity: 0; }
+}
+/* the glass turns over at the end of the run; the next run starts full, so the loop has no seam */
+@keyframes mascot-hourglass {
+  0%, 86% { transform: rotate(0deg); }
+  96%, 100% { transform: rotate(180deg); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+}
+/* calling (employee): the new card waits over the head and pops with every hop */
+@keyframes mascot-badge {
+  0%, 12% { transform: scale(1); }
+  18% { transform: scale(1.3); }
+  26% { transform: scale(0.95); }
+  36% { transform: scale(1.2); }
+  46%, 100% { transform: scale(1); }
+}
+/* nervous: the unread envelope bobs by the head in the nervous beat */
+@keyframes mascot-letter-bob {
+  0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+  25% { transform: translate(-0.8px, -1.6px) rotate(-10deg); }
+  50% { transform: translate(0.6px, -0.4px) rotate(-3deg); }
+  75% { transform: translate(-0.4px, -1.2px) rotate(-8deg); }
+}
+/* the stack's burning card: the clock throbs, the border warms and cools */
+@keyframes mascot-hot {
+  0%, 100% { transform: scale(1); }
+  40% { transform: scale(1.18); }
+  60% { transform: scale(0.96); }
+}
+
+/* catch — a card falls out of the sky into the face: eyes up, the hit, a bounce, then it holds */
+@keyframes mascot-act-catch {
+  0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+  22% { transform: translateY(-1px) rotate(-2deg) scale(0.98, 1.03); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  38% { transform: translateY(1.8px) rotate(1deg) scale(1.09, 0.91); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  52% { transform: translateY(-1.6px) rotate(0deg) scale(0.96, 1.05); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  68% { transform: translateY(0.4px) scale(1.02, 0.98); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-catch-eyes {
+  0% { transform: translate(0, 0); }
+  12%, 34% { transform: translate(1.8px, -2.8px); }
+  44% { transform: translate(1px, -1.2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes mascot-act-drop {
+  0% { transform: translate(-6px, -34px) rotate(-30deg); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6); }
+  8% { opacity: 1; }
+  38% { transform: translate(0, 0) rotate(6deg); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  46% { transform: translate(0, 1.6px) rotate(-3deg) scale(1.05, 0.92); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+  58%, 88% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+}
+/* nod — «есть!»: two quick nods, the tick pops, the card goes down into the stack */
+@keyframes mascot-act-nod {
+  0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+  14% { transform: translateY(2.4px) rotate(4deg) scale(1.04, 0.96); }
+  28% { transform: translateY(-0.8px) rotate(-1deg) scale(0.99, 1.01); }
+  42% { transform: translateY(1.6px) rotate(2.5deg) scale(1.03, 0.97); }
+  56% { transform: translateY(-0.4px) rotate(0deg) scale(1, 1); }
+  72%, 100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-tick {
+  0%, 12% { transform: scale(0.4) rotate(-12deg); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  24% { transform: scale(1.2) rotate(5deg); opacity: 1; animation-timing-function: cubic-bezier(0.34, 1.35, 0.64, 1); }
+  34%, 78% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(1.06) rotate(0deg); opacity: 0; }
+}
+@keyframes mascot-act-stash {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.8, 0.6); }
+  20% { transform: translate(-1px, -3px) rotate(-6deg) scale(1.02); opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  64% { transform: translate(7px, 44px) rotate(10deg) scale(0.8); opacity: 1; }
+  78%, 100% { transform: translate(8px, 48px) rotate(8deg) scale(0.74); opacity: 0; }
+}
+/* raise — «можно вопрос?»: a hand up, a small wiggle, the «?» floats off it */
+@keyframes mascot-act-raise {
+  0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+  16%, 80% { transform: translateY(-1.2px) rotate(3deg) scale(0.97, 1.04); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-arm {
+  0% { transform: scale(0) rotate(-30deg); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  14% { transform: scale(1.05) rotate(4deg); }
+  22% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1) rotate(-5deg); }
+  38% { transform: scale(1) rotate(4deg); }
+  46%, 82% { transform: scale(1) rotate(0deg); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  100% { transform: scale(0) rotate(-24deg); }
+}
+@keyframes mascot-act-ask {
+  0%, 18% { transform: translate(0, 0) scale(0.3); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  28% { transform: translate(0, 0) scale(1.15); opacity: 1; }
+  36% { transform: translate(0, 0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  80% { transform: translate(1px, -7px) scale(1); opacity: 1; }
+  100% { transform: translate(2px, -12px) scale(0.9); opacity: 0; }
+}
+@keyframes mascot-act-look-hand {
+  0% { transform: translate(0, 0); }
+  16%, 80% { transform: translate(-2.4px, -2.2px); }
+  100% { transform: translate(0, 0); }
+}
+/* shrug — «не могу»: shoulders up, palms out, a drop and an «эх»; the card slides aside */
+@keyframes mascot-act-shrug {
+  0% { transform: translateY(0) scale(1, 1); }
+  18%, 34% { transform: translateY(-2px) scale(0.97, 1.04); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  52% { transform: translateY(1.4px) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1); }
+  70% { transform: translateY(1px) scale(1.03, 0.97); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes mascot-act-palm {
+  0% { transform: translateY(0) scale(0); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  18% { transform: translateY(-1px) scale(1.06); }
+  30%, 72% { transform: translateY(-2px) scale(1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  100% { transform: translateY(0) scale(0); }
+}
+@keyframes mascot-act-aside {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  20% { transform: translate(-2px, -2px) rotate(-4deg); opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6); }
+  62% { transform: translate(14px, 22px) rotate(24deg); opacity: 0.85; }
+  80%, 100% { transform: translate(20px, 30px) rotate(32deg); opacity: 0; }
+}
+@keyframes mascot-act-flat-mouth {
+  0%, 30% { transform: scale(0.3, 1); opacity: 0; }
+  42%, 82% { transform: scale(1, 1); opacity: 1; }
+  100% { transform: scale(0.4, 1); opacity: 0; }
+}
+/* poof — revoked: the card over the head comes apart in the air, the face looks at empty hands */
+@keyframes mascot-act-poof {
+  0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+  20%, 40% { transform: translateY(-0.6px) rotate(2deg) scale(0.99, 1.01); }
+  50% { transform: translateY(0.6px) rotate(0deg) scale(1.03, 0.97); }
+  64%, 80% { transform: translateY(-1.6px) rotate(0deg) scale(0.97, 1.04); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-poof-card {
+  0% { transform: scale(0.8); opacity: 0; }
+  10%, 36% { transform: scale(1); opacity: 1; }
+  40% { transform: scale(1.06, 0.94); opacity: 1; }
+  54%, 100% { transform: scale(1.35); opacity: 0; }
+}
+@keyframes mascot-act-poof-bit {
+  0%, 38% { transform: translate(0, 0) scale(0.4); opacity: 0; }
+  44% { opacity: 1; }
+  76% { transform: translate(var(--px), var(--py)) scale(1); opacity: 0.9; }
+  90%, 100% { transform: translate(calc(var(--px) * 1.2), calc(var(--py) * 1.2)) scale(0.6); opacity: 0; }
+}
+/* handover — the card leaves the hand for the director: the throw of «Отправляю», with a tick */
+/* medal — «Директор принял»: the medal drops on the chest, a hop, a proud breath */
+@keyframes mascot-act-medal-body {
+  0%, 26% { transform: translateY(0) scale(1, 1); }
+  32% { transform: translateY(1px) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  44% { transform: translateY(-5px) scale(0.96, 1.05); animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.5); }
+  56% { transform: translateY(0.8px) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+  66% { transform: translateY(0) scale(1, 1); }
+  76%, 90% { transform: translateY(-0.8px) scale(0.975, 1.03); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes mascot-act-medal {
+  0% { transform: translateY(-40px) rotate(0deg); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6); }
+  6% { opacity: 1; }
+  30% { transform: translateY(0) rotate(0deg); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  36% { transform: translateY(-2px) rotate(0deg); }
+  44% { transform: translateY(0) rotate(-8deg); }
+  54% { transform: translateY(0) rotate(5deg); }
+  64% { transform: translateY(0) rotate(-2deg); }
+  74%, 90% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(0) rotate(0deg); opacity: 0; }
+}
+@keyframes mascot-act-medal-eyes {
+  0% { transform: translate(0, 0); }
+  8%, 26% { transform: translate(0, -2.6px); }
+  36%, 60% { transform: translate(0, 2.2px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes mascot-act-spark {
+  0%, 38% { transform: scale(0) rotate(0deg); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  48% { transform: scale(1.2) rotate(20deg); opacity: 1; }
+  62% { transform: scale(0.9) rotate(40deg); opacity: 0.85; }
+  76%, 100% { transform: scale(0.4) rotate(60deg); opacity: 0; }
+}
+/* boomerang — «на доработку»: the card comes back along an arc, bumps the head, a sigh,
+   then a small determined bounce — the face is not angry, it rolls up its sleeves */
+@keyframes mascot-act-sigh {
+  0%, 26% { transform: translateY(0) rotate(-2deg) scale(1, 1); }
+  34% { transform: translateY(1.2px) rotate(1deg) scale(1.05, 0.95); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+  44% { transform: translateY(0) rotate(0deg) scale(1, 1); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  56%, 72% { transform: translateY(1.8px) rotate(0deg) scale(1.04, 0.955); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+  84% { transform: translateY(-1.4px) rotate(0deg) scale(0.97, 1.04); }
+  92% { transform: translateY(0.3px) scale(1.01, 0.99); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-boomerang {
+  0% { transform: translate(30px, -24px) rotate(200deg) scale(0.8); opacity: 0; animation-timing-function: linear; }
+  6% { opacity: 1; }
+  18% { transform: translate(-12px, -30px) rotate(100deg) scale(0.95); animation-timing-function: cubic-bezier(0.4, 0, 0.8, 0.6); }
+  32% { transform: translate(0, 0) rotate(-8deg) scale(1); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  38% { transform: translate(0, 1.4px) rotate(4deg) scale(1.05, 0.93); }
+  48%, 88% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+}
+@keyframes mascot-act-boomerang-eyes {
+  0% { transform: translate(2.4px, -2.4px); }
+  16% { transform: translate(-2.2px, -2.6px); }
+  30% { transform: translate(1.4px, -2.2px); }
+  50%, 74% { transform: translate(0, 1.8px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes mascot-act-sigh-lids {
+  0%, 48% { transform: scaleY(1); }
+  56%, 76% { transform: scaleY(0.5); }
+  86%, 100% { transform: scaleY(1); }
+}
+/* relief — the deadline moved away: a breath in, the clock hand runs back, a long «фух» */
+@keyframes mascot-act-relief {
+  0% { transform: translateY(0) scale(1, 1); }
+  26%, 36% { transform: translateY(-1.2px) scale(0.97, 1.04); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  62% { transform: translateY(1.4px) scale(1.05, 0.95); }
+  80% { transform: translateY(0.4px) scale(1.02, 0.985); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes mascot-act-rewind {
+  0%, 16% { transform: rotate(0deg); animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1); }
+  62%, 100% { transform: rotate(-300deg); }
+}
+@keyframes mascot-act-phew {
+  0%, 38% { transform: scale(0.2); opacity: 0; }
+  50% { transform: scale(1); opacity: 1; }
+  70% { transform: scale(0.85, 0.7); opacity: 1; }
+  82%, 100% { transform: scale(0.2); opacity: 0; }
+}
+/* letter — the director's word flies in, the face turns to it */
+@keyframes mascot-act-letter {
+  0% { transform: translate(-24px, -22px) rotate(-30deg) scale(0.8); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1); }
+  10% { opacity: 1; }
+  50% { transform: translate(0, 0) rotate(4deg) scale(1); }
+  60% { transform: translate(0, 0) rotate(-3deg) scale(1); }
+  70%, 90% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0; }
+}
+@keyframes mascot-act-turn-to {
+  0% { transform: translateX(0) rotate(0deg); }
+  30%, 70% { transform: translateX(-1.2px) rotate(-5deg); }
+  100% { transform: translateX(0) rotate(0deg); }
+}
+@keyframes mascot-act-look-letter {
+  0% { transform: translate(0, 0); }
+  20%, 70% { transform: translate(-2.8px, -2.4px); }
+  100% { transform: translate(0, 0); }
+}
+/* read — «Прочитал»: the envelope opens, a tick, and it goes */
+@keyframes mascot-act-flap {
+  0%, 16% { transform: scaleY(1); }
+  36%, 100% { transform: scaleY(-1); }
+}
+@keyframes mascot-act-away {
+  0%, 70% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-6px); opacity: 0; }
+}
+/* listen — a word to everyone: an ear up, the gold arcs come into it */
+@keyframes mascot-act-lean-in {
+  0% { transform: rotate(0deg) translateX(0); }
+  18%, 80% { transform: rotate(-8deg) translateX(1.8px); }
+  100% { transform: rotate(0deg) translateX(0); }
+}
+@keyframes mascot-act-ear {
+  0% { transform: scale(0) rotate(-30deg); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  14% { transform: scale(1.08) rotate(4deg); }
+  22%, 84% { transform: scale(1) rotate(0deg); }
+  100% { transform: scale(0) rotate(-20deg); }
+}
+@keyframes mascot-act-attend {
+  0% { transform: translate(0, 0); }
+  18%, 80% { transform: translate(2.5px, -0.6px); }
+  100% { transform: translate(0, 0); }
+}
+/* thumb — «Ознакомился»: a thumb up out of the side, a small shake of it */
+@keyframes mascot-act-thumb {
+  0% { transform: scale(0) rotate(-30deg); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  16% { transform: scale(1.1) rotate(6deg); }
+  26% { transform: scale(1) rotate(0deg); }
+  40% { transform: scale(1) rotate(-7deg); }
+  52%, 80% { transform: scale(1) rotate(0deg); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  100% { transform: scale(0) rotate(-20deg); }
+}
+@keyframes mascot-act-proud {
+  0% { transform: translateY(0) scale(1, 1); }
+  16%, 78% { transform: translateY(-1.2px) scale(0.965, 1.045); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+/* watch — a look at the wristwatch: the arm comes up on the left, a nod, down */
+@keyframes mascot-act-watch-arm {
+  0% { transform: scale(0) rotate(30deg); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+  16% { transform: scale(1.05) rotate(-4deg); }
+  24%, 78% { transform: scale(1) rotate(0deg); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  100% { transform: scale(0) rotate(24deg); }
+}
+@keyframes mascot-act-watch {
+  0% { transform: translateY(0) rotate(0deg); }
+  18%, 40% { transform: translateY(0) rotate(3deg); }
+  50% { transform: translateY(1px) rotate(4deg); }
+  60%, 76% { transform: translateY(0) rotate(3deg); }
+  100% { transform: translateY(0) rotate(0deg); }
+}
+@keyframes mascot-act-watch-eyes {
+  0% { transform: translate(0, 0); }
+  18%, 72% { transform: translate(-2.8px, 0.4px); }
+  100% { transform: translate(0, 0); }
+}
+@keyframes mascot-act-watch-hand {
+  0%, 20% { transform: rotate(0deg); }
+  80%, 100% { transform: rotate(120deg); }
+}
+/* wipe — «фух»: a hand over the brow, a drop flicked off, a breath out */
+@keyframes mascot-act-wipe {
+  0% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+  20% { transform: translateY(0) rotate(1.5deg) scale(1, 1); }
+  56% { transform: translateY(0.4px) rotate(-1.5deg) scale(1, 1); }
+  72% { transform: translateY(1.2px) rotate(0deg) scale(1.03, 0.97); }
+  100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+}
+@keyframes mascot-act-wipe-hand {
+  0% { transform: translate(0, 0) scale(0); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1.2); }
+  12%, 20% { transform: translate(0, 0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  56% { transform: translate(-27px, 1.5px) scale(1); opacity: 1; }
+  66% { transform: translate(-29px, 2.5px) scale(0.9); opacity: 1; }
+  80%, 100% { transform: translate(-29px, 5px) scale(0.3); opacity: 0; }
+}
+@keyframes mascot-act-fling {
+  0%, 54% { transform: translate(0, 0) scale(0.6); opacity: 0; }
+  60% { transform: translate(-1px, 0) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.3, 0, 0.9, 0.6); }
+  100% { transform: translate(-8px, 10px) scale(0.8); opacity: 0; }
+}
+/* shuffle — goes through the stack: the top card lifts, turns, and goes back */
+@keyframes mascot-act-shuffle {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  24% { transform: translate(3px, -9px) rotate(14deg); }
+  50% { transform: translate(-2px, -10px) rotate(-8deg); }
+  76% { transform: translate(0, -1px) rotate(2deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+@keyframes mascot-act-shuffle-eyes {
+  0% { transform: translate(0, 0); }
+  16% { transform: translate(2.4px, 2px); }
+  30%, 56% { transform: translate(2px, -1.4px); }
+  80% { transform: translate(2.4px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+/* coin — points came in (behind points_enabled): a coin spins up off the crown and drops in */
+@keyframes mascot-act-coin {
+  0% { transform: translateY(6px) scale(0.4, 0.4); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  12% { opacity: 1; }
+  30% { transform: translateY(-10px) scale(1, 1); }
+  38% { transform: translateY(-11px) scale(-1, 1); }
+  46% { transform: translateY(-11px) scale(1, 1); }
+  54% { transform: translateY(-10px) scale(-1, 1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  78% { transform: translateY(4px) scale(0.8, 0.8); opacity: 1; }
+  90%, 100% { transform: translateY(8px) scale(0.5, 0.5); opacity: 0; }
+}
+@keyframes mascot-act-gulp {
+  0%, 70% { transform: translateY(0) scale(1, 1); }
+  78% { transform: translateY(1px) scale(1.06, 0.94); }
+  88% { transform: translateY(-0.6px) scale(0.98, 1.02); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+
 @keyframes thought-in {
   from { opacity: 0; transform: translateX(-50%) scale(0.85); }
   to { opacity: 1; transform: translateX(-50%) scale(1); }

@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 
+import { BRINGS_CARD, BRINGS_LETTER, CallCard, Hourglass, Letter, Stack, WorkActBehind, WorkActFront, WorkActOver, type WorkAct } from "@/components/brand/MascotWork";
+
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
  * Director-facing states only in the pilot. Each state is its own choreography — a
@@ -34,8 +36,16 @@ import type { CSSProperties } from "react";
  *   scheduling   «Календарь»: a tear-off calendar over the shoulder, a page flips and falls
  *   serving      «Секретарь»: a cup on a saucer held with care, steam rising, a small bow
  *   celebrating  the batch has flown: a jump and a burst of confetti
+ * The employee's face carries the work the director hands out (D-110, components/brand/MascotWork.tsx):
+ *   calling      the «!» is the new order itself — a card with a «!» badge over the head
+ *   nervous      the unread word of the director — an envelope bobs by the head
+ *   working      orders in work: holds the stack of cards (`carry`), glances down at it
+ *   awaiting     everything handed over: an hourglass runs, the eyes go up to the director
+ *   tuned        «Эфир» from the listener's side: an ear up, gold arcs come into it
  * An `act` is a one-shot over any of them (D-82): the small things a face does while nothing
- * is asked of it — a yawn, a snore bubble, rolling over, a wave, a wink (see MascotAct).
+ * is asked of it — a yawn, a snore bubble, rolling over, a wave, a wink (see MascotAct) — and,
+ * on the employee's face, what has just happened to the work: a card caught, «есть!», a hand
+ * up, a shrug, the card thrown up to the director, a medal, the card back to redo (D-110).
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
  * microphone) while listening — the blob swells and nods harder with the voice.
@@ -66,7 +76,10 @@ export type MascotState =
   | "announcing"
   | "scheduling"
   | "serving"
-  | "celebrating";
+  | "celebrating"
+  | "working"
+  | "awaiting"
+  | "tuned";
 
 /**
  * The small one-shots of a face at rest (D-82): played over the state, never instead of it,
@@ -90,10 +103,29 @@ export type MascotAct =
   | "heart"
   | "orbit"
   | "peek"
-  | "tiptoe";
+  | "tiptoe"
+  | WorkAct;
 
 /** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
 export const ACT_MS: Record<MascotAct, number> = {
+  catch: 1500,
+  insist: 1500,
+  nod: 1200,
+  raise: 1800,
+  shrug: 1800,
+  poof: 1800,
+  handover: 1300,
+  medal: 2400,
+  boomerang: 2200,
+  relief: 1800,
+  letter: 1500,
+  read: 1400,
+  listen: 2000,
+  thumb: 1300,
+  watch: 1800,
+  wipe: 1800,
+  shuffle: 1400,
+  coin: 1600,
   yawn: 2200,
   snore: 2800,
   turn: 2600,
@@ -145,6 +177,9 @@ const COLOR: Record<MascotState, string> = {
   scheduling: "var(--accent)",
   serving: "var(--accent)",
   celebrating: "var(--gold)",
+  working: "var(--accent)",
+  awaiting: "var(--accent)",
+  tuned: "var(--accent)",
 };
 
 /**
@@ -200,6 +235,10 @@ const POSE: Record<MascotState, string> = {
   // a small bow, the way a cup is brought in
   serving: "mascot-bow 0.8s cubic-bezier(0.34, 1.2, 0.64, 1) both",
   celebrating: "mascot-cheer-pose 0.9s both",
+  working: SETTLE,
+  awaiting: SETTLE,
+  // turns an ear to the word to everyone, the way `listening` turns it to the director
+  tuned: "mascot-lean 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both",
 };
 
 /** Looping body motion (inner group). */
@@ -231,6 +270,9 @@ const BODY: Record<MascotState, string> = {
   scheduling: "mascot-schedule 3s ease-in-out infinite",
   serving: "mascot-serve 3.2s ease-in-out infinite",
   celebrating: "mascot-happy 3.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  working: "mascot-work 6.4s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  awaiting: "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  tuned: "mascot-nod 1.8s ease-in-out infinite",
 };
 
 /**
@@ -246,6 +288,9 @@ const DRAG: Partial<Record<MascotState, string>> = {
   thinking: "mascot-drag-breath 2.6s ease-in-out infinite",
   serving: "mascot-drag-breath 3.2s ease-in-out infinite",
   celebrating: "mascot-happy-look 3.8s infinite",
+  working: "mascot-drag-breath 6.4s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  awaiting: "mascot-drag-breath 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  tuned: "mascot-drag-nod 1.8s ease-in-out infinite",
 };
 
 /** Eyes as a pair. */
@@ -277,6 +322,9 @@ const EYES: Record<MascotState, string> = {
   scheduling: "mascot-schedule-look 3s infinite",
   serving: "mascot-serve-look 3.2s infinite",
   celebrating: "none",
+  working: "mascot-work-look 6.4s infinite",
+  awaiting: "mascot-await-look 5s infinite",
+  tuned: "mascot-attend 3.2s ease-in-out infinite",
 };
 
 /** An act moves the whole body over whatever the state is doing (outermost motion group). */
@@ -297,6 +345,25 @@ const ACT_BODY: Record<MascotAct, string> = {
   orbit: "mascot-act-orbit-body 3.6s ease-in-out both",
   peek: "mascot-act-peek 2.8s ease-in-out both",
   tiptoe: "mascot-act-tiptoe 2.2s ease-in-out both",
+  // the work (D-110)
+  catch: "mascot-act-catch 1.5s both",
+  insist: "mascot-act-catch 1.5s both",
+  nod: "mascot-act-nod 1.2s ease-in-out both",
+  raise: "mascot-act-raise 1.8s ease-in-out both",
+  shrug: "mascot-act-shrug 1.8s both",
+  poof: "mascot-act-poof 1.8s ease-in-out both",
+  handover: "mascot-throw 1.2s cubic-bezier(0.4, 0, 0.2, 1) both",
+  medal: "mascot-act-medal-body 2.4s both",
+  boomerang: "mascot-act-sigh 2.2s both",
+  relief: "mascot-act-relief 1.8s ease-in-out both",
+  letter: "mascot-act-turn-to 1.5s ease-in-out both",
+  read: "mascot-act-nod 1.4s ease-in-out both",
+  listen: "mascot-act-lean-in 2s cubic-bezier(0.34, 1.2, 0.64, 1) both",
+  thumb: "mascot-act-proud 1.3s ease-in-out both",
+  watch: "mascot-act-watch 1.8s ease-in-out both",
+  wipe: "mascot-act-wipe 1.8s ease-in-out both",
+  shuffle: "mascot-act-content 1.4s ease-in-out both",
+  coin: "mascot-act-gulp 1.6s both",
 };
 
 /** Where an act sends the gaze — both eyes together, on top of the state's own look. */
@@ -305,6 +372,19 @@ const ACT_GAZE: Partial<Record<MascotAct, string>> = {
   peek: "mascot-act-peek-eyes 2.8s ease-in-out both",
   tiptoe: "mascot-act-tiptoe-eyes 2.2s ease-in-out both",
   heart: "mascot-act-look-up 2.4s ease-in-out both",
+  catch: "mascot-act-catch-eyes 1.5s ease-in-out both",
+  insist: "mascot-act-catch-eyes 1.5s ease-in-out both",
+  raise: "mascot-act-look-hand 1.8s ease-in-out both",
+  poof: "mascot-act-look-up 1.8s ease-in-out both",
+  handover: "mascot-follow 1.2s cubic-bezier(0.4, 0, 0.2, 1) both",
+  medal: "mascot-act-medal-eyes 2.4s ease-in-out both",
+  boomerang: "mascot-act-boomerang-eyes 2.2s ease-in-out both",
+  letter: "mascot-act-look-letter 1.5s ease-in-out both",
+  read: "mascot-act-look-letter 1.4s ease-in-out both",
+  listen: "mascot-act-attend 2s ease-in-out both",
+  watch: "mascot-act-watch-eyes 1.8s ease-in-out both",
+  shuffle: "mascot-act-shuffle-eyes 1.4s ease-in-out both",
+  coin: "mascot-act-look-up 1.6s ease-in-out both",
 };
 
 /** How an act shapes each eye: [left, right]. A wink is the one act that tells them apart. */
@@ -316,10 +396,31 @@ const ACT_LIDS: Partial<Record<MascotAct, [string, string]>> = {
   wink: ["mascot-act-half 1.3s ease-in-out both", "mascot-act-wink 1.3s both"],
   whistle: ["mascot-act-relax 2.8s ease-in-out both", "mascot-act-relax 2.8s ease-in-out both"],
   heart: ["mascot-act-glad 2.4s ease-in-out both", "mascot-act-glad 2.4s ease-in-out both"],
+  nod: ["mascot-act-glad 1.2s ease-in-out both", "mascot-act-glad 1.2s ease-in-out both"],
+  shrug: ["mascot-act-relax 1.8s ease-in-out both", "mascot-act-relax 1.8s ease-in-out both"],
+  medal: ["mascot-act-glad 2.4s ease-in-out both", "mascot-act-glad 2.4s ease-in-out both"],
+  boomerang: ["mascot-act-sigh-lids 2.2s ease-in-out both", "mascot-act-sigh-lids 2.2s ease-in-out both"],
+  relief: ["mascot-act-relax 1.8s ease-in-out both", "mascot-act-relax 1.8s ease-in-out both"],
+  thumb: ["mascot-act-glad 1.3s ease-in-out both", "mascot-act-glad 1.3s ease-in-out both"],
+  wipe: ["mascot-act-squeeze 1.8s ease-in-out both", "mascot-act-squeeze 1.8s ease-in-out both"],
 };
 
 /** The acts that warm the cheeks. */
-const ACT_BLUSH: Partial<Record<MascotAct, true>> = { smile: true, heart: true, wave: true, wink: true };
+const ACT_BLUSH: Partial<Record<MascotAct, true>> = { smile: true, heart: true, wave: true, wink: true, medal: true, thumb: true, coin: true };
+
+/** The acts whose mouth is a flat «эх»: a no, a card taken away, a card back to redo. */
+const FLAT_MOUTH: Partial<Record<MascotAct, string>> = {
+  shrug: "mascot-act-flat-mouth 1.8s ease-in-out both",
+  poof: "mascot-act-flat-mouth 1.8s ease-in-out both",
+  boomerang: "mascot-act-flat-mouth 2.2s ease-in-out both",
+};
+/** The acts that smile for their length: a medal, a thumb up, points in. */
+const ACT_SMILE: Partial<Record<MascotAct, string>> = {
+  medal: "mascot-act-smile 2.4s ease-in-out both",
+  thumb: "mascot-act-smile 1.3s ease-in-out both",
+  coin: "mascot-act-smile 1.6s ease-in-out both",
+  nod: "mascot-act-smile 1.2s ease-in-out both",
+};
 
 /**
  * The eye's drawn geometry; every state is a scale away from it (never a new rx/ry).
@@ -393,6 +494,7 @@ export function Mascot({
   level = 0,
   act = null,
   gaze = null,
+  carry = null,
 }: {
   state?: MascotState;
   size?: number;
@@ -400,13 +502,20 @@ export function Mascot({
   /** a one-shot over the state (D-82); the screen clears it after ACT_MS */
   act?: MascotAct | null;
   /**
+   * The employee's orders in work, held as a stack of cards (D-110): how many, and whether one
+   * of them is due within the hour. null or zero — empty hands.
+   */
+  carry?: { count: number; hot?: boolean } | null;
+  /**
    * Where the face is looking, as a direction from its middle (−1..1 on each axis): the eyes
    * go there and hold, the head leans a little the same way (D-84 — the person the director
    * has just tapped). null — the state's own look.
    */
   gaze?: { x: number; y: number } | null;
 }) {
-  const squint = state === "happy" || state === "celebrating";
+  // a no, a card taken back or sent back to redo is not met with a grin: the flat «эх» of the
+  // act drops the happy squint for its length (D-110)
+  const squint = (state === "happy" || state === "celebrating") && !(act && FLAT_MOUTH[act]);
   const wide = state === "listening";
   const talking = state === "speaking";
   const lidded = state === "saving"; // eyes half-closed while tucking the note away
@@ -449,6 +558,10 @@ export function Mascot({
   const acting = detailed ? act : null;
   const lids = act ? ACT_LIDS[act] : undefined;
   const cheeks = squint || content;
+  // the stack of orders in the hands (D-110); a held job of a ball keeps the hands for itself
+  const holding = detailed && carry !== null && carry.count > 0;
+  const flatMouth = act ? FLAT_MOUTH[act] : undefined;
+  const actSmile = act === "smile" ? "mascot-act-smile 3.2s ease-in-out both" : act ? ACT_SMILE[act] : undefined;
   // the jumps of an act leave the ground too, and while they do the ground answers them
   // instead of the state's breath
   const actShadow = act === "hop" ? "mascot-shadow-act-hop 1s both" : act === "spin" ? "mascot-shadow-act-spin 1.3s both" : null;
@@ -460,7 +573,7 @@ export function Mascot({
         ? "mascot-shadow-hop 3.8s ease-in-out infinite"
         : state === "sleeping"
           ? "mascot-shadow-sleep 7s ease-in-out infinite"
-          : state === "calm"
+          : state === "calm" || state === "awaiting"
             ? "mascot-shadow-idle 5.8s ease-in-out infinite"
             // the one-shots big enough for the ground to answer them
             : state === "surprised"
@@ -595,16 +708,17 @@ export function Mascot({
         </g>
       ) : null}
 
-      {/* listening: sound waves come in from the right and land on the ear */}
-      {state === "listening" ? (
-        <g fill="none" stroke={COLOR.listening} strokeWidth="1.7" strokeLinecap="round">
+      {/* listening: sound waves come in from the right and land on the ear; tuned — the gold of
+          Эфир, the word to everyone, coming in at an even pace (D-110) */}
+      {state === "listening" || state === "tuned" ? (
+        <g fill="none" stroke={state === "tuned" ? TONE.ether : COLOR.listening} strokeWidth="1.7" strokeLinecap="round">
           {[0, 1, 2].map((wave) => (
             <path
               key={wave}
               d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
               style={{
                 transformOrigin: "62px 25px",
-                animation: `mascot-wave-in ${(1.5 - clamped * 0.5).toFixed(2)}s ease-out ${wave * 0.28}s infinite`,
+                animation: `mascot-wave-in ${(state === "tuned" ? 1.6 : 1.5 - clamped * 0.5).toFixed(2)}s ease-out ${wave * 0.28}s infinite`,
                 opacity: 0,
               }}
             />
@@ -737,13 +851,9 @@ export function Mascot({
         </>
       ) : null}
 
-      {/* calling: «!» over the head, popping in time with the hops — the order is waiting */}
-      {state === "calling" ? (
-        <g style={{ transformOrigin: "46px 2px", animation: "mascot-call-mark 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite", opacity: 0 }}>
-          <path d="M46 -9 L46 -1" stroke={COLOR.calling} strokeWidth="4.4" strokeLinecap="round" />
-          <circle cx="46" cy="3.4" r="2.2" fill={COLOR.calling} />
-        </g>
-      ) : null}
+      {/* calling: the new order over the head, popping in time with the hops — a card with a
+          «!» badge (D-110), the bare «!» at avatar size. A card flying in brings it itself. */}
+      {state === "calling" && !(acting && BRINGS_CARD.has(acting)) ? <CallCard color={COLOR.calling} detailed={detailed} /> : null}
 
       {/* sleeping: two small z-s drift up from the head, one after the other */}
       {asleep ? (
@@ -781,9 +891,10 @@ export function Mascot({
       {/* happy: two sparks pop beside the blob in turn */}
       {state === "happy" ? (
         <g fill={COLOR.happy}>
+          {/* clear of the body: drawn behind it, a spark half inside it read as a pointed ear */}
           <path
-            d="M8 16 L9.6 20.4 L14 22 L9.6 23.6 L8 28 L6.4 23.6 L2 22 L6.4 20.4 Z"
-            style={{ transformOrigin: "8px 22px", animation: "mascot-spark 3.8s infinite", opacity: 0 }}
+            d="M1 10 L2.6 14.4 L7 16 L2.6 17.6 L1 22 L-0.6 17.6 L-5 16 L-0.6 14.4 Z"
+            style={{ transformOrigin: "1px 16px", animation: "mascot-spark 3.8s infinite", opacity: 0 }}
           />
           <path
             d="M56 6 L57.2 9.2 L60.4 10.4 L57.2 11.6 L56 14.8 L54.8 11.6 L51.6 10.4 L54.8 9.2 Z"
@@ -822,6 +933,8 @@ export function Mascot({
                   <ellipse cx="64" cy="7.4" rx="2" ry="1.2" transform="rotate(18 64 7.4)" fill="#ffffff" opacity="0.2" />
                 </g>
               ) : null}
+              {/* the hands of the work, behind the body the same way: a hand up, palms out, a thumb, the watch (D-110) */}
+              {acting ? <WorkActBehind act={acting} body={COLOR[state]} /> : null}
               <path
                 d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
                 fill={COLOR[state]}
@@ -839,8 +952,9 @@ export function Mascot({
                 style={{ transformOrigin: "24px 18px", animation: detailed ? "mascot-glint 7.3s ease-in-out infinite" : "none" }}
               />
 
-              {/* listening: the ear pricks up on the right and twitches now and then */}
-              {state === "listening" ? (
+              {/* listening: the ear pricks up on the right and twitches now and then; tuned — the
+                  same ear, turned to the word to everyone (D-110) */}
+              {state === "listening" || state === "tuned" ? (
                 <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both" }}>
                   <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-twitch 3.2s ease-in-out 1s infinite" }}>
                     {/* a proper ear: a rounded lobe standing out of the head, with a darker hollow */}
@@ -922,6 +1036,13 @@ export function Mascot({
                   <ellipse cx="52.5" cy="47.4" rx="7.4" ry="1.5" fill={`color-mix(in srgb, ${TONE.secretary} 55%, var(--bg))`} />
                 </g>
               ) : null}
+
+              {/* the employee's orders in work, a stack of cards in the hands (D-110) */}
+              {holding ? <Stack count={carry!.count} hot={carry!.hot === true} body={COLOR[state]} shuffle={acting === "shuffle"} /> : null}
+              {/* everything handed over: the hourglass runs until the director answers */}
+              {state === "awaiting" && detailed ? <Hourglass /> : null}
+              {/* what the work puts in front of the body for a moment: the medal, the hand at the brow, the ear */}
+              {acting ? <WorkActFront act={acting} body={COLOR[state]} /> : null}
 
               <g style={{ transform: gazeShift, transition: LOOK_EASE }}>
               <g style={{ transformOrigin: "32px 33px", animation: DRAG[state] ?? "none" }}>
@@ -1022,15 +1143,23 @@ export function Mascot({
                     {act === "whistle" ? (
                       <ellipse cx="34.5" cy="45.5" rx="1.9" ry="2.2" style={{ transformOrigin: "34.5px 45.5px", animation: "mascot-act-pucker 2.8s ease-in-out both" }} />
                     ) : null}
-                    {act === "smile" && !squint && !content ? (
+                    {actSmile && !squint && !content ? (
                       <path
                         d="M27 44 Q32 48.5 37 44"
                         fill="none"
                         stroke="var(--bg)"
                         strokeWidth="2.1"
                         strokeLinecap="round"
-                        style={{ transformOrigin: "32px 46px", animation: "mascot-act-smile 3.2s ease-in-out both" }}
+                        style={{ transformOrigin: "32px 46px", animation: actSmile }}
                       />
+                    ) : null}
+                    {/* the work's own mouths (D-110): a flat «эх» for a no or a card taken back,
+                        a round «фух» when the deadline moves away */}
+                    {flatMouth && !squint && !content ? (
+                      <path d="M27.6 45.6 Q32 44.4 36.4 45.6" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" style={{ transformOrigin: "32px 45px", animation: flatMouth }} />
+                    ) : null}
+                    {act === "relief" ? (
+                      <ellipse cx="32" cy="46" rx="2.2" ry="2.6" style={{ transformOrigin: "32px 46px", animation: "mascot-act-phew 1.8s ease-in-out both" }} />
                     ) : null}
                   </g>
                 </g>
@@ -1041,6 +1170,12 @@ export function Mascot({
         </g>
         </g>
       </g>
+
+      {/* nervous: the unread word itself, by the head (D-110) — unless it is flying in or being opened */}
+      {state === "nervous" && detailed && !(acting && BRINGS_LETTER.has(acting)) ? <Letter /> : null}
+      {/* what flies in the work's acts: the card caught, stashed, put aside, thrown up, back to
+          redo; the «?», the letter, the clock, the coin (D-110) */}
+      {acting ? <WorkActOver act={acting} /> : null}
 
       {/* processing: the new status itself — the tick lands with the top of the hop, and it
           is drawn last so the badge sits on the face instead of under it */}

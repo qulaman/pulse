@@ -26,6 +26,8 @@ type StateEntry = {
   note: string;
   /** the keyframes that drive the state: pose / body / eyes / props */
   keys: string;
+  /** the employee's orders in work, held as a stack (D-110) */
+  carry?: { count: number; hot?: boolean };
 };
 
 const STATES: StateEntry[] = [
@@ -104,8 +106,8 @@ const STATES: StateEntry[] = [
   {
     state: "calling",
     title: "Зовёт",
-    note: "«Обрати внимание!»: наклон к зрителю, два настойчивых подскока с креном и пауза, над головой выскакивает «!». Лента сотрудника, пока есть непринятая задача",
-    keys: "mascot-lean · mascot-call · mascot-call-mark",
+    note: "«Обрати внимание!»: наклон к зрителю, два настойчивых подскока с креном и пауза, над головой выскакивает новая карточка с бейджем «!» (D-110; на аватарном размере — голый «!»). Лента сотрудника, пока есть непринятая или возвращённая задача",
+    keys: "mascot-lean · mascot-call · mascot-call-mark · mascot-badge",
   },
   {
     state: "surprised",
@@ -128,8 +130,8 @@ const STATES: StateEntry[] = [
   {
     state: "nervous",
     title: "Нервничает",
-    note: "Неуверенно переминается, взгляд мечется, рядом появляется одна капля пота.",
-    keys: "mascot-nervous · mascot-nervous-look · mascot-sweat",
+    note: "Неуверенно переминается, взгляд мечется, капля пота, а у головы подпрыгивает конверт — непрочитанное слово директора (D-110).",
+    keys: "mascot-nervous · mascot-nervous-look · mascot-sweat · mascot-letter-bob",
   },
   {
     state: "bored",
@@ -140,8 +142,9 @@ const STATES: StateEntry[] = [
   {
     state: "panicking",
     title: "Паникует",
-    note: "Частая дрожь, широко раскрытые глаза и две торопливые капли пота.",
-    keys: "mascot-panic-pose · mascot-panic · mascot-panic-look · mascot-sweat",
+    note: "Частая дрожь, широко раскрытые глаза и две торопливые капли пота. У сотрудника в руках стопка, верхняя карточка горит — часы срока пульсируют (D-110).",
+    keys: "mascot-panic-pose · mascot-panic · mascot-panic-look · mascot-sweat · mascot-hot",
+    carry: { count: 2, hot: true },
   },
   {
     state: "swearing",
@@ -182,12 +185,31 @@ const STATES: StateEntry[] = [
   {
     state: "celebrating",
     title: "Празднует",
-    note: "Пачка улетела и дошла: настоящий прыжок, тень отрывается от земли, с макушки разлетается конфетти. Играет 1,8 с после броска (D-82)",
+    note: "Пачка улетела и дошла: настоящий прыжок, тень отрывается от земли, с макушки разлетается конфетти. Играет 1,8 с после броска (D-82); у сотрудника — после медали, если включены очки (D-110)",
     keys: "mascot-cheer-pose · mascot-happy · mascot-confetti · mascot-shadow-cheer",
+  },
+  {
+    state: "working",
+    title: "Работает (сотрудник)",
+    note: "Дела в работе — лицо не спит, а держит их стопкой карточек: до трёх веером, число на бейдже, большой палец на краю. Раз за цикл поглядывает вниз на стопку (D-110)",
+    keys: "mascot-work · mascot-work-look · mascot-prop-in",
+    carry: { count: 3 },
+  },
+  {
+    state: "awaiting",
+    title: "Ждёт приёмки (сотрудник)",
+    note: "Всё сдано директору: песочные часы, песок течёт и часы переворачиваются, глаза то вверх — к директору, то на часы (D-110)",
+    keys: "mascot-idle · mascot-await-look · mascot-hourglass · mascot-sand-top · mascot-sand-bottom",
+  },
+  {
+    state: "tuned",
+    title: "Шарик «Эфир» (сотрудник)",
+    note: "Эфир со стороны слушателя: наклон и ухо, как у «слушает», золотые дуги входят в ухо, кивки. Мегафон — у того, кто объявляет (D-110)",
+    keys: "mascot-lean · mascot-nod · mascot-attend · mascot-ear-up · mascot-wave-in",
   },
 ];
 
-type ActEntry = { act: MascotAct; on: MascotState; title: string; note: string };
+type ActEntry = { act: MascotAct; on: MascotState; title: string; note: string; carry?: { count: number; hot?: boolean } };
 
 /** The acts of a face at rest (D-82), each on the state whose pool it belongs to. */
 const ACTS: ActEntry[] = [
@@ -207,6 +229,25 @@ const ACTS: ActEntry[] = [
   { act: "orbit", on: "calm", title: "Следит за шариками", note: "Взгляд делает круг — вслед шарикам на орбите, тело поворачивается за ним" },
   { act: "peek", on: "alert", title: "Выглядывает", note: "Насторожен: высовывается посмотреть в одну сторону, потом в другую" },
   { act: "tiptoe", on: "alert", title: "На цыпочках", note: "Насторожен: тянется вверх, смотреть поверх, водит глазами и опускается" },
+  // the employee's work (D-110): what the face plays when something happens to an order
+  { act: "catch", on: "calling", title: "Ловит задачу", note: "Сотрудник: новая задача падает сверху карточкой, лицо приседает под ней, глаза следят — и она остаётся над головой с «!»" },
+  { act: "insist", on: "calling", title: "Директор настаивает", note: "После «Не могу» карточка возвращается тяжелее, с красным «!!»" },
+  { act: "nod", on: "working", title: "«Есть!» — Принял", note: "Два быстрых кивка, улыбка, галочка; карточка уходит вниз в стопку", carry: { count: 2 } },
+  { act: "raise", on: "calling", title: "Уточнить", note: "Поднимает руку, машет ею «можно?», с ладони уходит вверх «?»" },
+  { act: "shrug", on: "happy", title: "Не могу", note: "Плечи вверх, ладони в стороны, «эх» ртом; карточка отъезжает в сторону. Сдержанно, без драмы (D-45)" },
+  { act: "poof", on: "happy", title: "Отозвали", note: "Карточка над головой рассыпается в воздухе, лицо смотрит на пустое место и разводит руками" },
+  { act: "handover", on: "awaiting", title: "Сдал", note: "Бросок «Отправляю» с этой стороны: карточка с галочкой улетает вверх — к директору" },
+  { act: "medal", on: "happy", title: "Директор принял", note: "Медаль падает на грудь, прыжок, гордый вдох, искры. С очками после неё — прыжок с конфетти" },
+  { act: "boomerang", on: "calling", title: "На доработку", note: "Карточка возвращается по дуге и стукает по макушке; вздох, плечи опускаются — и решительный подскок. Не злится" },
+  { act: "relief", on: "working", title: "Срок отодвинули", note: "Вдох, стрелка часов бежит назад, долгое «фух»", carry: { count: 1 } },
+  { act: "letter", on: "nervous", title: "Пишет директор", note: "Конверт влетает к голове, лицо поворачивается к нему" },
+  { act: "read", on: "working", title: "Прочитал", note: "Конверт раскрывается, галочка, кивок — и конверт уходит", carry: { count: 1 } },
+  { act: "listen", on: "happy", title: "Объявление", note: "Ухо вверх, золотые дуги Эфира входят в него" },
+  { act: "thumb", on: "tuned", title: "Ознакомился", note: "Большой палец вверх из-за бока, улыбка, гордая осанка" },
+  { act: "watch", on: "working", title: "Смотрит на часы", note: "Рука с часами слева, взгляд на них, кивок. И в покое с делами, и на мысль о встрече", carry: { count: 2 } },
+  { act: "wipe", on: "working", title: "Вытирает лоб", note: "Рука проходит по лбу, капля слетает, выдох — сценка занятого лица", carry: { count: 2 } },
+  { act: "shuffle", on: "working", title: "Перебирает карточки", note: "Верхняя карточка стопки поднимается, поворачивается и возвращается", carry: { count: 3 } },
+  { act: "coin", on: "happy", title: "Пришли очки", note: "Монета взлетает с макушки, крутится и падает в голову; рядом «+N» (только с очками, D-40)" },
 ];
 
 /** One act on repeat: it plays, the face rests a beat, it plays again. Remount to restart. */
@@ -223,7 +264,7 @@ function ActDemo({ entry, size }: { entry: ActEntry; size: number }) {
     flip(false);
     return () => clearTimeout(timer);
   }, [entry.act]);
-  return <Mascot state={entry.on} size={size} act={on ? entry.act : null} />;
+  return <Mascot state={entry.on} size={size} act={on ? entry.act : null} carry={entry.carry ?? null} />;
 }
 
 type GestureEntry = {
@@ -535,6 +576,7 @@ export function MascotGallery() {
                     state={entry.state}
                     size={size}
                     level={entry.state === "listening" ? level : 0}
+                    carry={entry.carry ?? null}
                   />
                 </button>
               </Stage>
@@ -548,8 +590,9 @@ export function MascotGallery() {
         <h2 className="text-[19px] font-semibold leading-6">Сценки в покое</h2>
         <p className="mt-1 text-[13px] leading-4 text-muted">
           {ACTS.length} коротких сценок поверх состояния (D-82): на Пульсе в покое лицо само играет одну из подходящих каждые 6–12 с —
-          спящее спит дальше, бодрствующее ждёт выбора шарика, настороженное только оглядывается (D-70). Здесь каждая крутится по кругу;
-          тап — сначала.
+          спящее спит дальше, бодрствующее ждёт выбора шарика, настороженное только оглядывается (D-70). С «Ловит задачу» и ниже —
+          сценки сотрудника (D-110): что лицо играет, когда с его делом что-то случилось, — и его сценки с делами в руках. Раскадровка
+          всей жизни задачи — /dev/employee. Здесь каждая крутится по кругу; тап — сначала.
         </p>
         <div className="mt-3 flex flex-col gap-4">
           {ACTS.map((entry) => (

@@ -20,6 +20,11 @@ const POOLS: Partial<Record<MascotState, readonly MascotAct[]>> = {
   calm: AWAKE,
   happy: AWAKE,
   alert: ["peek", "tiptoe"],
+  // the employee's face with work in its hands (D-110): a look at the watch, the brow wiped,
+  // a card gone through, a tune, a wink — somebody busy, not somebody waiting
+  working: ["watch", "wipe", "shuffle", "whistle", "wink"],
+  // everything is with the director: it looks around, stretches to see, checks the time
+  awaiting: ["peek", "tiptoe", "watch", "whistle"],
 };
 
 /** The first act comes a few seconds after the face settles into its state. */

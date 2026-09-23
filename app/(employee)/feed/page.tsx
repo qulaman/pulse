@@ -2,14 +2,16 @@
 
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
-import type { MascotState } from "@/components/brand/Mascot";
+import { ACT_MS, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { IdleScene } from "@/components/pulse/IdleScene";
 import { MascotLever } from "@/components/pulse/MascotLever";
+import { useMascotActs } from "@/components/pulse/useMascotActs";
+import { EVENT_ACT, useEmployeeEvents } from "@/components/pulse/useEmployeeEvents";
 import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
@@ -36,16 +38,26 @@ import { haptic } from "@/lib/haptics";
 import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
 import { useErrands, useSecretaries, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
 import { askedDetails, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
-import { usePointsEnabled } from "@/lib/points/queries";
+import { usePointsArrival, usePointsEnabled } from "@/lib/points/queries";
 import type { SecretaryAction } from "@/lib/settings";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
 import { useEther } from "@/lib/ether/queries";
 import { describeEtherForEmployee } from "@/lib/pulse/ether";
 import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
-import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
-import { alarmOf } from "@/lib/pulse/mood";
+import {
+  describeForEmployeeAll,
+  employeeFace,
+  employeeLoad,
+  employeeOpening,
+  isOpenFor,
+  isTodo,
+  onTimeStreak,
+  otherSideOf,
+  reasonOf,
+} from "@/lib/pulse/employee";
 import { useNow } from "@/lib/pulse/queries";
-import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
+import { sortByUrgency, useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
+import { pluralRu } from "@/lib/tasks/status-text";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import { firstNameOf } from "@/lib/text/normalize";
 import { useVisits } from "@/lib/visits/queries";
@@ -60,12 +72,37 @@ const NO_ACTIONS: SecretaryAction[] = [];
 const OFFICE_HOURS = { from: "08:00", to: "21:00" };
 
 /**
+ * An open ball is a job the employee's face does by hand while the panel is open (D-82, D-110):
+ * the same clipboard, conversation and calendar as the director's — but Эфир is heard, not
+ * shouted: the megaphone belongs to whoever speaks to everyone.
+ */
+const PANEL_FACE: Record<OrbitId, MascotState> = {
+  tasks: "checking",
+  messages: "chatting",
+  ether: "tuned",
+  calendar: "scheduling",
+  secretary: "serving",
+};
+/** The medal has landed: then the face jumps with confetti this long (game feel, D-110). */
+const CHEER_AFTER_MS = 1_100;
+const CHEER_MS = 1_800;
+/** How long «+N» and «N подряд в срок» stay by the face. */
+const PILL_MS = 4_000;
+/** A pile of events is played one after another, but never more than this far behind. */
+const QUEUE_MAX_MS = 3_000;
+
+/**
  * Лента — the employee's home (D-62): the same sleeping face in the middle of the
  * screen. A tap wakes it: it says what is new for the person and three balls orbit it —
  * «Дела» (orders to accept or redo), «Сообщения» (the director's unread words),
  * «Эфир» (announcements not yet acknowledged). A ball opens its panel; a change from
  * the director's side is a thought above the head. No microphone here: the person
  * speaks inside a task, not to the face.
+ *
+ * The face carries the work (D-110): it holds the orders in work as a stack of cards and sleeps
+ * only with empty hands; it catches a new order, nods «есть!», puts up a hand, shrugs, throws the
+ * card back up to the director, gets it back to redo or with a medal. A worried face leads to
+ * its reason on the tap — the order to accept, the unread word — instead of to the balls.
  *
  * The secretary's Лента is its own (D-87): its own face — the secretary at work, acting out
  * the director's request in hand (coffee, tea, «не беспокоить», a guest) — a line under it
@@ -199,24 +236,6 @@ export default function FeedPage() {
   };
   // while a request is calling, the face itself is the biggest «Принял» on the screen (D-97)
   const acceptByFace = isSecretary && mode === "idle" && desk.phase === "asked" && desk.errand !== null;
-  const onFaceTap = () => {
-    if (acceptByFace && desk.errand) {
-      haptic(20);
-      errandActions.mutate({ id: desk.errand.id, to: "accepted" });
-      return;
-    }
-    if (mode === "idle") {
-      setWakeKey((key) => key + 1);
-      speech.replay();
-      setMode("ring");
-    } else if (mode === "panel") {
-      setMode("ring");
-      setPanel(null);
-    } else {
-      setMode("idle");
-      setPanel(null);
-    }
-  };
 
   // a change from the director's side is a thought above the head; the face wakes up to it
   // the board is one screen: the shell stops growing with its content while this page is open
@@ -245,26 +264,139 @@ export default function FeedPage() {
 
   // The feelings live here, on the side that carries the work (D-70): an unopened order
   // calls (D-69), a deadline within the hour is panic, an unread word from the director
-  // is nerves. The director's face only ever watches.
-  const alarm = useMemo(() => alarmOf(open, now, meId), [open, now, meId]);
-  const awake: MascotState = loading
-    ? "thinking"
-    : speech.speaking
-      ? "speaking"
-      : todo.length > 0
-        ? "calling"
-        : alarm === "deadline"
-          ? "panicking"
-          : alarm === "unread"
-            ? "nervous"
-            : lanes.overdue.length > 0
-              ? "calm"
-              : "happy";
-  // a change on the board is data the assistant has just read: it reports the new status (D-65)
-  // An unaccepted order calls even before the first tap: the resting face sleeps only when
-  // there is nothing to open (владелец, 2026-09-17 — Марат спал с пятью делами).
-  const restFace: MascotState = todo.length > 0 ? "calling" : alarm === "deadline" ? "panicking" : alarm === "unread" ? "nervous" : "sleeping";
-  const mascot: MascotState = thought ? "processing" : mode === "idle" ? restFace : awake;
+  // is nerves. The director's face only ever watches. Since D-110 the face also shows what is in
+  // its hands: the orders in work as a stack, the handed-over ones as an hourglass — and it
+  // sleeps only with empty hands (владелец, 2026-09-17 — Марат спал с пятью делами).
+  const load = useMemo(() => employeeLoad(open, now, meId), [open, now, meId]);
+  const restFace = employeeFace(load.rest, false);
+  // the medal has landed and the points are on (D-40, D-48): a jump with confetti after it
+  const [cheering, setCheering] = useState(false);
+  const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
+  // a thought is news from the director: the face is awake for it and plays what happened
+  // (D-110) instead of the director's «reads the data» (D-65)
+  const mascot: MascotState = cheering
+    ? "celebrating"
+    : thought
+      ? employeeFace(load.rest, true)
+      : mode === "idle"
+        ? restFace
+        : (panelFace ?? (loading ? "thinking" : speech.speaking ? "speaking" : employeeFace(load.rest, true)));
+  // the stack is in the hands whenever the hands are not busy with a ball's job
+  const carry = !isSecretary && !panelFace && !cheering && load.carry > 0 ? { count: load.carry, hot: load.hot } : null;
+  // a worried face leads to its reason on the tap (D-110); the secretary keeps its own face
+  const reason = isSecretary ? null : reasonOf(load.rest);
+
+  // the small things a face does on its own (D-82): asleep, busy with the stack, waiting for
+  // the director, glad on the ring — never over a thought, a panel or the celebration
+  const acts = useMascotActs(mascot, !isSecretary && !loading && !thought && !cheering && mode !== "panel");
+  const play = acts.play;
+  // one called act after another — an accepted pile nods once per card — but never far behind
+  const actsEnd = useRef(0);
+  const actTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const playInTurn = useCallback(
+    (act: MascotAct) => {
+      const at = Date.now();
+      const wait = Math.max(0, actsEnd.current - at);
+      if (wait > QUEUE_MAX_MS) return;
+      actsEnd.current = at + wait + ACT_MS[act];
+      if (wait === 0) play(act);
+      else actTimers.current.push(setTimeout(() => play(act), wait));
+    },
+    [play],
+  );
+  useEffect(
+    () => () => {
+      for (const timer of actTimers.current) clearTimeout(timer);
+    },
+    [],
+  );
+
+  // what has just happened to the work — the person's own taps included (D-110)
+  const happened = useEmployeeEvents(isSecretary ? undefined : rows, isSecretary ? undefined : ether.data, meId);
+  // «N подряд в срок» — the closed orders come from «Мои дела», already subscribed by the tab bar
+  const mine = useMyTasks(pointsEnabled && !isSecretary ? meId : undefined);
+  const onTime = useMemo(() => onTimeStreak(mine.data ?? []), [mine.data]);
+  // each event, each award and each thought plays once: an effect that re-runs for another
+  // reason (the motion setting read, the points switch loaded) must not replay the last one
+  const playedEvent = useRef(0);
+  useEffect(() => {
+    if (!happened.event || playedEvent.current === happened.key) return;
+    playedEvent.current = happened.key;
+    playInTurn(EVENT_ACT[happened.event]);
+    if (happened.event !== "approved" || !pointsEnabled) return;
+    // the medal lands first, then the jump; the run of «в срок» is said by the face
+    const start = setTimeout(() => setCheering(true), CHEER_AFTER_MS);
+    const stop = setTimeout(() => setCheering(false), CHEER_AFTER_MS + CHEER_MS);
+    return () => {
+      clearTimeout(start);
+      clearTimeout(stop);
+      setCheering(false);
+    };
+  }, [happened, playInTurn, pointsEnabled]);
+  // points in (behind the same switch): a coin into the head and «+N» by the face
+  const arrival = usePointsArrival(meId, pointsEnabled && !isSecretary);
+  const playedArrival = useRef(0);
+  useEffect(() => {
+    if (arrival.key === 0 || playedArrival.current === arrival.key) return;
+    playedArrival.current = arrival.key;
+    playInTurn("coin");
+  }, [arrival, playInTurn]);
+  // the pill under the face follows the medal and the points (adjusted during render, not in
+  // an effect); the run of «в срок» is read at the moment of the medal — later it is not news
+  const [pill, setPill] = useState<{ key: string; text: string } | null>(null);
+  const [pillFor, setPillFor] = useState({ happened: happened.key, arrival: arrival.key });
+  if (pillFor.happened !== happened.key || pillFor.arrival !== arrival.key) {
+    setPillFor({ happened: happened.key, arrival: arrival.key });
+    if (pillFor.arrival !== arrival.key && arrival.amount > 0) {
+      setPill({ key: `points-${arrival.key}`, text: `+${arrival.amount} ${pluralRu(arrival.amount, ["очко", "очка", "очков"])}` });
+    } else if (happened.event === "approved" && pointsEnabled && onTime >= 2) {
+      setPill({ key: `streak-${happened.key}`, text: `🔥 ${onTime} подряд в срок` });
+    }
+  }
+  const pillKey = pill?.key ?? null;
+  useEffect(() => {
+    if (!pillKey) return;
+    const timer = setTimeout(() => setPill(null), PILL_MS);
+    return () => clearTimeout(timer);
+  }, [pillKey]);
+  // a word about the calendar — an invitation, «скоро начнётся» — is a look at the watch
+  const calendarThought = !isSecretary && thought?.source === "calendar" ? thought.id : null;
+  const playedThought = useRef<string | null>(null);
+  useEffect(() => {
+    if (!calendarThought || playedThought.current === calendarThought) return;
+    playedThought.current = calendarThought;
+    playInTurn("watch");
+  }, [calendarThought, playInTurn]);
+
+  const onFaceTap = () => {
+    if (acceptByFace && desk.errand) {
+      haptic(20);
+      errandActions.mutate({ id: desk.errand.id, to: "accepted" });
+      return;
+    }
+    if (mode === "idle") {
+      setWakeKey((key) => key + 1);
+      speech.replay();
+      if (reason) {
+        // straight to what the face is worried about: face → card, not face → ball → card
+        setPanel(reason);
+        setMode("panel");
+        return;
+      }
+      setMode("ring");
+      if (!isSecretary) play("wave");
+    } else if (mode === "panel") {
+      setMode("ring");
+      setPanel(null);
+    } else {
+      setMode("idle");
+      setPanel(null);
+      // dozing off with a yawn — only a face with empty hands goes back to sleep
+      if (!isSecretary && restFace === "sleeping") play("yawn");
+    }
+  };
+  // the thought is about something: a tap opens the ball it is about (D-110)
+  const thoughtPanel: OrbitId = thought?.source === "ether" ? "ether" : thought?.source === "calendar" ? "calendar" : thought?.source === "errand" ? "secretary" : thought?.message ? "messages" : "tasks";
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
   // the small things at the desk play only at rest, on the waiting screen (D-97)
@@ -343,15 +475,49 @@ export default function FeedPage() {
               />
             ) : (
               <>
-                <IdleScene active={mode === "idle"} quiet={!thought} />
-                <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} wakeKey={wakeKey} voice={false} />
+                {/* the dust stays with the resting screen; the dream only with empty hands — a face
+                    holding its work, waiting on the director or worried is not dreaming (D-110) */}
+                <IdleScene active={mode === "idle"} quiet={!thought && restFace === "sleeping"} />
+                <MascotLever
+                  state={mascot}
+                  act={acts.act}
+                  carry={carry}
+                  onTap={onFaceTap}
+                  size={faceSize}
+                  wakeKey={wakeKey}
+                  voice={false}
+                  label={
+                    mode !== "idle"
+                      ? undefined
+                      : reason === "tasks"
+                        ? "Маскот: тап — открыть дела"
+                        : reason === "messages"
+                          ? "Маскот: тап — сообщение директора"
+                          : "Маскот: тап — дела, сообщения, эфир, календарь"
+                  }
+                />
               </>
             )}
             {/* the balls stay mounted while the face sleeps (shrunk into the head), so opening a
                 panel walks them down into the row instead of throwing them away (D-60) */}
             {mode !== "panel" ? <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} /> : null}
             <AnimatePresence>
-              {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
+              {thought ? (
+                <ThoughtBubble
+                  key={thought.id}
+                  text={thought.text}
+                  tone={thought.tone}
+                  faceSize={faceSize}
+                  onDismiss={() => setExpiredThought(thought.id)}
+                  // the thought opens what it is about: the order, the word, Эфир, the meeting (D-110)
+                  onOpen={() => {
+                    setExpiredThought(thought.id);
+                    setPanel(thoughtPanel);
+                    setMode("panel");
+                  }}
+                  openLabel={`открыть «${balls.find((ball) => ball.id === thoughtPanel)?.label ?? "Дела"}»`}
+                />
+              ) : null}
             </AnimatePresence>
           </motion.div>
         </div>
@@ -359,6 +525,19 @@ export default function FeedPage() {
         {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
             so a ball walking down from the orbit is never clipped on its way in. */}
         <div className="flex min-h-0 flex-1 flex-col" data-band="cards">
+          {/* right under the resting face: «+5 очков», «🔥 3 подряд в срок» — for a few seconds,
+              behind the adaptation gate like the points themselves (D-40, D-110) */}
+          {!isSecretary && mode === "idle" && pill ? (
+            <div className="flex shrink-0 justify-center" data-testid="face-pill">
+              <span
+                key={pill.key}
+                className="card-in nums rounded-full px-3 py-1 text-[14px] font-semibold leading-5"
+                style={{ background: "color-mix(in srgb, var(--gold) 18%, var(--surface))", color: "var(--gold)" }}
+              >
+                {pill.text}
+              </span>
+            </div>
+          ) : null}
           {/* right under the face: what the secretary is doing, «на месте», and a little lower
               «Посетитель» — out of the face's band, so the face stays in the middle (D-87 доводка) */}
           {isSecretary && mode === "idle" && !loading ? (
@@ -521,7 +700,13 @@ export default function FeedPage() {
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}
         >
-          {isSecretary ? "тап — дела, сообщения, эфир, календарь, заявки" : "тап — дела, сообщения, эфир, календарь"}
+          {isSecretary
+            ? "тап — дела, сообщения, эфир, календарь, заявки"
+            : reason === "tasks"
+              ? "тап — открыть дела"
+              : reason === "messages"
+                ? "тап — прочитать сообщение директора"
+                : "тап — дела, сообщения, эфир, календарь"}
         </p>
       ) : null}
 

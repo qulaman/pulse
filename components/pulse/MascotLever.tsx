@@ -80,9 +80,12 @@ export function MascotLever({
   act = null,
   pin = null,
   gaze = null,
+  carry = null,
   onHold,
 }: {
   state: MascotState;
+  /** the employee's orders in work, held as a stack of cards (D-110) */
+  carry?: { count: number; hot?: boolean } | null;
   /** a one-shot over the resting face (D-82); the pipeline, once it runs, drops it */
   act?: MascotAct | null;
   onTap: () => void;
@@ -306,7 +309,7 @@ export function MascotLever({
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
               style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
             >
-              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} />
+              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} />
             </span>
           </button>
         </motion.div>
