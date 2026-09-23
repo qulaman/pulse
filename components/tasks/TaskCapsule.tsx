@@ -2,93 +2,45 @@
 
 import Link from "next/link";
 
-import { humanAqtobe } from "@/lib/ai/time";
+import { TaskHead } from "@/components/tasks/TaskChrome";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, SHORT_STATUS, type TaskStatus } from "@/lib/tasks/status-text";
-
-const DOT: Record<TaskStatus, string> = {
-  scheduled: "var(--text-muted)",
-  sent: "var(--accent)",
-  accepted: "var(--ok)",
-  in_progress: "var(--ok)",
-  pending_review: "var(--warn)",
-  done: "var(--text-muted)",
-  rework: "var(--warn)",
-  declined: "var(--danger)",
-  revoked: "var(--text-muted)",
-};
-
-const ICON = {
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 1.8,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  width: 14,
-  height: 14,
-  viewBox: "0 0 24 24",
-  "aria-hidden": true,
-  className: "shrink-0",
-};
 
 function firstName(full: string | undefined | null): string {
   return full?.trim().split(/\s+/)[0] ?? "";
 }
 
-/**
- * One task as a capsule on «Задачи»: who, when it is due, when it was given —
- * three facts in one line under the title, a status dot on the left, the short
- * status on the right. Tap opens the thread.
- */
-export function TaskCapsule({ task, now = new Date(), question = false }: { task: TaskWithPeople; now?: Date; question?: boolean }) {
-  const overdue = isOverdue(task, now);
-  const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
-  const dot = overdue ? "var(--danger)" : question ? "var(--warn)" : DOT[task.status];
-  const who = firstName(task.assignee?.full_name) || "без исполнителя";
-  const due = task.deadline ? humanAqtobe(new Date(task.deadline), now) : "без срока";
-  const given = humanAqtobe(new Date(task.created_at), now);
+type Props = {
+  task: TaskWithPeople;
+  now?: Date;
+  question?: boolean;
+  /** Off inside a per-person group, where the name is already the heading. */
+  showPerson?: boolean;
+  /** Off under a «Просрочено» heading — the word would be the third thing saying it. */
+  showStatus?: boolean;
+};
 
+/**
+ * A task on the trace of «Задачи»: the shared head and nothing else — no box of its own,
+ * because the bead on the thread already carries the state. Tap opens the thread; the
+ * director's buttons live there and in Пульс, not in the list (docs/FRONTEND.md).
+ */
+export function TaskCapsule({ task, now = new Date(), question = false, showPerson = true, showStatus = true }: Props) {
+  const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
   return (
     <Link
       href={`/tasks/${task.id}`}
       className={[
-        "flex items-center gap-3 rounded-[20px] border border-border bg-surface py-3 pl-4 pr-4 transition-transform duration-[120ms] active:scale-[0.99]",
-        closed ? "opacity-60" : "",
+        "-mx-2 block rounded-[12px] px-2 py-1.5 transition-colors duration-[120ms] active:bg-surface",
+        closed ? "opacity-55" : "",
       ].join(" ")}
     >
-      <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: dot }} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[16px] font-semibold leading-[22px]">{task.title}</span>
-        <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] leading-4 text-muted">
-          <span className="inline-flex items-center gap-1">
-            <svg {...ICON}>
-              <circle cx="12" cy="8.5" r="3.6" />
-              <path d="M4.5 20a7.5 7.5 0 0 1 15 0" />
-            </svg>
-            {who}
-          </span>
-          <span className="nums inline-flex items-center gap-1" style={overdue ? { color: "var(--danger)" } : undefined}>
-            <svg {...ICON}>
-              <circle cx="12" cy="12" r="8.5" />
-              <path d="M12 7.5V12l3 2" />
-            </svg>
-            {task.deadline ? `до ${due}` : due}
-          </span>
-          <span className="nums inline-flex items-center gap-1">
-            <svg {...ICON}>
-              <path d="M4 12h12M11 7l5 5-5 5" />
-              <path d="M19 5v14" />
-            </svg>
-            дали {given}
-          </span>
-        </span>
-      </span>
-      <span
-        className="shrink-0 text-[13px] leading-4"
-        style={{ color: overdue ? "var(--danger)" : question ? "var(--warn)" : "var(--text-muted)" }}
-      >
-        {overdue ? "просрочена" : question ? "вопрос" : SHORT_STATUS[task.status]}
-      </span>
+      <TaskHead
+        task={task}
+        now={now}
+        question={question}
+        showStatus={showStatus}
+        person={showPerson ? firstName(task.assignee?.full_name) || "без исполнителя" : undefined}
+      />
     </Link>
   );
 }

@@ -411,6 +411,23 @@ h1 { letter-spacing: -0.025em; }
   to { opacity: 1; }
 }
 
+/* Task lists are one trace of the day (docs/DESIGN.md §2): the thread draws itself once,
+   top to bottom, like the line on the wordmark. Transform only — no layout, no paint. */
+@keyframes trace-draw {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.trace-line {
+  transform-origin: top;
+  animation: trace-draw 560ms var(--ease-out) both;
+}
+/* the bead of a task on the thread: it appears after the line has passed it */
+@keyframes trace-bead {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+.trace-bead { animation: trace-bead 240ms var(--ease-out) both; }
+
 /* Every screen fades in once; lists stagger their first six cards (opacity only — nothing moves). */
 /* backwards, not both: a retained transform would make <main> a stacking context and trap fixed sheets under the FAB */
 main { animation: page-enter var(--t-screen) var(--ease-out) backwards; }
