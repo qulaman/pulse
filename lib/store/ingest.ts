@@ -2,6 +2,7 @@ import { create } from "zustand";
 
 import { toast } from "@/components/ui/Toast";
 import { pluralRu } from "@/components/confirm/format";
+import { firstLine, restLines } from "@/lib/notes/list";
 import { softDeleteNotes } from "@/lib/notes/mutations";
 import type { BlockedReason, ParticipantMatch, PostprocessedEntity } from "../ai/postprocess";
 import type {
@@ -551,6 +552,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
      */
     startFromNote(note, as) {
       const text = note.text.trim();
+      // a long thought reads as a task by its first line; the rest goes under it (D-81)
+      const title = firstLine(text) || text;
+      const body = restLines(text) || null;
       const manual: PostprocessedEntity =
         as === "task"
           ? {
@@ -560,8 +564,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
               assignee_name: null,
               assignee_confidence: 0,
               group_id: null,
-              title: text,
-              body: null,
+              title,
+              body,
               deadline_iso: null,
               deadline_confidence: null,
               deadline_source_text: null,

@@ -11,31 +11,35 @@ export const noteKeys = {
   mine: (userId: string) => ["notes", "mine", userId] as const,
 };
 
-/** Active notes only; 300 is far past what one director writes before the trgm index (D-75 §8). */
+/** Live notes: 300 is far past what one director writes before the trgm index (D-75 §6). */
 const LIMIT = 300;
+/** The bin shows the latest deletions; older ones stay in the table, out of sight. */
+const TRASH_LIMIT = 100;
+
+const newestFirst = (a: Note, b: Note) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
 
 async function fetchNotes(): Promise<Note[]> {
   const supabase = createBrowserSupabase();
   // no user filter: RLS already leaves the author nothing but his own notes
-  const { data, error } = await supabase
-    .from("notes")
-    .select("*")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false })
-    .limit(LIMIT);
-  if (error) throw new Error(error.message);
-  return data ?? [];
-}
-
-/** A row that left the feed: deleted, or somebody else's (the socket filter aside). */
-function isGone(row: Note | undefined, userId: string): boolean {
-  return !row || row.deleted_at !== null || row.user_id !== userId;
+  const [live, bin] = await Promise.all([
+    supabase.from("notes").select("*").is("deleted_at", null).order("created_at", { ascending: false }).limit(LIMIT),
+    supabase
+      .from("notes")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false })
+      .limit(TRASH_LIMIT),
+  ]);
+  if (live.error) throw new Error(live.error.message);
+  if (bin.error) throw new Error(bin.error.message);
+  return [...(live.data ?? []), ...(bin.data ?? [])].sort(newestFirst);
 }
 
 /**
- * The director's own notes, live. The Realtime filter narrows the socket to this
- * author and RLS narrows it again on the server — a note is private to whoever
- * wrote it (D-75 §2).
+ * The director's own notes, live — the feed, «В деле» and the bin in one cache: a soft
+ * delete moves a row to the bin and «Вернуть» moves it back, both as an UPDATE (D-81).
+ * The Realtime filter narrows the socket to this author and RLS narrows it again on
+ * the server — a note is private to whoever wrote it (D-75 §3).
  */
 export function useNotes(userId: string | undefined) {
   return useRealtimeQuery<Note[], Note>({
@@ -59,11 +63,9 @@ export function useNotes(userId: string | undefined) {
         }
         queryClient.setQueryData<Note[]>(key, (rows) => {
           const rest = (rows ?? []).filter((note) => note.id !== row.id);
-          // a soft-deleted note simply leaves the feed — «Отменить» brings it back as an UPDATE
-          if (isGone(row, userId as string)) return rest;
-          return [row, ...rest].sort(
-            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-          );
+          // somebody else's row never lands here, the socket filter aside
+          if (row.user_id !== userId) return rest;
+          return [row, ...rest].sort(newestFirst);
         });
         return;
       }

@@ -1,0 +1,93 @@
+/*
+ * «Заметки» on the device kit (D-81): the composer well on the body, the level meter
+ * on the display, the search mark and the open card. Same hardware rules as
+ * components/ui/device: static shadows, motion by transform/opacity only, the LED
+ * blink as the only animation (DESIGN §2 perf contract).
+ */
+
+/* the recessed well the thought is typed into — the device slot, tall as a key */
+.well {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 60px;
+  padding: 8px 14px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+  cursor: text;
+  transition: box-shadow 120ms var(--ease-out);
+}
+.well:focus-within {
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.well textarea {
+  display: block;
+  width: 100%;
+  max-height: 118px;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 22px;
+}
+.well textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/*
+ * The level meter: a strip of bars on the display that scrolls the last seconds of
+ * the voice. Bars are scaled by JS writing `transform` — no layout, no re-render.
+ */
+.meter {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 36px;
+  overflow: hidden;
+}
+.bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 999px;
+  background: currentColor;
+  transform: scaleY(0.08);
+  transform-origin: center;
+  opacity: 0.9;
+}
+
+/* a search hit inside a card: the accent under the words, never a filled chip */
+.mark {
+  border-radius: 4px;
+  padding: 0 1px;
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: var(--text);
+}
+
+/* the note being edited: the card lifts its edge in the accent, nothing moves */
+.open {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border)) !important;
+}
+
+/* a card that is a button: the whole face sinks a pixel under the thumb */
+.press {
+  transition: transform 80ms var(--ease-out);
+}
+.press:active {
+  transform: scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press,
+  .well {
+    transition: none;
+  }
+}
