@@ -548,9 +548,58 @@ export type Database = {
           },
         ]
       }
+      mind_boards: {
+        Row: {
+          client_request_id: string | null
+          company_id: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_request_id?: string | null
+          company_id: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_request_id?: string | null
+          company_id?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mind_boards_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mind_boards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notes: {
         Row: {
           audio_path: string | null
+          board_id: string | null
           client_request_id: string | null
           company_id: string
           converted_announcement_id: string | null
@@ -558,9 +607,11 @@ export type Database = {
           converted_task_id: string | null
           created_at: string
           deleted_at: string | null
+          done_at: string | null
           id: string
           inbox_item_id: string | null
           pinned: boolean
+          position: number | null
           raw_transcript: string | null
           remind_at: string | null
           reminded_at: string | null
@@ -570,6 +621,7 @@ export type Database = {
         }
         Insert: {
           audio_path?: string | null
+          board_id?: string | null
           client_request_id?: string | null
           company_id: string
           converted_announcement_id?: string | null
@@ -577,9 +629,11 @@ export type Database = {
           converted_task_id?: string | null
           created_at?: string
           deleted_at?: string | null
+          done_at?: string | null
           id?: string
           inbox_item_id?: string | null
           pinned?: boolean
+          position?: number | null
           raw_transcript?: string | null
           remind_at?: string | null
           reminded_at?: string | null
@@ -589,6 +643,7 @@ export type Database = {
         }
         Update: {
           audio_path?: string | null
+          board_id?: string | null
           client_request_id?: string | null
           company_id?: string
           converted_announcement_id?: string | null
@@ -596,9 +651,11 @@ export type Database = {
           converted_task_id?: string | null
           created_at?: string
           deleted_at?: string | null
+          done_at?: string | null
           id?: string
           inbox_item_id?: string | null
           pinned?: boolean
+          position?: number | null
           raw_transcript?: string | null
           remind_at?: string | null
           reminded_at?: string | null
@@ -607,6 +664,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notes_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "mind_boards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notes_company_id_fkey"
             columns: ["company_id"]
@@ -1410,6 +1474,9 @@ export type Database = {
       tv_state: {
         Row: {
           applied_version: number | null
+          board_guest: boolean
+          board_id: string | null
+          board_until: string | null
           calendar_view: string
           clock_style: string
           company_id: string
@@ -1428,6 +1495,9 @@ export type Database = {
         }
         Insert: {
           applied_version?: number | null
+          board_guest?: boolean
+          board_id?: string | null
+          board_until?: string | null
           calendar_view?: string
           clock_style?: string
           company_id: string
@@ -1446,6 +1516,9 @@ export type Database = {
         }
         Update: {
           applied_version?: number | null
+          board_guest?: boolean
+          board_id?: string | null
+          board_until?: string | null
           calendar_view?: string
           clock_style?: string
           company_id?: string
@@ -1463,6 +1536,13 @@ export type Database = {
           version?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "tv_state_board_id_fkey"
+            columns: ["board_id"]
+            isOneToOne: false
+            referencedRelation: "mind_boards"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tv_state_company_id_fkey"
             columns: ["company_id"]
@@ -1857,8 +1937,11 @@ export type Database = {
         Args: { p_days?: number; p_from?: string; p_guest?: boolean }
         Returns: Json
       }
+      tv_board: { Args: { p_guest?: boolean }; Returns: Json }
       tv_control: {
         Args: {
+          p_board?: string
+          p_board_guest?: boolean
           p_calendar?: string
           p_clock?: string
           p_employee_id?: string
@@ -1870,6 +1953,9 @@ export type Database = {
         }
         Returns: {
           applied_version: number | null
+          board_guest: boolean
+          board_id: string | null
+          board_until: string | null
           calendar_view: string
           clock_style: string
           company_id: string
