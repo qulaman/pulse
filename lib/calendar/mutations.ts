@@ -102,8 +102,8 @@ export type EventDraft = {
 
 /** What the server says no to, in words — the form stays open with the text still in it. */
 function editError(message: string): string {
-  if (message.includes("event_end_before_start")) return "Конец раньше начала — поправь время";
-  if (message.includes("event_title_required")) return "Напиши, что за мероприятие";
+  if (message.includes("event_end_before_start")) return "Конец раньше начала";
+  if (message.includes("event_title_required")) return "Без названия не сохранить";
   if (message.includes("event_not_found")) return "Этого мероприятия уже нет";
   if (message.includes("forbidden")) return "Нет доступа";
   return GENERIC_ERROR;
@@ -181,8 +181,8 @@ export function useCreateEvent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ requestId, draft }: { requestId: string; draft: EventDraft }) => {
-      await voiceApi.confirm({
+    mutationFn: async ({ requestId, draft }: { requestId: string; draft: EventDraft }): Promise<string | null> => {
+      const response = await voiceApi.confirm({
         client_request_id: requestId,
         source: "typed",
         audio_path: null,
@@ -208,6 +208,9 @@ export function useCreateEvent() {
           },
         ],
       });
+      // the new meeting's id, so the screen can open its card
+      const ids = response.result.event_ids;
+      return Array.isArray(ids) && typeof ids[0] === "string" ? ids[0] : null;
     },
     onSuccess: () => toast("Мероприятие в календаре"),
     onError: (error) => {

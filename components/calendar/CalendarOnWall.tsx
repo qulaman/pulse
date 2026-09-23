@@ -27,11 +27,13 @@ export function CalendarOnWall() {
           { onSuccess: () => toast(onWall ? "Календарь убран со стены" : "Календарь на стене · неделя вперёд") },
         )
       }
-      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition-colors duration-[120ms] active:bg-surface-2 disabled:opacity-50"
-      style={{ color: onWall ? "var(--accent)" : "var(--text-muted)", background: onWall ? "color-mix(in srgb, var(--accent) 14%, transparent)" : undefined }}
+      // the round button of the screen heads («Задачи», «Заметки», «Календарь»)
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border transition-[transform,background-color,color] duration-[120ms] active:scale-95 disabled:opacity-50 ${
+        onWall ? "border-accent/60 bg-accent/15 text-accent" : "border-border/80 bg-surface text-muted"
+      }`}
       data-testid="calendar-on-wall"
     >
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <rect x="3" y="4.5" width="18" height="12" rx="2" />
         <path d="M9 20.5h6M12 16.5v4" />
       </svg>

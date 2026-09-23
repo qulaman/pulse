@@ -384,20 +384,31 @@ export function EtherSkeleton() {
   );
 }
 
-/** The calendar ribbon: a day heading and its rows — the geometry of CalendarList. */
+/** The ribbon of /calendar: a day heading and its cards — the geometry of EventCard (D-94). */
 export function CalendarListBone() {
   return (
-    <SkeletonGroup className="mt-4">
+    <SkeletonGroup className="mt-1">
       {[0, 1].map((group) => (
-        <div key={group} className={group ? "mt-6" : ""}>
-          <Bone h={16} w="24%" />
+        <div key={group}>
+          <div className={`flex min-h-[32px] items-end px-1 pb-0.5 ${group ? "pt-4" : "pt-3"}`}>
+            <Bone h={16} w={group ? "34%" : "46%"} />
+          </div>
           <div className="mt-2 flex flex-col gap-2">
             {[0, 1].map((row) => (
-              <div key={row} className="card flex items-start gap-3 p-3">
-                <Bone h={22} w={52} />
+              <div
+                key={row}
+                className="flex gap-3 rounded-[18px] border px-3.5 pb-3 pt-3.5"
+                style={{ borderColor: "color-mix(in srgb, var(--border) 72%, transparent)", background: "var(--surface)" }}
+              >
+                <div className="w-[44px] shrink-0">
+                  <Bone h={21} w={42} />
+                  <Bone h={16} w={34} className="mt-0.5" />
+                </div>
+                <Bone h={66} w={3} />
                 <div className="min-w-0 flex-1">
-                  <Bone h={22} w={row ? "52%" : "68%"} />
-                  <Bone h={16} w="38%" className="mt-2" />
+                  <Bone h={21} w={row ? "56%" : "72%"} />
+                  <Bone h={16} w="38%" className="mt-1" />
+                  <Bone h={18} w="46%" className="mt-1.5" />
                 </div>
               </div>
             ))}
@@ -408,17 +419,40 @@ export function CalendarListBone() {
   );
 }
 
+/**
+ * /calendar before the phone takes over (D-94): the date and the title, the status screen,
+ * the month of five weeks, the ribbon — each bone the box of its element (measured: head
+ * 54, status 223, grid 338).
+ */
 export function CalendarSkeleton() {
   return (
-    <main className={MAIN}>
-      <Title text="Календарь" />
-      {/* the geometry of MonthGrid: arrows row, weekdays, five weeks of 48px (most months) */}
-      <SkeletonGroup className="card mt-4 px-2 pb-2 pt-1">
-        <div className="flex h-11 items-center justify-center">
-          <Bone h={20} w="36%" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+      <div className="px-0.5">
+        <Bone h={16} w={150} />
+        <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">Календарь</h1>
+      </div>
+      <SkeletonGroup className="mt-3">
+        <div className="h-[223px] rounded-[22px] border border-border/70 bg-surface px-4 pt-3">
+          <Bone h={16} w="34%" />
+          <div className="mt-2 flex h-[58px] items-center gap-3.5">
+            <Bone h={46} w={46} round />
+            <div className="flex-1">
+              <Bone h={22} w="62%" />
+              <Bone h={16} w="84%" className="mt-1.5" />
+            </div>
+          </div>
+          <Bone h={10} className="mt-3 w-full" round />
         </div>
-        <div className="h-4" />
-        <div className="mt-1 h-[240px]" />
+      </SkeletonGroup>
+      <SkeletonGroup className="mt-3">
+        <div
+          className="h-[338px] rounded-[22px] border px-2 pt-1.5"
+          style={{ borderColor: "color-mix(in srgb, var(--border) 72%, transparent)", background: "var(--surface)" }}
+        >
+          <div className="flex h-11 items-center pl-2.5">
+            <Bone h={22} w="40%" />
+          </div>
+        </div>
       </SkeletonGroup>
       <CalendarListBone />
     </main>

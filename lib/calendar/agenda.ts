@@ -95,6 +95,13 @@ export function monthWindow({ year, month }: Month): { from: string; to: string 
   };
 }
 
+/** A day so many days on (or back) — the week view steps by seven. */
+export function shiftDay(ymd: Ymd, days: number): Ymd {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const moved = new Date(Date.UTC(year, month - 1, day + days));
+  return ymdOf(moved.getUTCFullYear(), moved.getUTCMonth() + 1, moved.getUTCDate());
+}
+
 /** Meetings per company day — the dots under the numbers of the grid. */
 export function countByDay(events: readonly { starts_at: string }[]): Map<Ymd, number> {
   const counts = new Map<Ymd, number>();

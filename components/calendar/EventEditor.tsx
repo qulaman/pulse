@@ -25,8 +25,8 @@ type Props = {
   day?: Ymd;
   meId: string;
   now?: Date;
-  /** The server has the meeting — with its start as saved (the month may follow it). */
-  onSaved?: (startsAt: string) => void;
+  /** The server has the meeting — with its start as saved (the month may follow it) and, for a new one, its id. */
+  onSaved?: (startsAt: string, id?: string | null) => void;
 };
 
 const REMIND: { min: number; label: string }[] = [
@@ -112,14 +112,12 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
       participant_ids: everyone ? [] : ids,
     };
     // the form stays up until the server has it: a failure leaves every word in place
-    const done = {
-      onSuccess: () => {
-        onSaved?.(draft.starts_at);
-        onClose();
-      },
+    const done = (id?: string | null) => {
+      onSaved?.(draft.starts_at, id);
+      onClose();
     };
-    if (event) edit.mutate({ eventId: event.id, draft }, done);
-    else create.mutate({ requestId, draft }, done);
+    if (event) edit.mutate({ eventId: event.id, draft }, { onSuccess: () => done(event.id) });
+    else create.mutate({ requestId, draft }, { onSuccess: (id) => done(id) });
   };
 
   return (
@@ -127,7 +125,7 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
       <label className="flex flex-col gap-1.5">
         <span className={LABEL}>Что</span>
         <input
-          className={FIELD}
+          className={`${FIELD} font-display text-[17px] font-semibold placeholder:font-normal`}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           maxLength={200}
@@ -136,7 +134,7 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
           data-autofocus={event ? undefined : ""}
         />
         {tried && !name ? (
-          <span className="text-[13px] leading-4 text-danger">Напиши, что за мероприятие</span>
+          <span className="text-[13px] leading-4 text-danger">Без названия не сохранить</span>
         ) : null}
       </label>
 
@@ -208,9 +206,15 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
         />
       </label>
 
-      <Button block size="lg" loading={busy} disabled={busy} onClick={save}>
-        {event ? "Сохранить" : "Создать"}
-      </Button>
+      {/* the button rides the bottom of the sheet: a long form never hides where it ends */}
+      <div
+        className="sticky bottom-0 z-[1] -mx-4 -mb-1 px-4 pb-1 pt-3"
+        style={{ background: "linear-gradient(180deg, transparent, var(--surface) 30%)" }}
+      >
+        <Button block size="lg" loading={busy} disabled={busy} onClick={save} data-testid="event-save">
+          {event ? "Сохранить" : "Создать"}
+        </Button>
+      </div>
 
       <ParticipantsPicker
         open={whoOpen}

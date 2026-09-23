@@ -12,6 +12,7 @@ import {
   nextEvent,
   peopleCount,
   rsvpSummary,
+  shiftDay,
   shiftEnd,
   startsSoon,
   timeRange,
@@ -180,5 +181,11 @@ describe("agenda", () => {
     expect(endIsBeforeStart("10:00", "10:00")).toBe(true);
     expect(endIsBeforeStart("10:00", "10:15")).toBe(false);
     expect(endIsBeforeStart("10:00", null)).toBe(false);
+  });
+
+  it("steps whole days across months and years", () => {
+    expect(shiftDay("2026-09-28", 7)).toBe("2026-10-05");
+    expect(shiftDay("2026-01-03", -7)).toBe("2025-12-27");
+    expect(shiftDay("2028-02-28", 1)).toBe("2028-02-29");
   });
 });
