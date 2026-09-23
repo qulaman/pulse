@@ -92,7 +92,6 @@ const TABS: Record<TabRole, Tab[]> = {
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
     { href: "/notes", label: "Заметки", icon: ICONS.notes },
     { href: "/screen", label: "Экран", icon: ICONS.screen },
-    { href: "/sent-alt", label: "Вариант", icon: ICONS.tasks },
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
     LAB_TAB,
@@ -100,7 +99,6 @@ const TABS: Record<TabRole, Tab[]> = {
   employee: [
     { href: "/feed", label: "Лента", icon: ICONS.feed },
     { href: "/tasks", label: "Дела", icon: ICONS.tasks },
-    { href: "/tasks-alt", label: "Вариант", icon: ICONS.tasks },
     { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
     LAB_TAB,

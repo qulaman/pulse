@@ -1,19 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { Fragment, type ReactNode } from "react";
-
-import { humanAqtobe } from "@/lib/ai/time";
 import { initialsOf } from "@/lib/people/queries";
-import { deadlineLabel, isOverdue, SHORT_STATUS, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
-import type { TaskWithPeople } from "@/lib/tasks/queries";
+import { deadlineLabel, SHORT_STATUS, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { deadlineToneOf, pillStyle, TONE_VAR, toneOf, type Tone } from "@/lib/tasks/tone";
 
 /**
  * The parts every task wears, in one place: the rail and the tint that carry its state,
  * the eyebrow that names it, the pill that carries the deadline and the chip that names
- * the person. The full card (`TaskCard`) and the capsule of a list (`TaskCapsule`) are
- * the same object at two densities — they must not drift apart, so they draw from here.
+ * the person. The thread's card (`TaskCard`) draws from here; the list cards of «Задачи»
+ * and «Мои дела» have their own head (components/tasks/list, D-82).
  */
 
 /** Left rail plus a breath of the same colour in the corner. Needs a relative, clipped parent. */
@@ -123,81 +118,6 @@ export function PersonChip({ fullName, label }: { fullName: string | null | unde
       </span>
       <span className="truncate">{label ?? fullName ?? "без исполнителя"}</span>
     </span>
-  );
-}
-
-/**
- * The head of a task on a trace: what it is and by when on the first line, who and in
- * what state on the second. One component for both lists, so «Задачи» директора and
- * «Мои дела» cannot drift apart again: the capsule is this head alone, the employee's
- * card is this head plus its buttons. The deadline is plain tabular numerals in the
- * colour of its urgency — on a list with no boxes a bordered chip is one border too many.
- */
-export function TaskHead({
-  task,
-  now = new Date(),
-  question = false,
-  person,
-  href,
-  showStatus = true,
-  extra,
-}: {
-  task: TaskWithPeople;
-  now?: Date;
-  question?: boolean;
-  /** Shown before the state; omitted where the group heading is already the name. */
-  person?: string | null;
-  /** Wraps the title only — a card with buttons must not live inside a link. */
-  href?: string;
-  showStatus?: boolean;
-  extra?: ReactNode;
-}) {
-  const overdue = isOverdue(task, now);
-  const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
-  // «срочно» stands where the eye looks for the time; the chip below would only repeat it
-  const urgentNow = isUrgentNow(task);
-  const status = overdue ? "просрочена" : question ? TEXT.question : SHORT_STATUS[task.status];
-  const statusColor = overdue ? "var(--danger)" : question ? "var(--warn)" : "var(--text-muted)";
-  const title = (
-    <h2 className="line-clamp-2 font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em] text-text">
-      {task.title}
-    </h2>
-  );
-
-  // the quiet line under the title: only the facts that exist, separated by dots
-  const parts: ReactNode[] = [];
-  if (person) parts.push(<span className="min-w-0 truncate">{person}</span>);
-  if (showStatus) parts.push(<span style={{ color: statusColor }}>{status}</span>);
-  if (!task.deadline && !closed) parts.push(<span className="nums">дали {humanAqtobe(new Date(task.created_at), now)}</span>);
-
-  return (
-    <>
-      <div className="flex items-baseline gap-3">
-        <div className="min-w-0 flex-1">{href ? <Link href={href}>{title}</Link> : title}</div>
-        <span
-          className="nums shrink-0 text-[13px] leading-[18px]"
-          style={{ color: urgentNow ? TONE_VAR.warn : TONE_VAR[deadlineToneOf(task, now)] }}
-        >
-          {task.deadline ? humanAqtobe(new Date(task.deadline), now) : urgentNow ? TEXT.urgent : TEXT.noDeadline}
-        </span>
-      </div>
-
-      {parts.length > 0 || extra ? (
-        <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 text-[13px] leading-[18px] text-muted">
-          {parts.map((node, index) => (
-            <Fragment key={index}>
-              {index > 0 ? (
-                <span aria-hidden className="opacity-40">
-                  ·
-                </span>
-              ) : null}
-              {node}
-            </Fragment>
-          ))}
-          {extra}
-        </div>
-      ) : null}
-    </>
   );
 }
 

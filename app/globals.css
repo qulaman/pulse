@@ -1021,23 +1021,6 @@ h1 { letter-spacing: -0.025em; }
   to { opacity: 1; }
 }
 
-/* Task lists are one trace of the day (docs/DESIGN.md §2): the thread draws itself once,
-   top to bottom, like the line on the wordmark. Transform only — no layout, no paint. */
-@keyframes trace-draw {
-  from { transform: scaleY(0); }
-  to { transform: scaleY(1); }
-}
-.trace-line {
-  transform-origin: top;
-  animation: trace-draw 560ms var(--ease-out) both;
-}
-/* the bead of a task on the thread: it appears after the line has passed it */
-@keyframes trace-bead {
-  from { transform: scale(0); }
-  to { transform: scale(1); }
-}
-.trace-bead { animation: trace-bead 240ms var(--ease-out) both; }
-
 /* Every screen fades in once; lists stagger their first six cards (opacity only — nothing moves). */
 /* backwards, not both: a retained transform would make <main> a stacking context and trap fixed sheets under the FAB */
 main { animation: page-enter var(--t-screen) var(--ease-out) backwards; }
@@ -1119,3 +1102,40 @@ select,
   user-select: text;
   caret-color: var(--accent);
 }
+
+/* ---- «Задачи» and «Мои дела» as cards (D-82) ------------------------------------------
+   One status screen, one segmented control, cards that open in place. Static shadows and
+   gradients only; the one thing that moves is transform/opacity (framer layout + fades). */
+.status-screen {
+  border: 1px solid color-mix(in srgb, var(--border) 80%, white 6%);
+  background:
+    radial-gradient(120% 95% at 100% 0%, color-mix(in srgb, var(--tone, var(--accent)) 17%, transparent), transparent 62%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 72%, var(--surface)), var(--surface) 70%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 14px 34px rgba(0, 0, 0, .34);
+}
+@keyframes bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.bar-grow {
+  transform-origin: left;
+  animation: bar-grow 700ms var(--ease-out) both;
+}
+.seg {
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+}
+.seg-thumb {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 80%, white 7%), var(--surface-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 2px 8px rgba(0, 0, 0, .35);
+}
+.task-card {
+  border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+  background: var(--surface);
+  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+.task-card[data-open] {
+  border-color: color-mix(in srgb, var(--accent) 26%, var(--border));
+  background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
+}
+.task-card[data-closed]:not([data-open]) { background: color-mix(in srgb, var(--surface) 60%, transparent); }

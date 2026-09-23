@@ -3,17 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { BoardTask } from "@/lib/pulse/board";
 
 import {
-  deskSummary,
   keysFor,
-  nextSelection,
-  personDots,
-  personSummary,
   queueOf,
   reasonOf,
   receiptText,
   type DeskAction,
 } from "./desk";
-import { TEXT, type TaskStatus } from "./status-text";
+import type { TaskStatus } from "./status-text";
 
 // 2026-09-17 12:00 Aqtobe (UTC+5)
 const NOW = new Date("2026-09-17T07:00:00Z");
@@ -119,63 +115,6 @@ describe("keysFor", () => {
   });
 });
 
-describe("deskSummary", () => {
-  it("calm: nothing waits, no deadlines", () => {
-    expect(deskSummary([task({ status: "accepted" })], [], NOW)).toEqual({ headline: TEXT.emptyInbox, line: "сроков нет", tone: "ok" });
-  });
-
-  it("the director's move: the count and the nearest deadline", () => {
-    const review = task({ status: "pending_review" });
-    const soon = task({ deadline: at("18", 13) });
-    const queue = queueOf([review, soon], NOW);
-    expect(deskSummary([review, soon], queue, NOW)).toEqual({
-      headline: "Ваш ход: 1",
-      line: "ближайший срок завтра 13:00",
-      tone: "warn",
-    });
-  });
-
-  it("something burns: overdue count first, red", () => {
-    const tasks = [task({ deadline: at("15") }), task({ deadline: at("16") }), task({ deadline: at("18", 13) })];
-    expect(deskSummary(tasks, queueOf(tasks, NOW), NOW)).toEqual({
-      headline: "Ваш ход: 2",
-      line: "2 просрочены · ближайший срок завтра 13:00",
-      tone: "danger",
-    });
-  });
-});
-
-describe("personSummary", () => {
-  it("names the person and only the numbers that are not zero", () => {
-    const tasks = [
-      task({ status: "accepted" }),
-      task({ status: "sent", deadline: at("16") }),
-      task({ status: "rework" }),
-      task({ status: "pending_review" }),
-      task({ status: "done" }),
-    ];
-    expect(personSummary("Асхат", tasks, NOW)).toEqual({ headline: "Асхат", line: "3 в работе · 1 просрочена · 1 на приёмке", tone: "danger" });
-    expect(personSummary("Асхат", [task({ status: "pending_review" })], NOW)).toEqual({ headline: "Асхат", line: "1 на приёмке", tone: "warn" });
-  });
-
-  it("nothing open says so", () => {
-    expect(personSummary("Асхат", [task({ status: "done" })], NOW)).toEqual({ headline: "Асхат", line: "открытых дел нет", tone: "ok" });
-    expect(personSummary("Асхат", [], NOW).line).toBe("открытых дел нет");
-  });
-});
-
-describe("personDots", () => {
-  it("lights whoever holds a queued task, red for overdue work", () => {
-    const review = task({ status: "pending_review", assignee_id: "marat" });
-    const late = task({ status: "accepted", deadline: at("16"), assignee_id: "erlan" });
-    const calm = task({ status: "accepted", deadline: at("20"), assignee_id: "aigul" });
-    const dots = personDots(queueOf([review, late, calm], NOW), [review, late, calm], NOW);
-    expect(dots.get("marat")).toBe("accent");
-    expect(dots.get("erlan")).toBe("danger");
-    expect(dots.has("aigul")).toBe(false);
-  });
-});
-
 describe("receiptText", () => {
   const row = {
     acted_at: null as string | null,
@@ -200,25 +139,5 @@ describe("receiptText", () => {
     });
     expect(receiptText({ ...row, status: "failed", last_error: "410" }, "sent", NOW)).toEqual({ text: "уведомление не ушло", tone: "warn" });
     expect(receiptText(row, "sent", NOW)).toEqual({ text: "отправляю уведомление…", tone: "muted" });
-  });
-});
-
-describe("nextSelection", () => {
-  const exists = (ids: string[]) => (id: string) => ids.includes(id);
-
-  it("stays while the picked task is in the queue", () => {
-    expect(nextSelection("b", ["a", "b"], ["b", "a"], exists([]))).toBe("b");
-  });
-
-  it("the next one takes the place of a task that left the queue", () => {
-    expect(nextSelection("b", ["a", "b", "c"], ["a", "c"], exists(["b"]))).toBe("c");
-    expect(nextSelection("c", ["a", "b", "c"], ["a", "b"], exists(["c"]))).toBe("b");
-    expect(nextSelection("a", ["a"], [], exists(["a"]))).toBeNull();
-  });
-
-  it("a task picked from the list stays while it exists", () => {
-    expect(nextSelection("x", ["a"], ["a"], exists(["x"]))).toBe("x");
-    expect(nextSelection("x", ["a"], ["a"], exists([]))).toBe("a");
-    expect(nextSelection(null, ["a"], ["a"], exists([]))).toBeNull();
   });
 });

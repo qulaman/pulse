@@ -61,96 +61,88 @@ export function PulseSkeleton() {
   );
 }
 
-/** The thread of a task list while its data is on the way: line, beads, text blocks. */
-function TraceBone({ children }: { children: React.ReactNode }) {
+/**
+ * «Задачи» and «Мои дела» before their data (D-82): the page title, the status screen with
+ * grey where the numbers go, the people strip (director), the tabs and a column of closed
+ * cards. Every box has the height of the real one, so nothing moves when the data lands.
+ */
+function CardsSkeleton({ title, director }: { title: string; director: boolean }) {
   return (
-    <div className="relative" style={{ paddingLeft: 24 }}>
-      <span aria-hidden className="absolute bottom-2 top-1 w-px bg-border" style={{ left: 8 }} />
-      {children}
-    </div>
-  );
-}
+    <main className={`mx-auto w-full max-w-lg flex-1 px-4 pt-3 ${director ? "pb-36" : "pb-24"}`}>
+      <div className="flex items-end justify-between gap-3 px-0.5">
+        <div>
+          <SkeletonGroup>
+            <Bone h={16} w={148} />
+          </SkeletonGroup>
+          <h1 className="mt-0.5 text-[30px] font-bold leading-[36px]">{title}</h1>
+        </div>
+        {director ? <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" /> : null}
+      </div>
 
-function BeadBone() {
-  return <span aria-hidden className="absolute block rounded-full bg-border" style={{ left: -21, top: 7, width: 10, height: 10 }} />;
-}
+      <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-0.5 pt-3">
+        <div className="flex items-center justify-between">
+          <Bone h={16} w={124} />
+          <Bone h={16} w={64} />
+        </div>
+        <div className="mt-2 flex min-h-[52px] items-center gap-3.5">
+          <Bone h={46} w={46} className="rounded-[14px]" />
+          <div className="flex-1">
+            <Bone h={20} w="68%" />
+            <Bone h={14} w="46%" className="mt-2" />
+          </div>
+        </div>
+        <Bone h={8} className="mt-3 rounded-full" />
+        <div className="mt-2 flex min-h-[18px] gap-3.5">
+          <Bone h={16} w={96} className="mt-px" />
+          <Bone h={16} w={84} className="mt-px" />
+        </div>
+        <div className="mt-2.5 flex min-h-[46px] items-center gap-2.5 border-t border-border/60">
+          <Bone h={17} w={17} round />
+          <Bone h={16} w="56%" />
+        </div>
+      </SkeletonGroup>
 
-/** «Задачи»: two piles on the thread — a heading, then title, deadline and who. */
-export function SentListBone() {
-  return (
-    <SkeletonGroup className="mt-4">
-      <TraceBone>
-        {[0, 1].map((group) => (
-          <div key={group} className={group ? "mt-6" : ""}>
-            <Bone h={16} w={92} className="mb-3" />
-            <div className="flex flex-col gap-4">
-              {[0, 1].map((i) => (
-                <div key={i} className="relative">
-                  <BeadBone />
-                  <div className="flex items-baseline gap-3">
-                    <Bone h={22} w={i ? "54%" : "70%"} />
-                    <Bone h={16} w={78} className="ml-auto shrink-0" />
-                  </div>
-                  <Bone h={16} w={124} className="mt-1.5" />
-                </div>
-              ))}
+      {director ? (
+        <SkeletonGroup className="-mx-4 mt-3 flex gap-2 overflow-hidden px-4 pb-0.5">
+          {[64, 96, 88, 104].map((w, i) => (
+            <Bone key={i} h={40} w={w} className="shrink-0 rounded-full" />
+          ))}
+        </SkeletonGroup>
+      ) : null}
+
+      <div className="mt-2">
+        <div aria-hidden className="h-px" />
+        <div className="py-2">
+          <SkeletonGroup className="seg rounded-[14px] p-1">
+            <Bone h={40} w="33%" className="rounded-[10px]" />
+          </SkeletonGroup>
+        </div>
+      </div>
+
+      <SkeletonGroup className="mt-1 flex flex-col gap-2">
+        <div className="px-1 pb-0.5 pt-4">
+          <Bone h={16} w={104} />
+        </div>
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
+            <Bone h={22} w={22} round className="shrink-0" />
+            <div className="flex-1">
+              <div className="flex gap-3">
+                <Bone h={21} w={i % 2 ? "58%" : "74%"} />
+                <Bone h={16} w={72} className="ml-auto mt-0.5 shrink-0" />
+              </div>
+              <Bone h={16} w={140} className="mt-1.5" />
             </div>
           </div>
         ))}
-      </TraceBone>
-    </SkeletonGroup>
+      </SkeletonGroup>
+    </main>
   );
 }
 
-/**
- * «Задачи»: the desk before its data — the same body, lens, display and keys as the device
- * (components/tasks/desk/Desk.tsx), then its lower half: the search slot, the filter keys,
- * the seam, the people keypad and the order switch, grey where the words will be — and the
- * thread of the list. The display keeps its height, so the keys are already where the
- * thumb will find them.
- */
+/** «Задачи» директора: the same page, grey. */
 export function SentSkeleton() {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
-      <SkeletonGroup className={`${device.body} mx-auto w-full max-w-[380px]`}>
-        <Bone h={14} w={64} className="mx-auto rounded-full" />
-        <div className={`${device.lcd} mt-3`}>
-          <div className="min-h-[155px]">
-            <div className="flex items-center justify-between">
-              <Bone h={12} w={120} />
-              <Bone h={12} w={40} />
-            </div>
-            <Bone h={24} w="78%" className="mt-3" />
-            <Bone h={14} w="52%" className="mt-2.5" />
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[0, 1, 2].map((i) => (
-            <Bone key={i} h={66} className="rounded-[18px]" />
-          ))}
-        </div>
-        <Bone h={46} className="mt-3 rounded-[14px]" />
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {[0, 1, 2].map((i) => (
-            <Bone key={i} h={60} className="rounded-[18px]" />
-          ))}
-        </div>
-        <div className="mt-2 h-[5px]" />
-        <div className={device.seam} />
-        <Bone h={16} w={96} className="mt-3 ml-1" />
-        <div className={`${device.pad} mt-2`}>
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <div key={i} className="flex flex-col items-center gap-1.5">
-              <Bone h={84} className="w-full rounded-[18px]" />
-              <span className="h-[5px]" />
-            </div>
-          ))}
-        </div>
-        <Bone h={60} className="mt-3 rounded-[18px]" />
-      </SkeletonGroup>
-      <SentListBone />
-    </main>
-  );
+  return <CardsSkeleton title="Задачи" director />;
 }
 
 export function TeamListBone() {
@@ -309,38 +301,6 @@ export function FeedSkeleton() {
   );
 }
 
-/** «Мои дела»: the same thread, and under each title the three buttons. */
-export function TasksListBone() {
-  return (
-    <SkeletonGroup className="mt-4">
-      <TraceBone>
-        {[0, 1].map((group) => (
-          <div key={group} className={group ? "mt-7" : ""}>
-            <Bone h={16} w={92} className="mb-3" />
-            <div className="flex flex-col gap-5">
-              {[0, 1].map((i) => (
-                <div key={i} className="relative">
-                  <BeadBone />
-                  <div className="flex items-baseline gap-3">
-                    <Bone h={16} w={88} />
-                    <Bone h={22} w={96} className="ml-auto shrink-0 rounded-full" />
-                  </div>
-                  <Bone h={22} w={i ? "62%" : "80%"} className="mt-2" />
-                  <div className="mt-4 flex gap-2">
-                    <Bone h={44} w={104} className="rounded-[12px]" />
-                    <Bone h={44} w={104} className="rounded-[12px]" />
-                    <Bone h={44} w={96} className="rounded-[12px]" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </TraceBone>
-    </SkeletonGroup>
-  );
-}
-
 /** «Заметки»: a printed day label and cards of a heading, a line and the time. */
 export function NotesListBone() {
   return (
@@ -401,13 +361,9 @@ export function NotesSkeleton() {
   );
 }
 
+/** «Мои дела»: the same page as the director's, without the people strip. */
 export function TasksSkeleton() {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-4">
-      <Title text="Мои дела" sub=" " />
-      <TasksListBone />
-    </main>
-  );
+  return <CardsSkeleton title="Мои дела" director={false} />;
 }
 
 /* ---- shared ------------------------------------------------------------------ */

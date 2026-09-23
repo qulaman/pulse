@@ -2,13 +2,13 @@ import { humanAqtobe } from "@/lib/ai/time";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { Database } from "@/lib/supabase/types";
 
-import { compareTasks, nearestDeadline, overdueCount, type Groupable } from "./grouping";
-import { isOverdue, pluralRu, TEXT, type TaskStatus } from "./status-text";
+import { compareTasks } from "./grouping";
+import { isOverdue, type TaskStatus } from "./status-text";
 
 /**
- * The desk of «Задачи»: the display at the head of the screen and the three keys under
- * it (D-80). Pure functions — the page only renders them. What the display says and which
- * keys it offers are the product, so they are tested, not eyeballed on a phone.
+ * The director's moves on a task (D-80, kept by D-82): why a task waits for the director
+ * («ваш ход»), in what order, and which three buttons its open card offers. Pure
+ * functions — the cards only render them; what is offered is the product, so it is tested.
  *
  * The keys are exactly what the thread card allows the director (`DirectorActions` in
  * TaskCard.tsx), folded to three per state: принцип 2 holds for the director's hand too.
@@ -30,7 +30,10 @@ const WORKING: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rewo
  * question beats a missed deadline. A question on a closed or declined task is not the
  * director's move on the question — the task itself is.
  */
-export function reasonOf(task: BoardTask, now: Date = new Date()): DeskReason | null {
+export function reasonOf(
+  task: { status: TaskStatus; deadline: string | null; question?: string | null },
+  now: Date = new Date(),
+): DeskReason | null {
   if (task.status === "pending_review") return "review";
   if (task.question && WORKING.includes(task.status)) return "question";
   if (task.status === "declined") return "declined";
@@ -82,7 +85,7 @@ export const KEY_LABEL: Record<DeskAction, string> = {
 };
 
 /**
- * The keys under the display for one task, at most three. Rows of D-80 top to bottom —
+ * The buttons of one task's open card, at most three. Rows of D-80 top to bottom —
  * the first that matches wins. «Продлить» and «Переназначить» on any open task (D-51 п.3).
  */
 export function keysFor(
@@ -101,73 +104,6 @@ export function keysFor(
 
 /** Quick answers of the swipe table (FRONTEND «Вопросы»), as chips; anything longer — in the thread. */
 export const QUICK_ANSWERS = ["Да", "Нет", "Позже", "Действуй сам"] as const;
-
-export type DeskTone = "ok" | "warn" | "danger";
-
-/**
- * The display with nothing picked — «стол»: whose move it is, then the deadlines of
- * everything handed out.
- */
-export function deskSummary(
-  tasks: readonly Groupable[],
-  queue: readonly DeskItem[],
-  now: Date = new Date(),
-): { headline: string; line: string; tone: DeskTone } {
-  const overdue = overdueCount([...tasks], now);
-  const soonest = nearestDeadline([...tasks], now);
-  const parts: string[] = [];
-  if (overdue > 0) parts.push(`${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
-  if (soonest) parts.push(`ближайший срок ${humanAqtobe(new Date(soonest), now)}`);
-  return {
-    headline: queue.length > 0 ? `Ваш ход: ${queue.length}` : TEXT.emptyInbox,
-    line: parts.length > 0 ? parts.join(" · ") : "сроков нет",
-    tone: overdue > 0 ? "danger" : queue.length > 0 ? "warn" : "ok",
-  };
-}
-
-/** Work the person still holds — «в работе» of the filter keys. */
-const IN_WORK: readonly TaskStatus[] = ["scheduled", ...WORKING];
-
-/**
- * The display with a person key lit and nothing picked: their name, then only the numbers
- * that are not zero — «3 в работе · 1 просрочена · 1 на приёмке». Red while something of
- * theirs is late, amber while their work waits for the director.
- */
-export function personSummary(
-  name: string,
-  tasks: readonly Groupable[],
-  now: Date = new Date(),
-): { headline: string; line: string; tone: DeskTone } {
-  const working = tasks.filter((task) => IN_WORK.includes(task.status)).length;
-  const overdue = overdueCount([...tasks], now);
-  const review = tasks.filter((task) => task.status === "pending_review").length;
-  const parts: string[] = [];
-  if (working > 0) parts.push(`${working} в работе`);
-  if (overdue > 0) parts.push(`${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
-  if (review > 0) parts.push(`${review} на приёмке`);
-  return {
-    headline: name,
-    line: parts.length > 0 ? parts.join(" · ") : "открытых дел нет",
-    tone: overdue > 0 ? "danger" : review > 0 ? "warn" : "ok",
-  };
-}
-
-export type PersonDot = "accent" | "danger";
-
-/**
- * The dots under the people keys: lit for whoever holds a task of the director's queue,
- * red for whoever holds overdue work — the one exception to «a dot is the accent».
- */
-export function personDots(
-  queue: readonly DeskItem[],
-  tasks: readonly (Groupable & { assignee_id: string })[],
-  now: Date = new Date(),
-): Map<string, PersonDot> {
-  const dots = new Map<string, PersonDot>();
-  for (const item of queue) dots.set(item.task.assignee_id, "accent");
-  for (const task of tasks) if (isOverdue(task, now)) dots.set(task.assignee_id, "danger");
-  return dots;
-}
 
 type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
@@ -197,23 +133,4 @@ export function receiptText(
     };
   }
   return { text: "отправляю уведомление…", tone: "muted" };
-}
-
-/**
- * Where the display goes when the queue changes under it. The picked task left the queue
- * (the director just moved it) — the next one takes its place, the last one when it was
- * the tail, nothing when the queue is empty. A task that was never in the queue (picked
- * from the list) stays picked while it exists.
- */
-export function nextSelection(
-  selectedId: string | null,
-  prevQueue: readonly string[],
-  queue: readonly string[],
-  exists: (id: string) => boolean,
-): string | null {
-  if (selectedId === null) return null;
-  if (queue.includes(selectedId)) return selectedId;
-  const was = prevQueue.indexOf(selectedId);
-  if (was >= 0) return queue.length > 0 ? queue[Math.min(was, queue.length - 1)] : null;
-  return exists(selectedId) ? selectedId : (queue[0] ?? null);
 }

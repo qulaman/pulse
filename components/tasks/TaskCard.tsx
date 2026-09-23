@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
-import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskHead, TaskRail } from "@/components/tasks/TaskChrome";
+import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskRail } from "@/components/tasks/TaskChrome";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { toast } from "@/components/ui/Toast";
@@ -33,21 +33,13 @@ export type TaskCardProps = {
   question?: string | null;
   /** Omitted inside the thread itself: the card must not link to its own page. */
   href?: string;
-  /**
-   * On a list drawn as a trace (components/tasks/Trace.tsx) the thread and its bead
-   * already carry the state, so the card drops its own box, rail and padding and hangs
-   * off the line as text plus buttons. Everywhere else it stays a card.
-   */
-  bare?: boolean;
-  /** Off under a «Просрочено» heading — the word would only repeat it. */
-  showStatus?: boolean;
 };
 
 type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign" | "delete";
 
 /* -------------------------------------------------------------------------- */
 
-export function TaskCard({ task, variant, actions, companyId, declineReason, question, href, bare = false, showStatus = true }: TaskCardProps) {
+export function TaskCard({ task, variant, actions, companyId, declineReason, question, href }: TaskCardProps) {
   const [sheet, setSheet] = useState<OpenSheet>("none");
   const close = () => setSheet("none");
   const router = useRouter();
@@ -65,69 +57,43 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
     </span>
   );
 
-  const title = (
-    <h2
-      className={
-        bare
-          ? "font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em] text-text"
-          : "text-[19px] font-semibold leading-6 text-text"
-      }
-    >
-      {task.title}
-    </h2>
-  );
+  const title = <h2 className="text-[19px] font-semibold leading-6 text-text">{task.title}</h2>;
 
   return (
     <article
       className={[
-        bare
-          ? "relative"
-          : "card relative overflow-hidden p-4 pl-5 transition-transform duration-[120ms] active:scale-[0.995]",
+        "card relative overflow-hidden p-4 pl-5 transition-transform duration-[120ms] active:scale-[0.995]",
         dimmed ? "opacity-70" : "",
       ].join(" ")}
       data-tone={tone}
     >
       {/* the state reads before the text does: rail and tint, then the two facts of row 1 */}
-      {bare ? null : <TaskRail tone={tone} />}
+      <TaskRail tone={tone} />
 
-      {bare ? (
-        /* on a trace the head is shared with the capsule of «Задачи», to the pixel */
-        <TaskHead
-          task={task}
-          now={now}
-          href={href}
-          person={variant === "director" ? task.assignee?.full_name : undefined}
-          showStatus={showStatus}
-          extra={task.priority === "high" && !isUrgentNow(task) ? urgent : null}
-        />
-      ) : (
-        <>
-          {/* row 1: status and due */}
-          <div className="relative flex items-center justify-between gap-2">
-            <StatusEyebrow status={task.status} overdue={deadline.overdue} tone={tone} />
-            <DeadlinePill task={task} now={now} />
-          </div>
+      {/* row 1: status and due */}
+      <div className="relative flex items-center justify-between gap-2">
+        <StatusEyebrow status={task.status} overdue={deadline.overdue} tone={tone} />
+        <DeadlinePill task={task} now={now} />
+      </div>
 
-          {/* row 2: title */}
-          <div className="relative mt-2">
-            {href ? (
-              <Link href={href} className="block">
-                {title}
-              </Link>
-            ) : (
-              title
-            )}
-          </div>
+      {/* row 2: title */}
+      <div className="relative mt-2">
+        {href ? (
+          <Link href={href} className="block">
+            {title}
+          </Link>
+        ) : (
+          title
+        )}
+      </div>
 
-          {/* row 3: who and how urgent */}
-          {(variant === "director" && task.assignee) || (task.priority === "high" && !isUrgentNow(task)) ? (
-            <div className="relative mt-3 flex flex-wrap items-center gap-2">
-              {variant === "director" && task.assignee ? <PersonChip fullName={task.assignee.full_name} /> : null}
-              {task.priority === "high" && !isUrgentNow(task) ? urgent : null}
-            </div>
-          ) : null}
-        </>
-      )}
+      {/* row 3: who and how urgent */}
+      {(variant === "director" && task.assignee) || (task.priority === "high" && !isUrgentNow(task)) ? (
+        <div className="relative mt-3 flex flex-wrap items-center gap-2">
+          {variant === "director" && task.assignee ? <PersonChip fullName={task.assignee.full_name} /> : null}
+          {task.priority === "high" && !isUrgentNow(task) ? urgent : null}
+        </div>
+      ) : null}
 
       {task.body ? <p className="relative mt-1.5 text-[15px] leading-[21px] text-muted">{task.body}</p> : null}
 
@@ -168,7 +134,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         />
       ) : null}
 
-      <div className={`relative gap-2 ${bare ? "mt-3" : "mt-4"} ${variant === "employee" && task.status === "sent" ? "grid grid-cols-3" : "flex flex-wrap"}`}>
+      <div className={`relative mt-4 gap-2 ${variant === "employee" && task.status === "sent" ? "grid grid-cols-3" : "flex flex-wrap"}`}>
         {variant === "employee" ? (
           <EmployeeActions task={task} onOpen={setSheet} actions={actions} />
         ) : (

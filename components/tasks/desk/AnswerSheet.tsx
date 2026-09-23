@@ -13,8 +13,8 @@ const FIELD_CLASS =
   "w-full field px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
 
 /**
- * «Ответить» from the display: the question, the quick answers of the card as chips (one
- * tap sends), and a field for the rest. The answer is an ordinary message of the thread —
+ * «Ответить словами…» from a card of «Задачи»: the question, the quick answers as chips
+ * (one tap sends), and a field for the rest. The answer is an ordinary message of the thread —
  * the author's reply closes the question there (the same path as `QuestionBanner`).
  */
 export function AnswerSheet({
