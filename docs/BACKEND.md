@@ -79,7 +79,7 @@ Primary — `gpt-4o-transcribe` с prompt-ростером имён/алиасо
 `context='director_input'` + `note_id` (диктофон «Заметок», D-81): тот же порядок для заметки — клиент кладёт аудио в Storage, вставляет строку `notes(text='', audio_path, inbox_item_id, client_request_id)` под RLS и зовёт transcribe с её `note_id`; роут дописывает `text` и `raw_transcript` service-клиентом, сузив запись до `user_id` вызывающего и того же `audio_path`, причём `text` — только пока он пустой (директор мог вписать слова руками раньше STT), `raw_transcript` — в любом случае. Парсер не вызывается. STT упал или guard отбраковал — заметка остаётся с голосом без слов, «Распознать» на карточке зовёт transcribe снова.
 
 ### POST /api/voice/parse
-Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id }`. Текст и Web Share Target идут сюда же — один парсер на все входы.
+Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id, suspicious?, assignee_id? }`. Текст и Web Share Target идут сюда же — один парсер на все входы. `assignee_id` — человек, выбранный до фразы (кружок на экране ожидания, «Дать задачу» на карточке, D-84): сервер ставит его всем сущностям с одним исполнителем зелёным «matched» (`lib/ai/pin.ts`), кроме той, где модель узнала человека с другим, произнесённым вслух именем.
 
 Модель `claude-haiku-4-5`, **structured outputs** (`json_schema`, `additionalProperties: false`) — невалидный JSON исключён схемой, **repair-retry не существует**. Промпт, few-shot, конвенции времени (D-15) и evals — в `docs/AI.md`, здесь только контракт выхода:
 

@@ -7,7 +7,7 @@ import { SLEEP_COLOR } from "@/components/brand/Mascot";
 import { DreamFlight, TOUCHES, type DreamId, DREAMS } from "@/components/pulse/DreamOrbit";
 import { flyChase, MAX_OVERSHOOT, type Chase } from "@/lib/idle/flight";
 import { PeopleField } from "@/components/pulse/PeopleField";
-import type { Load, Person } from "@/lib/idle/people";
+import type { Load, Orb, Person } from "@/lib/idle/people";
 import { looseSeed } from "@/lib/idle/random";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
 
@@ -73,6 +73,8 @@ export function IdleScene({
   quiet = true,
   only,
   team,
+  picked = null,
+  onPick,
 }: {
   /**
    * The screen is at rest: no panel open, nothing in flight — except the recording the
@@ -88,6 +90,9 @@ export function IdleScene({
   quiet?: boolean;
   only?: DreamId;
   team?: { people: Person[]; loads: Record<string, Load>; now: number };
+  /** the circle picked on this screen (D-84) — the screen keeps it, the field draws it */
+  picked?: string | null;
+  onPick?: (orb: Orb | null) => void;
 }) {
   const reduced = useReducedMotion();
   const playing = active && !reduced;
@@ -136,6 +141,8 @@ export function IdleScene({
           now={team.now}
           dream={dream}
           chase={chase}
+          picked={picked}
+          onPick={onPick}
         />
       ) : null}
       <RimWake dream={dream} chase={chase} ms={FLIGHT_MS} />

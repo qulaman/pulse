@@ -65,6 +65,9 @@ export type RetryFrom = "upload" | "transcribe" | "parse" | "send";
 
 export type IngestError = { code: IngestErrorCode; message?: string };
 
+/** The person chosen before a word was said: the parser gets the id, not a name to guess (D-84). */
+export type Pin = { id: string; name: string };
+
 /** Patch for an entity edited on /confirm; fields are shared across kinds by name. */
 export type EntityPatch = Partial<
   Omit<TaskEntity, "kind"> &
@@ -119,6 +122,8 @@ type IngestState = {
    * addressee still lands — one pipeline, no second way of assigning (D-72).
    */
   address: string | null;
+  /** Whom it is for, by id — stamped on the parsed entities by the server (D-84). */
+  pinned: Pin | null;
   source: IngestSource;
   /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
   noteId: string | null;
@@ -130,11 +135,14 @@ type IngestState = {
 };
 
 type IngestActions = {
-  /** `address` — «Динаре, », glued to the front of the transcript before it is parsed. */
-  startVoice: (address?: string) => Promise<void>;
+  /**
+   * `address` — «Динаре, », glued to the front of the transcript before it is parsed;
+   * `pin` — the same person by id, so the parser does not have to guess who (D-84).
+   */
+  startVoice: (address?: string, pin?: Pin) => Promise<void>;
   stopVoice: () => Promise<void>;
   cancelVoice: () => void;
-  submitText: (text: string) => Promise<void>;
+  submitText: (text: string, pin?: Pin) => Promise<void>;
   ingestAudio: (audio: RecordedAudio) => Promise<void>;
   runTranscribe: () => Promise<void>;
   runParse: () => Promise<void>;
@@ -168,6 +176,7 @@ const initialState: IngestState = {
   transcript: "",
   question: null,
   address: null,
+  pinned: null,
   source: "voice",
   noteId: null,
   entities: [],
@@ -302,7 +311,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
   return {
     ...initialState,
 
-    async startVoice(address) {
+    async startVoice(address, pin) {
       const stage = get().stage;
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
       if (stage !== "idle" && stage !== "error" && stage !== "question") return;
@@ -315,6 +324,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         stage: "recording",
         source: "voice",
         address: address ?? null,
+        pinned: pin ?? null,
         clientRequestId: crypto.randomUUID(),
         recordingStartedAt: Date.now(),
       });
@@ -364,7 +374,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       set({ ...initialState });
     },
 
-    async submitText(text) {
+    async submitText(text, pin) {
       const transcript = text.trim();
       if (!transcript) return;
       set({
@@ -372,6 +382,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         clientRequestId: crypto.randomUUID(),
         source: "typed",
         transcript,
+        pinned: pin ?? null,
       });
       await get().runParse();
     },
@@ -435,7 +446,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     async runParse() {
-      const { transcript, audioPath, source, clientRequestId } = get();
+      const { transcript, audioPath, source, clientRequestId, pinned } = get();
       if (!transcript || !clientRequestId) return;
       set({ stage: "parsing", error: null, retryFrom: null });
 
@@ -446,6 +457,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           source,
           client_request_id: clientRequestId,
           ...(get().suspicious ? { suspicious: true } : {}),
+          ...(pinned ? { assignee_id: pinned.id } : {}),
         });
         const entities = res.entities ?? [];
         if (res.inbox_id) set({ inboxId: res.inbox_id });
@@ -520,12 +532,14 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     /** Emergency path: the model gave nothing, so the transcript becomes one task by hand. */
     startManual() {
       const transcript = get().transcript.trim();
+      // the person tapped before speaking is known even when the model gave nothing (D-84)
+      const pinned = get().pinned;
       const manual: PostprocessedEntity = {
         kind: "task",
         assignee_queries: [],
-        assignee_id: null,
-        assignee_name: null,
-        assignee_confidence: 0,
+        assignee_id: pinned?.id ?? null,
+        assignee_name: pinned?.name ?? null,
+        assignee_confidence: pinned ? 1 : 0,
         group_id: null,
         title: transcript,
         body: null,
@@ -535,8 +549,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         priority: "normal",
         scheduled_send_at: null,
         source_span: transcript,
-        assignee: { status: "unmatched", user_id: null, candidates: [], flag: "check" },
-        blocked: "assignee_unmatched",
+        ...(pinned
+          ? { assignee: { status: "matched" as const, user_id: pinned.id, candidates: [], flag: "ok" as const } }
+          : { assignee: { status: "unmatched" as const, user_id: null, candidates: [], flag: "check" as const }, blocked: "assignee_unmatched" as const }),
       };
       set({ entities: [manual], parsedEntities: [], stage: "confirm", error: null, retryFrom: null });
     },

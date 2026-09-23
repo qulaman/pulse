@@ -392,12 +392,19 @@ export function Mascot({
   size = 64,
   level = 0,
   act = null,
+  gaze = null,
 }: {
   state?: MascotState;
   size?: number;
   level?: number;
   /** a one-shot over the state (D-82); the screen clears it after ACT_MS */
   act?: MascotAct | null;
+  /**
+   * Where the face is looking, as a direction from its middle (−1..1 on each axis): the eyes
+   * go there and hold, the head leans a little the same way (D-84 — the person the director
+   * has just tapped). null — the state's own look.
+   */
+  gaze?: { x: number; y: number } | null;
 }) {
   const squint = state === "happy" || state === "celebrating";
   const wide = state === "listening";
@@ -423,6 +430,13 @@ export function Mascot({
   const widen = wide ? 1.06 : startled || anxious || calling ? 1.1 : asleep ? 0.8 : squint ? 0.85 : lidded || bored || content ? 0.92 : 1;
   // the eye is drawn once at EYE_RX/EYE_RY and reshaped by scale — a compositor-only change
   const eyeShape = `scale(${widen}, ${open})`;
+  // a held look: the eyes travel to the side (a springy saccade, not a slide) and the head
+  // tips towards it; the state's own roaming eyes are switched off so the look stays put
+  const gx = gaze ? Math.max(-1, Math.min(1, gaze.x)) : 0;
+  const gy = gaze ? Math.max(-1, Math.min(1, gaze.y)) : 0;
+  const gazeShift = `translate(${(gx * 4.8).toFixed(2)}px, ${(gy * 3.8).toFixed(2)}px)`;
+  const lean = `translateX(${(gx * 2).toFixed(2)}px) rotate(${(gx * 9).toFixed(2)}deg)`;
+  const LOOK_EASE = "transform 420ms cubic-bezier(0.34, 1.45, 0.64, 1)";
   // one cycle now holds a flick, its echo and a later single blink, so the rhythm is not a tick
   const blink = squint || lidded || asleep ? "none" : "mascot-blink 9.2s infinite";
   // at avatar sizes the gleam and the ground shadow are sub-pixel decoration: draw them, do not animate
@@ -789,6 +803,8 @@ export function Mascot({
           willChange: state === "listening" ? "transform" : "auto",
         }}
       >
+        {/* the lean towards whoever the face is looking at (D-84) — a transition, not a loop */}
+        <g data-gaze={gaze ? "on" : undefined} style={{ transformOrigin: "32px 60px", transform: lean, transition: LOOK_EASE }}>
         {/* act: a one-shot over whatever the state is doing — the yawn, the roll, the hop (D-82) */}
         <g style={{ transformOrigin: "32px 58px", animation: act ? ACT_BODY[act] : "none" }}>
           {/* pose: one-shot on entry */}
@@ -907,8 +923,9 @@ export function Mascot({
                 </g>
               ) : null}
 
+              <g style={{ transform: gazeShift, transition: LOOK_EASE }}>
               <g style={{ transformOrigin: "32px 33px", animation: DRAG[state] ?? "none" }}>
-                <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: EYES[state] }}>
+                <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: gaze ? "none" : EYES[state] }}>
                   {/* where an act sends the gaze, over the state's own look */}
                   <g style={{ transformOrigin: "32px 33px", animation: act ? (ACT_GAZE[act] ?? "none") : "none" }}>
                     {/* The eye keeps one geometry and changes shape by transform: animating rx/ry
@@ -1018,8 +1035,10 @@ export function Mascot({
                   </g>
                 </g>
               </g>
+              </g>
             </g>
           </g>
+        </g>
         </g>
       </g>
 

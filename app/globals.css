@@ -1798,3 +1798,10 @@ select,
   to { opacity: 1; transform: translateY(0); }
 }
 .settings-bar-in { animation: settings-bar-in 180ms var(--ease-out) backwards; }
+
+/* The picked person (D-84): a ring breathes out of the circle and of the card's face —
+   a beacon for where the mascot is looking. Transform and opacity only. */
+@keyframes pick-pulse {
+  0% { transform: scale(1); opacity: 0.65; }
+  80%, 100% { transform: scale(1.32); opacity: 0; }
+}

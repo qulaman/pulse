@@ -17,6 +17,7 @@ import { ConfirmInline, type ConfirmHandle } from "@/components/confirm/ConfirmI
 import { entitiesSummary } from "@/components/confirm/format";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
+import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
@@ -41,6 +42,15 @@ import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
 
 type Exchange = { key: string; said: string; lines: string[]; understood: boolean };
+
+/**
+ * The face's look at a point, px from its middle, as a direction it can hold: mostly
+ * sideways and down, never so far up that the pupils leave the eye (D-84).
+ */
+function lookAt(x: number, y: number): { x: number; y: number } {
+  const length = Math.hypot(x, y) || 1;
+  return { x: x / length, y: Math.max(-0.6, y / length) };
+}
 
 /** idle — the face asleep in the middle; ring — awake, the balls orbit it; panel — one ball opened under the row of balls. */
 type Mode = "idle" | "ring" | "panel";
@@ -94,6 +104,23 @@ export default function PulsePage() {
   const requestId = useIngestStore((state) => state.clientRequestId);
   const resetIngest = useIngestStore((state) => state.reset);
   const startManual = useIngestStore((state) => state.startManual);
+  const startVoice = useIngestStore((state) => state.startVoice);
+  const stopVoice = useIngestStore((state) => state.stopVoice);
+
+  // ---- somebody picked on the waiting screen (D-84) -----------------------------------------
+  // The face turns to them and the ways to give them a task come out over its head; holding
+  // the face records for them too. The pick lasts until the phrase leaves for the parser.
+  const [picked, setPicked] = useState<Picked | null>(null);
+  // the face is held for the picked person right now: the card drops its buttons (D-84)
+  const [held, setHeld] = useState(false);
+  useEffect(
+    () =>
+      useIngestStore.subscribe((current) => {
+        // an error keeps the pick — «слишком коротко» is retried for the same person
+        if (current.stage !== "idle" && current.stage !== "recording" && current.stage !== "error") setPicked(null);
+      }),
+    [],
+  );
   const pointsEnabled = usePointsEnabled().data === true;
   const draftCount = stage === "confirm" ? entities.filter((entity) => isCountable(entity, pointsEnabled)).length : 0;
 
@@ -308,14 +335,25 @@ export default function PulsePage() {
   // The face sleeps only when the board is quiet: a mood outranks sleep, so the barometer
   // is readable without a tap (владелец, 2026-09-17 — «маскот должен меняться и в покое»).
   const restFace: MascotState = mood ?? "sleeping";
+  // a picked person wakes the face: it cannot look at anybody with its eyes shut
+  const attending = picked !== null && (stage === "idle" || stage === "recording");
   // an open ball is a job in the face's hands, and it does it while the panel is open (D-82)
   const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
-  const mascot: MascotState = confirmFace ?? (thought ? "processing" : mode === "idle" ? restFace : (panelFace ?? awake));
+  const mascot: MascotState = confirmFace ?? (thought ? "processing" : mode === "idle" ? (attending ? "calm" : restFace) : (panelFace ?? awake));
+  // where the face looks: the middle of the picked circle, as a direction from its own middle
+  const gaze = attending && picked ? lookAt(picked.x, picked.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
   // watchful (D-82); never while anything is in flight or said
-  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel");
+  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending);
 
   const onFaceTap = () => {
+    // somebody is picked: the face is their microphone — a tap starts, a tap stops (D-84);
+    // holding it works as always and never gets here
+    if (picked && !phraseInHand) {
+      if (stage === "recording") void stopVoice();
+      else if (stage === "idle" || stage === "error" || stage === "question") void startVoice(picked.address, { id: picked.id, name: picked.name });
+      return;
+    }
     // a phrase is in hand: the face is the throw, nothing else (D-36 — never by itself)
     if (phraseInHand) {
       if (confirmRef.current?.throwBatch()) {
@@ -425,7 +463,18 @@ export default function PulsePage() {
                 when nothing waits. The team also stays while the director is recording a task
                 he started from somebody's own orb (D-72); the dream does not — a dream is for
                 a face that is not doing anything. */}
-            <IdleScene active={mode === "idle" && (stage === "idle" || stage === "recording")} quiet={!thought && stage === "idle"} team={field} />
+            <IdleScene
+              active={mode === "idle" && (stage === "idle" || stage === "recording")}
+              // a face that is looking at somebody is not dreaming
+              quiet={!thought && stage === "idle" && !attending}
+              team={field}
+              picked={picked?.id ?? null}
+              onPick={(orb) => {
+                // a sleeping face wakes up with a stretch before it looks
+                if (orb && !picked && restFace === "sleeping") setWakeKey((key) => key + 1);
+                setPicked(orb ? { id: orb.id, name: orb.name, address: orb.address, x: orb.x, y: orb.y } : null);
+              }}
+            />
             <MascotLever
               state={mascot}
               act={acts.act}
@@ -436,8 +485,27 @@ export default function PulsePage() {
               voice={!phraseInHand}
               // the words above the head already say «Отправляю…» while the cards fly
               caption={!phraseInHand}
-              label={phraseInHand ? (sendableCount > 0 ? "Маскот: тап — отправить" : "Маскот: тап — указать, кому") : undefined}
+              label={
+                phraseInHand
+                  ? sendableCount > 0
+                    ? "Маскот: тап — отправить"
+                    : "Маскот: тап — указать, кому"
+                  : picked
+                    ? `Маскот: задача для ${picked.name} — удержи и говори или тапни`
+                    : undefined
+              }
+              pin={picked && !phraseInHand ? { id: picked.id, name: picked.name, address: picked.address } : null}
+              gaze={gaze}
+              onHold={setHeld}
             />
+            {/* the ways to give the picked person a task, right over the face that is looking at them */}
+            <AnimatePresence>
+              {picked && mode === "idle" && (stage === "idle" || stage === "recording") ? (
+                <div key={picked.id} className="absolute bottom-full left-1/2 z-30 mb-3 -translate-x-1/2">
+                  <PickCard picked={picked} held={held} onClose={() => setPicked(null)} />
+                </div>
+              ) : null}
+            </AnimatePresence>
             {/* the balls stay mounted while the face sleeps (shrunk into the head), so opening a
                 panel walks them down into the row instead of throwing them away (D-60) */}
             {mode !== "panel" && !phraseInHand ? (
@@ -520,7 +588,7 @@ export default function PulsePage() {
 
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
-      {showHint && mode === "idle" && stage === "idle" ? (
+      {showHint && mode === "idle" && stage === "idle" && !picked ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}

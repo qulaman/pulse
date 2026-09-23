@@ -144,7 +144,8 @@ export default function PersonPage() {
 
         {/* the main action on its own line — three buttons in a row wrap on a 375px phone */}
         <div className="mt-4 flex flex-col gap-2">
-          <Button block onClick={() => compose(`${dative}, `)}>
+          {/* the person is known by id: the chip in the sheet, and the parser does not guess (D-84) */}
+          <Button block onClick={() => compose("", { id: p.id, name: p.full_name, address: `${dative}, ` })}>
             Дать задачу
           </Button>
           <div className="grid grid-cols-2 gap-2">
