@@ -6,7 +6,7 @@ import { compareTasks } from "./grouping";
 import { isOverdue, type TaskStatus } from "./status-text";
 
 /**
- * The director's moves on a task (D-80, kept by D-82): why a task waits for the director
+ * The director's moves on a task (D-80, kept by D-83): why a task waits for the director
  * («ваш ход»), in what order, and which three buttons its open card offers. Pure
  * functions — the cards only render them; what is offered is the product, so it is tested.
  *

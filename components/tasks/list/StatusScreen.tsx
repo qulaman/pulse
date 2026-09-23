@@ -9,7 +9,7 @@ import { deadlineToneOf, TONE_VAR } from "@/lib/tasks/tone";
 import { Icon } from "../desk/icons";
 
 /**
- * The status screen at the head of «Задачи» and «Мои дела» (D-82): what the moment is
+ * The status screen at the head of «Задачи» and «Мои дела» (D-83): what the moment is
  * about in one big number and a sentence, how the open work splits into states as one
  * stacked bar (Screen Time's bar, one colour per state), and the nearest deadline as the
  * foot — a tap on it opens that task in the list below. Every row keeps its height

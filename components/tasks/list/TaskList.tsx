@@ -14,7 +14,7 @@ import { Icon } from "../desk/icons";
 import { StatusGlyph } from "./StatusGlyph";
 
 /**
- * The column of cards under the status screen (D-82): section titles and cards in one
+ * The column of cards under the status screen (D-83): section titles and cards in one
  * flat list, so a card that changes section slides there instead of being rebuilt; the
  * open card grows in place and the ones under it slide down (framer layout — transform
  * only, DESIGN §2). One card is open at a time, like Things.

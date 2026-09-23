@@ -45,7 +45,7 @@ function firstName(full: string | null | undefined): string {
 type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string } | null;
 
 /**
- * «Задачи» директора (D-82): a status screen on top — whose move it is, how the open work
+ * «Задачи» директора (D-83): a status screen on top — whose move it is, how the open work
  * splits, the nearest deadline — then the people who hold the work, then three tabs
  * «Ждут вас / В работе / Закрытые», and the tasks as cards that open in place with their
  * buttons. The tab that asks for a move opens its first card by itself, and when that

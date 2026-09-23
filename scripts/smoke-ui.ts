@@ -145,7 +145,7 @@ async function main() {
     // persistence: a cold reload of /sent reads the task straight from the database
     await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
     await page.reload({ waitUntil: "networkidle" });
-    // a task nobody has accepted yet lives in «В работе» (D-82); the parser may normalise the
+    // a task nobody has accepted yet lives in «В работе» (D-83); the parser may normalise the
     // stamp away — the newest «Казхром» card is ours
     await page.locator('[data-testid="tab-working"]').click();
     const sentCard = page.locator('[data-testid="sent-task"]', { hasText: /Казхром/i }).first();
@@ -160,7 +160,7 @@ async function main() {
     await page.screenshot({ path: join(SHOTS, "05b-sent.png") });
     record("задача сохранена: видна в «Отправленных» после перезагрузки", persisted && status === "sent", `status=${status}`);
 
-    // cards (D-82): a tap opens the card in place, with the director's buttons live
+    // cards (D-83): a tap opens the card in place, with the director's buttons live
     let opened = false;
     let keysLive = false;
     if (persisted) {

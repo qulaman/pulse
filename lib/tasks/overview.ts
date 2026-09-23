@@ -6,7 +6,7 @@ import { isOverdue, pluralRu, SHORT_STATUS, type TaskStatus } from "./status-tex
 import type { Tone } from "./tone";
 
 /**
- * «Задачи» and «Мои дела» as one screen shape (D-82): a status screen on top, three tabs
+ * «Задачи» and «Мои дела» as one screen shape (D-83): a status screen on top, three tabs
  * under it, and a column of cards that open in place. Everything the screen says — which
  * tab a task lives in, the sections of a tab, the numbers on the status screen, the steps
  * of a task — is decided here, in pure functions, so both roles read the same rules and

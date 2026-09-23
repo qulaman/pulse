@@ -7,7 +7,7 @@ import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 
 /**
- * «Задачи» директора (D-82): the data and the actions; the screen itself is
+ * «Задачи» директора (D-83): the data and the actions; the screen itself is
  * `DirectorTasksView` — the /dev sandbox draws the same view from fixtures.
  */
 export default function SentPage() {

@@ -21,7 +21,7 @@ export function directorSheetOf(name: string): DirectorSheetName | null {
 
 /**
  * The director's sheets of a task, in one place: the thread card and the cards of
- * «Задачи» (D-82) open the same ones, so a word or a button cannot drift between them.
+ * «Задачи» (D-83) open the same ones, so a word or a button cannot drift between them.
  * Each sheet calls the existing action and closes; nothing here decides what is allowed.
  */
 export function DirectorSheets({

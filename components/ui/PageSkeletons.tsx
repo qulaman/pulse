@@ -62,7 +62,7 @@ export function PulseSkeleton() {
 }
 
 /**
- * «Задачи» and «Мои дела» before their data (D-82): the page title, the status screen with
+ * «Задачи» and «Мои дела» before their data (D-83): the page title, the status screen with
  * grey where the numbers go, the people strip (director), the tabs and a column of closed
  * cards. Every box has the height of the real one, so nothing moves when the data lands.
  */

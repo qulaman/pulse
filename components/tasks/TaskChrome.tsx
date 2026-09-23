@@ -8,7 +8,7 @@ import { deadlineToneOf, pillStyle, TONE_VAR, toneOf, type Tone } from "@/lib/ta
  * The parts every task wears, in one place: the rail and the tint that carry its state,
  * the eyebrow that names it, the pill that carries the deadline and the chip that names
  * the person. The thread's card (`TaskCard`) draws from here; the list cards of «Задачи»
- * and «Мои дела» have their own head (components/tasks/list, D-82).
+ * and «Мои дела» have their own head (components/tasks/list, D-83).
  */
 
 /** Left rail plus a breath of the same colour in the corner. Needs a relative, clipped parent. */

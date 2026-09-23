@@ -26,7 +26,7 @@ const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "nume
 type SheetState = { name: "ask" | "decline" | "report"; taskId: string } | null;
 
 /**
- * «Мои дела» (D-82): the same screen shape as the director's «Задачи» — a status screen
+ * «Мои дела» (D-83): the same screen shape as the director's «Задачи» — a status screen
  * (what to accept, what is late, how much is in hand), three tabs «Новые / В работе /
  * Закрытые», cards that open in place. A new task opens by itself with Принял / Уточнить /
  * Не могу (принцип 2), so accepting stays one tap from the tab bar; the next new one takes

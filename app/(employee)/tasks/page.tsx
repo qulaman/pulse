@@ -7,7 +7,7 @@ import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
 
 /**
- * «Мои дела» (D-82): the data and the actions; the screen itself is `EmployeeTasksView` —
+ * «Мои дела» (D-83): the data and the actions; the screen itself is `EmployeeTasksView` —
  * the /dev sandbox draws the same view from fixtures.
  */
 export default function TasksPage() {

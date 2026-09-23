@@ -124,7 +124,7 @@ async function main() {
   });
   await page.screenshot({ path: join(SHOTS, "j1-sent.png") });
 
-  // «Задачи» are cards (D-82): a tap opens the card in place, «Переписка» opens its thread.
+  // «Задачи» are cards (D-83): a tap opens the card in place, «Переписка» opens its thread.
   // The pile that asks for a move opens its first card by itself — close it first.
   const row = page.locator('[data-testid="sent-task"]').first();
   const title = (await row.textContent().catch(() => null))?.trim() ?? "";

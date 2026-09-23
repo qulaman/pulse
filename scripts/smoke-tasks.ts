@@ -1,5 +1,5 @@
 /**
- * «Задачи» и «Мои дела» as cards (D-82) in a real browser (system Chrome via Playwright)
+ * «Задачи» и «Мои дела» as cards (D-83) in a real browser (system Chrome via Playwright)
  * against the dev database. The script makes its own «Tasks smoke …» orders for an
  * employee, moves them through RPCs as the employee would, and checks that the director
  * clears «Ждут вас» from the list — «Принять» on the open card, a one-tap answer to the
