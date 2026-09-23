@@ -16,7 +16,7 @@ export default async function DirectorLayout({ children }: { children: React.Rea
   if (profile.role !== "director") redirect(homeForRole(profile.role));
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="app-shell flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role="director" />

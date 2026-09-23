@@ -42,7 +42,8 @@ export function ThoughtBubble({
       exit={{ opacity: 0, scale: 0.9, y: 4, transition: { duration: 0.18 } }}
       transition={{ type: "spring", stiffness: 300, damping: 22 }}
       className="absolute left-1/2 z-10 w-[min(88vw,320px)] -translate-x-1/2 text-left"
-      style={{ bottom: `calc(50% + ${faceSize / 2 + 26}px)`, transformOrigin: "60% 100%" }}
+      // the face grows and shrinks with the mode: the thought follows it instead of jumping
+      style={{ bottom: `calc(50% + ${faceSize / 2 + 26}px)`, transformOrigin: "60% 100%", transition: "bottom 300ms var(--ease-out)" }}
       data-testid="thought"
     >
       <span

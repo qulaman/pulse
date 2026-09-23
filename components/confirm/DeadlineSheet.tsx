@@ -3,8 +3,9 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { DateTimeField } from "@/components/ui/datetime/DateTimeField";
 import { Sheet } from "@/components/ui/Sheet";
-import { aqtobeIsoAt, aqtobeIsoToLocalInput, localInputToAqtobeIso } from "@/components/confirm/format";
+import { aqtobeIsoAt } from "@/components/confirm/format";
 
 type Props = {
   open: boolean;
@@ -22,8 +23,6 @@ const PRESETS: { label: string; iso: () => string | null }[] = [
 ];
 
 export function DeadlineSheet({ open, onClose, currentIso, onPick }: Props) {
-  const [custom, setCustom] = useState(currentIso ? aqtobeIsoToLocalInput(currentIso) : "");
-
   const choose = (iso: string | null) => {
     onPick(iso);
     onClose();
@@ -31,32 +30,35 @@ export function DeadlineSheet({ open, onClose, currentIso, onPick }: Props) {
 
   return (
     <Sheet open={open} onClose={onClose} title="Срок">
+      {/* the body lives inside the sheet so it is born with it: the picker then starts
+          from the deadline this task has right now, not from the one it had at boot */}
+      <DeadlineBody currentIso={currentIso} onChoose={choose} />
+    </Sheet>
+  );
+}
+
+function DeadlineBody({ currentIso, onChoose }: { currentIso: string | null; onChoose: (iso: string | null) => void }) {
+  const [custom, setCustom] = useState<string | null>(currentIso);
+
+  return (
+    <>
       <div className="grid grid-cols-2 gap-2">
         {PRESETS.map((preset) => (
-          <Button key={preset.label} variant="secondary" onClick={() => choose(preset.iso())}>
+          <Button key={preset.label} variant="secondary" onClick={() => onChoose(preset.iso())}>
             {preset.label}
           </Button>
         ))}
       </div>
 
-      <label className="mt-4 block text-[13px] leading-4 text-muted" htmlFor="deadline-custom">
-        Своя дата
-      </label>
-      <div className="mt-1 flex gap-2">
-        <input
-          id="deadline-custom"
-          type="datetime-local"
-          value={custom}
-          onChange={(event) => setCustom(event.target.value)}
-          className="min-h-[44px] flex-1 field px-3 text-[16px] leading-[22px] outline-none focus:border-accent"
-        />
-        <Button
-          disabled={localInputToAqtobeIso(custom) === null}
-          onClick={() => choose(localInputToAqtobeIso(custom))}
-        >
+      <p className="mt-4 text-[13px] leading-4 text-muted">Своя дата</p>
+      <div className="mt-1">
+        <DateTimeField value={custom} onChange={setCustom} />
+      </div>
+      <div className="mt-2">
+        <Button block disabled={custom === null || custom === currentIso} onClick={() => onChoose(custom)}>
           Готово
         </Button>
       </div>
-    </Sheet>
+    </>
   );
 }

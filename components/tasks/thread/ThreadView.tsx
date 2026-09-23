@@ -91,7 +91,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
 
   return (
     <>
-      <section className={compact ? "flex flex-1 flex-col overflow-y-auto px-1 pb-2" : "mt-4 pb-28"} data-testid="thread">
+      <section className={compact ? "no-bar flex flex-1 flex-col overflow-y-auto px-1 pb-2" : "mt-4 pb-28"} data-testid="thread">
         {rows.length >= THREAD_PAGE && hasMore ? (
           <button
             type="button"

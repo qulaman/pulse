@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { TrashIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -55,8 +56,18 @@ export function DemoReset() {
 
   return (
     <div className="card px-4 py-4">
-      <p className="text-[16px] leading-[22px]">Обнулить демо-базу</p>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
+      {/* the one irreversible button of the app wears the same section header as the rest, in red */}
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+          style={{ background: "color-mix(in srgb, var(--danger) 14%, transparent)", color: "var(--danger)" }}
+        >
+          <TrashIcon />
+        </span>
+        <p className="font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em]">Обнулить демо-базу</p>
+      </div>
+      <p className="mt-2 text-[13px] leading-[18px] text-muted">
         Сотрёт все задачи, переписку, объявления, начисления, логи разбора и загруженные файлы компании. Люди и настройки останутся.
       </p>
       <div className="mt-3">

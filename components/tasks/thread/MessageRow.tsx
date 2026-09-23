@@ -8,6 +8,12 @@ import { messageState } from "@/lib/tasks/thread";
 import { TEXT } from "@/lib/tasks/status-text";
 import { VoiceMessage } from "./VoiceMessage";
 
+/** How long the recording is, as the sender's phone measured it (D-66); older rows have none. */
+function durationOf(message: TaskMessage): number | null {
+  const value = (message.meta as { duration_ms?: unknown } | null)?.duration_ms;
+  return typeof value === "number" && value > 0 ? value : null;
+}
+
 /** A clock while the row is on its way, a tick once the thread holds it. */
 function StateMark({ state }: { state: "pending" | "sent" }) {
   if (state === "pending") {
@@ -78,9 +84,8 @@ export function MessageRow({ message, mine, onRetry }: { message: TaskMessage; m
         {message.content ? <p className="mt-1 text-[16px] leading-[22px]">{message.content}</p> : null}
 
         {message.type === "photo" && message.file_path && state === "sent" ? <PhotoMessage messageId={message.id} /> : null}
-        {message.type === "voice" && state === "sent" ? <VoiceMessage messageId={message.id} /> : null}
-        {message.type === "voice" && !message.content ? (
-          <p className="mt-1 text-[13px] leading-4 text-muted">Расшифровываю…</p>
+        {message.type === "voice" && state === "sent" ? (
+          <VoiceMessage messageId={message.id} durationMs={durationOf(message)} />
         ) : null}
 
         {state === "failed" ? (

@@ -1,8 +1,14 @@
 import { redirect } from "next/navigation";
 
+import { InstallHint } from "@/components/InstallHint";
+import { PulseMark } from "@/components/brand/PulseMark";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
+import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { Row, RowGroup } from "@/components/ui/Row";
+import { SignOutRow } from "@/components/profile/SignOutRow";
+import { GearIcon, SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
 import { createServerSupabase } from "@/lib/supabase/server";
 
@@ -13,41 +19,50 @@ async function signOut() {
   redirect("/login");
 }
 
+/**
+ * Профиль: who is signed in (the card is the page's heading), the points card for an
+ * employee, then the short list of everything this person can actually change about
+ * themselves. Company configuration is the director's own screen — here it is one row,
+ * not a second settings page.
+ */
 export default async function ProfilePage() {
   const profile = await getSessionProfile();
   const director = profile.role === "director";
+  const build = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
+  // read here, not in the browser: whether points exist at all decides the page's shape
+  const supabase = await createServerSupabase();
+  const company = await supabase.from("companies").select("settings").limit(1).maybeSingle();
+  const pointsEnabled = (company.data?.settings as { points_enabled?: boolean } | null)?.points_enabled === true;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <h1 className="text-[24px] font-bold leading-[30px]">Профиль</h1>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
+      <ProfileCard userId={profile.userId} fullName={profile.fullName} role={profile.role} />
+      {director ? null : <PointsCard userId={profile.userId} enabled={pointsEnabled} />}
 
-      <div className="mt-4">
-        <ProfileCard userId={profile.userId} fullName={profile.fullName} role={profile.role} />
-      </div>
-
-      <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Личное</h2>
-      <div className="mt-2 flex flex-col gap-2">
+      <h2 className="eyebrow mt-6 px-1">Личное</h2>
+      <RowGroup className="mt-2">
         <PasswordRow />
         <NotificationsRow />
-        <div className="flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]">
-          Telegram
-          <span className="text-[13px] leading-4 text-muted">привязка — с доставкой уведомлений</span>
-        </div>
-      </div>
+        <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
+      </RowGroup>
+
       {director ? (
-        <p className="mt-3 text-[13px] leading-4 text-muted">
-          Настройки компании — распознавание, разбор, очки, сотрудники, данные — на вкладке «Настройки»
-        </p>
+        <>
+          <h2 className="eyebrow mt-6 px-1">Компания</h2>
+          <RowGroup className="mt-2">
+            <Row icon={<GearIcon />} title="Настройки" value="голос, разбор, очки" href="/settings" />
+          </RowGroup>
+        </>
       ) : null}
 
-      <form action={signOut} className="mt-6">
-        <button
-          type="submit"
-          className="min-h-[44px] w-full field px-4 text-[16px] font-medium"
-        >
-          Выйти
-        </button>
-      </form>
+      <InstallHint />
+
+      <SignOutRow action={signOut} className="mt-6" />
+
+      <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
+        <PulseMark />
+        {build ? <p className="nums text-[12px] leading-4 text-muted">сборка {build}</p> : null}
+      </footer>
     </main>
   );
 }

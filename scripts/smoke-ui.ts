@@ -199,13 +199,18 @@ async function main() {
   // ---- settings: the director switches points on --------------------------------
   await page.goto(`${APP_URL}/settings`, { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Настройки" }).waitFor({ timeout: 10_000 });
-  await page.getByRole("switch", { name: /Очки включены/ }).waitFor({ timeout: 10_000 });
-  await page.screenshot({ path: join(SHOTS, "09-settings.png"), fullPage: true });
+  // the sections start closed and say their current value; the switch lives inside one
+  await page.getByRole("button", { name: /Очки и рейтинг/ }).click();
   const pointsSwitch = page.getByRole("switch", { name: /Очки включены/ });
-  if ((await pointsSwitch.getAttribute("aria-checked")) !== "true") await pointsSwitch.click();
-  await page.getByRole("button", { name: "Сохранить", exact: true }).click();
-  await page.getByText("Сохранил настройки").waitFor({ timeout: 10_000 });
-  record("настройки: очки включены и сохранены", true);
+  await pointsSwitch.waitFor({ timeout: 10_000 });
+  await page.screenshot({ path: join(SHOTS, "09-settings.png"), fullPage: true });
+  if ((await pointsSwitch.getAttribute("aria-checked")) !== "true") {
+    // the save row belongs to the section and appears only once something changed
+    await pointsSwitch.click();
+    await page.getByRole("button", { name: "Сохранить", exact: true }).click();
+    await page.getByText("Сохранил настройки").waitFor({ timeout: 10_000 });
+  }
+  record("настройки: очки включены и сохранены", (await pointsSwitch.getAttribute("aria-checked")) === "true");
 
   // ---- points by text: two people, two cards with names, both sent ------------------
   await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });

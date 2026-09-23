@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 
+import { Row } from "@/components/ui/Row";
+import { LockIcon } from "@/components/profile/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -45,14 +47,7 @@ export function PasswordRow() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex min-h-[52px] w-full items-center justify-between gap-3 card px-4 text-left text-[16px] leading-[22px]"
-      >
-        Пароль
-        <span className="text-[13px] leading-4 text-muted">сменить ›</span>
-      </button>
+      <Row icon={<LockIcon />} title="Пароль" value="сменить" onClick={() => setOpen(true)} />
 
       <Sheet open={open} onClose={close} title="Сменить пароль">
         <form onSubmit={submit} className="flex flex-col gap-3">

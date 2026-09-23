@@ -41,12 +41,11 @@ export type ParseResponse = {
 
 export type TranscribeRequest = {
   audio_path: string;
-  context: UploadContext;
+  /** Only the director's dictation is transcribed; a thread's voice is kept as audio (D-66). */
+  context: "director_input";
   client_request_id: string;
   /** Real recording length — the STT guard's density checks need it (docs/AI.md §1). */
   duration_ms?: number;
-  /** The voice message the words belong to: the route writes the transcript onto it. */
-  message_id?: string;
   /** The note dictated on «Заметки»: the route writes the transcript onto it (D-81). */
   note_id?: string;
 };

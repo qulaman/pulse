@@ -12,10 +12,9 @@ import {
   Bone,
   ChatBone,
   PeopleGridBone,
-  CompanyFormBone,
   RatingRowBone,
   RowListBone,
-  SectionBone,
+  SettingsSectionsBone,
   SkeletonGroup,
   StatBone,
   TableBone,
@@ -154,27 +153,6 @@ export function SentSkeleton() {
   );
 }
 
-/** Пульт от телевизора: карточка «Сейчас на стене», поиск по людям и список. */
-export function ScreenSkeleton() {
-  return (
-    <main className={MAIN}>
-      <Title text="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
-      <SkeletonGroup className="mt-4 card p-4">
-        <Bone h={26} w={200} />
-        <Bone h={16} w={120} className="mt-2" />
-      </SkeletonGroup>
-      <h2 className="eyebrow mt-6 px-1">Показать сотрудника</h2>
-      <SkeletonGroup className="mt-2">
-        <Bone h={44} className="rounded-[12px]" />
-      </SkeletonGroup>
-      <div className="mt-2">
-        <RowListBone count={4} />
-      </div>
-    </main>
-  );
-}
-
-/** Search, filter chips, the count line, then rows — the roster below the grid. */
 export function TeamListBone() {
   return (
     <SkeletonGroup className="mt-4">
@@ -258,29 +236,39 @@ export function PersonSkeleton() {
 
 export function SettingsSkeleton() {
   return (
-    <main className={MAIN}>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
       <Title text="Настройки" sub="Всё здесь — конфигурация компании: код одинаков для всех клиентов" />
-      <h2 className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-muted">Компания</h2>
-      <div className="mt-2 flex flex-col gap-2">
-        {[
-          ["Сотрудники", "карточки, алиасы, роли ›"],
-          ["Данные", "таблицы компании как есть ›"],
-          ["Задачи", "все поручения списком ›"],
-        ].map(([title, hint]) => (
-          <div key={title} className="flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px]">
-            {title}
-            <span className="text-[13px] leading-4 text-muted">{hint}</span>
-          </div>
-        ))}
+      <h2 className="eyebrow mt-6 px-1">Компания</h2>
+      <div className="mt-2">
+        <SettingsSectionsBone count={1} />
       </div>
-      <SkeletonGroup className="mt-4">
-        <CompanyFormBone />
+      <SkeletonGroup className="mt-2">
+        <Bone h={176} className="rounded-[16px]" />
       </SkeletonGroup>
-      <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Голос и разбор</h2>
-      <SkeletonGroup className="mt-2 flex flex-col gap-4">
-        <SectionBone fields={3} />
-        <SectionBone fields={2} />
+      <h2 className="eyebrow mt-6 px-1">Правила работы</h2>
+      <div className="mt-2">
+        <SettingsSectionsBone />
+      </div>
+    </main>
+  );
+}
+
+/** Пульт от телевизора: карточка «Сейчас на стене», поиск по людям и список. */
+export function ScreenSkeleton() {
+  return (
+    <main className={MAIN}>
+      <Title text="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
+      <SkeletonGroup className="mt-4 card p-4">
+        <Bone h={26} w={200} />
+        <Bone h={16} w={120} className="mt-2" />
       </SkeletonGroup>
+      <h2 className="eyebrow mt-6 px-1">Показать сотрудника</h2>
+      <SkeletonGroup className="mt-2">
+        <Bone h={44} className="rounded-[12px]" />
+      </SkeletonGroup>
+      <div className="mt-2">
+        <RowListBone count={4} />
+      </div>
     </main>
   );
 }
@@ -321,6 +309,7 @@ export function FeedSkeleton() {
   );
 }
 
+/** «Мои дела»: the same thread, and under each title the three buttons. */
 export function TasksListBone() {
   return (
     <SkeletonGroup className="mt-4">
@@ -500,30 +489,40 @@ export function RatingSkeleton() {
 
 export function ProfileSkeleton() {
   return (
-    <main className={MAIN}>
-      <Title text="Профиль" />
-      <SkeletonGroup className="mt-4">
-        <section className="card p-4">
-          <div className="flex items-center gap-4">
-            <Bone round w={64} h={64} className="shrink-0" />
-            <div className="min-w-0 flex-1">
-              <Bone h={24} w="60%" />
-              <Bone h={16} w="40%" className="mt-1" />
-              <Bone h={28} w={96} className="mt-2 rounded-full" />
-            </div>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
+      <SkeletonGroup>
+        <section className="card px-4 pb-4 pt-7 text-center">
+          <Bone round w={84} h={84} className="mx-auto" />
+          <Bone h={30} w={190} className="mx-auto mt-3.5" />
+          <Bone h={18} w={120} className="mx-auto mt-1" />
+          <Bone h={26} w={104} className="mx-auto mt-2.5 rounded-full" />
+          <div className="mt-4 grid grid-cols-3 gap-2 rounded-[12px] bg-surface-2 py-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="flex flex-col items-center">
+                <Bone h={20} w={26} className="bg-border" />
+                <Bone h={12} w={64} className="mt-2 bg-border" />
+              </div>
+            ))}
           </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            <StatBone label=" " />
-            <StatBone label=" " />
-            <StatBone label=" " />
+          <div className="mt-3 rounded-[12px] bg-surface-2 px-3 pb-3 pt-2.5">
+            <div className="flex items-center justify-between">
+              <Bone h={16} w={110} className="bg-border" />
+              <Bone h={16} w={72} className="bg-border" />
+            </div>
+            <div className="mt-2 flex h-[36px] items-end gap-[3px]">
+              {Array.from({ length: 14 }, (_, i) => (
+                <span key={i} className="flex-1 rounded-[3px] bg-border" style={{ height: 3 }} />
+              ))}
+            </div>
           </div>
         </section>
       </SkeletonGroup>
-      <h2 className="mt-6 text-[13px] font-semibold uppercase tracking-wide text-muted">Личное</h2>
-      <SkeletonGroup className="mt-2 flex flex-col gap-2">
-        {[0, 1, 2].map((i) => (
-          <Bone key={i} h={52} className="rounded-[16px]" />
-        ))}
+      <h2 className="eyebrow mt-6 px-1">Личное</h2>
+      <SkeletonGroup className="mt-2">
+        <Bone h={176} className="rounded-[16px]" />
+      </SkeletonGroup>
+      <SkeletonGroup className="mt-6">
+        <Bone h={58} className="rounded-[16px]" />
       </SkeletonGroup>
     </main>
   );

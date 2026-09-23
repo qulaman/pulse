@@ -8,19 +8,12 @@ import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { subscribeIngestLevel, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
+import { STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
 
 /**
  * Visible progress of the pipeline (D-43) and every failure state of docs/AI.md §11.
  * Nothing here blocks the recording itself — it only reports where the phrase is now.
  */
-
-const STAGE_LINE: Record<string, string> = {
-  recording: "Слушаю…",
-  uploading: "Сохраняю…",
-  transcribing: "Распознаю…",
-  parsing: "Разбираю…",
-  sending: "Отправляю…",
-};
 
 type ErrorView = {
   line: string;
@@ -55,13 +48,7 @@ const SCENE: Record<string, Scene> = {
   sending: "sending",
 };
 
-function elapsed(startedAt: number | null): string {
-  if (!startedAt) return "0:00";
-  const total = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
-}
-
-export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) {
+export function IngestOverlay({ navigate = true, progress = true }: { navigate?: boolean; /** false on a screen whose own mascot plays the pipeline (the board) */ progress?: boolean } = {}) {
   const stage = useIngestStore((state) => state.stage);
   const error = useIngestStore((state) => state.error);
   const transcript = useIngestStore((state) => state.transcript);
@@ -90,7 +77,7 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
   useEffect(() => {
     if (stage !== "recording") return;
     const paint = () => {
-      if (timerRef.current) timerRef.current.textContent = elapsed(recordingStartedAt);
+      if (timerRef.current) timerRef.current.textContent = elapsedSince(recordingStartedAt);
     };
     paint();
     const id = setInterval(paint, 500);
@@ -107,6 +94,10 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     const key = `${clientRequestId}:${target}`;
     if (navigatedFor.current === key) return;
     navigatedFor.current = key;
+    // the board confirms the phrase where it was spoken: nowhere to go, and the trip is
+    // marked as made — a draft left on the board must not drag the director to /confirm
+    // the moment they open another screen (it waits in the pill instead)
+    if (stage === "confirm" && pathname === "/pulse") return;
     // The sandbox renders /confirm in place and must not be sent to the real screen.
     if (pathname !== target) router.push(target);
   }, [navigate, stage, clientRequestId, pathname, router]);
@@ -119,7 +110,7 @@ export function IngestOverlay({ navigate = true }: { navigate?: boolean } = {}) 
     }
   }, [stage, error, reset]);
 
-  const showProgress = stage in STAGE_LINE;
+  const showProgress = progress && stage in STAGE_LINE;
   const showError = stage === "error" && error !== null && error.code !== "record_too_short";
   if (!showProgress && !showError) return null;
 

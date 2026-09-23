@@ -112,6 +112,13 @@ type IngestState = {
   transcript: string;
   /** The director's question when the phrase held nothing to send (stage «question»). */
   question: string | null;
+  /**
+   * Whom the phrase is for, when the director started it from somebody's own orb on the
+   * waiting screen: «Динаре, ». It is glued to the front of the transcript before the parser
+   * sees it, so the phrase he speaks can be just the task («подготовь КП до пятницы») and the
+   * addressee still lands — one pipeline, no second way of assigning (D-72).
+   */
+  address: string | null;
   source: IngestSource;
   /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
   noteId: string | null;
@@ -123,7 +130,8 @@ type IngestState = {
 };
 
 type IngestActions = {
-  startVoice: () => Promise<void>;
+  /** `address` — «Динаре, », glued to the front of the transcript before it is parsed. */
+  startVoice: (address?: string) => Promise<void>;
   stopVoice: () => Promise<void>;
   cancelVoice: () => void;
   submitText: (text: string) => Promise<void>;
@@ -159,6 +167,7 @@ const initialState: IngestState = {
   inboxId: null,
   transcript: "",
   question: null,
+  address: null,
   source: "voice",
   noteId: null,
   entities: [],
@@ -293,7 +302,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
   return {
     ...initialState,
 
-    async startVoice() {
+    async startVoice(address) {
       const stage = get().stage;
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
       if (stage !== "idle" && stage !== "error" && stage !== "question") return;
@@ -305,6 +314,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         ...initialState,
         stage: "recording",
         source: "voice",
+        address: address ?? null,
         clientRequestId: crypto.randomUUID(),
         recordingStartedAt: Date.now(),
       });
@@ -406,8 +416,10 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           client_request_id: clientRequestId,
           ...(get().audio ? { duration_ms: get().audio!.durationMs } : {}),
         });
+        // the addressee the director picked before he spoke goes in front of what he said
+        const address = get().address;
         set({
-          transcript: res.transcript,
+          transcript: address && res.transcript.trim() ? `${address}${res.transcript}` : res.transcript,
           inboxId: res.inbox_id ?? get().inboxId,
           suspicious: res.suspicious ?? false,
         });

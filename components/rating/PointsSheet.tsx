@@ -76,7 +76,7 @@ export function PointsSheet({
               ) : (history.data ?? []).length === 0 ? (
                 <p className="mt-2 text-[14px] leading-[18px] text-muted">Очков пока не было</p>
               ) : (
-                <ul className="mt-2 max-h-[40vh] space-y-1.5 overflow-y-auto">
+                <ul className="no-bar mt-2 max-h-[40vh] space-y-1.5 overflow-y-auto">
                   {(history.data ?? []).slice(0, 30).map((line) => (
                     <li key={line.id} className="flex items-baseline justify-between gap-3 rounded-[12px] bg-surface-2 px-3 py-2 text-[14px] leading-[18px]">
                       <span className="min-w-0 truncate">

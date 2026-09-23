@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { BuildingIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
-import { CompanyFormBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { Disclosure } from "@/components/ui/Disclosure";
+import { SettingsSectionsBone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { APP_BG, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
 
@@ -19,8 +21,9 @@ async function readCompany(): Promise<Company> {
 }
 
 /**
- * «О компании»: the name, a logo, a tagline and an optional accent (D-44 — the only
- * customisation a client gets). The accent is honoured only above 4.5:1 on the app
+ * «Компания»: the name, a logo, a tagline and an optional accent (D-44 — the only
+ * customisation a client gets). Closed, the section says what the header shows today;
+ * open, it previews the header live. The accent is honoured only above 4.5:1 on the app
  * background; the readout says so before the director saves.
  */
 export function CompanyForm() {
@@ -111,23 +114,23 @@ export function CompanyForm() {
     } else toast("Не получилось убрать логотип");
   };
 
-  if (!company) {
-    return (
-      <SkeletonGroup>
-        <CompanyFormBone />
-      </SkeletonGroup>
-    );
-  }
+  if (!company) return <SettingsSectionsBone count={1} />;
+
+  const dirty =
+    name.trim() !== company.name ||
+    tagline.trim() !== (company.brand.tagline ?? "") ||
+    (accent.trim() ? accentHex.toUpperCase() : null) !== company.brand.accent;
 
   return (
-    <section className="card p-4">
-      <h2 className="text-[19px] font-semibold leading-6">О компании</h2>
-      <p className="mt-1 text-[13px] leading-4 text-muted">
-        Название и логотип видят все в шапке и на экране входа. Стиль Pulse остаётся, меняется только акцент
-      </p>
-
+    <Disclosure
+      icon={<BuildingIcon />}
+      title="Компания"
+      dirty={dirty}
+      summary={`${company.name} · ${company.brand.logo_url ? "логотип есть" : "без логотипа"}${company.brand.accent ? " · свой акцент" : ""}`}
+      hint="Название и логотип видят все в шапке и на экране входа. Стиль Pulse остаётся, меняется только акцент"
+    >
       {/* header preview */}
-      <div className="mt-4 flex items-center gap-3 rounded-[12px] border border-border bg-bg px-3 py-2">
+      <div className="flex items-center gap-3 rounded-[12px] border border-border bg-bg px-3 py-2">
         {company.brand.logo_url ? (
           // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
           <img src={company.brand.logo_url} alt="" className="h-7 max-w-[120px] object-contain" />
@@ -143,17 +146,17 @@ export function CompanyForm() {
 
       <div className="mt-4 flex flex-col gap-4">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[14px] font-medium leading-[18px]">Название</span>
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Название</span>
           <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="ТОО «Компания»" />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[14px] font-medium leading-[18px]">Подпись на экране входа</span>
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Подпись на экране входа</span>
           <input className={FIELD} value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={80} placeholder="Голосовое управление компанией" />
         </label>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[14px] font-medium leading-[18px]">Логотип</span>
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Логотип</span>
           <input
             ref={fileInput}
             type="file"
@@ -176,7 +179,7 @@ export function CompanyForm() {
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <span className="text-[14px] font-medium leading-[18px]">Акцентный цвет</span>
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Акцентный цвет</span>
           <div className="flex items-center gap-2">
             <input
               type="color"
@@ -210,11 +213,24 @@ export function CompanyForm() {
         </div>
       </div>
 
-      <div className="mt-4">
-        <Button block disabled={saving || !name.trim()} onClick={() => void save()}>
-          {saving ? "Сохраняю…" : "Сохранить компанию"}
-        </Button>
-      </div>
-    </section>
+      {dirty ? (
+        <div className="card-in mt-4 flex gap-2">
+          <Button block loading={saving} disabled={!name.trim()} onClick={() => void save()}>
+            Сохранить
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={saving}
+            onClick={() => {
+              setName(company.name);
+              setTagline(company.brand.tagline ?? "");
+              setAccent(company.brand.accent ?? "");
+            }}
+          >
+            Отменить
+          </Button>
+        </div>
+      ) : null}
+    </Disclosure>
   );
 }

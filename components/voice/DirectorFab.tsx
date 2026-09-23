@@ -58,7 +58,9 @@ export function DirectorFab() {
       ) : ownMic ? null : (
         <VoiceButton />
       )}
-      <IngestOverlay />
+      {/* on Пульс the face on the screen plays the pipeline itself; the overlay would be a
+          second mascot over the first (D-60, fifth refinement) — errors still need it */}
+      <IngestOverlay progress={pathname !== "/pulse"} />
     </>
   );
 }

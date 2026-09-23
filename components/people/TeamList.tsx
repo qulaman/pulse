@@ -171,8 +171,18 @@ export function TeamList({ people, loads, pointsOn }: { people: Person[]; loads:
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Имя, должность или как зовут в речи"
           aria-label="Поиск по команде"
-          className="min-h-[44px] w-full field pl-10 pr-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"
+          className="min-h-[44px] w-full field pl-10 pr-10 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"
         />
+        {query ? (
+          <button
+            type="button"
+            aria-label="Очистить"
+            onClick={() => setQuery("")}
+            className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center text-[18px] leading-none text-muted"
+          >
+            ×
+          </button>
+        ) : null}
       </label>
 
       <div className="mt-3 flex flex-wrap gap-2">

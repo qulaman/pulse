@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { ParticipantsPicker } from "@/components/confirm/ParticipantsPicker";
+import { useRoster } from "@/components/confirm/useRoster";
 import { WhenSheet } from "@/components/confirm/WhenSheet";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
@@ -52,6 +53,9 @@ export function EventSheet({ event, onClose, meId, isDirector }: Props) {
 function EventBody({ event, onClose, meId, isDirector }: { event: CalendarEvent } & Omit<Props, "event">) {
   const respond = useRespondEvent(meId);
   const setParticipants = useSetParticipants();
+  // «Все сотрудники» on a meeting that already exists: the RPC takes ids, not a flag, so
+  // the whole roster the director sees becomes the list to add (the sheet is director-only)
+  const roster = useRoster();
   const update = useUpdateEvent();
   const cancel = useCancelEvent();
 
@@ -163,9 +167,8 @@ function EventBody({ event, onClose, meId, isDirector }: { event: CalendarEvent 
         selectedIds={event.participants.map((p) => p.user_id)}
         onDone={({ everyone, ids }) => {
           const was = event.participants.map((p) => p.user_id);
-          // «Все» is materialised by the RPC on the server side of the roster it can see;
-          // from here it is still the difference between two lists
-          const next = everyone ? was : ids;
+          // «Все» is the roster itself; either way the RPC gets the difference of two lists
+          const next = everyone ? [...new Set([...was, ...(roster.data ?? []).map((u) => u.id)])] : ids;
           setParticipants.mutate({
             eventId: event.id,
             add: next.filter((id) => !was.includes(id)),

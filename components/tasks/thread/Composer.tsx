@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import { uploadPhoto } from "@/lib/files/photo";
@@ -14,6 +14,15 @@ import { createRecorder, extForMime, MicUnavailableError, type Recorder } from "
 const CANCEL_DISTANCE_PX = 60;
 /** Shorter than this is a slip of the thumb, not a message. */
 const MIN_RECORDING_MS = 700;
+/**
+ * A reply in a thread is ten seconds, and the counter says so from the first one
+ * (D-66). The cap is what makes a voice message answerable at a glance: the
+ * director hears the whole thing in the time it takes to read a line.
+ */
+const MAX_RECORDING_SEC = 10;
+const MAX_RECORDING_MS = MAX_RECORDING_SEC * 1000;
+/** Five lines of the field (22px each) plus its padding — past that the words scroll. */
+const MAX_FIELD_PX = 5 * 22 + 24;
 
 type Props = {
   taskId: string;
@@ -39,10 +48,33 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   const [recording, setRecording] = useState(false);
   const [cancelArmed, setCancelArmed] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [left, setLeft] = useState(MAX_RECORDING_SEC);
   const fileInput = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   const recorder = useRef<Recorder | null>(null);
   const start = useRef({ x: 0, y: 0 });
   const armed = useRef(false);
+  const ticker = useRef<ReturnType<typeof setInterval> | null>(null);
+  // the timer fires outside React's render, so the slide-to-cancel state it reads
+  // has to be a ref — a stale closure would send a recording meant to be forgotten
+  const cancelling = useRef(false);
+
+  const stopTicking = () => {
+    if (ticker.current) clearInterval(ticker.current);
+    ticker.current = null;
+  };
+
+  useEffect(() => stopTicking, []);
+
+  // the row grows with the words instead of handing them a native scrollbar and a resize
+  // grip — neither belongs in this design; past five lines the text scrolls with no bar
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    el.style.height = "auto";
+    const frame = el.offsetHeight - el.clientHeight; // borders: height is border-box
+    el.style.height = `${Math.min(el.scrollHeight + frame, MAX_FIELD_PX)}px`;
+  }, [draft]);
 
   const sendText = () => {
     const text = draft.trim();
@@ -73,8 +105,10 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   const stopRecording = async (cancelled: boolean) => {
     const active = recorder.current;
     recorder.current = null;
+    stopTicking();
     setRecording(false);
     setCancelArmed(false);
+    setLeft(MAX_RECORDING_SEC);
     if (!active) return;
     if (cancelled) {
       active.cancel();
@@ -90,28 +124,27 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
     }
     if (audio.durationMs < MIN_RECORDING_MS) return;
 
-    const requestId = crypto.randomUUID();
-    const messageId = crypto.randomUUID();
-    let posted = false;
     try {
       const ext = extForMime(audio.mime);
-      const upload = await voiceApi.uploadUrl({ ext, context: "task_message", client_request_id: requestId });
-      await voiceApi.uploadAudio({ signed_url: upload.signed_url, blob: audio.blob, mime: audio.mime });
-      // the message exists the moment the audio is safe; the words are written onto it later
-      actions.sendMessage({ taskId, companyId, text: "", filePath: upload.audio_path, type: "voice", id: messageId });
-      posted = true;
-      onSent?.();
-      await voiceApi.transcribe({
-        audio_path: upload.audio_path,
+      const upload = await voiceApi.uploadUrl({
+        ext,
         context: "task_message",
-        client_request_id: requestId,
-        duration_ms: audio.durationMs,
-        message_id: messageId,
+        client_request_id: crypto.randomUUID(),
       });
+      await voiceApi.uploadAudio({ signed_url: upload.signed_url, blob: audio.blob, mime: audio.mime });
+      // the length travels with the message so the player can draw a wave and count the
+      // seconds down without downloading anything (MediaRecorder files lie about duration)
+      actions.sendMessage({
+        taskId,
+        companyId,
+        text: "",
+        filePath: upload.audio_path,
+        type: "voice",
+        meta: { duration_ms: Math.min(audio.durationMs, MAX_RECORDING_MS) },
+      });
+      onSent?.();
     } catch {
-      // either the recording is in the thread and only the words are missing, or it never
-      // left the phone — say which, never pretend it went
-      toast(posted ? "Не расслышал — голосовое осталось в переписке" : "Голосовое не отправилось");
+      toast("Голосовое не отправилось");
     }
   };
 
@@ -134,15 +167,30 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       return;
     }
     recorder.current = active;
+    cancelling.current = false;
     setRecording(true);
+    setLeft(MAX_RECORDING_SEC);
     haptic(15);
+
+    // ten and out: at zero the recording stops and goes on its own, finger still down
+    const startedAt = Date.now();
+    ticker.current = setInterval(() => {
+      const remaining = MAX_RECORDING_MS - (Date.now() - startedAt);
+      if (remaining <= 0) {
+        haptic(15);
+        void stopRecording(cancelling.current);
+        return;
+      }
+      setLeft(Math.ceil(remaining / 1000));
+    }, 100);
   };
 
   const onPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!recording) return;
     const dx = Math.abs(event.clientX - start.current.x);
     const dy = Math.abs(event.clientY - start.current.y);
-    setCancelArmed(Math.max(dx, dy) > CANCEL_DISTANCE_PX);
+    cancelling.current = Math.max(dx, dy) > CANCEL_DISTANCE_PX;
+    setCancelArmed(cancelling.current);
   };
 
   const onPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
@@ -186,32 +234,62 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   const voiceButton = (
     <button
       type="button"
-      aria-label="Записать голосовое"
+      aria-label={recording ? `Идёт запись, осталось ${left} с` : `Записать голосовое, до ${MAX_RECORDING_SEC} секунд`}
       onPointerDown={(event) => void onPointerDown(event)}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerUp}
       style={{ touchAction: "none" }}
-      className={`flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full transition-transform duration-[120ms] ${
+      className={`relative flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-full transition-transform duration-[120ms] ${
         recording ? (cancelArmed ? "scale-110 bg-danger text-bg" : "scale-110 bg-accent text-bg") : "bg-surface-2 text-text"
       }`}
       data-recording={recording ? "true" : "false"}
+      data-left={recording ? left : undefined}
     >
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect x="9" y="3" width="6" height="11" rx="3" />
-        <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-      </svg>
+      {recording ? (
+        <>
+          {/* the ring drains over the same ten seconds the number counts, so the thumb
+              sees the end coming without reading a digit */}
+          <svg className="absolute inset-0 -rotate-90" width="44" height="44" viewBox="0 0 44 44" aria-hidden>
+            <circle cx="22" cy="22" r="18" fill="none" stroke="currentColor" strokeOpacity="0.25" strokeWidth="2.5" />
+            <circle
+              cx="22"
+              cy="22"
+              r="18"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeDasharray="113"
+              style={{ animation: `voice-countdown ${MAX_RECORDING_SEC}s linear forwards` }}
+            />
+          </svg>
+          <span className="nums text-[15px] font-semibold leading-none">{left}</span>
+        </>
+      ) : (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <rect x="9" y="3" width="6" height="11" rx="3" />
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+        </svg>
+      )}
     </button>
   );
 
   // typing turns the microphone into «Отправить»: one place, never two buttons at once
   const voiceOrSend = draft.trim() ? sendButton : voiceButton;
 
-  const field = (
+  const textField = (
     <textarea
-      className="min-h-[44px] flex-1 field px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
+      ref={field}
+      className="no-bar min-h-[44px] flex-1 resize-none overflow-y-auto field px-3 py-3 text-[16px] leading-[22px] outline-none placeholder:text-muted focus:border-accent"
       rows={1}
-      placeholder={recording ? (cancelArmed ? "Отпусти — отменю" : "Говори…") : TEXT.composerPlaceholder}
+      placeholder={
+        recording
+          ? cancelArmed
+            ? "Отпусти — отменю"
+            : `Говори… ${left} с`
+          : TEXT.composerPlaceholder
+      }
       value={draft}
       onChange={(event) => setDraft(event.target.value)}
       onKeyDown={(event) => {
@@ -233,7 +311,7 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       />
       {/* on a site the thumb finds the microphone first; at a desk the photo does */}
       {micFirst ? voiceOrSend : photoButton}
-      {field}
+      {textField}
       {micFirst ? photoButton : voiceOrSend}
     </div>
   );

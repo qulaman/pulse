@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { MascotScene, type Scene } from "@/components/brand/MascotScene";
+import type { DreamId } from "@/components/pulse/DreamOrbit";
+import { IdleScene } from "@/components/pulse/IdleScene";
+import { loadsOf } from "@/lib/idle/people";
 
 /**
  * The mascot's animation bench (Лаб). Every existing motion of «Капля» in one place,
@@ -59,8 +62,14 @@ const STATES: StateEntry[] = [
   {
     state: "sending",
     title: "Отправляю",
-    note: "Замах назад, бросок вперёд со сплющиванием, глаза провожают карточку вверх",
-    keys: "mascot-throw · mascot-follow",
+    note: "Замах назад, бросок вперёд со сплющиванием, карточка появляется в руке на замахе и улетает вверх-вправо на броске, глаза её провожают",
+    keys: "mascot-throw · mascot-throw-card · mascot-follow",
+  },
+  {
+    state: "offering",
+    title: "Ждёт броска",
+    note: "Разобранная фраза в руках: лицо само просит тап — вжимается и отскакивает, как кнопка под пальцем, из тела расходится кольцо, стопка подпрыгивает на отскоке",
+    keys: "mascot-offer · mascot-offer-eyes · mascot-tap-ring · mascot-offer-card",
   },
   {
     state: "thinking",
@@ -83,14 +92,62 @@ const STATES: StateEntry[] = [
   {
     state: "sleeping",
     title: "Спит",
-    note: "Глаза закрыты, самое медленное дыхание, «z» уплывают вверх; от 48px появляется сон — капля на месяце, звёзды, падающая звезда",
-    keys: "mascot-sleep · mascot-zzz · mascot-dream · mascot-dream-star · mascot-shooting-star · mascot-shadow-sleep",
+    note: "Глаза закрыты, самое медленное дыхание, «z» уплывают вверх. Что ему снится — рисуется вне головы, см. «Сны спящего лица» ниже",
+    keys: "mascot-sleep · mascot-zzz · mascot-shadow-sleep",
+  },
+  {
+    state: "alert",
+    title: "Насторожен",
+    note: "Лицо директора: выпрямляется и замирает, дышит поверхностно, раз за цикл прислушивается поворотом, глаза медленно ведут по сторонам и задерживаются на краях. Негативных состояний у директора нет (D-70)",
+    keys: "mascot-alert-pose · mascot-alert · mascot-scan",
+  },
+  {
+    state: "calling",
+    title: "Зовёт",
+    note: "«Обрати внимание!»: наклон к зрителю, два настойчивых подскока с креном и пауза, над головой выскакивает «!». Лента сотрудника, пока есть непринятая задача",
+    keys: "mascot-lean · mascot-call · mascot-call-mark",
   },
   {
     state: "surprised",
     title: "Удивлён",
     note: "Разбужен мыслью: прыжок назад, широкие глаза вверх, маленький круглый рот, дальше настороженное дыхание",
     keys: "mascot-startle · mascot-alert · mascot-look-up",
+  },
+  {
+    state: "processing",
+    title: "Обрабатывает",
+    note: "Подключается к хранилищу, глаза бегут глифами как терминал, затем фиксация, прыжок и галочка нового статуса (D-65)",
+    keys: "mascot-process · mascot-code-look · mascot-glyph · mascot-eye-return · mascot-store · mascot-data-bit · mascot-check-pop · mascot-shadow-process",
+  },
+  {
+    state: "angry",
+    title: "Злится",
+    note: "Нахмуренные брови, короткий тяжёлый толчок корпусом и упрямый взгляд исподлобья.",
+    keys: "mascot-angry-pose · mascot-angry · mascot-angry-look",
+  },
+  {
+    state: "nervous",
+    title: "Нервничает",
+    note: "Неуверенно переминается, взгляд мечется, рядом появляется одна капля пота.",
+    keys: "mascot-nervous · mascot-nervous-look · mascot-sweat",
+  },
+  {
+    state: "bored",
+    title: "Скучает",
+    note: "Вялое дыхание, полуприкрытые глаза и долгий взгляд в сторону — заняться нечем.",
+    keys: "mascot-bored · mascot-bored-look",
+  },
+  {
+    state: "panicking",
+    title: "Паникует",
+    note: "Частая дрожь, широко раскрытые глаза и две торопливые капли пота.",
+    keys: "mascot-panic-pose · mascot-panic · mascot-panic-look · mascot-sweat",
+  },
+  {
+    state: "swearing",
+    title: "Ругается",
+    note: "Сердитая мимика, рубленый ритм и облачко с нейтральными символами вместо брани.",
+    keys: "mascot-angry-pose · mascot-swear · mascot-swear-look · mascot-swear-cloud",
   },
 ];
 
@@ -145,8 +202,60 @@ const SCENES: { scene: Scene; title: string; note: string }[] = [
   { scene: "saving", title: "Сохраняю", note: "Лицо и полоска этапов" },
   { scene: "transcribing", title: "Распознаю", note: "Лицо и полоска этапов" },
   { scene: "parsing", title: "Разбираю", note: "Лицо и полоска этапов" },
-  { scene: "sending", title: "Отправляю", note: "Бросок и карточка, улетающая в такт mascot-throw (fly-card)" },
+  { scene: "sending", title: "Отправляю", note: "Бросок; карточка теперь улетает из самого лица (mascot-throw-card)" },
 ];
+
+const DREAMS: { id: DreamId; title: string; note: string; keys: string }[] = [
+  {
+    id: "rocket",
+    title: "Ракета",
+    note: "Капля в кабине, вид сверху; сопло пульсирует, из него отрываются клубы выхлопа. Летит одна — за ней никто не гонится",
+    keys: "dream-lap · dream-swell · dream-thrust · dream-puff",
+  },
+  {
+    id: "dragon",
+    title: "Китайский дракон",
+    note: "Голова с рогами, гривой и усами позади капли, за ней девять звеньев тела и хвост — каждое стартует на 34 мс позже предыдущего, поэтому тело само ложится по линии полёта, хлещет на отскоках и волной идёт по нему",
+    keys: "dream-lap · dream-swell · dream-step · dream-wave",
+  },
+  {
+    id: "monster",
+    title: "Монстр",
+    note: "Капля убегает, монстр следом тянет лапы с когтями; три глаза со зрачками и пасть с зубами",
+    keys: "dream-lap · dream-swell · dream-step · dream-grab",
+  },
+];
+
+/**
+ * A made-up company of fifty-two, so the waiting screen can be looked at the way it will
+ * actually be seen — a star field over the face and a floor of idlers under it — instead of
+ * the four people a dev database happens to hold.
+ */
+const CROWD = (() => {
+  const names = ["Марат Оспанов", "Динара Ахметова", "Ерлан Бек", "Тимур Салимов", "Айгуль Сапарова", "Асель Ким", "Нурлан Ким", "Жанна Ли"];
+  const people = Array.from({ length: 52 }, (_, i) => ({
+    id: `crowd-${i}`,
+    fullName: `${names[i % names.length]!.split(" ")[0]} ${String.fromCharCode(1040 + (i % 32))}.`,
+    alias: null,
+    available: true,
+  }));
+  // two thirds of the company are carrying something, at every stage a star can be in
+  const now = Date.now();
+  const stages = ["sent", "accepted", "pending_review", "declined", "rework", "accepted"] as const;
+  const rows = people.slice(0, 34).flatMap((person, i) =>
+    Array.from({ length: 1 + (i % 3) }, (_, k) => ({
+      id: `${person.id}-${k}`,
+      assignee_id: person.id,
+      status: stages[(i + k) % stages.length]!,
+      deadline: i % 7 === 0 ? new Date(now - 3_600_000).toISOString() : null,
+      title: `Задача ${k + 1} для ${person.fullName.split(" ")[0]}`,
+      question: i % 11 === 0 && k === 0 ? "А когда?" : null,
+      decline_reason: null,
+    })),
+  );
+  // the clock is read once, when the module loads: the bench only needs a plausible «now»
+  return { people, loads: loadsOf(rows, now), now };
+})();
 
 const SIZES = [32, 64, 96, 128];
 
@@ -208,6 +317,10 @@ export function MascotGallery() {
   // remounting a demo restarts its one-shot pose (lean, tilt-read, startle) and the gestures
   const [runKey, setRunKey] = useState(0);
   const [replays, setReplays] = useState<Record<string, number>>({});
+  // the seek harness: while paused, every keyframe is held at this second of its own timeline
+  const [seek, setSeek] = useState(0);
+  const root = useRef<HTMLDivElement>(null);
+  const baseDelays = useRef(new WeakMap<Element, number>());
 
   useEffect(() => {
     if (!auto) return;
@@ -219,12 +332,32 @@ export function MascotGallery() {
     return () => clearInterval(id);
   }, [auto]);
 
+  /**
+   * Freeze a chosen moment: a negative animation-delay seeks a paused keyframe to that
+   * second, so a frame can be read and screenshotted deterministically. Each element keeps
+   * its own authored delay, so staggered props (the three dots, the cards) stay in step.
+   */
+  useEffect(() => {
+    const node = root.current;
+    if (!node) return;
+    const animated = node.querySelectorAll<HTMLElement | SVGElement>("[style*='animation']");
+    for (const element of animated) {
+      let base = baseDelays.current.get(element);
+      if (base === undefined) {
+        const declared = getComputedStyle(element).animationDelay.split(",")[0]?.trim() ?? "0s";
+        base = declared.endsWith("ms") ? parseFloat(declared) / 1000 : parseFloat(declared) || 0;
+        baseDelays.current.set(element, base);
+      }
+      element.style.animationDelay = paused ? `${(base - seek).toFixed(3)}s` : `${base}s`;
+    }
+  }, [paused, seek, size, runKey, replays]);
+
   const replay = (key: string) => setReplays((current) => ({ ...current, [key]: (current[key] ?? 0) + 1 }));
   const stageBg = BACKGROUNDS.find((item) => item.key === background)!.css;
   const stageHeight = Math.round(size * 1.5 + 48);
 
   return (
-    <div className={paused ? "lab-paused" : undefined}>
+    <div ref={root} className={paused ? "lab-paused" : undefined}>
       {/* pause holds every keyframe where it is — the only way to read a single frame */}
       <style>{".lab-paused, .lab-paused *, .lab-paused *::before, .lab-paused *::after { animation-play-state: paused !important; }"}</style>
 
@@ -276,6 +409,21 @@ export function MascotGallery() {
               <span className="nums w-9 text-right text-text">{level.toFixed(2)}</span>
             </label>
           </div>
+          {paused ? (
+            <label className="mt-2 flex items-center gap-2 text-[13px] leading-4 text-muted">
+              Кадр
+              <input
+                type="range"
+                min={0}
+                max={8}
+                step={0.02}
+                value={seek}
+                onChange={(event) => setSeek(Number(event.target.value))}
+                className="min-h-[36px] min-w-0 flex-1 accent-accent"
+              />
+              <span className="nums w-12 text-right text-text">{seek.toFixed(2)}с</span>
+            </label>
+          ) : null}
         </section>
       </div>
 
@@ -344,6 +492,33 @@ export function MascotGallery() {
                 <MascotScene key={`${entry.scene}-${runKey}`} scene={entry.scene} level={entry.scene === "listening" ? level : 0} />
               </Stage>
               <Caption title={entry.title} note={entry.note} keys={entry.scene} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-[19px] font-semibold leading-6">Сны спящего лица</h2>
+        <p className="mt-1 text-[13px] leading-4 text-muted">
+          Сцена ожидания на домашних экранах: пыль «нарисованная ручкой» по всему экрану и сон, летящий сквозь неё.
+          Полёт управляемый — инерция, снос с курса, отталкивание от краёв дугой и погоня на упреждение; он считается
+          один раз на старте сна и записывается в keyframes, дальше JS спит. Пометки, мимо которых прошёл полёт,
+          вспыхивают. Первый сон — через 2,6 с, полёт 14 с, между снами 5 с; пробуждение гасит сцену за 180 мс. Здесь
+          зона сцены — сама карточка, каждый сон закреплён (`only`); в продукте зона равна экрану, а сны идут по кругу.
+          Команда здесь выдуманная, 52 человека: сверху звёзды по стадиям задач (сверхновая — выдана, жёлтая — в работе,
+          зелёная — сдана, красная — вопрос или просрочка), снизу ряды бездельников. Тап по звезде — карточка, тап по
+          кружку — «Записать задачу?».
+        </p>
+        <div className="mt-3 flex flex-col gap-4">
+          {DREAMS.map((dream) => (
+            <div key={dream.id} className="card p-4">
+              <Stage height={340} background={stageBg}>
+                <div key={`${dream.id}-${runKey}`} data-dream-area className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                  <IdleScene active only={dream.id} team={dream.id === "rocket" ? CROWD : undefined} />
+                  <Mascot state="sleeping" size={96} />
+                </div>
+              </Stage>
+              <Caption title={dream.title} note={dream.note} keys={dream.keys} />
             </div>
           ))}
         </div>
