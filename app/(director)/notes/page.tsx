@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { Mascot } from "@/components/brand/Mascot";
 import { BoardCard, BoardTrashCard, NewBoardCard } from "@/components/mindboard/BoardCards";
+import { AssignSheet } from "@/components/notes/AssignSheet";
 import { ConvertedCard, NoteCard, PendingCard, TrashCard } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
 import { NotesRecorder } from "@/components/notes/NotesRecorder";
@@ -88,6 +89,8 @@ export default function NotesPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [purging, setPurging] = useState<Purge | null>(null);
   const [reminding, setReminding] = useState<Note | null>(null);
+  // «Поручить»: the people sheet over the feed, the task leaves from here (D-108)
+  const [assigning, setAssigning] = useState<Note | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
 
@@ -316,7 +319,7 @@ export default function NotesPage() {
           accordion.toggle(note.id);
           remove.mutate({ id: note.id });
         }}
-        onAssign={() => startFromNote({ id: note.id, text: note.text, audio_path: note.audio_path }, "task")}
+        onAssign={() => setAssigning(note)}
         onAnnounce={() => startFromNote({ id: note.id, text: note.text, audio_path: note.audio_path }, "announcement")}
         onRetranscribe={() => dictation.retranscribe(note)}
         onRemind={() => setReminding(note)}
@@ -445,6 +448,8 @@ export default function NotesPage() {
           </div>
         )
       ) : null}
+
+      <AssignSheet note={assigning} onClose={() => setAssigning(null)} me={me.data} />
 
       <RemindSheet
         open={reminding !== null}

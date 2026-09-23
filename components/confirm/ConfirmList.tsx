@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import { AssigneePicker } from "@/components/confirm/AssigneePicker";
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { EntityCard } from "@/components/confirm/EntityCard";
-import { useRoster } from "@/components/confirm/useRoster";
+import { PeoplePicker } from "@/components/people/PeoplePicker";
+import { useRoster } from "@/lib/people/roster";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useIngestStore } from "@/lib/store/ingest";
 import { useMe } from "@/lib/tasks/queries";
@@ -107,12 +107,19 @@ export function ConfirmList({
         ))}
       </div>
 
-      <AssigneePicker
+      <PeoplePicker
         open={openAssignee !== null}
         onClose={() => onAssigneeIndex(null)}
-        candidates={openAssignee?.assignee?.candidates ?? []}
-        onPick={(user) => {
-          if (assigneeIndex !== null) pickAssignee(assigneeIndex, user);
+        title="Кому?"
+        subject={openAssignee?.kind === "task" ? openAssignee.title : null}
+        hint={
+          (openAssignee?.assignee?.candidates.length ?? 0) > 0
+            ? "Понял задачу, но имя подходит нескольким. Кому из них?"
+            : "Понял задачу, но не понял, кому. Выберите человека"
+        }
+        suggestedIds={(openAssignee?.assignee?.candidates ?? []).map((candidate) => candidate.user_id)}
+        onPick={(person) => {
+          if (assigneeIndex !== null) pickAssignee(assigneeIndex, { user_id: person.id, full_name: person.full_name });
         }}
       />
 

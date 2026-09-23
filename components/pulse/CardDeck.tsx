@@ -4,7 +4,7 @@ import { motion, type PanInfo } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import { AssigneePicker } from "@/components/confirm/AssigneePicker";
+import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { TaskCard } from "@/components/tasks/TaskCard";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -379,15 +379,15 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
           </>
         ) : null}
       </Sheet>
-      <AssigneePicker
+      <PeoplePicker
         open={menu !== null && menuStep === "reassign"}
         onClose={closeMenu}
         title="Кому передать?"
+        subject={menu?.title ?? null}
         hint="Задача уйдёт этому человеку как новая, у прежнего исполнителя закроется с пометкой"
-        candidates={[]}
-        onPick={(user) => {
-          if (menu) actions.reassign({ taskId: menu.id, assigneeId: user.user_id, assigneeName: user.full_name });
-          closeMenu();
+        currentId={menu?.assignee_id ?? null}
+        onPick={(person) => {
+          if (menu) actions.reassign({ taskId: menu.id, assigneeId: person.id, assigneeName: person.full_name });
         }}
       />
     </section>

@@ -3,7 +3,7 @@
 import { useCallback, useMemo } from "react";
 
 import { joinRu } from "@/components/confirm/format";
-import { useRoster } from "@/components/confirm/useRoster";
+import { useRoster } from "@/lib/people/roster";
 import { toast } from "@/components/ui/Toast";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";

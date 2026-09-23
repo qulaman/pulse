@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 
-import { ParticipantsPicker } from "@/components/confirm/ParticipantsPicker";
-import { useRoster } from "@/components/confirm/useRoster";
+import { PeoplePicker } from "@/components/people/PeoplePicker";
+import { useRoster } from "@/lib/people/roster";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Clock } from "@/components/ui/datetime/Clock";
@@ -216,9 +216,13 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
         </Button>
       </div>
 
-      <ParticipantsPicker
+      <PeoplePicker
+        mode="many"
         open={whoOpen}
         onClose={() => setWhoOpen(false)}
+        title="Кто участвует?"
+        subject={name || null}
+        allowEveryone
         everyone={everyone}
         selectedIds={ids}
         hideIds={[authorId]}

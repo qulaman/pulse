@@ -1,7 +1,7 @@
 "use client";
 
-import { AssigneePicker } from "@/components/confirm/AssigneePicker";
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
+import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -48,16 +48,14 @@ export function DirectorSheets({
         currentIso={task.deadline}
         onPick={(iso) => actions.extend({ taskId: task.id, deadlineIso: iso })}
       />
-      <AssigneePicker
+      <PeoplePicker
         open={open === "reassign"}
         onClose={onClose}
         title="Кому передать?"
+        subject={task.title}
         hint="Задача уйдёт этому человеку как новая, у прежнего исполнителя закроется с пометкой"
-        candidates={[]}
-        onPick={(user) => {
-          actions.reassign({ taskId: task.id, assigneeId: user.user_id, assigneeName: user.full_name });
-          onClose();
-        }}
+        currentId={task.assignee_id}
+        onPick={(person) => actions.reassign({ taskId: task.id, assigneeId: person.id, assigneeName: person.full_name })}
       />
 
       <Sheet open={open === "revoke"} onClose={onClose} title={BUTTON.revoke}>

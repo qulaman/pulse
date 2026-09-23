@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { Chip, type ChipTone } from "@/components/ui/Chip";
 import { formatDeadline } from "@/components/confirm/format";
-import { ParticipantsPicker } from "@/components/confirm/ParticipantsPicker";
+import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { WhenSheet } from "@/components/confirm/WhenSheet";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
@@ -384,9 +384,13 @@ export function EntityCard({
                   } as EntityPatch)
                 }
               />
-              <ParticipantsPicker
+              <PeoplePicker
+                mode="many"
                 open={whoOpen}
                 onClose={() => setWhoOpen(false)}
+                title="Кто участвует?"
+                subject={entity.title}
+                allowEveryone
                 everyone={entity.everyone}
                 selectedIds={entity.participant_ids}
                 onDone={({ everyone, ids }) =>

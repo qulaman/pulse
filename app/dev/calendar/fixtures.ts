@@ -1,4 +1,4 @@
-import type { RosterEntry } from "@/components/confirm/useRoster";
+import type { RosterEntry } from "@/lib/people/roster";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 
 /** Ids of the sandbox people — not real rows; nothing here reaches the database. */
@@ -6,15 +6,15 @@ export const DIRECTOR = "fx-dir";
 export const MARAT = "fx-marat";
 
 export const ROSTER: RosterEntry[] = [
-  { id: DIRECTOR, full_name: "Ерлан Сапаров", position: "Директор" },
-  { id: MARAT, full_name: "Марат Оспанов", position: "Менеджер по продажам" },
-  { id: "fx-aigul", full_name: "Айгуль Нурланова", position: "Бухгалтер" },
-  { id: "fx-dana", full_name: "Дана Жумабаева", position: "Юрист" },
-  { id: "fx-erlanb", full_name: "Ерлан Бекенов", position: "Снабжение" },
-  { id: "fx-askhat", full_name: "Асхат Тулегенов", position: "Прораб" },
-  { id: "fx-madi", full_name: "Мади Каримов", position: "Инженер ПТО" },
-  { id: "fx-saule", full_name: "Сауле Ахметова", position: "Секретарь" },
-  { id: "fx-timur", full_name: "Тимур Ибраев", position: "Водитель" },
+  { id: DIRECTOR, full_name: "Ерлан Сапаров", position: "Директор", avatar_url: null, role: "director" },
+  { id: MARAT, full_name: "Марат Оспанов", position: "Менеджер по продажам", avatar_url: null, role: "employee" },
+  { id: "fx-aigul", full_name: "Айгуль Нурланова", position: "Бухгалтер", avatar_url: null, role: "employee" },
+  { id: "fx-dana", full_name: "Дана Жумабаева", position: "Юрист", avatar_url: null, role: "employee" },
+  { id: "fx-erlanb", full_name: "Ерлан Бекенов", position: "Снабжение", avatar_url: null, role: "employee" },
+  { id: "fx-askhat", full_name: "Асхат Тулегенов", position: "Прораб", avatar_url: null, role: "employee" },
+  { id: "fx-madi", full_name: "Мади Каримов", position: "Инженер ПТО", avatar_url: null, role: "employee" },
+  { id: "fx-saule", full_name: "Сауле Ахметова", position: "Секретарь", avatar_url: null, role: "employee" },
+  { id: "fx-timur", full_name: "Тимур Ибраев", position: "Водитель", avatar_url: null, role: "employee" },
 ];
 
 const nameOf = (id: string) => ROSTER.find((person) => person.id === id)?.full_name ?? "Сотрудник";

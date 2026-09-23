@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { BoardOnWall } from "@/components/mindboard/BoardOnWall";
 import { PointCard } from "@/components/mindboard/PointCard";
+import { AssignSheet } from "@/components/notes/AssignSheet";
 import { NoteIcon } from "@/components/notes/icons";
 import { NotesRecorder, type RecorderWords } from "@/components/notes/NotesRecorder";
 import { Mascot } from "@/components/brand/Mascot";
@@ -25,7 +26,6 @@ import { firstLine, phoneRow } from "@/lib/notes/list";
 import { useCreateNote, useDeleteNote, useUpdateNote } from "@/lib/notes/mutations";
 import { useNotes, type Note } from "@/lib/notes/queries";
 import { usePendingNotes, useReplayHearing } from "@/lib/notes/replay";
-import { useIngestStore } from "@/lib/store/ingest";
 import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useTvState } from "@/lib/tv/queries";
@@ -72,7 +72,6 @@ export default function BoardPage() {
   const rename = useRenameBoard(me.data);
   const deleteBoard = useDeleteBoard(me.data);
   const restoreBoard = useRestoreBoard(me.data);
-  const startFromNote = useIngestStore((state) => state.startFromNote);
   const writing = useIsMutating({ mutationKey: ["notes"] }) > 0;
   const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
   const now = useMinute();
@@ -81,6 +80,8 @@ export default function BoardPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [held, setHeld] = useState<string[] | null>(null);
   const [dragging, setDragging] = useState(false);
+  // «Поручить»: the people sheet over the board, the task leaves from here (D-108)
+  const [assigning, setAssigning] = useState<Note | null>(null);
 
   const receiptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flash = useCallback((next: Receipt) => {
@@ -310,7 +311,7 @@ export default function BoardPage() {
                   onToggle={() => accordion.toggle(point.id)}
                   onChangeText={(text) => update.mutate({ id: point.id, text })}
                   onDone={() => update.mutate({ id: point.id, done_at: point.done_at ? null : new Date().toISOString() })}
-                  onAssign={() => startFromNote({ id: point.id, text: point.text, audio_path: point.audio_path }, "task")}
+                  onAssign={() => setAssigning(point)}
                   onDelete={() => {
                     accordion.toggle(point.id);
                     remove.mutate({ id: point.id });
@@ -332,6 +333,8 @@ export default function BoardPage() {
           Удалить доску
         </Button>
       </div>
+
+      <AssignSheet note={assigning} onClose={() => setAssigning(null)} me={me.data} />
 
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Удалить доску">
         <p className="text-[16px] leading-[22px] text-muted">
