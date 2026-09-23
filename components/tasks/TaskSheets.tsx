@@ -4,7 +4,9 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { DateField } from "@/components/ui/datetime/DateField";
 import { Sheet } from "@/components/ui/Sheet";
+import { humanYmd, todayYmd } from "@/lib/datetime/calendar";
 import { uploadPhoto } from "@/lib/files/photo";
 import { BUTTON, DECLINE_REASONS, TEXT } from "@/lib/tasks/status-text";
 
@@ -80,7 +82,7 @@ export function DeclineSheet({
 
   const submit = () => {
     if (!chip) return;
-    const head = needsDate && laterDate ? `${chip}: ${laterDate}` : chip;
+    const head = needsDate && laterDate ? `${chip}: ${humanYmd(laterDate)}` : chip;
     const tail = text.trim();
     onSubmit(tail ? `${head}. ${tail}` : head);
     reset();
@@ -102,12 +104,15 @@ export function DeclineSheet({
       </div>
 
       {needsDate ? (
-        <input
-          type="date"
-          className={`${FIELD_CLASS} mt-3`}
-          value={laterDate}
-          onChange={(event) => setLaterDate(event.target.value)}
-        />
+        <div className="mt-3">
+          <DateField
+            value={laterDate || null}
+            min={todayYmd()}
+            label="Когда смогу"
+            placeholder="Когда смогу"
+            onChange={setLaterDate}
+          />
+        </div>
       ) : null}
 
       <textarea

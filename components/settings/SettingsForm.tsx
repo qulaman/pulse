@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { BookIcon, ClockIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
-import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { TimeField } from "@/components/ui/datetime/TimeField";
+import { Disclosure } from "@/components/ui/Disclosure";
+import { SettingsSectionsBone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import {
   PARSER_MODEL_LABEL,
+  PARSER_MODEL_SHORT,
   PARSER_MODELS,
   STT_PROVIDER_LABEL,
+  STT_PROVIDER_SHORT,
   STT_PROVIDERS,
   type CompanySettings,
   type SettingsPatch,
@@ -33,16 +38,6 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
   });
   if (!res.ok) throw new Error("save failed");
   return ((await res.json()) as { settings: CompanySettings }).settings;
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="card p-4">
-      <h2 className="text-[19px] font-semibold leading-6">{title}</h2>
-      {hint ? <p className="mt-1 text-[13px] leading-4 text-muted">{hint}</p> : null}
-      <div className="mt-4 flex flex-col gap-4">{children}</div>
-    </section>
-  );
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -81,117 +76,195 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
   );
 }
 
+/**
+ * The actions of one section: they appear only where something was actually changed, so
+ * the director saves next to the field instead of hunting for one button under six
+ * sections — and a half-edited section never rides along with another one's save.
+ */
+function SectionActions({ pending, onSave, onReset }: { pending: boolean; onSave: () => void; onReset: () => void }) {
+  return (
+    <div className="card-in mt-4 flex gap-2">
+      <Button block loading={pending} onClick={onSave}>
+        Сохранить
+      </Button>
+      <Button variant="ghost" disabled={pending} onClick={onReset}>
+        Отменить
+      </Button>
+    </div>
+  );
+}
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+
+function splitVocabulary(text: string): string[] {
+  return text
+    .split(/[,\n;]/)
+    .map((word) => word.trim())
+    .filter(Boolean);
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${n} ${one}`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} ${few}`;
+  return `${n} ${many}`;
+}
+
 export function SettingsForm() {
   const queryClient = useQueryClient();
   const query = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
   // Edits live in `edited`; until the first edit the form mirrors the server value.
   const [edited, setEdited] = useState<CompanySettings | null>(null);
   const [vocabularyEdited, setVocabularyEdited] = useState<string | null>(null);
-  const draft = edited ?? query.data ?? null;
+  const server = query.data ?? null;
+  const draft = edited ?? server;
   const vocabularyText = vocabularyEdited ?? draft?.vocabulary.join(", ") ?? "";
-  const setDraft = (next: CompanySettings) => setEdited(next);
-  const setVocabularyText = (next: string) => setVocabularyEdited(next);
 
   const save = useMutation({
     mutationFn: patchSettings,
+    // Only the cache is rebased: a section saved on its own stops being dirty, and edits
+    // left open in other sections survive.
     onSuccess: (settings) => {
       queryClient.setQueryData(["settings"], settings);
-      setEdited(null);
-      setVocabularyEdited(null);
       toast("Сохранил настройки");
     },
     onError: () => toast("Не получилось сохранить. Попробуй ещё раз"),
   });
 
-  if (!draft) {
-    return (
-      <SkeletonGroup className="flex flex-col gap-4">
-        <SectionBone fields={3} />
-        <SectionBone fields={2} />
-      </SkeletonGroup>
-    );
-  }
+  if (!draft || !server) return <SettingsSectionsBone />;
 
-  const update = (patch: Partial<CompanySettings>) => setDraft({ ...draft, ...patch });
+  const update = (patch: Partial<CompanySettings>) => setEdited({ ...draft, ...patch });
   const updateConvention = (index: number, patch: Partial<CompanySettings["conventions"][number]>) =>
     update({ conventions: draft.conventions.map((row, i) => (i === index ? { ...row, ...patch } : row)) });
 
-  const submit = () => {
-    const vocabulary = vocabularyText
-      .split(/[,\n;]/)
-      .map((v) => v.trim())
-      .filter(Boolean);
-    save.mutate({
-      stt: draft.stt,
-      parser: draft.parser,
-      vocabulary,
-      conventions: draft.conventions.filter((c) => c.phrase.trim() && c.meaning.trim()),
-      points_enabled: draft.points_enabled,
-      rating_mode: draft.rating_mode,
-      delivery_window: draft.delivery_window,
-    });
+  const vocabulary = splitVocabulary(vocabularyText);
+  const conventions = draft.conventions.filter((row) => row.phrase.trim() && row.meaning.trim());
+  const dirty = {
+    stt: !same(draft.stt, server.stt),
+    parser: !same(draft.parser, server.parser),
+    vocabulary: !same(vocabulary, server.vocabulary),
+    conventions: !same(conventions, server.conventions),
+    points: draft.points_enabled !== server.points_enabled || draft.rating_mode !== server.rating_mode,
+    window: !same(draft.delivery_window, server.delivery_window),
   };
+  // which section is in flight: the spinner belongs to the button that was pressed
+  const saving = (key: keyof SettingsPatch) => save.isPending && save.variables?.[key] !== undefined;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Section title="Распознавание речи" hint="Итог СТТ-гейта: gpt-4o-transcribe без языковой подсказки. Менять — только по данным гейта.">
-        <Field label="Основной провайдер">
-          <select className={FIELD} value={draft.stt.provider} onChange={(e) => update({ stt: { ...draft.stt, provider: e.target.value as CompanySettings["stt"]["provider"] } })}>
-            {STT_PROVIDERS.map((p) => (
-              <option key={p} value={p}>{STT_PROVIDER_LABEL[p]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Запасной провайдер (если основной упал)">
-          <select className={FIELD} value={draft.stt.fallback ?? ""} onChange={(e) => update({ stt: { ...draft.stt, fallback: (e.target.value || null) as CompanySettings["stt"]["fallback"] } })}>
-            <option value="">Нет</option>
-            {STT_PROVIDERS.filter((p) => p !== draft.stt.provider).map((p) => (
-              <option key={p} value={p}>{STT_PROVIDER_LABEL[p]}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Язык">
-          <select className={FIELD} value={draft.stt.language} onChange={(e) => update({ stt: { ...draft.stt, language: e.target.value as "auto" | "ru" } })}>
-            <option value="auto">Авто — смешанная русско-казахская речь</option>
-            <option value="ru">Только русский</option>
-          </select>
-        </Field>
-      </Section>
+    <div className="flex flex-col gap-2">
+      <Disclosure
+        icon={<MicIcon />}
+        title="Распознавание речи"
+        dirty={dirty.stt}
+        summary={`${STT_PROVIDER_SHORT[draft.stt.provider]} · ${draft.stt.language === "auto" ? "смешанная речь" : "только русский"}`}
+        hint="Итог СТТ-гейта: gpt-4o-transcribe без языковой подсказки. Менять — только по данным гейта."
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Основной провайдер">
+            <select className={FIELD} value={draft.stt.provider} onChange={(e) => update({ stt: { ...draft.stt, provider: e.target.value as CompanySettings["stt"]["provider"] } })}>
+              {STT_PROVIDERS.map((p) => (
+                <option key={p} value={p}>{STT_PROVIDER_LABEL[p]}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Запасной провайдер (если основной упал)">
+            <select className={FIELD} value={draft.stt.fallback ?? ""} onChange={(e) => update({ stt: { ...draft.stt, fallback: (e.target.value || null) as CompanySettings["stt"]["fallback"] } })}>
+              <option value="">Нет</option>
+              {STT_PROVIDERS.filter((p) => p !== draft.stt.provider).map((p) => (
+                <option key={p} value={p}>{STT_PROVIDER_LABEL[p]}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Язык">
+            <select className={FIELD} value={draft.stt.language} onChange={(e) => update({ stt: { ...draft.stt, language: e.target.value as "auto" | "ru" } })}>
+              <option value="auto">Авто — смешанная русско-казахская речь</option>
+              <option value="ru">Только русский</option>
+            </select>
+          </Field>
+        </div>
+        {dirty.stt ? (
+          <SectionActions
+            pending={saving("stt")}
+            onSave={() => save.mutate({ stt: draft.stt })}
+            onReset={() => update({ stt: server.stt })}
+          />
+        ) : null}
+      </Disclosure>
 
-      <Section title="Разбор поручений" hint="Модель читает транскрипт и раскладывает его на задачи, объявления и очки.">
-        <Field label="Основная модель">
-          <select className={FIELD} value={draft.parser.model} onChange={(e) => update({ parser: { ...draft.parser, model: e.target.value } })}>
-            {PARSER_MODELS.map((m) => (
-              <option key={m} value={m}>{PARSER_MODEL_LABEL[m] ?? m}</option>
-            ))}
-          </select>
-        </Field>
-        <Toggle
-          label="Перепроверять сильной моделью"
-          hint="Длинные монологи и сомнительные исполнители уходят на вторую модель"
-          checked={draft.parser.escalate}
-          onChange={(v) => update({ parser: { ...draft.parser, escalate: v } })}
-        />
-        <Field label="Модель для перепроверки">
-          <select className={FIELD} value={draft.parser.escalation_model} onChange={(e) => update({ parser: { ...draft.parser, escalation_model: e.target.value } })}>
-            {PARSER_MODELS.map((m) => (
-              <option key={m} value={m}>{PARSER_MODEL_LABEL[m] ?? m}</option>
-            ))}
-          </select>
-        </Field>
-      </Section>
+      <Disclosure
+        icon={<ParseIcon />}
+        title="Разбор поручений"
+        dirty={dirty.parser}
+        summary={`${PARSER_MODEL_SHORT[draft.parser.model] ?? draft.parser.model} · ${
+          draft.parser.escalate ? "с перепроверкой" : "без перепроверки"
+        }`}
+        hint="Модель читает транскрипт и раскладывает его на задачи, объявления и очки."
+      >
+        <div className="flex flex-col gap-4">
+          <Field label="Основная модель">
+            <select className={FIELD} value={draft.parser.model} onChange={(e) => update({ parser: { ...draft.parser, model: e.target.value } })}>
+              {PARSER_MODELS.map((m) => (
+                <option key={m} value={m}>{PARSER_MODEL_LABEL[m] ?? m}</option>
+              ))}
+            </select>
+          </Field>
+          <Toggle
+            label="Перепроверять сильной моделью"
+            hint="Длинные монологи и сомнительные исполнители уходят на вторую модель"
+            checked={draft.parser.escalate}
+            onChange={(v) => update({ parser: { ...draft.parser, escalate: v } })}
+          />
+          {draft.parser.escalate ? (
+            <Field label="Модель для перепроверки">
+              <select className={FIELD} value={draft.parser.escalation_model} onChange={(e) => update({ parser: { ...draft.parser, escalation_model: e.target.value } })}>
+                {PARSER_MODELS.map((m) => (
+                  <option key={m} value={m}>{PARSER_MODEL_LABEL[m] ?? m}</option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+        </div>
+        {dirty.parser ? (
+          <SectionActions
+            pending={saving("parser")}
+            onSave={() => save.mutate({ parser: draft.parser })}
+            onReset={() => update({ parser: server.parser })}
+          />
+        ) : null}
+      </Disclosure>
 
-      <Section title="Словарь" hint="Контрагенты и объекты, которые распознавание должно знать по имени. Через запятую.">
+      <Disclosure
+        icon={<BookIcon />}
+        title="Словарь"
+        dirty={dirty.vocabulary}
+        summary={vocabulary.length ? plural(vocabulary.length, "слово", "слова", "слов") : "пусто"}
+        hint="Контрагенты и объекты, которые распознавание должно знать по имени. Через запятую."
+      >
         <textarea
           className={`${FIELD} py-3`}
           rows={3}
+          aria-label="Словарь"
           value={vocabularyText}
-          onChange={(e) => setVocabularyText(e.target.value)}
+          onChange={(e) => setVocabularyEdited(e.target.value)}
           placeholder="Казхром, КазАзот, ERG, Актобе-склад"
         />
-      </Section>
+        {dirty.vocabulary ? (
+          <SectionActions
+            pending={saving("vocabulary")}
+            onSave={() => save.mutate({ vocabulary })}
+            onReset={() => setVocabularyEdited(server.vocabulary.join(", "))}
+          />
+        ) : null}
+      </Disclosure>
 
-      <Section title="Слова о сроках" hint="Что значит «до обеда» или «к вечеру» именно у вас. Сверху — как говорите, под ним — во сколько это.">
+      <Disclosure
+        icon={<ClockIcon />}
+        title="Слова о сроках"
+        dirty={dirty.conventions}
+        summary={conventions.length ? plural(conventions.length, "правило", "правила", "правил") : "нет правил"}
+        hint="Что значит «до обеда» или «к вечеру» именно у вас. Сверху — как говорите, под ним — во сколько это."
+      >
         <div className="flex flex-col gap-3">
           {draft.conventions.map((row, index) => (
             // Two lines per row: a phone-width screen cannot fit both texts side by side.
@@ -226,46 +299,83 @@ export function SettingsForm() {
             </div>
           ))}
         </div>
-        <Button
-          variant="secondary"
-          block
-          onClick={() =>
-            update({ conventions: [...draft.conventions, { phrase: "", meaning: "", confidence: 0.7 }] })
-          }
-        >
-          Добавить слово
-        </Button>
-      </Section>
+        <div className="mt-3">
+          <Button
+            variant="secondary"
+            block
+            onClick={() => update({ conventions: [...draft.conventions, { phrase: "", meaning: "", confidence: 0.7 }] })}
+          >
+            Добавить слово
+          </Button>
+        </div>
+        {dirty.conventions ? (
+          <SectionActions
+            pending={saving("conventions")}
+            onSave={() => save.mutate({ conventions })}
+            onReset={() => update({ conventions: server.conventions })}
+          />
+        ) : null}
+      </Disclosure>
 
-      <Section title="Очки и рейтинг" hint="Во время пилота очки выключены (D-40). Включи, когда команда привыкнет к задачам.">
-        <Toggle
-          label="Очки включены"
-          hint="Директор начисляет очки голосом и с экрана рейтинга"
-          checked={draft.points_enabled}
-          onChange={(v) => update({ points_enabled: v })}
-        />
-        <Field label="Кто видит рейтинг целиком">
-          <select className={FIELD} value={draft.rating_mode} onChange={(e) => update({ rating_mode: e.target.value as "top5" | "full" })}>
-            <option value="top5">Топ-5 всем, полный список — директору</option>
-            <option value="full">Полный список всем</option>
-          </select>
-        </Field>
-      </Section>
+      <Disclosure
+        icon={<StarIcon />}
+        title="Очки и рейтинг"
+        dirty={dirty.points}
+        summary={
+          draft.points_enabled
+            ? `включены · ${draft.rating_mode === "top5" ? "топ-5 всем" : "полный список всем"}`
+            : "выключены"
+        }
+        hint="Во время пилота очки выключены (D-40). Включи, когда команда привыкнет к задачам."
+      >
+        <div className="flex flex-col gap-4">
+          <Toggle
+            label="Очки включены"
+            hint="Директор начисляет очки голосом и с экрана рейтинга"
+            checked={draft.points_enabled}
+            onChange={(v) => update({ points_enabled: v })}
+          />
+          {draft.points_enabled ? (
+            <Field label="Кто видит рейтинг целиком">
+              <select className={FIELD} value={draft.rating_mode} onChange={(e) => update({ rating_mode: e.target.value as "top5" | "full" })}>
+                <option value="top5">Топ-5 всем, полный список — директору</option>
+                <option value="full">Полный список всем</option>
+              </select>
+            </Field>
+          ) : null}
+        </div>
+        {dirty.points ? (
+          <SectionActions
+            pending={saving("points_enabled")}
+            onSave={() => save.mutate({ points_enabled: draft.points_enabled, rating_mode: draft.rating_mode })}
+            onReset={() => update({ points_enabled: server.points_enabled, rating_mode: server.rating_mode })}
+          />
+        ) : null}
+      </Disclosure>
 
-      <Section title="Тихие часы" hint="Вне окна задачи ждут утра, если не нажать «отправить сейчас».">
+      <Disclosure
+        icon={<MoonIcon />}
+        title="Тихие часы"
+        dirty={dirty.window}
+        summary={`доставка ${draft.delivery_window.from} — ${draft.delivery_window.to}`}
+        hint="Вне окна задачи ждут утра, если не нажать «отправить сейчас»."
+      >
         <div className="grid grid-cols-2 gap-3">
           <Field label="С">
-            <input type="time" className={FIELD} value={draft.delivery_window.from} onChange={(e) => update({ delivery_window: { ...draft.delivery_window, from: e.target.value } })} />
+            <TimeField label="Доставка с" value={draft.delivery_window.from} onChange={(from) => update({ delivery_window: { ...draft.delivery_window, from } })} />
           </Field>
           <Field label="До">
-            <input type="time" className={FIELD} value={draft.delivery_window.to} onChange={(e) => update({ delivery_window: { ...draft.delivery_window, to: e.target.value } })} />
+            <TimeField label="Доставка до" value={draft.delivery_window.to} onChange={(to) => update({ delivery_window: { ...draft.delivery_window, to } })} />
           </Field>
         </div>
-      </Section>
-
-      <Button block onClick={submit} disabled={save.isPending}>
-        {save.isPending ? "Сохраняю…" : "Сохранить"}
-      </Button>
+        {dirty.window ? (
+          <SectionActions
+            pending={saving("delivery_window")}
+            onSave={() => save.mutate({ delivery_window: draft.delivery_window })}
+            onReset={() => update({ delivery_window: server.delivery_window })}
+          />
+        ) : null}
+      </Disclosure>
     </div>
   );
 }

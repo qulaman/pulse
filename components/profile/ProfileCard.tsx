@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 
-import { Mascot } from "@/components/brand/Mascot";
 import { Chip } from "@/components/ui/Chip";
-import { Bone } from "@/components/ui/Skeleton";
+import { aqtobeDay } from "@/lib/ai/time";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Availability, type Role } from "@/lib/people/queries";
-import { balanceOf, usePointHistory } from "@/lib/points/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 type Props = {
@@ -16,7 +13,57 @@ type Props = {
   role: Role;
 };
 
-type Stats = { done30: number; onTimePct: number | null; open: number; position: string | null; availability: Availability; people?: number; sent30?: number };
+/** Fourteen day-buckets, oldest first — the strip inside the identity card. */
+const STRIP_DAYS = 14;
+
+type Stats = {
+  done30: number;
+  onTimePct: number | null;
+  open: number;
+  position: string | null;
+  availability: Availability;
+  since: string | null;
+  strip: number[];
+  people?: number;
+  sent30?: number;
+};
+
+const MONTHS_GENITIVE = [
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
+];
+
+function sinceLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const wall = new Date(date.getTime() + 5 * 3_600_000);
+  return `с ${MONTHS_GENITIVE[wall.getUTCMonth()]} ${wall.getUTCFullYear()}`;
+}
+
+/** Counts instants into the last fourteen Aqtobe days, oldest bucket first. */
+function stripOf(dates: (string | null)[], now = Date.now()): number[] {
+  const today = aqtobeDay(new Date(now));
+  const buckets = new Array<number>(STRIP_DAYS).fill(0);
+  for (const iso of dates) {
+    if (!iso) continue;
+    const index = STRIP_DAYS - 1 - (today - aqtobeDay(new Date(iso)));
+    if (index >= 0 && index < STRIP_DAYS) buckets[index] += 1;
+  }
+  return buckets;
+}
+
+const sum = (values: number[]) => values.reduce((total, n) => total + n, 0);
 
 function useProfileStats(userId: string, role: Role) {
   return useQuery({
@@ -24,22 +71,28 @@ function useProfileStats(userId: string, role: Role) {
     queryFn: async (): Promise<Stats> => {
       const supabase = createBrowserSupabase();
       const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const me = await supabase.from("profiles").select("position, availability").eq("id", userId).single();
+      const me = await supabase.from("profiles").select("position, availability, created_at").eq("id", userId).single();
+      const common = {
+        position: me.data?.position ?? null,
+        availability: me.data?.availability ?? ("active" as Availability),
+        since: me.data?.created_at ?? null,
+      };
 
       if (role === "director") {
         const [people, sent, openAll] = await Promise.all([
           supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_active", true).not("role", "in", "(tv,director)"),
-          supabase.from("tasks").select("id", { count: "exact", head: true }).gte("created_at", since),
+          supabase.from("tasks").select("created_at").gte("created_at", since),
           supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["sent", "accepted", "rework", "pending_review"]),
         ]);
+        const created = sent.data ?? [];
         return {
+          ...common,
           done30: 0,
           onTimePct: null,
           open: openAll.count ?? 0,
-          position: me.data?.position ?? null,
-          availability: me.data?.availability ?? "active",
+          strip: stripOf(created.map((task) => task.created_at)),
           people: people.count ?? 0,
-          sent30: sent.count ?? 0,
+          sent30: created.length,
         };
       }
 
@@ -48,106 +101,140 @@ function useProfileStats(userId: string, role: Role) {
         supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assignee_id", userId).in("status", ["sent", "accepted", "rework", "pending_review"]),
       ]);
       const rows = done.data ?? [];
-      const onTime = rows.filter((t) => !t.deadline || (t.closed_at && t.closed_at <= t.deadline)).length;
+      const onTime = rows.filter((task) => !task.deadline || (task.closed_at && task.closed_at <= task.deadline)).length;
       return {
+        ...common,
         done30: rows.length,
         onTimePct: rows.length ? Math.round((100 * onTime) / rows.length) : null,
         open: open.count ?? 0,
-        position: me.data?.position ?? null,
-        availability: me.data?.availability ?? "active",
+        strip: stripOf(rows.map((task) => task.closed_at)),
       };
     },
   });
 }
 
-function Stat({ value, label }: { value: string | number | null; label: string }) {
+/** A number that has not arrived yet: a bar of the border colour, pulsing (DESIGN §2). */
+function NumBone({ w, h }: { w: number; h: number }) {
+  return <span aria-hidden className="skeleton block rounded-[6px]" style={{ width: w, height: h, background: "var(--border)" }} />;
+}
+
+/** One of the three numbers under the name; the label keeps two lines of room so nothing jumps. */
+function Stat({ value, label, tone }: { value: string | number | null; label: string; tone?: string }) {
   return (
-    <div className="rounded-[12px] bg-surface-2 px-3 py-2 text-center">
-      <p className="nums flex h-[30px] items-center justify-center text-[24px] font-bold leading-[30px]">
-        {value === null ? <Bone h={22} w={28} className="bg-border" /> : value}
-      </p>
-      <p className="text-[11px] leading-4 text-muted">{label}</p>
+    <div className="flex flex-col items-center px-1">
+      <span
+        className="nums flex h-[28px] items-center text-[22px] font-bold leading-[28px]"
+        style={tone ? { color: tone } : undefined}
+      >
+        {value === null ? <NumBone w={26} h={20} /> : value}
+      </span>
+      <span className="mt-0.5 flex min-h-[32px] max-w-[104px] items-start justify-center text-center text-[11px] leading-4 text-muted">
+        {label}
+      </span>
     </div>
   );
 }
 
+/** Fourteen bars, one per day: a day with nothing is a hairline, not a gap. */
+function DayStrip({ days, title, caption }: { days: number[] | null; title: string; caption: string }) {
+  const peak = Math.max(1, ...(days ?? []));
+  return (
+    <div className="mt-3 rounded-[12px] bg-surface-2 px-3 pb-3 pt-2.5">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="eyebrow">{title}</span>
+        <span className="text-[12px] leading-4 text-muted">{days ? caption : ""}</span>
+      </div>
+      <div className={`mt-2 flex h-[36px] items-end gap-[3px] ${days ? "" : "skeleton"}`} aria-hidden>
+        {(days ?? new Array<number>(STRIP_DAYS).fill(0)).map((count, index) => (
+          <span
+            key={index}
+            className="flex-1 rounded-[3px]"
+            style={{
+              height: count ? `${Math.max(8, Math.round((36 * count) / peak))}px` : "3px",
+              background: count
+                ? `color-mix(in srgb, var(--accent) ${55 + Math.round((45 * count) / peak)}%, transparent)`
+                : "var(--border)",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The profile hero: who is signed in, the three numbers that matter for the role, and
+ * the shape of the last two weeks. Points live in their own card below — the director
+ * has none, and an employee sees the card only once the company switched them on (D-40)
+ * or something is already on the balance.
+ */
 export function ProfileCard({ userId, fullName, role }: Props) {
   const stats = useProfileStats(userId, role);
-  const history = usePointHistory(role === "director" ? undefined : userId);
-  const balance = balanceOf(history.data);
-  const s = stats.data;
+  const stat = stats.data;
+  const since = sinceLabel(stat?.since ?? null);
 
   return (
-    <>
-      <section className="card p-4">
-        <div className="flex items-center gap-4">
-          <span
-            className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-[22px] font-bold text-bg"
-            style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)" }}
-          >
-            {initialsOf(fullName)}
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-[19px] font-semibold leading-6">{fullName}</p>
-            <p className="mt-0.5 text-[13px] leading-4 text-muted">{s?.position ?? ROLE_LABEL[role]}</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              <Chip tone="neutral" interactive={false}>{ROLE_LABEL[role]}</Chip>
-              {s && s.availability !== "active" ? (
-                <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[s.availability]}</Chip>
-              ) : null}
-            </div>
-          </div>
+    <section className="relative overflow-hidden card px-4 pb-4 pt-7 text-center">
+      {/* static accent halo behind the avatar — one gradient, never animated */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-0 h-[200px] w-[320px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+        style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%)" }}
+      />
+      <div className="relative">
+        <span
+          className="relative mx-auto flex h-[84px] w-[84px] items-center justify-center rounded-full"
+          style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", boxShadow: "var(--accent-glow)" }}
+        >
+          <span className="font-display text-[30px] font-bold tracking-[-0.02em] text-bg">{initialsOf(fullName)}</span>
+          <span aria-hidden className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 1.5px 0 rgba(255,255,255,.35)" }} />
+        </span>
+
+        <h1 className="mt-3.5 text-[24px] font-bold leading-[30px]">{fullName}</h1>
+        <p className="mt-1 text-[14px] leading-[18px] text-muted">{stat ? (stat.position ?? ROLE_LABEL[role]) : " "}</p>
+
+        <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
+          <Chip tone="neutral" interactive={false}>{ROLE_LABEL[role]}</Chip>
+          {stat && stat.availability !== "active" ? (
+            <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[stat.availability]}</Chip>
+          ) : null}
+          {since ? <span className="text-[13px] leading-4 text-muted">{since}</span> : null}
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-3 rounded-[12px] bg-surface-2 py-3 [&>*+*]:border-l [&>*+*]:border-border">
           {role === "director" ? (
             <>
-              <Stat value={s?.people ?? null} label="в команде" />
-              <Stat value={s?.sent30 ?? null} label="задач за 30 дн." />
-              <Stat value={s?.open ?? null} label="в работе у команды" />
+              <Stat value={stat?.people ?? null} label="в команде" />
+              <Stat value={stat?.sent30 ?? null} label="задач за 30 дн." />
+              <Stat value={stat?.open ?? null} label="в работе у команды" />
             </>
           ) : (
             <>
-              <Stat value={s?.open ?? null} label="открытых" />
-              <Stat value={s?.done30 ?? null} label="закрыто за 30 дн." />
-              <Stat value={s?.onTimePct === null || s?.onTimePct === undefined ? "—" : `${s.onTimePct}%`} label="в срок" />
+              <Stat value={stat?.open ?? null} label="в работе" />
+              <Stat
+                value={stat?.done30 ?? null}
+                label="закрыто за 30 дн."
+                tone={stat && stat.done30 > 0 ? "var(--ok)" : undefined}
+              />
+              <Stat
+                value={stat ? (stat.onTimePct === null ? "—" : `${stat.onTimePct}%`) : null}
+                label="в срок"
+                tone={stat && stat.onTimePct !== null && stat.onTimePct >= 80 ? "var(--ok)" : undefined}
+              />
             </>
           )}
         </div>
-      </section>
 
-      {role !== "director" ? (
-        <section className="mt-4 card p-4">
-          <div className="flex items-center gap-4">
-            <Mascot state={balance > 0 ? "happy" : "calm"} size={48} />
-            <div>
-              <p className="text-[13px] leading-4 text-muted">Очки</p>
-              <p data-testid="balance" className="nums text-[32px] font-bold leading-9" style={{ color: "var(--gold)" }}>
-                {history.isLoading ? <Bone h={28} w={36} className="inline-block bg-border" /> : balance}
-              </p>
-            </div>
-            <Link href="/rating" className="ml-auto text-[13px] leading-4 text-accent underline underline-offset-4">
-              Рейтинг
-            </Link>
-          </div>
-          {history.data && history.data.length > 0 ? (
-            <ul className="mt-3 space-y-1.5">
-              {history.data.slice(0, 3).map((row) => (
-                <li key={row.id} className="flex justify-between gap-3 text-[14px] leading-[18px]">
-                  <span className="truncate">
-                    <span className="nums font-semibold" style={{ color: row.amount > 0 ? "var(--gold)" : "var(--danger)" }}>
-                      {row.amount > 0 ? `+${row.amount}` : row.amount}
-                    </span>{" "}
-                    {row.reason}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-[13px] leading-4 text-muted">Очков пока нет. Первые придут за закрытые задачи</p>
-          )}
-        </section>
-      ) : null}
-    </>
+        <DayStrip
+          days={stat?.strip ?? null}
+          title="Последние 14 дней"
+          caption={
+            role === "director"
+              ? `отправлено ${sum(stat?.strip ?? [])}`
+              : `закрыто ${sum(stat?.strip ?? [])}`
+          }
+        />
+      </div>
+    </section>
   );
 }

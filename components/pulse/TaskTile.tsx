@@ -65,7 +65,12 @@ export type TaskTileProps = {
 };
 
 function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string {
-  const due = task.deadline ? `до ${humanAqtobe(new Date(task.deadline), now)}` : TEXT.noDeadline;
+  // «срочно» без срока — это тоже ответ на «когда», и громче, чем «без срока» (docs/AI.md §10)
+  const due = task.deadline
+    ? `до ${humanAqtobe(new Date(task.deadline), now)}`
+    : task.priority === "high"
+      ? TEXT.urgent
+      : TEXT.noDeadline;
   switch (lane) {
     case "overdue":
       return `срок был ${humanAqtobe(new Date(task.deadline as string), now)}`;

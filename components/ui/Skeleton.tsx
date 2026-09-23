@@ -36,16 +36,22 @@ export function SkeletonGroup({ children, className = "" }: { children: React.Re
 /* Blocks — each mirrors a real component                                      */
 /* -------------------------------------------------------------------------- */
 
-/** components/tasks/TaskCard: title (2 lines max), chips row, receipt line, actions row. */
+/** components/tasks/TaskCard: rail, status + deadline pill, title, who, actions row. */
 export function TaskCardBone({ variant = "employee" }: { variant?: "employee" | "director" }) {
   return (
-    <div className="card p-4">
-      <Bone h={24} w="72%" />
-      <div className="mt-3 flex gap-2">
-        <Bone h={32} w={112} className="rounded-full" />
-        <Bone h={32} w={84} className="rounded-full" />
+    <div className="card relative overflow-hidden p-4 pl-5">
+      <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full bg-border" />
+      <div className="flex items-center justify-between gap-2">
+        <Bone h={16} w={92} />
+        <Bone h={26} w={104} className="rounded-full" />
       </div>
-      {variant === "director" ? <Bone h={16} w="55%" className="mt-2" /> : null}
+      <Bone h={24} w="72%" className="mt-2" />
+      {variant === "director" ? (
+        <div className="mt-3 flex items-center gap-2">
+          <Bone round w={24} h={24} className="shrink-0" />
+          <Bone h={16} w={120} />
+        </div>
+      ) : null}
       <Bone h={16} w={140} className="mt-3" />
       <div className="mt-4 flex gap-2">
         <Bone h={44} w={104} className="rounded-[12px]" />
@@ -162,36 +168,27 @@ export function SectionBone({ fields = 2 }: { fields?: number }) {
   );
 }
 
-/** components/settings/CompanyForm: title, hint, preview row, name, tagline, logo block, accent block, button. */
-export function CompanyFormBone() {
+/** components/ui/Disclosure closed: the icon tile, the title, one line of summary. */
+export function SectionRowBone() {
   return (
-    <div className="card p-4">
-      <Bone h={24} w={140} />
-      <Bone h={16} className="mt-1" />
-      <Bone h={16} w="60%" className="mt-0" />
-      <Bone h={46} className="mt-4 rounded-[12px]" />
-      <div className="mt-4 flex flex-col gap-4">
-        <div>
-          <Bone h={18} w={90} />
-          <Bone h={44} className="mt-1.5 rounded-[12px]" />
-        </div>
-        <div>
-          <Bone h={18} w={200} />
-          <Bone h={44} className="mt-1.5 rounded-[12px]" />
-        </div>
-        <div>
-          <Bone h={18} w={70} />
-          <Bone h={44} w={120} className="mt-1.5 rounded-[12px]" />
-          <Bone h={16} w="85%" className="mt-1.5" />
-        </div>
-        <div>
-          <Bone h={18} w={130} />
-          <Bone h={44} className="mt-1.5 rounded-[12px]" />
-          <Bone h={16} w="70%" className="mt-1.5" />
-        </div>
+    <div className="flex min-h-[64px] items-center gap-3 card px-4 py-3">
+      <Bone w={32} h={32} className="shrink-0" />
+      <div className="min-w-0 flex-1">
+        <Bone h={22} w="52%" />
+        <Bone h={14} w="34%" className="mt-1" />
       </div>
-      <Bone h={44} className="mt-4 rounded-[12px]" />
     </div>
+  );
+}
+
+/** The settings screen is a stack of closed sections — the same picture before and after. */
+export function SettingsSectionsBone({ count = 6 }: { count?: number }) {
+  return (
+    <SkeletonGroup className="flex flex-col gap-2">
+      {Array.from({ length: count }, (_, i) => (
+        <SectionRowBone key={i} />
+      ))}
+    </SkeletonGroup>
   );
 }
 

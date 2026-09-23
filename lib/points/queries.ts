@@ -33,9 +33,10 @@ export const pointKeys = {
   history: (userId: string) => ["points", "history", userId] as const,
 };
 
-export function useRating(period: RatingPeriod) {
+export function useRating(period: RatingPeriod, enabled = true) {
   return useQuery({
     queryKey: pointKeys.rating(period),
+    enabled,
     placeholderData: keepPreviousData,
     queryFn: async (): Promise<RatingRow[]> => {
       const { from, to } = periodBounds(period);

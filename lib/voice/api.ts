@@ -39,12 +39,11 @@ export type ParseResponse = {
 
 export type TranscribeRequest = {
   audio_path: string;
-  context: UploadContext;
+  /** Only the director's dictation is transcribed; a thread's voice is kept as audio (D-66). */
+  context: "director_input";
   client_request_id: string;
   /** Real recording length — the STT guard's density checks need it (docs/AI.md §1). */
   duration_ms?: number;
-  /** The voice message the words belong to: the route writes the transcript onto it. */
-  message_id?: string;
 };
 
 export type ConfirmRequest = {
@@ -57,6 +56,8 @@ export type ConfirmRequest = {
   /** D-38: override of the 08:00–21:00 delivery window, set by an explicit tap. */
   force_now?: boolean;
   inbox_id?: string;
+  /** The note this batch grew out of: the RPC marks it converted (D-75 §5). */
+  note_id?: string;
 };
 
 export type ConfirmResponse = {

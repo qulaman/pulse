@@ -49,7 +49,7 @@ function Cell({ value, kind }: { value: unknown; kind: Column["kind"] }) {
       if (text === "{}" || text === "[]" || text === "null") return <span className="text-muted">{text}</span>;
       return (
         <details>
-          <summary className="cursor-pointer whitespace-nowrap text-accent">
+          <summary className="cursor-pointer list-none whitespace-nowrap text-accent [&::-webkit-details-marker]:hidden">
             {text.length > 40 ? `${text.slice(0, 40)}…` : text}
           </summary>
           <pre className="mt-1 max-h-64 max-w-[420px] overflow-auto whitespace-pre-wrap rounded-[8px] bg-bg p-2 text-[11px] leading-4">
@@ -113,13 +113,25 @@ export function DataTable({ spec }: { spec: TableSpec }) {
             {spec.hint} · <code className="text-[12px]">{spec.table}</code>
           </p>
         </div>
-        <input
-          type="search"
-          placeholder="Фильтр по странице…"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="min-h-[40px] w-full max-w-[240px] field px-3 text-[14px] outline-none focus:border-accent"
-        />
+        <label className="relative block w-full max-w-[240px]">
+          <input
+            type="search"
+            placeholder="Фильтр по странице…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="min-h-[40px] w-full field pl-3 pr-9 text-[14px] outline-none focus:border-accent"
+          />
+          {filter ? (
+            <button
+              type="button"
+              aria-label="Очистить"
+              onClick={() => setFilter("")}
+              className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center text-[16px] leading-none text-muted"
+            >
+              ×
+            </button>
+          ) : null}
+        </label>
       </div>
 
       <div className="overflow-x-auto border-t border-border">

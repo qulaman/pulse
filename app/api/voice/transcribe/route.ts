@@ -4,7 +4,6 @@ import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { guardTranscript } from "@/lib/ai/stt-guard";
 import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
-import { AuthError } from "@/lib/auth";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
 import { loadAssigneeCounts, loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
@@ -14,12 +13,15 @@ export const maxDuration = 60;
 
 const BodySchema = z.strictObject({
   audio_path: z.string().min(1),
-  context: z.enum(["director_input", "task_message"]),
+  /**
+   * Only the director's own input is transcribed at all. Voice messages in a thread are
+   * kept as a recording and never sent to STT (D-66) — the field stays so the contract
+   * reads the same from the client and a stray `task_message` is refused, not billed.
+   */
+  context: z.literal("director_input"),
   client_request_id: z.uuid(),
   /** Real recording length from MediaRecorder; the guard's density checks need it. */
   duration_ms: z.number().positive().optional(),
-  /** A voice message already in the thread: the transcript is written onto that row. */
-  message_id: z.uuid().optional(),
 });
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -43,14 +45,10 @@ function modelOf(provider: string | undefined): string {
   return (provider && MODEL_BY_PROVIDER[provider]) ?? "unknown";
 }
 
+// Only the director's own input is transcribed at all (docs/BACKEND.md §1 table).
 export const POST = withAuth<z.infer<typeof BodySchema>>(
-  "any",
+  ["director"],
   async ({ profile, body }) => {
-    // Only the director's own input feeds the parser (docs/BACKEND.md §1 table).
-    if (body.context === "director_input" && profile.role !== "director") {
-      throw new AuthError(403, "forbidden");
-    }
-
     // Path is the ownership proof: the bucket policies are segment-based (DATABASE.md).
     const prefix = `${profile.companyId}/${profile.userId}/`;
     if (!body.audio_path.startsWith(prefix)) {
@@ -147,29 +145,11 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       raw_response: { duration_ms: body.duration_ms ?? null },
     });
 
-    if (body.context === "director_input") {
-      await supabase
-        .from("inbox_items")
-        .update({ status: "transcribed", transcript: result.text })
-        .eq("company_id", profile.companyId)
-        .eq("client_request_id", body.client_request_id);
-    }
-
-    // A voice message exists in the thread before it is transcribed (принцип 5): the words
-    // land on that row now. task_messages is append-only for clients — there is no update
-    // policy — so the row is written by the service client, narrowed to the caller's own
-    // message and to the very recording that was just transcribed. The thread sees the
-    // change over Realtime as an UPDATE and patches itself (Д-2).
-    if (body.context === "task_message" && body.message_id) {
-      const written = await supabase
-        .from("task_messages")
-        .update({ content: result.text })
-        .eq("id", body.message_id)
-        .eq("sender_id", profile.userId)
-        .eq("file_path", body.audio_path)
-        .select("id");
-      if (written.error) console.error("voice transcript write failed:", written.error.message);
-    }
+    await supabase
+      .from("inbox_items")
+      .update({ status: "transcribed", transcript: result.text })
+      .eq("company_id", profile.companyId)
+      .eq("client_request_id", body.client_request_id);
 
     return apiOk({
       transcript: result.text,

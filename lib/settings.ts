@@ -109,6 +109,21 @@ export const STT_PROVIDER_LABEL: Record<SttProviderKey, string> = {
   elevenlabs: "ElevenLabs Scribe v2 — запасной (D-53)",
 };
 
+/** One-line names for summaries and chips — the long labels above belong in a <select>. */
+export const STT_PROVIDER_SHORT: Record<SttProviderKey, string> = {
+  openai: "gpt-4o-transcribe",
+  whisper1: "whisper-1",
+  deepgram: "Deepgram nova-3",
+  elevenlabs: "ElevenLabs Scribe v2",
+};
+
+export const PARSER_MODEL_SHORT: Record<string, string> = {
+  "claude-haiku-4-5": "Claude Haiku 4.5",
+  "claude-sonnet-5": "Claude Sonnet 5",
+  "deepseek-chat": "DeepSeek V3",
+  "deepseek-reasoner": "DeepSeek R1",
+};
+
 export const PARSER_MODEL_LABEL: Record<string, string> = {
   "claude-haiku-4-5": "Claude Haiku 4.5 — быстрый, ~2.8 с",
   "claude-sonnet-5": "Claude Sonnet 5 — точнее, ~6 с",

@@ -15,7 +15,8 @@ const STEPS: { key: Scene; label: string }[] = [
  * The mascot at work (D-43: the pipeline is visible). One character, a different
  * choreography per stage — the Mascot itself carries the ear, the note, the text
  * lines, the cards and the throw; the scene adds only what lives outside the blob:
- * the equaliser of the voice, the step strip, the card that flies away.
+ * the equaliser of the voice and the step strip. The thrown card moved into the face
+ * itself, so that every screen showing `sending` — the board included — throws something.
  * Everything is transform/opacity (DESIGN §2).
  */
 export function MascotScene({ scene, level = 0 }: { scene: Scene; level?: number }) {
@@ -41,23 +42,6 @@ export function MascotScene({ scene, level = 0 }: { scene: Scene; level?: number
             />
           ))}
         </div>
-      </div>
-    );
-  }
-
-  if (scene === "sending") {
-    return (
-      <div className="relative flex flex-col items-center">
-        {/* the card leaves the hand at the throw (fly-card is timed to mascot-throw) and fades up and away */}
-        <span
-          aria-hidden
-          className="absolute left-1/2 top-4 h-9 w-14 -translate-x-1/2 rounded-[8px] border border-accent/60 bg-surface"
-          style={{ animation: "fly-card 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite" }}
-        >
-          <span className="mx-2 mt-2 block h-1 w-8 rounded bg-accent/70" />
-          <span className="mx-2 mt-1 block h-1 w-5 rounded bg-border" />
-        </span>
-        <Mascot state="sending" size={112} />
       </div>
     );
   }

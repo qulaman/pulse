@@ -1,58 +1,28 @@
 "use client";
 
-import { useState } from "react";
-
-import { Button } from "@/components/ui/Button";
+import { VoicePlayer } from "@/components/tasks/VoicePlayer";
 import { TEXT } from "@/lib/tasks/status-text";
 
 /**
- * The original recording behind the task. The signed URL is fetched on tap, not
- * on render: a feed of twenty cards must not sign twenty objects nobody plays.
+ * The original recording behind the task — the same player as a voice message in
+ * the thread, so a card never shows two different transports (D-66). The signed URL
+ * is fetched on tap, not on render: a feed of twenty cards must not sign twenty
+ * objects nobody plays.
  */
 export function AudioOriginal({ path }: { path: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  const open = async () => {
-    setLoading(true);
-    setFailed(false);
-    try {
-      const res = await fetch(`/api/voice/audio-url?path=${encodeURIComponent(path)}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("audio url failed");
-      const body = (await res.json()) as { url: string };
-      setUrl(body.url);
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
+  const load = async () => {
+    const res = await fetch(`/api/voice/audio-url?path=${encodeURIComponent(path)}`, {
+      credentials: "include",
+    });
+    if (!res.ok) throw new Error("audio url failed");
+    const body = (await res.json()) as { url: string };
+    return body.url;
   };
 
-  if (url) {
-    return <audio className="mt-3 w-full" controls preload="none" src={url} />;
-  }
-
   return (
-    <div className="mt-3">
-      <Button
-        variant="secondary"
-        size="sm"
-        loading={loading}
-        onClick={open}
-        icon={
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M8 5.5v13l11-6.5z" />
-          </svg>
-        }
-      >
-        {TEXT.original}
-      </Button>
-      {failed ? (
-        <p className="mt-2 text-[13px] leading-4 text-danger">{TEXT.audioFailed}</p>
-      ) : null}
+    <div className="mt-2">
+      <p className="text-[12px] leading-4 text-muted">{TEXT.original}</p>
+      <VoicePlayer load={load} seed={path} failedText={TEXT.audioFailed} />
     </div>
   );
 }

@@ -282,7 +282,7 @@ function withRow(board: readonly BoardTask[], index: number, row: BoardTask): Bo
 export type SpeechTone = "danger" | "warn" | "ok" | "muted";
 
 /** `source` marks a phrase that is not about a task — a tap on it opens no thread. */
-export type Phrase = { text: string; tone: SpeechTone; source?: "calendar" };
+export type Phrase = { text: string; tone: SpeechTone; source?: "ether" | "calendar" };
 
 /** The assignee as the director calls them — first name, nominative, never declined. */
 export function whoOf(task: Pick<BoardTask, "assignee">): string {

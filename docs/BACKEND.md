@@ -30,7 +30,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 | Эндпоинт | Метод | Роль | Rate limit (в час, из `company.settings.limits`) |
 |---|---|---|---|
 | `/api/voice/upload-url` | POST | любая активная | как transcribe |
-| `/api/voice/transcribe` | POST | director (`context='director_input'`), любая (`context='task_message'`) | director 30, employee 10 |
+| `/api/voice/transcribe` | POST | director (`context='director_input'` — единственный) | 30 |
 | `/api/voice/parse` | POST | director | 30 |
 | `/api/voice/confirm` | POST | director | — |
 | `/api/voice/query` | POST | director | 20 |
@@ -63,7 +63,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 
 ### POST /api/voice/transcribe
 `export const maxDuration = 60`.
-Вход: `{ audio_path, context: 'director_input'|'task_message', client_request_id, duration_ms?, message_id? }`. Аудио уже в Storage — тело запроса без бинарных данных.
+Вход: `{ audio_path, context: 'director_input', client_request_id, duration_ms? }`. Аудио уже в Storage — тело запроса без бинарных данных.
 Выход: `{ transcript, audio_path, stt_provider, latency_ms }`.
 
 STT — только через интерфейс `lib/ai/stt.ts`:
@@ -74,7 +74,7 @@ transcribe(audio: Blob|Stream, opts: { language?: string, vocabularyHints: strin
 
 Primary — `gpt-4o-transcribe` с prompt-ростером имён/алиасов сотрудников из БД (`vocabularyHints`). Fallback-провайдер — по env `STT_PROVIDER`; авто-фолбэк при 5xx/timeout primary. Таймаут вызова 30 с, backoff 1 с/3 с, максимум 1 ретрай внутри запроса; дальше — `502 stt_failed`, ретрай с фронта по сохранённому `audio_path` (без перезаписи).
 
-`context='task_message'` (голосовые в треде, любая роль): тот же transcribe, БЕЗ парсинга. Порядок — принцип 5: клиент сначала кладёт аудио в Storage и **сразу** вставляет строку `task_messages(type='voice', file_path=audio_path, content=null)`, затем зовёт transcribe с `message_id` этой строки; роут дописывает `content=transcript` service-клиентом (у `task_messages` нет update-политики), сузив запись до `sender_id` вызывающего и того же `file_path`; тред получает UPDATE по Realtime. STT упал — голосовое остаётся в треде без слов (D-64 §4).
+**Голосовые в треде не распознаются (D-66)** — роут принимает только `context='director_input'` и только роль директора. Сообщение-голос остаётся звуком: клиент кладёт аудио в Storage по signed URL (`context='task_message'` у upload-url, чтобы не заводить строку `inbox_items`) и вставляет `task_messages(type='voice', file_path=audio_path, content=null, meta.duration_ms)`; транскрипта у него нет и не будет. Отменяет D-64 §4 в части дописывания `content` по `message_id`.
 
 ### POST /api/voice/parse
 Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id }`. Текст и Web Share Target идут сюда же — один парсер на все входы.

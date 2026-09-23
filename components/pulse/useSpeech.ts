@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { describeCalendar } from "@/lib/calendar/say";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase } from "@/lib/pulse/board";
+import { describeEther, type EtherPost } from "@/lib/pulse/ether";
 
 /** How long the mascot's mouth moves after a new line. */
 const SPEAKING_MS = 1_200;
@@ -23,7 +24,9 @@ const nextId = () => `say:${++counter}`;
 export type Voice = {
   opening: (lanes: Lanes, now: Date, name: string) => Phrase;
   describe: (prev: readonly BoardTask[], next: readonly BoardTask[], now: Date) => Phrase[];
-  /** The calendar is a second source of news, on its own tables and its own diff. */
+  /** Эфир is a second source of news, on its own table and its own diff. */
+  describeEther?: (prev: readonly EtherPost[], next: readonly EtherPost[]) => Phrase[];
+  /** The calendar is the third: an invitation, an answer, a move, and the reminder tick. */
   describeCalendar?: (prev: readonly CalendarEvent[], next: readonly CalendarEvent[], now: Date) => Phrase[];
 };
 
@@ -34,6 +37,7 @@ export function useSpeech(
   now: Date,
   directorName: string,
   meId: string,
+  ether?: EtherPost[],
   calendar?: CalendarEvent[],
 ) {
   // «Марат пишет по …» is a message the reader has not seen — the reader is the director
@@ -41,11 +45,12 @@ export function useSpeech(
     () => ({
       opening: openingLine,
       describe: (prev, next, at) => describeChanges(prev, next, at, meId),
+      describeEther: (prev, next) => describeEther(prev, next, meId),
       describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
     }),
     [meId],
   );
-  return useSpeechWith(rows, lanes, now, directorName, voice, calendar);
+  return useSpeechWith(rows, lanes, now, directorName, voice, ether, calendar);
 }
 
 export function useSpeechWith(
@@ -54,6 +59,7 @@ export function useSpeechWith(
   now: Date,
   directorName: string,
   voice: Voice,
+  ether?: EtherPost[],
   calendar?: CalendarEvent[],
 ) {
   const [line, setLine] = useState<SpokenLine | null>(null);
@@ -91,7 +97,21 @@ export function useSpeechWith(
     }
   }, [rows, directorName, say, voice]);
 
-  // The calendar: the first feed is the baseline, every later change is a word of its own
+  // Эфир: the first feed is the baseline, every later change is a word of its own
+  const etherBefore = useRef<EtherPost[] | undefined>(undefined);
+  useEffect(() => {
+    if (!ether || !voice.describeEther) return;
+    const before = etherBefore.current;
+    etherBefore.current = ether;
+    if (!before) return;
+    const phrases = voice.describeEther(before, ether);
+    if (phrases.length > 0) {
+      opening.current = null;
+      say(phrases[phrases.length - 1]!);
+    }
+  }, [ether, say, voice]);
+
+  // The calendar: same shape again — the first feed is the baseline, a change is a word
   const calendarBefore = useRef<CalendarEvent[] | undefined>(undefined);
   useEffect(() => {
     if (!calendar || !voice.describeCalendar) return;

@@ -51,7 +51,7 @@ export function AssigneePicker({ open, onClose, candidates, onPick, title = "К�
             (candidates.length > 0 ? "Понял задачу, но имя подходит нескольким. Кому из них?" : "Понял задачу, но не понял, кому. Выбери человека")}
         </p>
       </div>
-      <div className="max-h-[60vh] overflow-y-auto">
+      <div className="no-bar max-h-[60vh] overflow-y-auto">
         {candidates.length > 0 ? (
           <div className="mb-2">
             {candidates.map((candidate) => (

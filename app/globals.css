@@ -75,6 +75,68 @@
   border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
+
+/* ---- the browser's own furniture inside a field -------------------------------------
+   Arrows, spinners, clear crosses and the resize grip are the one part of a control we
+   never draw ourselves, and they arrive in the system's shape, not ours. They come off
+   here once instead of in every form. A date and a time are not a field's business at
+   all any more: they are picked in our own calendar and clock (components/ui/datetime). */
+.field {
+  appearance: none;
+  -webkit-appearance: none;
+}
+textarea.field { resize: none; }
+
+/* the chevron of a select is ours; the hex mirrors --text-muted by hand because a data
+   URI cannot read a custom property (same duplication as the token block above) */
+select.field {
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2393A2B4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+/* the little ▲▼ of a number field */
+.field::-webkit-outer-spin-button,
+.field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"].field {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* the clear cross of a search field: every search here carries its own «×» */
+input[type="search"]::-webkit-search-cancel-button,
+input[type="search"]::-webkit-search-decoration {
+  -webkit-appearance: none;
+}
+
+/* the colour swatch is drawn by the browser inside our frame: strip its own border and
+   let it fill the padding box, so the field reads as one rounded tile */
+input[type="color"] { appearance: none; -webkit-appearance: none; }
+input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+input[type="color"]::-webkit-color-swatch { border: none; border-radius: 8px; }
+input[type="color"]::-moz-color-swatch { border: none; border-radius: 8px; }
+
+/* Chrome repaints an autofilled field in its own colour; an inset shadow is the only way
+   to put ours back, and the text colour has to be restated next to it */
+.field:-webkit-autofill,
+.field:-webkit-autofill:hover,
+.field:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--text);
+  caret-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--surface-2) inset;
+  /* the repaint is delayed, not prevented — a long transition is the usual way to outrun it */
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--text);
+}
 .btn-primary {
   background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent) 45%, var(--accent-2));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22), var(--accent-glow);
@@ -107,6 +169,38 @@ body {
 /* desktop: a scrollbar that comes and goes with content height would shift everything sideways */
 html {
   scrollbar-gutter: stable;
+}
+
+/* a band that scrolls inside the board: the bar itself would shift the centred face sideways
+   and blink in and out as the mode changes — the content shows there is more, the bar need not */
+/* where a bar does show, it is ours: a thin rounded thumb and none of the system's step
+   arrows, which is what made a two-line message field look like a Windows window */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--text-muted) 45%, transparent) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-muted) 40%, transparent);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--text-muted) 65%, transparent); }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+.no-bar {
+  scrollbar-width: none;
+}
+.no-bar::-webkit-scrollbar {
+  display: none;
+}
+
+/* the board (Пульс, Лента) is exactly one screen: the shell stops growing with its content, so
+   the face keeps the middle and no scrollbar blinks in and out as the modes change (D-60).
+   The bands inside the board scroll instead. */
+body[data-board] .app-shell {
+  height: 100dvh;
 }
 
 /* a bottom sheet is open: the page behind it must not scroll under the finger */
@@ -145,13 +239,59 @@ h1, h2, h3 {
 h1 { letter-spacing: -0.025em; }
 
 /* Mascot «Капля» and the FAB: transform/opacity only (docs/DESIGN.md §2, D-45). */
+/* Scrolled out of view (components/brand/MascotPower.tsx marks it): the face holds its
+   pose and stops costing frames. Play state only — nothing moves, nothing is re-laid out. */
+.mascot[data-idle],
+.mascot[data-idle] * {
+  animation-play-state: paused !important;
+}
 @keyframes mascot-breathe {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.045); }
 }
+/* calm: a living idle, with a short still beat so the face never looks like a loader */
+@keyframes mascot-idle {
+  0% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: linear; }
+  /* the still beat drifts by a third of a pixel: a held pose still breathes, it does not freeze */
+  16% { transform: translateY(-0.3px) rotate(0.15deg) scale(1.004, 0.997); animation-timing-function: cubic-bezier(0.32, 0, 0.2, 1); }
+  38% { transform: translateY(-1.8px) rotate(-1.2deg) scale(1.035, 0.98); animation-timing-function: cubic-bezier(0.55, 0, 0.5, 1); }
+  58% { transform: translateY(0.8px) rotate(0.8deg) scale(0.985, 1.025); animation-timing-function: cubic-bezier(0.3, 0, 0.35, 1); }
+  76% { transform: translateY(-0.5px) rotate(0deg) scale(1.012, 0.993); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+@keyframes mascot-shadow-idle {
+  0%, 16%, 100% { transform: scaleX(1); opacity: 0.5; }
+  38% { transform: scaleX(0.86); opacity: 0.34; }
+  58% { transform: scaleX(1.04); opacity: 0.54; }
+}
+@keyframes mascot-shadow-hop {
+  0%, 18%, 100% { transform: scaleX(1); opacity: 0.5; }
+  42% { transform: scaleX(0.72); opacity: 0.24; }
+  64% { transform: scaleX(1.08); opacity: 0.56; }
+}
+@keyframes mascot-shadow-sleep {
+  0% { transform: scaleX(0.96); opacity: 0.38; }
+  22% { transform: scaleX(1.06); opacity: 0.48; }
+  48% { transform: scaleX(0.98); opacity: 0.4; }
+  72% { transform: scaleX(1.09); opacity: 0.5; }
+  100% { transform: scaleX(0.96); opacity: 0.38; }
+}
+/* a small travelling gleam gives the otherwise flat blob a sense of volume */
+@keyframes mascot-glint {
+  0%, 22%, 100% { transform: translate(0, 0) scale(1); opacity: 0.14; }
+  48% { transform: translate(1.2px, -0.8px) scale(1.08, 0.9); opacity: 0.22; }
+  68% { transform: translate(-0.5px, 0.4px) scale(0.96, 1.06); opacity: 0.12; }
+}
+/* a face does not blink on a metronome: a flick, its quick echo, and a single one later */
 @keyframes mascot-blink {
-  0%, 93%, 100% { transform: scaleY(1); }
-  96% { transform: scaleY(0.12); }
+  0%, 43% { transform: scaleY(1); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  44.4% { transform: scaleY(0.08); animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1); }
+  46% { transform: scaleY(1); }
+  47.4% { transform: scaleY(0.16); }
+  49% { transform: scaleY(1); }
+  91% { transform: scaleY(1); }
+  92.4% { transform: scaleY(0.08); }
+  94%, 100% { transform: scaleY(1); }
 }
 @keyframes mascot-bounce {
   0%, 100% { transform: translateY(0) scale(1); }
@@ -159,20 +299,26 @@ h1 { letter-spacing: -0.025em; }
   45% { transform: translateY(-7px) scale(0.96, 1.05); }
   70% { transform: translateY(0) scale(1.03, 0.97); }
 }
+/* surprised - the eyes are pinned to the thought above and only dart back for a blink */
 @keyframes mascot-look-up {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-2px); }
+  0% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  18%, 62% { transform: translate(0, -2.2px); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  72%, 78% { transform: translate(-1.2px, -1.4px); animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1); }
+  100% { transform: translate(0, 0); }
 }
 /* listening — pose: the blob leans in and turns an ear to the voice (one-shot, keeps the end) */
+/* listening — pose: the body leans into the voice, overshoots by a degree and settles */
 @keyframes mascot-lean {
-  from { transform: rotate(0deg) translateX(0); }
-  to { transform: rotate(-9deg) translateX(2px); }
+  0% { transform: rotate(0deg) translateX(0) scale(1); animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1); }
+  62% { transform: rotate(-10.4deg) translateX(2.6px) scale(1.015, 0.985); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  100% { transform: rotate(-9deg) translateX(2px) scale(1); }
 }
 /* listening — loop: a nod, deeper on the beat */
 @keyframes mascot-nod {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  32% { transform: translateY(2.4px) rotate(2deg) scale(1.02, 0.98); }
-  58% { transform: translateY(-0.6px) rotate(-0.5deg); }
+  0% { transform: translateY(0) rotate(0deg); animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1); }
+  32% { transform: translateY(3.2px) rotate(2.6deg) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  58% { transform: translateY(-1px) rotate(-0.8deg) scale(0.99, 1.015); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  100% { transform: translateY(0) rotate(0deg); }
 }
 /* listening — the ear pricks up (overshoot), then twitches now and then */
 @keyframes mascot-ear-up {
@@ -180,45 +326,63 @@ h1 { letter-spacing: -0.025em; }
   to { transform: scale(1) rotate(0deg); }
 }
 @keyframes mascot-ear-twitch {
-  0%, 78%, 100% { transform: rotate(0deg); }
-  84% { transform: rotate(9deg); }
-  90% { transform: rotate(-5deg); }
+  0%, 40% { transform: rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  /* a small adjustment mid-cycle — the ear is aiming, not ticking */
+  45% { transform: rotate(3.5deg) scale(1.02, 0.99); animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  53%, 78% { transform: rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  84% { transform: rotate(9deg) scale(1.04, 0.97); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  90% { transform: rotate(-5deg) scale(0.99, 1.02); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+  100% { transform: rotate(0deg) scale(1); }
 }
 /* listening — sound waves travel in from the right and land on the ear */
 @keyframes mascot-wave-in {
-  0% { transform: translateX(10px) scale(1.15); opacity: 0; }
-  35% { opacity: 0.85; }
+  0% { transform: translateX(10px) scale(1.15); opacity: 0; animation-timing-function: linear; }
+  35% { transform: translateX(3.5px) scale(1.02); opacity: 0.85; animation-timing-function: cubic-bezier(0.25, 0, 0.5, 1); }
+  72% { transform: translateX(-0.5px) scale(0.88); opacity: 0.5; animation-timing-function: cubic-bezier(0.4, 0, 0.9, 0.6); }
   100% { transform: translateX(-3px) scale(0.8); opacity: 0; }
 }
 /* listening — eyes: attentive, glancing towards the ear, a small squint of concentration */
 @keyframes mascot-attend {
-  0%, 100% { transform: translate(1.5px, 0); }
-  40% { transform: translate(2.5px, -0.5px); }
-  70% { transform: translate(0.5px, 0.5px); }
+  0% { transform: translate(1.5px, 0); animation-timing-function: cubic-bezier(0.3, 0, 0.15, 1); }
+  18%, 40% { transform: translate(2.5px, -0.5px); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  70% { transform: translate(0.5px, 0.5px); animation-timing-function: cubic-bezier(0.35, 0, 0.3, 1); }
+  100% { transform: translate(1.5px, 0); }
 }
 /* saving — the body takes the note in: a squash and a settle */
+/* saving - the note lands at 50%, so the body answers at 58%: cause, then effect */
 @keyframes mascot-tuck {
-  0%, 100% { transform: scale(1); }
-  55% { transform: scale(1.06, 0.94); }
-  75% { transform: scale(0.98, 1.03); }
+  0%, 46% { transform: scale(1); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  58% { transform: scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.34, 1.25, 0.64, 1); }
+  76% { transform: scale(0.98, 1.03); animation-timing-function: var(--ease-out); }
+  100% { transform: scale(1); }
 }
 /* saving — the note drops from above into the head and disappears */
+/* saving - the note is offered, hangs a beat, then is taken in and swallowed */
 @keyframes mascot-tuck-note {
-  0% { transform: translateY(-6px) scale(0.9); opacity: 0; }
-  22% { transform: translateY(0) scale(1); opacity: 1; }
-  50% { transform: translateY(8px) scale(0.96); opacity: 1; }
-  72%, 100% { transform: translateY(18px) scale(0.7); opacity: 0; }
+  0% { transform: translateY(-6px) scale(0.9) rotate(-5deg); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  20% { transform: translateY(0) scale(1) rotate(0deg); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  34% { transform: translateY(0.6px) scale(1) rotate(1deg); opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  50% { transform: translateY(8px) scale(0.95) rotate(2deg); opacity: 1; animation-timing-function: cubic-bezier(0.6, 0, 0.9, 0.5); }
+  66%, 100% { transform: translateY(18px) scale(0.68) rotate(3deg); opacity: 0; }
 }
 /* saving — eyes follow the note down */
+/* saving - the eyes follow the note down and come back up unhurried */
 @keyframes mascot-track-down {
-  0%, 100% { transform: translateY(-1.5px); }
-  55% { transform: translateY(2px); }
-  80% { transform: translateY(0); }
+  0%, 16% { transform: translateY(-1.5px); animation-timing-function: cubic-bezier(0.35, 0, 0.25, 1); }
+  52% { transform: translateY(2.2px); animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  80% { transform: translateY(0); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  100% { transform: translateY(-1.5px); }
 }
 /* transcribing — pose: a small tilt, like reading over a shoulder */
 @keyframes mascot-tilt-read {
   from { transform: rotate(0deg); }
   to { transform: rotate(4deg); }
+}
+/* transcribing: a concentrated forward/back beat, separate from the line-scanning eyes */
+@keyframes mascot-read-body {
+  0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+  34% { transform: translateY(1.4px) rotate(1.2deg) scale(1.025, 0.985); }
+  62% { transform: translateY(-0.8px) rotate(-0.5deg) scale(0.99, 1.015); }
 }
 /* transcribing — eyes scan a line left → right, jump back, scan again */
 @keyframes mascot-read {
@@ -228,58 +392,94 @@ h1 { letter-spacing: -0.025em; }
   100% { transform: translate(-3px, -1px); }
 }
 /* transcribing — the voice on the left breathes, then goes quiet as the words appear */
+/* transcribing - the voice speaks, then is consumed: the bars collapse as the text starts */
 @keyframes mascot-bar-fade {
-  0% { transform: scaleY(0.5); opacity: 0.35; }
-  18% { transform: scaleY(1.15); opacity: 1; }
-  32% { transform: scaleY(0.8); opacity: 0.9; }
-  55%, 100% { transform: scaleY(0.3); opacity: 0; }
+  0% { transform: scaleY(0.5); opacity: 0.35; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  18% { transform: scaleY(1.15); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  32% { transform: scaleY(0.75); opacity: 0.9; animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  42% { transform: scaleY(1.05); opacity: 0.95; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  58%, 100% { transform: scaleY(0.22); opacity: 0; }
 }
 /* transcribing — a line of text types in from the left, holds, then clears for the next phrase */
+/* transcribing - a line types out at an even speed and holds; the phrase clears at once */
 @keyframes mascot-line-type {
-  0% { transform: scaleX(0); opacity: 0; }
-  10% { opacity: 1; }
-  30%, 75% { transform: scaleX(1); opacity: 1; }
-  90%, 100% { transform: scaleX(1); opacity: 0; }
+  0% { transform: scaleX(0); opacity: 0; animation-timing-function: linear; }
+  8% { transform: scaleX(0.12); opacity: 1; animation-timing-function: cubic-bezier(0.35, 0, 0.6, 1); }
+  30%, 78% { transform: scaleX(1); opacity: 1; animation-timing-function: var(--ease-out); }
+  88%, 100% { transform: scaleX(1); opacity: 0; }
 }
 /* parsing — a card appears over the head, waits, then slides off into the stack on the right */
+/* parsing - the card is picked up, read for a beat, then flicked onto the stack */
 @keyframes mascot-sort-card {
-  0% { transform: translate(0, -6px) scale(0.85); opacity: 0; }
-  18% { transform: translate(0, 0) scale(1); opacity: 1; }
-  55% { transform: translate(0, 0) scale(1); opacity: 1; }
-  80%, 100% { transform: translate(22px, 10px) scale(0.7); opacity: 0; }
+  0% { transform: translate(0, -6px) scale(0.85) rotate(-6deg); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.85, 0.3, 1); }
+  18% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  55% { transform: translate(0.4px, 0) scale(1) rotate(1.5deg); opacity: 1; animation-timing-function: cubic-bezier(0.3, 0, 0.1, 1); }
+  80%, 100% { transform: translate(22px, 10px) scale(0.7) rotate(11deg); opacity: 0; }
+}
+/* parsing: a clear three-beat settle while cards are stacked */
+@keyframes mascot-sort-body {
+  0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+  28% { transform: translate(-1px, 0.8px) rotate(-2deg) scale(1.025, 0.98); }
+  56% { transform: translate(1.4px, -1px) rotate(1.5deg) scale(0.985, 1.025); }
+  78% { transform: translate(0.4px, 0) rotate(-0.5deg) scale(1.01, 0.99); }
 }
 /* parsing — eyes look up at the cards, then right where they go */
+/* parsing - the eyes read the card, then throw it after the stack */
 @keyframes mascot-look-cards {
-  0%, 100% { transform: translate(-1px, -2.5px); }
-  55% { transform: translate(1px, -2.5px); }
-  80% { transform: translate(3px, -1px); }
+  0%, 14% { transform: translate(-1px, -2.5px); animation-timing-function: cubic-bezier(0.35, 0, 0.3, 1); }
+  55% { transform: translate(1px, -2.5px); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  74%, 84% { transform: translate(3.2px, -1px); animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  100% { transform: translate(-1px, -2.5px); }
 }
 /* sending — wind up back, throw forward with a squash, settle (in step with fly-card) */
 @keyframes mascot-throw {
-  0% { transform: rotate(0deg) translateX(0) scale(1); }
-  22%, 34% { transform: rotate(11deg) translateX(-4px) scale(0.96, 1.04); }
-  42% { transform: rotate(-10deg) translateX(5px) scale(1.08, 0.92); }
-  60% { transform: rotate(-3deg) translateX(1px) scale(1); }
+  0% { transform: rotate(0deg) translateX(0) scale(1); animation-timing-function: cubic-bezier(0.5, 0, 0.7, 1); }
+  22%, 34% { transform: rotate(11deg) translateX(-4px) scale(0.96, 1.04); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  42% { transform: rotate(-10deg) translateX(5px) scale(1.08, 0.92); animation-timing-function: cubic-bezier(0.34, 1.3, 0.64, 1); }
+  60% { transform: rotate(-3deg) translateX(1px) scale(1); animation-timing-function: var(--ease-out); }
   100% { transform: rotate(0deg) translateX(0) scale(1); }
 }
+/* the thrown card, inside the face's own viewBox: it is in the hand through the wind-up,
+   leaves at the release (42% of mascot-throw) and is gone before the next swing */
+@keyframes mascot-throw-card {
+  0%, 20% { transform: translate(-3px, 3px) rotate(-12deg) scale(0.9); opacity: 0; }
+  28% { transform: translate(-3px, 3px) rotate(-12deg) scale(0.95); opacity: 1; animation-timing-function: cubic-bezier(0.3, 0, 0.6, 1); }
+  42% { transform: translate(1px, 0) rotate(-4deg) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.15, 0.55, 0.3, 1); }
+  72%, 100% { transform: translate(34px, -34px) rotate(26deg) scale(0.68); opacity: 0; }
+}
 /* sending — the eyes follow the card up and away */
+/* sending - the gaze loads with the arm (back and down), then whips after the card */
 @keyframes mascot-follow {
-  0%, 20% { transform: translate(-1px, 0); }
-  42% { transform: translate(2px, -2px); }
-  70% { transform: translate(3.5px, -3px); }
+  0% { transform: translate(-1px, 0); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  26%, 34% { transform: translate(-2.6px, 0.8px); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  46% { transform: translate(2.2px, -2.2px); animation-timing-function: cubic-bezier(0.35, 0, 0.3, 1); }
+  70% { transform: translate(3.5px, -3px); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
   100% { transform: translate(0, 0); }
 }
 /* thinking: slow tilt to one side, a pause, back */
+/* thinking: tilt into the question, hold there (the holding IS the thinking), then a
+   short second guess the other way before coming back */
 @keyframes mascot-ponder {
-  0%, 100% { transform: rotate(0deg) scale(1); }
-  35%, 55% { transform: rotate(-6deg) scale(1.02); }
-  80% { transform: rotate(2deg) scale(1); }
+  0% { transform: rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.3, 0, 0.15, 1); }
+  30%, 55% { transform: rotate(-6deg) scale(1.02, 0.99); animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1); }
+  70%, 78% { transform: rotate(2.4deg) scale(0.995, 1.008); animation-timing-function: cubic-bezier(0.45, 0, 0.5, 1); }
+  100% { transform: rotate(0deg) scale(1); }
 }
 /* thinking: eyes wander up-left, then right, then centre */
+/* thinking — the eyes: a thought lands, the gaze stops on it, then moves on */
 @keyframes mascot-wander {
-  0%, 100% { transform: translate(0, 0); }
-  30%, 45% { transform: translate(-3px, -2px); }
-  65%, 80% { transform: translate(3px, -1px); }
+  0% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  30%, 45% { transform: translate(-3px, -2px); animation-timing-function: cubic-bezier(0.3, 0, 0.12, 1); }
+  52%, 58% { transform: translate(-3.2px, -1.2px); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  65%, 80% { transform: translate(3px, -1px); animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
+  100% { transform: translate(0, 0); }
+}
+/* thinking — the dots belong to one thought: they arrive one by one and leave together */
+@keyframes mascot-dot {
+  0% { transform: scale(0.4); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  14% { transform: scale(1.12); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  22%, 62% { transform: scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1); }
+  74%, 100% { transform: scale(0.5); opacity: 0; }
 }
 /* thinking: the three dots above the head, one after another */
 @keyframes mascot-dot {
@@ -287,42 +487,287 @@ h1 { letter-spacing: -0.025em; }
   35%, 60% { transform: scale(1); opacity: 1; }
 }
 /* calm: a rare glance to the side, most of the cycle looking straight */
+/* calm: the eyes wander off and come back — the leaving is quick, the returning lazy */
 @keyframes mascot-glance {
-  0%, 82%, 100% { transform: translateX(0); }
-  86%, 94% { transform: translateX(3px); }
+  0%, 38% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  43%, 52% { transform: translate(-1.6px, 0.4px); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  60%, 82% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  86%, 94% { transform: translate(3px, -0.3px); animation-timing-function: cubic-bezier(0.55, 0, 0.45, 1); }
+  100% { transform: translate(0, 0); }
 }
+/* Secondary motion: the eyes are not welded to the body, they arrive a beat late and
+   overshoot a hair on the way back. Amplitudes are a fraction of a pixel on purpose —
+   at this size that is the whole difference between a drawing and a face. */
+@keyframes mascot-drag-breath {
+  0%, 16% { transform: translateY(0); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  44% { transform: translateY(0.45px); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  64% { transform: translateY(-0.25px); animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1); }
+  84% { transform: translateY(0.1px); }
+  100% { transform: translateY(0); }
+}
+@keyframes mascot-drag-nod {
+  0% { transform: translateY(0); animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
+  42% { transform: translateY(-0.9px); animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  70% { transform: translateY(0.35px); animation-timing-function: cubic-bezier(0.3, 0, 0.5, 1); }
+  100% { transform: translateY(0); }
+}
+/* speaking: look between the listener and the next thought, not a single fixed stare */
 /* happy: a spark pops, spins a little and fades */
+/* happy — the spark pops at the top of the hop, spins once and is gone before the landing */
 @keyframes mascot-spark {
-  0% { transform: scale(0) rotate(0deg); opacity: 0; }
-  35% { transform: scale(1.1) rotate(20deg); opacity: 1; }
-  100% { transform: scale(0.6) rotate(45deg); opacity: 0; }
+  0%, 14% { transform: scale(0) rotate(0deg); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  28% { transform: scale(1.15) rotate(18deg); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  46% { transform: scale(0.9) rotate(34deg); opacity: 0.85; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  62%, 100% { transform: scale(0.55) rotate(52deg); opacity: 0; }
+}
+/* happy — the blush warms as the body lands and cools while it is in the air */
+@keyframes mascot-blush {
+  0%, 18% { opacity: 0.2; animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  38% { opacity: 0.13; animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1); }
+  58% { opacity: 0.3; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  100% { opacity: 0.2; }
+}
+/* happy — even a squinted eye is alive: the arc lifts a hair on the landing */
+@keyframes mascot-happy-look {
+  0%, 18% { transform: translateY(0); animation-timing-function: cubic-bezier(0.3, 0, 0.4, 1); }
+  38% { transform: translateY(0.5px); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  58% { transform: translateY(-0.45px); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  100% { transform: translateY(0); }
+}
+/* happy: a restrained little hop, then a long pleased settle */
+@keyframes mascot-happy {
+  0%, 18% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.2, 0.75, 0.3, 1); }
+  30% { transform: translateY(-2.6px) rotate(-1.4deg) scale(0.975, 1.035); animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.6); }
+  38% { transform: translateY(-3.2px) rotate(-2deg) scale(0.99, 1.015); animation-timing-function: cubic-bezier(0.55, 0, 0.9, 0.5); }
+  55% { transform: translateY(1px) rotate(1.2deg) scale(1.05, 0.95); animation-timing-function: cubic-bezier(0.34, 1.35, 0.64, 1); }
+  72% { transform: translateY(-0.6px) rotate(0deg) scale(0.99, 1.01); animation-timing-function: var(--ease-out); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
 }
 /* speaking: the mouth opens and closes in the rhythm of a phrase — scale only */
+/* speaking — the mouth runs a phrase: syllables of uneven size, then a beat of silence
+   where the speaker takes a breath (that silence is what makes it read as speech) */
 @keyframes mascot-mouth {
-  0%, 100% { transform: scale(0.9, 0.18); }
-  14% { transform: scale(1, 1); }
-  28% { transform: scale(1.1, 0.45); }
-  45% { transform: scale(0.95, 0.85); }
-  60% { transform: scale(1.05, 0.3); }
-  76% { transform: scale(1, 0.7); }
-  90% { transform: scale(0.9, 0.25); }
+  0% { transform: scale(0.9, 0.18); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  10% { transform: scale(1, 1); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  20% { transform: scale(1.1, 0.4); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  32% { transform: scale(0.95, 0.9); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  44% { transform: scale(1.05, 0.28); animation-timing-function: cubic-bezier(0.25, 0, 0.2, 1); }
+  54% { transform: scale(1, 0.72); animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+  64% { transform: scale(0.95, 0.3); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  72% { transform: scale(1.02, 0.55); animation-timing-function: cubic-bezier(0.45, 0, 0.5, 1); }
+  82%, 100% { transform: scale(0.9, 0.16); }
 }
 /* sleeping: the z-s float up and fade */
+/* the z leaves on the exhale (half of the 7s breath) and wanders as it climbs */
 @keyframes mascot-zzz {
-  0% { opacity: 0; transform: translate(0, 4px) scale(0.8); }
-  25% { opacity: 0.9; }
-  100% { opacity: 0; transform: translate(6px, -14px) scale(1.15); }
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.8) rotate(-6deg); animation-timing-function: cubic-bezier(0.2, 0.7, 0.4, 1); }
+  22% { opacity: 0.9; transform: translate(1px, 0) scale(1) rotate(2deg); animation-timing-function: linear; }
+  62% { opacity: 0.7; transform: translate(3.5px, -7px) scale(1.08) rotate(-3deg); animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1); }
+  100% { opacity: 0; transform: translate(6px, -14px) scale(1.15) rotate(4deg); }
+}
+/* Sleep is not one breath on repeat: two of them, and on the second the sleeper settles
+   deeper — sags a little wider and lower, the way a body gives in to the ground. */
+@keyframes mascot-sleep {
+  0% { transform: translateY(0) rotate(0deg) scale(0.985, 1.01); animation-timing-function: cubic-bezier(0.4, 0, 0.45, 1); }
+  22% { transform: translateY(1px) rotate(-0.7deg) scale(1.025, 0.975); animation-timing-function: cubic-bezier(0.5, 0, 0.6, 1); }
+  48% { transform: translateY(0.2px) rotate(-0.15deg) scale(0.99, 1.006); animation-timing-function: cubic-bezier(0.4, 0, 0.45, 1); }
+  72% { transform: translateY(1.5px) rotate(-1deg) scale(1.035, 0.968); animation-timing-function: cubic-bezier(0.55, 0, 0.7, 1); }
+  100% { transform: translateY(0) rotate(0deg) scale(0.985, 1.01); }
+}
+
+/* entering a state that has no pose of its own: a short settle, so the face arrives
+   instead of cutting in (the entrance curve, 220 ms — UI feedback band) */
+@keyframes mascot-settle {
+  from { transform: translateY(2px) scale(0.955, 1.05); }
+  60% { transform: translateY(-0.4px) scale(1.012, 0.99); }
+  to { transform: translateY(0) scale(1, 1); }
 }
 
 /* surprised: a small jump back on noticing a thought */
 @keyframes mascot-startle {
-  0% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-5px) scale(1.06, 0.95); }
-  60% { transform: translateY(1px) scale(0.98, 1.03); }
+  0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(0.4, 0, 0.9, 0.5); }
+  12% { transform: translateY(1.4px) scale(1.06, 0.94); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  38% { transform: translateY(-5.4px) scale(0.95, 1.07); animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.5); }
+  66% { transform: translateY(1px) scale(1.05, 0.95); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* the ground answers the jump: the shadow shrinks under the body and comes back with it */
+@keyframes mascot-shadow-startle {
+  0% { transform: scaleX(1); opacity: 0.5; }
+  12% { transform: scaleX(1.07); opacity: 0.54; }
+  38% { transform: scaleX(0.66); opacity: 0.2; }
+  66% { transform: scaleX(1.06); opacity: 0.55; }
+  100% { transform: scaleX(1); opacity: 0.5; }
+}
+/* after the startle, stay alert with a small, uneven breath */
+/* surprised - the breath after the fright: shallow, and it catches once per cycle */
+@keyframes mascot-alert {
+  0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(0.3, 0, 0.3, 1); }
+  30% { transform: translateY(-1.2px) scale(1.03, 0.98); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  40%, 46% { transform: translateY(-1.6px) scale(1.04, 0.972); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  66% { transform: translateY(0.5px) scale(0.99, 1.02); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
   100% { transform: translateY(0) scale(1); }
 }
 
+/* ---- processing: the assistant reads the data and reports the new status (D-65) ----
+   One 2.4s take, four beats: plug into the store, read (the eyes are glyphs running like
+   a terminal), lock on the answer, then hop and show the tick. Everything is transform and
+   opacity, so the whole take costs the same as a breath. */
+@keyframes mascot-process {
+  0% { transform: translateY(0) scale(1); animation-timing-function: cubic-bezier(0.25, 0, 0.08, 1); }
+  /* plug in: the body tightens and leans down to the data */
+  6% { transform: translateY(1.2px) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+  /* the reading beats — quick, one per pass of the eyes over the line */
+  18% { transform: translateY(0.2px) scale(0.99, 1.012); animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+  30% { transform: translateY(0.9px) scale(1.02, 0.985); animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+  40% { transform: translateY(0.15px) scale(0.995, 1.008); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  /* locked: the reading stops dead — the stillness is what says «found it» */
+  46%, 56% { transform: translateY(0.5px) scale(1.01, 0.992); animation-timing-function: cubic-bezier(0.4, 0, 0.9, 0.5); }
+  /* crouch, then up: the answer is good news */
+  62% { transform: translateY(2.2px) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  74% { transform: translateY(-5.6px) scale(0.95, 1.07); animation-timing-function: cubic-bezier(0.5, 0, 0.85, 0.5); }
+  85% { transform: translateY(1.1px) scale(1.06, 0.94); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+  100% { transform: translateY(0) scale(1); }
+}
+/* the ground answers the hop of the report */
+@keyframes mascot-shadow-process {
+  0%, 56% { transform: scaleX(1); opacity: 0.5; }
+  62% { transform: scaleX(1.08); opacity: 0.55; }
+  74% { transform: scaleX(0.64); opacity: 0.18; }
+  85% { transform: scaleX(1.07); opacity: 0.55; }
+  100% { transform: scaleX(1); opacity: 0.5; }
+}
+/* the eyes while reading: down the line, back, down again — and still at the lock */
+@keyframes mascot-code-look {
+  0% { transform: translate(-2.4px, 0.6px); animation-timing-function: linear; }
+  13% { transform: translate(2.4px, 0.6px); animation-timing-function: cubic-bezier(0.25, 0, 0.05, 1); }
+  16% { transform: translate(-2.4px, 1px); animation-timing-function: linear; }
+  28% { transform: translate(2.4px, 1px); animation-timing-function: cubic-bezier(0.25, 0, 0.05, 1); }
+  31% { transform: translate(-2.4px, 0.3px); animation-timing-function: linear; }
+  42% { transform: translate(2.2px, 0.3px); animation-timing-function: cubic-bezier(0.35, 0, 0.2, 1); }
+  50%, 100% { transform: translate(0, 0); }
+}
+/* one glyph of the roll: shown for its quarter of the cycle, then gone — a terminal snap,
+   never a cross-fade (the jump between characters is the whole point) */
+@keyframes mascot-glyph {
+  0%, 24.9% { opacity: 1; }
+  25%, 100% { opacity: 0; }
+}
+/* the drawn eye is away while the glyphs run and comes back the moment the answer is found */
+@keyframes mascot-eye-return {
+  0%, 44% { opacity: 0; }
+  50%, 100% { opacity: 1; }
+}
+/* the store the assistant plugs into: it appears, works, and is gone once read */
+@keyframes mascot-store {
+  0% { opacity: 0; transform: translateX(-3px) scale(0.86); animation-timing-function: cubic-bezier(0.2, 0.85, 0.3, 1); }
+  7% { opacity: 1; transform: translateX(0) scale(1); animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1); }
+  17% { transform: translateX(0) scale(1.06, 0.95); animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1); }
+  27% { transform: translateX(0) scale(1); animation-timing-function: cubic-bezier(0.35, 0, 0.5, 1); }
+  37% { transform: translateX(0) scale(1.05, 0.96); animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  46% { opacity: 1; transform: translateX(0) scale(1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  56%, 100% { opacity: 0; transform: translateX(-4px) scale(0.9); }
+}
+/* a bit of data crossing from the store into the head */
+@keyframes mascot-data-bit {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); animation-timing-function: cubic-bezier(0.15, 0.8, 0.4, 1); }
+  16% { opacity: 1; transform: translate(4px, 1.6px) scale(1); animation-timing-function: linear; }
+  72% { opacity: 1; transform: translate(11.5px, 4.6px) scale(0.9); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  100% { opacity: 0; transform: translate(15px, 6px) scale(0.5); }
+}
+/* the tick of the new status: it arrives with the top of the hop and leaves quietly */
+@keyframes mascot-check-pop {
+  0%, 73% { opacity: 0; transform: scale(0.4) rotate(-12deg); animation-timing-function: cubic-bezier(0.2, 0.9, 0.3, 1); }
+  /* the top of the hop: the body is up, and only then does the tick land */
+  81% { opacity: 1; transform: scale(1.2) rotate(5deg); animation-timing-function: cubic-bezier(0.34, 1.35, 0.64, 1); }
+  88% { opacity: 1; transform: scale(1) rotate(0deg); animation-timing-function: linear; }
+  94% { opacity: 1; transform: scale(1) rotate(0deg); animation-timing-function: var(--ease-out); }
+  100% { opacity: 0; transform: scale(1.08) rotate(0deg); }
+}
+
 /* a thought pops above the head — scale from the tail, opacity only otherwise */
+/* Negative reactions: each remains legible with transforms and opacity only. */
+@keyframes mascot-angry-pose { from { transform: translateY(0) rotate(0deg) scale(1); } to { transform: translateY(1px) rotate(-2deg) scale(1.04, 0.96); } }
+@keyframes mascot-angry {
+  0% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  28% { transform: translateY(1.8px) rotate(-1.8deg) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.5, 0, 0.35, 1); }
+  53% { transform: translateY(-1.1px) rotate(1deg) scale(0.98, 1.03); animation-timing-function: cubic-bezier(0.45, 0, 0.6, 1); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+/* angry - the stare holds; it only leans harder into the target on the beat */
+@keyframes mascot-angry-look {
+  0%, 22% { transform: translate(0, 1px); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  45%, 62% { transform: translate(-1.2px, 1.7px); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  100% { transform: translate(0, 1px); }
+}
+@keyframes mascot-nervous {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  22% { transform: translate(-1.2px, 0.7px) rotate(-1.2deg) scale(0.98, 1.025); animation-timing-function: cubic-bezier(0.35, 0, 0.25, 1); }
+  48% { transform: translate(1.4px, -0.6px) rotate(1deg) scale(1.025, 0.98); animation-timing-function: cubic-bezier(0.35, 0, 0.25, 1); }
+  72% { transform: translate(-0.7px, 0.4px) rotate(-0.6deg); animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+/* nervous - the gaze checks one side, then the other: snap, hold, snap */
+@keyframes mascot-nervous-look {
+  0%, 14% { transform: translate(-1.5px, 0); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  30%, 42% { transform: translate(2.4px, -1px); animation-timing-function: cubic-bezier(0.2, 0, 0.05, 1); }
+  58%, 72% { transform: translate(-2.5px, 0.8px); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  86%, 100% { transform: translate(-1.5px, 0); }
+}
+@keyframes mascot-bored {
+  0%, 26% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.6, 0, 0.6, 1); }
+  52%, 60% { transform: translateY(1.8px) rotate(3deg) scale(1.035, 0.975); animation-timing-function: cubic-bezier(0.5, 0, 0.7, 1); }
+  76% { transform: translateY(0.6px) rotate(1.4deg) scale(0.99, 1.015); animation-timing-function: cubic-bezier(0.5, 0, 0.8, 1); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+/* bored - a long look away at nothing, and an even slower way back */
+@keyframes mascot-bored-look {
+  0%, 44% { transform: translate(0, 1px); animation-timing-function: cubic-bezier(0.4, 0, 0.25, 1); }
+  60%, 86% { transform: translate(3.2px, 1.5px); animation-timing-function: cubic-bezier(0.5, 0, 0.6, 1); }
+  100% { transform: translate(0, 1px); }
+}
+@keyframes mascot-panic-pose { from { transform: scale(1); } to { transform: scale(1.08, 0.92); } }
+@keyframes mascot-panic {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  25% { transform: translate(-2px, 1px) rotate(-3deg) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  50% { transform: translate(2.2px, -1px) rotate(3deg) scale(0.94, 1.07); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  75% { transform: translate(-1.4px, 0.7px) rotate(-2deg) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+/* panicking - nothing to hold on to: every look is cut short by the next one */
+@keyframes mascot-panic-look {
+  0% { transform: translate(0, -1px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  22%, 30% { transform: translate(-2.4px, -2px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  52%, 62% { transform: translate(2.4px, -1.5px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  80%, 86% { transform: translate(-1.2px, -2.2px); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  100% { transform: translate(0, -1px); }
+}
+@keyframes mascot-swear {
+  0% { transform: translateY(0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.15, 0, 0.1, 1); }
+  30%, 40% { transform: translateY(1.6px) rotate(-2.5deg) scale(1.08, 0.92); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  58%, 66% { transform: translateY(-0.8px) rotate(1.5deg) scale(0.97, 1.03); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  100% { transform: translateY(0) rotate(0deg) scale(1); }
+}
+/* swearing - the look punches out with the word and snaps back */
+@keyframes mascot-swear-look {
+  0% { transform: translate(0, 1px); animation-timing-function: cubic-bezier(0.15, 0, 0.1, 1); }
+  30%, 48% { transform: translate(1.2px, 1.7px); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  100% { transform: translate(0, 1px); }
+}
+@keyframes mascot-sweat {
+  0% { transform: translate(0, -2px) scale(0.55); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  28% { transform: translate(0, 0) scale(1.05); opacity: 1; animation-timing-function: linear; }
+  44% { transform: translate(-0.2px, 0.6px) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.5); }
+  100% { transform: translate(-1px, 8px) scale(0.8); opacity: 0; }
+}
+/* swearing - the cloud shakes on the same beat as the body, and never quite settles */
+@keyframes mascot-swear-cloud {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0.9; animation-timing-function: cubic-bezier(0.15, 0, 0.1, 1); }
+  30% { transform: translate(-0.8px, -2px) rotate(-2.5deg) scale(1.06); opacity: 1; animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  58% { transform: translate(0.9px, -0.8px) rotate(2deg) scale(1.02); opacity: 1; animation-timing-function: cubic-bezier(0.4, 0, 0.4, 1); }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 0.9; }
+}
+
 @keyframes thought-in {
   from { opacity: 0; transform: translateX(-50%) scale(0.85); }
   to { opacity: 1; transform: translateX(-50%) scale(1); }
@@ -334,6 +779,161 @@ h1 { letter-spacing: -0.025em; }
   35% { transform: scale(1.1, 0.94) rotate(-2deg); }
   70% { transform: scale(0.97, 1.05) rotate(1.5deg); }
   100% { transform: scale(1) rotate(0); }
+}
+
+/* ---- the dream of the sleeping face (D-67) ------------------------------------------
+   While a home screen is at rest the assistant dreams: the figures come out of the middle of
+   his head, circle him from above and grow as they go (components/pulse/DreamOrbit.tsx).
+   Two nested animations carry the whole thing, both compositor-only. `dream-swell` scales the
+   carousel from a speck to full size — the orbit lives inside it, so one scale grows the
+   radius and the figures together and they spiral out of the head. `dream-lap` walks one
+   figure around the ellipse and turns it into the direction of travel; the radii arrive as
+   custom properties, so these keyframes serve every screen, and a negative delay is what puts
+   the chaser behind the runner. The ellipse is sampled every 30°: over one lap a chord that
+   short is the arc, and the heading between two samples is off by less than the eye reads. */
+/* out of the head as a speck, clear of it by the first quarter, then slowly on up and gone */
+@keyframes dream-swell {
+  0% { transform: scale(0.08); opacity: 0; animation-timing-function: cubic-bezier(0.3, 0.7, 0.4, 1); }
+  4% { opacity: 1; }
+  /* clear of the head early, then out to the full screen and held there: at full size the
+     bounce lands exactly on the edge, so growing past 1 would send it over */
+  14% { transform: scale(0.62); animation-timing-function: linear; }
+  38%, 92% { transform: scale(1); }
+  100% { transform: scale(1); opacity: 0; }
+}
+/* ---- the team on the waiting screen (D-69, two halves in D-71) ----------------------
+   Above the face the people who have work on them, as points of light; below it the idlers,
+   as circles that drift. Give an idler a task and his circle dives through the face and is
+   spat out above as a star; close his last one and the star sinks back home. Transform and
+   opacity only, and everything that differs per person arrives as a custom property. */
+@keyframes star-twinkle {
+  0%, 100% { transform: scale(0.82); opacity: 0.5; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+/* The rays breathe out of step with the star itself, and that is what makes it twinkle rather
+   than merely pulse: a real one glitters because its spikes come and go, not its middle. */
+@keyframes star-rays {
+  0%, 100% { transform: scale(0.7) rotate(-6deg); opacity: 0.55; }
+  50% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+}
+/* a task just handed out: a supernova, the loudest thing in the sky */
+@keyframes star-nova {
+  0%, 100% { transform: scale(1.05); opacity: 0.85; }
+  18% { transform: scale(1.5); opacity: 1; }
+  46% { transform: scale(1.12); opacity: 0.95; }
+}
+/* and the shell it throws */
+@keyframes star-shell {
+  0% { transform: scale(0.3); opacity: 0; }
+  18% { opacity: 0.8; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+/* something needs him: it does not twinkle, it blinks */
+@keyframes star-alarm {
+  0%, 100% { transform: scale(0.9); opacity: 0.55; }
+  40% { transform: scale(1.3); opacity: 1; }
+  60% { transform: scale(1.1); opacity: 0.9; }
+}
+/* an idler: the slowest breath on the screen, and nothing else */
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.82; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+/* an idler stands in his row and shivers: nothing to do, and it shows */
+@keyframes orb-drift {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(var(--orb-dx), var(--orb-dy)) rotate(1.2deg); }
+  50% { transform: translate(0, calc(var(--orb-dy) * -1)) rotate(-0.8deg); }
+  75% { transform: translate(calc(var(--orb-dx) * -1), var(--orb-dy)) rotate(0.6deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+/* caught: it stops dead and jumps once, and the input opens with his name in it */
+@keyframes orb-caught {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.32); filter: brightness(1.4); }
+  100% { transform: scale(1.1); }
+}
+/* The flight up, in three acts (D-74). Act one: he flinches back, then is torn towards the
+   face with acceleration and stretched along the way he is going — squash and stretch is what
+   makes it read as being sucked in. Act two: he is inside, and only the rings and the spark
+   tell what is happening. Act three: out of the middle towards his star, hard, stretched the
+   new way, past the mark and elastically back onto it. */
+@keyframes orb-launch {
+  0% { transform: translate(var(--from-x), var(--from-y)) rotate(var(--in-deg)) scale(1, 1); opacity: 1; animation-timing-function: var(--ease-out); }
+  /* the wind-up: half a step back before the move, the way it is drawn on paper */
+  9% { transform: translate(calc(var(--from-x) * 1.06), calc(var(--from-y) * 1.06)) rotate(var(--in-deg)) scale(0.94, 1.06); animation-timing-function: cubic-bezier(0.7, 0, 0.9, 0.4); }
+  28% { transform: translate(calc(var(--from-x) * 0.5), calc(var(--from-y) * 0.5)) rotate(var(--in-deg)) scale(1.4, 0.64); animation-timing-function: cubic-bezier(0.8, 0, 1, 0.6); }
+  /* swallowed at the rim, where a mouth would be, and not a frame later */
+  38% { transform: translate(var(--in-x), var(--in-y)) rotate(var(--in-deg)) scale(1.75, 0.46); opacity: 1; }
+  43% { transform: translate(0px, 0px) rotate(var(--in-deg)) scale(0.12, 0.12); opacity: 0; }
+  /* act two: he is in there, out of sight. The rings on the rim carry it — orb-suck, orb-chew. */
+  57% { transform: translate(calc(var(--out-x) * 0.3), calc(var(--out-y) * 0.3)) rotate(var(--out-deg)) scale(0.12, 0.12); opacity: 0; animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  61% { transform: translate(var(--out-x), var(--out-y)) rotate(var(--out-deg)) scale(1.8, 0.44); opacity: 1; }
+  75% { transform: translate(calc(var(--to-x) * 0.82), calc(var(--to-y) * 0.82)) rotate(var(--out-deg)) scale(calc(var(--to-scale) * 1.9), calc(var(--to-scale) * 0.72)); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
+  /* past his own mark, then back onto it: the spit has force behind it */
+  87% { transform: translate(calc(var(--to-x) * 1.14), calc(var(--to-y) * 1.14)) rotate(var(--out-deg)) scale(calc(var(--to-scale) * 1.15)); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+  100% { transform: translate(var(--to-x), var(--to-y)) rotate(var(--out-deg)) scale(var(--to-scale)); opacity: 1; }
+}
+/* the letters do not tumble: they step from one heading to the other while he is out of sight */
+@keyframes orb-launch-label {
+  0% { transform: rotate(calc(var(--in-deg) * -1)); }
+  50% { transform: rotate(calc(var(--out-deg) * -1)); }
+  100% { transform: rotate(calc(var(--out-deg) * -1)); }
+}
+/* The breath in: a ring closing on the face while he is pulled into it. It stops at the rim
+   of the head rather than at nothing — everything inside the head is hidden behind it. */
+@keyframes orb-suck {
+  0%, 6% { transform: scale(1.75); opacity: 0; }
+  22% { opacity: 0.45; }
+  40% { transform: scale(1.04); opacity: 0.85; }
+  46%, 100% { transform: scale(1.04); opacity: 0; }
+}
+/* chewing: two pulses on the rim while he is in there and out of sight */
+@keyframes orb-chew {
+  0%, 42% { transform: scale(1.02); opacity: 0; }
+  46% { transform: scale(1.08); opacity: 0.75; }
+  50% { transform: scale(1.01); opacity: 0.25; }
+  54% { transform: scale(1.1); opacity: 0.9; }
+  58% { transform: scale(1.02); opacity: 0.2; }
+  60%, 100% { opacity: 0; }
+}
+/* the shock of him leaving: it starts wider than the head, so it is seen from the first frame */
+@keyframes orb-burst {
+  0%, 57% { transform: scale(1.02); opacity: 0; }
+  62% { transform: scale(1.2); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+/* and the way back: no fuss, he simply has nothing on him again */
+@keyframes orb-sink {
+  0% { transform: translate(var(--from-x), var(--from-y)) scale(1); opacity: 1; }
+  55% { transform: translate(calc(var(--to-x) * 0.5), calc(var(--to-y) * 0.5)) scale(calc(var(--to-scale) * 0.6)); opacity: 0.8; }
+  100% { transform: translate(var(--to-x), var(--to-y)) scale(var(--to-scale)); opacity: 1; }
+}
+
+/* the run: a short bob on every step */
+@keyframes dream-step {
+  0%, 100% { transform: translateY(-0.8px) rotate(-3deg); }
+  50% { transform: translateY(0.8px) rotate(3deg); }
+}
+/* the long body slithers: every link rides this with its own phase, so a wave runs down it */
+@keyframes dream-wave {
+  0%, 100% { transform: translateY(-2.6px) rotate(-4deg); }
+  50% { transform: translateY(2.6px) rotate(4deg); }
+}
+/* the claws open and close on the air behind the runner */
+@keyframes dream-grab {
+  0%, 100% { transform: scaleY(0.88) translateX(-0.6px); }
+  50% { transform: scaleY(1.12) translateX(0.8px); }
+}
+/* the jet: the flame is never the same length two frames running */
+@keyframes dream-thrust {
+  0%, 100% { transform: scale(0.82, 0.88); opacity: 0.8; }
+  50% { transform: scale(1.14, 1.06); opacity: 1; }
+}
+/* what the jet leaves behind: a puff that falls back and thins out */
+@keyframes dream-puff {
+  0% { transform: translateX(2px) scale(0.5); opacity: 0.75; }
+  100% { transform: translateX(-16px) scale(1.7); opacity: 0; }
 }
 
 /* the balls orbit the face; each ball turns the other way so its label stays upright */
@@ -357,9 +957,19 @@ h1 { letter-spacing: -0.025em; }
 
 /* speaking: the body nods a little with the words */
 @keyframes mascot-talk {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  30% { transform: scale(1.02, 0.99) rotate(-1deg); }
-  70% { transform: scale(0.99, 1.02) rotate(1.2deg); }
+  0% { transform: scale(1) rotate(0deg); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  18% { transform: translateY(-0.7px) scale(1.025, 0.985) rotate(-1.4deg); animation-timing-function: cubic-bezier(0.4, 0, 0.3, 1); }
+  42% { transform: translateY(0.9px) scale(0.985, 1.025) rotate(1.5deg); animation-timing-function: cubic-bezier(0.35, 0, 0.35, 1); }
+  66% { transform: translateY(-0.35px) scale(1.012, 0.993) rotate(-0.6deg); animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+/* speaking — the eyes leave the listener on the accented word and come back for the answer */
+@keyframes mascot-speak-look {
+  0%, 18% { transform: translate(0, 0); animation-timing-function: cubic-bezier(0.25, 0, 0.1, 1); }
+  30%, 42% { transform: translate(1.8px, -0.5px); animation-timing-function: cubic-bezier(0.35, 0, 0.2, 1); }
+  58%, 70% { transform: translate(-1.3px, 0.4px); animation-timing-function: cubic-bezier(0.3, 0, 0.25, 1); }
+  84% { transform: translate(0.8px, 0); animation-timing-function: cubic-bezier(0.45, 0, 0.5, 1); }
+  100% { transform: translate(0, 0); }
 }
 
 /* mascot scenes (components/brand/MascotScene.tsx) */
@@ -466,6 +1076,19 @@ button, a[href] { -webkit-tap-highlight-color: transparent; }
 .landing .pulse-line { stroke-dasharray: 900; animation: line-draw 1.4s var(--ease-out) 200ms both; }
 .landing .wave { animation: eq-idle 1.6s ease-in-out infinite; }
 
+/* A voice message being played: the wave breathes under the play head (D-66). Only
+   scaleY — the bars stay on the compositor, so a Redmi plays without dropping frames. */
+@keyframes voice-bar {
+  0%, 100% { transform: scaleY(0.88); }
+  50% { transform: scaleY(1.1); }
+}
+
+/* Holding the microphone in a thread: the ring drains over the ten seconds (D-66). */
+@keyframes voice-countdown {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: 113; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -473,6 +1096,17 @@ button, a[href] { -webkit-tap-highlight-color: transparent; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  /* The net above is a backstop, not the whole answer: «Капля» says what she is doing
+     through the props around the head (waves, dots, the note, the cards, the z-s, the
+     drops), and every one of them is revealed by its own keyframes from opacity 0. With
+     motion removed they would all vanish and every state would read as the same blob.
+     So the movement goes and the meaning stays: each prop holds its readable frame. */
+  .mascot > g:not([data-face]),
+  .mascot > g:not([data-face]) * {
+    animation: none !important;
+    opacity: 1 !important;
   }
 }
 

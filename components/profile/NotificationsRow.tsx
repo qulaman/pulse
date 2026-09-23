@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from "react";
 
+import { Row } from "@/components/ui/Row";
+import { BellIcon } from "@/components/profile/icons";
 import { toast } from "@/components/ui/Toast";
 import { enablePush, pushState, type PushState } from "@/lib/push/client";
 
 const LABEL: Record<PushState, string> = {
   granted: "включены",
   denied: "запрещены в браузере",
-  default: "выключены · включить ›",
-  unsupported: "этот браузер не умеет",
+  default: "включить",
+  unsupported: "браузер не умеет",
   no_keys: "не настроены",
 };
 
@@ -41,16 +43,15 @@ export function NotificationsRow() {
   };
 
   return (
-    <button
-      type="button"
-      onClick={enable}
-      disabled={!canEnable || busy}
-      className="flex min-h-[52px] w-full items-center justify-between gap-3 card px-4 text-left text-[16px] leading-[22px] disabled:opacity-100"
-    >
-      Уведомления
-      <span className="text-[13px] leading-4" style={{ color: state === "granted" ? "var(--ok)" : "var(--text-muted)" }}>
-        {busy ? "…" : state ? LABEL[state] : ""}
-      </span>
-    </button>
+    <Row
+      icon={<BellIcon />}
+      title="Уведомления"
+      tone={state === "denied" ? "danger" : "accent"}
+      value={state ? LABEL[state] : ""}
+      valueColor={state === "granted" ? "var(--ok)" : state === "denied" ? "var(--danger)" : undefined}
+      busy={busy}
+      disabled={!canEnable}
+      onClick={() => void enable()}
+    />
   );
 }

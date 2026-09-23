@@ -8,6 +8,7 @@ import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
+import { IdleScene } from "@/components/pulse/IdleScene";
 import { MascotLever } from "@/components/pulse/MascotLever";
 import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
@@ -24,8 +25,10 @@ import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
 import { useEther } from "@/lib/ether/queries";
+import { describeEtherForEmployee } from "@/lib/pulse/ether";
 import { hasUnread, isOnBoard, lanesOf, type BoardTask } from "@/lib/pulse/board";
 import { describeForEmployeeAll, employeeOpening, isOpenFor, isTodo, otherSideOf } from "@/lib/pulse/employee";
+import { alarmOf } from "@/lib/pulse/mood";
 import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, usePulseBoard } from "@/lib/tasks/queries";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
@@ -55,23 +58,25 @@ export default function FeedPage() {
   const companyId = me.data?.companyId ?? "";
   const name = firstNameOf(me.data?.fullName);
   const ether = useEther();
+  const calendar = useCalendar();
+  const events = useMemo(() => calendar.data ?? [], [calendar.data]);
 
   const rows = board.data;
   const loading = me.isLoading || board.isLoading;
   const open = useMemo(() => (rows ?? []).filter((task) => isOnBoard(task.status)), [rows]);
   const lanes = useMemo(() => lanesOf(open, now, meId), [open, now, meId]);
-  const calendar = useCalendar();
-  const events = useMemo(() => calendar.data ?? [], [calendar.data]);
   const voice = useMemo<Voice>(
     () => ({
       opening: employeeOpening,
       describe: (prev, next) => describeForEmployeeAll(prev, next, meId),
+      // a word to everyone is news to the person too — the face wakes up to it
+      describeEther: (prev, next) => describeEtherForEmployee(prev, next, meId),
       // an invitation, a move and «скоро начнётся» are news for the person too
       describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
     }),
     [meId],
   );
-  const speech = useSpeechWith(rows, lanes, now, name, voice, calendar.data);
+  const speech = useSpeechWith(rows, lanes, now, name, voice, ether.data, calendar.data);
 
   // «Дела»: what to accept or redo first, then what is in work, then what waits for the director
   const todo = useMemo(() => sortByUrgency(open.filter(isTodo), now), [open, now]);
@@ -127,6 +132,12 @@ export default function FeedPage() {
   };
 
   // a change from the director's side is a thought above the head; the face wakes up to it
+  // the board is one screen: the shell stops growing with its content while this page is open
+  useEffect(() => {
+    document.body.setAttribute("data-board", "");
+    return () => document.body.removeAttribute("data-board");
+  }, []);
+
   const [expiredThought, setExpiredThought] = useState<string | null>(null);
   const thought = speech.line && !speech.line.opening && speech.line.id !== expiredThought ? speech.line : null;
   const thoughtId = thought?.id ?? null;
@@ -143,111 +154,143 @@ export default function FeedPage() {
     return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
   }, [speech.line, mode, events, now]);
 
-  const awake: MascotState = loading ? "thinking" : speech.speaking ? "speaking" : todo.length > 0 || lanes.overdue.length > 0 ? "calm" : "happy";
-  const mascot: MascotState = thought ? "surprised" : mode === "idle" ? "sleeping" : awake;
+  // The feelings live here, on the side that carries the work (D-70): an unopened order
+  // calls (D-69), a deadline within the hour is panic, an unread word from the director
+  // is nerves. The director's face only ever watches.
+  const alarm = useMemo(() => alarmOf(open, now, meId), [open, now, meId]);
+  const awake: MascotState = loading
+    ? "thinking"
+    : speech.speaking
+      ? "speaking"
+      : todo.length > 0
+        ? "calling"
+        : alarm === "deadline"
+          ? "panicking"
+          : alarm === "unread"
+            ? "nervous"
+            : lanes.overdue.length > 0
+              ? "calm"
+              : "happy";
+  // a change on the board is data the assistant has just read: it reports the new status (D-65)
+  // An unaccepted order calls even before the first tap: the resting face sleeps only when
+  // there is nothing to open (владелец, 2026-09-17 — Марат спал с пятью делами).
+  const restFace: MascotState = todo.length > 0 ? "calling" : alarm === "deadline" ? "panicking" : alarm === "unread" ? "nervous" : "sleeping";
+  const mascot: MascotState = thought ? "processing" : mode === "idle" ? restFace : awake;
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
   return (
+    // three bands, and the middle one never moves: the face sits in the centre of the screen
+    // in every mode, what it says grows upwards above it and the cards downwards under it.
+    // The bands scroll inside themselves, so the page itself is always one screen (D-60).
     <main
-      className={`mx-auto flex w-full max-w-lg flex-1 flex-col px-4 pb-10 ${mode === "idle" ? "justify-center" : "justify-start pt-2"}`}
+      className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
     >
       <LayoutGroup>
-        <div className="relative flex flex-col items-center">
+        {/* above the head: what the assistant says */}
+        <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
+          <div className="mt-auto pb-3 pt-2">
+            <Assistant lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines} />
+          </div>
+        </div>
+
+        <div className="relative flex shrink-0 flex-col items-center">
           <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+            {/* the same waiting screen the director has (D-68): dust and a dream behind the
+                head while the board is at rest, gone at the first touch */}
+            <IdleScene active={mode === "idle"} quiet={!thought} />
             <MascotLever state={mascot} onTap={onFaceTap} size={faceSize} wakeKey={wakeKey} voice={false} />
-            <AnimatePresence>
-              {mode === "ring" ? <OrbitBalls key="ring" balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} /> : null}
-            </AnimatePresence>
+            {/* the balls stay mounted while the face sleeps (shrunk into the head), so opening a
+                panel walks them down into the row instead of throwing them away (D-60) */}
+            {mode !== "panel" ? <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} /> : null}
             <AnimatePresence>
               {thought ? <ThoughtBubble key={thought.id} text={thought.text} tone={thought.tone} faceSize={faceSize} onDismiss={() => setExpiredThought(thought.id)} /> : null}
             </AnimatePresence>
           </motion.div>
-          <AnimatePresence>
-            {mode === "panel" ? (
-              <motion.div key="row" layout className="mt-1 w-full" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
-              </motion.div>
-            ) : null}
-          </AnimatePresence>
         </div>
 
-        <motion.div layout className="mt-3">
-          <Assistant lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
+        {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
+            so a ball walking down from the orbit is never clipped on its way in. */}
+        <div className="flex min-h-0 flex-1 flex-col" data-band="cards">
+          {mode === "panel" ? (
+            <div className="mt-1 w-full shrink-0">
+              <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
+            </div>
+          ) : null}
+          <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {mode !== "idle" ? (
               <>
                 <PushCard bubble />
                 <InstallHint bubble />
               </>
             ) : null}
-          </Assistant>
-        </motion.div>
-
-        {mode === "panel" ? (
-          <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
-            {panel === "tasks" ? (
-              todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
-                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {[...todo, ...inWork].map((task) => (
-                    <div key={task.id} className="card-in">
-                      <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
-                    </div>
-                  ))}
-                  {onReview.length > 0 ? (
-                    <>
-                      <p className="mt-1 px-1 text-[14px] leading-4 text-muted">На проверке у директора · {onReview.length}</p>
-                      {onReview.map((task) => (
-                        <div key={task.id} className="card-in opacity-80">
+            {mode === "panel" ? (
+              <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
+                {panel === "tasks" ? (
+                  todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
+                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {[...todo, ...inWork].map((task) => (
+                        <div key={task.id} className="card-in">
                           <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
                         </div>
                       ))}
-                    </>
-                  ) : null}
-                  <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted">
-                    Все дела ›
-                  </Link>
-                </div>
-              )
+                      {onReview.length > 0 ? (
+                        <>
+                          <p className="mt-1 px-1 text-[14px] leading-4 text-muted">На проверке у директора · {onReview.length}</p>
+                          {onReview.map((task) => (
+                            <div key={task.id} className="card-in opacity-80">
+                              <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
+                            </div>
+                          ))}
+                        </>
+                      ) : null}
+                      <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted">
+                        Все дела ›
+                      </Link>
+                    </div>
+                  )
+                ) : null}
+                {panel === "messages" ? (
+                  unread.length === 0 ? (
+                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Новых сообщений от директора нет.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {unread.map((task) => (
+                        <MessageRow
+                          key={task.id}
+                          task={task}
+                          companyId={companyId}
+                          meId={meId}
+                          actions={actions}
+                          onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })}
+                          onOpen={() => setThread({ id: task.id, title: task.title })}
+                        />
+                      ))}
+                    </div>
+                  )
+                ) : null}
+                {panel === "calendar" ? (
+                  events.length === 0 ? (
+                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
+                  ) : (
+                    <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
+                  )
+                ) : null}
+                {panel === "ether" ? (
+                  (ether.data ?? []).length === 0 ? (
+                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
+                  ) : (
+                    <EtherSection variant="page" />
+                  )
+                ) : null}
+              </motion.div>
             ) : null}
-            {panel === "messages" ? (
-              unread.length === 0 ? (
-                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Новых сообщений от директора нет.</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {unread.map((task) => (
-                    <MessageRow
-                      key={task.id}
-                      task={task}
-                      companyId={companyId}
-                      meId={meId}
-                      actions={actions}
-                      onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })}
-                      onOpen={() => setThread({ id: task.id, title: task.title })}
-                    />
-                  ))}
-                </div>
-              )
-            ) : null}
-            {panel === "calendar" ? (
-              events.length === 0 ? (
-                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
-              ) : (
-                <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
-              )
-            ) : null}
-            {panel === "ether" ? (
-              (ether.data ?? []).length === 0 ? (
-                <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
-              ) : (
-                <EtherSection variant="page" />
-              )
-            ) : null}
-          </motion.div>
-        ) : null}
+          </div>
+        </div>
       </LayoutGroup>
 
       {mode === "idle" ? (
