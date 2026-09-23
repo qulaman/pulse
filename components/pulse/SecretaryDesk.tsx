@@ -2,19 +2,15 @@
 
 import type { CSSProperties } from "react";
 
-import { Mascot } from "@/components/brand/Mascot";
+import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
+import { Glyph, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
+import type { DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
 
 /** The desk is drawn in this box; the screen places the box, not its parts. */
 export const DESK_W = 100;
 export const DESK_H = 72;
 /** Where the small face sits inside the box: its middle, for the big face to look at. */
 export const DESK_FACE = { x: 30, y: 34 };
-
-/**
- * The secretary's colour: the brand's deeper teal — another character of the same family,
- * never a status colour (DESIGN §1.3). The small face reads it through `--accent`.
- */
-const SECRETARY_TONE = "color-mix(in srgb, var(--accent-2) 82%, var(--surface-2))";
 
 const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
 
@@ -33,6 +29,9 @@ export function SecretaryDesk({
   count,
   tone,
   label,
+  scene = null,
+  phase = "rest",
+  urgency = 0,
   onTap,
 }: {
   /** turned to the big face: the typing stops, the eyes go left */
@@ -42,9 +41,20 @@ export function SecretaryDesk({
   /** the badge colour: waiting for somebody to take it, or taken */
   tone: string;
   label: string;
+  /**
+   * What the secretaries are doing about the director's requests right now (D-97): the small
+   * secretary holds the job — the cup, the sign — and the monitor shows its picture; after
+   * «Готово» it carries the cup over to the big face.
+   */
+  scene?: DeskScene | null;
+  phase?: DeskPhase;
+  urgency?: Urgency;
   onTap: () => void;
 }) {
   const still = attending ? "sec-paused" : "";
+  // the monitor shows the job while there is one; the typing lines otherwise
+  const working = (phase === "asked" || phase === "doing") && scene !== null;
+  const handing = phase === "done" && !attending;
   return (
     <button
       type="button"
@@ -80,24 +90,48 @@ export function SecretaryDesk({
         {/* the monitor: a stand, a dark screen, and the work on it */}
         <path d="M71 44 H79 L81 52 H69 Z" fill={EDGE} />
         <rect x="56" y="17" width="38" height="27" rx="4" fill="var(--surface)" stroke={SECRETARY_TONE} strokeWidth="1.6" />
-        {[
-          { y: 24, w: 24, d: 0 },
-          { y: 30, w: 18, d: 0.45 },
-          { y: 36, w: 11, d: 0.9 },
-        ].map((line) => (
-          <path
-            key={line.y}
-            d={`M61 ${line.y} h${line.w}`}
-            stroke="var(--accent)"
-            strokeWidth="2"
-            strokeLinecap="round"
-            style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `sec-line 2.8s ease-out ${line.d}s infinite` }}
-          />
-        ))}
-        <rect x="74" y="34" width="2" height="4" rx="0.6" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
+        {working && scene ? (
+          // the job on the screen: its picture, and a pulsing frame while nobody has taken it
+          <g>
+            {phase === "asked" ? (
+              <rect
+                x="57.5"
+                y="18.5"
+                width="35"
+                height="24"
+                rx="3"
+                fill="none"
+                stroke={urgency === 2 ? "var(--danger)" : "var(--warn)"}
+                strokeWidth="1.4"
+                style={{ animation: `smc-glow ${urgency === 2 ? "0.6s" : "1.2s"} ease-in-out infinite` }}
+              />
+            ) : null}
+            <g transform="translate(75 30.5) scale(1.25)">
+              <Glyph scene={scene} />
+            </g>
+          </g>
+        ) : (
+          <>
+            {[
+              { y: 24, w: 24, d: 0 },
+              { y: 30, w: 18, d: 0.45 },
+              { y: 36, w: 11, d: 0.9 },
+            ].map((line) => (
+              <path
+                key={line.y}
+                d={`M61 ${line.y} h${line.w}`}
+                stroke="var(--accent)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `sec-line 2.8s ease-out ${line.d}s infinite` }}
+              />
+            ))}
+            <rect x="74" y="34" width="2" height="4" rx="0.6" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
+          </>
+        )}
       </svg>
 
-      {/* the small face: the same character as the big one, smaller and in its own colour */}
+      {/* the small face: the secretary's own character (D-87) — headset, bow tie — smaller */}
       <span
         className="absolute block"
         style={{ left: DESK_FACE.x - 20, top: DESK_FACE.y - 20, width: 40, height: 40, "--accent": SECRETARY_TONE } as CSSProperties}
@@ -106,11 +140,26 @@ export function SecretaryDesk({
           className="block"
           style={{
             transformOrigin: "50% 100%",
-            // typing, or the one small hop of turning round to the big face
-            animation: attending ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both" : "sec-type 0.95s ease-in-out infinite",
+            // typing; the small hop of turning round to the big face; or, after «Готово», the
+            // walk over to the big face with the job in hand and back (D-97)
+            animation: attending
+              ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
+              : handing
+                ? "smc-handoff 2.2s ease-in-out both"
+                : working
+                  ? "none"
+                  : "sec-type 0.95s ease-in-out infinite",
           }}
         >
-          <Mascot state="calm" size={40} gaze={attending ? { x: -1, y: -0.2 } : { x: 0.95, y: 0.1 }} />
+          <SecretaryMascot
+            mini
+            size={40}
+            scene={attending ? null : scene}
+            phase={attending ? "rest" : phase}
+            urgency={urgency}
+            // looking at the big face, or at the monitor while typing; a job has its own look
+            look={attending ? { x: -1, y: -0.2 } : working || handing ? null : { x: 0.95, y: 0.1 }}
+          />
         </span>
       </span>
 

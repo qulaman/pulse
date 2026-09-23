@@ -54,6 +54,7 @@ async function main() {
   await wipe("notes");
   await wipe("events");
   await wipe("errands");
+  await wipe("visits");
   await wipe("reminders");
   await wipe("recurrence_rules");
   await wipe("inbox_items");
@@ -65,7 +66,7 @@ async function main() {
   // tv_state is state, not activity: the wall goes back to the ether instead of vanishing
   const { error: tvError } = await supabase
     .from("tv_state")
-    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null })
+    .update({ mode: "ether", employee_id: null, task_id: null, expires_at: null, guest: false, guest_until: null })
     .neq("company_id", ALL);
   if (tvError) throw new Error(`tv_state: ${tvError.message}`);
   console.log(`  ${"tv_state".padEnd(20)} → эфир`);

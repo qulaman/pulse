@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { Chip } from "@/components/ui/Chip";
-import { dayGroups, myStatus, peopleCount, startsSoon, timeRange } from "@/lib/calendar/agenda";
+import { dayGroups, hhmm, isOver, myStatus, peopleCount, startsSoon } from "@/lib/calendar/agenda";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 
 type Props = {
@@ -22,7 +22,7 @@ const STATUS_CHIP = {
 };
 
 /**
- * The calendar as a ribbon of days (D-78 §10 — no month grid in v1). One row per meeting:
+ * The calendar as a ribbon of days (D-78; /calendar lays it under a month grid, D-94). One row per meeting:
  * the time on the left, what and where on the right, and — for anybody but the author —
  * the chip of their own answer, because that is the only thing they can do here.
  */
@@ -56,7 +56,8 @@ export function CalendarList({ events, now, meId, onOpen, variant = "page" }: Pr
   );
 }
 
-function EventRow({
+/** One meeting in a ribbon — here, and under the month grid of /calendar (D-94). */
+export function EventRow({
   event,
   now,
   meId,
@@ -68,19 +69,25 @@ function EventRow({
   onOpen: (event: CalendarEvent) => void;
 }) {
   const mine = myStatus(event, meId);
-  const soon = startsSoon(event, now);
+  const over = isOver(event, now);
+  const soon = !over && startsSoon(event, now);
   const count = peopleCount(event);
-  // the author called the meeting: he is going by definition, the chip is for the invited
-  const chip = mine && event.author_id !== meId ? STATUS_CHIP[mine] : null;
+  // the author called the meeting: he is going by definition, the chip is for the invited;
+  // a meeting that is over asks nobody for an answer any more
+  const chip = mine && event.author_id !== meId && !(over && mine === "invited") ? STATUS_CHIP[mine] : null;
 
   return (
     <button
       type="button"
       onClick={() => onOpen(event)}
-      className="card flex w-full items-start gap-3 p-3 text-left active:bg-surface-2"
+      className={`card flex w-full items-start gap-3 p-3 text-left active:bg-surface-2 ${over ? "opacity-60" : ""}`}
     >
-      <span className="w-[60px] shrink-0 text-[15px] font-semibold leading-[22px] tabular-nums">
-        {timeRange(event)}
+      {/* the start carries the row; the end, when there is one, sits under it quietly */}
+      <span className="flex w-[52px] shrink-0 flex-col tabular-nums">
+        <span className="text-[15px] font-semibold leading-[22px]">{hhmm(event.starts_at)}</span>
+        {event.ends_at ? (
+          <span className="mt-0.5 text-[13px] leading-4 text-muted">{hhmm(event.ends_at)}</span>
+        ) : null}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[16px] leading-[22px]">{event.title}</span>

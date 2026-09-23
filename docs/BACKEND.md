@@ -54,6 +54,8 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/tasks/purge` | POST | director | → `purge_closed_tasks` (D-58) |
 | `/api/admin/reset-demo` | POST | director + `DEMO_RESET_ENABLED=1` на инстансе | `{confirm: "ОБНУЛИТЬ"}`; активность компании стирается, люди и настройки остаются (D-58, G.20a); иначе `403 demo_reset_disabled` |
 | `/api/errands` | POST | director | `{kind, note?, client_request_id, audio_path?, source_transcript?, inbox_item_id?}` → вставка `errands` под RLS; `label` берётся из `settings.secretary.actions`, неизвестный код — `400 unknown_kind`; дубль ключа → `{duplicate: true}` (D-79) |
+| `/api/visits` | POST | secretary | `{note?, client_request_id}` → RPC `announce_visit`; пуш `visit_arrived` директорам сразу (D-96) |
+| `/api/visits/:id/answer` | POST | director | `{answer: 'invited' \| 'wait' \| 'declined'}` → RPC `answer_visit`; «invited» включает гостя на час; пуш `visit_answered` автору сразу (D-96) |
 | магазин | — | — | роутов нет: клиент зовёт RPC `create_shop_order`, `cancel_shop_order`, `set_shop_order_status` напрямую (D-71); права и идемпотентность — внутри функций. Ассортимент (`shop_items`) директор и завхоз правят upsert'ом под RLS с заранее выданным id |
 | `/api/push/subscribe` | POST, DELETE | любая | POST `{endpoint, keys: {p256dh, auth}, user_agent?}`; DELETE `{endpoint}` — своя подписка |
 | `/api/push/seen` | POST | любая | «увидел» (D-32): `{delivery_id}` из SW при показе уведомления; без `delivery_id` (открытие приложения) — все незакрытые строки человека |
@@ -78,7 +80,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 
 ### POST /api/voice/upload-url
 Вход: `{ ext, context: 'director_input'|'task_message', client_request_id }`.
-Выход: `{ audio_path, signed_url, token, inbox_id? }`. Путь в бакете `voice` строго `{company_id}/{user_id}/{client_request_id}.{ext}`. Клиент грузит НАПРЯМУЮ в Storage по signed upload URL — лимит тела Vercel 4.5 МБ не участвует. Для `director_input` роут заводит (или находит по `client_request_id`) строку `inbox_items` со статусом `recorded`. Политики бакета — по сегментам пути (DATABASE.md).
+Выход: `{ audio_path, signed_url, token, inbox_id? }`. Путь в бакете `voice` строго `{company_id}/{user_id}/{client_request_id}.{ext}`. Клиент грузит НАПРЯМУЮ в Storage по signed upload URL — лимит тела Vercel 4.5 МБ не участвует. Для `director_input` роут заводит (или находит по `client_request_id`) строку `inbox_items` со статусом `recorded`. Политики бакета — по сегментам пути (DATABASE.md). Объект этого ключа уже в Storage (прошлая загрузка дошла, ответ потерялся) — `{ audio_path, signed_url: '', token: '', stored: true }`, клиент загрузку пропускает и идёт дальше (D-95): повтор не падает навсегда.
 
 ### POST /api/voice/transcribe
 `export const maxDuration = 60`.
@@ -118,7 +120,7 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 `confirm_voice_batch(payload jsonb, client_request_id uuid, p_now timestamptz default now()) returns jsonb` (security definer, только director):
 1. `insert into ingest_batches ... on conflict do nothing`; при конфликте — сохранённый `result` + `duplicate: true`.
-2. В одной транзакции по видам: `task` / `delegation` → `tasks` (N копий с общим `group_id`, D-02; без исполнителя — `assignee_required`); `announcement` → `announcements`; `reminder` → `reminders`; `event` → `events` + `event_participants` (автор — `going`, «всем» материализуется составом компании; без времени — `event_time_required`, D-78); `note` → `notes` (D-75); `recurrence` → `recurrence_rules`; `points` → `point_transactions` только при `points_enabled` и сумме > 0, иначе в `skipped` (D-48, D-30); `query` → в `skipped`.
+2. В одной транзакции по видам: `task` / `delegation` → `tasks` (N копий с общим `group_id`, D-02; без исполнителя — `assignee_required`); `announcement` → `announcements`; `reminder` → заметка с `remind_at` (D-95; ключ ответа `reminder_ids` — id заметок); `event` → `events` + `event_participants` (автор — `going`, «всем» материализуется составом компании; без времени — `event_time_required`, D-78); `note` → `notes` (D-75); `recurrence` → `recurrence_rules`; `points` → `point_transactions` только при `points_enabled` и сумме > 0, иначе в `skipped` (D-48, D-30); `query` → в `skipped`.
 3. Окно доставки (D-38): задача с явным `scheduled_send_at` или вне `settings.delivery_window` (если нет `force_now`) → статус `scheduled` с `scheduled_send_at` = открытие окна. Выпуск `scheduled → sent` — `[не построено]`, наряд 017.
 4. Триггеры БД вставляют строки в `notification_deliveries` (§4) — HTTP из транзакции не зовётся.
 5. `confirmed_entities`, `was_edited`, `edit_fields` — в строку `ai_logs` разбора того же `client_request_id` (метрика «доля правок», D-35); `inbox_items` → `confirmed`; заметка `note_id` → `converted_*` (D-75 §5).
@@ -152,10 +154,19 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 | `set_shop_order_status` | `(p_order_id uuid, p_status order_status, client_request_id uuid) → jsonb` | Завхоз/директор ведёт заказ: `pending → approved`, `pending\|approved → delivered`; свой заказ не проводит никто; outbox `shop_approved` / `shop_ready` владельцу. Выдача новых транзакций **не пишет** — hold финален, `shop_final` не существует (D-10) |
 | `respond_event` | `(p_event uuid, p_status text, p_reason text) → event_participants`, без `client_request_id` (D-78 §6) | «Буду» / «Не смогу»: только позванный на неотменённое мероприятие; `going \| declined` (причина — только к отказу); отказ сразу шлёт автору `event_declined` |
 | `set_event_participants` | `(p_event uuid, p_add uuid[], p_remove uuid[]) → void`, без `client_request_id` | Только director: добавить активных людей компании (приглашение — триггером), убрать кого угодно, кроме автора |
+| `edit_event` | `(p_event uuid, p_title text, p_starts_at timestamptz, p_ends_at timestamptz, p_location text, p_body text, p_remind_before_min int, p_everyone boolean, p_participant_ids uuid[]) → events`, без `client_request_id` (D-94 §4) | Только director: все поля и состав атомарно; убранным, кто знал о встрече, — «Отмена» (ещё не ушедшее приглашение снимается), оставшимся — «Перенос» / «Новое место»; по прошедшей встрече — ничего |
+| `delete_event` | `(p_event uuid) → void`, без `client_request_id` (D-94 §5) | Только director: строки больше нет; тем, кто знал о будущей встрече, — «Отмена», всё стоящее в очереди по ней снимается; повтор безвреден |
 | `events_due_reminders` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика (§10): мероприятия, у которых наступило `starts_at − remind_before_min` и не прошло больше часа от начала, → `event_reminder` участникам, кроме отказавшихся, + `tv_events` вида `event`; идемпотентно через `events.reminded_at` (D-78 §5) |
+| `notes_due_reminders` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика (§10): заметки с наступившим `remind_at` → `note_reminder` автору, идемпотентно по `reminded_at` (D-95) |
+| `notes_purge_trash` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: удаляет заметки, лежащие в корзине дольше 3 дней (D-95) |
 | `transition_errand` | `(p_id uuid, p_to text, p_reason text, client_request_id uuid) → jsonb` | Автомат заявки (D-79 §1): `accepted` — только `secretary`, забирает первая (`already_claimed` остальным); `done` — взявшая; `declined` — секретарь из `sent` или взявшая из `accepted`; `cancelled` — автор из `sent`/`accepted` (пуша нет, очередь снимается). Ошибки `forbidden`, `bad_status`, `bad_transition` |
 | `errands_due_escalation` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: один повторный `errand_sent` (`meta.repeat`) секретарям по заявке, никем не взятой за `settings.secretary.escalate_after_min` (дефолт 3), не старше часа; идемпотентно через `errands.escalated_at` (D-79 §6) |
-| `tv_control`, `tv_focus`, `tv_heartbeat`, `tv_summary` | §8 | Пульт и киоск ТВ |
+| `thank_errand` | `(p_id uuid, client_request_id uuid) → jsonb` | «Спасибо ♥» (D-97 §10): только автор и только `done`; ставит `errands.thanked_at`, повтор держит время первого; пуша нет |
+| `announce_visit` | `(p_note text, client_request_id uuid) → visits` | «К вам посетитель» (D-96): только `secretary`; пуш `visit_arrived` директорам сразу; поднимает версию стены (`tv_touch`) |
+| `answer_visit` | `(p_id uuid, p_answer text) → visits`, без `client_request_id` (D-96 §6) | Только director: `invited` / `wait` / `declined`; `invited` включает гостя на час (`tv_state.guest_until`); пуш `visit_answered` автору |
+| `close_visit` | `(p_id uuid) → visits`, без `client_request_id` | Убрать карточку визита |
+| `visits_due_expiry` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: визит без ответа гаснет (20 минут, после «Подождёт» — час) |
+| `tv_control`, `tv_focus`, `tv_heartbeat`, `tv_summary`, `tv_calendar`, `tv_overlay` | §8 | Пульт и киоск ТВ |
 
 ## 4. Подсистема доставки уведомлений — продуктовая фича №1
 
@@ -167,6 +178,7 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 - **Триггер БД вставляет строку `queued` — и НИКОГДА не зовёт HTTP.** Push задачи `task_sent` рождается только при вставке со статусом `sent` или при переходе в `sent`.
 - **Воркер — `lib/push/send.ts` `sweepDeliveries()`** (G.20c): до 50 строк `queued`, `channel='push'`, `attempts < 3`, `deliver_after <= now()` → web-push на все подписки человека → `sent`; неудача → `attempts+1`, на третьей — `failed`; нет ни одной подписки → сразу `failed`, `last_error='no_subscription'` (директору — «уведомления не включены у сотрудника»). Без VAPID-ключей строки остаются `queued` — квитанция не подделывается.
 - **Пинок** — `kickDeliveries()` через `after()` из `/api/voice/confirm`, `/api/tasks/:id/transition`, `/deadline`, `/reassign`, `/api/errands`; **страховка** — минутный тик `/api/push/sweep` (§10).
+- **Минутный свип** `POST /api/push/sweep` (Vercel cron, сервисный ключ) перед отправкой очереди зовёт тики, каждый сам по себе (ошибка одного пишется в лог и не валит свип): `events_due_reminders` (D-78), `errands_due_escalation` (D-79), `notes_due_reminders` — напоминания заметок, пуш `note_reminder` автору без тихих часов, ссылка `/notes?n=<id>` — и `notes_purge_trash` — корзина заметок старше 3 дней (D-95), `visits_due_expiry` — визит без ответа гаснет (D-96).
 
 ### Ack-семантика (D-32)
 «Увидел» = SW шлёт `POST /api/push/seen {delivery_id}` при показе уведомления, ЛИБО открытое приложение шлёт тот же роут без `delivery_id` и закрывает все незакрытые строки человека (`seen_at`). «Принял» = переход задачи в `accepted` ставит `acted_at` строке `task_sent`; для `message` — `mark_thread_read`. Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
@@ -201,6 +213,9 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 | `event_declined` | `respond_event` | автор мероприятия | «Не сможет» | `/calendar?e={id}` | сразу |
 | `errand_sent` | триггер на `errands`; повтор — `errands_due_escalation` | все активные `secretary`, кроме автора | надпись кнопки / «Ещё раз: …» | `/secretary?e={id}` | сразу (D-79 §6) |
 | `errand_accepted` / `errand_done` / `errand_declined` | триггер на `errands` | автор заявки | «Принято · Имя» / «Готово · Имя» / «Не может · Имя» | `/secretary?e={id}` | сразу |
+| `note_reminder` | `notes_due_reminders` | автор заметки | напоминание заметки | `/notes?n={id}` | сразу (D-95) |
+| `visit_arrived` | триггер на `visits` | директора компании | «К вам посетитель» | `/pulse` | сразу (D-96) |
+| `visit_answered` | триггер на `visits` | секретарь-автор | ответ директора | `/feed` | сразу (D-96) |
 
 Про `message`: **схлопывание** — пока строка ещё `queued`, следующее сообщение того же треда не создаёт новую, а обновляет её («N новых сообщения · последние слова»), один сигнал на очередь, а не N. **Не сообщения:** причина отказа, комментарий к доработке и отчёт при сдаче — у них свои события (`declined`, `rework`, `pending_review`). **Квитанцию закрывает** `mark_thread_read` — «Прочитал» из шторки или открытый тред. В таблице могут лежать строки прежних видов `question` и `reply` — новых не появляется. Очки (`award_points`) уведомлений не порождают.
 
@@ -235,12 +250,13 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 ## 8. ТВ-режим (D-76)
 
-- Киоск — **auth-пользователь роли `tv`** (не anon): по RLS видит только свой профиль, `tv_events` (предмаскированный `payload_guest`) и `tv_state` своей компании, зовёт `tv_summary(p_guest)`, `tv_focus()`, `tv_heartbeat(p_applied_version)`. Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
-- **Состояние стены — строка `tv_state`** (одна на компанию): `mode` (`ether | employee | task`), `employee_id`, `task_id`, `scene` (`face | clock | team`), `guest`, `expires_at`, `version`, `reload_requested_at`, `seen_at`, `applied_version`, `updated_by`. Политик на запись нет вовсе; киоск и пульт слушают строку через Postgres Changes под RLS (D-76 §1). Отдельного HTTP-роута у пульта нет.
-- **Команды — только RPC `tv_control(p_mode, p_employee_id, p_task_id, p_scene, p_guest, p_reload)`** (security definer, роль `director`): абсолютное состояние, `null` = «не трогать», каждая команда поднимает `version`; повтор безвреден — `client_request_id` не заводится (исключение из принципа 7, D-76 §2–3). Фокус живёт 10 минут (`expires_at`), возврат в эфир считает киоск по своим часам, без cron. Режим `task` схемой допущен, UI его не строит.
+- Киоск — **auth-пользователь роли `tv`** (не anon): по RLS видит только свой профиль, `tv_events` (предмаскированный `payload_guest`) и `tv_state` своей компании, зовёт `tv_summary(p_guest)`, `tv_focus()`, `tv_calendar(p_guest)`, `tv_overlay()`, `tv_heartbeat(p_applied_version)` (D-96). Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
+- **Состояние стены — строка `tv_state`** (одна на компанию): `mode` (`ether | employee | task`), `employee_id`, `task_id`, `scene` (`face | clock | team | calendar`), `clock_style` (`digital | analog`), `guest`, `guest_until`, `expires_at`, `version`, `reload_requested_at`, `seen_at`, `applied_version`, `updated_by`. Политик на запись нет вовсе; киоск и пульт слушают строку через Postgres Changes под RLS (D-76 §1). Отдельного HTTP-роута у пульта нет.
+- **Команды — только RPC `tv_control(p_mode, p_employee_id, p_task_id, p_scene, p_guest, p_reload, p_clock)`** (security definer, роль `director`): абсолютное состояние, `null` = «не трогать», каждая команда поднимает `version`; повтор безвреден — `client_request_id` не заводится (исключение из принципа 7, D-76 §2–3). Фокус живёт 10 минут (`expires_at`), возврат в эфир считает киоск по своим часам, без cron. Режим `task` схемой допущен, UI его не строит.
 - **Данные фокуса — RPC `tv_focus()`** (роли `tv`/`director`): сотрудник и до 8 открытых дел (`sent, accepted, in_progress, rework, pending_review`), маска гостя в БД (имя без фамилии, `title = null`), просрочка не помечается (D-45).
-- **Сводка стены — `tv_summary(p_guest)`**: пульс дня по часам, ближайшие мероприятия, вердикт числами без имён, три числа дня, топ-5 недели через `fn_rating`, загрузка людей, закрытое за неделю, выдачи наград; маска гостя внутри.
-- Guest-режим — поле `tv_state.guest` (кнопка «Посетитель» на пульте, D-33); `?guest=1` — лишь стартовое значение до прихода строки.
+- **Сводка стены — `tv_summary(p_guest)`**: пульс дня по часам, ближайшие мероприятия, вердикт числами без имён, три числа дня, топ-5 недели через `fn_rating`, загрузка людей, закрытое за неделю, выдачи наград; маска гостя внутри. Неделя мероприятий для стены — `tv_calendar(p_guest, p_days)` (роль `tv` таблицу `events` не читает); надпись поверх любой сцены (посетитель, скорое мероприятие) — `tv_overlay()` (D-96 §3, §6–7).
+- **«К вам посетитель» (D-96)**: `POST /api/visits` (secretary → RPC `announce_visit`, пуш директору сразу) и `POST /api/visits/[id]/answer` (director → `answer_visit`, пуш секретарю сразу); закрытие — RPC `close_visit` с клиента; минутный свип зовёт `visits_due_expiry` (20 минут без ответа, после «Подождёт» — час). Визит поднимает версию `tv_state`, киоск перечитывает надпись `tv_overlay()`.
+- Guest-режим — поле `tv_state.guest` (переключатель «Гость в кабинете» на пульте, D-33; «Пусть заходит» посетителю включает его на час — `guest_until`, D-96); `?guest=1` — лишь стартовое значение до прихода строки.
 - **Квитанция экрана** — `tv_heartbeat(p_applied_version)` от роли `tv` раз в минуту и после каждого применённого состояния; пульт показывает «На стене» / «Отправлено, экран ещё не показал» / «Экран не отвечает с 9:14» (принцип 8). Перезапуск с пульта — `reload_requested_at`; киоск сравнивает отметку с временем своей загрузки.
 - Чистка хвоста `tv_events` — функция `tv_events_prune(p_days)` есть, вызова нет `[не построено]`.
 
@@ -265,9 +281,9 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `* * * * *` → `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`). Роут экспортирует только `POST`, а Vercel cron вызывает `GET` — исправление в наряде 017.
 
-Один вызов тика делает по порядку: `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. Выпуск отложенных задач `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
+Один вызов тика делает по порядку: `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. Выпуск отложенных задач `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
 
-Исполнителя нет `[не построено]` у: напоминаний «напомни мне» (`reminders`) и повторов (`recurrence_rules`) — записываются, но не исполняются (наряд 017, «Вне скоупа»); пометки просрочек и авто-очков (D-28); вечерней сводки директору; еженедельной проверки подписок (§4); чистки аудио старше срока хранения (D-18 ◐, D-66 п.6); чистки `tv_events` (`tv_events_prune`); подсчёта streak.
+Исполнителя нет `[не построено]` у: повторов (`recurrence_rules`) — записываются, но не исполняются (наряд 017, «Вне скоупа»); «напомни мне» с D-95 — заметка со временем, её исполняет `notes_due_reminders`; пометки просрочек и авто-очков (D-28); вечерней сводки директору; еженедельной проверки подписок (§4); чистки аудио старше срока хранения (D-18 ◐, D-66 п.6); чистки `tv_events` (`tv_events_prune`); подсчёта streak.
 
 ## 11. Environments (D-19)
 

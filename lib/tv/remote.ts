@@ -1,6 +1,6 @@
 import { tvTime } from "./clock";
 import type { TvState } from "./queries";
-import { effectiveMode, focusRemainingMs, sceneOf, type TvScene } from "./state";
+import { effectiveMode, focusRemainingMs, sceneOf, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Что пульт говорит директору о стене. Чистые функции: формулировки — часть продукта,
@@ -23,12 +23,20 @@ export const SCENE_LABEL: Record<TvScene, string> = {
   face: "Лицо",
   clock: "Часы",
   team: "Команда",
+  calendar: "Календарь",
+};
+
+/** Переключатель часов на пульте (D-96): как на стене, так и на клавише. */
+export const CLOCK_LABEL: Record<ClockStyle, string> = {
+  digital: "Цифры",
+  analog: "Стрелки",
 };
 
 const SCENE_NOW: Record<TvScene, string> = {
   face: "Эфир · лицо",
   clock: "Эфир · часы",
   team: "Эфир · команда",
+  calendar: "Эфир · календарь",
 };
 
 export function wallReceipt(state: TvState | null, now: Date): WallReceipt {

@@ -225,6 +225,7 @@ export type Database = {
           note: string | null
           source_transcript: string | null
           status: Database["public"]["Enums"]["errand_status"]
+          thanked_at: string | null
           updated_at: string
         }
         Insert: {
@@ -245,6 +246,7 @@ export type Database = {
           note?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
+          thanked_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -265,6 +267,7 @@ export type Database = {
           note?: string | null
           source_transcript?: string | null
           status?: Database["public"]["Enums"]["errand_status"]
+          thanked_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -532,6 +535,8 @@ export type Database = {
           inbox_item_id: string | null
           pinned: boolean
           raw_transcript: string | null
+          remind_at: string | null
+          reminded_at: string | null
           text: string
           updated_at: string
           user_id: string
@@ -549,6 +554,8 @@ export type Database = {
           inbox_item_id?: string | null
           pinned?: boolean
           raw_transcript?: string | null
+          remind_at?: string | null
+          reminded_at?: string | null
           text: string
           updated_at?: string
           user_id: string
@@ -566,6 +573,8 @@ export type Database = {
           inbox_item_id?: string | null
           pinned?: boolean
           raw_transcript?: string | null
+          remind_at?: string | null
+          reminded_at?: string | null
           text?: string
           updated_at?: string
           user_id?: string
@@ -1371,10 +1380,12 @@ export type Database = {
       tv_state: {
         Row: {
           applied_version: number | null
+          clock_style: string
           company_id: string
           employee_id: string | null
           expires_at: string | null
           guest: boolean
+          guest_until: string | null
           mode: string
           reload_requested_at: string | null
           scene: string
@@ -1386,10 +1397,12 @@ export type Database = {
         }
         Insert: {
           applied_version?: number | null
+          clock_style?: string
           company_id: string
           employee_id?: string | null
           expires_at?: string | null
           guest?: boolean
+          guest_until?: string | null
           mode?: string
           reload_requested_at?: string | null
           scene?: string
@@ -1401,10 +1414,12 @@ export type Database = {
         }
         Update: {
           applied_version?: number | null
+          clock_style?: string
           company_id?: string
           employee_id?: string | null
           expires_at?: string | null
           guest?: boolean
+          guest_until?: string | null
           mode?: string
           reload_requested_at?: string | null
           scene?: string
@@ -1445,11 +1460,129 @@ export type Database = {
           },
         ]
       }
+      visits: {
+        Row: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        Insert: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Update: {
+          answered_at?: string | null
+          answered_by?: string | null
+          author_id?: string
+          client_request_id?: string | null
+          closed_at?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          shown_at?: string | null
+          status?: string
+          tv_version?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_answered_by_fkey"
+            columns: ["answered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      announce_visit: {
+        Args: { client_request_id?: string; p_note?: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      answer_visit: {
+        Args: { p_answer: string; p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       auth_company_id: { Args: never; Returns: string }
       auth_role: { Args: never; Returns: string }
       award_points: {
@@ -1466,6 +1599,30 @@ export type Database = {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
       }
+      close_visit: {
+        Args: { p_id: string }
+        Returns: {
+          answered_at: string | null
+          answered_by: string | null
+          author_id: string
+          client_request_id: string | null
+          closed_at: string | null
+          company_id: string
+          created_at: string
+          id: string
+          note: string | null
+          shown_at: string | null
+          status: string
+          tv_version: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "visits"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       confirm_voice_batch: {
         Args: { client_request_id: string; p_now?: string; payload: Json }
         Returns: Json
@@ -1474,8 +1631,54 @@ export type Database = {
         Args: { client_request_id?: string; p_item_id: string }
         Returns: Json
       }
+      delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      edit_event: {
+        Args: {
+          p_body?: string
+          p_ends_at?: string
+          p_event: string
+          p_everyone?: boolean
+          p_location?: string
+          p_participant_ids?: string[]
+          p_remind_before_min?: number
+          p_starts_at: string
+          p_title: string
+        }
+        Returns: {
+          audio_path: string | null
+          author_id: string
+          body: string | null
+          cancelled_at: string | null
+          company_id: string
+          created_at: string
+          ends_at: string | null
+          everyone: boolean
+          id: string
+          inbox_item_id: string | null
+          location: string | null
+          remind_before_min: number
+          reminded_at: string | null
+          source_transcript: string | null
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       errands_due_escalation: { Args: { p_now?: string }; Returns: number }
+      event_release: {
+        Args: {
+          p_event: Database["public"]["Tables"]["events"]["Row"]
+          p_users: string[]
+        }
+        Returns: undefined
+      }
       events_due_reminders: { Args: { p_now?: string }; Returns: number }
       extend_task_deadline: {
         Args: {
@@ -1506,6 +1709,8 @@ export type Database = {
         Args: { p_company: string; p_now?: string }
         Returns: string
       }
+      notes_due_reminders: { Args: { p_now?: string }; Returns: number }
+      notes_purge_trash: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
       reassign_task: {
         Args: {
@@ -1553,6 +1758,10 @@ export type Database = {
         Args: { r: Database["public"]["Enums"]["user_role"] }
         Returns: boolean
       }
+      thank_errand: {
+        Args: { client_request_id?: string; p_id: string }
+        Returns: Json
+      }
       transition_errand: {
         Args: {
           client_request_id?: string
@@ -1571,8 +1780,13 @@ export type Database = {
         }
         Returns: Json
       }
+      tv_calendar: {
+        Args: { p_days?: number; p_guest?: boolean }
+        Returns: Json
+      }
       tv_control: {
         Args: {
+          p_clock?: string
           p_employee_id?: string
           p_guest?: boolean
           p_mode?: string
@@ -1582,10 +1796,12 @@ export type Database = {
         }
         Returns: {
           applied_version: number | null
+          clock_style: string
           company_id: string
           employee_id: string | null
           expires_at: string | null
           guest: boolean
+          guest_until: string | null
           mode: string
           reload_requested_at: string | null
           scene: string
@@ -1616,10 +1832,20 @@ export type Database = {
       }
       tv_events_prune: { Args: { p_days?: number }; Returns: number }
       tv_focus: { Args: never; Returns: Json }
+      tv_guest_on: {
+        Args: { p_state: Database["public"]["Tables"]["tv_state"]["Row"] }
+        Returns: boolean
+      }
       tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
+      tv_overlay: { Args: never; Returns: Json }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
+      tv_touch: {
+        Args: { p_company: string; p_guest_minutes?: number }
+        Returns: number
+      }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
+      visits_due_expiry: { Args: { p_now?: string }; Returns: number }
     }
     Enums: {
       absence_kind: "vacation" | "sick" | "other"

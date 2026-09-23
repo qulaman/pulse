@@ -22,7 +22,9 @@ export type NoteIconName =
   | "search"
   | "wave"
   | "lock"
-  | "note";
+  | "note"
+  | "bell"
+  | "cloud";
 
 const PATHS: Record<NoteIconName, ReactNode> = {
   mic: (
@@ -71,6 +73,14 @@ const PATHS: Record<NoteIconName, ReactNode> = {
     </>
   ),
   note: <path d="M6.5 3.5h7l4 4v13h-11zM13.5 3.5v4h4M9 12.5h6M9 16h4" />,
+  bell: (
+    <>
+      <path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </>
+  ),
+  // waiting for the network: a cloud with a gap in it
+  cloud: <path d="M7 18.5h9.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 6.6 12 3.25 3.25 0 0 0 7 18.5zM4 4l16 16" />,
 };
 
 export function NoteIcon({ name, size = 16, className = "" }: { name: NoteIconName; size?: number; className?: string }) {

@@ -91,3 +91,83 @@ export function focusRows(focus: TvFocusEmployee, now: Date): FocusRow[] {
     tone: STATUS_TONE[task.status] ?? "ok",
   }));
 }
+
+/* -------------------------------------------------------------------------- */
+/* Карточка v2 (D-96): три колонки по стадиям и числа над ними                */
+/* -------------------------------------------------------------------------- */
+
+export type LaneKey = "new" | "work" | "review";
+
+export type FocusLaneRow = FocusRow & {
+  /** Срок сегодня и ещё впереди — подсвечен акцентом. Прошедший не подсвечивается (D-45). */
+  soon: boolean;
+};
+
+export type FocusLane = {
+  key: LaneKey;
+  label: string;
+  tone: FocusTone;
+  /** По всем открытым делам, а не по показанным. */
+  count: number;
+  rows: FocusLaneRow[];
+  /** Сколько не влезло в колонку: «+ ещё 2». */
+  more: number;
+};
+
+export type FocusCard = {
+  lanes: FocusLane[];
+  total: number;
+  done: { count: number; titles: string[] };
+};
+
+/** Больше трёх карточек в колонке на стене не помещаются вместе с человеком и числами. */
+export const PER_LANE = 3;
+
+const LANE_OF: Record<string, LaneKey> = {
+  sent: "new",
+  accepted: "work",
+  in_progress: "work",
+  // доработка — это тоже работа (D-45)
+  rework: "work",
+  pending_review: "review",
+};
+
+const LANE_LABEL: Record<LaneKey, string> = { new: "Новые", work: "В работе", review: "На проверке" };
+const LANE_TONE: Record<LaneKey, FocusTone> = { new: "accent", work: "ok", review: "muted" };
+
+function soonOf(iso: string | null, now: Date): boolean {
+  if (!iso) return false;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return false;
+  return dayIndex(date) === dayIndex(now) && date.getTime() > now.getTime();
+}
+
+/**
+ * Сотрудник на стене колонками «Новые → В работе → На проверке» (D-96). Числа приходят
+ * из `tv_focus().counts` — по всем открытым делам; старая база без них — считаем по
+ * показанным. Сданное сегодня — отдельно: хорошее по имени на стену можно.
+ */
+export function focusCard(focus: TvFocusEmployee, now: Date): FocusCard {
+  const rows = focusRows(focus, now);
+  const lanes = (["new", "work", "review"] as const).map((key): FocusLane => {
+    const inLane = focus.tasks
+      .map((task, i) => ({ task, row: rows[i] }))
+      .filter(({ task }) => (LANE_OF[task.status] ?? "work") === key);
+    const shown = inLane.slice(0, PER_LANE).map(({ task, row }) => ({ ...row, soon: soonOf(task.deadline, now) }));
+    const count = Math.max(focus.counts?.[key] ?? inLane.length, inLane.length);
+    return { key, label: LANE_LABEL[key], tone: LANE_TONE[key], count, rows: shown, more: Math.max(0, count - shown.length) };
+  });
+  const titles = (focus.done_today?.titles ?? []).map((title) => title?.trim() || UNTITLED);
+  return {
+    lanes,
+    total: lanes.reduce((sum, lane) => sum + lane.count, 0),
+    done: { count: focus.done_today?.count ?? 0, titles },
+  };
+}
+
+/** «МА» — две буквы для кружка вместо фото. */
+export function initialsOfName(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const letters = parts.length > 1 ? parts[0][0] + parts[1][0] : (parts[0] ?? "").slice(0, 2);
+  return letters.toUpperCase();
+}

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { askSecretary, cancelErrand, usePendingErrands } from "@/lib/errands/pending";
-import { useErrandActions } from "@/lib/errands/mutations";
+import { useErrandActions, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand } from "@/lib/errands/queries";
 import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
@@ -13,6 +13,8 @@ import { firstNameOf } from "@/lib/text/normalize";
 
 /** Долгий тап — второй слой: примечание к просьбе («без сахара»). */
 const HOLD_MS = 500;
+/** «Спасибо» — пока закрытая просьба свежая: четверть часа. */
+const THANKS_WINDOW_MS = 15 * 60_000;
 
 /**
  * Панель шарика «Секретарь» у директора (D-79): сетка крупных кнопок каталога — один
@@ -26,6 +28,7 @@ export function SecretaryPanel({
   now,
   onRefresh,
   compact = false,
+  thanks = false,
 }: {
   actions: readonly SecretaryAction[];
   errands: readonly Errand[];
@@ -33,6 +36,8 @@ export function SecretaryPanel({
   onRefresh: () => void;
   /** the card over the face (D-85): the same buttons, a row high instead of a tile */
   compact?: boolean;
+  /** «Спасибо ♥» on what was just closed (D-97) — only after the adaptation gate (D-40) */
+  thanks?: boolean;
 }) {
   const pending = usePendingErrands((state) => state.pending);
   const [noteFor, setNoteFor] = useState<SecretaryAction | null>(null);
@@ -41,6 +46,10 @@ export function SecretaryPanel({
   const held = useRef(false);
 
   const active = errands.filter(isActive);
+  // closed in the last quarter of an hour and not thanked yet: the moment a thank-you still means something
+  const thankable = thanks
+    ? errands.filter((e) => e.status === "done" && !e.thanked_at && e.done_at && now.getTime() - new Date(e.done_at).getTime() <= THANKS_WINDOW_MS)
+    : [];
 
   const ask = (action: SecretaryAction, text: string | null) => {
     askSecretary(action, text, onRefresh);
@@ -122,6 +131,10 @@ export function SecretaryPanel({
         <ActiveErrand key={errand.id} errand={errand} now={now} compact={compact} />
       ))}
 
+      {thankable.map((errand) => (
+        <ThankRow key={errand.id} errand={errand} compact={compact} />
+      ))}
+
       <Sheet open={Boolean(noteFor)} onClose={() => setNoteFor(null)} title={noteFor?.label ?? ""}>
         <input
           data-autofocus
@@ -180,6 +193,32 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
           {line.text}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Закрытая просьба, за которую ещё можно сказать «спасибо» (D-97): у секретаря над головой
+ * поднимаются сердечки. Реакция, не статус — второй тап ничего не меняет.
+ */
+function ThankRow({ errand, compact }: { errand: Errand; compact: boolean }) {
+  const thank = useThankErrand();
+  const who = firstNameOf(errand.claimed?.full_name ?? "");
+  return (
+    <div className={`card-in flex items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`} data-testid="errand-thank">
+      <span className="text-[15px] leading-5">
+        {errand.label}
+        <span style={{ color: "var(--ok)" }}> · Готово{who ? ` · ${who}` : ""}</span>
+      </span>
+      <button
+        type="button"
+        className="min-h-[44px] shrink-0 text-[14px] font-semibold"
+        style={{ color: "var(--danger)" }}
+        disabled={thank.isPending}
+        onClick={() => thank.mutate(errand.id)}
+      >
+        Спасибо ♥
+      </button>
     </div>
   );
 }

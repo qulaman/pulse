@@ -6,31 +6,52 @@ import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
 import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { PersonPad } from "@/components/ui/device/PersonPad";
 import { toast } from "@/components/ui/Toast";
+import { ANSWERS } from "@/components/visits/VisitAsk";
 import { usePeople } from "@/lib/people/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
-import { SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
-import { effectiveMode, FOCUS_MS, focusRemainingMs, guestOf, sceneOf, TV_SCENES, type TvScene } from "@/lib/tv/state";
+import { CLOCK_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
+import {
+  CLOCK_STYLES,
+  clockStyleOf,
+  effectiveMode,
+  FOCUS_MS,
+  focusRemainingMs,
+  guestEndsAt,
+  guestOf,
+  sceneOf,
+  TV_SCENES,
+  type ClockStyle,
+  type TvScene,
+} from "@/lib/tv/state";
+import { useAnswerVisit } from "@/lib/visits/mutations";
+import { useVisits } from "@/lib/visits/queries";
+import { awaitingDirector, waitedSince } from "@/lib/visits/text";
 
 /**
- * «Экран в кабинете» — пульт от телевизора в кармане директора (D-76 §10).
+ * «Экран в кабинете» — пульт от телевизора в кармане директора (D-76 §10, D-96).
  *
  * Жест, ради которого он существует: сотрудник зашёл в кабинет — директор нажал
- * его имя — на стене в коридоре его дела (CONCEPT §9, демо-сцена продажи). Поэтому
- * люди — клавиши на самом пульте и работают в один тап, без листа подтверждения.
+ * его имя — на стене его дела (CONCEPT §9, демо-сцена продажи). Поэтому люди — клавиши
+ * на самом пульте и работают в один тап, без листа подтверждения.
  *
  * Сам пульт собран как устройство: линза с диодом-квитанцией, дисплей «что на стене»,
  * резиновые клавиши и ползунок. Директор не видит телевизор из кабинета и обязан узнать
  * от пульта, дошла команда или экран висит со вчера (принцип 8 для ТВ): диод мигает,
  * пока команда летит, горит зелёным, когда стена показала, жёлтым — когда экран молчит.
  * Оффлайн-очереди у пульта нет: без сети клавиша честно говорит «нет связи» (D-76 §3).
+ *
+ * С D-96: четыре заставки (плюс «Календарь»), переключатель часов «Цифры / Стрелки»,
+ * «Гость в кабинете» вместо «Посетителя» (посетитель теперь — событие от секретаря) и
+ * ответ посетителю прямо с пульта, когда он ждёт.
  */
 
 const SCENE_HINT: Record<TvScene, string> = {
   face: "Лицо говорит о последних событиях",
   clock: "Тихие часы: для совещаний",
   team: "Кто чем занят",
+  calendar: "Неделя вперёд: что запланировано",
 };
 
 const RECEIPT_COLOR = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
@@ -50,16 +71,21 @@ export default function ScreenPage() {
   const state = useTvState();
   const people = usePeople();
   const control = useTvControl();
+  const visits = useVisits();
+  const answer = useAnswerVisit();
 
   if (state.isLoading || people.isLoading) return <ScreenPageSkeleton />;
 
   const row = state.data ?? null;
   const mode = effectiveMode(row, now);
   const scene = sceneOf(row);
-  const guest = guestOf(row, false);
+  const clock = clockStyleOf(row);
+  const guest = guestOf(row, false, now);
+  const guestEnds = guestEndsAt(row, now);
   const receipt = wallReceipt(row, now);
   const remainingMs = focusRemainingMs(row, now);
   const onScreenId = mode === "employee" ? row?.employee_id ?? null : null;
+  const visitor = awaitingDirector(visits.data ?? [])[0] ?? null;
   // экран ни разу не поднимался: сначала объясняем, как его завести, потом команды
   const neverSeen = !row?.seen_at;
   // диод мигает, пока команда в пути: от нажатия до того, как киоск отметил её показанной
@@ -102,6 +128,11 @@ export default function ScreenPage() {
               <p className="mt-1 text-[13px] leading-[18px]" style={{ color: RECEIPT_COLOR[receipt.tone] }}>
                 {receipt.text}
               </p>
+              {visitor?.status === "waiting" ? (
+                <p className="mt-1 text-[13px] leading-[18px]" style={{ color: "var(--accent)" }}>
+                  Поверх всего — «К вам посетитель»
+                </p>
+              ) : null}
               {mode === "employee" ? (
                 <div className="mt-3">
                   <Gauge ratio={remainingMs / FOCUS_MS} />
@@ -110,6 +141,31 @@ export default function ScreenPage() {
             </>
           )}
         </Lcd>
+
+        {/* the visitor at the secretary's desk: the answer from the remote too (D-96) */}
+        {visitor ? (
+          <div className="mt-3 rounded-[14px] p-3" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }} data-testid="remote-visitor">
+            <p className="text-[13px] leading-4 text-muted">
+              {visitor.status === "waiting" ? "К вам посетитель" : "Посетитель ждёт"} · {waitedSince(visitor.created_at, now)}
+            </p>
+            <p className="mt-0.5 truncate font-display text-[17px] font-semibold leading-[22px]">
+              {visitor.note?.trim() || "Без имени"}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {ANSWERS.map((option) => (
+                <Key
+                  key={option.value}
+                  className={option.value === "invited" ? "col-span-2" : ""}
+                  on={option.value === "invited"}
+                  disabled={(answer.isPending && answer.variables?.id === visitor.id) || (option.value === "wait" && visitor.status === "wait")}
+                  onClick={() => answer.mutate({ id: visitor.id, answer: option.value })}
+                >
+                  <span className="text-[13px] leading-4">{option.label}</span>
+                </Key>
+              ))}
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-3 flex items-stretch gap-2">
           <Key
@@ -127,37 +183,60 @@ export default function ScreenPage() {
           />
         </div>
 
-        <div className="mt-3 grid grid-cols-3 gap-2">
+        {/* four scenes, two by two; the lit dot under the one on the wall */}
+        <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2">
           {TV_SCENES.map((value) => (
+            <div key={value} className="flex flex-col items-stretch gap-1.5">
+              <Key
+                tall
+                on={scene === value}
+                icon={SCENE_ICON[value]}
+                onClick={() => {
+                  if (scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
+                }}
+              >
+                {SCENE_LABEL[value]}
+              </Key>
+              <span className="flex justify-center">
+                <Dot on={scene === value} />
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="mt-1 px-1 text-center text-[13px] leading-[18px] text-muted">{SCENE_HINT[scene]}</p>
+
+        {/* the clock on the wall: digits or hands, everywhere it is drawn (D-96) */}
+        <Seam label="Часы на стене" />
+        <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Часы на стене">
+          {CLOCK_STYLES.map((value: ClockStyle) => (
             <Key
               key={value}
-              tall
-              on={scene === value}
-              icon={SCENE_ICON[value]}
+              on={clock === value}
+              role="radio"
+              aria-checked={clock === value}
+              icon={value === "analog" ? <HandsIcon /> : <DigitsIcon />}
               onClick={() => {
-                if (scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
+                if (clock !== value) show({ clock: value }, value === "analog" ? "Часы: стрелки" : "Часы: цифры");
               }}
             >
-              {SCENE_LABEL[value]}
+              {CLOCK_LABEL[value]}
             </Key>
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {TV_SCENES.map((value) => (
-            <span key={value} className="flex justify-center">
-              <Dot on={scene === value} />
-            </span>
-          ))}
-        </div>
-        <p className="mt-2 px-1 text-center text-[13px] leading-[18px] text-muted">{SCENE_HINT[scene]}</p>
 
         <div className="mt-3">
           <Switch
             on={guest}
-            icon={<VisitorIcon />}
-            title="Посетитель"
-            value={guest ? "без фамилий, очков и названий" : "выключен"}
-            onToggle={(next) => show({ guest: next }, next ? "Посетитель включён" : "Посетитель выключен")}
+            icon={<GuestIcon />}
+            title="Гость в кабинете"
+            value={
+              guest
+                ? guestEnds
+                  ? `без фамилий и названий · выключится в ${tvTime(guestEnds)}`
+                  : "без фамилий, очков и названий"
+                : "выключен"
+            }
+            onToggle={(next) => show({ guest: next }, next ? "Гость в кабинете: имена скрыты" : "Гость ушёл: имена снова видны")}
           />
         </div>
         <Seam label="Кого показать" />
@@ -211,10 +290,24 @@ const RefreshIcon = () => (
   </svg>
 );
 
-const VisitorIcon = () => (
+const GuestIcon = () => (
   <svg {...icon}>
     <circle cx="10" cy="7" r="3.2" />
     <path d="M3.8 16.6c0-3 2.8-4.8 6.2-4.8s6.2 1.8 6.2 4.8" />
+  </svg>
+);
+
+const HandsIcon = () => (
+  <svg {...icon}>
+    <circle cx="10" cy="10" r="7" />
+    <path d="M10 5.6V10l3 2" />
+  </svg>
+);
+
+const DigitsIcon = () => (
+  <svg {...icon}>
+    <rect x="2.6" y="5" width="14.8" height="10" rx="2.2" />
+    <path d="M6.4 8v4M9 8.2h1.8v1.8H9v2h1.8M13 8v4" />
   </svg>
 );
 
@@ -238,6 +331,13 @@ const SCENE_ICON: Record<TvScene, React.ReactNode> = {
       <circle cx="13.6" cy="8.2" r="2.1" />
       <path d="M2.6 16c0-2.6 2.1-4.2 4.6-4.2s4.6 1.6 4.6 4.2" />
       <path d="M12.6 15.6h4.8c0-2.2-1.6-3.6-3.8-3.6" />
+    </svg>
+  ),
+  calendar: (
+    <svg {...icon}>
+      <rect x="3" y="4.4" width="14" height="12.4" rx="2.2" />
+      <path d="M3 8.2h14M7 2.8v3M13 2.8v3" />
+      <path d="M6.6 11.4h.01M10 11.4h.01M13.4 11.4h.01M6.6 14h.01M10 14h.01" strokeWidth="2" />
     </svg>
   ),
 };

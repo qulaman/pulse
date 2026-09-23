@@ -71,7 +71,7 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
 | `announcement` | `text` | — | — |
 | `task` | `assignee_queries`, `assignee_name`, `assignee_confidence`, `group_id`, `title`, `body`, `deadline_iso`, `deadline_confidence`, `deadline_source_text`, `priority`, `scheduled_send_at` | `assignee_id` (ставит postprocess по матчу) | D-02, D-56 |
 | `points` | `assignee_*`, `amount`, `reason` | `assignee_id`; сохраняется только при `points_enabled` | D-30, D-48 |
-| `reminder` | `text`, `remind_at_iso` | — ; записывается, но `[не исполняется]` (наряд 017, «Вне скоупа») | — |
+| `reminder` | `text`, `remind_at_iso` | — ; с D-95 пишется заметкой со временем (`notes.remind_at`), пуш в срок — `notes_due_reminders` | — |
 | `note` | `text` | — | D-75 |
 | `event` | `title`, `location` (`""` — не сказано), `starts_at_iso`, `time_confidence` (`0` — времени нет), `time_source_text`, `participant_names`, `everyone` | `body`, `ends_at_iso`, `remind_before_min` (все `null`; дефолт напоминания — 30 мин в БД), `participant_queries`, `participant_ids`; модельные `""` и `0` становятся `null` | D-78 |
 | `recurrence` | `assignee_*`, `title`, `rrule` | `assignee_id`; записывается, но `[не исполняется]` | — |

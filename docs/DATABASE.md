@@ -187,8 +187,10 @@ payload jsonb not null default '{}', payload_guest jsonb not null default '{}', 
 company_id uuid pk → companies,   -- одна строка на компанию, без id/created_at
 mode text not null default 'ether' check (mode in ('ether','employee','task')),
 employee_id uuid null → profiles on delete set null, task_id uuid null → tasks on delete set null,
-scene text not null default 'face' check (scene in ('face','clock','team')),
+scene text not null default 'face' check (scene in ('face','clock','team','calendar')),   -- calendar — D-96
 guest bool not null default false,
+guest_until timestamptz null,     -- гость, включённый визитом, гаснет по часам киоска (D-96)
+clock_style text not null default 'digital' check (clock_style in ('digital','analog')),   -- D-96
 expires_at timestamptz null,      -- фокус гаснет по часам киоска, без cron
 version int not null default 0,   -- поднимает каждый tv_control; киоск квитирует
 reload_requested_at, seen_at timestamptz null, applied_version int null,
@@ -196,15 +198,17 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 ```
 Пишут только RPC `tv_control` (director, абсолютное состояние, без `client_request_id`, D-76 §3) и `tv_heartbeat` (tv); данные фокуса — `tv_focus()` (tv/director; маска гостя и отсев негатива внутри).
 
+**Стена v2 (D-96, миграция `20260923230000_tv_wall_v2`):** `tv_control(..., p_clock)` пересоздан; `tv_focus()` отдаёт ещё `counts {new, work, review}` по всем открытым делам, `done_today`, `points_week`, `employee.avatar_url` (гостю — null); `tv_calendar(p_guest, p_days)` — неделя мероприятий для роли `tv`, которая `events` не читает; `tv_overlay()` — надпись поверх сцены. pgTAP — `022_tv_wall_v2.test.sql`.
+
 ### inbox_items — staging голосового конвейера
 `id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, created_at, updated_at`. Заводит `/api/voice/upload-url` (`director_input`), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
 
 ### recurrence_rules
 `id, company_id, author_id, assignee_id, title not null, body null, priority task_priority, rrule text not null, is_active bool default true, next_run_at timestamptz null`, без `created_at`. Пишет `confirm_voice_batch` (сущность `recurrence`, `next_run_at = now`). Исполнителя, который порождает задачи по правилу, нет `[не построено]`.
 ### reminders
-`id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. Пишет `confirm_voice_batch` («напомни мне»). Отправителя нет `[не построено]` — напоминание записывается, но не срабатывает.
+`id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
-`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text` и `pinned`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод и диктовка на странице заметок; текст диктовки дописывает `/api/voice/transcribe`).
+`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text`, `pinned` и `remind_at`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
 
 ### events + event_participants — календарь (D-78)
 ```
@@ -222,6 +226,8 @@ event_participants: event_id → events on delete cascade, user_id → profiles 
 ```
 Мероприятие одно на всех, участники — строками, не копиями (в отличие от D-02); автор — всегда участник `going`. Создаёт `confirm_voice_batch` (сущность `event`); отвечает участник через `respond_event`, состав правит директор через `set_event_participants`; перенос и отмену директор пишет прямо в `events` под RLS. Видимость считают security-definer-функции `is_event_participant(event)` и `can_see_event(event)` — политики двух таблиц друг на друга не ссылаются (иначе рекурсия политик).
 
+Правка — RPC `edit_event` (все поля и состав атомарно), удаление — `delete_event` (строки больше нет; D-94). Колонка `cancelled_at` и её ветка в триггере остаются для старых отменённых. Миграции `20260923200000_calendar_edit_delete`, `20260923201000_calendar_queued_refresh`, pgTAP `023_calendar_edit.test.sql`.
+
 ### errands — заявки секретарю (D-79)
 ```
 id, company_id, author_id,              -- директор, который попросил
@@ -232,9 +238,13 @@ claimed_by uuid null → profiles,        -- секретарь, который 
 decline_reason text null, audio_path null, source_transcript null,
 inbox_item_id uuid null → inbox_items (set null), client_request_id uuid null (unique где not null),
 escalated_at timestamptz null,          -- один повторный push ушёл
+thanked_at timestamptz null,            -- «Спасибо ♥» директора (D-97), ставит thank_errand
 created_at, accepted_at null, done_at null, updated_at
 ```
 Автомат `sent → accepted → done | declined | cancelled` — только RPC `transition_errand`; вставка — `/api/errands` под RLS. Очков, стены и ТВ у заявок нет (D-45, D-79 §10).
+
+### visits — «К вам посетитель» (D-96)
+Секретарь → директор (миграция `20260923230100_visits`). Колонки: `author_id` (секретарь), `note` (≤120, необязательно), `status` (`waiting → wait → invited | declined`, либо `expired`), `answered_by/at`, `tv_version` (версия `tv_state`, которая несла надпись), `shown_at` (квитанция стены: `tv_heartbeat` отметил эту версию), `closed_at` (карточку убрали), `client_request_id` (уникальный). Политик на запись нет — только `announce_visit` (secretary), `answer_visit` (director; `invited` включает гостя на час), `close_visit`; каждая поднимает версию стены через `tv_touch`. Outbox: `visit_arrived` директорам, `visit_answered` автору — мимо окна доставки; истечение — `visits_due_expiry` в минутном свипе. В публикации Realtime. pgTAP — `023_visits.test.sql`.
 
 ### consents — `[не построено]` (G.12)
 Таблицы согласий нет; анонимизации «Сотрудник №N» по согласию нет ни в рейтинге, ни на ТВ.
@@ -287,8 +297,9 @@ create policy tasks_insert on tasks for insert with check (
 - **notification_deliveries**: select — свои + director; запись — service role и security-definer-функции.
 - **ingest_batches, ai_logs**: select — director; запись — service role и security-definer-функции.
 - **inbox_items**: select — автор + director; insert — своё; update — автор до `confirmed`.
-- **recurrence_rules**: select — компания, кроме `tv`; insert/update/delete — director. **reminders**: select — свои; записи клиентом нет.
-- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_heartbeat`. Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_heartbeat`. Никакого anon.
+- **recurrence_rules**: select — компания, кроме `tv`; insert/update/delete — director. **reminders**: select — свои; записи нет (таблица выведена из оборота, D-95).
+- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_heartbeat` (и `tv_touch` изнутри функций визита, D-96). Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_calendar` / `tv_overlay` / `tv_heartbeat`. Никакого anon.
+- **visits** (D-96): select — директор и секретари своей компании; `tv` и остальные — никогда; политик на запись нет — только RPC `announce_visit` / `answer_visit` / `close_visit`.
 - **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят.
 - **events**: select — компания, кроме `tv`: director — всё, остальные — автор или участник; update — director; insert/delete — нет (создаёт `confirm_voice_batch`). **event_participants**: select — кроме `tv`, кто видит мероприятие (`can_see_event`); запись — только RPC и `confirm_voice_batch`.
 - **errands**: select — автор + любой `director` / `secretary` своей компании, `tv` никогда; insert — director (автор — он сам); update/delete — нет (только `transition_errand`).
@@ -330,18 +341,36 @@ set_shop_order_status(p_order_id uuid, p_status order_status, client_request_id 
 respond_event(p_event uuid, p_status text, p_reason text default null) returns event_participants
 set_event_participants(p_event uuid, p_add uuid[] default '{}', p_remove uuid[] default '{}') returns void
 events_due_reminders(p_now timestamptz default now()) returns int        -- только service_role
+edit_event(p_event uuid, p_title text, p_starts_at timestamptz, p_ends_at timestamptz default null, p_location text default null,
+           p_body text default null, p_remind_before_min int default 30, p_everyone boolean default false,
+           p_participant_ids uuid[] default '{}') returns events   -- D-94, без client_request_id
+delete_event(p_event uuid) returns void                                   -- D-94
+
+-- заметки (D-95)
+notes_due_reminders(p_now timestamptz default now()) returns int         -- только service_role
+notes_purge_trash(p_now timestamptz default now()) returns int           -- только service_role, корзина старше 3 дней
 
 -- заявки (D-79)
 transition_errand(p_id uuid, p_to text, p_reason text default null, client_request_id uuid default null) returns jsonb
 errands_due_escalation(p_now timestamptz default now()) returns int      -- только service_role
+thank_errand(p_id uuid, client_request_id uuid default null) returns jsonb   -- D-97
+
+-- посетители (D-96)
+announce_visit(p_note text default null, client_request_id uuid default null) returns visits
+answer_visit(p_id uuid, p_answer text) returns visits
+close_visit(p_id uuid) returns visits
+visits_due_expiry(p_now timestamptz default now()) returns int           -- только service_role
 
 -- ТВ (D-76)
-tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean) returns tv_state
+tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text) returns tv_state
 tv_focus() returns jsonb
 tv_heartbeat(p_applied_version int default null) returns void
 tv_summary(p_guest boolean default false) returns jsonb
 -- пульс дня, ближайшие мероприятия, вердикт числами, три числа дня, топ-5 недели (fn_rating),
 -- загрузка людей (team_role), неделя, выдачи; при p_guest — маскированные поля; роли tv/director
+tv_calendar(p_guest boolean default false, p_days int default 7) returns jsonb   -- D-96
+tv_overlay() returns jsonb                                                -- D-96: посетитель, скорое мероприятие
+tv_touch(p_company uuid, p_guest_minutes int default null) returns int  -- внутренняя: поднять версию стены
 tv_events_prune(p_days int default 30) returns int
 
 -- хелперы
@@ -380,6 +409,8 @@ announcements (company_id, created_at desc);  inbox_items (company_id, user_id);
 recurrence_rules (next_run_at) where is_active;  reminders (remind_at) where not sent;
 point_transactions (company_id, user_id, created_at);
 push_subscriptions (user_id);
+notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
+notes (remind_at) where remind_at is not null and reminded_at is null and deleted_at is null;  notes (deleted_at) where deleted_at is not null;
 notification_deliveries (status, created_at) where status='queued';
 notification_deliveries (task_id, event_kind);  notification_deliveries (user_id, status);
 notification_deliveries_due_idx (status, channel, deliver_after) where status='queued';
@@ -408,9 +439,9 @@ errands (company_id, created_at desc) where status in ('sent','accepted');  erra
 
 ## Расписание — минутный тик (вместо pg_cron)
 
-pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `events_due_reminders()`, `errands_due_escalation()`, затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
+pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `events_due_reminders()`, `errands_due_escalation()`, `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
 
-Исполнителя нет `[не построено]` у: `reminders` и `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`.
+Исполнителя нет `[не построено]` у: `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `notes.reminded_at`.
 
 ## Миграции — дисциплина
 

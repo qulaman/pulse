@@ -147,7 +147,6 @@ type IngestActions = {
   runTranscribe: () => Promise<void>;
   runParse: () => Promise<void>;
   startManual: () => void;
-  startManualEvent: () => void;
   /** A note the director hands out: one entity built by hand, then the usual confirm screen. */
   startFromNote: (
     note: { id: string; text: string; audio_path: string | null },
@@ -554,41 +553,6 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           : { assignee: { status: "unmatched" as const, user_id: null, candidates: [], flag: "check" as const }, blocked: "assignee_unmatched" as const }),
       };
       set({ entities: [manual], parsedEntities: [], stage: "confirm", error: null, retryFrom: null });
-    },
-
-    /**
-     * «+» on /calendar: the same confirm screen, started from an empty meeting card.
-     * There is no second way to create an event — one parser, one screen (principle 1).
-     */
-    startManualEvent() {
-      const transcript = get().transcript.trim();
-      const manual: PostprocessedEntity = {
-        kind: "event",
-        title: transcript,
-        body: null,
-        location: null,
-        starts_at_iso: null,
-        ends_at_iso: null,
-        time_confidence: null,
-        time_source_text: null,
-        participant_queries: [],
-        participant_names: [],
-        participant_ids: [],
-        everyone: false,
-        remind_before_min: null,
-        source_span: transcript,
-        participants: [],
-        blocked: "time_missing",
-      };
-      set({
-        ...initialState,
-        clientRequestId: crypto.randomUUID(),
-        source: "typed",
-        transcript,
-        entities: [manual],
-        parsedEntities: [],
-        stage: "confirm",
-      });
     },
 
     /**

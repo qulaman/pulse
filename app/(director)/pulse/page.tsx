@@ -28,9 +28,15 @@ import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
 import { SecretaryCard } from "@/components/pulse/SecretaryCard";
+import { VisitAsk } from "@/components/visits/VisitAsk";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useEther } from "@/lib/ether/queries";
-import { activeCount, useErrands, useSecretaryActions } from "@/lib/errands/queries";
+import { useDeskFocus } from "@/components/secretary/useDeskFocus";
+import { activeCount, useErrands, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
+import { urgencyOf } from "@/lib/errands/scene";
+import type { SecretaryAction } from "@/lib/settings";
+import { useVisits } from "@/lib/visits/queries";
+import { awaitingDirector } from "@/lib/visits/text";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
@@ -87,6 +93,9 @@ const PANEL_FACE: Record<OrbitId, MascotState> = {
  * middle of the face to the desk's top-left corner.
  */
 const DESK_AT = { x: 80, y: -14 };
+const NO_ACTIONS: SecretaryAction[] = [];
+/** The finishes the small secretary brings over as a cup — the big face takes it (D-97). */
+const DRINKS = new Set(["coffee", "tea", "water"]);
 
 /**
  * Пульс — the director's home (D-57, D-60): the face of «Капля» asleep in the middle of
@@ -186,6 +195,15 @@ export default function PulsePage() {
   const errands = useErrands(hasSecretary);
   const errandRows = useMemo(() => errands.data ?? [], [errands.data]);
   const catalogue = useSecretaryActions(hasSecretary);
+  // what the secretaries are doing about the requests, for the small secretary at the desk:
+  // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
+  const deskStage = useDeskFocus(errandRows, null, catalogue.data ?? NO_ACTIONS);
+  const secretarySetup = useSecretarySetup(hasSecretary);
+  // «К вам посетитель» (D-96): somebody at the secretary's desk waits for an answer — the card
+  // sits under the face even on the waiting screen, a person is standing there
+  const visits = useVisits(hasSecretary);
+  const visitRows = useMemo(() => visits.data ?? [], [visits.data]);
+  const visitorsWaiting = awaitingDirector(visitRows).length > 0;
   // Эфир is news too: an announcement going out and every «ознакомился» coming back;
   // so are the calendar — an answer, a move, the reminder the tick has just written —
   // and the errands: «Айгуль · кофе принят»
@@ -343,16 +361,19 @@ export default function PulsePage() {
   // the desk is part of the waiting screen: shown there, and only when there is somebody at it
   const showDesk = hasSecretary && mode === "idle" && !phraseInHand && (stage === "idle" || stage === "recording");
   const asking = deskOpen && showDesk && stage === "idle";
+  // the small secretary has brought the cup over: the face takes it and looks at the desk
+  const handoff = showDesk && !asking && stage === "idle" && deskStage.phase === "done" && DRINKS.has(deskStage.scene ?? "");
   // an open ball is a job in the face's hands, and it does it while the panel is open (D-82)
   const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
   // asking the secretary, the face brings the cup and looks at the desk (D-85)
   const mascot: MascotState =
-    confirmFace ?? (thought ? "processing" : mode === "idle" ? (asking ? "serving" : attending ? "calm" : restFace) : (panelFace ?? awake));
+    // the cup brought over outranks the news of it: the face takes it, the thought says it
+    confirmFace ?? (handoff ? "serving" : thought ? "processing" : mode === "idle" ? (asking ? "serving" : attending ? "calm" : restFace) : (panelFace ?? awake));
   // where the face looks: the middle of the picked circle, or the small face at the desk
-  const gaze = attending && picked ? lookAt(picked.x, picked.y) : asking ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
+  const gaze = attending && picked ? lookAt(picked.x, picked.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
   // watchful (D-82); never while anything is in flight or said
-  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !asking);
+  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !asking && !handoff);
 
   const onFaceTap = () => {
     // the errand card is out: a tap on the face puts it away, it does not wake the balls
@@ -541,6 +562,9 @@ export default function PulsePage() {
                   <div className="origin-top-left [@media(max-width:380px)]:scale-[0.84]">
                   <SecretaryDesk
                     attending={asking}
+                    scene={deskStage.scene}
+                    phase={deskStage.phase}
+                    urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3)}
                     count={activeCount(errandRows)}
                     tone={errandRows.some((e) => e.status === "accepted") ? "var(--ok)" : "var(--warn)"}
                     label={asking ? "Секретарь: убрать кнопки" : `Секретарь${secretaries.length ? `: ${secretaries.map((p) => firstNameOf(p.full_name)).join(", ")}` : ""} — попросить`}
@@ -564,6 +588,8 @@ export default function PulsePage() {
                     errands={errandRows}
                     now={now}
                     onRefresh={() => void errands.refetch()}
+                    // «спасибо» for a closed request waits for the adaptation gate (D-40, D-97)
+                    thanks={pointsEnabled}
                     onClose={() => setDeskOpen(false)}
                   />
                 </div>
@@ -601,6 +627,7 @@ export default function PulsePage() {
           <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
             {confirming ? <ConfirmInline ref={confirmRef} /> : null}
+            {!phraseInHand && visitorsWaiting ? <VisitAsk visits={visitRows} now={now} /> : null}
             {/* service cards only once the face has been tapped — the idle screen is the face alone */}
             {!phraseInHand && mode !== "idle" ? serviceLines : null}
             {mode === "panel" && !phraseInHand ? (
@@ -643,7 +670,7 @@ export default function PulsePage() {
 
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
-      {showHint && mode === "idle" && stage === "idle" && !picked && !asking ? (
+      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(56px + env(safe-area-inset-bottom) + 10px)" }}

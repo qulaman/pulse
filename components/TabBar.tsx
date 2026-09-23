@@ -41,6 +41,13 @@ const ICONS = {
       <circle cx="6.5" cy="19" r="1.2" fill="currentColor" stroke="none" />
     </svg>
   ),
+  calendar: (
+    <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" />
+      <circle cx="8.5" cy="14.5" r="1.2" fill="currentColor" stroke="none" />
+    </svg>
+  ),
   profile: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <circle cx="12" cy="8.5" r="3.6" />
@@ -85,11 +92,15 @@ const ICONS = {
 /** The developer's lab (D-63): every role sees it for now, no role check by design. */
 const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
+/** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
+const CALENDAR_TAB: Tab = { href: "/calendar", label: "Календарь", icon: ICONS.calendar };
+
 const TABS: Record<TabRole, Tab[]> = {
   // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
   director: [
     { href: "/pulse", label: "Пульс", icon: ICONS.pulse },
     { href: "/sent", label: "Задачи", icon: ICONS.tasks },
+    CALENDAR_TAB,
     { href: "/notes", label: "Заметки", icon: ICONS.notes },
     { href: "/screen", label: "Экран", icon: ICONS.screen },
     { href: "/settings", label: "Настройки", icon: ICONS.settings },
@@ -99,6 +110,7 @@ const TABS: Record<TabRole, Tab[]> = {
   employee: [
     { href: "/feed", label: "Лента", icon: ICONS.feed },
     { href: "/tasks", label: "Дела", icon: ICONS.tasks },
+    CALENDAR_TAB,
     { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
     LAB_TAB,

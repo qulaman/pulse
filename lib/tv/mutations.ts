@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { FOCUS_MS, type TvScene } from "./state";
+import { FOCUS_MS, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -32,6 +32,8 @@ export type TvControlInput = {
   scene?: TvScene;
   guest?: boolean;
   reload?: boolean;
+  /** Цифры или стрелки на стене (D-96). */
+  clock?: ClockStyle;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -49,7 +51,12 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.expires_at = null;
   }
   if (input.scene) next.scene = input.scene;
-  if (input.guest !== undefined) next.guest = input.guest;
+  if (input.guest !== undefined) {
+    next.guest = input.guest;
+    // a hand on the switch owns guest mode: no timer after it (same rule as tv_control)
+    next.guest_until = null;
+  }
+  if (input.clock) next.clock_style = input.clock;
   return next;
 }
 
@@ -72,6 +79,7 @@ export function useTvControl() {
         p_scene: input.scene,
         p_guest: input.guest,
         p_reload: input.reload ?? false,
+        p_clock: input.clock,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),

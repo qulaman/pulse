@@ -1,10 +1,25 @@
-import { humanYmd, todayYmd, type Ymd } from "@/lib/datetime/calendar";
+import {
+  addMonths,
+  compareYmd,
+  daysBetween,
+  hmOf,
+  humanYmd,
+  nowHm,
+  parseHm,
+  todayYmd,
+  ymdHmToAqtobeIso,
+  ymdOf,
+  type Hm,
+  type Month,
+  type Ymd,
+} from "@/lib/datetime/calendar";
 
 import type { CalendarEvent } from "./queries";
 
 /**
- * How the calendar is read (D-78): a ribbon of days, not a month grid. Pure functions —
- * the same rows and the same clock give the same words on the page, on Пульс and on ТВ.
+ * How the calendar is read: a ribbon of days on Пульс and in Ленте (D-78), a month grid
+ * with the ribbon under it on /calendar (D-94). Pure functions — the same rows and the
+ * same clock give the same words on the page, on Пульс and on ТВ.
  */
 
 /** Aqtobe is +05:00 all year (docs/AI.md §2), so the wall clock is plain arithmetic. */
@@ -58,6 +73,82 @@ export function nextEvent<T extends { starts_at: string }>(events: readonly T[],
     .filter((event) => new Date(event.starts_at).getTime() >= at - STARTED_GRACE_MS)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   return ahead[0] ?? null;
+}
+
+/** Over once its end has passed; a meeting without an end — half an hour after it began. */
+export function isOver(event: { starts_at: string; ends_at?: string | null }, now: Date): boolean {
+  const end = event.ends_at
+    ? new Date(event.ends_at).getTime()
+    : new Date(event.starts_at).getTime() + STARTED_GRACE_MS;
+  return end < now.getTime();
+}
+
+/**
+ * What one month of the page reads: the month itself and the one after it, because the
+ * ribbon under the grid runs on past the month's last day.
+ */
+export function monthWindow({ year, month }: Month): { from: string; to: string } {
+  const after = addMonths({ year, month }, 2);
+  return {
+    from: ymdHmToAqtobeIso(ymdOf(year, month, 1), "00:00")!,
+    to: ymdHmToAqtobeIso(ymdOf(after.year, after.month, 1), "00:00")!,
+  };
+}
+
+/** Meetings per company day — the dots under the numbers of the grid. */
+export function countByDay(events: readonly { starts_at: string }[]): Map<Ymd, number> {
+  const counts = new Map<Ymd, number>();
+  for (const event of events) {
+    const ymd = ymdOfEvent(event);
+    counts.set(ymd, (counts.get(ymd) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * The ribbon under the grid: the chosen day first — even an empty one, it is what was
+ * tapped — then every day ahead that has something, up to `days` days on.
+ */
+export function agendaFrom<T extends { starts_at: string }>(
+  events: readonly T[],
+  from: Ymd,
+  now: Date,
+  days = 30,
+): DayGroup<T>[] {
+  const ahead = events.filter((event) => {
+    const ymd = ymdOfEvent(event);
+    return compareYmd(ymd, from) >= 0 && daysBetween(from, ymd) <= days;
+  });
+  const groups = dayGroups(ahead, now);
+  if (groups[0]?.ymd !== from) groups.unshift({ ymd: from, label: humanYmd(from, now), events: [] });
+  return groups;
+}
+
+/** Where a new meeting starts: the next whole hour today, ten in the morning any other day. */
+export function defaultStartHm(day: Ymd, now: Date): Hm {
+  if (day !== todayYmd(now)) return "10:00";
+  return hmOf(Math.min(23, parseHm(nowHm(now))!.hours + 1), 0);
+}
+
+const minutesOf = (hm: Hm) => {
+  const parts = parseHm(hm)!;
+  return parts.hours * 60 + parts.minutes;
+};
+
+/**
+ * A moved start takes the end along, so the meeting keeps its length; an end pushed past
+ * midnight is dropped — a meeting here lives within one day.
+ */
+export function shiftEnd(startBefore: Hm, end: Hm | null, startAfter: Hm): Hm | null {
+  if (!end) return null;
+  const moved = minutesOf(end) + minutesOf(startAfter) - minutesOf(startBefore);
+  if (moved >= 24 * 60 || moved <= minutesOf(startAfter)) return null;
+  return hmOf(Math.floor(moved / 60), moved % 60);
+}
+
+/** The end must come after the start — on the same day, by the rule above. */
+export function endIsBeforeStart(start: Hm | null, end: Hm | null): boolean {
+  return Boolean(start && end && minutesOf(end) <= minutesOf(start));
 }
 
 export function startsSoon(event: { starts_at: string } | null, now: Date, withinMs = SOON_MS): boolean {

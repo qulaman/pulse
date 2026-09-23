@@ -54,7 +54,7 @@
   /(employee)/feed      # Лента сотрудника — маскот и шарики (D-62)
   /(employee)/tasks     # «Мои дела»
   /tasks/[id]           # экран задачи (D-88)
-  /calendar             # мероприятия (D-78)
+  /calendar             # календарь — вкладка обеих ролей (D-78, D-94)
   /secretary            # заявки секретарю (D-79)
   /rating               # рейтинг (D-48)
   /profile              # профиль
@@ -62,7 +62,7 @@
   /shop                 # магазин (D-71)
   /tv                   # ТВ-режим (kiosk, D-76)
   /lab                  # лаборатория моделей и полка маскота /lab/mascot (D-63)
-  /api                  # route handlers (voice, push, tasks, people, settings, company, errands, lab...)
+  /api                  # route handlers (voice, push, tasks, people, settings, company, errands, visits, lab...)
   /dev                  # страницы-песочницы компонентов (только dev)
 /components
 /lib                    # supabase clients, ai (stt.ts, schema.ts, examples.ts), auth.ts, haptics.ts, matchName.ts

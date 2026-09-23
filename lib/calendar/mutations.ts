@@ -1,40 +1,50 @@
 "use client";
 
-import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { calendarKeys, type CalendarEvent } from "./queries";
 
 /**
- * What a meeting can be told (D-78). The two RPCs are absolute commands — the answer of
- * one person, the guest list of one meeting — so they carry no `client_request_id`: a
- * repeat writes the same state (the same exception as D-76 §3). Moving and cancelling are
- * plain updates under the director's RLS.
+ * What a meeting can be told (D-78, D-94). Every command here is absolute — the answer of
+ * one person, the whole form of one meeting, «its row is gone» — so a repeat writes the
+ * same state and none carries a `client_request_id` (the exception of D-76 §3). Creation
+ * is the one exception to the exception: it goes through the voice pipeline's own
+ * `confirm_voice_batch`, which is idempotent by the id the form was opened with.
  */
 
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
 
-type Cache = CalendarEvent[] | undefined;
+/** Every calendar the screen may hold — Пульс's ribbon, the months of /calendar, one event. */
+type Snapshot = [QueryKey, unknown][];
 
-function patchEvent(
+function patchEverywhere(
   queryClient: QueryClient,
   id: string,
-  change: (event: CalendarEvent) => CalendarEvent,
-): Cache {
-  const key = calendarKeys.list();
-  const before = queryClient.getQueryData<CalendarEvent[]>(key);
-  queryClient.setQueryData<CalendarEvent[]>(key, (rows) =>
-    (rows ?? []).map((event) => (event.id === id ? change(event) : event)),
-  );
-  return before;
+  change: (event: CalendarEvent) => CalendarEvent | null,
+): Snapshot {
+  const snapshot = queryClient.getQueriesData({ queryKey: calendarKeys.root });
+  queryClient.setQueriesData<unknown>({ queryKey: calendarKeys.root }, (data: unknown) => {
+    if (Array.isArray(data)) {
+      return (data as CalendarEvent[]).flatMap((event) => {
+        if (event.id !== id) return [event];
+        const next = change(event);
+        return next ? [next] : [];
+      });
+    }
+    if (data && (data as CalendarEvent).id === id) return change(data as CalendarEvent);
+    return data;
+  });
+  return snapshot;
 }
 
-function restore(queryClient: QueryClient, snapshot: Cache) {
-  if (snapshot) queryClient.setQueryData<CalendarEvent[]>(calendarKeys.list(), snapshot);
+function restore(queryClient: QueryClient, snapshot: Snapshot | undefined) {
+  for (const [key, data] of snapshot ?? []) queryClient.setQueryData(key, data);
 }
 
-function fail(queryClient: QueryClient, snapshot: Cache) {
+function fail(queryClient: QueryClient, snapshot: Snapshot | undefined) {
   restore(queryClient, snapshot);
   toast(GENERIC_ERROR);
 }
@@ -62,7 +72,7 @@ export function useRespondEvent(meId: string | undefined) {
       if (error) throw new Error(error.message);
     },
     onMutate: ({ eventId, status, reason }) => {
-      const snapshot = patchEvent(queryClient, eventId, (event) => ({
+      const snapshot = patchEverywhere(queryClient, eventId, (event) => ({
         ...event,
         participants: event.participants.map((person) =>
           person.user_id === meId
@@ -77,69 +87,133 @@ export function useRespondEvent(meId: string | undefined) {
   });
 }
 
-/** The guest list, rewritten by the director: the difference, not the whole list. */
-export function useSetParticipants() {
+/** Everything the form holds: the meeting's own fields and who is invited. */
+export type EventDraft = {
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  location: string | null;
+  body: string | null;
+  remind_before_min: number;
+  everyone: boolean;
+  /** Without the author — the author is always in, the server keeps them. */
+  participant_ids: string[];
+};
+
+/** What the server says no to, in words — the form stays open with the text still in it. */
+function editError(message: string): string {
+  if (message.includes("event_end_before_start")) return "Конец раньше начала — поправь время";
+  if (message.includes("event_title_required")) return "Напиши, что за мероприятие";
+  if (message.includes("event_not_found")) return "Этого мероприятия уже нет";
+  if (message.includes("forbidden")) return "Нет доступа";
+  return GENERIC_ERROR;
+}
+
+/**
+ * «Сохранить» in the form (D-94): one RPC for the fields and the guest list, so a lost
+ * network never leaves a meeting half-edited. The card under the form changes at once;
+ * the server's answer settles who got invited.
+ */
+export function useEditEvent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ eventId, add, remove }: { eventId: string; add: string[]; remove: string[] }) => {
+    mutationFn: async ({ eventId, draft }: { eventId: string; draft: EventDraft }) => {
       const supabase = createBrowserSupabase();
-      const { error } = await supabase.rpc("set_event_participants", {
+      const { error } = await supabase.rpc("edit_event", {
         p_event: eventId,
-        p_add: add,
-        p_remove: remove,
+        p_title: draft.title,
+        p_starts_at: draft.starts_at,
+        p_ends_at: draft.ends_at ?? undefined,
+        p_location: draft.location ?? undefined,
+        p_body: draft.body ?? undefined,
+        p_remind_before_min: draft.remind_before_min,
+        p_everyone: draft.everyone,
+        p_participant_ids: draft.participant_ids,
       });
       if (error) throw new Error(error.message);
     },
-    onError: () => toast(GENERIC_ERROR),
-    onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
-  });
-}
-
-type EventFields = Partial<
-  Pick<CalendarEvent, "title" | "starts_at" | "location" | "body" | "remind_before_min">
->;
-
-/** Moving a meeting, renaming it, changing the place — the director's own row (RLS). */
-export function useUpdateEvent() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ eventId, fields }: { eventId: string; fields: EventFields }) => {
-      const supabase = createBrowserSupabase();
-      const { error } = await supabase.from("events").update(fields).eq("id", eventId);
-      if (error) throw new Error(error.message);
-    },
-    onMutate: ({ eventId, fields }) => ({
-      snapshot: patchEvent(queryClient, eventId, (event) => ({ ...event, ...fields })),
+    onMutate: ({ eventId, draft }) => ({
+      snapshot: patchEverywhere(queryClient, eventId, (event) => ({
+        ...event,
+        title: draft.title,
+        starts_at: draft.starts_at,
+        ends_at: draft.ends_at,
+        location: draft.location,
+        body: draft.body,
+        remind_before_min: draft.remind_before_min,
+        everyone: draft.everyone,
+      })),
     }),
-    onError: (_error, _vars, context) => fail(queryClient, context?.snapshot),
+    onSuccess: () => toast("Сохранил"),
+    onError: (error, _vars, context) => {
+      restore(queryClient, context?.snapshot);
+      toast(editError(error.message));
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });
 }
 
-/** Calling it off: the row leaves the calendar at once, and the notices are already out. */
-export function useCancelEvent() {
+/** «Удалить» (D-94): the row leaves every calendar at once; the server tells the invited. */
+export function useDeleteEvent() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ eventId }: { eventId: string }) => {
       const supabase = createBrowserSupabase();
-      const { error } = await supabase
-        .from("events")
-        .update({ cancelled_at: new Date().toISOString() })
-        .eq("id", eventId);
+      const { error } = await supabase.rpc("delete_event", { p_event: eventId });
       if (error) throw new Error(error.message);
     },
-    onMutate: ({ eventId }) => {
-      const key = calendarKeys.list();
-      const before = queryClient.getQueryData<CalendarEvent[]>(key);
-      queryClient.setQueryData<CalendarEvent[]>(key, (rows) => (rows ?? []).filter((e) => e.id !== eventId));
-      return { snapshot: before };
-    },
-    // no «Отменить» on this toast: the notices have already gone out to everybody
-    onSuccess: () => toast("Отменил мероприятие"),
+    onMutate: ({ eventId }) => ({ snapshot: patchEverywhere(queryClient, eventId, () => null) }),
+    // no «Вернуть» on this toast: the notices of the cancellation are already queued
+    onSuccess: () => toast("Удалил мероприятие"),
     onError: (_error, _vars, context) => fail(queryClient, context?.snapshot),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
+  });
+}
+
+/**
+ * «+» on /calendar (D-94): the form's meeting goes through the same confirm route as a
+ * spoken one — one writer of `events`, the same invitations, the same idempotency by the
+ * `requestId` the form was opened with, so a double tap or a retry creates one meeting.
+ */
+export function useCreateEvent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ requestId, draft }: { requestId: string; draft: EventDraft }) => {
+      await voiceApi.confirm({
+        client_request_id: requestId,
+        source: "typed",
+        audio_path: null,
+        transcript: draft.title,
+        // nothing was parsed: the director typed every field by hand
+        parsed_entities: [],
+        confirmed_entities: [
+          {
+            kind: "event",
+            title: draft.title,
+            body: draft.body,
+            location: draft.location,
+            starts_at_iso: draft.starts_at,
+            ends_at_iso: draft.ends_at,
+            time_confidence: 1,
+            time_source_text: null,
+            participant_queries: [],
+            participant_names: [],
+            participant_ids: draft.participant_ids,
+            everyone: draft.everyone,
+            remind_before_min: draft.remind_before_min,
+            source_span: draft.title,
+          },
+        ],
+      });
+    },
+    onSuccess: () => toast("Мероприятие в календаре"),
+    onError: (error) => {
+      const body = error instanceof VoiceApiError ? (error.body as { error?: { message_ru?: string } } | null) : null;
+      toast(body?.error?.message_ru ?? GENERIC_ERROR);
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });
 }
