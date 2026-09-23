@@ -6,12 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SettingsSectionsBone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import type { CompanySettings, SettingsPatch } from "@/lib/settings";
-
-async function fetchSettings(): Promise<CompanySettings> {
-  const res = await fetch("/api/settings", { credentials: "include" });
-  if (!res.ok) throw new Error("settings failed");
-  return ((await res.json()) as { settings: CompanySettings }).settings;
-}
+import { fetchSettings, settingsKey } from "@/lib/settings-query";
 
 async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
   const res = await fetch("/api/settings", {
@@ -26,23 +21,12 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-function splitVocabulary(text: string): string[] {
-  return text
-    .split(/[,\n;]/)
-    .map((word) => word.trim())
-    .filter(Boolean);
-}
-
-export type SectionKey = "stt" | "parser" | "vocabulary" | "conventions" | "points" | "window" | "secretary";
+export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary";
 
 type Draft = {
   server: CompanySettings;
   draft: CompanySettings;
   update: (patch: Partial<CompanySettings>) => void;
-  vocabularyText: string;
-  setVocabularyText: (text: string | null) => void;
-  /** The words as they will be saved: split, trimmed, no empties. */
-  vocabulary: string[];
   /** The conventions as they will be saved: empty rows are scratch space. */
   conventions: CompanySettings["conventions"];
   dirty: Record<SectionKey, boolean>;
@@ -60,16 +44,15 @@ const DraftContext = createContext<Draft | null>(null);
  */
 export function SettingsDraftProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: ["settings"], queryFn: fetchSettings });
+  const query = useQuery({ queryKey: settingsKey, queryFn: fetchSettings });
   const [edited, setEdited] = useState<CompanySettings | null>(null);
-  const [vocabularyEdited, setVocabularyEdited] = useState<string | null>(null);
 
   const save = useMutation({
     mutationFn: patchSettings,
     // Only the cache is rebased: a section saved on its own stops being dirty, and edits
     // left open in other sections survive.
     onSuccess: (settings, patch) => {
-      queryClient.setQueryData(["settings"], settings);
+      queryClient.setQueryData(settingsKey, settings);
       // the rating, the team list and the award buttons read the switch on their own
       if (patch.points_enabled !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_enabled"] });
       // the secretary's buttons and their scenes are read by Пульс and the secretary's screen (D-97)
@@ -84,21 +67,15 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
 
   let value: Draft | null = null;
   if (draft && server) {
-    const vocabularyText = vocabularyEdited ?? draft.vocabulary.join(", ");
-    const vocabulary = splitVocabulary(vocabularyText);
     const conventions = draft.conventions.filter((row) => row.phrase.trim() && row.meaning.trim());
     value = {
       server,
       draft,
       update: (patch) => setEdited({ ...draft, ...patch }),
-      vocabularyText,
-      setVocabularyText: setVocabularyEdited,
-      vocabulary,
       conventions,
       dirty: {
         stt: !same(draft.stt, server.stt),
         parser: !same(draft.parser, server.parser),
-        vocabulary: !same(vocabulary, server.vocabulary),
         conventions: !same(conventions, server.conventions),
         points: draft.points_enabled !== server.points_enabled || draft.rating_mode !== server.rating_mode,
         window: !same(draft.delivery_window, server.delivery_window),

@@ -168,32 +168,42 @@ export function ParserSection() {
   );
 }
 
-export function VocabularySection() {
-  const { server, vocabularyText, setVocabularyText, vocabulary, dirty, save, saving } = useDraft();
+/**
+ * «Словарь» has a page of its own (D-111): the names people are called by and the words
+ * the recogniser has to spell, with instructions. Here — the header of a section that
+ * leads there, so the tab keeps one rhythm of cards.
+ */
+export function DictionarySection() {
+  const { server } = useDraft();
+  const people = usePeople();
+  const names = (people.data ?? [])
+    .filter((p) => p.is_active && p.role !== "tv")
+    .reduce((sum, p) => sum + p.aliases.length, 0);
+  const words = server.vocabulary.length;
   return (
-    <Disclosure
-      icon={<BookIcon />}
-      title="Словарь"
-      dirty={dirty.vocabulary}
-      summary={vocabulary.length ? plural(vocabulary.length, "слово", "слова", "слов") : "пусто"}
-      hint="Контрагенты и объекты, которые распознавание должно знать по имени. Через запятую."
+    <Link
+      href="/settings/dictionary"
+      data-testid="settings-dictionary"
+      className="card flex min-h-[64px] w-full items-center gap-3 px-4 py-3 text-left transition-colors duration-[120ms] active:bg-surface-2"
     >
-      <textarea
-        className={`${FIELD} py-3`}
-        rows={3}
-        aria-label="Словарь"
-        value={vocabularyText}
-        onChange={(e) => setVocabularyText(e.target.value)}
-        placeholder="Казхром, КазАзот, ERG, Актобе-склад"
-      />
-      {dirty.vocabulary ? (
-        <SectionActions
-          pending={saving("vocabulary")}
-          onSave={() => save({ vocabulary })}
-          onReset={() => setVocabularyText(server.vocabulary.join(", "))}
-        />
-      ) : null}
-    </Disclosure>
+      <span
+        aria-hidden
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]"
+        style={{ background: "color-mix(in srgb, var(--accent) 15%, transparent)", color: "var(--accent)" }}
+      >
+        <BookIcon />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em]">Словарь</span>
+        <span className="mt-0.5 block truncate text-[13px] leading-4 text-muted">
+          {people.data ? `${plural(names, "имя", "имени", "имён")} · ` : "имена · "}
+          {words ? plural(words, "слово", "слова", "слов") : "слов нет"}
+        </span>
+      </span>
+      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden className="shrink-0 text-muted">
+        <polyline points="6,3.5 10.5,8 6,12.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </Link>
   );
 }
 
