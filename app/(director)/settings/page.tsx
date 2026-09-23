@@ -3,7 +3,7 @@ import { parseSettingsTab } from "@/lib/settings-tabs";
 
 /**
  * Настройки: everything that makes this instance this company, split into four tabs —
- * Компания, Программа, Сотрудники, ИИ-модель (D-84). `?tab=` opens one directly, so a
+ * Компания, Программа, Сотрудники, ИИ-модель (D-85). `?tab=` opens one directly, so a
  * link from the rating («включить очки») or the secretary screen lands on the right tab.
  */
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {

@@ -1779,7 +1779,7 @@ select,
 }
 .task-card[data-closed]:not([data-open]) { background: color-mix(in srgb, var(--surface) 60%, transparent); }
 
-/* ---- Настройки: four tiles are the tabs (D-84) ----------------------------------------
+/* ---- Настройки: four tiles are the tabs (D-85) ----------------------------------------
    The tile is a quiet card; the chosen one wears a raised accent thumb that framer slides
    between tiles (layout = transform). The pinned bar only fades in — nothing else moves. */
 .settings-tile {

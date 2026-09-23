@@ -84,7 +84,7 @@ function DirtyDot() {
 }
 
 /**
- * Настройки as four tabs (D-84): Компания, Программа, Сотрудники, ИИ-модель. The tiles on
+ * Настройки as four tabs (D-85): Компания, Программа, Сотрудники, ИИ-модель. The tiles on
  * top are the tabs — a tap swaps the content below in place, a raised thumb slides to the
  * chosen tile and the new content slides in from its side. Scrolled past the tiles, a
  * compact bar pins under the header, so a long tab (the roster) never strands the director.
