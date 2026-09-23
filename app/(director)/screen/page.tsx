@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 
-import { PersonPad } from "@/components/screen/PersonPad";
-import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
+import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
+import { PersonPad } from "@/components/ui/device/PersonPad";
 import { toast } from "@/components/ui/Toast";
 import { usePeople } from "@/lib/people/queries";
 import { tvTime } from "@/lib/tv/clock";
@@ -164,7 +164,11 @@ export default function ScreenPage() {
         <div className="mt-2">
           <PersonPad
             people={people.data ?? []}
-            onScreenId={onScreenId}
+            activeId={onScreenId}
+            groupLabel="Кого показать"
+            ariaFor={(person, active) =>
+              active ? `${person.full_name} — на стене, продлить` : `Показать: ${person.full_name}`
+            }
             onPick={(person) =>
               show(
                 { mode: "employee", employeeId: person.id },
