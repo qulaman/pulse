@@ -29,7 +29,6 @@ export function EmployeeTaskCard({
   now,
   onToggle,
   onAction,
-  onThread,
 }: {
   task: TaskWithPeople;
   row: BoardTask | undefined;
@@ -38,7 +37,6 @@ export function EmployeeTaskCard({
   now: Date;
   onToggle: () => void;
   onAction: (action: EmployeeAction, task: TaskWithPeople) => void;
-  onThread: (task: TaskWithPeople) => void;
 }) {
   const unread = row ? hasUnread(row, meId) : false;
   const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
@@ -152,7 +150,7 @@ export function EmployeeTaskCard({
         </p>
       ) : null}
 
-      <CardFoot onThread={() => onThread(task)} />
+      <CardFoot href={`/tasks/${task.id}`} />
     </CardShell>
   );
 }

@@ -98,7 +98,9 @@ async function main() {
     // ---- delete one order from its page ---------------------------------------------
     const doomed = await createTask(director, marat.userId, `Cleanup smoke delete ${stamp}`);
     await page.goto(`${APP_URL}/tasks/${doomed}`, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: "Удалить", exact: true }).first().click();
+    // an open task keeps «Удалить» under «Все действия» (D-87)
+    await page.getByRole("button", { name: "Все действия" }).click();
+    await page.locator('[data-testid="more-remove"]').click();
     await page.getByRole("dialog").waitFor({ timeout: 5_000 });
     await page.screenshot({ path: join(SHOTS, "c1-delete-sheet.png") });
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();

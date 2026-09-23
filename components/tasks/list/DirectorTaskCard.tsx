@@ -94,7 +94,6 @@ export function DirectorTaskCard({
   onToggle,
   onAction,
   onAnswer,
-  onThread,
   onMore,
   showPerson = true,
 }: {
@@ -108,7 +107,6 @@ export function DirectorTaskCard({
   onToggle: () => void;
   onAction: (action: DeskAction, task: TaskWithPeople) => void;
   onAnswer: (task: TaskWithPeople, text: string | null) => void;
-  onThread: (task: TaskWithPeople) => void;
   onMore: (task: TaskWithPeople) => void;
   showPerson?: boolean;
 }) {
@@ -226,7 +224,7 @@ export function DirectorTaskCard({
       ) : null}
 
       <CardFoot
-        onThread={() => onThread(task)}
+        href={`/tasks/${task.id}`}
         extra={
           more.length > 0 ? (
             <button

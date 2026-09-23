@@ -484,3 +484,63 @@ export function statusWord(
   }
   return SHORT_STATUS[task.status];
 }
+
+/* -------------------------------------------------------------------------- */
+/* Time left: the foot of the task's own screen                               */
+/* -------------------------------------------------------------------------- */
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY_MS = 24 * HOUR;
+
+/** «40 мин», «3 ч 20 мин», «9 ч», «2 дня 4 ч», «12 дней» — how a person says a span. */
+export function spanRu(ms: number): string {
+  const total = Math.max(0, Math.round(ms / MINUTE));
+  if (total < 60) return `${Math.max(1, total)} мин`;
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours < 24) return hours < 6 && minutes > 0 ? `${hours} ч ${minutes} мин` : `${hours} ч`;
+  const days = Math.floor(hours / 24);
+  const rest = hours % 24;
+  const word = pluralRu(days, ["день", "дня", "дней"]);
+  return days < 3 && rest > 0 ? `${days} ${word} ${rest} ч` : `${days} ${word}`;
+}
+
+export type TimeLeft = {
+  text: string;
+  tone: Tone;
+  /** How much of the time from handing out to the deadline has gone, 0..1; null — no bar. */
+  used: number | null;
+};
+
+/**
+ * The one line under a task's own screen: how much time is left, or how late it is, or how
+ * it ended. The bar is the share of the time already used — full and red once it is late.
+ */
+export function timeLeft(
+  task: {
+    status: TaskStatus;
+    deadline: string | null;
+    created_at: string;
+    closed_at: string | null;
+    updated_at: string;
+    completed_at: string | null;
+    priority?: string | null;
+  },
+  now: Date = new Date(),
+): TimeLeft {
+  if (task.status === "done") return { text: `принята ${humanAqtobe(new Date(closedAtOf(task)), now)}`, tone: "ok", used: null };
+  if (task.status === "revoked") return { text: `отозвана ${humanAqtobe(new Date(closedAtOf(task)), now)}`, tone: "muted", used: null };
+  if (task.status === "declined") return { text: "отказ — решение за директором", tone: "danger", used: null };
+  if (task.status === "pending_review") {
+    return { text: task.completed_at ? `сдана ${humanAqtobe(new Date(task.completed_at), now)} · ждёт проверки` : "ждёт проверки", tone: "warn", used: null };
+  }
+  // «срочно» without a time is the loudest «when» there is (docs/AI.md §10), not «без срока»
+  if (!task.deadline) return task.priority === "high" ? { text: "срочно — время не названо", tone: "warn", used: null } : { text: "без срока", tone: "muted", used: null };
+  const end = new Date(task.deadline).getTime();
+  const start = new Date(task.created_at).getTime();
+  const left = end - now.getTime();
+  if (left <= 0) return { text: `просрочено на ${spanRu(-left)}`, tone: "danger", used: 1 };
+  const used = end > start ? Math.min(1, Math.max(0, (now.getTime() - start) / (end - start))) : 0;
+  return { text: `осталось ${spanRu(left)}`, tone: left < DAY_MS ? "warn" : "accent", used };
+}

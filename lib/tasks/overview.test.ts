@@ -11,8 +11,10 @@ import {
   matchesQuery,
   peopleLoad,
   reasonFor,
+  spanRu,
   statusWord,
   stepsOf,
+  timeLeft,
   workingSections,
   yoursSections,
   type ListTask,
@@ -284,5 +286,26 @@ describe("closedTodayCount", () => {
     ];
     expect(closedTodayCount(tasks, NOW)).toBe(1);
     expect(closedTodayCount(tasks, NOW, 7)).toBe(2);
+  });
+});
+
+describe("spanRu / timeLeft", () => {
+  it("says a span the way a person does", () => {
+    expect(spanRu(40 * 60_000)).toBe("40 мин");
+    expect(spanRu(20_000)).toBe("1 мин");
+    expect(spanRu((3 * 60 + 20) * 60_000)).toBe("3 ч 20 мин");
+    expect(spanRu(9 * 3_600_000 + 5 * 60_000)).toBe("9 ч");
+    expect(spanRu((2 * 24 + 4) * 3_600_000)).toBe("2 дня 4 ч");
+    expect(spanRu(12 * 24 * 3_600_000)).toBe("12 дней");
+  });
+
+  it("time left, late, and how it ended", () => {
+    const open = task({ status: "accepted", created_at: at("17", 6), deadline: at("17", 18) });
+    expect(timeLeft(open, NOW)).toEqual({ text: "осталось 6 ч", tone: "warn", used: 0.5 });
+    expect(timeLeft(task({ status: "accepted", deadline: at("17", 10) }), NOW)).toMatchObject({ text: "просрочено на 2 ч", tone: "danger", used: 1 });
+    expect(timeLeft(task({ status: "sent" }), NOW)).toEqual({ text: "без срока", tone: "muted", used: null });
+    expect(timeLeft(task({ status: "accepted", priority: "high" }), NOW)).toEqual({ text: "срочно — время не названо", tone: "warn", used: null });
+    expect(timeLeft(task({ status: "done", closed_at: at("17", 9) }), NOW).text).toBe("принята сегодня 09:00");
+    expect(timeLeft(task({ status: "pending_review", completed_at: at("16", 15) }), NOW).text).toBe("сдана вчера 15:00 · ждёт проверки");
   });
 });

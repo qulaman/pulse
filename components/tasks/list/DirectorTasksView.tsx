@@ -1,19 +1,13 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { AnswerSheet } from "@/components/tasks/desk/AnswerSheet";
-import { DirectorSheets, type DirectorSheetName } from "@/components/tasks/desk/DirectorSheets";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { toast } from "@/components/ui/Toast";
-import { humanAqtobe } from "@/lib/ai/time";
-import { haptic } from "@/lib/haptics";
 import type { BoardTask } from "@/lib/pulse/board";
-import type { DeskAction, DeskReason } from "@/lib/tasks/desk";
+import type { DeskReason } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import {
   closedSections,
@@ -30,19 +24,14 @@ import {
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 
-import { ACTION_ICON, ACTION_LABEL, allActionsFor, DirectorTaskCard } from "./DirectorTaskCard";
+import { DirectorTaskCard } from "./DirectorTaskCard";
 import { PeopleStrip } from "./PeopleStrip";
 import { StatusScreen } from "./StatusScreen";
 import { Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
+import { useDirectorControls } from "./useDirectorControls";
 
 const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
-
-function firstName(full: string | null | undefined): string {
-  return full?.trim().split(/\s+/)[0] ?? "";
-}
-
-type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string } | null;
 
 /**
  * «Задачи» директора (D-83): a status screen on top — whose move it is, how the open work
@@ -73,11 +62,9 @@ export function DirectorTasksView({
   onPurge: (done: () => void) => void;
   purging?: boolean;
 }) {
-  const router = useRouter();
   const [personId, setPersonId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sheet, setSheet] = useState<SheetState>(null);
   const [purgeAsk, setPurgeAsk] = useState(false);
   const searchField = useRef<HTMLInputElement>(null);
 
@@ -132,66 +119,14 @@ export function DirectorTasksView({
   }, [searchOpen]);
 
   const byId = (id: string) => all.find((task) => task.id === id) ?? null;
-  const who = (task: TaskWithPeople) => firstName(task.assignee?.full_name);
-  const named = (text: string, task: TaskWithPeople) => (who(task) ? `${text} · ${who(task)}` : text);
-
-  // the same actions with a receipt in words: the card leaves under the thumb, the toast says where it went
-  const actions: TaskActions = {
-    ...base,
-    transition: (input) => {
-      const task = byId(input.taskId);
-      base.transition(input);
-      if (!task) return;
-      if (input.toStatus === "done") toast(named("Принято", task));
-      else if (input.toStatus === "rework") toast(named("На доработку", task));
-      else if (input.toStatus === "sent") toast(named("Снова отправлено", task));
-    },
-    extend: (input) => {
-      base.extend(input);
-      toast(input.deadlineIso ? `Срок: ${humanAqtobe(new Date(input.deadlineIso), now)}` : "Теперь без срока");
-    },
-    revoke: (taskId) => {
-      base.revoke(taskId);
-      toast("Отозвано");
-    },
-  };
-
-  const press = (action: DeskAction, task: TaskWithPeople) => {
-    switch (action) {
-      case "approve":
-        haptic(15);
-        actions.transition({ taskId: task.id, toStatus: "done" });
-        return;
-      case "insist":
-        actions.transition({ taskId: task.id, toStatus: "sent" });
-        return;
-      case "open":
-        router.push(`/tasks/${task.id}`);
-        return;
-      case "answer":
-        setSheet({ name: "answer", taskId: task.id });
-        return;
-      case "cancel":
-      case "revoke":
-        setSheet({ name: "revoke", taskId: task.id });
-        return;
-      case "remove":
-        setSheet({ name: "delete", taskId: task.id });
-        return;
-      default:
-        setSheet({ name: action, taskId: task.id });
-    }
-  };
-
-  const answer = (task: TaskWithPeople, text: string | null) => {
-    if (!text) {
-      setSheet({ name: "answer", taskId: task.id });
-      return;
-    }
-    haptic(10);
-    actions.sendMessage({ taskId: task.id, companyId, text });
-    toast(named("Ответ ушёл", task));
-  };
+  const controls = useDirectorControls({
+    base,
+    companyId,
+    tasks: all,
+    questionOf: (id) => rows.get(id)?.question ?? null,
+    now,
+  });
+  const { press, answer } = controls;
 
   const showNearest = (id: string) => {
     const task = byId(id);
@@ -203,8 +138,6 @@ export function DirectorTasksView({
     accordion.focus(id);
   };
 
-  const sheetTask = sheet ? byId(sheet.taskId) : null;
-  const sheetRow = sheetTask ? rows.get(sheetTask.id) : undefined;
   const person = personId ? people.find((p) => p.id === personId) : undefined;
   const closedCount = all.filter((task) => task.status === "done" || task.status === "revoked" || task.status === "declined").length;
 
@@ -305,8 +238,7 @@ export function DirectorTasksView({
               onToggle={() => accordion.toggle(task.id)}
               onAction={press}
               onAnswer={answer}
-              onThread={(t) => router.push(`/tasks/${t.id}`)}
-              onMore={(t) => setSheet({ name: "more", taskId: t.id })}
+              onMore={controls.more}
             />
           )}
         />
@@ -321,67 +253,7 @@ export function DirectorTasksView({
         </div>
       ) : null}
 
-      {sheetTask ? (
-        <>
-          <DirectorSheets
-            task={sheetTask}
-            open={sheet && sheet.name !== "answer" && sheet.name !== "more" ? sheet.name : null}
-            onClose={() => setSheet(null)}
-            actions={actions}
-          />
-          {sheetRow?.question ? (
-            <AnswerSheet
-              open={sheet?.name === "answer"}
-              onClose={() => setSheet(null)}
-              taskId={sheetTask.id}
-              companyId={companyId}
-              question={sheetRow.question}
-              actions={{
-                ...actions,
-                sendMessage: (input) => {
-                  actions.sendMessage(input);
-                  toast(named("Ответ ушёл", sheetTask));
-                },
-              }}
-            />
-          ) : null}
-          <Sheet open={sheet?.name === "more"} onClose={() => setSheet(null)} title="Действия">
-            <p className="-mt-1 line-clamp-2 text-[14px] leading-[19px] text-muted">{sheetTask.title}</p>
-            <div className="mt-3 flex flex-col gap-1">
-              {[...allActionsFor(sheetTask), "open" as const].map((action) => {
-                const danger = action === "remove" || action === "cancel" || action === "revoke";
-                const icon = action === "open" ? "reply" : (ACTION_ICON[action] ?? "open");
-                return (
-                  <button
-                    key={action}
-                    type="button"
-                    data-testid={`more-${action}`}
-                    onClick={() => {
-                      setSheet(null);
-                      // the next sheet slides in after this one has gone
-                      setTimeout(() => press(action, sheetTask), action === "approve" || action === "insist" || action === "open" ? 0 : 170);
-                    }}
-                    className={`flex min-h-[52px] items-center gap-3 rounded-[14px] px-3 text-left text-[16px] font-medium transition-colors duration-[120ms] active:bg-surface-2 ${
-                      danger ? "text-danger" : "text-text"
-                    }`}
-                  >
-                    <span
-                      className="flex h-9 w-9 items-center justify-center rounded-[11px]"
-                      style={{ background: danger ? "color-mix(in srgb, var(--danger) 12%, transparent)" : "var(--surface-2)" }}
-                    >
-                      <Icon name={icon} size={18} />
-                    </span>
-                    <span className="flex-1">{action === "open" ? "Открыть переписку" : action === "reassign" ? "Переназначить" : ACTION_LABEL[action]}</span>
-                    <span className="text-muted">
-                      <Icon name="open" size={14} />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </Sheet>
-        </>
-      ) : null}
+      {controls.sheets}
 
       <Sheet open={purgeAsk} onClose={() => setPurgeAsk(false)} title="Очистить закрытые">
         <p className="text-[16px] leading-[22px] text-muted">

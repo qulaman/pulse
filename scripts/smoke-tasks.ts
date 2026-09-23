@@ -163,6 +163,26 @@ async function main() {
     const inWorking = await card(page, "sent-task", titles.question).count();
     record("задача с отвеченным вопросом — во «В работе»", inWorking === 1, `cards=${inWorking}`);
     await page.screenshot({ path: join(SHOTS, "t4-working.png") });
+
+    // ---- the task's own screen (D-87): the status screen, the buttons, «⋯ → Удалить» -----------
+    await page.locator('[data-task-id][data-open] [data-testid="task-thread"]').click().catch(async () => {
+      await card(page, "sent-task", titles.question).click();
+      await page.locator('[data-task-id][data-open] [data-testid="task-thread"]').click();
+    });
+    await page.waitForURL((url) => url.pathname === `/tasks/${questionId}`, { timeout: 15_000 });
+    const screen = page.locator('[data-testid="task-screen"]');
+    await screen.waitFor({ timeout: 15_000 });
+    record("«Открыть задачу» ведёт на экран задачи", (await screen.getAttribute("data-status")) === "accepted");
+    const keysLive = await page.locator('[data-testid="task-action-extend"]').isVisible();
+    record("на экране задачи — кнопки директора", keysLive);
+    await page.screenshot({ path: join(SHOTS, "t4b-task-screen.png") });
+    await page.getByRole("button", { name: "Все действия" }).click();
+    await page.locator('[data-testid="more-remove"]').click();
+    await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();
+    await page.waitForURL((url) => !url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
+    await page.waitForTimeout(1_500);
+    const gone = await director.supabase.from("tasks").select("id").eq("id", questionId).maybeSingle();
+    record("«⋯ → Удалить» на экране задачи: задачи нет в базе", gone.data === null);
     record("директор: без ошибок страницы", errors.length === 0, errors.join(" | "));
     await dctx.close();
 
@@ -193,7 +213,8 @@ async function main() {
     await browser.close();
     for (const id of ids) {
       const removed = await director.supabase.rpc("delete_task", { task_id: id });
-      if (removed.error) console.error(`cleanup ${id}: ${removed.error.message}`);
+      // the one deleted from its own screen is already gone
+      if (removed.error && !/not_found/.test(removed.error.message)) console.error(`cleanup ${id}: ${removed.error.message}`);
     }
   }
 

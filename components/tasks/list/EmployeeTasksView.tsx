@@ -1,14 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Icon } from "@/components/tasks/desk/icons";
-import { AskSheet, DeclineSheet, ReportSheet } from "@/components/tasks/TaskSheets";
 import { Button } from "@/components/ui/Button";
-import { toast } from "@/components/ui/Toast";
-import { haptic } from "@/lib/haptics";
 import type { BoardTask } from "@/lib/pulse/board";
 import { compareTasks } from "@/lib/tasks/grouping";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -16,14 +12,13 @@ import { closedSections, employeeScreen, employeeTabOf, workingSections, type Em
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
 
-import { EmployeeTaskCard, type EmployeeAction } from "./EmployeeTaskCard";
+import { EmployeeTaskCard } from "./EmployeeTaskCard";
 import { StatusScreen } from "./StatusScreen";
 import { Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
+import { useEmployeeControls } from "./useEmployeeControls";
 
 const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric", month: "long", timeZone: "Asia/Aqtobe" });
-
-type SheetState = { name: "ask" | "decline" | "report"; taskId: string } | null;
 
 /**
  * «Мои дела» (D-83): the same screen shape as the director's «Задачи» — a status screen
@@ -49,8 +44,6 @@ export function EmployeeTasksView({
   actions: TaskActions;
   now: Date;
 }) {
-  const router = useRouter();
-  const [sheet, setSheet] = useState<SheetState>(null);
 
   const rows = useMemo(() => new Map(board.map((row) => [row.id, row] as [string, BoardTask])), [board]);
   const screen = useMemo(() => employeeScreen(all, now), [all, now]);
@@ -77,15 +70,7 @@ export function EmployeeTasksView({
 
   const byId = (id: string) => all.find((task) => task.id === id) ?? null;
 
-  const press = (action: EmployeeAction, task: TaskWithPeople) => {
-    if (action === "accept") {
-      haptic(15);
-      actions.transition({ taskId: task.id, toStatus: "accepted" });
-      toast("Принято · в работе");
-      return;
-    }
-    setSheet({ name: action === "complete" ? "report" : action, taskId: task.id });
-  };
+  const { press, sheets } = useEmployeeControls({ actions, companyId, tasks: all });
 
   const showNearest = (id: string) => {
     const task = byId(id);
@@ -94,7 +79,6 @@ export function EmployeeTasksView({
     accordion.focus(id);
   };
 
-  const sheetTask = sheet ? byId(sheet.taskId) : null;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24 pt-3">
@@ -132,45 +116,12 @@ export function EmployeeTasksView({
               now={now}
               onToggle={() => accordion.toggle(task.id)}
               onAction={press}
-              onThread={(t) => router.push(`/tasks/${t.id}`)}
             />
           )}
         />
       </div>
 
-      <AskSheet
-        open={sheet?.name === "ask"}
-        onClose={() => setSheet(null)}
-        onSubmit={(text) => {
-          if (!sheetTask) return;
-          actions.sendMessage({ taskId: sheetTask.id, companyId, text, meta: { is_question: true } });
-          toast(TEXT.askedToast);
-        }}
-      />
-      <DeclineSheet
-        open={sheet?.name === "decline"}
-        onClose={() => setSheet(null)}
-        onSubmit={(reason) => {
-          if (!sheetTask) return;
-          actions.transition({ taskId: sheetTask.id, toStatus: "declined", reason });
-          toast("Сообщил директору");
-        }}
-      />
-      <ReportSheet
-        open={sheet?.name === "report"}
-        onClose={() => setSheet(null)}
-        onSubmit={(text, filePath) => {
-          if (!sheetTask) return;
-          // one call: the words, the photo and the handover are one transaction (D-64 §3)
-          actions.complete({
-            taskId: sheetTask.id,
-            fromStatus: sheetTask.status,
-            report: text || filePath ? { text: text || undefined, file_path: filePath ?? undefined } : undefined,
-          });
-          haptic(15);
-          toast("Сдано на проверку директору");
-        }}
-      />
+      {sheets}
     </main>
   );
 }

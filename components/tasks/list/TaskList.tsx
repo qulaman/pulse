@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "framer-motion";
+import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
@@ -503,20 +504,19 @@ export function LastWord({ name, text, at, now, unread }: { name: string; text: 
   );
 }
 
-/** The row under the buttons: the thread, and whatever else the card has to offer. */
-export function CardFoot({ onThread, extra }: { onThread: () => void; extra?: ReactNode }) {
+/** The row under the buttons: the task's own screen, and whatever else the card has to offer. */
+export function CardFoot({ href, extra }: { href: string; extra?: ReactNode }) {
   return (
     <div className="-mx-1.5 mt-2 flex items-center justify-between">
-      <button
-        type="button"
-        onClick={onThread}
+      <Link
+        href={href}
         data-testid="task-thread"
         className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
       >
         <Icon name="reply" size={16} />
-        Переписка
+        Открыть задачу
         <Icon name="open" size={13} />
-      </button>
+      </Link>
       {extra}
     </div>
   );

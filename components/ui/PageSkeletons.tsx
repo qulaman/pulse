@@ -18,7 +18,6 @@ import {
   SkeletonGroup,
   StatBone,
   TableBone,
-  TaskCardBone,
   TaskListBone,
 } from "./Skeleton";
 
@@ -483,37 +482,47 @@ export function ProfileSkeleton() {
 }
 
 export function TaskPageSkeleton() {
+  // the task's own screen (D-87): the top bar, the status screen, «О задаче», the thread
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 py-5">
-      <p className="flex min-h-[32px] items-center gap-1 text-[14px] leading-[18px] text-muted">
-        <span aria-hidden>←</span> Назад
-      </p>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pt-2">
+      <p className="-ml-2 flex min-h-[44px] items-center gap-0.5 px-2 text-[15px] font-semibold text-accent">‹ Назад</p>
       <SkeletonGroup>
-        <div className="mt-3">
-          <TaskCardBone variant="director" />
+        <div className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5">
+          <div className="flex items-center justify-between">
+            <Bone h={18} w={120} />
+            <Bone h={26} w={112} className="rounded-full" />
+          </div>
+          <Bone h={26} w="84%" className="mt-3" />
+          <Bone h={26} w="52%" className="mt-1" />
+          <Bone h={22} w={190} className="mt-2" />
+          <div className="mt-4 grid grid-cols-4 gap-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex flex-col items-center gap-1.5">
+                <Bone h={14} w={14} round />
+                <Bone h={12} w="70%" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {[0, 1, 2].map((i) => (
+              <Bone key={i} h={44} className="rounded-[12px]" />
+            ))}
+          </div>
+          <div className="mt-4 border-t border-border/60 pt-3">
+            <Bone h={18} w={140} />
+          </div>
         </div>
-        <section className="mt-4 card px-4 py-2">
-          <h2 className="pt-1 text-[13px] font-semibold uppercase tracking-wide text-muted">Сроки</h2>
-          {["Создана", "Срок", "Принял", "Выполнил", "Закрыта"].map((label) => (
-            <div key={label} className="flex items-center justify-between py-1.5">
-              <span className="text-[13px] leading-4 text-muted">{label}</span>
-              <Bone h={18} w={110} />
-            </div>
-          ))}
-        </section>
-        <section className="mt-4">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Хронология</h2>
-          <div className="mt-2 border-l border-border pl-4">
-            <Bone h={18} w="70%" className="my-1.5" />
-            <Bone h={18} w="55%" className="my-1.5" />
+        <div className="task-card mt-3 rounded-[18px] px-4 py-3.5">
+          <Bone h={16} w={80} />
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+            {[0, 1, 2, 3].map((i) => (
+              <Bone key={i} h={34} />
+            ))}
           </div>
-        </section>
-        <section className="mt-4">
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted">Чат</h2>
-          <div className="mt-2">
-            <ChatBone />
-          </div>
-        </section>
+        </div>
+        <div className="mt-5">
+          <ChatBone />
+        </div>
       </SkeletonGroup>
     </main>
   );
