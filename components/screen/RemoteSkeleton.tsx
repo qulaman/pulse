@@ -1,6 +1,6 @@
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 
-import s from "./remote.module.css";
+import s from "@/components/ui/device/device.module.css";
 
 /**
  * The remote before its state arrives: the same body, the same boxes, grey where the

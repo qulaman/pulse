@@ -10,7 +10,7 @@ import {
 
 import { haptic } from "@/lib/haptics";
 
-import s from "./remote.module.css";
+import s from "./device.module.css";
 
 /**
  * The parts of a physical remote, as components. The page composes them; nothing here
@@ -22,15 +22,16 @@ import s from "./remote.module.css";
  * — the same reason a real remote has no touchscreen.
  */
 
-export function RemoteBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Body({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`${s.body} ${className}`}>{children}</div>;
 }
 
-export type LedTone = "ok" | "warn" | "muted" | "accent" | "off";
+export type LedTone = "ok" | "warn" | "danger" | "muted" | "accent" | "off";
 
 const LED_COLOR: Record<LedTone, string> = {
   ok: "var(--ok)",
   warn: "var(--warn)",
+  danger: "var(--danger)",
   muted: "var(--text-muted)",
   accent: "var(--accent)",
   off: "rgba(255,255,255,.12)",
@@ -148,9 +149,9 @@ export function Key({
   );
 }
 
-/** The indicator under a key: lit when that key's state is the current one. */
-export function Dot({ on }: { on: boolean }) {
-  return <span aria-hidden className={`${s.dot} ${on ? s.dotOn : ""}`} />;
+/** The indicator under a key: lit when that key's state is the current one; red only for overdue work. */
+export function Dot({ on, tone = "accent" }: { on: boolean; tone?: "accent" | "danger" }) {
+  return <span aria-hidden className={`${s.dot} ${on ? (tone === "danger" ? s.dotDanger : s.dotOn) : ""}`} />;
 }
 
 /**

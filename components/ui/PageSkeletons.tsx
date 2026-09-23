@@ -5,6 +5,7 @@
  * Server-safe.
  */
 import { Mascot } from "@/components/brand/Mascot";
+import device from "@/components/ui/device/device.module.css";
 
 import {
   AnnouncementBone,
@@ -61,32 +62,92 @@ export function PulseSkeleton() {
   );
 }
 
-/** «Задачи»: capsule rows — a dot, a title, one meta line, a short status. */
+/** The thread of a task list while its data is on the way: line, beads, text blocks. */
+function TraceBone({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative" style={{ paddingLeft: 24 }}>
+      <span aria-hidden className="absolute bottom-2 top-1 w-px bg-border" style={{ left: 8 }} />
+      {children}
+    </div>
+  );
+}
+
+function BeadBone() {
+  return <span aria-hidden className="absolute block rounded-full bg-border" style={{ left: -21, top: 7, width: 10, height: 10 }} />;
+}
+
+/** «Задачи»: two piles on the thread — a heading, then title, deadline and who. */
 export function SentListBone() {
   return (
-    <SkeletonGroup className="mt-5 flex flex-col gap-2">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-3 rounded-[20px] border border-border bg-surface py-3 pl-4 pr-4">
-          <Bone round w={10} h={10} />
-          <div className="min-w-0 flex-1">
-            <Bone h={22} w={i % 2 ? 180 : 220} />
-            <Bone h={16} w={240} className="mt-1" />
+    <SkeletonGroup className="mt-4">
+      <TraceBone>
+        {[0, 1].map((group) => (
+          <div key={group} className={group ? "mt-6" : ""}>
+            <Bone h={16} w={92} className="mb-3" />
+            <div className="flex flex-col gap-4">
+              {[0, 1].map((i) => (
+                <div key={i} className="relative">
+                  <BeadBone />
+                  <div className="flex items-baseline gap-3">
+                    <Bone h={22} w={i ? "54%" : "70%"} />
+                    <Bone h={16} w={78} className="ml-auto shrink-0" />
+                  </div>
+                  <Bone h={16} w={124} className="mt-1.5" />
+                </div>
+              ))}
+            </div>
           </div>
-          <Bone h={16} w={52} />
-        </div>
-      ))}
+        ))}
+      </TraceBone>
     </SkeletonGroup>
   );
 }
 
+/**
+ * «Задачи»: the desk before its data — the same body, lens, display and keys as the device
+ * (components/tasks/desk/Desk.tsx), then its lower half: the search slot, the filter keys,
+ * the seam, the people keypad and the order switch, grey where the words will be — and the
+ * thread of the list. The display keeps its height, so the keys are already where the
+ * thumb will find them.
+ */
 export function SentSkeleton() {
   return (
-    <main className={MAIN}>
-      <Title text="Задачи" sub=" " />
-      <SkeletonGroup className="mt-4 flex flex-wrap gap-2">
-        {[96, 118, 104, 64].map((w) => (
-          <Bone key={w} h={36} w={w} className="rounded-full" />
-        ))}
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
+      <SkeletonGroup className={`${device.body} mx-auto w-full max-w-[380px]`}>
+        <Bone h={14} w={64} className="mx-auto rounded-full" />
+        <div className={`${device.lcd} mt-3`}>
+          <div className="min-h-[155px]">
+            <div className="flex items-center justify-between">
+              <Bone h={12} w={120} />
+              <Bone h={12} w={40} />
+            </div>
+            <Bone h={24} w="78%" className="mt-3" />
+            <Bone h={14} w="52%" className="mt-2.5" />
+          </div>
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Bone key={i} h={66} className="rounded-[18px]" />
+          ))}
+        </div>
+        <Bone h={46} className="mt-3 rounded-[14px]" />
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Bone key={i} h={60} className="rounded-[18px]" />
+          ))}
+        </div>
+        <div className="mt-2 h-[5px]" />
+        <div className={device.seam} />
+        <Bone h={16} w={96} className="mt-3 ml-1" />
+        <div className={`${device.pad} mt-2`}>
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5">
+              <Bone h={84} className="w-full rounded-[18px]" />
+              <span className="h-[5px]" />
+            </div>
+          ))}
+        </div>
+        <Bone h={60} className="mt-3 rounded-[18px]" />
       </SkeletonGroup>
       <SentListBone />
     </main>
@@ -260,13 +321,42 @@ export function FeedSkeleton() {
   );
 }
 
+export function TasksListBone() {
+  return (
+    <SkeletonGroup className="mt-4">
+      <TraceBone>
+        {[0, 1].map((group) => (
+          <div key={group} className={group ? "mt-7" : ""}>
+            <Bone h={16} w={92} className="mb-3" />
+            <div className="flex flex-col gap-5">
+              {[0, 1].map((i) => (
+                <div key={i} className="relative">
+                  <BeadBone />
+                  <div className="flex items-baseline gap-3">
+                    <Bone h={16} w={88} />
+                    <Bone h={22} w={96} className="ml-auto shrink-0 rounded-full" />
+                  </div>
+                  <Bone h={22} w={i ? "62%" : "80%"} className="mt-2" />
+                  <div className="mt-4 flex gap-2">
+                    <Bone h={44} w={104} className="rounded-[12px]" />
+                    <Bone h={44} w={104} className="rounded-[12px]" />
+                    <Bone h={44} w={96} className="rounded-[12px]" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </TraceBone>
+    </SkeletonGroup>
+  );
+}
+
 export function TasksSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-5">
-      <Title text="Мои дела" />
-      <SkeletonGroup className="mt-4">
-        <TaskListBone count={3} />
-      </SkeletonGroup>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-4">
+      <Title text="Мои дела" sub=" " />
+      <TasksListBone />
     </main>
   );
 }
