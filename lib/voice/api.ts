@@ -45,6 +45,8 @@ export type TranscribeRequest = {
   duration_ms?: number;
   /** The voice message the words belong to: the route writes the transcript onto it. */
   message_id?: string;
+  /** The note dictated on «Заметки»: the route writes the transcript onto it (D-81). */
+  note_id?: string;
 };
 
 export type ConfirmRequest = {
