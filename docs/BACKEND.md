@@ -69,7 +69,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/company/logo` | POST | director | multipart ≤2 МБ, PNG/JPEG/WebP/SVG → публичный бакет `brand/{company}/logo-*.ext`, URL — в `settings.brand.logo_url` |
 | `/api/settings` | GET, PATCH | director | D-48: секции `stt`, `parser`, `vocabulary`, `conventions` (D-15), `matching` (D-16), `points_enabled`, `rating_mode`, `delivery_window`, `secretary` (D-79), `brand`; PATCH дополняет присланную секцию текущими значениями и сливает через RPC `update_company_settings` |
 | `/api/settings/vocabulary` | POST | director, secretary | D-111: `{add?, remove?}` — слова в словарь и из него; сервер сливает с сохранённым `settings.vocabulary` (множество: повтор безвреден, id запроса не нужен), больше 200 — 422 `vocabulary_full`; ответ — настройки целиком |
-| `/api/lab` | GET, PATCH | любая (D-63, без проверки роли по слову владельца) | GET — последние 400 строк `ai_logs` (stt/parse) с ценой по `lib/ai/pricing.ts`; PATCH — секции `stt`, `parser` service-клиентом |
+| `/api/lab` | GET, PATCH | director, secretary (D-63) | GET — последние 400 строк `ai_logs` (stt/parse) с ценой по `lib/ai/pricing.ts`; PATCH — секции `stt`, `parser` service-клиентом |
 | `/api/me` | GET | любая сессия | `{profile}` |
 | `/api/health` | GET | публичный | liveness `{ok, version, time}`, без БД |
 
