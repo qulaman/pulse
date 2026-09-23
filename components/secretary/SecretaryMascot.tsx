@@ -1,28 +1,68 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import type { DeskPhase, DeskScene } from "@/lib/errands/scene";
+import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
+
+import {
+  Arm,
+  Bubble,
+  Car,
+  Carried,
+  CoffeeMachine,
+  Confetti,
+  EDGE,
+  GEAR,
+  Glyph,
+  GuestDoor,
+  Hearts,
+  Hush,
+  MeetingTable,
+  Mitten,
+  Notepad,
+  PourCup,
+  Pourer,
+  Printer,
+  RoomBack,
+  RoomFront,
+  SECRETARY_TONE,
+  ShutDoor,
+  Sign,
+  TEA,
+  TypingHands,
+  WATER,
+  Writing,
+} from "./secretaryRoom";
 
 import "./secretary-mascot.css";
 
-/**
- * The secretary's colour: the brand's deeper teal, the one the small face at the director's
- * desk wears (D-86) — another character of the same family, never a status colour (DESIGN §1.3).
- */
-export const SECRETARY_TONE = "color-mix(in srgb, var(--accent-2) 82%, var(--surface-2))";
+export { SECRETARY_TONE } from "./secretaryRoom";
 
-/** The headset and the bow tie: dark on the teal body, so the character reads at a glance. */
-const GEAR = "color-mix(in srgb, var(--bg) 72%, var(--surface-2))";
-const EDGE = "color-mix(in srgb, var(--border) 70%, var(--text-muted))";
-const COFFEE = "color-mix(in srgb, var(--gold) 36%, #3b2415)";
-const TEA = "color-mix(in srgb, var(--gold) 70%, #8a3d10)";
-/** A hand held in front of the body: the body's colour, a shade lighter and outlined. */
-const HAND = "color-mix(in srgb, var(--accent-2) 70%, white 12%)";
+/**
+ * The one-shots of the secretary's face (D-97): «есть!» on «Принял», the small things done at
+ * the desk while nobody asks, the morning arrival, the director's «спасибо».
+ */
+export type SecretaryAct = "accept" | "sip" | "headset" | "stretch" | "clock" | "papers" | "plant" | "arrive" | "thanks";
+
+/** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
+export const SEC_ACT_MS: Record<SecretaryAct, number> = {
+  accept: 900,
+  sip: 2600,
+  headset: 2200,
+  stretch: 2400,
+  clock: 2200,
+  papers: 2000,
+  plant: 2800,
+  arrive: 2600,
+  thanks: 2600,
+};
+
+/** How long the finish after «Готово» plays (the carry-out keyframes are cut to it). */
+export const FINISH_MS = 2_200;
 
 const EYE_RX = 6.6;
 const EYE_RY = 7;
 const LOOK_EASE = "transform 420ms cubic-bezier(0.34, 1.45, 0.64, 1)";
 const SHAPE_EASE = "transform 160ms var(--ease-out)";
-const PROP_IN = "smc-env-in 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both";
+const IDLE = "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite";
 
 type Look = { x: number; y: number; loop?: string };
 
@@ -30,10 +70,16 @@ type Look = { x: number; y: number; loop?: string };
 const LOOK: Record<DeskScene, Look> = {
   coffee: { x: -3.4, y: -0.6 },
   tea: { x: -3, y: 1.6 },
+  water: { x: -3, y: 1.6 },
   dnd: { x: 1.2, y: 0.2 },
   guest: { x: 0, y: 0, loop: "smc-guest-look 4.2s ease-in-out infinite" },
+  meeting: { x: -3.4, y: 1.2 },
   doctor: { x: 1.4, y: -0.6 },
   come: { x: -3.2, y: 0 },
+  taxi: { x: -3.4, y: 0.8 },
+  print: { x: -3.4, y: 0.2 },
+  lunch: { x: -2.4, y: 0 },
+  courier: { x: -2.4, y: 0 },
   other: { x: 2.2, y: 2.2 },
 };
 
@@ -41,29 +87,57 @@ const LOOK: Record<DeskScene, Look> = {
 const BODY: Record<DeskScene, string> = {
   coffee: "mascot-serve 3.2s ease-in-out infinite",
   tea: "smc-pour-body 3.2s ease-in-out infinite",
+  water: "smc-pour-body 3.2s ease-in-out infinite",
   dnd: "smc-guard 4.2s ease-in-out infinite",
   guest: "smc-invite 4.2s ease-in-out infinite",
+  meeting: "mascot-serve 3.2s ease-in-out infinite",
   doctor: "mascot-talk 1.1s ease-in-out infinite",
   come: "smc-walk 0.56s ease-in-out infinite",
-  other: "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
+  taxi: "mascot-talk 1.1s ease-in-out infinite",
+  print: IDLE,
+  lunch: "smc-walk 0.56s ease-in-out infinite",
+  courier: "smc-walk 0.56s ease-in-out infinite",
+  other: IDLE,
+};
+
+/** The finishes that carry the job out of the frame and come back empty-handed. */
+const CARRY_OUT: ReadonlySet<DeskScene> = new Set(["coffee", "tea", "water", "lunch", "courier", "print", "come"]);
+
+/** What an idle act does to the body and to the eyes. */
+const ACT_BODY: Partial<Record<SecretaryAct, string>> = {
+  accept: "smc-nod 0.9s cubic-bezier(0.34, 1.4, 0.64, 1) both",
+  stretch: "smc-stretch 2.4s ease-in-out both",
+  arrive: "smc-arrive 2.6s cubic-bezier(0.3, 0.7, 0.3, 1) both",
+};
+const ACT_EYES: Partial<Record<SecretaryAct, string>> = {
+  clock: "smc-look-clock 2.2s ease-in-out both",
+  papers: "smc-look-papers 2s ease-in-out both",
+  plant: "smc-look-plant 2.8s ease-in-out both",
+};
+const ACT_LIDS: Partial<Record<SecretaryAct, string>> = {
+  sip: "smc-lids-shut 2.6s ease-in-out both",
+  stretch: "smc-lids-shut 2.4s ease-in-out both",
 };
 
 /**
- * The secretary's own face (D-87): the same soft blob as «Капля», in the secretary's deeper
- * teal, with a headset and a bow tie — the receptionist of the family. Its body shows the
- * director's request in hand, so the person at the desk reads the job without a caption:
- *   rest    nobody asks: typing at a laptop, a look up now and then
- *   asked   a request nobody took: the headset rings, the face hops, the request floats
- *           over the head as a picture (a cup, a teapot, the sign, a door)
- *   doing   the job — coffee: a finger on the machine, the stream, steam off the cup;
- *           tea: the pot tips over the cup; dnd: the «не беспокоить» sign held up, a finger
- *           on the lips, «тсс»; guest: the door opens, the guest steps in, a bow with the
- *           hand out; doctor: a call on the headset; come: off to the director with a
- *           notepad; other: a note is taken
- *   done    the cheer after «Готово»: a squint, a smile, a tick over the head
- * `bare` drops the room and the job (the face is talking while the balls are out).
- * Perf contract of the mascot: one SVG, transform and opacity only, CSS keyframes
- * (./secretary-mascot.css and app/globals.css).
+ * The secretary's own face (D-87, D-97): the same soft blob as «Капля», in the secretary's
+ * deeper teal, with a headset, a bow tie and a gleam in each eye — the receptionist of the
+ * family. Its body shows the director's request in hand:
+ *   rest    at the desk: typing, the window behind shows the time of day, a clock on the wall,
+ *           a mug, papers and a plant; now and then an act — a sip, the headset set right, a
+ *           stretch, a look at the clock, the papers squared, the plant watered; at night
+ *           (outside the delivery window) the secretary dozes at the desk
+ *   asked   a request nobody took: the headset rings, the face hops, the request floats over
+ *           the head as a picture with «+N» for the ones behind it; the longer it waits the
+ *           harder it calls — faster, the bubble shaking, then running on the spot
+ *   doing   the job — coffee, tea, water, the «не беспокоить» sign at the director's shut door,
+ *           the guest's door, a meeting room, a call to the doctor or for a car, the printer,
+ *           lunch or a parcel carried, off to the director, a note taken
+ *   done    the finish after «Готово»: the cup carried out, the door shut, the sign put away,
+ *           the car gone — then a tick
+ * `bare` drops the room and the job (the face is talking while the balls are out); `mini` is
+ * the small secretary at the director's desk: no room, the job in its hands only. Perf
+ * contract of the mascot: one SVG, transform and opacity only, CSS keyframes.
  */
 export function SecretaryMascot({
   scene,
@@ -71,28 +145,96 @@ export function SecretaryMascot({
   size = 128,
   talking = false,
   bare = false,
+  mini = false,
+  act = null,
+  urgency = 0,
+  queue = 0,
+  daypart = "day",
+  look = null,
+  cheer = false,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
   size?: number;
   talking?: boolean;
   bare?: boolean;
+  mini?: boolean;
+  act?: SecretaryAct | null;
+  urgency?: Urgency;
+  queue?: number;
+  daypart?: Daypart;
+  /** where the eyes go and hold, −1..1 on each axis (the desk turned to the director's face) */
+  look?: { x: number; y: number } | null;
+  /** a quick job was just closed — confetti (the caller asks only after the D-40 gate) */
+  cheer?: boolean;
 }) {
   // below avatar size the room and the props are noise: the body and the headset still read
   const detailed = size >= 40;
+  const room = detailed && !bare && !mini;
+  const rest = !bare && phase === "rest";
+  const asleep = rest && daypart === "night";
   const job: DeskScene | null = !bare && phase === "doing" ? scene : null;
   const asked = !bare && phase === "asked";
   const done = !bare && phase === "done";
-  const rest = !bare && phase === "rest";
   const show = (what: DeskScene) => detailed && job === what;
+  const inRoom = (what: DeskScene) => room && job === what;
+  const finish = done && scene ? scene : null;
+  const glad = done || act === "thanks";
 
-  const look: Look = bare || talking ? { x: 0, y: 0 } : rest ? { x: 0, y: 2.6, loop: "smc-type-look 7s ease-in-out infinite" } : job ? LOOK[job] : { x: 0, y: 0 };
-  // how the eye is open: wide on a call, soft on the door, a squint of joy after «Готово»
-  const eye = done ? "scale(0.85, 0.42)" : asked ? "scale(1.1, 1.14)" : job === "dnd" ? "scale(0.95, 0.6)" : "scale(1, 1)";
-  const blink = done ? "none" : "mascot-blink 9.2s infinite";
-  const body = talking ? "mascot-talk 1.1s ease-in-out infinite" : asked ? "mascot-call 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite" : done ? "mascot-happy 3.8s cubic-bezier(0.45, 0, 0.55, 1) infinite" : job ? BODY[job] : rest ? "smc-type 0.84s ease-in-out infinite" : "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite";
-  const lightTone = asked ? "var(--warn)" : talking || job === "doctor" ? "var(--ok)" : "var(--accent)";
-  const lightLoop = asked ? "smc-light 0.6s steps(1) infinite" : talking || job === "doctor" ? "smc-light 1.1s steps(1) infinite" : "smc-glow 3.4s ease-in-out infinite";
+  const base: Look = look
+    ? { x: look.x * 4, y: look.y * 3 }
+    : bare || talking
+      ? { x: 0, y: 0 }
+      : asleep
+        ? { x: 0, y: 1 }
+        : rest && !mini
+          ? { x: 2.6, y: 1.2, loop: "smc-desk-look 7s ease-in-out infinite" }
+          : job
+            ? LOOK[job]
+            : { x: 0, y: 0 };
+  const eyeLoop = (act && ACT_EYES[act]) ?? base.loop ?? "none";
+  const eye = asleep
+    ? "scale(0.9, 0.16)"
+    : glad
+      ? "scale(0.85, 0.42)"
+      : asked
+        ? `scale(1.1, ${urgency === 2 ? 1.2 : 1.14})`
+        : job === "dnd"
+          ? "scale(0.95, 0.6)"
+          : "scale(1, 1)";
+  const blink = glad || asleep ? "none" : "mascot-blink 9.2s infinite";
+  const lids = act ? ACT_LIDS[act] : undefined;
+
+  const body = talking
+    ? "mascot-talk 1.1s ease-in-out infinite"
+    : asked
+      ? urgency === 2
+        ? "smc-run 0.36s ease-in-out infinite"
+        : `mascot-call ${urgency === 1 ? "1.25s" : "1.9s"} cubic-bezier(0.3, 0, 0.2, 1) infinite`
+      : done
+        ? finish === "guest"
+          ? "mascot-bow 0.8s cubic-bezier(0.34, 1.2, 0.64, 1) both"
+          : "mascot-happy 3.8s cubic-bezier(0.45, 0, 0.55, 1) infinite"
+        : job
+          ? BODY[job]
+          : asleep
+            ? "mascot-sleep 7s ease-in-out infinite"
+            : rest
+              ? "smc-type 0.84s ease-in-out infinite"
+              : IDLE;
+  // the outer motion: an act moves the whole body; the finish carries the job out and back
+  // (the director's desk walks its small secretary over to the big face instead — SecretaryDesk)
+  const outer = act && ACT_BODY[act] ? ACT_BODY[act] : finish && CARRY_OUT.has(finish) && !mini ? `smc-carry-out ${FINISH_MS}ms ease-in-out both` : "none";
+
+  const danger = asked && urgency === 2;
+  const ringTone = danger ? "var(--danger)" : "var(--warn)";
+  const lightTone = act === "accept" ? "var(--ok)" : asked ? ringTone : talking || job === "doctor" || job === "taxi" ? "var(--ok)" : "var(--accent)";
+  const lightLoop = asked
+    ? `smc-light ${danger ? "0.3s" : "0.6s"} steps(1) infinite`
+    : talking || job === "doctor" || job === "taxi"
+      ? "smc-light 1.1s steps(1) infinite"
+      : "smc-glow 3.4s ease-in-out infinite";
+  const bubbleMotion = urgency === 2 ? "smc-shake 0.3s ease-in-out infinite" : urgency === 1 ? "smc-shake 0.5s ease-in-out infinite" : "smc-bubble 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite";
 
   return (
     <svg
@@ -104,416 +246,254 @@ export function SecretaryMascot({
       data-secretary
       data-scene={scene ?? "none"}
       data-phase={bare ? "bare" : phase}
+      data-act={act ?? undefined}
+      data-urgency={asked ? urgency : undefined}
       style={{ overflow: "visible", display: "block" }}
     >
-      <ellipse cx="32" cy="61" rx="16" ry="2.5" fill="var(--bg)" opacity="0.5" />
+      {room ? null : <ellipse cx="32" cy="61" rx="16" ry="2.5" fill="var(--bg)" opacity="0.5" />}
 
       {/* ---- the room behind the body ---- */}
-      {show("coffee") ? <CoffeeMachine /> : null}
-      {show("guest") ? <Door /> : null}
-      {show("tea") ? <TeaCup /> : null}
+      {room && rest ? <RoomBack daypart={daypart} clockAct={act === "clock"} /> : null}
+      {inRoom("coffee") ? <CoffeeMachine /> : null}
+      {inRoom("guest") ? <GuestDoor /> : null}
+      {room && finish === "guest" ? <GuestDoor closing /> : null}
+      {inRoom("tea") ? <PourCup liquid={TEA} tag /> : null}
+      {inRoom("water") ? <PourCup liquid={WATER} tag={false} /> : null}
+      {inRoom("dnd") || (room && finish === "dnd") ? <ShutDoor /> : null}
       {show("dnd") ? <Sign /> : null}
+      {detailed && finish === "dnd" ? <Sign away /> : null}
+      {inRoom("taxi") ? <Car /> : null}
+      {room && finish === "taxi" ? <Car motion="leave" /> : null}
+      {inRoom("print") ? <Printer /> : null}
+      {inRoom("meeting") ? <MeetingTable /> : null}
 
-      {/* asked: the headset rings — arcs go out of the left ear */}
+      {/* asked: the headset rings — arcs go out of the left ear, faster the longer it waits */}
       {asked && detailed ? (
-        <g fill="none" stroke="var(--warn)" strokeWidth="1.4" strokeLinecap="round">
+        <g fill="none" stroke={ringTone} strokeWidth="1.4" strokeLinecap="round">
           {["M0 25.5 Q-3.5 31 0 36.5", "M-4.2 22 Q-9.4 31 -4.2 40"].map((d, i) => (
-            <path key={d} d={d} style={{ transformBox: "fill-box", transformOrigin: "100% 50%", animation: `smc-ring 1.2s ease-out ${i * 0.3}s infinite`, opacity: 0 }} />
+            <path
+              key={d}
+              d={d}
+              style={{
+                transformBox: "fill-box",
+                transformOrigin: "100% 50%",
+                animation: `smc-ring ${urgency === 2 ? "0.6s" : urgency === 1 ? "0.85s" : "1.2s"} ease-out ${i * 0.3}s infinite`,
+                opacity: 0,
+              }}
+            />
           ))}
         </g>
       ) : null}
 
-      {/* the body: every motion rides this group, the props in hand ride with it */}
-      <g style={{ transformOrigin: "32px 52px", animation: asked ? "mascot-settle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both" : "none" }}>
-        <g key={`${bare ? "bare" : phase}-${job ?? ""}`} style={{ transformOrigin: "32px 44px", animation: body }}>
-          {/* arms drawn before the body, so the body covers their roots */}
-          {show("coffee") ? (
-            <g style={{ animation: "smc-press 2.6s ease-in-out infinite" }}>
-              <path d="M10 35 Q2 28 -3.5 24" fill="none" stroke={SECRETARY_TONE} strokeWidth="5" strokeLinecap="round" />
-              <ellipse cx="-5.5" cy="23" rx="3.6" ry="3" fill={SECRETARY_TONE} />
+      {/* the body: every motion rides these groups, the props in hand ride with them */}
+      <g style={{ transformOrigin: "32px 58px", animation: outer }}>
+        <g
+          style={{
+            transformOrigin: "32px 52px",
+            // dozing: the head sinks towards the desk and tips over
+            transform: asleep ? "translateY(2.4px) rotate(7deg)" : undefined,
+            transition: "transform 600ms var(--ease-out)",
+            animation: asked ? "mascot-settle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both" : "none",
+          }}
+        >
+          <g key={`${bare ? "bare" : phase}-${job ?? ""}-${asleep ? "z" : ""}`} style={{ transformOrigin: "32px 44px", animation: body }}>
+            {/* arms, drawn before the body so the body covers their roots */}
+            {show("coffee") && !mini ? (
+              <g style={{ animation: "smc-press 2.6s ease-in-out infinite" }}>
+                <Arm d="M10 35 Q2 28 -3.5 24" hand={{ cx: -5.5, cy: 23, rx: 3.6, ry: 3 }} />
+              </g>
+            ) : null}
+            {(show("tea") || show("water")) && !mini ? <Arm d="M10 38 Q3 34 -1 31" /> : null}
+            {show("dnd") ? <Arm d="M52 41 Q60 39 63 31.5" /> : null}
+            {show("guest") ? <Arm d="M10 41 Q4 45 -1 43.5" hand={{ cx: -2.8, cy: 43, rx: 3.6, ry: 2.6 }} /> : null}
+            {show("print") && !mini ? <Arm d="M10 36 Q2 33 -4 31" /> : null}
+            {show("meeting") && !mini ? <Arm d="M10 40 Q2 38 -6 37.5" /> : null}
+            {act === "stretch" && detailed ? (
+              <g style={{ animation: "smc-arms-up 2.4s ease-in-out both" }}>
+                <Arm d="M12 26 Q6 14 5 4" />
+                <Arm d="M52 26 Q58 14 59 4" />
+              </g>
+            ) : null}
+            {act === "arrive" && detailed ? (
+              // the bag of the morning, in the left hand; it goes under the desk
+              <g style={{ animation: "smc-bag 2.6s ease-in-out both" }}>
+                <path d="M-4 42 Q1 36 6 42" fill="none" stroke={GEAR} strokeWidth="1.4" />
+                <rect x="-6" y="42" width="14" height="11" rx="2" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
+                <Arm d="M10 40 Q5 40 2 40" />
+              </g>
+            ) : null}
+
+            <path d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z" fill={SECRETARY_TONE} />
+            <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" opacity="0.14" />
+
+            {/* the bow tie: the receptionist's sign, under the chin */}
+            <g fill={GEAR}>
+              <path d="M32 54.5 L25.6 51.2 Q24.6 54.5 25.6 57.8 Z" />
+              <path d="M32 54.5 L38.4 51.2 Q39.4 54.5 38.4 57.8 Z" />
+              <rect x="30.2" y="52.7" width="3.6" height="3.6" rx="1.2" />
             </g>
-          ) : null}
-          {show("tea") ? <Arm d="M10 38 Q3 34 -1 31" /> : null}
-          {show("dnd") ? <Arm d="M52 41 Q60 39 63 31.5" /> : null}
-          {show("guest") ? <Arm d="M10 41 Q4 45 -1 43.5" hand={{ cx: -2.8, cy: 43, rx: 3.6, ry: 2.6 }} /> : null}
 
-          <path d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z" fill={SECRETARY_TONE} />
-          <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" opacity="0.14" />
+            {/* the headset: a band over the crown, two cups, the boom down to the mouth */}
+            <path d="M8.6 29 C8.6 14.5 19 6.8 32 6.8 C45 6.8 55.4 14.5 55.4 29" fill="none" stroke={GEAR} strokeWidth="2.6" strokeLinecap="round" />
+            <rect x="2.6" y="24.5" width="8" height="13" rx="3.4" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
+            <rect x="53.4" y="24.5" width="8" height="13" rx="3.4" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
+            <path d="M6.6 36.5 C7.6 45.5 13 49.6 21.5 49.2" fill="none" stroke={GEAR} strokeWidth="1.7" strokeLinecap="round" />
+            <ellipse cx="23.2" cy="49.1" rx="2.6" ry="2" fill={GEAR} />
+            <circle cx="6.6" cy="29" r="1.25" fill={lightTone} style={{ animation: asleep ? "none" : lightLoop }} />
 
-          {/* the bow tie: the receptionist's sign, under the chin */}
-          <g fill={GEAR}>
-            <path d="M32 54.5 L25.6 51.2 Q24.6 54.5 25.6 57.8 Z" />
-            <path d="M32 54.5 L38.4 51.2 Q39.4 54.5 38.4 57.8 Z" />
-            <rect x="30.2" y="52.7" width="3.6" height="3.6" rx="1.2" />
-          </g>
+            {glad ? (
+              <g fill="#ffffff" opacity="0.22">
+                <ellipse cx="16" cy="41" rx="4" ry="2" />
+                <ellipse cx="48" cy="41" rx="4" ry="2" />
+              </g>
+            ) : null}
 
-          {/* the headset: a band over the crown, two cups, the boom down to the mouth */}
-          <path d="M8.6 29 C8.6 14.5 19 6.8 32 6.8 C45 6.8 55.4 14.5 55.4 29" fill="none" stroke={GEAR} strokeWidth="2.6" strokeLinecap="round" />
-          <rect x="2.6" y="24.5" width="8" height="13" rx="3.4" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
-          <rect x="53.4" y="24.5" width="8" height="13" rx="3.4" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
-          <path d="M6.6 36.5 C7.6 45.5 13 49.6 21.5 49.2" fill="none" stroke={GEAR} strokeWidth="1.7" strokeLinecap="round" />
-          <ellipse cx="23.2" cy="49.1" rx="2.6" ry="2" fill={GEAR} />
-          <circle cx="6.6" cy="29" r="1.25" fill={lightTone} style={{ animation: lightLoop }} />
-
-          {done ? (
-            <g fill="#ffffff" opacity="0.22">
-              <ellipse cx="16" cy="41" rx="4" ry="2" />
-              <ellipse cx="48" cy="41" rx="4" ry="2" />
-            </g>
-          ) : null}
-
-          {/* the eyes: one geometry, reshaped and moved by transform only */}
-          <g style={{ transform: `translate(${look.x}px, ${look.y}px)`, transition: LOOK_EASE }}>
-            <g style={{ transformOrigin: "32px 33px", animation: look.loop ?? "none" }}>
-              <g fill="var(--bg)">
-                {[24, 40].map((cx) => (
-                  <g key={cx} style={{ transformOrigin: `${cx}px 33px`, animation: blink }}>
-                    <g style={{ transformOrigin: `${cx}px 33px`, transform: eye, transition: SHAPE_EASE }}>
-                      <ellipse cx={cx} cy="33" rx={EYE_RX} ry={EYE_RY} />
-                      {/* a gleam in each eye: the secretary's own mark, and the eyes stay lively
-                          instead of reading as two dark holes */}
-                      {done ? null : <circle cx={cx + 2.3} cy="30.2" r="1.8" fill="#ffffff" opacity="0.92" />}
+            {/* the eyes: one geometry, reshaped and moved by transform only */}
+            <g style={{ transform: `translate(${base.x}px, ${base.y}px)`, transition: LOOK_EASE }}>
+              <g style={{ transformOrigin: "32px 33px", animation: eyeLoop }}>
+                <g fill="var(--bg)">
+                  {[24, 40].map((cx) => (
+                    <g key={cx} style={{ transformOrigin: `${cx}px 33px`, animation: blink }}>
+                      <g style={{ transformOrigin: `${cx}px 33px`, animation: lids ?? "none" }}>
+                        <g style={{ transformOrigin: `${cx}px 33px`, transform: eye, transition: SHAPE_EASE }}>
+                          <ellipse cx={cx} cy="33" rx={EYE_RX} ry={EYE_RY} />
+                          {/* a gleam in each eye: the secretary's own mark, and the eyes stay lively
+                              instead of reading as two dark holes */}
+                          {glad || asleep ? null : <circle cx={cx + 2.3} cy="30.2" r="1.8" fill="#ffffff" opacity="0.92" />}
+                        </g>
+                      </g>
                     </g>
-                  </g>
-                ))}
+                  ))}
+                </g>
               </g>
             </g>
+
+            <Mouth talking={talking || job === "doctor" || job === "taxi"} asked={asked} glad={glad} job={job} rest={rest && !asleep} />
+
+            {/* ---- what is held in front of the body ---- */}
+            {show("dnd") ? <Hush /> : null}
+            {show("come") ? <Notepad x={50} y={37} tilt={10} /> : null}
+            {show("other") ? <Writing /> : null}
+            {show("lunch") || show("courier") ? <Carried scene={job!} /> : null}
+            {/* the small secretary at the director's desk holds the job itself (D-97) */}
+            {mini && detailed && job && ["coffee", "tea", "water", "print", "meeting"].includes(job) ? <Carried scene={job} /> : null}
+            {detailed && finish && CARRY_OUT.has(finish) ? <Carried scene={finish} /> : null}
+            {act === "headset" && detailed ? <Mitten cx={8} cy={46} rx={3.2} ry={2.8} style={{ animation: "smc-hand-ear 2.2s ease-in-out both", opacity: 0 }} /> : null}
           </g>
-
-          <Mouth talking={talking || job === "doctor"} asked={asked} done={done} job={job} />
-
-          {/* ---- what is held in front of the body ---- */}
-          {show("dnd") ? <Hush /> : null}
-          {show("come") ? <Notepad x={50} y={37} tilt={10} /> : null}
-          {show("other") ? <Writing /> : null}
         </g>
       </g>
 
-      {/* rest: the laptop in front, the hands on the keys */}
-      {rest && detailed ? <Laptop /> : null}
+      {/* rest: the desk in front, the hands on the keys */}
+      {room && rest ? (
+        <>
+          <RoomFront act={act} asleep={asleep} />
+          <TypingHands asleep={asleep} />
+        </>
+      ) : null}
+      {asleep && detailed ? <Zzz /> : null}
 
-      {/* the teapot rides outside the body's sway: the pour needs a steady hand */}
-      {show("tea") ? <Teapot /> : null}
+      {/* the pourer rides outside the body's sway: the pour needs a steady hand */}
+      {inRoom("tea") ? <Pourer kind="teapot" /> : null}
+      {inRoom("water") ? <Pourer kind="carafe" /> : null}
 
-      {/* doctor: the call goes out of the microphone */}
-      {show("doctor") ? (
+      {/* doctor and taxi: the call goes out of the microphone, its subject over the head */}
+      {show("doctor") || show("taxi") ? (
         <>
           <g fill="none" stroke="var(--ok)" strokeWidth="1.3" strokeLinecap="round">
             {["M15 51 Q12 54 15 57", "M11 49 Q6.5 54 11 59"].map((d, i) => (
               <path key={d} d={d} style={{ transformBox: "fill-box", transformOrigin: "100% 50%", animation: `smc-ring 1.1s ease-out ${i * 0.28}s infinite`, opacity: 0 }} />
             ))}
           </g>
-          <Bubble tone="var(--danger)" still>
-            <Glyph scene="doctor" />
+          <Bubble tone={job === "doctor" ? "var(--danger)" : "var(--gold)"} motion="none">
+            <Glyph scene={job!} />
           </Bubble>
         </>
       ) : null}
 
-      {/* come: speed lines behind, dust from the steps */}
-      {show("come") ? (
-        <g stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round">
-          {[22, 30, 38].map((y, i) => (
-            <path key={y} d={`M62 ${y} h6`} style={{ animation: `smc-speed 0.56s ease-out ${i * 0.12}s infinite`, opacity: 0 }} />
-          ))}
-          <g fill="var(--text-muted)" stroke="none">
-            {[
-              { x: 50, y: 59, d: 0 },
-              { x: 56, y: 60, d: 0.28 },
-            ].map((puff) => (
-              <circle key={puff.x} cx={puff.x} cy={puff.y} r="1.8" style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: `mascot-act-dust 0.56s ease-out ${puff.d}s infinite`, opacity: 0 }} />
-            ))}
-          </g>
-        </g>
-      ) : null}
+      {/* walking jobs: speed lines behind, dust from the steps */}
+      {show("come") || show("lunch") || show("courier") || danger ? <Dust /> : null}
 
-      {/* asked: the request over the head, as a picture, hopping with the face */}
-      {asked && detailed ? (
-        <Bubble tone="var(--warn)">
+      {/* asked: the request over the head, as a picture, «+N» for the ones behind it */}
+      {/* (the director's desk shows the picture on its monitor instead) */}
+      {asked && detailed && !mini ? (
+        <Bubble tone={ringTone} motion={bubbleMotion} queue={queue}>
           <Glyph scene={scene ?? "other"} />
         </Bubble>
       ) : null}
 
+      {/* accept: «есть!» — a tick pops by the headset */}
+      {act === "accept" && detailed ? (
+        <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "smc-accept-tick 0.9s ease-out both", opacity: 0 }}>
+          <circle cx="2" cy="18" r="5" fill="var(--ok)" />
+          <path d="M-0.4 18.2 l1.8 1.8 L5 16.2" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </g>
+      ) : null}
+
       {/* done: a tick over the head, and two sparks */}
       {done && detailed ? (
-        <>
+        <Delayed ms={finish && CARRY_OUT.has(finish) ? 1500 : 300}>
           <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "smc-pop 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
             <circle cx="54" cy="6" r="7" fill="var(--ok)" />
             <path d="M50.6 6.2 l2.4 2.4 L57.6 3.6" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
           </g>
           <path d="M8 10 l1.2 2.8 l2.8 1.2 l-2.8 1.2 l-1.2 2.8 l-1.2 -2.8 l-2.8 -1.2 l2.8 -1.2 Z" fill="var(--gold)" style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-spark 3.8s infinite", opacity: 0 }} />
           <path d="M60 22 l1 2.2 l2.2 1 l-2.2 1 l-1 2.2 l-1 -2.2 l-2.2 -1 l2.2 -1 Z" fill="var(--gold)" style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-spark 3.8s 1.9s infinite", opacity: 0 }} />
-        </>
+        </Delayed>
       ) : null}
+      {cheer && detailed ? <Confetti /> : null}
+      {act === "thanks" && detailed ? <Hearts /> : null}
     </svg>
   );
 }
 
-function Arm({ d, hand }: { d: string; hand?: { cx: number; cy: number; rx: number; ry: number } }) {
-  // the hand sits where the arm ends: the last pair of numbers of the path
-  const end = d.trim().split(/\s+/).slice(-2).map(Number) as [number, number];
-  const at = hand ?? { cx: end[0], cy: end[1], rx: 3.4, ry: 3 };
-  return (
-    <g>
-      <path d={d} fill="none" stroke={SECRETARY_TONE} strokeWidth="5" strokeLinecap="round" />
-      <ellipse cx={at.cx} cy={at.cy} rx={at.rx} ry={at.ry} fill={SECRETARY_TONE} />
-    </g>
-  );
+/** Shown after a delay, by CSS alone: the tick waits until the cup has left the frame. */
+function Delayed({ ms, children }: { ms: number; children: ReactNode }) {
+  return <g style={{ animation: `smc-fade-in 0.01s linear ${ms}ms both` }}>{children}</g>;
 }
 
-function Mouth({ talking, asked, done, job }: { talking: boolean; asked: boolean; done: boolean; job: DeskScene | null }) {
+function Mouth({ talking, asked, glad, job, rest }: { talking: boolean; asked: boolean; glad: boolean; job: DeskScene | null; rest: boolean }) {
   if (talking) {
     return <ellipse cx="32" cy="45" rx="3.8" ry="2.8" fill="var(--bg)" style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }} />;
   }
   // an eager open smile — «да-да, слушаю»
   if (asked) return <path d="M27.6 43.6 Q32 44.6 36.4 43.6 Q35.6 49 32 49 Q28.4 49 27.6 43.6 Z" fill="var(--bg)" />;
-  if (done) return <path d="M26 43 Q32 48.6 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />;
+  if (glad) return <path d="M26 43 Q32 48.6 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />;
   // the finger covers the lips; walking is a set mouth; any other job is a small smile
   if (job === "dnd") return null;
-  if (job === "come") return <path d="M29 45 H35" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;
+  if (job === "come" || job === "lunch" || job === "courier") return <path d="M29 45 H35" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;
   if (job) return <path d="M27.5 43.8 Q32 47.2 36.5 43.8" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" />;
+  if (rest) return <path d="M28.6 43.2 Q32 45.4 35.4 43.2" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;
   return null;
 }
 
-/** A bubble over the head, on the right — the request (asked) or the call's subject (doctor). */
-function Bubble({ tone, still = false, children }: { tone: string; still?: boolean; children: ReactNode }) {
+function Dust() {
   return (
-    <g style={{ transformBox: "fill-box", transformOrigin: "30% 100%", animation: "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
-      <g style={{ transformBox: "fill-box", transformOrigin: "30% 100%", animation: still ? "none" : "smc-bubble 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite" }}>
-        <rect x="41" y="-19" width="24" height="19" rx="8" fill="var(--surface)" stroke={tone} strokeWidth="1.3" />
-        <circle cx="45" cy="3.2" r="2" fill="var(--surface)" stroke={tone} strokeWidth="1.1" />
-        <circle cx="41.6" cy="7" r="1.2" fill="var(--surface)" stroke={tone} strokeWidth="1" />
-        <g transform="translate(53 -9.5)">{children}</g>
-      </g>
-    </g>
-  );
-}
-
-/** The request as a small picture, drawn round (0, 0) in a box about 14 across. */
-function Glyph({ scene }: { scene: DeskScene }) {
-  switch (scene) {
-    case "coffee":
-      return (
-        <g>
-          <path d="M-5.5 -2 H4 V2 A3.5 3.5 0 0 1 0.5 5.5 H-2 A3.5 3.5 0 0 1 -5.5 2 Z" fill={COFFEE} />
-          <path d="M4 -0.8 a2 2 0 0 1 0 3.8" fill="none" stroke={COFFEE} strokeWidth="1.3" />
-          <path d="M-3 -4 q-1 -1.6 0 -3.2 M0.5 -4 q1 -1.6 0 -3.2" fill="none" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round" />
-        </g>
-      );
-    case "tea":
-      return (
-        <g>
-          <path d="M-5.5 -1 H4.5 V2 A3.5 3.5 0 0 1 1 5.5 H-2 A3.5 3.5 0 0 1 -5.5 2 Z" fill="var(--surface-2)" stroke={TEA} strokeWidth="1.2" />
-          <ellipse cx="-0.5" cy="-0.8" rx="4.6" ry="0.9" fill={TEA} />
-          <path d="M3 -1 L5.5 -5" stroke="var(--text-muted)" strokeWidth="0.7" />
-          <rect x="4.2" y="-7.6" width="3" height="3" rx="0.5" fill="var(--gold)" />
-        </g>
-      );
-    case "dnd":
-      return (
-        <g>
-          <circle r="5.8" fill="var(--danger)" />
-          <rect x="-3.8" y="-1.1" width="7.6" height="2.2" rx="1.1" fill="#ffffff" />
-        </g>
-      );
-    case "guest":
-      return (
-        <g>
-          <rect x="-6" y="-6.5" width="8.5" height="13" rx="1" fill="var(--surface-2)" stroke={EDGE} strokeWidth="0.9" />
-          <circle cx="0.6" cy="0.4" r="0.8" fill="var(--gold)" />
-          <circle cx="5" cy="-2.6" r="2" fill="var(--text-muted)" />
-          <path d="M2 6.5 C2 1.6 8 1.6 8 6.5 Z" fill="var(--text-muted)" />
-        </g>
-      );
-    case "doctor":
-      return (
-        <g>
-          <rect x="-5.5" y="-5.5" width="11" height="11" rx="2.6" fill="#ffffff" />
-          <path d="M0 -3.4 V3.4 M-3.4 0 H3.4" stroke="var(--danger)" strokeWidth="2.2" strokeLinecap="round" />
-        </g>
-      );
-    case "come":
-      return (
-        <g>
-          <rect x="-1" y="-6.5" width="7.5" height="13" rx="1" fill="var(--surface-2)" stroke={EDGE} strokeWidth="0.9" />
-          <path d="M-7 0 H-1.6 M-4 -2.6 L-1.4 0 L-4 2.6" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </g>
-      );
-    default:
-      return <path d="M0 -5.5 V1.5 M0 4.8 V5" stroke="var(--warn)" strokeWidth="2.6" strokeLinecap="round" />;
-  }
-}
-
-function Laptop() {
-  return (
-    <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-prop-in 0.4s cubic-bezier(0.34, 1.3, 0.64, 1) both" }}>
-      {/* the back of the lid, facing us, with a glowing mark */}
-      <rect x="16.5" y="41" width="31" height="14.5" rx="2.2" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1" />
-      <circle cx="32" cy="48.2" r="1.9" fill="var(--accent)" style={{ animation: "smc-glow 2.6s ease-in-out infinite" }} />
-      <rect x="13" y="55" width="38" height="3" rx="1.5" fill={EDGE} />
-      {/* the hands on the keys, in turn */}
-      {[
-        { cx: 18.5, d: "0s" },
-        { cx: 45.5, d: "0.21s" },
-      ].map((hand) => (
-        <ellipse
-          key={hand.cx}
-          cx={hand.cx}
-          cy="54.2"
-          rx="3.5"
-          ry="2.6"
-          fill={SECRETARY_TONE}
-          stroke="var(--bg)"
-          strokeOpacity="0.3"
-          strokeWidth="0.8"
-          style={{ animation: `smc-tap 0.42s ease-in-out ${hand.d} infinite` }}
-        />
+    <g stroke="var(--text-muted)" strokeWidth="1.2" strokeLinecap="round">
+      {[22, 30, 38].map((y, i) => (
+        <path key={y} d={`M62 ${y} h6`} style={{ animation: `smc-speed 0.56s ease-out ${i * 0.12}s infinite`, opacity: 0 }} />
       ))}
-    </g>
-  );
-}
-
-function CoffeeMachine() {
-  return (
-    <g style={{ transformBox: "fill-box", transformOrigin: "100% 100%", animation: PROP_IN }}>
-      <rect x="-27" y="18" width="22" height="40" rx="3.5" fill="var(--surface)" stroke={EDGE} strokeWidth="1.3" />
-      <rect x="-27" y="18" width="22" height="9" rx="3.5" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.3" />
-      <circle cx="-16" cy="22.5" r="1.5" fill={EDGE} />
-      <circle cx="-10" cy="22.5" r="1.6" fill="var(--ok)" style={{ animation: "smc-light 1.3s steps(1) infinite" }} />
-      {/* the alcove, the spout, the stream */}
-      <rect x="-24" y="30.5" width="16" height="22" rx="2" fill="var(--bg)" opacity="0.55" />
-      <rect x="-18" y="30.5" width="4" height="3" rx="1" fill={EDGE} />
-      <rect x="-16.6" y="33.5" width="1.2" height="12.5" fill={COFFEE} style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "smc-stream 2.6s ease-in-out infinite" }} />
-      {/* the cup under it, filling */}
-      <path d="M-21 46 H-11 V49.6 A3.6 3.6 0 0 1 -14.6 53.2 H-17.4 A3.6 3.6 0 0 1 -21 49.6 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.1" />
-      <path d="M-11 47.2 a2 2 0 0 1 0 4" fill="none" stroke="var(--text-muted)" strokeWidth="1.1" />
-      <ellipse cx="-16" cy="46.6" rx="4.4" ry="0.9" fill={COFFEE} style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "smc-fill 2.6s ease-out infinite" }} />
-      <rect x="-25" y="53.5" width="18" height="2" rx="1" fill={EDGE} />
-      <Steam x={-16} y={44} />
-    </g>
-  );
-}
-
-function TeaCup() {
-  return (
-    <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: PROP_IN }}>
-      <ellipse cx="-21" cy="57.6" rx="9.5" ry="1.9" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1" />
-      <path d="M-27 48 H-15 V51.4 A4.4 4.4 0 0 1 -19.4 55.8 H-22.6 A4.4 4.4 0 0 1 -27 51.4 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.1" />
-      <path d="M-15 49.4 a2.2 2.2 0 0 1 0 4.4" fill="none" stroke="var(--text-muted)" strokeWidth="1.1" />
-      <ellipse cx="-21" cy="48.6" rx="5.4" ry="1" fill={TEA} style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "smc-fill 3.2s ease-out infinite" }} />
-      {/* the tea bag's tag over the rim, swinging a little */}
-      <g style={{ transformOrigin: "-17px 48px", animation: "smc-tag 2.4s ease-in-out infinite" }}>
-        <path d="M-17 48 L-13.6 52.6" stroke="var(--text-muted)" strokeWidth="0.6" />
-        <rect x="-15" y="52.4" width="3.2" height="3.6" rx="0.6" fill="var(--gold)" />
-      </g>
-      <Steam x={-21} y={46} />
-    </g>
-  );
-}
-
-/** The pot in the left hand, above the cup: it tips to pour and rights itself. */
-function Teapot() {
-  return (
-    <g transform="translate(-2 30)">
-      <g style={{ transformOrigin: "0px 0px", animation: "smc-teapot 3.2s ease-in-out infinite" }}>
-        <g style={{ transformBox: "fill-box", transformOrigin: "100% 50%", animation: PROP_IN }}>
-          <path d="M-15 0.5 L-21 -4.5" fill="none" stroke="var(--text-muted)" strokeWidth="2.4" strokeLinecap="round" />
-          <ellipse cx="-9" cy="0" rx="7.5" ry="6" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.2" />
-          <path d="M-15.6 1.5 H-2.4" stroke={TEA} strokeWidth="1.6" />
-          <ellipse cx="-9" cy="-6" rx="3.8" ry="1.3" fill="var(--surface-2)" stroke="var(--text-muted)" strokeWidth="0.9" />
-          <circle cx="-9" cy="-8" r="1.2" fill="var(--text-muted)" />
-          <path d="M-2.2 -3 Q2 -1 -2.2 3.4" fill="none" stroke="var(--text-muted)" strokeWidth="1.6" />
-        </g>
-      </g>
-      {/* the stream, from where the spout's tip lands at the tilt down to the cup */}
-      <rect x="-20.2" y="9" width="1.4" height="9" rx="0.7" fill={TEA} style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "smc-tea-stream 3.2s ease-in-out infinite" }} />
-      {/* the hand on the handle */}
-      <ellipse cx="-0.6" cy="0.6" rx="3.3" ry="2.9" fill={SECRETARY_TONE} />
-    </g>
-  );
-}
-
-function Sign() {
-  return (
-    <g style={{ transformOrigin: "63px 31px", animation: "smc-sign 2.8s ease-in-out infinite" }}>
-      <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: PROP_IN }}>
-        <rect x="54.5" y="3" width="18" height="26" rx="4" fill="var(--surface)" stroke="var(--danger)" strokeWidth="1.4" />
-        <circle cx="63.5" cy="8.2" r="2.3" fill="var(--bg)" />
-        <circle cx="63.5" cy="19.5" r="6" fill="var(--danger)" />
-        <rect x="59.4" y="18.4" width="8.2" height="2.2" rx="1.1" fill="#ffffff" />
+      <g fill="var(--text-muted)" stroke="none">
+        {[
+          { x: 50, y: 59, d: 0 },
+          { x: 56, y: 60, d: 0.28 },
+        ].map((puff) => (
+          <circle key={puff.x} cx={puff.x} cy={puff.y} r="1.8" style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: `mascot-act-dust 0.56s ease-out ${puff.d}s infinite`, opacity: 0 }} />
+        ))}
       </g>
     </g>
   );
 }
 
-/** A finger on the lips and «тсс» floating off them. */
-function Hush() {
+/** Dozing at the desk: two small «z» drift up off the head. */
+function Zzz() {
   return (
-    <>
-      <ellipse cx="33.5" cy="51.6" rx="4.4" ry="3.3" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
-      <ellipse cx="33" cy="45.4" rx="1.9" ry="4.6" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
-      <text x="-9" y="47" fontSize="6.4" fontWeight="700" fill="var(--text-muted)" style={{ animation: "smc-shh 2.8s ease-out infinite", opacity: 0 }}>
-        тсс
+    <g fontSize="6.4" fontWeight="800" fill="var(--text-muted)">
+      <text x="46" y="10" style={{ animation: "mascot-zzz 3.4s ease-out infinite", opacity: 0 }}>
+        z
       </text>
-    </>
-  );
-}
-
-function Door() {
-  return (
-    <g style={{ transformBox: "fill-box", transformOrigin: "100% 100%", animation: PROP_IN }}>
-      <rect x="-27" y="7" width="24" height="52" rx="2" fill="var(--bg)" stroke={EDGE} strokeWidth="1.3" />
-      {/* the guest in the doorway, seen once the door is open */}
-      <g opacity="0" style={{ animation: "smc-guest 4.2s ease-in-out infinite" }}>
-        <circle cx="-15" cy="27" r="5" fill="var(--text-muted)" />
-        <path d="M-23 50 C-23 37.5 -7 37.5 -7 50 V58 H-23 Z" fill="var(--text-muted)" />
-      </g>
-      {/* the leaf, on its hinge at the left edge */}
-      <g style={{ transformOrigin: "-26px 33px", animation: "smc-door 4.2s ease-in-out infinite" }}>
-        <rect x="-26" y="8" width="22" height="50" rx="1.5" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1" />
-        <rect x="-23" y="12" width="16" height="17" rx="1" fill="none" stroke={EDGE} strokeWidth="0.8" />
-        <rect x="-23" y="33" width="16" height="21" rx="1" fill="none" stroke={EDGE} strokeWidth="0.8" />
-        <circle cx="-7.2" cy="34" r="1.4" fill="var(--gold)" />
-      </g>
-    </g>
-  );
-}
-
-function Notepad({ x, y, tilt }: { x: number; y: number; tilt: number }) {
-  return (
-    <g transform={`translate(${x} ${y}) rotate(${tilt})`}>
-      <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: PROP_IN }}>
-        <rect x="0" y="0" width="13" height="16" rx="1.6" fill="var(--surface)" stroke={EDGE} strokeWidth="1" />
-        <rect x="3" y="-1.4" width="7" height="2.6" rx="1" fill={EDGE} />
-        <path d="M2.6 5 h7.6 M2.6 8.4 h6 M2.6 11.8 h7" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round" />
-      </g>
-    </g>
-  );
-}
-
-/** other: a note in front, a pen going over it. */
-function Writing() {
-  return (
-    <>
-      <Notepad x={39} y={39} tilt={-8} />
-      <g style={{ animation: "smc-write 1.6s ease-in-out infinite" }}>
-        <path d="M45 42 L52 34" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
-        <ellipse cx="52.6" cy="33.8" rx="3" ry="2.6" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
-      </g>
-    </>
-  );
-}
-
-function Steam({ x, y }: { x: number; y: number }) {
-  const curl = (delay: number): CSSProperties => ({
-    transformBox: "fill-box",
-    transformOrigin: "50% 100%",
-    animation: `mascot-steam 2.2s ease-out ${delay}s infinite`,
-    opacity: 0,
-  });
-  return (
-    <g fill="none" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round">
-      <path d={`M${x - 2} ${y} q-1.3 -2.2 0 -4.4`} style={curl(0)} />
-      <path d={`M${x + 1.6} ${y} q1.3 -2.2 0 -4.4`} style={curl(1.1)} />
+      <text x="51" y="4" fontSize="5" style={{ animation: "mascot-zzz 3.4s ease-out 1.7s infinite", opacity: 0 }}>
+        z
+      </text>
     </g>
   );
 }

@@ -6,10 +6,14 @@ import {
   firstLine,
   groupNotes,
   markMatches,
+  nextReminder,
   notesHero,
   noteTime,
+  reminderRu,
+  remindPresets,
   restLines,
   splitNotes,
+  trashExpiresAt,
 } from "./list";
 import type { Note } from "./queries";
 
@@ -27,6 +31,8 @@ function note(overrides: Partial<Note> = {}): Note {
     converted_announcement_id: null,
     converted_at: null,
     deleted_at: null,
+    remind_at: null,
+    reminded_at: null,
     client_request_id: null,
     created_at: "2026-09-17T10:00:00Z",
     updated_at: "2026-09-17T10:00:00Z",
@@ -168,5 +174,71 @@ describe("notesHero", () => {
 
   it("says what to do when there is nothing yet", () => {
     expect(notesHero(splitNotes([]), NOW).value).toBeNull();
+  });
+});
+
+describe("the bin keeps three days (D-95)", () => {
+  it("expires a deletion three days after it", () => {
+    const gone = note({ deleted_at: "2026-09-20T07:00:00Z" });
+    expect(trashExpiresAt(gone).toISOString()).toBe("2026-09-23T07:00:00.000Z");
+  });
+
+  it("drops what is past its time even before the sweep comes round", () => {
+    const fresh = note({ deleted_at: "2026-09-22T07:00:00Z" });
+    const stale = note({ deleted_at: "2026-09-20T06:59:00Z" });
+    expect(splitNotes([fresh, stale], NOW).trash.map((n) => n.id)).toEqual([fresh.id]);
+    // without a clock nothing is dropped
+    expect(splitNotes([fresh, stale]).trash).toHaveLength(2);
+  });
+});
+
+describe("search reaches what was said", () => {
+  it("finds a word the director edited away", () => {
+    const edited = note({ text: "Позвонить поставщику", raw_transcript: "позвонить в Казхром насчёт труб" });
+    expect(filterNotes([edited], "казхром")).toHaveLength(1);
+  });
+});
+
+describe("reminders (D-95)", () => {
+  const soon = note({ text: "Позвонить в Казхром", remind_at: "2026-09-24T04:00:00Z" });
+  const later = note({ text: "Счёт от поставщика", remind_at: "2026-09-28T04:00:00Z", pinned: true });
+  const rung = note({ text: "Уже было", remind_at: "2026-09-23T04:00:00Z", reminded_at: "2026-09-23T04:00:30Z", created_at: "2026-09-23T03:00:00Z" });
+
+  it("files reminders still to ring first, soonest first — pinned or not", () => {
+    const groups = groupNotes(splitNotes([rung, later, soon]).active, NOW);
+    expect(groups[0].key).toBe("reminders");
+    expect(groups[0].notes.map((n) => n.text)).toEqual(["Позвонить в Казхром", "Счёт от поставщика"]);
+    // a reminder that has rung goes back to its day
+    expect(groups.find((g) => g.key === "today")?.notes.map((n) => n.text)).toEqual(["Уже было"]);
+    expect(groups.some((g) => g.key === "pinned")).toBe(false);
+  });
+
+  it("says the reminder the way a person does", () => {
+    expect(reminderRu(soon, NOW)).toBe("напомню завтра 09:00");
+    expect(reminderRu(rung, NOW)).toBe("напомнил сегодня 09:00");
+    expect(reminderRu(note({ remind_at: "2026-09-23T06:59:00Z" }), NOW)).toBe("напомню сейчас");
+    expect(reminderRu(note(), NOW)).toBeNull();
+  });
+
+  it("puts the soonest one on the status screen", () => {
+    expect(nextReminder([later, soon, rung])?.id).toBe(soon.id);
+    expect(notesHero(splitNotes([rung, later, soon]), NOW).second).toBe("напомню завтра 09:00 · 3 за 7 дней");
+  });
+
+  it("offers one-tap times", () => {
+    // Wednesday 12:00 in Aqtobe
+    expect(remindPresets(NOW).map((p) => [p.label, p.at.toISOString()])).toEqual([
+      ["Через час", "2026-09-23T08:00:00.000Z"],
+      ["Сегодня 18:00", "2026-09-23T13:00:00.000Z"],
+      ["Завтра 9:00", "2026-09-24T04:00:00.000Z"],
+      ["Пн 9:00", "2026-09-28T04:00:00.000Z"],
+    ]);
+  });
+
+  it("drops the evening once it is less than an hour away, and Monday when it is tomorrow", () => {
+    // Sunday 17:10 in Aqtobe
+    const sunday = new Date("2026-09-27T12:10:00Z");
+    expect(remindPresets(sunday).map((p) => p.label)).toEqual(["Через час", "Завтра 9:00"]);
+    expect(remindPresets(sunday)[0].at.toISOString()).toBe("2026-09-27T13:10:00.000Z");
   });
 });

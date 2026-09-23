@@ -12,6 +12,8 @@ type Props = {
   everyone: boolean;
   selectedIds: string[];
   onDone: (next: { everyone: boolean; ids: string[] }) => void;
+  /** People who are in anyway and need no check — the author of a meeting (D-94). */
+  hideIds?: string[];
 };
 
 function Check({ on, dim }: { on: boolean; dim: boolean }) {
@@ -40,12 +42,12 @@ function Check({ on, dim }: { on: boolean; dim: boolean }) {
  * not the assignee sheet: «Все сотрудники» is a switch above the list, and while it is on
  * the individual checks are inert — the company is already the answer.
  */
-export function ParticipantsPicker({ open, onClose, everyone, selectedIds, onDone }: Props) {
+export function ParticipantsPicker({ open, onClose, everyone, selectedIds, onDone, hideIds }: Props) {
   return (
     <Sheet open={open} onClose={onClose} title="Кто участвует?">
       {/* the body is born with the sheet, so every opening starts from the list the card
           holds right now — the same trick DeadlineSheet uses */}
-      <ParticipantsBody everyone={everyone} selectedIds={selectedIds} onClose={onClose} onDone={onDone} />
+      <ParticipantsBody everyone={everyone} selectedIds={selectedIds} onClose={onClose} onDone={onDone} hideIds={hideIds} />
     </Sheet>
   );
 }
@@ -55,6 +57,7 @@ function ParticipantsBody({
   selectedIds,
   onClose,
   onDone,
+  hideIds = [],
 }: Omit<Props, "open">) {
   const roster = useRoster();
   const [all, setAll] = useState(everyone);
@@ -79,7 +82,7 @@ function ParticipantsBody({
         {roster.isLoading ? <p className="px-3 py-2 text-[14px] text-muted">Загружаю…</p> : null}
         {roster.isError ? <p className="px-3 py-2 text-[14px] text-danger">Не смог загрузить список</p> : null}
 
-        {(roster.data ?? []).map((user) => (
+        {(roster.data ?? []).filter((user) => !hideIds.includes(user.id)).map((user) => (
           <button
             key={user.id}
             type="button"

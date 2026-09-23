@@ -3,7 +3,10 @@
 import { useMutation, useMutationState, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { isNetworkError } from "@/lib/net";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+
+import { claim, dropCreate, keepCreate, keepEdit, release, settleEdit, type NoteFields } from "./pending";
 import { noteKeys, type Note } from "./queries";
 
 /**
@@ -55,6 +58,13 @@ export async function insertNote(me: Me, row: NewNote): Promise<Note> {
 }
 
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
+const KEPT_OFFLINE = "Нет связи — сохранил на телефоне, отправлю сам";
+
+/**
+ * Creates and edits of notes run one after another (TanStack `scope`): an edit made
+ * while its note is still on its way must not reach the server before the note does.
+ */
+const SERIAL = { id: "notes" };
 
 function keyOf(userId: string) {
   return noteKeys.mine(userId);
@@ -98,11 +108,26 @@ export function useCreateNote(me: Me | undefined) {
 
   return useMutation({
     mutationKey: ["notes", "create"],
+    scope: SERIAL,
     mutationFn: (row: NewNote) => insertNote(me as Me, row),
     onMutate: async (row) => {
       if (!me) return;
-      await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       const now = new Date().toISOString();
+      // on the phone first: a tab closed before the insert lands must not lose the thought (D-95);
+      // while this mutation owns it (even paused offline), the replay leaves it alone
+      claim(row.id);
+      void keepCreate({
+        id: row.id,
+        userId: me.userId,
+        companyId: me.companyId,
+        crid: row.client_request_id,
+        text: row.text,
+        createdAt: now,
+        audio: null,
+        audioPath: null,
+        inboxId: null,
+      });
+      await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       upsertCached(queryClient, me.userId, {
         company_id: me.companyId,
         user_id: me.userId,
@@ -114,40 +139,69 @@ export function useCreateNote(me: Me | undefined) {
         converted_announcement_id: null,
         converted_at: null,
         deleted_at: null,
+        remind_at: null,
+        reminded_at: null,
         created_at: now,
         updated_at: now,
         ...row,
       });
     },
     onSuccess: (row) => {
+      void dropCreate(row.id);
       if (me) upsertCached(queryClient, me.userId, row);
     },
     onError: (error, row) => {
+      // a dead network after all retries: the note stays on screen and on the phone,
+      // the replay sends it when the network is back
+      if (isNetworkError(error)) {
+        toast(KEPT_OFFLINE);
+        return;
+      }
+      void dropCreate(row.id);
       if (me) queryClient.setQueryData<Note[]>(keyOf(me.userId), (rows) => (rows ?? []).filter((note) => note.id !== row.id));
       fail(error);
+    },
+    onSettled: (_data, _error, row) => {
+      release(row.id);
     },
   });
 }
 
 const UPDATE_KEY = ["notes", "update"] as const;
 
-/** Text (autosave) and «Закрепить» — the last writer wins, as on any note app. */
+/**
+ * Text (autosave), «Закрепить» and «Напомнить» — the last writer wins, as on any note
+ * app. The fields are kept on the phone until the server has them (D-95).
+ */
 export function useUpdateNote(me: { userId: string } | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationKey: UPDATE_KEY,
-    mutationFn: async ({ id, ...fields }: { id: string; text?: string; pinned?: boolean }) => {
+    scope: SERIAL,
+    mutationFn: async ({ id, ...fields }: { id: string } & NoteFields) => {
       const supabase = createBrowserSupabase();
       const { error } = await supabase.from("notes").update(fields).eq("id", id);
       if (error) throw new Error(error.message);
     },
     onMutate: async ({ id, ...fields }) => {
       if (!me) return undefined;
+      void keepEdit(me.userId, id, fields);
       await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
-      return { snapshot: patch(queryClient, me.userId, id, fields) };
+      // a new time rings again: the cache says so before the trigger does
+      const shown: Partial<Note> = "remind_at" in fields ? { ...fields, reminded_at: null } : fields;
+      return { snapshot: patch(queryClient, me.userId, id, shown) };
     },
-    onError: (error, _input, context) => {
+    onSuccess: (_data, { id, ...fields }) => {
+      void settleEdit(id, fields);
+    },
+    onError: (error, { id, ...fields }, context) => {
+      // the edit stays on screen and on the phone; the replay writes it later
+      if (isNetworkError(error)) {
+        toast(KEPT_OFFLINE);
+        return;
+      }
+      void settleEdit(id, fields);
       if (me && context) rollback(queryClient, me.userId, context.snapshot);
       fail(error);
     },

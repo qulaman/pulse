@@ -27,7 +27,7 @@ export function CalendarOnWall() {
           { onSuccess: () => toast(onWall ? "Календарь убран со стены" : "Календарь на стене · неделя вперёд") },
         )
       }
-      className="-mt-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition-colors duration-[120ms] active:bg-surface-2 disabled:opacity-50"
+      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px] transition-colors duration-[120ms] active:bg-surface-2 disabled:opacity-50"
       style={{ color: onWall ? "var(--accent)" : "var(--text-muted)", background: onWall ? "color-mix(in srgb, var(--accent) 14%, transparent)" : undefined }}
       data-testid="calendar-on-wall"
     >

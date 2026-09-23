@@ -2,22 +2,16 @@
 
 import { useState } from "react";
 
-import { ParticipantsPicker } from "@/components/confirm/ParticipantsPicker";
-import { useRoster } from "@/components/confirm/useRoster";
-import { WhenSheet } from "@/components/confirm/WhenSheet";
+import { EventEditor } from "@/components/calendar/EventEditor";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { Sheet } from "@/components/ui/Sheet";
 import { humanAqtobe } from "@/lib/ai/time";
-import { myStatus, rsvpSummary, timeRange } from "@/lib/calendar/agenda";
-import {
-  useCancelEvent,
-  useRespondEvent,
-  useSetParticipants,
-  useUpdateEvent,
-} from "@/lib/calendar/mutations";
+import { humanYmd } from "@/lib/datetime/calendar";
+import { isOver, myStatus, rsvpSummary, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
+import { useDeleteEvent, useRespondEvent } from "@/lib/calendar/mutations";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 
 type Props = {
@@ -25,6 +19,8 @@ type Props = {
   onClose: () => void;
   meId: string;
   isDirector: boolean;
+  /** The director saved the form — with the start as it is now (the month may follow it). */
+  onSaved?: (startsAt: string) => void;
 };
 
 /** Причины «Не смогу» — те же чипы, что у задачи: короткие и правдивые. */
@@ -39,30 +35,26 @@ const DOT: Record<string, string> = {
 /**
  * One meeting, opened from the ribbon or from a push (`/calendar?e=…`). A participant has
  * exactly two buttons — «Буду» and «Не смогу» (principle 2 counted in its own way: a
- * meeting is not a task, so there is no «Уточнить»); the director gets the guest list, the
- * new time and the way to call it off.
+ * meeting is not a task, so there is no «Уточнить»); the director gets «Изменить» — the
+ * whole form of the meeting — and «Удалить» (D-94).
  */
-export function EventSheet({ event, onClose, meId, isDirector }: Props) {
+export function EventSheet({ event, onClose, meId, isDirector, onSaved }: Props) {
   return (
     <Sheet open={Boolean(event)} onClose={onClose} title={event?.title ?? ""}>
-      {event ? <EventBody event={event} onClose={onClose} meId={meId} isDirector={isDirector} /> : null}
+      {event ? (
+        <EventBody event={event} onClose={onClose} meId={meId} isDirector={isDirector} onSaved={onSaved} />
+      ) : null}
     </Sheet>
   );
 }
 
-function EventBody({ event, onClose, meId, isDirector }: { event: CalendarEvent } & Omit<Props, "event">) {
+function EventBody({ event, onClose, meId, isDirector, onSaved }: { event: CalendarEvent } & Omit<Props, "event">) {
   const respond = useRespondEvent(meId);
-  const setParticipants = useSetParticipants();
-  // «Все сотрудники» on a meeting that already exists: the RPC takes ids, not a flag, so
-  // the whole roster the director sees becomes the list to add (the sheet is director-only)
-  const roster = useRoster();
-  const update = useUpdateEvent();
-  const cancel = useCancelEvent();
+  const remove = useDeleteEvent();
 
   const [declining, setDeclining] = useState(false);
-  const [whoOpen, setWhoOpen] = useState(false);
-  const [whenOpen, setWhenOpen] = useState(false);
-  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const mine = myStatus(event, meId);
   const canAnswer = mine !== null && event.author_id !== meId;
@@ -75,8 +67,10 @@ function EventBody({ event, onClose, meId, isDirector }: { event: CalendarEvent 
   return (
     <>
       <p className="text-[16px] leading-[22px]">
-        {humanAqtobe(new Date(event.starts_at))}
-        {event.ends_at ? ` · ${timeRange(event)}` : ""}
+        {/* «завтра · 14:00–15:30» — the start is said once, whether or not there is an end */}
+        {event.ends_at
+          ? `${humanYmd(ymdOfEvent(event))} · ${timeRange(event)}`
+          : humanAqtobe(new Date(event.starts_at))}
       </p>
       {event.location ? <p className="mt-1 text-[15px] leading-5 text-muted">{event.location}</p> : null}
       {event.body ? <p className="mt-2 text-[15px] leading-5">{event.body}</p> : null}
@@ -144,61 +138,46 @@ function EventBody({ event, onClose, meId, isDirector }: { event: CalendarEvent 
 
       {isDirector ? (
         <RowGroup className="mt-4">
+          <Row icon={<PencilIcon />} title="Изменить" onClick={() => setEditing(true)} />
           <Row
-            icon={<PeopleIcon />}
-            title="Участники"
-            value={String(event.participants.length)}
-            onClick={() => setWhoOpen(true)}
-          />
-          <Row icon={<ClockIcon />} title="Перенести" value={timeRange(event)} onClick={() => setWhenOpen(true)} />
-          <Row
-            icon={<CrossIcon />}
-            title="Отменить мероприятие"
+            icon={<TrashIcon />}
+            title="Удалить мероприятие"
             tone="danger"
-            onClick={() => setConfirmCancel(true)}
+            onClick={() => setConfirmDelete(true)}
           />
         </RowGroup>
       ) : null}
 
-      <ParticipantsPicker
-        open={whoOpen}
-        onClose={() => setWhoOpen(false)}
-        everyone={event.everyone}
-        selectedIds={event.participants.map((p) => p.user_id)}
-        onDone={({ everyone, ids }) => {
-          const was = event.participants.map((p) => p.user_id);
-          // «Все» is the roster itself; either way the RPC gets the difference of two lists
-          const next = everyone ? [...new Set([...was, ...(roster.data ?? []).map((u) => u.id)])] : ids;
-          setParticipants.mutate({
-            eventId: event.id,
-            add: next.filter((id) => !was.includes(id)),
-            remove: was.filter((id) => !next.includes(id) && id !== event.author_id),
-          });
-        }}
-      />
+      {isDirector ? (
+        <EventEditor
+          open={editing}
+          onClose={() => setEditing(false)}
+          event={event}
+          meId={meId}
+          onSaved={onSaved}
+        />
+      ) : null}
 
-      <WhenSheet
-        open={whenOpen}
-        onClose={() => setWhenOpen(false)}
-        currentIso={event.starts_at}
-        onPick={(iso) => update.mutate({ eventId: event.id, fields: { starts_at: iso } })}
-      />
-
-      <Sheet open={confirmCancel} onClose={() => setConfirmCancel(false)} title="Отменить мероприятие?">
-        <p className="text-[15px] leading-5 text-muted">Участники получат уведомление об отмене.</p>
+      <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Удалить мероприятие?">
+        <p className="text-[15px] leading-5 text-muted">
+          {/* who already knew gets «Отмена»; a past meeting just leaves the calendar */}
+          {!isOver(event, new Date()) && event.participants.some((p) => p.user_id !== event.author_id)
+            ? "Оно исчезнет из календаря у всех. Кто уже знает о нём, получит уведомление об отмене."
+            : "Оно исчезнет из календаря у всех."}
+        </p>
         <div className="mt-3 flex flex-col gap-2">
           <Button
             variant="danger"
             block
             onClick={() => {
-              cancel.mutate({ eventId: event.id });
-              setConfirmCancel(false);
+              remove.mutate({ eventId: event.id });
+              setConfirmDelete(false);
               onClose();
             }}
           >
-            Да, отменить
+            Удалить
           </Button>
-          <Button variant="ghost" block onClick={() => setConfirmCancel(false)}>
+          <Button variant="ghost" block onClick={() => setConfirmDelete(false)}>
             Оставить
           </Button>
         </div>
@@ -215,30 +194,20 @@ const STROKE = {
   strokeLinejoin: "round" as const,
 };
 
-function PeopleIcon() {
+function PencilIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden {...STROKE}>
-      <circle cx="9" cy="8.5" r="3" />
-      <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
-      <path d="M16 6.2a3 3 0 0 1 0 5.6M17.5 14.4c2 .7 3 2.4 3 4.6" />
+      <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
     </svg>
   );
 }
 
-function ClockIcon() {
+function TrashIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden {...STROKE}>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" />
-    </svg>
-  );
-}
-
-function CrossIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden {...STROKE}>
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M9 9l6 6M15 9l-6 6" />
+      <path d="M4.5 7h15M10 7V4.5h4V7M6.5 7l1 13h9l1-13" />
+      <path d="M10 11v5.5M14 11v5.5" />
     </svg>
   );
 }

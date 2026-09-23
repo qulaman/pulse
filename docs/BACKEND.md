@@ -59,7 +59,7 @@ requireRole(profile, ...roles: Role[]): void                        // 403 ес�
 
 ### POST /api/voice/upload-url
 Вход: `{ ext: 'webm'|'m4a'|'mp4', context: 'director_input'|'task_message' }`.
-Выход: `{ audio_path, signed_url, token }`. Путь строго `voice/{company_id}/{user_id}/{uuid}.{ext}`. Клиент грузит НАПРЯМУЮ в Storage по signed upload URL — лимит тела Vercel 4.5 МБ не участвует. Политики бакета — по сегментам пути (DATABASE.md).
+Выход: `{ audio_path, signed_url, token }`. Путь строго `voice/{company_id}/{user_id}/{uuid}.{ext}`. Клиент грузит НАПРЯМУЮ в Storage по signed upload URL — лимит тела Vercel 4.5 МБ не участвует. Политики бакета — по сегментам пути (DATABASE.md). Объект этого ключа уже в Storage (прошлая загрузка дошла, ответ потерялся) — `{ audio_path, signed_url: '', token: '', stored: true }`, клиент загрузку пропускает и идёт дальше (D-95): повтор не падает навсегда.
 
 ### POST /api/voice/transcribe
 `export const maxDuration = 60`.
@@ -154,6 +154,7 @@ Handler: auth → zod → `rpc('confirm_voice_batch', { payload, client_request_
 - **Триггер БД вставляет строку `queued` — и НИКОГДА не зовёт HTTP.** Push-триггер задач срабатывает только на переход `scheduled/insert → sent`.
 - `pg_net` — только «пинок» Edge Function `send-push` (fire-and-forget допустим, потому что есть свип).
 - Страховка: pg_cron-свип каждую минуту — зависшие `queued`/`failed` c `attempts < 3` переотправляются.
+- Минутный свип `POST /api/push/sweep` (Vercel cron, сервисный ключ) перед отправкой очереди зовёт тики, каждый сам по себе (ошибка одного пишется в лог и не валит свип): `events_due_reminders` (D-78), `errands_due_escalation` (D-79), `notes_due_reminders` — напоминания заметок, пуш `note_reminder` автору без тихих часов, ссылка `/notes?n=<id>` — и `notes_purge_trash` — корзина заметок старше 3 дней (D-95).
 - Edge Function `send-push`: читает пачку queued → web-push → `sent`/`failed(attempts+1, last_error)`.
 
 ### Ack-семантика (D-32)

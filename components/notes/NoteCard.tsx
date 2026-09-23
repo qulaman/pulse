@@ -10,7 +10,18 @@ import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import { awaitsWords, firstLine, markMatches, noteTime, restLines, whenRu, type NoteGroupKey } from "@/lib/notes/list";
+import {
+  awaitsReminder,
+  awaitsWords,
+  firstLine,
+  markMatches,
+  noteTime,
+  reminderRu,
+  restLines,
+  trashExpiresAt,
+  whenRu,
+  type NoteGroupKey,
+} from "@/lib/notes/list";
 import { useNoteSaveState } from "@/lib/notes/mutations";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -198,6 +209,8 @@ type CardProps = {
   open: boolean;
   /** The words of this note are on their way from STT right now. */
   busy: boolean;
+  /** Something of this note waits on the phone for the network (D-95). */
+  offline: boolean;
   onToggle: () => void;
   /** Autosave: called on a pause in typing and on blur. */
   onChangeText: (text: string) => void;
@@ -206,15 +219,18 @@ type CardProps = {
   onAssign: () => void;
   onAnnounce: () => void;
   onRetranscribe: () => void;
+  /** «Напомнить»: the page opens the time sheet for this note. */
+  onRemind: () => void;
 };
 
 /**
  * One thought, as a card of «Задачи» is one task (D-93): closed — the mark (pinned, spoken,
- * written), the first line, up to two more, the time; open, in place — the text that saves
- * itself, the recording, «Поручить / Объявить / Закрепить», and copy, share, delete.
+ * written), the first line, up to two more, the time or the reminder; open, in place — the
+ * text that saves itself, the recording, «Напомнить» (D-95), «Поручить / Объявить /
+ * Закрепить», and copy, share, delete.
  */
 export function NoteCard(props: CardProps) {
-  const { note, group, now, query, open, busy, onToggle, onChangeText, onPin, onDelete, onAssign, onAnnounce, onRetranscribe } = props;
+  const { note, group, now, query, open, busy, offline, onToggle, onChangeText, onPin, onDelete, onAssign, onAnnounce, onRetranscribe, onRemind } = props;
   const waiting = awaitsWords(note);
   const head = firstLine(note.text);
   const rest = restLines(note.text);
@@ -224,6 +240,8 @@ export function NoteCard(props: CardProps) {
   const empty = !note.text.trim();
   const raw = note.raw_transcript?.trim() ?? "";
   const edited = raw !== "" && raw !== note.text.trim();
+  const ringing = awaitsReminder(note);
+  const reminder = reminderRu(note, now);
 
   // pinning moves an open card to the top of the feed: the eye follows it there
   const pinned = note.pinned;
@@ -299,8 +317,15 @@ export function NoteCard(props: CardProps) {
           <NoteGlyph note={note} waiting={waiting} />
           <span className="min-w-0 flex-1">
             {heading}
-            <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-              <span className="nums">{noteTime(note.created_at, group, now)}</span>
+            <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-4 text-muted">
+              {ringing && reminder ? (
+                <span className="nums inline-flex items-center gap-1 font-semibold text-accent" data-testid="note-reminder">
+                  <NoteIcon name="bell" size={12} />
+                  {reminder}
+                </span>
+              ) : (
+                <span className="nums">{noteTime(note.created_at, group, now)}</span>
+              )}
               {note.audio_path ? (
                 <>
                   <span aria-hidden className="opacity-40">
@@ -318,6 +343,14 @@ export function NoteCard(props: CardProps) {
                     ·
                   </span>
                   <span className="text-accent">закреплена</span>
+                </>
+              ) : null}
+              {offline ? (
+                <>
+                  <span aria-hidden className="opacity-40">
+                    ·
+                  </span>
+                  <span style={{ color: "var(--warn)" }}>ждёт связи</span>
                 </>
               ) : null}
             </span>
@@ -361,6 +394,19 @@ export function NoteCard(props: CardProps) {
 
       {note.audio_path ? <AudioOriginal path={note.audio_path} /> : null}
       {edited ? <Original raw={raw} /> : null}
+
+      {/* a time on the thought (D-95): set, moved or dropped in the sheet */}
+      <button
+        type="button"
+        onClick={onRemind}
+        data-testid="note-remind"
+        className={`mt-3 inline-flex min-h-[40px] max-w-full items-center gap-2 rounded-full border px-3.5 text-[14px] font-semibold transition-[transform,background-color] duration-[120ms] active:scale-[0.98] ${
+          ringing ? "border-accent/50 bg-accent/10 text-accent" : "border-border/80 bg-surface-2/40 text-text/85"
+        }`}
+      >
+        <NoteIcon name="bell" size={16} />
+        <span className="nums truncate">{ringing && reminder ? reminder : note.reminded_at && reminder ? `${reminder} · ещё раз` : "Напомнить"}</span>
+      </button>
 
       {/* what the thought can become — the same three-button row as a task's card */}
       <div className="mt-4 grid grid-cols-3 gap-2">
@@ -481,6 +527,9 @@ export function TrashCard({ note, now, query, onRestore, onPurge }: { note: Note
           Удалена {whenRu(note.deleted_at ?? note.updated_at, now)}
           {note.audio_path ? " · с голосом" : ""}
         </span>
+        <span className="nums mt-0.5 block text-[12px] leading-4" style={{ color: "var(--warn)" }} data-testid="note-expires">
+          исчезнет {humanAqtobe(trashExpiresAt(note), now)}
+        </span>
         <span className="mt-3 flex items-center gap-2">
           <Button variant="secondary" size="sm" icon={<NoteIcon name="restore" size={14} />} data-testid="note-restore" onClick={onRestore}>
             Вернуть
@@ -488,6 +537,64 @@ export function TrashCard({ note, now, query, onRestore, onPurge }: { note: Note
           <Button variant="ghost" size="sm" className="!text-danger/80" onClick={onPurge}>
             Удалить навсегда
           </Button>
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A thought that is still only on the phone (D-95): dictated or typed without network,
+ * or its tab was closed before it landed. It goes out by itself when the network is back;
+ * «Удалить» is the only way to give it up, and asks twice — a recording is not undone.
+ */
+export function PendingCard({ note, voiced, now, onDiscard }: { note: Note; voiced: boolean; now: Date; onDiscard: () => void }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), 3_000);
+    return () => clearTimeout(timer);
+  }, [armed]);
+
+  const head = firstLine(note.text);
+  const rest = restLines(note.text);
+
+  return (
+    <div className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5" data-testid="note-pending" data-note-id={note.id}>
+      <span
+        aria-hidden
+        className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full"
+        style={{ background: "color-mix(in srgb, var(--warn) 14%, transparent)", color: "var(--warn)" }}
+      >
+        <NoteIcon name={voiced ? "wave" : "cloud"} size={13} />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
+          {head || (voiced ? "Голосовая заметка" : "Без текста")}
+        </span>
+        {rest ? <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
+        <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4">
+          <Dot tone="warn" pulse />
+          <span style={{ color: "var(--warn)" }}>{voiced ? "Голос на телефоне — отправлю, как появится связь" : "Ждёт связи — отправлю сам"}</span>
+        </span>
+        <span className="mt-1 flex items-center justify-between gap-2 text-[12px] leading-4 text-muted">
+          <span className="nums">{whenRu(note.created_at, now)}</span>
+          <button
+            type="button"
+            data-testid="note-pending-discard"
+            onClick={() => {
+              if (!armed) {
+                setArmed(true);
+                return;
+              }
+              setArmed(false);
+              onDiscard();
+            }}
+            className="min-h-[36px] rounded-[10px] px-2 text-[13px] font-semibold transition-colors duration-[120ms] active:bg-white/[0.05]"
+            style={{ color: armed ? "var(--danger)" : "var(--text-muted)" }}
+          >
+            {armed ? "Ещё раз — удалю" : "Удалить"}
+          </button>
         </span>
       </span>
     </div>

@@ -20,13 +20,22 @@ export async function POST(req: Request) {
     // tick is logged, the queue still goes out
     const escalated = await service.rpc("errands_due_escalation");
     if (escalated.error) console.error("errands_due_escalation failed:", escalated.error.message);
+    // the director's own «напомни мне» — a note with a time (D-95) — and the bin of notes,
+    // which keeps a deleted thought three days; same rule, a failure is logged, not fatal
+    const noted = await service.rpc("notes_due_reminders");
+    if (noted.error) console.error("notes_due_reminders failed:", noted.error.message);
+    const purged = await service.rpc("notes_purge_trash");
+    if (purged.error) console.error("notes_purge_trash failed:", purged.error.message);
     // and a visitor nobody answered leaves the wall (D-96): the same rule again
     const expired = await service.rpc("visits_due_expiry");
     if (expired.error) console.error("visits_due_expiry failed:", expired.error.message);
+    // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries()),
       reminders: due.data ?? 0,
       escalations: escalated.data ?? 0,
+      note_reminders: noted.data ?? 0,
+      notes_purged: purged.data ?? 0,
       visits_expired: expired.data ?? 0,
     });
   } catch (err) {

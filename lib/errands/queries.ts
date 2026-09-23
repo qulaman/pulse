@@ -88,6 +88,25 @@ export function useSecretaryActions(enabled = true) {
   });
 }
 
+/**
+ * Что нужно лицу секретаря кроме каталога (D-97): когда уходит повторный пуш — с этого
+ * момента лицо бежит на месте, — и окно доставки компании: вне его за столом ночь.
+ */
+export function useSecretarySetup(enabled = true) {
+  return useQuery({
+    queryKey: ["company", "secretary-setup"],
+    enabled,
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<{ escalateAfterMin: number; window: { from: string; to: string } }> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
+      if (error) throw new Error(error.message);
+      const settings = parseCompanySettings(data?.settings);
+      return { escalateAfterMin: settings.secretary.escalate_after_min, window: settings.delivery_window };
+    },
+  });
+}
+
 /** Сколько заявок ждут ответа: столько и стоит в шарике. */
 export function activeCount(rows: readonly Errand[] | undefined): number {
   return (rows ?? []).filter(isActive).length;

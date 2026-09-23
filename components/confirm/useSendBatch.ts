@@ -54,12 +54,15 @@ export function useSendBatch(onDone?: () => void) {
         ),
       ];
       const hasAnnouncement = going.some((entity) => entity.kind === "announcement");
+      // «напомни мне» lives in «Заметки» now (D-95): the toast says where to find it
+      const hasReminder = going.some((entity) => entity.kind === "reminder");
 
       const result = await send(forceNow, pointsEnabled);
       if (!result) return; // the overlay owns the failure and the retry
 
       const parts = [...names];
       if (hasAnnouncement) parts.push("объявление в Эфир");
+      if (hasReminder) parts.push("напоминание в Заметки");
       toast(parts.length > 0 ? `Отправил ${joinRu(parts)}` : "Отправил");
       reset();
       if (question) ask(question);

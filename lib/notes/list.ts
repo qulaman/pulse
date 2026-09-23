@@ -5,8 +5,9 @@ import type { Note } from "./queries";
 
 /**
  * Pure list arithmetic of the notes screen — three piles (thoughts, «В деле», the
- * bin), pinned first, day groups the way a notes app files them, plain substring
- * search. The screen is a client's own feed of a few hundred rows at most (D-75 §6).
+ * bin), reminders and pinned first, day groups the way a notes app files them, plain
+ * substring search. The screen holds the latest few hundred rows; older ones come by
+ * «Показать раньше» and by the server search (D-95).
  */
 
 export type NotePiles = { active: Note[]; converted: Note[]; trash: Note[] };
@@ -18,16 +19,28 @@ export function isConverted(note: Note): boolean {
 const time = (iso: string | null) => (iso ? new Date(iso).getTime() : 0);
 const newestFirst = (a: Note, b: Note) => time(b.created_at) - time(a.created_at);
 
+/** A deleted note waits in the bin this long; then the minute sweep removes the row (D-95). */
+export const TRASH_DAYS = 3;
+const DAY_MS = 86_400_000;
+
+/** When the sweep takes a note out of the bin for good. */
+export function trashExpiresAt(note: Note): Date {
+  return new Date(time(note.deleted_at ?? note.updated_at) + TRASH_DAYS * DAY_MS);
+}
+
 /**
  * The bin holds what was deleted, newest deletion first; «В деле» — what a note
- * became; the rest is the working feed, pinned on top.
+ * became; the rest is the working feed, pinned on top. With `now`, a deletion past
+ * its three days is gone already, even if the sweep has not come round yet.
  */
-export function splitNotes(notes: readonly Note[]): NotePiles {
+export function splitNotes(notes: readonly Note[], now?: Date): NotePiles {
   const active: Note[] = [];
   const converted: Note[] = [];
   const trash: Note[] = [];
   for (const note of notes) {
-    if (note.deleted_at !== null) trash.push(note);
+    if (note.deleted_at !== null) {
+      if (!now || trashExpiresAt(note).getTime() > now.getTime()) trash.push(note);
+    }
     else if (isConverted(note)) converted.push(note);
     else active.push(note);
   }
@@ -41,11 +54,14 @@ export function splitNotes(notes: readonly Note[]): NotePiles {
   return { active, converted, trash };
 }
 
-/** Case-insensitive substring over the text; an empty query keeps everything. */
+/**
+ * Case-insensitive substring over the text and over what was said (`raw_transcript`):
+ * a word the director edited away still finds its note. An empty query keeps everything.
+ */
 export function filterNotes(notes: readonly Note[], query: string): Note[] {
   const needle = query.trim().toLowerCase();
   if (!needle) return [...notes];
-  return notes.filter((note) => note.text.toLowerCase().includes(needle));
+  return notes.filter((note) => note.text.toLowerCase().includes(needle) || (note.raw_transcript ?? "").toLowerCase().includes(needle));
 }
 
 /** The card's heading: the first line with something on it. */
@@ -78,7 +94,7 @@ export function awaitsWords(note: Note): boolean {
 /* Day groups                                                                   */
 /* -------------------------------------------------------------------------- */
 
-export type NoteGroupKey = "pinned" | "today" | "yesterday" | "week" | "month" | `m-${number}-${number}` | `y-${number}`;
+export type NoteGroupKey = "reminders" | "pinned" | "today" | "yesterday" | "week" | "month" | `m-${number}-${number}` | `y-${number}`;
 
 export type NoteGroup = { key: NoteGroupKey; title: string; notes: Note[] };
 
@@ -106,6 +122,7 @@ function aqtobeMonth(date: Date): { year: number; month: number } {
 }
 
 function groupOf(note: Note, now: Date): { key: NoteGroupKey; title: string } {
+  if (awaitsReminder(note)) return { key: "reminders", title: "Напоминания" };
   if (note.pinned) return { key: "pinned", title: "Закреплённые" };
   const created = new Date(note.created_at);
   const days = aqtobeDay(now) - aqtobeDay(created);
@@ -119,9 +136,9 @@ function groupOf(note: Note, now: Date): { key: NoteGroupKey; title: string } {
 }
 
 /**
- * The feed filed the way a notes app files it: pinned, today, yesterday, the last 7
- * and 30 days, then the months of this year and whole earlier years. The input order
- * is kept inside a group, so `splitNotes` decides who comes first.
+ * The feed filed the way a notes app files it: reminders still to ring (soonest first),
+ * pinned, today, yesterday, the last 7 and 30 days, then the months of this year and
+ * whole earlier years. Elsewhere the input order is kept, so `splitNotes` decides.
  */
 export function groupNotes(notes: readonly Note[], now: Date): NoteGroup[] {
   const groups: NoteGroup[] = [];
@@ -136,7 +153,10 @@ export function groupNotes(notes: readonly Note[], now: Date): NoteGroup[] {
     }
     group.notes.push(note);
   }
-  return groups;
+  const reminders = byKey.get("reminders");
+  if (!reminders) return groups;
+  reminders.notes.sort((a, b) => time(a.remind_at) - time(b.remind_at));
+  return [reminders, ...groups.filter((group) => group !== reminders)];
 }
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -199,11 +219,14 @@ export type NotesHero = { value: number | null; label: string; detail: string; s
 
 /**
  * What the head of the screen says about the thoughts, whatever tab is open below — the
- * way the status screen of «Задачи» speaks for all of them: how many, pinned, the latest,
+ * way the status screen of «Задачи» speaks for all of them: how many (the server's `total`
+ * when it knows more than the screen loaded), pinned, the latest, the soonest reminder,
  * the week, how many were spoken.
  */
-export function notesHero(piles: NotePiles, now: Date): NotesHero {
+export function notesHero(piles: NotePiles, now: Date, total = 0): NotesHero {
   const { active } = piles;
+  // the server may hold more than the screen loaded (D-95): the number is the server's
+  const count = Math.max(active.length, total);
   if (active.length === 0) {
     return { value: null, label: "Пока пусто", detail: "Зажмите микрофон и скажите мысль —", second: "запишу слово в слово" };
   }
@@ -212,12 +235,66 @@ export function notesHero(piles: NotePiles, now: Date): NotesHero {
   const weekStart = aqtobeDay(now) - 6;
   const week = active.filter((note) => aqtobeDay(new Date(note.created_at)) >= weekStart).length;
   const voiced = active.filter((note) => note.audio_path !== null).length;
+  const soon = nextReminder(active);
   return {
-    value: active.length,
-    label: pluralRu(active.length, ["заметка", "заметки", "заметок"]),
+    value: count,
+    label: pluralRu(count, ["заметка", "заметки", "заметок"]),
     detail: [pinned > 0 ? `${pinned} ${pluralRu(pinned, ["закреплена", "закреплены", "закреплено"])}` : "", `последняя ${whenRu(latest.created_at, now)}`]
       .filter(Boolean)
       .join(" · "),
-    second: [`${week} за 7 дней`, voiced > 0 ? `${voiced} голосом` : ""].filter(Boolean).join(" · "),
+    // a reminder still to ring outranks «голосом»: it is the one line with a promise in it
+    second: [soon ? reminderRu(soon, now) : "", `${week} за 7 дней`, !soon && voiced > 0 ? `${voiced} голосом` : ""].filter(Boolean).join(" · "),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reminders (D-95)                                                             */
+/* -------------------------------------------------------------------------- */
+
+/** A note with a time that has not rung yet — «напомни мне …» said or set on the card. */
+export function awaitsReminder(note: Note): boolean {
+  return note.remind_at !== null && note.reminded_at === null && note.deleted_at === null;
+}
+
+/** The reminder of a note in words: «напомню завтра 09:00», «напомнил вчера 09:00». */
+export function reminderRu(note: Note, now: Date): string | null {
+  if (!note.remind_at) return null;
+  const at = new Date(note.remind_at);
+  if (note.reminded_at) return `напомнил ${whenRu(note.remind_at, now)}`;
+  // the tick has not come round yet: it rings within the minute
+  if (at.getTime() <= now.getTime()) return "напомню сейчас";
+  return `напомню ${humanAqtobe(at, now)}`;
+}
+
+/** The soonest reminder still to ring among the thoughts. */
+export function nextReminder(notes: readonly Note[]): Note | null {
+  let soonest: Note | null = null;
+  for (const note of notes) {
+    if (awaitsReminder(note) && (!soonest || time(note.remind_at) < time(soonest.remind_at))) soonest = note;
+  }
+  return soonest;
+}
+
+/** An instant at hh:mm on the Aqtobe wall clock, `dayShift` days from today there. */
+function aqtobeAt(now: Date, dayShift: number, hours: number, minutes: number): Date {
+  const wall = new Date(now.getTime() + OFFSET_MS);
+  return new Date(Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate() + dayShift, hours, minutes) - OFFSET_MS);
+}
+
+export type RemindPreset = { label: string; at: Date };
+
+/**
+ * The one-tap times of «Напомнить»: in an hour (on a five-minute mark), this evening
+ * while it is still ahead, tomorrow morning, Monday morning when Monday is not tomorrow.
+ */
+export function remindPresets(now: Date): RemindPreset[] {
+  const step = 5 * 60_000;
+  const presets: RemindPreset[] = [{ label: "Через час", at: new Date(Math.ceil((now.getTime() + 3_600_000) / step) * step) }];
+  const evening = aqtobeAt(now, 0, 18, 0);
+  if (evening.getTime() - now.getTime() >= 3_600_000) presets.push({ label: "Сегодня 18:00", at: evening });
+  presets.push({ label: "Завтра 9:00", at: aqtobeAt(now, 1, 9, 0) });
+  const weekday = new Date(now.getTime() + OFFSET_MS).getUTCDay();
+  const toMonday = ((8 - weekday) % 7) || 7;
+  if (toMonday > 1) presets.push({ label: "Пн 9:00", at: aqtobeAt(now, toMonday, 9, 0) });
+  return presets;
 }
