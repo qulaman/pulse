@@ -57,10 +57,14 @@ export function pageItems(items: readonly TvBoardItem[], layout: BoardLayout, pa
   return items.slice(from, from + layout.perPage).map((item, index) => ({ item, n: from + index + 1 }));
 }
 
-/** Пункт сказан меньше минуты назад: на стене он мягко светится. */
+/**
+ * Пункт сказан меньше минуты назад: на стене он мягко светится. Время пункта ставит сервер,
+ * а «сейчас» — часы киоска: у только что сказанного пункта возраст бывает и отрицательным
+ * на секунду-другую, это всё равно новый пункт. Дальше минуты «из будущего» — не свежий.
+ */
 export function isFresh(item: Pick<TvBoardItem, "created_at">, now: Date): boolean {
   const age = now.getTime() - new Date(item.created_at).getTime();
-  return age >= 0 && age < FRESH_MS;
+  return age > -FRESH_MS && age < FRESH_MS;
 }
 
 /** Нейтральная пометка у пункта: «→ Марат», «→ Марат · сдано» — ни отказов, ни просрочек (D-45). */

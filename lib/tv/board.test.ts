@@ -39,7 +39,9 @@ describe("isFresh", () => {
     const now = new Date("2026-09-18T08:00:30Z");
     expect(isFresh(item(1), now)).toBe(true);
     expect(isFresh(item(1, { created_at: "2026-09-18T07:58:00Z" }), now)).toBe(false);
-    // часы телефона впереди часов киоска: не светится «из будущего»
+    // часы сервера на пару секунд впереди киоска: только что сказанный — всё равно новый
+    expect(isFresh(item(1, { created_at: "2026-09-18T08:00:32Z" }), now)).toBe(true);
+    // а на пять минут «из будущего» — нет
     expect(isFresh(item(1, { created_at: "2026-09-18T08:05:00Z" }), now)).toBe(false);
   });
 });

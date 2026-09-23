@@ -44,6 +44,9 @@ export function Tabs<K extends string>({
   const top = useHeaderHeight();
   const sentinel = useRef<HTMLDivElement>(null);
   const [stuck, setStuck] = useState(false);
+  // four piles («Заметки» with «Доски», D-102) do not fit thirds on a 320 px phone: each tab
+  // takes the width of its words, one pixel of type smaller
+  const many = items.length > 3;
 
   useEffect(() => {
     const node = sentinel.current;
@@ -62,7 +65,7 @@ export function Tabs<K extends string>({
         className={`sticky z-[5] -mx-4 bg-bg px-4 pb-2 pt-2 transition-[border-color] duration-[160ms] ${stuck ? "border-b border-border/70" : "border-b border-transparent"}`}
         style={{ top }}
       >
-        <div role="tablist" aria-label="Стопки задач" className="seg grid grid-cols-3 gap-1 rounded-[14px] p-1">
+        <div role="tablist" aria-label="Стопки задач" className={`seg gap-1 rounded-[14px] p-1 ${many ? "flex" : "grid grid-cols-3"}`}>
           {items.map((item) => {
             const active = item.key === value;
             const lit = item.alert && item.count > 0;
@@ -74,15 +77,15 @@ export function Tabs<K extends string>({
                 aria-selected={active}
                 data-testid={`${testIdPrefix}${item.key}`}
                 onClick={() => onChange(item.key)}
-                className={`relative min-h-[40px] rounded-[10px] px-1 font-display text-[14px] font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
-                  active ? "text-text" : "text-muted active:text-text"
-                }`}
+                className={`relative min-h-[40px] rounded-[10px] px-1 font-display font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
+                  many ? "min-w-0 flex-auto text-[13px]" : "text-[14px]"
+                } ${active ? "text-text" : "text-muted active:text-text"}`}
               >
                 {active ? <motion.span layoutId={`${id}-thumb`} transition={THUMB} className="seg-thumb absolute inset-0 rounded-[10px]" /> : null}
-                <span className="relative z-[1] flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <span className={`relative z-[1] flex items-center justify-center whitespace-nowrap ${many ? "gap-1" : "gap-1.5"}`}>
                   {item.label}
                   <span
-                    className={`nums inline-flex h-[19px] min-w-[19px] items-center justify-center rounded-full px-1.5 text-[12px] leading-none ${lit ? "font-bold" : "font-semibold opacity-80"}`}
+                    className={`nums inline-flex h-[19px] items-center justify-center rounded-full text-[12px] leading-none ${many ? "min-w-[14px] px-0.5" : "min-w-[19px] px-1.5"} ${lit ? "font-bold" : "font-semibold opacity-80"}`}
                     style={lit ? { background: TONE_VAR[item.alert as Tone], color: "var(--bg)" } : undefined}
                   >
                     {item.count}
