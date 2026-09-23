@@ -18,6 +18,7 @@ import { entitiesSummary } from "@/components/confirm/format";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
+import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
@@ -52,6 +53,21 @@ const FACE_SMALL = 88;
 const RING_RADIUS = 124;
 /** How long a thought hangs above the head before the face dozes off again. */
 const THOUGHT_MS = 9_000;
+/** The batch has landed: the face jumps for joy this long after the throw (D-82). */
+const CHEER_MS = 1_800;
+
+/**
+ * An open ball is a job the face does by hand while the panel is open (D-82): it ticks off
+ * the tasks on a clipboard, answers a message, shouts into Эфир through a megaphone, tears a
+ * page off the calendar, brings the coffee.
+ */
+const PANEL_FACE: Record<OrbitId, MascotState> = {
+  tasks: "checking",
+  messages: "chatting",
+  ether: "announcing",
+  calendar: "scheduling",
+  secretary: "serving",
+};
 
 /**
  * Пульс — the director's home (D-57, D-60): the face of «Капля» asleep in the middle of
@@ -90,8 +106,28 @@ export default function PulsePage() {
   // wind-up and the card never left the hand. The swing is held to its end (D-60, sixth).
   const [throwing, setThrowing] = useState(false);
   const throwTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => {
-    if (throwTimer.current) clearTimeout(throwTimer.current);
+  const throwEndsAt = useRef(0);
+  // The batch has landed (the store went from «sending» to done): the face celebrates — after
+  // the swing, never over it. A failed send goes to «error» and gets no confetti.
+  const [cheering, setCheering] = useState(false);
+  const cheerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const unsubscribe = useIngestStore.subscribe((current, previous) => {
+      if (previous.stage !== "sending" || (current.stage !== "done" && current.stage !== "idle")) return;
+      if (cheerTimer.current) clearTimeout(cheerTimer.current);
+      cheerTimer.current = setTimeout(
+        () => {
+          setCheering(true);
+          cheerTimer.current = setTimeout(() => setCheering(false), CHEER_MS);
+        },
+        Math.max(0, throwEndsAt.current - Date.now()),
+      );
+    });
+    return () => {
+      unsubscribe();
+      if (throwTimer.current) clearTimeout(throwTimer.current);
+      if (cheerTimer.current) clearTimeout(cheerTimer.current);
+    };
   }, []);
   /** the phrase owns the screen from the parse until the swing after the tap is over */
   const phraseInHand = confirming || throwing;
@@ -245,32 +281,6 @@ export default function PulsePage() {
     return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
   }, [exchange, speech.line, mode, events, now]);
 
-  const onFaceTap = () => {
-    // a phrase is in hand: the face is the throw, nothing else (D-36 — never by itself)
-    if (phraseInHand) {
-      if (confirmRef.current?.throwBatch()) {
-        setThrowing(true);
-        if (throwTimer.current) clearTimeout(throwTimer.current);
-        throwTimer.current = setTimeout(() => setThrowing(false), THROW_MS);
-      }
-      return;
-    }
-    closeExchange();
-    if (mode === "idle") {
-      // waking up: a stretch, the summary, the balls come out
-      setWakeKey((key) => key + 1);
-      speech.replay();
-      setMode("ring");
-    } else if (mode === "panel") {
-      // one step back: the panel folds, the balls orbit again
-      setMode("ring");
-      setPanel(null);
-    } else {
-      setMode("idle");
-      setPanel(null);
-    }
-  };
-
   // The director's assistant is never angry (D-70, владелец): whatever waits for him — a
   // deadline within the hour, an order unaccepted for half an hour, an unread word — the
   // face just goes watchful. The balls and the line say which of the three it is.
@@ -282,14 +292,58 @@ export default function PulsePage() {
     : speech.speaking
       ? "speaking"
       : (mood ?? (counts.attention > 0 ? "calm" : "happy"));
-  // while the cards wait for the throw the face shows whether they are ready to fly
-  const confirmFace: MascotState | null = throwing ? "sending" : confirming ? (sendableCount > 0 ? "offering" : "thinking") : null;
+  // while the cards wait for the throw the face shows whether they are ready to fly; once
+  // they have landed it jumps for joy (D-82)
+  const confirmFace: MascotState | null = throwing
+    ? "sending"
+    : cheering
+      ? "celebrating"
+      : confirming
+        ? sendableCount > 0
+          ? "offering"
+          : "thinking"
+        : null;
   // a thought wakes the face whatever it was doing; without one the idle face sleeps
   // a change on the board is data the assistant has just read: it reports the new status (D-65)
   // The face sleeps only when the board is quiet: a mood outranks sleep, so the barometer
   // is readable without a tap (владелец, 2026-09-17 — «маскот должен меняться и в покое»).
   const restFace: MascotState = mood ?? "sleeping";
-  const mascot: MascotState = confirmFace ?? (thought ? "processing" : mode === "idle" ? restFace : awake);
+  // an open ball is a job in the face's hands, and it does it while the panel is open (D-82)
+  const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
+  const mascot: MascotState = confirmFace ?? (thought ? "processing" : mode === "idle" ? restFace : (panelFace ?? awake));
+  // the small things a face at rest does on its own — asleep, waiting on the ring, or
+  // watchful (D-82); never while anything is in flight or said
+  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel");
+
+  const onFaceTap = () => {
+    // a phrase is in hand: the face is the throw, nothing else (D-36 — never by itself)
+    if (phraseInHand) {
+      if (confirmRef.current?.throwBatch()) {
+        setThrowing(true);
+        throwEndsAt.current = Date.now() + THROW_MS;
+        if (throwTimer.current) clearTimeout(throwTimer.current);
+        throwTimer.current = setTimeout(() => setThrowing(false), THROW_MS);
+      }
+      return;
+    }
+    closeExchange();
+    if (mode === "idle") {
+      // waking up: a stretch, a wave hello, the summary, the balls come out
+      setWakeKey((key) => key + 1);
+      speech.replay();
+      setMode("ring");
+      acts.play("wave");
+    } else if (mode === "panel") {
+      // one step back: the panel folds, the balls orbit again
+      setMode("ring");
+      setPanel(null);
+    } else {
+      setMode("idle");
+      setPanel(null);
+      // dozing off again with a yawn — unless something waits, then the face stays watchful
+      if (!mood) acts.play("yawn");
+    }
+  };
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
   // the waiting screen's own view of the team: who is carrying what right now (D-69)
   const field = useMemo(
@@ -374,6 +428,7 @@ export default function PulsePage() {
             <IdleScene active={mode === "idle" && (stage === "idle" || stage === "recording")} quiet={!thought && stage === "idle"} team={field} />
             <MascotLever
               state={mascot}
+              act={acts.act}
               onTap={onFaceTap}
               size={faceSize}
               wakeKey={wakeKey}

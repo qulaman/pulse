@@ -8,7 +8,7 @@ import { keyframesOf, type Chase } from "@/lib/idle/flight";
 import type { Touch } from "@/lib/idle/wake";
 
 /** The dreams: one at a time, in this order, from wherever the rotation starts. */
-export const DREAMS = ["rocket", "dragon", "monster"] as const;
+export const DREAMS = ["rocket", "dragon", "monster", "plane", "bees", "ufo"] as const;
 export type DreamId = (typeof DREAMS)[number];
 
 /**
@@ -260,6 +260,107 @@ function RocketTop(): ReactNode {
 }
 
 /**
+ * A paper plane from above, the drop riding on the fold (D-82). It banks as it goes — seen from
+ * above a bank is only the wings getting narrower — and leaves a dotted line behind it, the way
+ * a flight is drawn on a map.
+ */
+function PlaneTop(): ReactNode {
+  return (
+    <g fill="currentColor">
+      <g style={{ transformOrigin: "0px 0px", animation: "dream-bank 1.6s ease-in-out infinite" }}>
+        {/* the wings: one dart, folded down the middle */}
+        <path d="M30 0 L-18 -19 L-10 0 L-18 19 Z" />
+        {/* the near half catches the light, the fold is a darker line */}
+        <path d="M30 0 L-18 -19 L-12.5 -3.2 Z" fill="#ffffff" opacity="0.16" />
+        <path d="M30 0 L-10 0" stroke="var(--bg)" strokeWidth="1.3" opacity="0.5" />
+      </g>
+      {/* the rider, sitting on the fold and looking where it goes */}
+      <circle cx="-1" cy="0" r="7" stroke="var(--bg)" strokeWidth="1.6" />
+      <ellipse cx="0.4" cy="-2.6" rx="3" ry="1.5" fill="#ffffff" opacity="0.18" />
+      <g fill="var(--bg)">
+        <circle cx="2.4" cy="-2.4" r="1.6" />
+        <circle cx="2.4" cy="2.4" r="1.6" />
+      </g>
+    </g>
+  );
+}
+
+/** One dot of the plane's line on the map: it rides the same flight, a moment behind. */
+function TrailDot(): ReactNode {
+  return <circle cx="0" cy="0" r="7" fill="currentColor" />;
+}
+
+/**
+ * A bee from above: a striped body, a head with eyes, a sting, and two wings that are never
+ * still. Each bee of the swarm hovers off the line on its own beat, so they read as a swarm
+ * rather than a train.
+ */
+function BeeTop({ hover }: { hover: number }): ReactNode {
+  return (
+    <g style={{ transformOrigin: "0px 0px", animation: `dream-hover ${(0.9 + hover * 0.23).toFixed(2)}s ease-in-out ${(-hover * 0.31).toFixed(2)}s infinite` }}>
+      <g fill="currentColor">
+        {/* the sting */}
+        <path d="M-15 0 L-10 -2.4 L-10 2.4 Z" />
+        {/* the body and its stripes */}
+        <ellipse cx="-1" cy="0" rx="11" ry="8" />
+        <g fill="var(--bg)" opacity="0.55">
+          <rect x="-7" y="-7.4" width="2.6" height="14.8" rx="1.3" />
+          <rect x="-1.2" y="-7.9" width="2.6" height="15.8" rx="1.3" />
+        </g>
+        {/* the head, with its eyes to the front */}
+        <circle cx="11" cy="0" r="5.4" />
+        <g fill="var(--bg)">
+          <circle cx="13.2" cy="-2.2" r="1.3" />
+          <circle cx="13.2" cy="2.2" r="1.3" />
+        </g>
+      </g>
+      {/* the wings: a blur, beating far too fast to see */}
+      <g fill="#ffffff" opacity="0.4">
+        <ellipse cx="-2" cy="-9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px -5px", animation: "dream-buzz 0.09s linear infinite" }} />
+        <ellipse cx="-2" cy="9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px 5px", animation: "dream-buzz 0.09s linear infinite" }} />
+      </g>
+    </g>
+  );
+}
+
+/**
+ * A flying saucer from above: the rim with its lights running round, the glass dome over the
+ * pilot, and a ring pulsing out beneath it — the beam it is trying to catch the drop with.
+ */
+function UfoTop(): ReactNode {
+  return (
+    <g fill="currentColor">
+      <circle cx="0" cy="0" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transformOrigin: "0px 0px", animation: "dream-beam 1.4s ease-out infinite" }} />
+      {/* the rim, and the ring of lights running round it */}
+      <circle cx="0" cy="0" r="20" />
+      <circle cx="0" cy="0" r="20" fill="#ffffff" opacity="0.08" />
+      <g fill="#ffffff">
+        {Array.from({ length: 8 }, (_, i) => {
+          const a = (i / 8) * Math.PI * 2;
+          return (
+            <circle
+              key={i}
+              cx={(Math.cos(a) * 15).toFixed(2)}
+              cy={(Math.sin(a) * 15).toFixed(2)}
+              r="1.8"
+              style={{ animation: `dream-lights 0.8s linear ${(-(i / 8) * 0.8).toFixed(2)}s infinite` }}
+            />
+          );
+        })}
+      </g>
+      {/* the dome and the one who flies it */}
+      <circle cx="0" cy="0" r="9" fill="var(--bg)" />
+      <circle cx="0" cy="0" r="7.4" fill="#ffffff" opacity="0.12" />
+      <ellipse cx="-2.6" cy="-3" rx="2.8" ry="1.5" fill="#ffffff" opacity="0.3" transform="rotate(-30 -2.6 -3)" />
+      <g fill="currentColor">
+        <circle cx="2" cy="-2.2" r="1.6" />
+        <circle cx="2" cy="2.2" r="1.6" />
+      </g>
+    </g>
+  );
+}
+
+/**
  * The Chinese dragon: a head and a body of links, each a few degrees further back on the same
  * orbit. Built tail first, so every link is painted under the one ahead of it and the head
  * ends up on top, the way scales overlap.
@@ -296,6 +397,21 @@ const ACTORS: Record<DreamId, Actor[]> = {
   monster: [
     { key: "drop", size: 56, track: "lead", trail: 0, figure: <DropTop /> },
     { key: "monster", size: 84, track: "chase", trail: 0, figure: <MonsterTop /> },
+  ],
+  // the line on the map is drawn first, so the plane flies over its own dots
+  plane: [
+    // 150 ms apart at the flight's 390 px/s: a dot every ~60 px, smaller the older it is
+    ...[4, 3, 2, 1].map((dot) => ({ key: `dot-${dot}`, size: 26 - dot * 2.5, track: "lead" as const, trail: dot * 150, figure: <TrailDot /> })),
+    { key: "plane", size: 80, track: "lead", trail: 0, figure: <PlaneTop /> },
+  ],
+  // the swarm keeps close behind whoever leads it, each bee a beat after the one before
+  bees: [
+    { key: "drop", size: 56, track: "lead", trail: 0, figure: <DropTop /> },
+    ...[3, 2, 1, 0].map((bee) => ({ key: `bee-${bee}`, size: 54 - bee * 4, track: "chase" as const, trail: bee * 130, figure: <BeeTop hover={bee} /> })),
+  ],
+  ufo: [
+    { key: "drop", size: 56, track: "lead", trail: 0, figure: <DropTop /> },
+    { key: "ufo", size: 80, track: "chase", trail: 0, figure: <UfoTop /> },
   ],
 };
 

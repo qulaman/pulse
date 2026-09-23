@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { Mascot, type MascotState } from "@/components/brand/Mascot";
+import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import type { DreamId } from "@/components/pulse/DreamOrbit";
 import { IdleScene } from "@/components/pulse/IdleScene";
@@ -149,7 +149,82 @@ const STATES: StateEntry[] = [
     note: "Сердитая мимика, рубленый ритм и облачко с нейтральными символами вместо брани.",
     keys: "mascot-angry-pose · mascot-swear · mascot-swear-look · mascot-swear-cloud",
   },
+  {
+    state: "checking",
+    title: "Шарик «Задачи»",
+    note: "Достаёт планшет, наклоняется к нему и ставит галочки по строкам — глаза идут по списку вниз, на каждую галочку кивок, в конце довольный взгляд на директора (D-82)",
+    keys: "mascot-check-pose · mascot-check · mascot-check-look · mascot-tick-1…3 · mascot-prop-in",
+  },
+  {
+    state: "chatting",
+    title: "Шарик «Сообщения»",
+    note: "Слева приходит пузырь с тремя «печатающими» точками — лицо повернулось к нему; затем справа уходит ответ, рот шевелится, строки печатаются (D-82)",
+    keys: "mascot-chat · mascot-chat-look · mascot-chat-mouth · mascot-bubble-left · mascot-bubble-right · mascot-typing · mascot-reply-line",
+  },
+  {
+    state: "announcing",
+    title: "Шарик «Эфир»",
+    note: "Выпрямляется, мегафон у рта: вдох с откидыванием, выкрик с толчком вперёд, из раструба расходятся дуги (D-82)",
+    keys: "mascot-announce-pose · mascot-announce · mascot-announce-look · mascot-shout-mouth · mascot-shout-wave",
+  },
+  {
+    state: "scheduling",
+    title: "Шарик «Календарь»",
+    note: "Отрывной календарь над плечом: верхний лист отрывается и падает, глаза провожают его вниз, кивок «записал»; сегодняшний день обведён и пульсирует (D-82)",
+    keys: "mascot-schedule-pose · mascot-schedule · mascot-schedule-look · mascot-page-flip · mascot-today",
+  },
+  {
+    state: "serving",
+    title: "Шарик «Секретарь»",
+    note: "Поклон, чашка на блюдце в руках, над ней пар, аккуратное покачивание, мягкий прищур и улыбка — взгляд то на чашку, то на директора (D-82)",
+    keys: "mascot-bow · mascot-serve · mascot-serve-look · mascot-steam",
+  },
+  {
+    state: "celebrating",
+    title: "Празднует",
+    note: "Пачка улетела и дошла: настоящий прыжок, тень отрывается от земли, с макушки разлетается конфетти. Играет 1,8 с после броска (D-82)",
+    keys: "mascot-cheer-pose · mascot-happy · mascot-confetti · mascot-shadow-cheer",
+  },
 ];
+
+type ActEntry = { act: MascotAct; on: MascotState; title: string; note: string };
+
+/** The acts of a face at rest (D-82), each on the state whose pool it belongs to. */
+const ACTS: ActEntry[] = [
+  { act: "yawn", on: "sleeping", title: "Зевок", note: "Приседает, тянется вверх, рот широко, глаза зажмурены. И сам по себе, и при засыпании по тапу" },
+  { act: "snore", on: "sleeping", title: "Храп", note: "Пузырь у рта растёт на выдохе, сдувается на вдохе и лопается" },
+  { act: "turn", on: "sleeping", title: "Переворачивается", note: "Ворочается во сне: на один бок, через себя, на другой" },
+  { act: "doze", on: "sleeping", title: "Клюёт носом", note: "Голова медленно опускается, рывок вверх, глаза приоткрываются — всё тихо — снова спит" },
+  { act: "mumble", on: "sleeping", title: "Бормочет", note: "Говорит во сне: маленький рот и пузырь с точками, без слов" },
+  { act: "smile", on: "sleeping", title: "Улыбается во сне", note: "Хороший сон: улыбка под закрытыми глазами, румянец" },
+  { act: "kick", on: "sleeping", title: "Бежит во сне", note: "Короткие рывки влево-вправо, из-под него пыль — снится погоня" },
+  { act: "wave", on: "calm", title: "Машет", note: "Из-за тела выходит ручка и машет, глаза улыбаются. Играет на пробуждении по тапу" },
+  { act: "wink", on: "calm", title: "Подмигивает", note: "Наклон, один глаз закрывается, рядом блик" },
+  { act: "hop", on: "calm", title: "Подпрыгивает", note: "Два прыжка просто так, тень отвечает" },
+  { act: "spin", on: "calm", title: "Кружится", note: "Прыжок и разворот в воздухе: тело встаёт ребром, показывает спину и возвращается" },
+  { act: "whistle", on: "calm", title: "Насвистывает", note: "Губы трубочкой, покачивается в ритм, ноты улетают вверх" },
+  { act: "heart", on: "calm", title: "Сердечко", note: "Сжимается «ми-ми», с макушки поднимаются два сердечка, глаза улыбаются им вслед" },
+  { act: "orbit", on: "calm", title: "Следит за шариками", note: "Взгляд делает круг — вслед шарикам на орбите, тело поворачивается за ним" },
+  { act: "peek", on: "alert", title: "Выглядывает", note: "Насторожен: высовывается посмотреть в одну сторону, потом в другую" },
+  { act: "tiptoe", on: "alert", title: "На цыпочках", note: "Насторожен: тянется вверх, смотреть поверх, водит глазами и опускается" },
+];
+
+/** One act on repeat: it plays, the face rests a beat, it plays again. Remount to restart. */
+function ActDemo({ entry, size }: { entry: ActEntry; size: number }) {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const flip = (value: boolean) => {
+      timer = setTimeout(() => {
+        setOn(value);
+        flip(!value);
+      }, value ? 900 : ACT_MS[entry.act]);
+    };
+    flip(false);
+    return () => clearTimeout(timer);
+  }, [entry.act]);
+  return <Mascot state={entry.on} size={size} act={on ? entry.act : null} />;
+}
 
 type GestureEntry = {
   key: string;
@@ -223,6 +298,24 @@ const DREAMS: { id: DreamId; title: string; note: string; keys: string }[] = [
     title: "Монстр",
     note: "Капля убегает, монстр следом тянет лапы с когтями; три глаза со зрачками и пасть с зубами",
     keys: "dream-lap · dream-swell · dream-step · dream-grab",
+  },
+  {
+    id: "plane",
+    title: "Бумажный самолётик",
+    note: "Капля верхом на самолётике, крылья «кренятся» (сужаются и расширяются), за ним пунктир — как маршрут на карте. Летит один (D-82)",
+    keys: "dream-lap · dream-swell · dream-bank",
+  },
+  {
+    id: "bees",
+    title: "Рой пчёл",
+    note: "Капля убегает от четырёх пчёл: полоски, жало, крылья жужжат размытым пятном, каждая пчела висит в воздухе в своём ритме — рой, а не паровозик (D-82)",
+    keys: "dream-lap · dream-swell · dream-step · dream-hover · dream-buzz",
+  },
+  {
+    id: "ufo",
+    title: "НЛО",
+    note: "Летающая тарелка гонится за каплей: огни бегут по кругу, под стеклянным куполом пилот, кольцо-луч пульсирует — пытается поймать (D-82)",
+    keys: "dream-lap · dream-swell · dream-step · dream-lights · dream-beam",
   },
 ];
 
@@ -446,6 +539,27 @@ export function MascotGallery() {
                 </button>
               </Stage>
               <Caption title={entry.title} note={entry.note} keys={entry.keys} />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="mt-6">
+        <h2 className="text-[19px] font-semibold leading-6">Сценки в покое</h2>
+        <p className="mt-1 text-[13px] leading-4 text-muted">
+          {ACTS.length} коротких сценок поверх состояния (D-82): на Пульсе в покое лицо само играет одну из подходящих каждые 6–12 с —
+          спящее спит дальше, бодрствующее ждёт выбора шарика, настороженное только оглядывается (D-70). Здесь каждая крутится по кругу;
+          тап — сначала.
+        </p>
+        <div className="mt-3 flex flex-col gap-4">
+          {ACTS.map((entry) => (
+            <div key={entry.act} className="card p-4">
+              <Stage height={stageHeight} background={stageBg}>
+                <button type="button" aria-label={`Переиграть: ${entry.title}`} onClick={() => replay(`act-${entry.act}`)}>
+                  <ActDemo key={`${entry.act}-${runKey}-${replays[`act-${entry.act}`] ?? 0}`} entry={entry} size={size} />
+                </button>
+              </Stage>
+              <Caption title={entry.title} note={entry.note} keys={`act «${entry.act}» на «${entry.on}» · ${ACT_MS[entry.act]} мс`} />
             </div>
           ))}
         </div>
