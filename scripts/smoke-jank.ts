@@ -124,13 +124,21 @@ async function main() {
   });
   await page.screenshot({ path: join(SHOTS, "j1-sent.png") });
 
-  const firstLink = page.locator('[data-testid="sent-task"] a[href^="/tasks/"]').first();
-  const href = await firstLink.getAttribute("href").catch(() => null);
-  record("есть задача для открытия", Boolean(href), href ?? "");
-  if (href) {
-    await measure(page, "директор: список → карточка задачи", async () => {
-      await firstLink.click();
-      await page.waitForURL((url) => url.pathname === href, { timeout: 10_000 });
+  // «Задачи» are a desk (D-80): the first tap on a row puts the task on the display, the
+  // second opens its thread
+  const row = page.locator('[data-testid="sent-task"]').first();
+  const title = (await row.locator("h2").first().textContent().catch(() => null))?.trim() ?? "";
+  record("есть задача для открытия", Boolean(title), title);
+  if (title) {
+    await measure(page, "директор: тап по строке → задача на дисплее", async () => {
+      await row.click();
+      await page.locator('[data-testid="desk-lcd"]', { hasText: title }).waitFor({ timeout: 5_000 });
+    });
+    await page.screenshot({ path: join(SHOTS, "j1b-desk.png") });
+
+    await measure(page, "директор: второй тап → карточка задачи", async () => {
+      await row.click();
+      await page.waitForURL((url) => url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
       await page.locator("article").first().waitFor({ timeout: 10_000 });
     });
     await page.screenshot({ path: join(SHOTS, "j2-thread-director.png") });
@@ -147,6 +155,15 @@ async function main() {
       await page.waitForURL((url) => url.pathname === "/sent", { timeout: 10_000 });
       await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 10_000 });
     });
+
+    // the device is taller than a phone: once its keys pass under the header a folded copy
+    // sticks there, fixed and out of the flow — the list under it must not move
+    await measure(page, "директор: прокрутка «Задач» — голова сворачивается", async () => {
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.locator('[data-testid="desk-lcd"]').waitFor({ timeout: 5_000 });
+    });
+    await page.screenshot({ path: join(SHOTS, "j1c-desk-folded.png") });
+    await page.evaluate(() => window.scrollTo(0, 0));
   }
 
   await measure(page, "директор: вкладка Настройки", async () => {
