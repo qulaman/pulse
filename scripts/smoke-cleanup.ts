@@ -115,7 +115,7 @@ async function main() {
       if (revoked.error) throw new Error(`revoke_task: ${revoked.error.message}`);
     }
     await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
-    await page.getByRole("button", { name: /^Закрытые/ }).click();
+    await page.getByRole("tab", { name: /^Закрытые/ }).click();
     const purgeButton = page.getByRole("button", { name: /^Очистить закрытые/ });
     await purgeButton.waitFor({ timeout: 10_000 });
     const label = (await purgeButton.textContent()) ?? "";

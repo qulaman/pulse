@@ -124,20 +124,24 @@ async function main() {
   });
   await page.screenshot({ path: join(SHOTS, "j1-sent.png") });
 
-  // «Задачи» are a desk (D-80): the first tap on a row puts the task on the display, the
-  // second opens its thread
+  // «Задачи» are cards (D-82): a tap opens the card in place, «Переписка» opens its thread.
+  // The pile that asks for a move opens its first card by itself — close it first.
   const row = page.locator('[data-testid="sent-task"]').first();
-  const title = (await row.locator("h2").first().textContent().catch(() => null))?.trim() ?? "";
-  record("есть задача для открытия", Boolean(title), title);
+  const title = (await row.textContent().catch(() => null))?.trim() ?? "";
+  record("есть задача для открытия", Boolean(title), title.slice(0, 40));
   if (title) {
-    await measure(page, "директор: тап по строке → задача на дисплее", async () => {
+    if ((await row.getAttribute("aria-expanded")) === "true") {
       await row.click();
-      await page.locator('[data-testid="desk-lcd"]', { hasText: title }).waitFor({ timeout: 5_000 });
+      await page.waitForTimeout(SETTLE_MS);
+    }
+    await measure(page, "директор: тап по карточке → раскрылась на месте", async () => {
+      await row.click();
+      await page.locator('[data-testid="task-body"]').first().waitFor({ timeout: 5_000 });
     });
-    await page.screenshot({ path: join(SHOTS, "j1b-desk.png") });
+    await page.screenshot({ path: join(SHOTS, "j1b-card-open.png") });
 
-    await measure(page, "директор: второй тап → карточка задачи", async () => {
-      await row.click();
+    await measure(page, "директор: «Переписка» → карточка задачи", async () => {
+      await page.locator('[data-testid="task-thread"]').first().click();
       await page.waitForURL((url) => url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
       // the thread opens with its card folded to a head: the composer says the page is there
       await page.getByPlaceholder(/Написать/).waitFor({ timeout: 10_000 });
@@ -157,13 +161,12 @@ async function main() {
       await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 10_000 });
     });
 
-    // the device is taller than a phone: once its keys pass under the header a folded copy
-    // sticks there, fixed and out of the flow — the list under it must not move
-    await measure(page, "директор: прокрутка «Задач» — голова сворачивается", async () => {
+    // the tabs stick under the header while the list scrolls — sticky, not re-laid out
+    await measure(page, "директор: прокрутка «Задач» — вкладки липнут", async () => {
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-      await page.locator('[data-testid="desk-lcd"]').waitFor({ timeout: 5_000 });
+      await page.locator('[role="tablist"]').waitFor({ state: "visible", timeout: 5_000 });
     });
-    await page.screenshot({ path: join(SHOTS, "j1c-desk-folded.png") });
+    await page.screenshot({ path: join(SHOTS, "j1c-tabs-stuck.png") });
     await page.evaluate(() => window.scrollTo(0, 0));
   }
 
