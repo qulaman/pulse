@@ -15,6 +15,7 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest: false,
     guest_until: null,
     clock_style: "digital",
+    calendar_view: "week",
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -61,6 +62,7 @@ describe("wallNow", () => {
     expect(wallNow(state({ scene: "clock" }), PEOPLE, NOW)).toBe("Эфир · часы");
     expect(wallNow(state({ scene: "team" }), PEOPLE, NOW)).toBe("Эфир · команда");
     expect(wallNow(state({ scene: "calendar" }), PEOPLE, NOW)).toBe("Эфир · календарь");
+    expect(wallNow(state({ scene: "calendar", calendar_view: "month" }), PEOPLE, NOW)).toBe("Эфир · календарь · месяц");
     expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · лицо");
   });
 

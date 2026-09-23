@@ -32,6 +32,13 @@ export function RemoteSkeleton() {
         <Bone h={66} className="rounded-[18px]" />
       </div>
       <Bone h={16} w={180} className="mx-auto mt-3" />
+      {/* the calendar view keys (D-98) */}
+      <div className={`${s.seam}`} />
+      <Bone h={16} w={140} className="mt-3 ml-1" />
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <Bone h={60} className="rounded-[18px]" />
+        <Bone h={60} className="rounded-[18px]" />
+      </div>
       <div className={`${s.seam}`} />
       <Bone h={16} w={120} className="mt-3 ml-1" />
       <div className="mt-2 grid grid-cols-2 gap-2">

@@ -3,7 +3,8 @@
 import { lineOf } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
 import { useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvState, useTvSummary } from "@/lib/tv/queries";
-import { clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
+import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
+import { calendarViewOf, clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
@@ -43,7 +44,13 @@ export function TvScreen({
   const feed = useTvFeed();
   const summary = useTvSummary(guest);
   const focus = useTvFocus(mode === "employee");
-  const calendar = useTvCalendar(guest, scene === "calendar");
+  // the week from today, or six weeks from the Monday the month starts in (D-98)
+  const calendarView = calendarViewOf(row);
+  const calendar = useTvCalendar(
+    guest,
+    scene === "calendar",
+    calendarView === "month" ? { from: monthGridFrom(now), days: MONTH_DAYS } : { from: null, days: 7 },
+  );
   const overlay = useTvOverlay();
   const offline = useOffline(summary.dataUpdatedAt);
 
@@ -75,6 +82,7 @@ export function TvScreen({
         focus={focused}
         focusRemainingMs={focusRemainingMs(row, now)}
         calendar={calendar.data ?? null}
+        calendarView={calendarView}
         overlay={overlayOf(overlay.data, data?.events ?? [], now)}
         // only the kiosk rings: the director peeking at /tv from a laptop is not the wall
         sound={role === "tv"}

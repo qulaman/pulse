@@ -16,6 +16,8 @@ export type WallCase =
   | "clock"
   | "team"
   | "calendar"
+  | "calendar-month"
+  | "calendar-empty"
   | "focus"
   | "focus-empty"
   | "visit"
@@ -109,6 +111,13 @@ function fixtures(base: number, guest: boolean) {
       { id: "c5", title: "Планёрка", starts_at: todayAt(base, 9, 0, 3), ends_at: null, location: "Переговорная", everyone: true, people: 24, going: 0 },
       { id: "c6", title: "Встреча с заказчиком по второму корпусу", starts_at: todayAt(base, 15, 0, 3), ends_at: todayAt(base, 16, 30, 3), location: "Кабинет директора", everyone: false, people: 3, going: 2 },
       { id: "c7", title: "Корпоратив", starts_at: todayAt(base, 19, 0, 5), ends_at: null, location: "Ресторан", everyone: true, people: 30, going: 12 },
+      { id: "c8", title: "Обучение по охране труда", starts_at: todayAt(base, 11, 0, 1), ends_at: todayAt(base, 13, 0, 1), location: "Учебный класс", everyone: false, people: 12, going: 8 },
+      { id: "c9", title: "Планёрка", starts_at: todayAt(base, 9, 0, 7), ends_at: null, location: "Переговорная", everyone: true, people: 24, going: 0 },
+      { id: "c10", title: "Приёмка второго корпуса", starts_at: todayAt(base, 14, 0, 9), ends_at: null, location: "Объект", everyone: false, people: 6, going: 0 },
+      { id: "c11", title: "Совет директоров", starts_at: todayAt(base, 16, 0, 12), ends_at: null, location: null, everyone: false, people: 4, going: 0 },
+      { id: "c12", title: "Выезд к заказчику", starts_at: todayAt(base, 10, 0, -6), ends_at: null, location: null, everyone: false, people: 3, going: 3 },
+      { id: "c13", title: "Планёрка", starts_at: todayAt(base, 9, 0, -7), ends_at: null, location: "Переговорная", everyone: true, people: 24, going: 20 },
+      { id: "c14", title: "День рождения Асель", starts_at: todayAt(base, 17, 0, -3), ends_at: null, location: "Кухня", everyone: true, people: 30, going: 25 },
     ].map((e) => (guest ? { ...e, title: null, location: null } : e)),
   };
 
@@ -130,13 +139,20 @@ function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay
 }
 
 export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; clock: ClockStyle; guest: boolean }) {
-  const [base] = useState(() => Date.now());
+  // on the minute: the fixtures are built on the server and again in the browser, and
+  // they have to be the same fixtures for hydration
+  const [base] = useState(() => Date.now() - (Date.now() % 60_000));
   const live = useClock();
   // the night case pins the clock to 23:10 in Aqtobe; every other case runs on the real one
   const now = wallCase === "night" ? new Date(todayAt(base, 23, 10)) : live;
   const data = fixtures(base, guest);
   const lines = data.events.map((event) => lineOf(event, guest));
-  const scene: TvScene = wallCase === "clock" || wallCase === "team" || wallCase === "calendar" ? wallCase : "face";
+  const scene: TvScene =
+    wallCase === "clock" || wallCase === "team"
+      ? wallCase
+      : wallCase === "calendar" || wallCase === "calendar-month" || wallCase === "calendar-empty"
+        ? "calendar"
+        : "face";
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
   const summary = wallCase === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
 
@@ -156,7 +172,8 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
         summary={summary}
         focus={wallCase === "focus" ? data.focus : wallCase === "focus-empty" ? { ...data.focus, tasks: [], counts: { new: 0, work: 0, review: 0 } } : null}
         focusRemainingMs={7 * MIN}
-        calendar={data.calendar}
+        calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
+        calendarView={wallCase === "calendar-month" ? "month" : "week"}
         overlay={overlayOf(overlayFor(wallCase, base, guest), summary.events, new Date(base))}
         sound={false}
       />

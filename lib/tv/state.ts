@@ -12,9 +12,12 @@ import type { TvState } from "./queries";
 export type TvMode = "ether" | "employee";
 export type TvScene = "face" | "clock" | "team" | "calendar";
 export type ClockStyle = "digital" | "analog";
+/** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
+export type CalendarView = "week" | "month";
 
 export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar"];
 export const CLOCK_STYLES: readonly ClockStyle[] = ["digital", "analog"];
+export const CALENDAR_VIEWS: readonly CalendarView[] = ["week", "month"];
 
 /** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
 export const FOCUS_MS = 10 * 60_000;
@@ -63,6 +66,11 @@ export function sceneOf(state: TvState | null): TvScene {
 /** Цифры или стрелки — везде, где стена рисует часы (D-96). Незнакомое — цифры. */
 export function clockStyleOf(state: TvState | null): ClockStyle {
   return state?.clock_style === "analog" ? "analog" : "digital";
+}
+
+/** Вид календаря на стене. Незнакомое — неделя: она показывает и «Сегодня». */
+export function calendarViewOf(state: TvState | null): CalendarView {
+  return state?.calendar_view === "month" ? "month" : "week";
 }
 
 /**

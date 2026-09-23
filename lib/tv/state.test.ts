@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { TvState } from "./queries";
 import {
   burnInShift,
+  calendarViewOf,
   clockStyleOf,
   effectiveMode,
   focusRemainingMs,
@@ -26,6 +27,7 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest: false,
     guest_until: null,
     clock_style: "digital",
+    calendar_view: "week",
     expires_at: null,
     version: 1,
     reload_requested_at: null,
@@ -124,6 +126,14 @@ describe("clockStyleOf", () => {
     expect(clockStyleOf(state({ clock_style: "analog" }))).toBe("analog");
     expect(clockStyleOf(state({ clock_style: "sundial" }))).toBe("digital");
     expect(clockStyleOf(null)).toBe("digital");
+  });
+});
+
+describe("calendarViewOf", () => {
+  it("месяц — только когда так сказал пульт; иначе неделя с «Сегодня»", () => {
+    expect(calendarViewOf(state({ calendar_view: "month" }))).toBe("month");
+    expect(calendarViewOf(state({ calendar_view: "year" }))).toBe("week");
+    expect(calendarViewOf(null)).toBe("week");
   });
 });
 

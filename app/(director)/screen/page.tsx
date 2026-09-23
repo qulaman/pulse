@@ -11,8 +11,10 @@ import { usePeople } from "@/lib/people/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
-import { CLOCK_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
+import { CALENDAR_LABEL, CLOCK_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
+  CALENDAR_VIEWS,
+  calendarViewOf,
   CLOCK_STYLES,
   clockStyleOf,
   effectiveMode,
@@ -22,6 +24,7 @@ import {
   guestOf,
   sceneOf,
   TV_SCENES,
+  type CalendarView,
   type ClockStyle,
   type TvScene,
 } from "@/lib/tv/state";
@@ -80,6 +83,7 @@ export default function ScreenPage() {
   const mode = effectiveMode(row, now);
   const scene = sceneOf(row);
   const clock = clockStyleOf(row);
+  const calendarView = calendarViewOf(row);
   const guest = guestOf(row, false, now);
   const guestEnds = guestEndsAt(row, now);
   const receipt = wallReceipt(row, now);
@@ -205,6 +209,27 @@ export default function ScreenPage() {
         </div>
         <p className="mt-1 px-1 text-center text-[13px] leading-[18px] text-muted">{SCENE_HINT[scene]}</p>
 
+        {/* the calendar on the wall: today with the week, or the month (D-98). One tap puts the
+            calendar up in that view — the key is also the way to the scene */}
+        <Seam label="Календарь на стене" />
+        <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Календарь на стене">
+          {CALENDAR_VIEWS.map((value: CalendarView) => (
+            <Key
+              key={value}
+              on={scene === "calendar" && calendarView === value}
+              role="radio"
+              aria-checked={scene === "calendar" && calendarView === value}
+              icon={value === "month" ? <MonthIcon /> : <WeekIcon />}
+              onClick={() => {
+                if (scene === "calendar" && calendarView === value) return;
+                show({ scene: "calendar", calendar: value }, value === "month" ? "На стене — месяц" : "На стене — сегодня и неделя");
+              }}
+            >
+              {CALENDAR_LABEL[value]}
+            </Key>
+          ))}
+        </div>
+
         {/* the clock on the wall: digits or hands, everywhere it is drawn (D-96) */}
         <Seam label="Часы на стене" />
         <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Часы на стене">
@@ -232,7 +257,7 @@ export default function ScreenPage() {
             value={
               guest
                 ? guestEnds
-                  ? `без фамилий и названий · выключится в ${tvTime(guestEnds)}`
+                  ? `имена скрыты до ${tvTime(guestEnds)}`
                   : "без фамилий, очков и названий"
                 : "выключен"
             }
@@ -301,6 +326,22 @@ const HandsIcon = () => (
   <svg {...icon}>
     <circle cx="10" cy="10" r="7" />
     <path d="M10 5.6V10l3 2" />
+  </svg>
+);
+
+const WeekIcon = () => (
+  <svg {...icon}>
+    <rect x="2.8" y="4.2" width="14.4" height="12.2" rx="2.2" />
+    <path d="M2.8 8.2h14.4" />
+    <path d="M5.8 12.2h8.4" strokeWidth="2.4" />
+  </svg>
+);
+
+const MonthIcon = () => (
+  <svg {...icon}>
+    <rect x="2.8" y="4.2" width="14.4" height="12.2" rx="2.2" />
+    <path d="M2.8 8.2h14.4" />
+    <path d="M6 11.2h.01M10 11.2h.01M14 11.2h.01M6 14h.01M10 14h.01M14 14h.01" strokeWidth="2.2" />
   </svg>
 );
 

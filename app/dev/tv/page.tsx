@@ -1,9 +1,9 @@
 import { WallSandbox, type WallCase } from "./WallSandbox";
 
-const CASES: readonly WallCase[] = ["face", "clock", "team", "calendar", "focus", "focus-empty", "visit", "wait", "in", "event", "night"];
+const CASES: readonly WallCase[] = ["face", "clock", "team", "calendar", "calendar-month", "calendar-empty", "focus", "focus-empty", "visit", "wait", "in", "event", "night"];
 
 /**
- * /dev/tv?case=face|clock|team|calendar|focus|focus-empty|visit|wait|in|event|night[&clock=analog][&guest=1]
+ * /dev/tv?case=face|clock|team|calendar|calendar-month|calendar-empty|focus|focus-empty|visit|wait|in|event|night[&clock=analog][&guest=1]
  * — the office wall on fixtures (dev only): every scene and notice of D-96 without a kiosk,
  * a login or the shared database. Screenshots at 1920×1080 and 1280×720 come from here.
  */

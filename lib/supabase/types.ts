@@ -1380,6 +1380,7 @@ export type Database = {
       tv_state: {
         Row: {
           applied_version: number | null
+          calendar_view: string
           clock_style: string
           company_id: string
           employee_id: string | null
@@ -1397,6 +1398,7 @@ export type Database = {
         }
         Insert: {
           applied_version?: number | null
+          calendar_view?: string
           clock_style?: string
           company_id: string
           employee_id?: string | null
@@ -1414,6 +1416,7 @@ export type Database = {
         }
         Update: {
           applied_version?: number | null
+          calendar_view?: string
           clock_style?: string
           company_id?: string
           employee_id?: string | null
@@ -1781,11 +1784,12 @@ export type Database = {
         Returns: Json
       }
       tv_calendar: {
-        Args: { p_days?: number; p_guest?: boolean }
+        Args: { p_days?: number; p_from?: string; p_guest?: boolean }
         Returns: Json
       }
       tv_control: {
         Args: {
+          p_calendar?: string
           p_clock?: string
           p_employee_id?: string
           p_guest?: boolean
@@ -1796,6 +1800,7 @@ export type Database = {
         }
         Returns: {
           applied_version: number | null
+          calendar_view: string
           clock_style: string
           company_id: string
           employee_id: string | null

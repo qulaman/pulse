@@ -6,7 +6,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { OverlayView } from "@/lib/tv/overlay";
 import type { TvCalendar as TvCalendarData, TvFocusEmployee, TvSummary } from "@/lib/tv/queries";
-import { burnInShift, type ClockStyle, type TvScene } from "@/lib/tv/state";
+import { burnInShift, type CalendarView, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import type { TickerItem } from "@/lib/tv/ticker";
 import type { TvSpeech } from "@/lib/tv/voice";
 
@@ -51,6 +51,8 @@ export type TvFrameProps = {
   focus: TvFocusEmployee | null;
   focusRemainingMs: number;
   calendar: TvCalendarData | null;
+  /** «Сегодня» с неделей или месяц сеткой (D-98). */
+  calendarView: CalendarView;
   overlay: OverlayView;
   /** The kiosk rings for a visitor; the sandbox and a laptop preview keep quiet. */
   sound: boolean;
@@ -77,7 +79,13 @@ export function TvFrame(props: TvFrameProps) {
   // a person on the wall or a notice wakes the night up: somebody is in the office
   const dim = night && !focus && !overlay.banner;
   // the scene key: changing it plays the transition, everything else updates in place
-  const sceneKey = dim ? "night" : focus ? `focus:${focus.employee.id}` : scene;
+  const sceneKey = dim
+    ? "night"
+    : focus
+      ? `focus:${focus.employee.id}`
+      : scene === "calendar"
+        ? `calendar:${props.calendarView}`
+        : scene;
 
   return (
     <div className="relative h-full w-full overflow-hidden" data-scene={sceneKey} data-clock={clock} data-guest={guest || undefined}>
@@ -116,7 +124,7 @@ export function TvFrame(props: TvFrameProps) {
               ) : scene === "team" ? (
                 <TvTeam summary={summary ?? EMPTY_SUMMARY} guest={guest} />
               ) : scene === "calendar" ? (
-                <TvCalendar calendar={calendar} now={now} />
+                <TvCalendar calendar={calendar} now={now} view={props.calendarView} />
               ) : (
                 <TvMascot speech={speech} />
               )}

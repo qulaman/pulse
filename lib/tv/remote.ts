@@ -1,6 +1,6 @@
 import { tvTime } from "./clock";
 import type { TvState } from "./queries";
-import { effectiveMode, focusRemainingMs, sceneOf, type ClockStyle, type TvScene } from "./state";
+import { calendarViewOf, effectiveMode, focusRemainingMs, sceneOf, type CalendarView, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Что пульт говорит директору о стене. Чистые функции: формулировки — часть продукта,
@@ -30,6 +30,12 @@ export const SCENE_LABEL: Record<TvScene, string> = {
 export const CLOCK_LABEL: Record<ClockStyle, string> = {
   digital: "Цифры",
   analog: "Стрелки",
+};
+
+/** Переключатель вида календаря на пульте (D-98). */
+export const CALENDAR_LABEL: Record<CalendarView, string> = {
+  week: "Неделя",
+  month: "Месяц",
 };
 
 const SCENE_NOW: Record<TvScene, string> = {
@@ -66,7 +72,9 @@ export function wallNow(
     const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
     return `${person?.full_name ?? "Сотрудник"} · ещё ${minutes} мин`;
   }
-  return SCENE_NOW[sceneOf(state)];
+  const scene = sceneOf(state);
+  if (scene === "calendar" && calendarViewOf(state) === "month") return "Эфир · календарь · месяц";
+  return SCENE_NOW[scene];
 }
 
 export { keyLabels } from "@/lib/people/labels";

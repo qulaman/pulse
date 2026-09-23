@@ -20,7 +20,7 @@ export const tvKeys = {
   summary: (guest: boolean) => ["tv", "summary", guest] as const,
   state: ["tv", "state"] as const,
   focus: ["tv", "focus"] as const,
-  calendar: (guest: boolean) => ["tv", "calendar", guest] as const,
+  calendar: (guest: boolean, from: string, days: number) => ["tv", "calendar", guest, from, days] as const,
   overlay: ["tv", "overlay"] as const,
 };
 
@@ -232,24 +232,30 @@ export type TvCalendar = { from: string; days: number; events: TvCalendarEvent[]
 const CALENDAR_REFRESH_MS = 60_000;
 
 /**
- * Неделя вперёд для заставки «Календарь» — одним вызовом `tv_calendar()`: роль `tv`
- * не читает `events` (D-78 §4). Сокета на мероприятия у киоска нет, поэтому раз в
- * минуту и по каждому событию стены (напоминание пишет `tv_events` вида `event`).
+ * Мероприятия для заставки «Календарь» одним вызовом `tv_calendar()`: роль `tv` не читает
+ * `events` (D-78 §4). Неделя — семь дней с сегодня; месяц — шесть недель с понедельника
+ * первой недели месяца (`from` — `YYYY-MM-DD`, D-98). Сокета на мероприятия у киоска нет,
+ * поэтому раз в минуту и по каждому событию стены (напоминание пишет `tv_events`).
  */
-export function useTvCalendar(guest: boolean, enabled: boolean) {
+export function useTvCalendar(guest: boolean, enabled: boolean, range: { from: string | null; days: number }) {
+  const key = tvKeys.calendar(guest, range.from ?? "today", range.days);
   const query = useQuery({
-    queryKey: tvKeys.calendar(guest),
+    queryKey: key,
     enabled,
     refetchInterval: CALENDAR_REFRESH_MS,
     queryFn: async (): Promise<TvCalendar> => {
       const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.rpc("tv_calendar", { p_guest: guest, p_days: 7 });
+      const { data, error } = await supabase.rpc("tv_calendar", {
+        p_guest: guest,
+        p_days: range.days,
+        p_from: range.from ?? undefined,
+      });
       if (error) throw new Error(error.message);
       const value = (data ?? {}) as Partial<TvCalendar>;
-      return { from: value.from ?? new Date().toISOString(), days: value.days ?? 7, events: value.events ?? [] };
+      return { from: value.from ?? new Date().toISOString(), days: value.days ?? range.days, events: value.events ?? [] };
     },
   });
-  useRealtimeInvalidate({ table: "tv_events" }, tvKeys.calendar(guest), enabled);
+  useRealtimeInvalidate({ table: "tv_events" }, key, enabled);
   return query;
 }
 

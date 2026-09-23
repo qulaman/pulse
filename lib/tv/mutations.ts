@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { FOCUS_MS, type ClockStyle, type TvScene } from "./state";
+import { FOCUS_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -34,6 +34,8 @@ export type TvControlInput = {
   reload?: boolean;
   /** Цифры или стрелки на стене (D-96). */
   clock?: ClockStyle;
+  /** «Неделя» или «Месяц» в заставке «Календарь» (D-98). */
+  calendar?: CalendarView;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -57,6 +59,7 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.guest_until = null;
   }
   if (input.clock) next.clock_style = input.clock;
+  if (input.calendar) next.calendar_view = input.calendar;
   return next;
 }
 
@@ -80,6 +83,7 @@ export function useTvControl() {
         p_guest: input.guest,
         p_reload: input.reload ?? false,
         p_clock: input.clock,
+        p_calendar: input.calendar,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),
