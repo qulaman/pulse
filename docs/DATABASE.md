@@ -16,7 +16,7 @@
 - Materialized views **не используем**; допустимы только обычные view `with (security_invoker = on)`. Сейчас view в БД нет ни одного: Пульс читает задачи одним запросом с вложенными сообщениями (D-57 §3).
 - Партиционирование **не нужно**; порог пересмотра — 10 млн строк в task_messages. `company_id` — первым столбцом составных индексов.
 - `point_balance_checkpoints (user_id, as_of, balance)` — зарезервировано, не строить.
-- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются на всём флоте. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `events`, `event_participants`, `errands`, `profiles` (клиент слушает только строки секретарей, `role=eq.secretary` — «на месте / не на месте до …» без перезагрузки, D-99; миграция `20260923235500`).
+- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются на всём флоте. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `mind_boards`, `events`, `event_participants`, `errands`, `profiles` (клиент слушает только строки секретарей, `role=eq.secretary` — «на месте / не на месте до …» без перезагрузки, D-99; миграция `20260923235500`).
 
 ## Enum-типы
 
@@ -187,11 +187,14 @@ payload jsonb not null default '{}', payload_guest jsonb not null default '{}', 
 company_id uuid pk → companies,   -- одна строка на компанию, без id/created_at
 mode text not null default 'ether' check (mode in ('ether','employee','task')),
 employee_id uuid null → profiles on delete set null, task_id uuid null → tasks on delete set null,
-scene text not null default 'face' check (scene in ('face','clock','team','calendar')),   -- calendar — D-96
+scene text not null default 'face' check (scene in ('face','clock','team','calendar','board')),   -- calendar — D-96, board — D-102
 guest bool not null default false,
 guest_until timestamptz null,     -- гость, включённый визитом, гаснет по часам киоска (D-96)
 clock_style text not null default 'digital' check (clock_style in ('digital','analog')),   -- D-96
 calendar_view text not null default 'week' check (calendar_view in ('week','month')),   -- «Сегодня» с неделей или месяц, D-98
+board_id uuid null → mind_boards on delete set null,   -- доска на стене при scene = 'board', D-102
+board_until timestamptz null,     -- доска уходит со стены: 21:00 Актобе, поставленная после 21:00 — через 2 часа
+board_guest bool not null default false,   -- «Показать гостю»; сбрасывают новая доска и выключенный гость
 expires_at timestamptz null,      -- фокус гаснет по часам киоска, без cron
 version int not null default 0,   -- поднимает каждый tv_control; киоск квитирует
 reload_requested_at, seen_at timestamptz null, applied_version int null,
@@ -203,6 +206,8 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 
 **Месяц на стене (D-98, миграция `20260923233000_tv_calendar_month`):** `calendar_view` (`week | month`) — вид заставки «Календарь»; `tv_control(..., p_calendar)` пересоздан; `tv_calendar(p_guest, p_days, p_from)` отдаёт до 42 дней с `p_from` (по умолчанию сегодня по Актобе) — сетка месяца с понедельника первой недели. pgTAP — `024_tv_calendar_month.test.sql`.
 
+**Доска на стене (D-102, миграция `20260924090000_mind_boards`):** сцену `board` ставит только `tv_control(..., p_board)` — автор своей живой доски (`p_scene => 'board'` отклоняется, `bad_scene`; чужая или удалённая — `bad_board`); любая другая `p_scene` снимает доску; `p_board_guest` — «Показать гостю». `tv_board(p_guest)` (tv/director) отдаёт `{board, hidden}`: доску, стоящую на стене и живую по `board_until`, с пунктами по `position` (непустые, не удалённые) и нейтральными пометками (`assignee` — имя без фамилии исполнителя поручения, кроме `revoked`; `handed_done`); при госте без `board_guest` — `hidden: true`, если доску показали гостю — без имён. Правка доски на стене поднимает версию строки (`tv_touch`) — киоск перечитывает `tv_board`. pgTAP — `025_mind_boards.test.sql`.
+
 ### inbox_items — staging голосового конвейера
 `id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, created_at, updated_at`. Заводит `/api/voice/upload-url` (`director_input`), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
 
@@ -211,7 +216,10 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 ### reminders
 `id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
-`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text`, `pinned` и `remind_at`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
+`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), board_id uuid null → mind_boards (cascade; пункт доски, D-102), position double precision null (порядок на доске, дробный — перестановка пишет одну строку; обязателен у пункта — check), done_at timestamptz null (пункт отмечен), created_at, updated_at`. Правятся только `text`, `pinned`, `remind_at` и у пунктов `done_at` / `position`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
+
+### mind_boards — доски директора (D-102)
+`id, company_id, user_id (автор), title text not null (1–120), deleted_at timestamptz null (мягкое удаление; через 3 дня строку вместе с пунктами удаляет `notes_purge_trash`), client_request_id uuid null (unique где not null), created_at, updated_at`. Контейнер: пункты — строки `notes` с `board_id`. Пишется напрямую с клиента под RLS (ключ — с телефона, повтор перечитывает строку). `updated_at` поднимает и правка любого пункта (триггер) — «последние доски» на пульте. Состоит в публикации `supabase_realtime`.
 
 ### events + event_participants — календарь (D-78)
 ```
@@ -301,9 +309,9 @@ create policy tasks_insert on tasks for insert with check (
 - **ingest_batches, ai_logs**: select — director; запись — service role и security-definer-функции.
 - **inbox_items**: select — автор + director; insert — своё; update — автор до `confirmed`.
 - **recurrence_rules**: select — компания, кроме `tv`; insert/update/delete — director. **reminders**: select — свои; записи нет (таблица выведена из оборота, D-95).
-- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_heartbeat` (и `tv_touch` изнутри функций визита, D-96). Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_calendar` / `tv_overlay` / `tv_heartbeat`. Никакого anon.
+- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_heartbeat` (и `tv_touch` изнутри функций визита, D-96). Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_calendar` / `tv_overlay` / `tv_board` / `tv_heartbeat`. Никакого anon.
 - **visits** (D-96): select — директор и секретари своей компании; `tv` и остальные — никогда; политик на запись нет — только RPC `announce_visit` / `answer_visit` / `close_visit`.
-- **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят.
+- **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят. **mind_boards** — те же четыре политики по автору; `notes_insert` / `notes_update` дополнительно требуют, чтобы `board_id` был доской того же автора (D-102).
 - **events**: select — компания, кроме `tv`: director — всё, остальные — автор или участник; update — director; insert/delete — нет (создаёт `confirm_voice_batch`). **event_participants**: select — кроме `tv`, кто видит мероприятие (`can_see_event`); запись — только RPC и `confirm_voice_batch`.
 - **errands**: select — автор + любой `director` / `secretary` своей компании, `tv` никогда; insert — director (автор — он сам); update/delete — нет (только `transition_errand`).
 - View нет. Функции клиентским ролям — перечисленные ниже security-definer-функции: `execute` отозван у `public`/`anon`, выдан `authenticated`; тики `events_due_reminders` и `errands_due_escalation` — только `service_role`.
@@ -365,7 +373,8 @@ close_visit(p_id uuid) returns visits
 visits_due_expiry(p_now timestamptz default now()) returns int           -- только service_role
 
 -- ТВ (D-76)
-tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text) returns tv_state
+tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text, p_board uuid, p_board_guest boolean) returns tv_state   -- p_board* — D-102
+tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102
 tv_focus() returns jsonb
 tv_heartbeat(p_applied_version int default null) returns void
 tv_summary(p_guest boolean default false) returns jsonb
@@ -396,7 +405,8 @@ tv_emit(p_company, p_kind, p_actor, p_task, p_title, p_amount, p_title_guest) re
 7. Outbox (только вставка строк): `trg_notify_outbox_tasks` (after insert or update of status on tasks), `trg_notify_outbox_messages` (after insert on task_messages), `trg_notify_outbox_announcements` (after insert on announcements), `trg_notify_outbox_event_participant` (after insert on event_participants), `trg_notify_outbox_event` (after update on events), `trg_notify_outbox_errand` (after insert or update of status on errands); `trg_notification_deliveries_deliver_after` (before insert on notification_deliveries) — окно доставки.
 8. Проекции ТВ: `trg_tv_events_task` (after insert or update on tasks), `trg_tv_events_points` (after insert on point_transactions), `trg_tv_events_announcement` (after insert on announcements), `trg_tv_events_order` (after update on orders).
 9. `trg_events_reset_reminder` (before update on events) — перенос `starts_at` обнуляет `reminded_at`.
-10. `moddatetime` (extension) — `updated_at` на tasks, inbox_items, shop_items, orders, notes, tv_state, events, errands.
+10. `moddatetime` (extension) — `updated_at` на tasks, inbox_items, shop_items, orders, notes, mind_boards, tv_state, events, errands.
+11. `trg_notes_mind_board` (after insert/update/delete on notes, пункты досок) поднимает `mind_boards.updated_at`; `trg_mind_boards_touch_tv` (after update on mind_boards) зовёт `tv_touch`, если доска на стене (D-102).
 
 ## Индексы (полный список; ставит миграция, не «агент по вкусу»)
 
@@ -414,6 +424,8 @@ point_transactions (company_id, user_id, created_at);
 push_subscriptions (user_id);
 notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
 notes (remind_at) where remind_at is not null and reminded_at is null and deleted_at is null;  notes (deleted_at) where deleted_at is not null;
+notes (board_id, position) where board_id is not null;   -- пункты доски по порядку, D-102
+mind_boards (user_id, updated_at desc) where deleted_at is null;  mind_boards (client_request_id) unique where not null;  mind_boards (deleted_at) where deleted_at is not null;
 notification_deliveries (status, created_at) where status='queued';
 notification_deliveries (task_id, event_kind);  notification_deliveries (user_id, status);
 notification_deliveries_due_idx (status, channel, deliver_after) where status='queued';
@@ -484,5 +496,6 @@ pg_cron и pg_net не подключены. Единственное распи
 | `022_tv_wall_v2.test.sql` | стена v2: часы и календарь пультом, гость с таймером, карточка сотрудника по стадиям, неделя для киоска |
 | `023_visits.test.sql` | «К вам посетитель»: объявляет секретарь, отвечает директор, квитанция стены, маска гостя, истечение |
 | `024_tv_calendar_month.test.sql` | календарь на стене: «Неделя / Месяц» пультом, шесть недель для киоска |
+| `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).
