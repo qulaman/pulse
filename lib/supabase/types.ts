@@ -535,6 +535,8 @@ export type Database = {
           inbox_item_id: string | null
           pinned: boolean
           raw_transcript: string | null
+          remind_at: string | null
+          reminded_at: string | null
           text: string
           updated_at: string
           user_id: string
@@ -552,6 +554,8 @@ export type Database = {
           inbox_item_id?: string | null
           pinned?: boolean
           raw_transcript?: string | null
+          remind_at?: string | null
+          reminded_at?: string | null
           text: string
           updated_at?: string
           user_id: string
@@ -569,6 +573,8 @@ export type Database = {
           inbox_item_id?: string | null
           pinned?: boolean
           raw_transcript?: string | null
+          remind_at?: string | null
+          reminded_at?: string | null
           text?: string
           updated_at?: string
           user_id?: string
@@ -1555,6 +1561,8 @@ export type Database = {
         Args: { p_company: string; p_now?: string }
         Returns: string
       }
+      notes_due_reminders: { Args: { p_now?: string }; Returns: number }
+      notes_purge_trash: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
       reassign_task: {
         Args: {

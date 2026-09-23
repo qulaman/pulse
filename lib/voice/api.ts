@@ -13,10 +13,13 @@ export type UploadContext = "director_input" | "task_message";
 
 export type UploadUrlResponse = {
   audio_path: string;
+  /** Empty when `stored`: there is nothing left to upload. */
   signed_url: string;
   token: string;
   /** Staging row of the director's recording (docs/DATABASE.md inbox_items). */
   inbox_id?: string | null;
+  /** The object of this key is in Storage already — an earlier upload landed, its answer was lost. */
+  stored?: boolean;
 };
 
 export type TranscribeResponse = {
@@ -144,6 +147,8 @@ export const voiceApi: VoiceApi = {
 
   /** Straight to Storage by signed URL — the 4.5 MB Vercel body limit never applies (G.8). */
   async uploadAudio({ signed_url, blob, mime }) {
+    // `stored` slot: the recording of this key is in Storage already (D-95)
+    if (!signed_url) return;
     let res: Response;
     try {
       res = await fetch(signed_url, {

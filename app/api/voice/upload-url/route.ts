@@ -22,13 +22,20 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const supabase = createServiceSupabase();
 
     const { data, error } = await supabase.storage.from("voice").createSignedUploadUrl(path);
-    if (error || !data) {
+    // the object of this key is there already: an earlier upload of the same capture landed
+    // and its answer was lost — a retry must go on to the next step, not fail forever (D-95)
+    let slot: { audio_path: string; signed_url: string; token: string; stored?: boolean };
+    if (error && /already exists/i.test(error.message)) {
+      slot = { audio_path: path, signed_url: "", token: "", stored: true };
+    } else if (error || !data) {
       console.error("signed upload url failed:", error?.message);
       return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуй ещё раз");
+    } else {
+      slot = { audio_path: path, signed_url: data.signedUrl, token: data.token };
     }
 
     if (body.context !== "director_input") {
-      return apiOk({ audio_path: path, signed_url: data.signedUrl, token: data.token });
+      return apiOk(slot);
     }
 
     // Idempotent by client_request_id: a retried FAB tap reuses the staging row (G.11).
@@ -56,12 +63,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       inboxId = inserted.data.id;
     }
 
-    return apiOk({
-      audio_path: path,
-      signed_url: data.signedUrl,
-      token: data.token,
-      inbox_id: inboxId,
-    });
+    return apiOk({ ...slot, inbox_id: inboxId });
   },
   BodySchema,
 );

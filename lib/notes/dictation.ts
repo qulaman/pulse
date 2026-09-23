@@ -4,22 +4,24 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { MIN_RECORDING_MS } from "@/lib/store/ingest";
-import { voiceApi } from "@/lib/voice/api";
-import { createRecorder, extForMime, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
+import { createRecorder, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
 
 import { firstLine } from "./list";
-import { insertNote, upsertCached } from "./mutations";
-import { noteKeys, type Note } from "./queries";
+import { upsertCached } from "./mutations";
+import { claim, dropCreate, keepCreate, release, type PendingCreate } from "./pending";
+import type { Note } from "./queries";
+import { applyWords, deliverCreate, fetchWords } from "./replay";
 
 /**
  * The dictaphone of «Заметки» (D-81): press, speak, let go — the words become a note
  * verbatim. No parser and no «запиши мысль» preamble: on this screen everything said is
  * a note, so nothing has to be decided and nothing can be misfiled as a task.
  *
- * Order of safety (принцип 5): the recording goes to Storage first, then the note row
- * is born with the recording and no words, then STT writes the words onto that row on
- * the server (the transcribe route takes `note_id`). A failed STT, a closed tab or a
- * lost response leaves a note with its voice — never a thought without a trace.
+ * Order of safety (принцип 5): the recording is kept on the phone (IndexedDB, D-95),
+ * then goes to Storage, then the note row is born with the recording and no words, then
+ * STT writes the words onto that row on the server (the transcribe route takes
+ * `note_id`). No network, a closed tab, a failed STT or a lost response — the thought
+ * waits on the phone or in the feed with its voice, never gone without a trace.
  *
  * The key works two ways, like a walkie-talkie with a lock: hold it and talk — letting
  * go saves; tap it — it keeps recording until the next tap.
@@ -39,15 +41,13 @@ const TOO_SHORT: Receipt = { tone: "warn", eyebrow: "Не записал", headl
 const MIC_DENIED: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Нет доступа", line: "Разреши микрофон в настройках браузера" };
 const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Недоступен здесь", line: "Открой приложение по https" };
 const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Аудио сохранил", line: "Заметка в ленте — распознаю ещё раз по тапу" };
+const KEPT_ON_PHONE: Receipt = { tone: "warn", eyebrow: "Нет связи", headline: "Голос на телефоне", line: "Отправлю сам, как появится связь" };
 
 type Job = {
-  audio: RecordedAudio;
-  /** Idempotency key of the whole capture: the storage object, the inbox row, the note. */
-  crid: string;
-  noteId: string;
-  /** Set once the object is in Storage — a retry must not upload it twice (x-upsert off). */
-  audioPath: string | null;
-  inboxId: string | null;
+  /** The capture as the phone keeps it: id, idempotency key, the recording, upload progress. */
+  entry: PendingCreate;
+  /** It is in IndexedDB: a failed delivery is the replay's job, and the key is free at once. */
+  kept: boolean;
 };
 
 export function useDictation(me: { userId: string; companyId: string } | undefined, onReceipt: (receipt: Receipt) => void) {
@@ -83,29 +83,11 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
   async function transcribe(note: Note, durationMs?: number): Promise<void> {
     if (!note.audio_path) return;
     mark(note.id, true);
-    let words: string | null = null;
-    try {
-      const res = await voiceApi.transcribe({
-        audio_path: note.audio_path,
-        context: "director_input",
-        client_request_id: note.client_request_id ?? crypto.randomUUID(),
-        note_id: note.id,
-        ...(durationMs ? { duration_ms: durationMs } : {}),
-      });
-      // the guard answers 200 with no transcript when the audio held no speech
-      words = typeof res.transcript === "string" && res.transcript.trim() ? res.transcript : null;
-    } catch {
-      words = null;
-    }
+    const words = await fetchWords(note, durationMs);
     mark(note.id, false);
 
     const userId = live.current.me?.userId;
-    if (words && userId) {
-      // the route already wrote the words onto the row; the cache learns them now and
-      // Realtime confirms — unless the director typed into the empty note meanwhile
-      const current = queryClient.getQueryData<Note[]>(noteKeys.mine(userId))?.find((row) => row.id === note.id);
-      if (current && current.text.trim() === "") upsertCached(queryClient, userId, { ...current, text: words, raw_transcript: words });
-    }
+    if (words && userId) applyWords(queryClient, userId, note.id, words);
     if (headNote.current === note.id) {
       headNote.current = null;
       setStage((now) => (now === "transcribing" ? "idle" : now));
@@ -115,7 +97,7 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
     );
   }
 
-  /** Storage → note row → STT. Every step is keyed, so «Повторить» resumes where it broke. */
+  /** Phone → Storage → note row → STT. Every step is keyed, so a retry resumes where it broke. */
   async function deliver(): Promise<void> {
     const current = job.current;
     const me = live.current.me;
@@ -123,33 +105,27 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
     setStage("saving");
     let note: Note;
     try {
-      if (!current.audioPath) {
-        const slot = await voiceApi.uploadUrl({
-          ext: extForMime(current.audio.mime),
-          context: "director_input",
-          client_request_id: current.crid,
-        });
-        await voiceApi.uploadAudio({ signed_url: slot.signed_url, blob: current.audio.blob, mime: current.audio.mime });
-        current.audioPath = slot.audio_path;
-        current.inboxId = slot.inbox_id ?? null;
-      }
-      note = await insertNote(me, {
-        id: current.noteId,
-        text: "",
-        client_request_id: current.crid,
-        audio_path: current.audioPath,
-        inbox_item_id: current.inboxId,
-      });
+      note = await deliverCreate(me, current.entry);
     } catch {
-      // the recording is still in memory: the display offers «Повторить»
+      if (current.kept) {
+        // on the phone: the replay sends it when the network is back (the feed shows it as
+        // «ждёт связи»), and the dictaphone is free for the next thought right now
+        release(current.entry.id);
+        job.current = null;
+        setStage("idle");
+        live.current.onReceipt(KEPT_ON_PHONE);
+        return;
+      }
+      // kept in memory only (no IndexedDB here): the display offers «Повторить»
       setStage("failed");
       return;
     }
+    release(current.entry.id);
     job.current = null;
     upsertCached(queryClient, me.userId, note);
     headNote.current = note.id;
     setStage("transcribing");
-    await transcribe(note, current.audio.durationMs);
+    await transcribe(note, current.entry.audio?.durationMs);
   }
 
   async function begin(): Promise<void> {
@@ -201,7 +177,22 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
       live.current.onReceipt(TOO_SHORT);
       return;
     }
-    job.current = { audio, crid: crypto.randomUUID(), noteId: crypto.randomUUID(), audioPath: null, inboxId: null };
+    const me = live.current.me;
+    if (!me) return;
+    const entry: PendingCreate = {
+      id: crypto.randomUUID(),
+      userId: me.userId,
+      companyId: me.companyId,
+      crid: crypto.randomUUID(),
+      text: "",
+      createdAt: new Date().toISOString(),
+      audio: { blob: audio.blob, mime: audio.mime, durationMs: audio.durationMs },
+      audioPath: null,
+      inboxId: null,
+    };
+    // this capture is the dictaphone's until it lands or is handed over to the replay
+    claim(entry.id);
+    job.current = { entry, kept: await keepCreate(entry) };
     await deliver();
   }
 
@@ -276,6 +267,10 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
 
     /** «Удалить запись» after a failed delivery: the director gives up on it explicitly. */
     discard() {
+      if (job.current) {
+        release(job.current.entry.id);
+        void dropCreate(job.current.entry.id);
+      }
       job.current = null;
       setStage("idle");
     },
