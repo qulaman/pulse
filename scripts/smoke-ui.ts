@@ -157,6 +157,23 @@ async function main() {
     const status = persisted ? await sentCard.getAttribute("data-status") : null;
     await page.screenshot({ path: join(SHOTS, "05b-sent.png") });
     record("задача сохранена: видна в «Отправленных» после перезагрузки", persisted && status === "sent", `status=${status}`);
+
+    // the desk (D-80): a tap on the row puts the task on the display, with its three keys live
+    let onDesk = false;
+    let keysLive = false;
+    if (persisted) {
+      await sentCard.click();
+      try {
+        await page.locator('[data-testid="desk-lcd"]', { hasText: /Казхром/i }).waitFor({ timeout: 5_000 });
+        onDesk = true;
+      } catch {
+        onDesk = false;
+      }
+      const keys = ["extend", "reassign", "revoke"].map((key) => page.locator(`[data-testid="desk-key-${key}"]`));
+      keysLive = (await Promise.all(keys.map(async (key) => (await key.isVisible()) && (await key.isEnabled())))).every(Boolean);
+    }
+    await page.screenshot({ path: join(SHOTS, "05c-desk.png") });
+    record("«Задачи»: тап по строке кладёт задачу на дисплей", onDesk && keysLive, `lcd=${onDesk} keys=${keysLive}`);
   }
 
   // ---- announcement: «всем: …» → Эфир ---------------------------------------------
