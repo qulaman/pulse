@@ -149,9 +149,9 @@ export function Key({
   );
 }
 
-/** The indicator under a key: lit when that key's state is the current one. */
-export function Dot({ on }: { on: boolean }) {
-  return <span aria-hidden className={`${s.dot} ${on ? s.dotOn : ""}`} />;
+/** The indicator under a key: lit when that key's state is the current one; red only for overdue work. */
+export function Dot({ on, tone = "accent" }: { on: boolean; tone?: "accent" | "danger" }) {
+  return <span aria-hidden className={`${s.dot} ${on ? (tone === "danger" ? s.dotDanger : s.dotOn) : ""}`} />;
 }
 
 /**

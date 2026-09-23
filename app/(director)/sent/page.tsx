@@ -11,8 +11,11 @@ import { isUrgentNow, TaskHead } from "@/components/tasks/TaskChrome";
 import { Trace, TraceHeading, TraceLeaf, TraceNow } from "@/components/tasks/Trace";
 import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { Button } from "@/components/ui/Button";
+import { Seam } from "@/components/ui/device/Device";
+import { PersonPad } from "@/components/ui/device/PersonPad";
 import { Sheet } from "@/components/ui/Sheet";
-import { queueOf } from "@/lib/tasks/desk";
+import { usePeople } from "@/lib/people/queries";
+import { personDots, personSummary, queueOf } from "@/lib/tasks/desk";
 import { GROUP_LABEL, groupTasks, overdueCount, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
@@ -73,8 +76,10 @@ export default function SentPage() {
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
   const board = usePulseBoard(me.data);
+  const people = usePeople();
   const actions = useTaskActions(me.data);
   const [filter, setFilter] = useState<Filter>("active");
+  const [personId, setPersonId] = useState<string | null>(null);
   const [purging, setPurging] = useState(false);
   const purge = usePurgeClosed();
   const [query, setQuery] = useState("");
@@ -88,10 +93,23 @@ export default function SentPage() {
   // out — only the author's reply closes a question, so only the author's tasks are «ваш ход»
   const mine = useMemo(() => (board.data ?? []).filter((task) => task.author_id === meId), [board.data, meId]);
   const boardById = useMemo(() => new Map(mine.map((task) => [task.id, task])), [mine]);
-  const queue = useMemo(() => queueOf(mine, now), [mine, now]);
+  const queueAll = useMemo(() => queueOf(mine, now), [mine, now]);
+  const queue = useMemo(
+    () => (personId ? queueAll.filter((item) => item.task.assignee_id === personId) : queueAll),
+    [queueAll, personId],
+  );
   const questionIds = useMemo(() => new Set(mine.filter((task) => task.question).map((task) => task.id)), [mine]);
+  // the dots under the people keys speak for the whole desk, whoever is lit
+  const dots = useMemo(() => personDots(queueAll, all, now), [queueAll, all, now]);
 
-  const loading = me.isLoading || tasks.isLoading || board.isLoading;
+  const scoped = useMemo(() => (personId ? all.filter((task) => task.assignee_id === personId) : all), [all, personId]);
+  const personName = firstName(people.data?.find((person) => person.id === personId)?.full_name);
+  const personLine = useMemo(
+    () => (personId ? personSummary(personName || "Без имени", scoped, now) : null),
+    [personId, personName, scoped, now],
+  );
+
+  const loading = me.isLoading || tasks.isLoading || board.isLoading || people.isLoading;
   const desk = useDesk({ tasks: all, queue, ready: !loading });
   const delivery = useTaskDelivery(desk.selectedId);
 
@@ -121,20 +139,20 @@ export default function SentPage() {
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return all.filter(
+    return scoped.filter(
       (t) =>
         matches(t, filter) &&
         (!needle || t.title.toLowerCase().includes(needle) || (t.assignee?.full_name ?? "").toLowerCase().includes(needle)),
     );
-  }, [all, filter, query]);
+  }, [scoped, filter, query]);
 
   const counts = useMemo(
     () => ({
-      active: all.filter((t) => matches(t, "active")).length,
-      review: all.filter((t) => matches(t, "review")).length,
-      closed: all.filter((t) => matches(t, "closed")).length,
+      active: scoped.filter((t) => matches(t, "active")).length,
+      review: scoped.filter((t) => matches(t, "review")).length,
+      closed: scoped.filter((t) => matches(t, "closed")).length,
     }),
-    [all],
+    [scoped],
   );
 
   // grouping by deadline inside «Закрытые» would be one pile called «Закрытые»
@@ -153,6 +171,13 @@ export default function SentPage() {
     else desk.select(task.id);
   };
 
+  // a person key is a filter: lit narrows the list to them, a second tap lets go; the
+  // display drops its task so their numbers can speak
+  const pickPerson = (id: string) => {
+    setPersonId((current) => (current === id ? null : id));
+    desk.select(null);
+  };
+
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
       <h1 className="sr-only">Задачи</h1>
@@ -167,8 +192,21 @@ export default function SentPage() {
         flash={desk.flash}
         delivery={delivery.data}
         actions={desk.wrap(actions)}
+        person={personLine}
       >
         <FilterKeys value={filter} counts={counts} onChange={setFilter} />
+
+        <Seam label="Чьи дела" />
+        <div className="mt-2">
+          <PersonPad
+            people={people.data ?? []}
+            activeId={personId}
+            groupLabel="Чьи дела"
+            ariaFor={(person, active) => (active ? `${person.full_name} — снять фильтр` : `Дела: ${person.full_name}`)}
+            onPick={(person) => pickPerson(person.id)}
+            dotFor={(person) => dots.get(person.id) ?? null}
+          />
+        </div>
       </Desk>
 
       {/* a hairline, not a filled box: above a list with no boxes a solid field shouts */}
@@ -205,8 +243,9 @@ export default function SentPage() {
           </svg>
         </button>
 
-        {/* cleanup of the closed stack: wrong and test orders go for good, in one tap */}
-        {filter === "closed" && counts.closed > 0 ? (
+        {/* cleanup of the closed stack: wrong and test orders go for good, in one tap; it is
+            company-wide, so not under a lit person key, where the count would be theirs */}
+        {filter === "closed" && !personId && counts.closed > 0 ? (
           <Button variant="ghost" size="sm" className="!text-danger/80" onClick={() => setPurging(true)}>
             Очистить закрытые ({counts.closed})
           </Button>
@@ -275,7 +314,8 @@ export default function SentPage() {
                             now={now}
                             question={question}
                             showStatus={group.key !== "overdue" && group.key !== "review"}
-                            person={effectiveGroup !== "person" ? firstName(task.assignee?.full_name) || "без исполнителя" : undefined}
+                            // a lit person key or a per-person pile already names who
+                            person={effectiveGroup !== "person" && !personId ? firstName(task.assignee?.full_name) || "без исполнителя" : undefined}
                           />
                         </button>
                         <p className="sr-only">{STATUS_LABEL[task.status]}</p>

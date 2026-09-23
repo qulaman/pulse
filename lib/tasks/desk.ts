@@ -125,6 +125,50 @@ export function deskSummary(
   };
 }
 
+/** Work the person still holds — «в работе» of the filter keys. */
+const IN_WORK: readonly TaskStatus[] = ["scheduled", ...WORKING];
+
+/**
+ * The display with a person key lit and nothing picked: their name, then only the numbers
+ * that are not zero — «3 в работе · 1 просрочена · 1 на приёмке». Red while something of
+ * theirs is late, amber while their work waits for the director.
+ */
+export function personSummary(
+  name: string,
+  tasks: readonly Groupable[],
+  now: Date = new Date(),
+): { headline: string; line: string; tone: DeskTone } {
+  const working = tasks.filter((task) => IN_WORK.includes(task.status)).length;
+  const overdue = overdueCount([...tasks], now);
+  const review = tasks.filter((task) => task.status === "pending_review").length;
+  const parts: string[] = [];
+  if (working > 0) parts.push(`${working} в работе`);
+  if (overdue > 0) parts.push(`${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
+  if (review > 0) parts.push(`${review} на приёмке`);
+  return {
+    headline: name,
+    line: parts.length > 0 ? parts.join(" · ") : "открытых дел нет",
+    tone: overdue > 0 ? "danger" : review > 0 ? "warn" : "ok",
+  };
+}
+
+export type PersonDot = "accent" | "danger";
+
+/**
+ * The dots under the people keys: lit for whoever holds a task of the director's queue,
+ * red for whoever holds overdue work — the one exception to «a dot is the accent».
+ */
+export function personDots(
+  queue: readonly DeskItem[],
+  tasks: readonly (Groupable & { assignee_id: string })[],
+  now: Date = new Date(),
+): Map<string, PersonDot> {
+  const dots = new Map<string, PersonDot>();
+  for (const item of queue) dots.set(item.task.assignee_id, "accent");
+  for (const task of tasks) if (isOverdue(task, now)) dots.set(task.assignee_id, "danger");
+  return dots;
+}
+
 type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 export type ReceiptTone = "ok" | "warn" | "muted";

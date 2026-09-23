@@ -198,6 +198,10 @@
   background: var(--accent);
   box-shadow: 0 0 5px color-mix(in srgb, var(--accent) 80%, transparent);
 }
+.dotDanger {
+  background: var(--danger);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--danger) 80%, transparent);
+}
 
 /* a recessed panel inside the body (the switch row) */
 .panel {

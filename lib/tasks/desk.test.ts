@@ -6,6 +6,8 @@ import {
   deskSummary,
   keysFor,
   nextSelection,
+  personDots,
+  personSummary,
   queueOf,
   reasonOf,
   receiptText,
@@ -140,6 +142,37 @@ describe("deskSummary", () => {
       line: "2 просрочены · ближайший срок завтра 13:00",
       tone: "danger",
     });
+  });
+});
+
+describe("personSummary", () => {
+  it("names the person and only the numbers that are not zero", () => {
+    const tasks = [
+      task({ status: "accepted" }),
+      task({ status: "sent", deadline: at("16") }),
+      task({ status: "rework" }),
+      task({ status: "pending_review" }),
+      task({ status: "done" }),
+    ];
+    expect(personSummary("Асхат", tasks, NOW)).toEqual({ headline: "Асхат", line: "3 в работе · 1 просрочена · 1 на приёмке", tone: "danger" });
+    expect(personSummary("Асхат", [task({ status: "pending_review" })], NOW)).toEqual({ headline: "Асхат", line: "1 на приёмке", tone: "warn" });
+  });
+
+  it("nothing open says so", () => {
+    expect(personSummary("Асхат", [task({ status: "done" })], NOW)).toEqual({ headline: "Асхат", line: "открытых дел нет", tone: "ok" });
+    expect(personSummary("Асхат", [], NOW).line).toBe("открытых дел нет");
+  });
+});
+
+describe("personDots", () => {
+  it("lights whoever holds a queued task, red for overdue work", () => {
+    const review = task({ status: "pending_review", assignee_id: "marat" });
+    const late = task({ status: "accepted", deadline: at("16"), assignee_id: "erlan" });
+    const calm = task({ status: "accepted", deadline: at("20"), assignee_id: "aigul" });
+    const dots = personDots(queueOf([review, late, calm], NOW), [review, late, calm], NOW);
+    expect(dots.get("marat")).toBe("accent");
+    expect(dots.get("erlan")).toBe("danger");
+    expect(dots.has("aigul")).toBe(false);
   });
 });
 

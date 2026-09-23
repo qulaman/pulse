@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { keyLabels } from "@/lib/people/labels";
 import { ROLE_LABEL, initialsOf, type Person } from "@/lib/people/queries";
 
-import { Avatar, Key, PersonName, Slot, padClass, personKeyClass } from "./Device";
+import { Avatar, Dot, Key, PersonName, Slot, padClass, personKeyClass } from "./Device";
 
 /**
  * The people keypad: one rubber key per person, on the body of a device. Tap a key —
@@ -15,8 +15,9 @@ import { Avatar, Key, PersonName, Slot, padClass, personKeyClass } from "./Devic
  *
  * Keys keep their order whoever is active, so the thumb learns where Marat is.
  * Search appears only when the keypad outgrows three rows: a company of ten does not
- * need a field between the switch and the keys. Role `tv` and inactive people are
- * excluded — the kiosk is not a person.
+ * need a field between the switch and the keys. A screen with a search field of its own
+ * («Задачи») turns this one off and hands its query in. Role `tv` and inactive people
+ * are excluded — the kiosk is not a person.
  */
 
 /** Three rows of four: past this the thumb stops scanning and starts typing. */
@@ -38,6 +39,9 @@ export function PersonPad({
   onPick,
   groupLabel,
   ariaFor,
+  searchable = true,
+  query: outerQuery,
+  dotFor,
 }: {
   people: Person[];
   /** Whose key is lit right now. */
@@ -47,9 +51,14 @@ export function PersonPad({
   groupLabel: string;
   /** Accessible name of one key, lit or not. */
   ariaFor: (person: Person, active: boolean) => string;
+  /** Off where the screen already has a search field; its text comes in as `query`. */
+  searchable?: boolean;
+  query?: string;
+  /** A dot under each key, lit for the people the caller marks. Without it — no dot row. */
+  dotFor?: (person: Person) => "accent" | "danger" | null;
 }) {
-  const [query, setQuery] = useState("");
-  const q = normalise(query);
+  const [ownQuery, setQuery] = useState("");
+  const q = normalise(searchable ? ownQuery : (outerQuery ?? ""));
 
   const roster = useMemo(() => people.filter((p) => p.is_active && p.role !== "tv"), [people]);
   const labels = useMemo(() => keyLabels(roster), [roster]);
@@ -57,7 +66,7 @@ export function PersonPad({
 
   return (
     <div>
-      {roster.length > SEARCH_FROM ? (
+      {searchable && roster.length > SEARCH_FROM ? (
         <div className="mb-3">
           <Slot>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -66,7 +75,7 @@ export function PersonPad({
             </svg>
             <input
               type="search"
-              value={query}
+              value={ownQuery}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Имя или должность"
               aria-label="Поиск по команде"
@@ -81,7 +90,7 @@ export function PersonPad({
         <div className={padClass} role="group" aria-label={groupLabel}>
           {list.map((person) => {
             const active = person.id === activeId;
-            return (
+            const key = (
               <Key
                 key={person.id}
                 on={active}
@@ -93,6 +102,14 @@ export function PersonPad({
                 <Avatar initials={initialsOf(person.full_name)} />
                 <PersonName>{labels.get(person.id) ?? person.full_name}</PersonName>
               </Key>
+            );
+            if (!dotFor) return key;
+            const dot = dotFor(person);
+            return (
+              <div key={person.id} className="flex flex-col items-center gap-1.5">
+                {key}
+                <Dot on={dot !== null} tone={dot ?? "accent"} />
+              </div>
             );
           })}
         </div>

@@ -26,10 +26,13 @@ export function DeskKeys({
   keys,
   disabled = false,
   onPress,
+  live = true,
 }: {
   keys: readonly DeskAction[];
   disabled?: boolean;
   onPress: (action: DeskAction) => void;
+  /** The copy the thumb is on carries the test ids; the one scrolled away does not. */
+  live?: boolean;
 }) {
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -37,7 +40,7 @@ export function DeskKeys({
         const action = disabled ? undefined : keys[slot];
         if (!action) return <Key key={`empty-${slot}`} tall disabled aria-hidden tabIndex={-1} />;
         return (
-          <Key key={action} tall icon={<Icon name={KEY_ICON[action]} size={18} />} data-testid={`desk-key-${action}`} onClick={() => onPress(action)}>
+          <Key key={action} tall icon={<Icon name={KEY_ICON[action]} size={18} />} data-testid={live ? `desk-key-${action}` : undefined} onClick={() => onPress(action)}>
             <span className="max-w-full text-[12px] tracking-[-0.02em]">{KEY_LABEL[action]}</span>
           </Key>
         );

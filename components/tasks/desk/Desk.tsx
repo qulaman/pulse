@@ -2,7 +2,7 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { RECEIPT_COLOR } from "@/components/tasks/DeliveryStatus";
 import { Body, Gauge, Key, Lcd, LcdDim, Lens, type LedTone } from "@/components/ui/device/Device";
@@ -20,6 +20,7 @@ import {
   type DeskAction,
   type DeskItem,
   type DeskReason,
+  type DeskTone,
 } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
@@ -38,9 +39,11 @@ import { Icon } from "./icons";
  * the TV remote — the same hardware rules: static shadows, transform-only motion, the
  * LED blink as the only animation.
  *
- * The head sticks under the app header and folds to one line of display plus the keys
- * once the list scrolls under it. The fold keeps the page's height: what the head gives
- * up is handed to a spacer below it, so the list does not jump (DESIGN §1.6).
+ * The device scrolls with the page — its lower half (search, filters, the people keypad,
+ * the order switch) is taller than a phone and must stay reachable. Once its keys pass
+ * under the app header, a folded copy sticks there: one line of display and the same
+ * three keys. The copy is fixed, out of the flow, so nothing on the page moves when it
+ * appears (DESIGN §1.6).
  */
 
 type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
@@ -214,16 +217,13 @@ export function useDesk({ tasks, queue, ready }: { tasks: readonly TaskWithPeopl
 }
 
 /* -------------------------------------------------------------------------- */
-/* Fold: the head sticks under the app header and shrinks once scrolled        */
+/* Fold: a copy of the display and keys sticks under the app header           */
 /* -------------------------------------------------------------------------- */
 
 function useFold() {
-  const sentinel = useRef<HTMLDivElement>(null);
-  const head = useRef<HTMLDivElement>(null);
-  const spacer = useRef<HTMLDivElement>(null);
-  const fullHeight = useRef(0);
+  const keysRow = useRef<HTMLDivElement>(null);
   const [top, setTop] = useState(0);
-  const [compact, setCompact] = useState(false);
+  const [folded, setFolded] = useState(false);
 
   useEffect(() => {
     const header = document.querySelector("header");
@@ -235,27 +235,19 @@ function useFold() {
   }, []);
 
   useEffect(() => {
-    const node = sentinel.current;
+    const node = keysRow.current;
     if (!node) return;
-    const observer = new IntersectionObserver(([entry]) => setCompact(!entry.isIntersecting), {
-      rootMargin: `-${Math.round(top)}px 0px 0px 0px`,
-    });
+    // folded once the keys have gone up under the header; keys still below the bottom
+    // edge of the screen are not «scrolled past»
+    const observer = new IntersectionObserver(
+      ([entry]) => setFolded(!entry.isIntersecting && entry.boundingClientRect.top < top),
+      { rootMargin: `-${Math.round(top)}px 0px 0px 0px` },
+    );
     observer.observe(node);
     return () => observer.disconnect();
   }, [top]);
 
-  // the full head's height is the page's; the folded head hands the difference to the spacer
-  useLayoutEffect(() => {
-    if (!head.current || !spacer.current) return;
-    if (!compact) {
-      fullHeight.current = head.current.offsetHeight;
-      spacer.current.style.height = "0px";
-    } else {
-      spacer.current.style.height = `${Math.max(0, fullHeight.current - head.current.offsetHeight)}px`;
-    }
-  });
-
-  return { sentinel, head, spacer, top, compact };
+  return { keysRow, top, folded };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -270,6 +262,7 @@ export function Desk({
   flash,
   delivery,
   actions,
+  person,
   children,
 }: {
   me: Me;
@@ -284,12 +277,14 @@ export function Desk({
   delivery: Delivery | null | undefined;
   /** Already wrapped by `useDesk` so the receipts arrive. */
   actions: TaskActions;
-  /** Keys below the command keys (filters): folded away with the lens. */
+  /** A lit person key: with nothing picked, the display talks about them. */
+  person?: { headline: string; line: string; tone: DeskTone } | null;
+  /** The lower half of the device: search, filters, people, the order switch. */
   children?: ReactNode;
 }) {
   const router = useRouter();
   const now = useTick();
-  const { sentinel, head, spacer, top, compact } = useFold();
+  const { keysRow, top, folded } = useFold();
   const [sheet, setSheet] = useState<{ name: DirectorSheetName | "answer"; taskId: string } | null>(null);
 
   const task = selectedId ? (tasks.find((t) => t.id === selectedId) ?? null) : null;
@@ -299,6 +294,8 @@ export function Desk({
   const reason = row ? reasonOf(row, now) : null;
   const keys: DeskAction[] = task ? keysFor(task, { question: Boolean(row?.question), overdue }) : [];
   const summary = deskSummary(tasks, queue, now);
+  // with a person key lit the idle display is theirs; the lens keeps the whole desk
+  const idle = person ?? summary;
 
   const led: LedTone = actions.busy
     ? "accent"
@@ -374,80 +371,94 @@ export function Desk({
   const sheetTask = sheet ? (tasks.find((t) => t.id === sheet.taskId) ?? null) : null;
   const sheetRow = sheetTask ? (board.get(sheetTask.id) ?? null) : null;
 
+  const oneLine = flash ? flash.text : task ? task.title : person ? `${person.headline} · ${person.line}` : summary.headline;
+
   return (
     <>
-      <div ref={sentinel} aria-hidden className="h-px" />
-      <div ref={head} className="sticky z-20 -mx-4 bg-bg px-4 pb-3" style={{ top: top }}>
-        <Body className="mx-auto w-full max-w-[380px]">
-          {compact ? null : <Lens tone={led} blink={actions.busy} />}
+      <Body className="mx-auto w-full max-w-[380px]">
+        <Lens tone={led} blink={actions.busy} />
 
-          <div data-testid="desk-lcd" className={compact ? "" : "mt-3"}>
-            <Lcd>
-              {compact ? (
-                <p className="truncate font-display text-[15px] font-semibold leading-5 tracking-[-0.01em]" style={flash ? { color: second?.color } : undefined}>
-                  {flash ? flash.text : task ? task.title : summary.headline}
+        <div data-testid={folded ? undefined : "desk-lcd"} className="mt-3">
+          <Lcd>
+            {task ? (
+              <div className="min-h-[155px]">
+                <div className="flex items-center justify-between gap-3">
+                  <LcdDim className={`${EYEBROW} truncate`}>{reason ? REASON_WORD[reason] : SHORT_STATUS[task.status]}</LcdDim>
+                  <LcdDim className="nums shrink-0 text-[12px] leading-4">
+                    {position >= 0 ? `${position + 1} / ${queue.length}` : tvTime(now)}
+                  </LcdDim>
+                </div>
+                <p className="mt-2 line-clamp-3 min-h-12 font-display text-[19px] font-bold leading-6 tracking-[-0.02em]">{task.title}</p>
+                <p className="mt-1.5 truncate text-[13px] leading-[18px]">
+                  <LcdDim>{task.assignee?.full_name ?? "без исполнителя"} · </LcdDim>
+                  <span style={overdue ? { color: "var(--danger)" } : undefined}>
+                    {deadline ? humanAqtobe(deadline, now) : "без срока"}
+                  </span>
                 </p>
-              ) : task ? (
-                <div className="min-h-[155px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <LcdDim className={`${EYEBROW} truncate`}>{reason ? REASON_WORD[reason] : SHORT_STATUS[task.status]}</LcdDim>
-                    <LcdDim className="nums shrink-0 text-[12px] leading-4">
-                      {position >= 0 ? `${position + 1} / ${queue.length}` : tvTime(now)}
-                    </LcdDim>
-                  </div>
-                  <p className="mt-2 line-clamp-3 min-h-12 font-display text-[19px] font-bold leading-6 tracking-[-0.02em]">{task.title}</p>
-                  <p className="mt-1.5 truncate text-[13px] leading-[18px]">
-                    <LcdDim>{task.assignee?.full_name ?? "без исполнителя"} · </LcdDim>
-                    <span style={overdue ? { color: "var(--danger)" } : undefined}>
-                      {deadline ? humanAqtobe(deadline, now) : "без срока"}
-                    </span>
-                  </p>
-                  <p className="mt-1 h-[18px] truncate text-[13px] leading-[18px]" style={second ? { color: second.color } : undefined}>
-                    {second?.text ?? ""}
-                  </p>
-                  <p className="mt-1 h-[18px] truncate text-[13px] leading-[18px]" style={quote?.color ? { color: quote.color } : undefined}>
-                    {quote?.text ?? ""}
-                  </p>
-                  <div className={`mt-3 ${gauge === null ? "invisible" : ""}`}>
-                    <Gauge ratio={gauge ?? 0} />
-                  </div>
+                <p className="mt-1 h-[18px] truncate text-[13px] leading-[18px]" style={second ? { color: second.color } : undefined}>
+                  {second?.text ?? ""}
+                </p>
+                <p className="mt-1 h-[18px] truncate text-[13px] leading-[18px]" style={quote?.color ? { color: quote.color } : undefined}>
+                  {quote?.text ?? ""}
+                </p>
+                <div className={`mt-3 ${gauge === null ? "invisible" : ""}`}>
+                  <Gauge ratio={gauge ?? 0} />
                 </div>
-              ) : (
-                <div className="min-h-[155px]">
-                  <div className="flex items-center justify-between gap-3">
-                    <LcdDim className={EYEBROW}>Задачи</LcdDim>
-                    <LcdDim className="nums text-[12px] leading-4">{tvTime(now)}</LcdDim>
-                  </div>
-                  <p className="mt-2 truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.02em]">{summary.headline}</p>
-                  <p className="mt-1 text-[13px] leading-[18px]" style={{ color: flash ? second?.color : SUMMARY_COLOR[summary.tone] }}>
-                    {flash ? flash.text : summary.line}
-                  </p>
+              </div>
+            ) : (
+              <div className="min-h-[155px]">
+                <div className="flex items-center justify-between gap-3">
+                  <LcdDim className={EYEBROW}>{person ? "Чьи дела" : "Задачи"}</LcdDim>
+                  <LcdDim className="nums text-[12px] leading-4">{tvTime(now)}</LcdDim>
                 </div>
-              )}
-            </Lcd>
-          </div>
+                <p className="mt-2 truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.02em]">{idle.headline}</p>
+                <p className="mt-1 text-[13px] leading-[18px]" style={{ color: flash ? second?.color : SUMMARY_COLOR[idle.tone] }}>
+                  {flash ? flash.text : idle.line}
+                </p>
+              </div>
+            )}
+          </Lcd>
+        </div>
 
-          {!compact && queue.length >= 2 ? (
-            <div className="mt-3 flex justify-end gap-2">
-              <Key round icon={<Icon name="left" size={20} />} aria-label="Предыдущая в очереди" disabled={position <= 0} onClick={() => step(-1)} />
-              <Key
-                round
-                icon={<Icon name="right" size={20} />}
-                aria-label="Следующая в очереди"
-                disabled={position >= queue.length - 1}
-                onClick={() => step(1)}
-              />
+        {queue.length >= 2 ? (
+          <div className="mt-3 flex justify-end gap-2">
+            <Key round icon={<Icon name="left" size={20} />} aria-label="Предыдущая в очереди" disabled={position <= 0} onClick={() => step(-1)} />
+            <Key
+              round
+              icon={<Icon name="right" size={20} />}
+              aria-label="Следующая в очереди"
+              disabled={position >= queue.length - 1}
+              onClick={() => step(1)}
+            />
+          </div>
+        ) : null}
+
+        <div ref={keysRow} className="mt-3">
+          <DeskKeys keys={keys} disabled={!task} onPress={press} live={!folded} />
+        </div>
+
+        {children}
+      </Body>
+
+      {folded ? (
+        <div className="fixed inset-x-0 z-20 bg-bg px-4 pb-3 pt-2" style={{ top }}>
+          <Body className="mx-auto w-full max-w-[380px]">
+            <div data-testid="desk-lcd">
+              <Lcd>
+                <p
+                  className="truncate font-display text-[15px] font-semibold leading-5 tracking-[-0.01em]"
+                  style={flash ? { color: second?.color } : undefined}
+                >
+                  {oneLine}
+                </p>
+              </Lcd>
             </div>
-          ) : null}
-
-          <div className="mt-3">
-            <DeskKeys keys={keys} disabled={!task} onPress={press} />
-          </div>
-
-          {compact ? null : children}
-        </Body>
-      </div>
-      <div ref={spacer} aria-hidden />
+            <div className="mt-3">
+              <DeskKeys keys={keys} disabled={!task} onPress={press} />
+            </div>
+          </Body>
+        </div>
+      ) : null}
 
       {sheetTask ? (
         <DirectorSheets
