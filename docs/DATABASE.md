@@ -58,7 +58,7 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `delivery_window` | `{from, to}`, дефолт 08:00–21:00 Asia/Aqtobe | D-38 |
 | `secretary` | `escalate_after_min` (дефолт 3), `actions[]` — `{code, label, icon, synonyms}` | D-79 |
 
-Пишет только RPC `update_company_settings` (директор; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет `[не построено]`.
+Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет `[не построено]`.
 
 ### profiles (расширение auth.users; id = fk auth.users on delete cascade, без default)
 ```
@@ -73,7 +73,7 @@ settings jsonb not null default '{}',         -- ключей код не чит
 streak_count int not null default 0, streak_updated_at timestamptz null,  -- streak не считается [не построено]
 created_at
 ```
-Роль `tv` — служебный auth-пользователь киоска; `secretary` — сотрудник с правом вести заявки (D-79). Кто «команда» — функция `team_role(role)`: `employee`, `manager`, `shopkeeper`, `secretary`. Аватаров нет (бакета `avatars` нет).
+Роль `tv` — служебный auth-пользователь киоска; `secretary` — сотрудник с правом вести заявки (D-79), а с D-104 — ещё настройки и команду: карточки, роли и вход всех, кроме директоров. Кто «команда» — функция `team_role(role)`: `employee`, `manager`, `shopkeeper`, `secretary`. Аватаров нет (бакета `avatars` нет).
 
 ### tasks
 ```
@@ -303,7 +303,7 @@ create policy tasks_insert on tasks for insert with check (
 Плюс `tasks_update` (та же видимость, `with check` своей компании) и `tasks_delete` (director, только `scheduled`). В новых политиках вызовы оборачивать в `(select auth.uid())` / `(select auth_company_id())` — initplan считается раз на запрос (так сделаны `task_messages`, `task_reads`, `notes`, `errands`).
 
 Матрица по остальным таблицам:
-- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); update — владелец (защищённые поля — `trg_profiles_guard`) + director; insert/delete — только service role. **companies**: select — компания, кроме `tv`; write — service role и RPC `update_company_settings` / `update_company_profile`.
+- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); update — владелец (защищённые поля — `trg_profiles_guard`) + director + secretary (`profiles_update_secretary`: строка директора вне досягаемости, строка не уходит директорской — D-104); insert/delete — только service role. **companies**: select — компания, кроме `tv`; write — service role и RPC `update_company_settings` / `update_company_profile`.
 - **task_messages**: select и insert — участники задачи (автор/исполнитель/директор/менеджер глубины 1; `sender_id = auth.uid()`); update/delete — нет (append-only, `answered_at` ставит триггер).
 - **task_reads**: только свои строки — select/insert/update по `user_id = auth.uid()`, `company_id` сверяется с `auth_company_id()`; delete — нет (каскад от задачи).
 - **point_transactions**: select — свои + director; insert/update/delete — нет (только security-definer-функции). Рейтинг клиентом из сырых транзакций НЕ читается — только `fn_rating()`.
@@ -343,8 +343,8 @@ fn_rating(p_from timestamptz, p_to timestamptz)
   returns table (user_id uuid, display_name text, points int, rank int,
                  delta_vs_prev int, on_time_pct numeric, is_me boolean)
 -- состав — активные team_role(); rating_mode='top5' — топ-5 + строка запрашивающего; директору — все
-update_company_settings(patch jsonb) returns jsonb            -- director, settings || patch
-update_company_profile(p_name text) returns jsonb             -- director, название 1–120
+update_company_settings(patch jsonb) returns jsonb            -- director, secretary (D-104), settings || patch
+update_company_profile(p_name text) returns jsonb             -- director, secretary (D-104), название 1–120
 
 -- магазин (hold-final, D-10)
 create_shop_order(p_item_id uuid, client_request_id uuid default null) returns jsonb
@@ -406,7 +406,7 @@ tv_emit(p_company, p_kind, p_actor, p_task, p_title, p_amount, p_title_guest) re
 2. `trg_tasks_field_guard` (before update on tasks) — не-директор и не-автор меняет ТОЛЬКО `status`; без перехода штампы заморожены.
 3. `trg_task_status_message` (after update of status) — строка `status_change` в task_messages.
 4. `trg_question_answered` (after insert on task_messages) — первое сообщение автора задачи проставляет `meta.answered_at` открытым вопросам этой задачи.
-5. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; service role (`auth.uid()` null) — без ограничений.
+5. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; секретарь на чужой строке меняет `role`, `is_active`, `manager_id`, но не трогает директора и никого им не делает, на своей — как все (D-104, миграция `20260924100000_secretary_admin`); service role (`auth.uid()` null) — без ограничений.
 6. `trg_point_transactions_hold_guard` (constraint trigger after insert on point_transactions, deferrable initially immediate) — только для `shop_hold`: баланс < 0 → `insufficient_points`.
 7. Outbox (только вставка строк): `trg_notify_outbox_tasks` (after insert or update of status on tasks), `trg_notify_outbox_messages` (after insert on task_messages), `trg_notify_outbox_announcements` (after insert on announcements), `trg_notify_outbox_event_participant` (after insert on event_participants), `trg_notify_outbox_event` (after update on events), `trg_notify_outbox_errand` (after insert or update of status on errands); `trg_notification_deliveries_deliver_after` (before insert on notification_deliveries) — окно доставки.
 8. Проекции ТВ: `trg_tv_events_task` (after insert or update on tasks), `trg_tv_events_points` (after insert on point_transactions), `trg_tv_events_announcement` (after insert on announcements), `trg_tv_events_order` (after update on orders).
@@ -503,6 +503,7 @@ pg_cron и pg_net не подключены. Единственное распи
 | `023_visits.test.sql` | «К вам посетитель»: объявляет секретарь, отвечает директор, квитанция стены, маска гостя, истечение |
 | `024_tv_calendar_month.test.sql` | календарь на стене: «Неделя / Месяц» пультом, шесть недель для киоска |
 | `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
+| `026_secretary_admin.test.sql` | секретарь: правит чужие карточки и роли, кроме директора, директором никого не делает, своё не трогает; настройки и название компании — да, сотрудник — нет (D-104) |
 | `027_tv_wake.test.sql` | разбудка стены: два часа от «сейчас», `false` усыпляет, другие команды не трогают, будит только директор |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).
