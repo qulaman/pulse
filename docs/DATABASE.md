@@ -161,9 +161,9 @@ payload jsonb not null, payload_guest jsonb not null, created_at
 ### recurrence_rules
 `id, company_id, author_id, assignee_id, title, body, priority, rrule text, is_active bool, next_run_at timestamptz`.
 ### reminders
-`id, company_id, user_id, text, remind_at timestamptz, sent bool default false`.
+`id, company_id, user_id, text, remind_at timestamptz, sent bool default false`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
-`id, company_id, user_id, text, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text` и `pinned`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
+`id, company_id, user_id, text, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text`, `pinned` и `remind_at`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
 
 ## Представления (обычные view, security_invoker = on)
 
@@ -293,6 +293,7 @@ point_transactions (company_id, user_id, created_at);
 orders (company_id, status);  reactions (message_id);  profiles (company_id);
 recurrence_rules (next_run_at) where is_active;  reminders (remind_at) where not sent;
 notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
+notes (remind_at) where remind_at is not null and reminded_at is null and deleted_at is null;  notes (deleted_at) where deleted_at is not null;
 notification_deliveries (status, created_at) where status='queued';
 tv_events (company_id, seq desc);  ai_logs (company_id, created_at);
 announcements (company_id, created_at desc);  absences (company_id, user_id, starts_on);
@@ -311,7 +312,8 @@ announcements (company_id, created_at desc);  absences (company_id, user_id, sta
 | recurrence_spawn | `*/5 * * * *` | по next_run_at, в транзакции сдвигает next_run_at — дубликата нет |
 | overdue_sweep | `*/15 * * * *` | system-message + штраф `overdue_penalty` (если включён в settings); идемпотентно через unique(task_id,rule_code) on conflict do nothing |
 | notify_sweep | `* * * * *` | отправка queued из notification_deliveries, attempts+1, эскалация telegram по таймауту |
-| reminders_send | `* * * * *` | where remind_at≤now() and not sent |
+| notes_due_reminders | `* * * * *` | в минутном свипе `/api/push/sweep` (D-95): заметки с remind_at≤now(), reminded_at is null → `note_reminder` автору; идемпотентно по reminded_at (заменил `reminders_send`) |
+| notes_purge_trash | `* * * * *` | там же: удаляет заметки, лежащие в корзине дольше 3 дней (D-95) |
 | evening_digest | `0 13 * * *` | сводка директору 18:00 Aqtobe |
 | streak_recalc | `30 19 * * *` | 00:30 Aqtobe; учитывает absences (заморозка) |
 | push_health | `0 5 * * 1` | еженедельный отчёт «у кого канал мёртв» |
