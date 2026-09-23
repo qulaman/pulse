@@ -104,46 +104,50 @@ export function SentListBone() {
 }
 
 /**
- * «Задачи»: the desk before its data — the same body, lens, display and keys as the head
- * (components/tasks/desk/Desk.tsx), grey where the words will be — then the search field,
- * the order row and the thread of the list. The display keeps its height, so the keys
- * under it are already where the thumb will find them.
+ * «Задачи»: the desk before its data — the same body, lens, display and keys as the device
+ * (components/tasks/desk/Desk.tsx), then its lower half: the search slot, the filter keys,
+ * the seam, the people keypad and the order switch, grey where the words will be — and the
+ * thread of the list. The display keeps its height, so the keys are already where the
+ * thumb will find them.
  */
 export function SentSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
-      <div className="h-px" />
-      <div className="-mx-4 px-4 pb-3">
-        <SkeletonGroup className={`${device.body} mx-auto w-full max-w-[380px]`}>
-          <Bone h={14} w={64} className="mx-auto rounded-full" />
-          <div className={`${device.lcd} mt-3`}>
-            <div className="min-h-[155px]">
-              <div className="flex items-center justify-between">
-                <Bone h={12} w={120} />
-                <Bone h={12} w={40} />
-              </div>
-              <Bone h={24} w="78%" className="mt-3" />
-              <Bone h={14} w="52%" className="mt-2.5" />
+      <SkeletonGroup className={`${device.body} mx-auto w-full max-w-[380px]`}>
+        <Bone h={14} w={64} className="mx-auto rounded-full" />
+        <div className={`${device.lcd} mt-3`}>
+          <div className="min-h-[155px]">
+            <div className="flex items-center justify-between">
+              <Bone h={12} w={120} />
+              <Bone h={12} w={40} />
             </div>
+            <Bone h={24} w="78%" className="mt-3" />
+            <Bone h={14} w="52%" className="mt-2.5" />
           </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((i) => (
-              <Bone key={i} h={66} className="rounded-[18px]" />
-            ))}
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((i) => (
-              <Bone key={i} h={60} className="rounded-[18px]" />
-            ))}
-          </div>
-          <div className="mt-2 h-[5px]" />
-        </SkeletonGroup>
-      </div>
-      <SkeletonGroup className="mt-1">
-        <Bone h={44} className="rounded-[12px]" />
-      </SkeletonGroup>
-      <SkeletonGroup className="mt-3 flex min-h-[36px] items-center">
-        <Bone h={16} w={88} />
+        </div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Bone key={i} h={66} className="rounded-[18px]" />
+          ))}
+        </div>
+        <Bone h={46} className="mt-3 rounded-[14px]" />
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Bone key={i} h={60} className="rounded-[18px]" />
+          ))}
+        </div>
+        <div className="mt-2 h-[5px]" />
+        <div className={device.seam} />
+        <Bone h={16} w={96} className="mt-3 ml-1" />
+        <div className={`${device.pad} mt-2`}>
+          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5">
+              <Bone h={84} className="w-full rounded-[18px]" />
+              <span className="h-[5px]" />
+            </div>
+          ))}
+        </div>
+        <Bone h={60} className="mt-3 rounded-[18px]" />
       </SkeletonGroup>
       <SentListBone />
     </main>

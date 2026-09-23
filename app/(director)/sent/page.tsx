@@ -7,28 +7,24 @@ import { Mascot } from "@/components/brand/Mascot";
 import { useTaskDelivery } from "@/components/tasks/DeliveryStatus";
 import { Desk, useDesk } from "@/components/tasks/desk/Desk";
 import { FilterKeys, type Filter } from "@/components/tasks/desk/FilterKeys";
+import { Icon } from "@/components/tasks/desk/icons";
 import { isUrgentNow, TaskHead } from "@/components/tasks/TaskChrome";
 import { Trace, TraceHeading, TraceLeaf, TraceNow } from "@/components/tasks/Trace";
-import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { Button } from "@/components/ui/Button";
-import { Seam } from "@/components/ui/device/Device";
+import { Seam, Slot, Switch } from "@/components/ui/device/Device";
 import { PersonPad } from "@/components/ui/device/PersonPad";
+import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { usePeople } from "@/lib/people/queries";
 import { personDots, personSummary, queueOf } from "@/lib/tasks/desk";
-import { GROUP_LABEL, groupTasks, overdueCount, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
+import { groupTasks, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 import { toneOf, type Tone } from "@/lib/tasks/tone";
 
-const GROUP_OPTIONS: { key: GroupBy; title: string; hint: string }[] = [
-  { key: "deadline", title: "По сроку", hint: "Сначала то, что горит: просрочено, сегодня, завтра" },
-  { key: "person", title: "По людям", hint: "Одна стопка на человека, внутри — по срочности" },
-  { key: "none", title: "Без группировки", hint: "Сплошной список, новые сверху" },
-];
-
-const GROUP_KEY = "pulse.sent.group";
+/** This phone's habit, not company data: «Сначала срочное» on or off. */
+const URGENT_KEY = "pulse.sent.urgentFirst";
 
 const ACTIVE: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
@@ -48,28 +44,13 @@ function firstName(full: string | undefined | null): string {
   return full?.trim().split(/\s+/)[0] ?? "";
 }
 
-function SortIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden className="shrink-0">
-      <path d="M4 6h12M4 10h8M4 14h4" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0 text-accent">
-      <polyline points="4,10.5 8,14.5 16,5.5" />
-    </svg>
-  );
-}
-
 /**
- * «Задачи» as a desk (D-80): the head is a device — a display that says whose move it is
- * and holds one task, three keys for that task's commands — and the list below is the
- * trace of everything handed out, grouped the way a planner groups. A tap on a row puts
- * the task on the display; a second tap opens its thread. The director's buttons live
- * on the desk now, three at most, every one an existing action (useTaskActions).
+ * «Задачи» as a desk (D-80): the device on top — a display that says whose move it is and
+ * holds one task, three keys for that task's commands, the search slot, the filter keys,
+ * the people keypad and the order switch — and the trace of everything handed out below.
+ * A tap on a row puts the task on the display; a second tap opens its thread. A lit
+ * person key narrows the list and the queue to that person and puts their numbers on the
+ * display. The director's buttons are all existing actions (useTaskActions), three at most.
  */
 export default function SentPage() {
   const router = useRouter();
@@ -83,8 +64,7 @@ export default function SentPage() {
   const [purging, setPurging] = useState(false);
   const purge = usePurgeClosed();
   const [query, setQuery] = useState("");
-  const [groupBy, setGroupBy] = useState<GroupBy>("deadline");
-  const [grouping, setGrouping] = useState(false);
+  const [urgentFirst, setUrgentFirst] = useState(true);
   const now = useMemo(() => new Date(), []);
 
   const all = tasks.data ?? EMPTY;
@@ -113,13 +93,13 @@ export default function SentPage() {
   const desk = useDesk({ tasks: all, queue, ready: !loading });
   const delivery = useTaskDelivery(desk.selectedId);
 
-  // the choice is this phone's habit, not company data; read after the first paint so
-  // the server pass and the client pass agree (same trick as the push row in Профиль)
+  // read after the first paint so the server pass and the client pass agree (same trick
+  // as the push row in Профиль); the old «Как показать» key is ignored on purpose
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        const saved = window.localStorage.getItem(GROUP_KEY);
-        if (saved === "deadline" || saved === "person" || saved === "none") setGroupBy(saved);
+        const saved = window.localStorage.getItem(URGENT_KEY);
+        if (saved === "false") setUrgentFirst(false);
       } catch {
         // private mode: the default is fine
       }
@@ -127,11 +107,10 @@ export default function SentPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const chooseGroup = (next: GroupBy) => {
-    setGroupBy(next);
-    setGrouping(false);
+  const chooseOrder = (next: boolean) => {
+    setUrgentFirst(next);
     try {
-      window.localStorage.setItem(GROUP_KEY, next);
+      window.localStorage.setItem(URGENT_KEY, String(next));
     } catch {
       // nothing to remember, nothing to fix
     }
@@ -155,13 +134,12 @@ export default function SentPage() {
     [scoped],
   );
 
-  // grouping by deadline inside «Закрытые» would be one pile called «Закрытые»
-  const effectiveGroup: GroupBy = filter === "closed" && groupBy === "deadline" ? "none" : groupBy;
-  const groups = useMemo(() => groupTasks(rows, effectiveGroup, now, { reviewFirst: true }), [rows, effectiveGroup, now]);
+  // «Закрытые» by urgency would be one pile called «Закрытые»
+  const groupBy: GroupBy = urgentFirst && filter !== "closed" ? "deadline" : "none";
+  const groups = useMemo(() => groupTasks(rows, groupBy, now, { reviewFirst: true }), [rows, groupBy, now]);
 
   // the tick divides «чей ход» from «когда»: it stands before the first dated pile
-  const nowIndex =
-    effectiveGroup === "deadline" ? groups.findIndex((group) => TIME_BUCKETS.includes(group.key as never)) : -1;
+  const nowIndex = groupBy === "deadline" ? groups.findIndex((group) => TIME_BUCKETS.includes(group.key as never)) : -1;
 
   if (loading || !me.data) return <SentSkeleton />;
 
@@ -194,6 +172,27 @@ export default function SentPage() {
         actions={desk.wrap(actions)}
         person={personLine}
       >
+        <div className="mt-3">
+          <Slot>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Название или имя"
+              aria-label="Поиск по задачам"
+            />
+            {query ? (
+              <button type="button" aria-label="Очистить" onClick={() => setQuery("")} className="text-[18px] leading-none text-muted">
+                ×
+              </button>
+            ) : null}
+          </Slot>
+        </div>
+
         <FilterKeys value={filter} counts={counts} onChange={setFilter} />
 
         <Seam label="Чьи дела" />
@@ -204,53 +203,32 @@ export default function SentPage() {
             groupLabel="Чьи дела"
             ariaFor={(person, active) => (active ? `${person.full_name} — снять фильтр` : `Дела: ${person.full_name}`)}
             onPick={(person) => pickPerson(person.id)}
+            searchable={false}
+            query={query}
             dotFor={(person) => dots.get(person.id) ?? null}
+          />
+        </div>
+
+        <div className="mt-3">
+          <Switch
+            on={urgentFirst}
+            icon={<Icon name="flame" size={20} />}
+            title="Сначала срочное"
+            value={urgentFirst ? "просрочено → приёмка → сегодня → …" : "по времени выдачи, новые сверху"}
+            onToggle={chooseOrder}
           />
         </div>
       </Desk>
 
-      {/* a hairline, not a filled box: above a list with no boxes a solid field shouts */}
-      <label className="mt-1 flex min-h-[44px] items-center gap-2 rounded-[12px] border border-border/70 px-3 transition-colors duration-[120ms] focus-within:border-accent/60">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className="shrink-0 text-muted" aria-hidden>
-          <circle cx="11" cy="11" r="6.5" />
-          <path d="M16 16l4.5 4.5" />
-        </svg>
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Название или имя"
-          aria-label="Поиск по задачам"
-          className="min-w-0 flex-1 bg-transparent text-[16px] leading-[22px] text-text outline-none placeholder:text-muted"
-        />
-        {query ? (
-          <button type="button" aria-label="Очистить" onClick={() => setQuery("")} className="text-[16px] text-muted">
-            ×
-          </button>
-        ) : null}
-      </label>
-
-      <div className="mt-3 flex min-h-[36px] items-center justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setGrouping(true)}
-          className="inline-flex min-h-[36px] items-center gap-1.5 text-[13px] leading-4 text-muted"
-        >
-          <SortIcon />
-          {GROUP_LABEL[groupBy]}
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <polyline points="3.5,6 8,10.5 12.5,6" />
-          </svg>
-        </button>
-
-        {/* cleanup of the closed stack: wrong and test orders go for good, in one tap; it is
-            company-wide, so not under a lit person key, where the count would be theirs */}
-        {filter === "closed" && !personId && counts.closed > 0 ? (
+      {/* cleanup of the closed stack: wrong and test orders go for good, in one tap; it is
+          company-wide, so not under a lit person key, where the count would be theirs */}
+      {filter === "closed" && !personId && counts.closed > 0 ? (
+        <div className="mt-3 flex justify-end">
           <Button variant="ghost" size="sm" className="!text-danger/80" onClick={() => setPurging(true)}>
             Очистить закрытые ({counts.closed})
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
 
       {groups.length === 0 ? (
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
@@ -272,14 +250,6 @@ export default function SentPage() {
                   count={group.tasks.length}
                   tone={HEAD_TONE[group.key] ?? "muted"}
                   className={index === 0 || index === nowIndex ? "mt-1" : "mt-6"}
-                  // per person the director needs one more number: сколько из них горит
-                  extra={
-                    effectiveGroup === "person" && overdueCount(group.tasks, now) > 0 ? (
-                      <span className="nums shrink-0 text-[12px] leading-4" style={{ color: "var(--danger)" }}>
-                        · {overdueCount(group.tasks, now)} просроч.
-                      </span>
-                    ) : null
-                  }
                 />
               ) : null}
               <div className={`flex flex-col gap-2 ${group.title ? "mt-2" : ""}`}>
@@ -314,8 +284,8 @@ export default function SentPage() {
                             now={now}
                             question={question}
                             showStatus={group.key !== "overdue" && group.key !== "review"}
-                            // a lit person key or a per-person pile already names who
-                            person={effectiveGroup !== "person" && !personId ? firstName(task.assignee?.full_name) || "без исполнителя" : undefined}
+                            // a lit person key already names who
+                            person={personId ? undefined : firstName(task.assignee?.full_name) || "без исполнителя"}
                           />
                         </button>
                         <p className="sr-only">{STATUS_LABEL[task.status]}</p>
@@ -326,29 +296,9 @@ export default function SentPage() {
               </div>
             </section>
           ))}
-          {effectiveGroup === "deadline" && nowIndex === -1 && groups.length > 0 ? <TraceNow now={now} className="mt-6" /> : null}
+          {groupBy === "deadline" && nowIndex === -1 && groups.length > 0 ? <TraceNow now={now} className="mt-6" /> : null}
         </Trace>
       )}
-
-      <Sheet open={grouping} onClose={() => setGrouping(false)} title="Как показать">
-        <ul className="flex flex-col">
-          {GROUP_OPTIONS.map((option) => (
-            <li key={option.key}>
-              <button
-                type="button"
-                onClick={() => chooseGroup(option.key)}
-                className="flex min-h-[60px] w-full items-center justify-between gap-3 border-b border-border/70 py-2 text-left last:border-b-0"
-              >
-                <span className="min-w-0">
-                  <span className="block text-[16px] leading-[22px]">{option.title}</span>
-                  <span className="block text-[13px] leading-4 text-muted">{option.hint}</span>
-                </span>
-                {groupBy === option.key ? <CheckIcon /> : null}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </Sheet>
 
       <Sheet open={purging} onClose={() => setPurging(false)} title="Очистить закрытые">
         <p className="text-[16px] leading-[22px] text-muted">

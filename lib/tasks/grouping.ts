@@ -23,13 +23,8 @@ export type Groupable = {
   assignee: { full_name: string } | null;
 };
 
-export type GroupBy = "deadline" | "person" | "none";
-
-export const GROUP_LABEL: Record<GroupBy, string> = {
-  deadline: "по сроку",
-  person: "по людям",
-  none: "новые сверху",
-};
+/** «Сначала срочное» or the plain list, newest first. People are a filter now, not a grouping (D-80). */
+export type GroupBy = "deadline" | "none";
 
 export type Bucket = "overdue" | "urgent" | "review" | "today" | "tomorrow" | "week" | "later" | "none" | "closed";
 
@@ -88,12 +83,6 @@ export function compareTasks(a: Groupable, b: Groupable): number {
   return a.created_at > b.created_at ? -1 : a.created_at < b.created_at ? 1 : 0;
 }
 
-function byName(a: string, b: string): number {
-  return a.localeCompare(b, "ru");
-}
-
-const NOBODY = "Без исполнителя";
-
 export type GroupOptions = {
   /** The director's list: «На приёмке» is their own queue and stands near the top. */
   reviewFirst?: boolean;
@@ -109,27 +98,6 @@ export function groupTasks<T extends Groupable>(
   if (by === "none") {
     const all = [...tasks].sort((a, b) => (a.created_at > b.created_at ? -1 : a.created_at < b.created_at ? 1 : 0));
     return all.length ? [{ key: "all", title: "", tasks: all }] : [];
-  }
-
-  if (by === "person") {
-    const piles = new Map<string, T[]>();
-    for (const task of tasks) {
-      const name = task.assignee?.full_name ?? NOBODY;
-      const pile = piles.get(name);
-      if (pile) pile.push(task);
-      else piles.set(name, [task]);
-    }
-    return [...piles.entries()]
-      .sort(([a], [b]) => (a === NOBODY ? 1 : b === NOBODY ? -1 : byName(a, b)))
-      .map(([name, pile]) => ({
-        key: name,
-        title: name,
-        // inside a person: the same urgency order as the deadline view
-        tasks: pile.sort((a, b) => {
-          const byBucket = order.indexOf(bucketOf(a, now)) - order.indexOf(bucketOf(b, now));
-          return byBucket !== 0 ? byBucket : compareTasks(a, b);
-        }),
-      }));
   }
 
   const piles = new Map<Bucket, T[]>();

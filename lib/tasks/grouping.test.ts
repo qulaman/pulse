@@ -124,18 +124,6 @@ describe("«На приёмке» stands where the next move is", () => {
   });
 });
 
-describe("groupTasks by person", () => {
-  it("one pile per name, «Без исполнителя» last, urgency first inside", () => {
-    const marat = task({ assignee: { full_name: "Марат Оспанов" }, deadline: at("30") });
-    const maratLate = task({ assignee: { full_name: "Марат Оспанов" }, deadline: at("16") });
-    const aigul = task({ assignee: { full_name: "Айгуль Сериковна" } });
-    const nobody = task({ assignee: null });
-    const groups = groupTasks([marat, aigul, nobody, maratLate], "person", NOW);
-    expect(groups.map((g) => g.title)).toEqual(["Айгуль Сериковна", "Марат Оспанов", "Без исполнителя"]);
-    expect(groups[1].tasks.map((t) => t.id)).toEqual([maratLate.id, marat.id]);
-  });
-});
-
 describe("groupTasks without grouping", () => {
   it("is one pile, newest first, no heading", () => {
     const old = task({ created_at: "2026-09-01T06:00:00Z" });
