@@ -1,5 +1,5 @@
 import type { SecretaryAction } from "@/lib/settings";
-import { normalize } from "@/lib/text/normalize";
+import { firstNameOf, normalize } from "@/lib/text/normalize";
 
 import type { Errand } from "./queries";
 
@@ -364,4 +364,15 @@ export function isAway(person: { away_until?: string | null }, now: Date): boole
 export function untilLine(iso: string): string {
   const wall = new Date(new Date(iso).getTime() + AQTOBE_OFFSET_MS);
   return `до ${String(wall.getUTCHours()).padStart(2, "0")}:${String(wall.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * Who is away, for the toast of a request that went (D-106): «Айгуль не на месте до 14:00»,
+ * or, when every secretary has stepped away, the earliest return. Null while somebody is there.
+ */
+export function absenceLine(people: readonly { full_name: string; away_until?: string | null }[], now: Date): string | null {
+  if (people.length === 0 || !people.every((person) => isAway(person, now))) return null;
+  const back = people.map((person) => person.away_until as string).sort()[0];
+  if (people.length === 1) return `${firstNameOf(people[0].full_name)} не на месте ${untilLine(back)}`;
+  return `никого нет на месте ${untilLine(back)}`;
 }

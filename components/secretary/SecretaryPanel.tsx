@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
 import { haptic } from "@/lib/haptics";
-import { askSecretary, usePendingErrands } from "@/lib/errands/pending";
+import { askSecretary, cancelAsked, usePendingErrands } from "@/lib/errands/pending";
 import { useErrandActions, useErrandLink, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
 import { etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
@@ -168,10 +168,30 @@ export function SecretaryPanel({
       ) : null}
 
       {pending.map((row) => (
-        <div key={row.id} className={`card-in flex min-h-[44px] items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`}>
-          <span className="text-[15px] leading-5">
-            {row.label} · <span className="text-muted">отправляю…</span>
+        <div
+          key={row.id}
+          className={`card-in flex min-h-[44px] items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`}
+          data-testid="pending-errand"
+          data-waiting={row.waiting ? "1" : "0"}
+        >
+          <span className="min-w-0 text-[15px] leading-5">
+            {row.label} ·{" "}
+            {row.waiting ? (
+              // kept on the phone: it goes by itself once the network is back (D-106)
+              <span style={{ color: "var(--warn)" }}>ждёт связи — уйдёт сама</span>
+            ) : (
+              <span className="text-muted">отправляю…</span>
+            )}
           </span>
+          {row.waiting ? (
+            <button
+              type="button"
+              className="min-h-[40px] shrink-0 px-2 font-display text-[14px] font-semibold text-muted"
+              onClick={() => cancelAsked(row.id)}
+            >
+              Отменить
+            </button>
+          ) : null}
         </div>
       ))}
 

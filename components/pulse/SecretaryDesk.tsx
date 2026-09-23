@@ -45,6 +45,7 @@ export function SecretaryDesk({
   phase = "rest",
   urgency = 0,
   away = null,
+  waiting = 0,
   etaLeft = null,
   asking = false,
   listening = false,
@@ -68,6 +69,8 @@ export function SecretaryDesk({
   urgency?: Urgency;
   /** every secretary has stepped away — until when (D-99): an empty chair, a caption */
   away?: string | null;
+  /** requests kept on the phone without network (D-106): «ждёт связи» under the desk */
+  waiting?: number;
   /** minutes left of what the secretary promised on «Принял»; the monitor counts them down */
   etaLeft?: number | null;
   /** the secretary has asked something and waits for the director's answer */
@@ -229,7 +232,18 @@ export function SecretaryDesk({
           <rect x="18" y="40" width="24" height="6" rx="2.5" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.2" />
         </svg>
       ) : null}
-      {away ? (
+      {waiting > 0 ? (
+        // kept on the phone, it goes by itself once the network is back (D-106); the empty
+        // chair already says the secretary is away, so this caption takes the line
+        <span
+          className="absolute left-0 top-full mt-0.5 flex items-center gap-1 whitespace-nowrap text-[11px] font-medium leading-3"
+          style={{ color: "var(--warn)" }}
+          data-testid="desk-waiting"
+        >
+          <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--warn)", animation: "smc-glow 1.2s ease-in-out infinite" }} />
+          ждёт связи{waiting > 1 ? ` · ${waiting}` : ""}
+        </span>
+      ) : away ? (
         <span className="absolute left-0 top-full mt-0.5 whitespace-nowrap text-[11px] font-medium leading-3" style={{ color: "var(--warn)" }}>
           не на месте {untilLine(away)}
         </span>
