@@ -137,6 +137,8 @@ export function SecretaryCard({
             thanks={thanks}
             secretaries={secretaries}
             meetingEndsAt={meetingEndsAt}
+            // the request is given: the card goes, the desk plays the rest
+            onSent={onClose}
           />
         </div>
       </div>

@@ -69,11 +69,14 @@ export function SecretaryPanel({
   thanks = false,
   secretaries,
   meetingEndsAt = null,
+  onSent,
 }: {
   actions: readonly SecretaryAction[];
   errands: readonly Errand[];
   now: Date;
   onRefresh: () => void;
+  /** a request has gone — the card over the face closes itself, no second tap on the desk */
+  onSent?: () => void;
   /** the card over the face (D-85): the same buttons, a row high instead of a tile */
   compact?: boolean;
   /** «Спасибо ♥» on what was just closed (D-97) — only after the adaptation gate (D-40) */
@@ -107,7 +110,10 @@ export function SecretaryPanel({
 
   const ask = (action: SecretaryAction, text: string | null, untilMin?: number) => {
     if (text) rememberNote(action.code, text);
-    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: true });
+    // a card that stays shows «отправляю…» itself; a card that closes on the send leaves the
+    // word to the toast — no button is under it any more
+    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: !onSent });
+    onSent?.();
   };
 
   // a short tap: the sheet with the note, «как обычно» and the spans of «не беспокоить»
@@ -266,6 +272,7 @@ function HoldButton({
   const [holding, setHolding] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sent = useRef(false);
+  const tapped = useRef(false);
   const pressedAt = useRef(0);
   const stop = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -283,6 +290,7 @@ function HoldButton({
       aria-label={`${action.label}: удержите две секунды, чтобы отправить`}
       onPointerDown={() => {
         sent.current = false;
+        tapped.current = false;
         pressedAt.current = Date.now();
         setHolding(true);
         timer.current = setTimeout(() => {
@@ -298,8 +306,16 @@ function HoldButton({
         stop();
         if (!early || sent.current) return;
         // a tap is a tap; a hold let go half-way is a change of mind — only a hint, no sheet
-        if (Date.now() - pressedAt.current < TAP_MS) onTap();
+        if (Date.now() - pressedAt.current < TAP_MS) tapped.current = true;
         else onHint(`Держите «${action.label}» 2 секунды, чтобы отправить`);
+      }}
+      // the tap opens its sheet on the click, not on the release: on a phone the click comes
+      // after the finger is up, and a sheet already open under it took that click on its
+      // backdrop and closed at once; a keyboard press (detail 0) is a tap too
+      onClick={(event) => {
+        if (!tapped.current && event.detail !== 0) return;
+        tapped.current = false;
+        onTap();
       }}
       onPointerLeave={stop}
       onPointerCancel={stop}
