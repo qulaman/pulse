@@ -25,11 +25,14 @@ export function SecretaryPanel({
   errands,
   now,
   onRefresh,
+  compact = false,
 }: {
   actions: readonly SecretaryAction[];
   errands: readonly Errand[];
   now: Date;
   onRefresh: () => void;
+  /** the card over the face (D-85): the same buttons, a row high instead of a tile */
+  compact?: boolean;
 }) {
   const pending = usePendingErrands((state) => state.pending);
   const [noteFor, setNoteFor] = useState<SecretaryAction | null>(null);
@@ -67,8 +70,13 @@ export function SecretaryPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3" data-testid="secretary-panel">
-      <div className="grid grid-cols-2 gap-3">
+    <div className={`flex flex-col ${compact ? "gap-2" : "gap-3"}`} data-testid="secretary-panel">
+      {/* the card over the face keeps the whole catalogue in one row: it has to fit over the
+          face on an iPhone SE, and four tiles side by side read as a keypad */}
+      <div
+        className={`grid ${compact ? "gap-2" : "grid-cols-2 gap-3"}`}
+        style={compact ? { gridTemplateColumns: `repeat(${Math.min(4, actions.length)}, minmax(0, 1fr))` } : undefined}
+      >
         {actions.map((action) => (
           <button
             key={action.code}
@@ -82,20 +90,24 @@ export function SecretaryPanel({
               holdTimer.current = null;
             }}
             onContextMenu={(e) => e.preventDefault()}
-            className="flex min-h-[92px] flex-col items-center justify-center gap-1 card px-3 py-4 text-center active:scale-[0.98]"
+            className={
+              compact
+                ? "flex min-h-[74px] flex-col items-center justify-center gap-1 rounded-[14px] border border-border/80 bg-surface-2/70 px-1 py-2 text-center transition-transform duration-[120ms] active:scale-[0.96]"
+                : "flex min-h-[92px] flex-col items-center justify-center gap-1 card px-3 py-4 text-center active:scale-[0.98]"
+            }
             style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
           >
-            <span aria-hidden className="text-[28px] leading-none">
+            <span aria-hidden className={`${compact ? "text-[24px]" : "text-[28px]"} leading-none`}>
               {action.icon || "•"}
             </span>
-            <span className="text-[16px] font-semibold leading-[22px]">{action.label}</span>
+            <span className={`${compact ? "line-clamp-2 min-w-0 text-[12px] leading-[15px]" : "text-[16px] leading-[22px]"} font-semibold`}>{action.label}</span>
           </button>
         ))}
       </div>
-      <p className="px-1 text-[13px] leading-4 text-muted">Долгий тап — добавить примечание</p>
+      <p className={`px-1 text-[13px] leading-4 text-muted ${compact ? "text-center" : ""}`}>Долгий тап — добавить примечание</p>
 
       {pending.map((row) => (
-        <div key={row.id} className="card-in flex items-center justify-between gap-3 card px-4 py-3">
+        <div key={row.id} className={`card-in flex items-center justify-between gap-3 card ${compact ? "px-3 py-1" : "px-4 py-3"}`}>
           <span className="text-[15px] leading-5">
             {row.label} · <span className="text-muted">отправляю…</span>
           </span>
@@ -106,7 +118,7 @@ export function SecretaryPanel({
       ))}
 
       {active.map((errand) => (
-        <ActiveErrand key={errand.id} errand={errand} now={now} />
+        <ActiveErrand key={errand.id} errand={errand} now={now} compact={compact} />
       ))}
 
       <Sheet open={Boolean(noteFor)} onClose={() => setNoteFor(null)} title={noteFor?.label ?? ""}>
@@ -134,7 +146,7 @@ export function SecretaryPanel({
 }
 
 /** Одна живая заявка: что просили, кто взял, сколько ждёт и видел ли секретарь пуш. */
-function ActiveErrand({ errand, now }: { errand: Errand; now: Date }) {
+function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: Date; compact?: boolean }) {
   const transition = useErrandActions();
   // квитанция нужна, только пока никто не взялся: «принято» честнее любой галочки
   const receipt = useErrandReceipt(errand.id, errand.status === "sent");
@@ -142,7 +154,7 @@ function ActiveErrand({ errand, now }: { errand: Errand; now: Date }) {
   const who = firstNameOf(errand.claimed?.full_name ?? "");
 
   return (
-    <div className="card-in card px-4 py-3" data-testid="errand-active" data-status={errand.status}>
+    <div className={`card-in card ${compact ? "px-3 py-1" : "px-4 py-3"}`} data-testid="errand-active" data-status={errand.status}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-[15px] leading-5">
           {errand.label}
