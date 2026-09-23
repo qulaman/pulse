@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
+import type { TabBarRole } from "@/lib/routes";
 import { inboxCounts, useDirectorInbox, useMe, useMyTasks } from "@/lib/tasks/queries";
 
-type TabRole = "director" | "employee";
+type TabRole = TabBarRole;
 
 type Tab = { href: string; label: string; icon: ReactNode };
 
@@ -95,6 +96,15 @@ const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 /** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
 const CALENDAR_TAB: Tab = { href: "/calendar", label: "Календарь", icon: ICONS.calendar };
 
+const EMPLOYEE_TABS: Tab[] = [
+  { href: "/feed", label: "Лента", icon: ICONS.feed },
+  { href: "/tasks", label: "Дела", icon: ICONS.tasks },
+  CALENDAR_TAB,
+  { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
+  { href: "/profile", label: "Профиль", icon: ICONS.profile },
+  LAB_TAB,
+];
+
 const TABS: Record<TabRole, Tab[]> = {
   // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
   director: [
@@ -107,13 +117,12 @@ const TABS: Record<TabRole, Tab[]> = {
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
     LAB_TAB,
   ],
-  employee: [
-    { href: "/feed", label: "Лента", icon: ICONS.feed },
-    { href: "/tasks", label: "Дела", icon: ICONS.tasks },
-    CALENDAR_TAB,
-    { href: "/rating", label: "Рейтинг", icon: ICONS.rating },
-    { href: "/profile", label: "Профиль", icon: ICONS.profile },
-    LAB_TAB,
+  employee: EMPLOYEE_TABS,
+  // D-104: the secretary runs the settings and the roster — the employee's bar plus «Настройки»
+  secretary: [
+    ...EMPLOYEE_TABS.slice(0, 4),
+    { href: "/settings", label: "Настройки", icon: ICONS.settings },
+    ...EMPLOYEE_TABS.slice(4),
   ],
 };
 
@@ -124,9 +133,9 @@ const TABS: Record<TabRole, Tab[]> = {
  */
 function useTabBadges(role: TabRole): Record<string, number> {
   const me = useMe();
-  const mine = useMyTasks(role === "employee" ? me.data?.userId : undefined);
+  const mine = useMyTasks(role !== "director" ? me.data?.userId : undefined);
   const inbox = useDirectorInbox(me.data, role === "director");
-  if (role === "employee") {
+  if (role !== "director") {
     const fresh = (mine.data ?? []).filter((task) => task.status === "sent").length;
     return fresh > 0 ? { "/tasks": fresh } : {};
   }

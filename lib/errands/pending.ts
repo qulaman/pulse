@@ -6,6 +6,7 @@ import { create } from "zustand";
 
 import { dismissToast, toast } from "@/components/ui/Toast";
 import { errandKeys } from "@/lib/errands/queries";
+import { atLine } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
@@ -34,6 +35,8 @@ export type PendingErrand = {
   inboxId?: string | null;
   /** «не беспокоить на 30 мин» — the request ends by itself (D-99) */
   untilMin?: number | null;
+  /** «Такси к 18:00» — the moment it is needed by (D-106 §8), ISO */
+  dueAt?: string | null;
   /** When the director asked, ms — a request that waited too long for the network is dropped. */
   at: number;
   /** A post has missed the network at least once: the line says «ждёт связи». */
@@ -73,8 +76,12 @@ export function verdictOf(status: number): "ok" | "retry" | "fail" {
   return "fail";
 }
 
-/** Too old to send: the network came back after the moment had passed. */
-export function isStale(errand: Pick<PendingErrand, "at">, now: number): boolean {
+/**
+ * Too old to send: the network came back after the moment had passed. A request for a time
+ * keeps until five minutes before that time — «такси к 18:00» asked in the morning still goes.
+ */
+export function isStale(errand: Pick<PendingErrand, "at" | "dueAt">, now: number): boolean {
+  if (errand.dueAt) return new Date(errand.dueAt).getTime() - now < 5 * 60_000;
   return now - errand.at > STALE_MS;
 }
 
@@ -83,10 +90,10 @@ export function isStale(errand: Pick<PendingErrand, "at">, now: number): boolean
  * label is the first words of its note — then the note alone. Who is away is said after it
  * (D-106): the request waits for them.
  */
-export function sentLine(label: string, note: string | null, absence: string | null = null): string {
+export function sentLine(label: string, note: string | null, absence: string | null = null, dueAt: string | null = null): string {
   const words = note?.trim() ?? "";
   const head = !words ? label : words.toLowerCase().startsWith(label.toLowerCase()) ? clip(words, 48) : `${label} · ${clip(words, 32)}`;
-  return `${head} · отправлено${absence ? ` · ${absence}` : ""}`;
+  return `${head}${dueAt ? ` · ${atLine(dueAt)}` : ""} · отправлено${absence ? ` · ${absence}` : ""}`;
 }
 
 function clip(text: string, max: number): string {
@@ -172,6 +179,7 @@ async function postErrand(errand: PendingErrand): Promise<PostResult> {
         source_transcript: errand.transcript ?? undefined,
         inbox_item_id: errand.inboxId ?? undefined,
         until_min: errand.untilMin ?? undefined,
+        due_at: errand.dueAt ?? undefined,
       }),
     });
   } catch {
@@ -366,7 +374,7 @@ export function askSecretary(
   note: string | null,
   onSent: () => void,
   voice?: { id?: string; audioPath?: string | null; transcript?: string | null; inboxId?: string | null },
-  options?: { untilMin?: number | null; quiet?: boolean },
+  options?: { untilMin?: number | null; quiet?: boolean; dueAt?: string | null },
 ): string {
   const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   const errand: PendingErrand = {
@@ -380,6 +388,7 @@ export function askSecretary(
     transcript: voice?.transcript ?? null,
     inboxId: voice?.inboxId ?? null,
     untilMin: options?.untilMin ?? null,
+    dueAt: options?.dueAt ?? null,
     at: Date.now(),
     waiting: offline,
   };
@@ -391,7 +400,7 @@ export function askSecretary(
     return errand.id;
   }
   if (!options?.quiet) {
-    const shown = toast(sentLine(action.label, note, absence), {
+    const shown = toast(sentLine(action.label, note, absence, errand.dueAt ?? null), {
       lifetimeMs: UNDO_MS,
       action: { label: "Отменить", onClick: () => cancelAsked(errand.id) },
     });

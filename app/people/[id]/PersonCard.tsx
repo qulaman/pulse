@@ -53,7 +53,7 @@ function Stat({ value, label, tone }: { value: string | number | null; label: st
  * every task on them with the director's own buttons, and what they last said.
  * Editing the roster entry is one tap away, not the card itself.
  */
-export default function PersonPage() {
+export function PersonCard() {
   const { id } = useParams<{ id: string }>();
   const me = useMe();
   const person = usePerson(id);
@@ -158,7 +158,7 @@ export default function PersonPage() {
             >
               Поощрить
             </Button>
-            <Link href={`/people/${p.id}/edit`} className="block">
+            <Link href={`/people/${p.id}/edit?from=card`} className="block">
               <Button block variant="secondary">
                 Изменить
               </Button>

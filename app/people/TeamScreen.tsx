@@ -23,7 +23,7 @@ function plural(n: number, forms: [string, string, string]): string {
  * full roster with search, filters and sorts — the director finds a free person or a
  * drowning one in two taps.
  */
-export default function PeoplePage() {
+export function TeamScreen() {
   const people = usePeople();
   const loads = useTeamLoads();
   const pointsOn = usePointsEnabled().data === true;

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
+import { tabBarRole } from "@/lib/routes";
 
 /** Shared screen: any signed-in role, same shell as Эфир. */
 export default async function RatingLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,7 @@ export default async function RatingLayout({ children }: { children: React.React
     <div className="flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
-      <TabBar role={profile.role === "director" ? "director" : "employee"} />
+      <TabBar role={tabBarRole(profile.role)} />
     </div>
   );
 }

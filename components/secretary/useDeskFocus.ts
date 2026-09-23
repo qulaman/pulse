@@ -23,8 +23,18 @@ export type DeskStage = DeskFocus & {
  * made here or on another phone. `meId` null is the director's desk: anybody's job counts.
  * A new request nobody took cuts the finish short — somebody has to say «Принял» first.
  */
-export function useDeskFocus(errands: readonly Errand[], meId: string | null, catalogue: readonly SecretaryAction[] = []): DeskStage {
-  const base = useMemo(() => deskFocus(errands, meId, catalogue), [errands, meId, catalogue]);
+export function useDeskFocus(
+  errands: readonly Errand[],
+  meId: string | null,
+  catalogue: readonly SecretaryAction[] = [],
+  now?: Date,
+): DeskStage {
+  // the minute matters: a request for a time becomes the job in hand once it is near (D-106 §8)
+  const minute = now ? Math.floor(now.getTime() / 60_000) : null;
+  const base = useMemo(
+    () => deskFocus(errands, meId, catalogue, minute === null ? undefined : new Date(minute * 60_000)),
+    [errands, meId, catalogue, minute],
+  );
 
   // the list seen last time, to tell the moves apart (adjusted during render, not in an effect)
   const [seen, setSeen] = useState(errands);

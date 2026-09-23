@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { AppHeader } from "@/components/AppHeader";
-import { NotesReplay } from "@/components/notes/NotesReplay";
-import { TabBar } from "@/components/TabBar";
-import { DirectorFab } from "@/components/voice/DirectorFab";
+import { DirectorShell } from "@/components/DirectorShell";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
 
 export default async function DirectorLayout({ children }: { children: React.ReactNode }) {
@@ -17,12 +14,8 @@ export default async function DirectorLayout({ children }: { children: React.Rea
   if (profile.role !== "director") redirect(homeForRole(profile.role));
 
   return (
-    <div className="app-shell flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
+    <DirectorShell fullName={profile.fullName} companyId={profile.companyId}>
       {children}
-      <TabBar role="director" />
-      <DirectorFab />
-      <NotesReplay />
-    </div>
+    </DirectorShell>
   );
 }

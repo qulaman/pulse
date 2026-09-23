@@ -113,7 +113,12 @@ const oldestFirst = (a: Errand, b: Errand) => a.created_at.localeCompare(b.creat
  * `meId` is the secretary whose screen it is — only their own jobs are acted out. `null` is
  * the director's desk (D-97): whoever of the secretaries took the job, the desk shows it.
  */
-export function deskFocus(errands: readonly Errand[], meId: string | null, catalogue: readonly SecretaryAction[] = []): DeskFocus {
+export function deskFocus(
+  errands: readonly Errand[],
+  meId: string | null,
+  catalogue: readonly SecretaryAction[] = [],
+  now: Date = new Date(),
+): DeskFocus {
   const scene = (e: Errand) => sceneOf(e, catalogue);
   // «вызови охрану» outranks everything: nobody took it — it calls; taken — it is the job (D-99)
   const alarm = errands.filter((e) => (e.status === "sent" || e.status === "accepted") && scene(e) === "security").sort(oldestFirst)[0];
@@ -122,7 +127,10 @@ export function deskFocus(errands: readonly Errand[], meId: string | null, catal
   const sent = errands.filter((e) => e.status === "sent").sort(oldestFirst);
   if (sent[0]) return { scene: scene(sent[0]), phase: "asked", errand: sent[0], queue: sent.length - 1 };
 
-  const taken = errands.filter((e) => e.status === "accepted" && (meId === null || e.claimed_by === meId)).sort(newestFirst);
+  // a request for a time far ahead is planned, not in hand: the desk acts it out once it is near (D-106 §8)
+  const taken = errands
+    .filter((e) => e.status === "accepted" && (meId === null || e.claimed_by === meId) && !isPlanned(e, now))
+    .sort(newestFirst);
   const job = taken.find((e) => scene(e) !== "dnd");
   if (job) return { scene: scene(job), phase: "doing", errand: job, queue: 0 };
 
@@ -274,10 +282,13 @@ const DOING: Record<DeskScene, string> = {
 };
 
 /** The line under the face on the secretary's home: the moment in a few words. */
-export function deskLine(focus: DeskFocus): string {
+export function deskLine(focus: DeskFocus, now: Date = new Date()): string {
   const { errand, phase, scene } = focus;
   if (phase === "rest" || !errand || !scene) return "Заявок нет — на месте";
-  if (phase === "asked") return scene === "security" ? "Директор: вызови охрану!" : `Директор просит: ${lower(errand.label)}`;
+  if (phase === "asked") {
+    if (scene === "security") return "Директор: вызови охрану!";
+    return `Директор просит: ${lower(errand.label)}${errand.due_at ? ` · ${atLine(errand.due_at, now)}` : ""}`;
+  }
   if (phase === "done") return `Готово · ${lower(errand.label)}`;
   return DOING[scene] || `В работе: ${lower(errand.label)}`;
 }
@@ -362,8 +373,53 @@ export function isAway(person: { away_until?: string | null }, now: Date): boole
 
 /** «до 14:05» on the Aqtobe wall clock. */
 export function untilLine(iso: string): string {
+  return `до ${wallTime(iso)}`;
+}
+
+/**
+ * «к 18:00» — the time a request is needed by (D-106 §8), on the Aqtobe wall clock; «завтра к
+ * 17:30» when it falls on the next day — typed at ten at night, «17:30» means tomorrow.
+ */
+export function atLine(iso: string, now: Date = new Date()): string {
+  return `${dayOf(new Date(iso)) > dayOf(now) ? "завтра " : ""}к ${wallTime(iso)}`;
+}
+
+function wallTime(iso: string): string {
   const wall = new Date(new Date(iso).getTime() + AQTOBE_OFFSET_MS);
-  return `до ${String(wall.getUTCHours()).padStart(2, "0")}:${String(wall.getUTCMinutes()).padStart(2, "0")}`;
+  return `${String(wall.getUTCHours()).padStart(2, "0")}:${String(wall.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** Further ahead than this, a request for a time is planned — not the job in hand yet (D-106 §8). */
+export const PLANNED_AHEAD_MS = 15 * 60_000;
+
+export function isPlanned(errand: { due_at?: string | null }, now: Date): boolean {
+  return Boolean(errand.due_at) && new Date(errand.due_at as string).getTime() - now.getTime() > PLANNED_AHEAD_MS;
+}
+
+/**
+ * The times the sheet offers (D-106 §8): the next half-hours at least a quarter of an hour
+ * ahead. Aqtobe is a whole five hours from UTC, so a UTC half-hour is an Aqtobe half-hour.
+ */
+export function dueSlots(now: Date, count = 4): string[] {
+  const step = 30 * 60_000;
+  const first = Math.ceil((now.getTime() + PLANNED_AHEAD_MS) / step) * step;
+  return Array.from({ length: count }, (_, index) => new Date(first + index * step).toISOString());
+}
+
+/**
+ * «17:30» typed in the time field → the next such moment: today while it is still ahead,
+ * otherwise tomorrow. Null for what is not a time.
+ */
+export function dueFromWall(hm: string, now: Date): string | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hm.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  const wallNow = new Date(now.getTime() + AQTOBE_OFFSET_MS);
+  let at = Date.UTC(wallNow.getUTCFullYear(), wallNow.getUTCMonth(), wallNow.getUTCDate(), hours, minutes) - AQTOBE_OFFSET_MS;
+  if (at - now.getTime() < 60_000) at += 24 * 60 * 60_000;
+  return new Date(at).toISOString();
 }
 
 /**

@@ -25,7 +25,12 @@ const BodySchema = z.strictObject({
   inbox_item_id: z.uuid().optional(),
   /** «Не беспокоить на 30 мин» (D-99): the request ends by itself after this many minutes. */
   until_min: z.number().int().min(5).max(12 * 60).optional(),
+  /** «Такси к 18:00» (D-106 §8): the moment it is needed by — a minute to a day ahead. */
+  due_at: z.iso.datetime({ offset: true }).optional(),
 });
+
+/** How far ahead a request for a time may be asked: any time on the clock — the next day at most. */
+const DUE_AHEAD_MAX_MS = 24 * 60 * 60_000;
 
 /**
  * «Кофе» in one tap: the director asks, every active secretary hears it at once.
@@ -45,6 +50,10 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       ? { code: FREE_KIND, label: words.split(/\s+/).slice(0, 5).join(" ").slice(0, 40) }
       : settings.secretary.actions.find((a) => a.code === body.kind);
     if (!action) return apiError(400, "unknown_kind", "Такой кнопки нет в каталоге");
+    if (body.due_at) {
+      const ahead = new Date(body.due_at).getTime() - Date.now();
+      if (!(ahead >= 60_000 && ahead <= DUE_AHEAD_MAX_MS)) return apiError(400, "bad_due", "Время должно быть впереди, в ближайшие сутки");
+    }
     // an alarm is known by its scene, never by what the client says (D-99)
     const urgent = !free && sceneOf({ kind: action.code, label: action.label }, settings.secretary.actions) === "security";
 
@@ -63,6 +72,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         client_request_id: body.client_request_id,
         urgent,
         until_at: body.until_min ? new Date(Date.now() + body.until_min * 60_000).toISOString() : null,
+        // only when asked: a request without a time does not need the column (D-106 §8)
+        ...(body.due_at ? { due_at: new Date(body.due_at).toISOString() } : {}),
       })
       .select("id, status")
       .single();

@@ -220,6 +220,8 @@ export type Database = {
           created_at: string
           decline_reason: string | null
           done_at: string | null
+          due_at: string | null
+          due_reminded_at: string | null
           escalated_at: string | null
           eta_at: string | null
           id: string
@@ -250,6 +252,8 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           done_at?: string | null
+          due_at?: string | null
+          due_reminded_at?: string | null
           escalated_at?: string | null
           eta_at?: string | null
           id?: string
@@ -280,6 +284,8 @@ export type Database = {
           created_at?: string
           decline_reason?: string | null
           done_at?: string | null
+          due_at?: string | null
+          due_reminded_at?: string | null
           escalated_at?: string | null
           eta_at?: string | null
           id?: string
@@ -1817,6 +1823,7 @@ export type Database = {
         Returns: Json
       }
       errands_due_escalation: { Args: { p_now?: string }; Returns: number }
+      errands_due_remind: { Args: { p_now?: string }; Returns: number }
       errands_expire: { Args: { p_now?: string }; Returns: number }
       event_release: {
         Args: {

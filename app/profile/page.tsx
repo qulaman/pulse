@@ -10,6 +10,7 @@ import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
 import { GearIcon, SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
+import { canManageTeam } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
 
 async function signOut() {
@@ -22,8 +23,8 @@ async function signOut() {
 /**
  * Профиль: who is signed in (the card is the page's heading), the points card for an
  * employee, then the short list of everything this person can actually change about
- * themselves. Company configuration is the director's own screen — here it is one row,
- * not a second settings page.
+ * themselves. Company configuration is the director's and the secretary's screen (D-104) —
+ * here it is one row, not a second settings page.
  */
 export default async function ProfilePage() {
   const profile = await getSessionProfile();
@@ -46,11 +47,11 @@ export default async function ProfilePage() {
         <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
       </RowGroup>
 
-      {director ? (
+      {canManageTeam(profile.role) ? (
         <>
           <h2 className="eyebrow mt-6 px-1">Компания</h2>
           <RowGroup className="mt-2">
-            <Row icon={<GearIcon />} title="Настройки" value="голос, разбор, очки" href="/settings" />
+            <Row icon={<GearIcon />} title="Настройки" value={director ? "голос, разбор, очки" : "команда, роли, пароли"} href="/settings" />
           </RowGroup>
         </>
       ) : null}

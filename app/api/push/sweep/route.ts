@@ -23,6 +23,9 @@ export async function POST(req: Request) {
     // a request with an end («не беспокоить на 30 мин», D-99) ends by itself on the tick
     const ended = await service.rpc("errands_expire");
     if (ended.error) console.error("errands_expire failed:", ended.error.message);
+    // «такси к 18:00»: one reminder ten minutes before the time (D-106 §8), same rule
+    const dueSoon = await service.rpc("errands_due_remind");
+    if (dueSoon.error) console.error("errands_due_remind failed:", dueSoon.error.message);
     // the director's own «напомни мне» — a note with a time (D-95) — and the bin of notes,
     // which keeps a deleted thought three days; same rule, a failure is logged, not fatal
     const noted = await service.rpc("notes_due_reminders");
@@ -37,6 +40,7 @@ export async function POST(req: Request) {
       ...(await sweepDeliveries()),
       reminders: due.data ?? 0,
       escalations: escalated.data ?? 0,
+      due_reminders: dueSoon.data ?? 0,
       note_reminders: noted.data ?? 0,
       notes_purged: purged.data ?? 0,
       visits_expired: expired.data ?? 0,

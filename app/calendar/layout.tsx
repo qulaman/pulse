@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
+import { tabBarRole } from "@/lib/routes";
 
 /** Общий экран: календарь открыт любой вошедшей роли, оболочка та же, что у Магазина. */
 export default async function CalendarLayout({ children }: { children: React.ReactNode }) {
@@ -18,7 +19,7 @@ export default async function CalendarLayout({ children }: { children: React.Rea
     <div className="flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
-      <TabBar role={profile.role === "director" ? "director" : "employee"} />
+      <TabBar role={tabBarRole(profile.role)} />
     </div>
   );
 }

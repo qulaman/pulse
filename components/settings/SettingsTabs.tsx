@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 
-import { TeamList } from "@/components/people/TeamList";
+import { TeamRoster } from "@/components/people/TeamRoster";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
@@ -35,9 +35,9 @@ import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 import { Button } from "@/components/ui/Button";
 import { TeamListBone } from "@/components/ui/PageSkeletons";
 import { Row, RowGroup } from "@/components/ui/Row";
-import { useTeamLoads } from "@/lib/people/loads";
 import { usePeople } from "@/lib/people/queries";
-import { usePointsEnabled } from "@/lib/points/queries";
+import type { Role } from "@/lib/routes";
+import { useMe } from "@/lib/tasks/queries";
 import { useHeaderHeight } from "@/lib/useHeaderHeight";
 
 const TABS: Record<SettingsTab, { title: string; short: string; about: string; icon: ReactNode }> = {
@@ -91,16 +91,17 @@ function DirtyDot() {
  * A tab is mounted on its first visit and then only hidden, so open sections, a half-typed
  * logo name and the roster's search survive a trip to another tab; settings edits live in
  * the draft above all tabs, and a tile wears a dot while its tab holds unsaved edits.
+ * The secretary gets the same four tabs (D-104) without the director's own modules.
  */
-export function SettingsTabs({ initialTab }: { initialTab: SettingsTab }) {
+export function SettingsTabs({ initialTab, role }: { initialTab: SettingsTab; role: Role }) {
   return (
     <SettingsDraftProvider>
-      <TabsBody initialTab={initialTab} />
+      <TabsBody initialTab={initialTab} director={role === "director"} />
     </SettingsDraftProvider>
   );
 }
 
-function TabsBody({ initialTab }: { initialTab: SettingsTab }) {
+function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director: boolean }) {
   const [tab, setTab] = useState(initialTab);
   const [visited, setVisited] = useState<ReadonlySet<SettingsTab>>(() => new Set([initialTab]));
   const [move, setMove] = useState<Move>({ dir: 1, n: 0 });
@@ -225,9 +226,9 @@ function TabsBody({ initialTab }: { initialTab: SettingsTab }) {
               {key === "company" ? (
                 <CompanyPanel onCompanyDirty={setCompanyDirty} />
               ) : key === "app" ? (
-                <AppPanel />
+                <AppPanel director={director} />
               ) : key === "team" ? (
-                <TeamPanel />
+                <TeamPanel director={director} />
               ) : (
                 <AiPanel />
               )}
@@ -279,16 +280,19 @@ function CompanyPanel({ onCompanyDirty }: { onCompanyDirty: (dirty: boolean) => 
   );
 }
 
-/** The app's modules and the one module with a catalogue of its own — the secretary's buttons. */
-function AppPanel() {
+/**
+ * The app's modules and the one module with a catalogue of its own — the secretary's
+ * buttons. Tasks, the wall remote and the raw tables are the director's screens (D-104).
+ */
+function AppPanel({ director }: { director: boolean }) {
   return (
     <>
       <h2 className="eyebrow px-1">Модули</h2>
       <RowGroup className="mt-2">
-        <Row icon={<ListIcon />} title="Задачи" value="весь список" href="/sent" />
+        {director ? <Row icon={<ListIcon />} title="Задачи" value="весь список" href="/sent" /> : null}
         <Row icon={<CupIcon />} title="Заявки" value="кофе, врач, «зайди ко мне»" href="/secretary" />
-        <Row icon={<TvIcon />} title="Экран" value="пульт от телевизора" href="/screen" />
-        <Row icon={<TableIcon />} title="Данные" value="таблицы как есть" href="/admin" />
+        {director ? <Row icon={<TvIcon />} title="Экран" value="пульт от телевизора" href="/screen" /> : null}
+        {director ? <Row icon={<TableIcon />} title="Данные" value="таблицы как есть" href="/admin" /> : null}
       </RowGroup>
       <div className="mt-2">
         <SettingsReady bones={1}>
@@ -297,7 +301,7 @@ function AppPanel() {
       </div>
 
       {/* a demo instance only: the value is inlined at build time, a client's prod never sets it */}
-      {process.env.NEXT_PUBLIC_DEMO_MODE === "1" ? (
+      {director && process.env.NEXT_PUBLIC_DEMO_MODE === "1" ? (
         <>
           <h2 className="eyebrow mt-6 px-1">Демо</h2>
           <div className="mt-2">
@@ -309,11 +313,14 @@ function AppPanel() {
   );
 }
 
-/** The people themselves: a tap on a person opens their card — role, aliases, password. */
-function TeamPanel() {
+/**
+ * The people themselves (D-104): the roster by role, a tap opens the person's editor —
+ * role, card, password. The load board («Команда») is the director's: the secretary
+ * sees nobody's tasks, so it would show her an idle company.
+ */
+function TeamPanel({ director }: { director: boolean }) {
   const people = usePeople();
-  const loads = useTeamLoads();
-  const pointsOn = usePointsEnabled().data === true;
+  const me = useMe();
 
   return (
     <>
@@ -322,7 +329,7 @@ function TeamPanel() {
           <PointsSection />
         </SettingsReady>
         <RowGroup>
-          <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" />
+          {director ? <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" /> : null}
           <Row icon={<PodiumIcon />} title="Рейтинг" value="очки и динамика" href="/rating" />
           <Row icon={<GiftIcon />} title="Магазин" value="награды и выдача" href="/shop" />
         </RowGroup>
@@ -335,7 +342,11 @@ function TeamPanel() {
           <Button size="sm">+ Добавить</Button>
         </Link>
       </div>
-      {people.isLoading ? <TeamListBone /> : <TeamList people={people.data ?? []} loads={loads.data} pointsOn={pointsOn} />}
+      {people.isLoading ? (
+        <TeamListBone />
+      ) : (
+        <TeamRoster people={people.data ?? []} me={me.data ? { id: me.data.userId, role: me.data.role } : null} />
+      )}
     </>
   );
 }

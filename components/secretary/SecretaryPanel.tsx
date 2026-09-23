@@ -10,7 +10,7 @@ import { countHold, holdsLearned, orderFor, rememberSend, usualNote } from "@/li
 import { askSecretary, cancelAsked, usePendingErrands } from "@/lib/errands/pending";
 import { useErrandActions, useErrandLink, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
-import { etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
+import { atLine, dueFromWall, dueSlots, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
 import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
 import { firstNameOf } from "@/lib/text/normalize";
@@ -90,6 +90,9 @@ export function SecretaryPanel({
   const pending = usePendingErrands((state) => state.pending);
   const [noteFor, setNoteFor] = useState<SecretaryAction | null>(null);
   const [note, setNote] = useState("");
+  // «ко времени» (D-106 §8): a half-hour chip or a time typed in the field
+  const [dueAt, setDueAt] = useState<string | null>(null);
+  const [customHm, setCustomHm] = useState("");
   // a hint in the line under the buttons, not a toast: toasts come down over the first row
   const [hint, setHint] = useState<string | null>(null);
   const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,18 +120,20 @@ export function SecretaryPanel({
   );
   const [learned] = useState(holdsLearned);
 
-  const ask = (action: SecretaryAction, text: string | null, untilMin?: number) => {
+  const ask = (action: SecretaryAction, text: string | null, untilMin?: number, due: string | null = null) => {
     if (text) rememberNote(action.code, text);
     rememberSend(action.code, text);
     // a card that stays shows «отправляю…» itself; a card that closes on the send leaves the
     // word to the toast — no button is under it any more
-    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: !onSent });
+    askSecretary(action, text, onRefresh, undefined, { untilMin: untilMin ?? null, quiet: !onSent, dueAt: due });
     onSent?.();
   };
 
   // a short tap: the sheet with the note, «как обычно» and the spans of «не беспокоить»
   const openSheet = (action: SecretaryAction) => {
     setNote("");
+    setDueAt(null);
+    setCustomHm("");
     setNoteFor(action);
   };
 
@@ -248,6 +253,39 @@ export function SecretaryPanel({
             ) : null}
           </div>
         ) : null}
+        {noteFor && noteScene !== "dnd" ? (
+          // «ко времени» (D-106 §8): the request goes now, the time rides with it
+          <div className="mb-3" data-testid="due-slots">
+            <p className="mb-1.5 text-[13px] leading-4 text-muted">Ко времени</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {dueSlots(now).map((slot) => (
+                <Chip
+                  key={slot}
+                  tone={dueAt === slot ? "accent" : "neutral"}
+                  aria-pressed={dueAt === slot}
+                  onClick={() => {
+                    setCustomHm("");
+                    setDueAt(dueAt === slot ? null : slot);
+                  }}
+                >
+                  {atLine(slot)}
+                </Chip>
+              ))}
+              <input
+                type="time"
+                aria-label="Другое время"
+                data-testid="due-custom"
+                className="min-h-[34px] rounded-full border border-border bg-surface-2 px-3 text-[14px] leading-5 text-text outline-none focus:border-accent"
+                style={customHm && dueAt ? { borderColor: "var(--accent)" } : undefined}
+                value={customHm}
+                onChange={(event) => {
+                  setCustomHm(event.target.value);
+                  setDueAt(dueFromWall(event.target.value, now));
+                }}
+              />
+            </div>
+          </div>
+        ) : null}
         {recentNotes.length > 0 && noteFor ? (
           // «как обычно»: прошлые примечания этой кнопки одним тапом
           <div className="mb-3 flex flex-wrap gap-2" data-testid="recent-notes">
@@ -255,7 +293,7 @@ export function SecretaryPanel({
               <Chip
                 key={text}
                 onClick={() => {
-                  ask(noteFor, text);
+                  ask(noteFor, text, undefined, dueAt);
                   setNoteFor(null);
                 }}
               >
@@ -275,11 +313,11 @@ export function SecretaryPanel({
           <Button
             block
             onClick={() => {
-              if (noteFor) ask(noteFor, note.trim() || null);
+              if (noteFor) ask(noteFor, note.trim() || null, undefined, dueAt);
               setNoteFor(null);
             }}
           >
-            Отправить
+            {dueAt ? `Отправить · ${atLine(dueAt)}` : "Отправить"}
           </Button>
         </div>
       </Sheet>
@@ -436,6 +474,7 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
           {errand.urgent ? "🚨 " : ""}
           {errand.label}
           {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
+          {errand.due_at ? <span className="font-semibold"> · {atLine(errand.due_at)}</span> : null}
           {errand.status === "accepted" ? (
             // без рода: «Принято · Айгуль», а не «приняла» (docs/DESIGN.md)
             <span style={{ color: "var(--ok)" }}> · Принято{who ? ` · ${who}` : ""}</span>
