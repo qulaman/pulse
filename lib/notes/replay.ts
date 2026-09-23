@@ -10,16 +10,21 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { extForMime } from "@/lib/voice/recorder";
 
+import { insertBoard, upsertBoardCached } from "@/lib/mindboard/mutations";
+
 import { insertNote, upsertCached } from "./mutations";
 import {
   claim,
+  dropBoard,
   dropCreate,
+  listBoards,
   listCreates,
   listEdits,
   patchCreate,
   release,
   settleEdit,
   subscribePending,
+  type PendingBoard,
   type PendingCreate,
   type PendingEdit,
 } from "./pending";
@@ -59,7 +64,15 @@ export async function deliverCreate(me: Me, entry: PendingCreate): Promise<Note>
     entry.inboxId = inboxId;
     await patchCreate(entry.id, { audioPath, inboxId });
   }
-  const note = await insertNote(me, { id: entry.id, text: entry.text, client_request_id: entry.crid, audio_path: audioPath, inbox_item_id: inboxId });
+  const note = await insertNote(me, {
+    id: entry.id,
+    text: entry.text,
+    client_request_id: entry.crid,
+    audio_path: audioPath,
+    inbox_item_id: inboxId,
+    board_id: entry.boardId ?? null,
+    position: entry.position ?? null,
+  });
   await dropCreate(entry.id);
   return note;
 }
@@ -129,6 +142,17 @@ export function flushPendingNotes(me: Me, queryClient: QueryClient): Promise<num
   running ??= (async () => {
     let sent = 0;
     try {
+      // boards first: a point cannot land on a board the server has not seen (D-102)
+      for (const board of await listBoards(me.userId)) {
+        try {
+          const row = await insertBoard(me, { id: board.id, title: board.title, client_request_id: board.crid });
+          upsertBoardCached(queryClient, me.userId, row);
+          await dropBoard(board.id);
+        } catch (error) {
+          if (isTransient(error)) return sent;
+          // refused for good: its points would be refused too, the board stays on the phone
+        }
+      }
       for (const entry of await listCreates(me.userId)) {
         // the dictaphone or a create mutation is sending this one right now
         if (!claim(entry.id)) continue;
@@ -205,9 +229,9 @@ export function useNotesReplay(me: Me | undefined) {
   }, [userId, companyId, queryClient]);
 }
 
-export type PendingState = { creates: PendingCreate[]; edits: PendingEdit[] };
+export type PendingState = { creates: PendingCreate[]; edits: PendingEdit[]; boards: PendingBoard[] };
 
-const NOTHING: PendingState = { creates: [], edits: [] };
+const NOTHING: PendingState = { creates: [], edits: [], boards: [] };
 
 /** What waits on the phone for this author — the «ждёт связи» cards and the edits laid over the feed. */
 export function usePendingNotes(userId: string | undefined): PendingState {
@@ -216,8 +240,8 @@ export function usePendingNotes(userId: string | undefined): PendingState {
     if (!userId) return;
     let alive = true;
     const read = async () => {
-      const [creates, edits] = await Promise.all([listCreates(userId), listEdits(userId)]);
-      if (alive) setState(creates.length === 0 && edits.length === 0 ? NOTHING : { creates, edits });
+      const [creates, edits, boards] = await Promise.all([listCreates(userId), listEdits(userId), listBoards(userId)]);
+      if (alive) setState(creates.length === 0 && edits.length === 0 && boards.length === 0 ? NOTHING : { creates, edits, boards });
     };
     void read();
     const off = subscribePending(() => void read());

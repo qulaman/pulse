@@ -70,8 +70,24 @@ function Timer({ startedAt }: { startedAt: number | null }) {
   return <span ref={node} className="nums" />;
 }
 
+/** What the screen says between captures, when it is not the thoughts' hero — a board (D-102). */
+export type RecorderIdle = { eyebrow: string; right?: ReactNode; body: ReactNode };
+
+/** The words of the input row: a board asks for a point, not for a thought. */
+export type RecorderWords = { placeholder: string; field: string; record: string; write: string };
+
+const NOTE_WORDS: RecorderWords = {
+  placeholder: "Написать мысль…",
+  field: "Новая заметка",
+  record: "Диктовать заметку",
+  write: "Записать заметку",
+};
+
 type Props = {
-  hero: NotesHero;
+  hero?: NotesHero;
+  /** Replaces the thoughts' hero between captures. */
+  idle?: RecorderIdle;
+  words?: RecorderWords;
   /** The receipt of the last write, shown for a few seconds. */
   receipt: Receipt | null;
   dictation: Dictation;
@@ -90,7 +106,7 @@ type Props = {
  * «Распознаю», «Записал». Under it, inside the same screen, the field for a typed thought
  * and the round microphone: hold it and talk, or tap it and talk until the next tap (D-81).
  */
-export function NotesRecorder({ hero, receipt, dictation, writing, onWrite, onCapture }: Props) {
+export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onCapture }: Props) {
   const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
   const [draft, setDraft] = useState("");
   const [armed, setArmed] = useState(false);
@@ -159,7 +175,11 @@ export function NotesRecorder({ hero, receipt, dictation, writing, onWrite, onCa
   } else if (receipt) {
     eyebrow = receipt.eyebrow;
     body = <Big title={receipt.headline} line={receipt.line} lineTone={receipt.tone} clamp />;
-  } else {
+  } else if (idle) {
+    eyebrow = idle.eyebrow;
+    right = idle.right ?? null;
+    body = idle.body;
+  } else if (hero) {
     eyebrow = "Мои мысли";
     right = (
       <span className="inline-flex items-center gap-1.5 text-[12px] leading-4 text-muted">
@@ -181,10 +201,13 @@ export function NotesRecorder({ hero, receipt, dictation, writing, onWrite, onCa
         </div>
       </div>
     );
+  } else {
+    eyebrow = "";
+    body = null;
   }
 
   const roundIcon = mode === "stop" ? "stop" : mode === "send" ? "up" : mode === "discard" ? "x" : "mic";
-  const roundLabel = mode === "stop" ? "Закончить запись" : mode === "send" ? "Записать заметку" : mode === "discard" ? "Удалить запись" : "Диктовать заметку";
+  const roundLabel = mode === "stop" ? "Закончить запись" : mode === "send" ? words.write : mode === "discard" ? "Удалить запись" : words.record;
 
   return (
     <section
@@ -231,8 +254,8 @@ export function NotesRecorder({ hero, receipt, dictation, writing, onWrite, onCa
                   send();
                 }
               }}
-              placeholder="Написать мысль…"
-              aria-label="Новая заметка"
+              placeholder={words.placeholder}
+              aria-label={words.field}
               data-testid="note-draft"
               className="block max-h-[118px] w-full resize-none bg-transparent text-[16px] leading-[22px] text-text outline-none placeholder:text-muted"
             />

@@ -43,6 +43,12 @@ const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", he
 const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Аудио сохранил", line: "Заметка в ленте — распознаю ещё раз по тапу" };
 const KEPT_ON_PHONE: Receipt = { tone: "warn", eyebrow: "Нет связи", headline: "Голос на телефоне", line: "Отправлю сам, как появится связь" };
 
+/**
+ * Where the capture goes: a loose thought by default, or the next point of a board (D-102).
+ * The place is taken when the recording ends, so two points said in a row keep their order.
+ */
+export type DictationTarget = { boardId: string; nextPosition: () => number };
+
 type Job = {
   /** The capture as the phone keeps it: id, idempotency key, the recording, upload progress. */
   entry: PendingCreate;
@@ -50,7 +56,11 @@ type Job = {
   kept: boolean;
 };
 
-export function useDictation(me: { userId: string; companyId: string } | undefined, onReceipt: (receipt: Receipt) => void) {
+export function useDictation(
+  me: { userId: string; companyId: string } | undefined,
+  onReceipt: (receipt: Receipt) => void,
+  target?: DictationTarget,
+) {
   const queryClient = useQueryClient();
   const [stage, setStage] = useState<DictationStage>("idle");
   const [latched, setLatched] = useState(false);
@@ -67,9 +77,9 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
   // the head's current capture; an older one finishing its STT must not reset the display
   const headNote = useRef<string | null>(null);
 
-  const live = useRef({ me, onReceipt });
+  const live = useRef({ me, onReceipt, target });
   useEffect(() => {
-    live.current = { me, onReceipt };
+    live.current = { me, onReceipt, target };
   });
 
   const mark = (id: string, on: boolean) =>
@@ -179,6 +189,7 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
     }
     const me = live.current.me;
     if (!me) return;
+    const place = live.current.target;
     const entry: PendingCreate = {
       id: crypto.randomUUID(),
       userId: me.userId,
@@ -189,6 +200,8 @@ export function useDictation(me: { userId: string; companyId: string } | undefin
       audio: { blob: audio.blob, mime: audio.mime, durationMs: audio.durationMs },
       audioPath: null,
       inboxId: null,
+      boardId: place?.boardId ?? null,
+      position: place ? place.nextPosition() : null,
     };
     // this capture is the dictaphone's until it lands or is handed over to the replay
     claim(entry.id);

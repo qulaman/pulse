@@ -26,17 +26,31 @@ export type PendingCreate = {
   /** Set once the recording is in Storage — a retry does not upload it again. */
   audioPath: string | null;
   inboxId: string | null;
+  /** A point of a board (D-102): the board and the place on it. Absent in entries kept before boards. */
+  boardId?: string | null;
+  position?: number | null;
 };
 
-export type NoteFields = { text?: string; pinned?: boolean; remind_at?: string | null };
+/** A board born on the phone (D-102): it must reach the server before its points do. */
+export type PendingBoard = {
+  id: string;
+  userId: string;
+  companyId: string;
+  crid: string;
+  title: string;
+  createdAt: string;
+};
+
+export type NoteFields = { text?: string; pinned?: boolean; remind_at?: string | null; done_at?: string | null; position?: number };
 
 /** The fields of one note still owed to the server, merged — the latest value of each wins. */
 export type PendingEdit = { id: string; userId: string; fields: NoteFields; at: number };
 
 const DB_NAME = "pulse-notes";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const CREATES = "creates";
 const EDITS = "edits";
+const BOARDS = "boards";
 
 let opening: Promise<IDBDatabase | null> | null = null;
 
@@ -49,6 +63,7 @@ function database(): Promise<IDBDatabase | null> {
         const db = request.result;
         if (!db.objectStoreNames.contains(CREATES)) db.createObjectStore(CREATES, { keyPath: "id" });
         if (!db.objectStoreNames.contains(EDITS)) db.createObjectStore(EDITS, { keyPath: "id" });
+        if (!db.objectStoreNames.contains(BOARDS)) db.createObjectStore(BOARDS, { keyPath: "id" });
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => resolve(null);
@@ -115,6 +130,26 @@ export async function dropCreate(id: string): Promise<void> {
 /** What this author still owes the server, oldest first. */
 export async function listCreates(userId: string): Promise<PendingCreate[]> {
   const { value } = await run<PendingCreate[]>(CREATES, "readonly", (store) => store.getAll());
+  return (value ?? []).filter((entry) => entry.userId === userId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/* ----------------------------------------------------------------- boards */
+
+/** Keep a new board on the phone until the server has it. False — nothing was kept. */
+export async function keepBoard(entry: PendingBoard): Promise<boolean> {
+  const { ok } = await run(BOARDS, "readwrite", (store) => store.put(entry));
+  if (ok) changed();
+  return ok;
+}
+
+export async function dropBoard(id: string): Promise<void> {
+  const { ok } = await run(BOARDS, "readwrite", (store) => store.delete(id));
+  if (ok) changed();
+}
+
+/** Boards this author still owes the server, oldest first. */
+export async function listBoards(userId: string): Promise<PendingBoard[]> {
+  const { value } = await run<PendingBoard[]>(BOARDS, "readonly", (store) => store.getAll());
   return (value ?? []).filter((entry) => entry.userId === userId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 

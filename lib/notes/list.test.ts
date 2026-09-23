@@ -33,6 +33,9 @@ function note(overrides: Partial<Note> = {}): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    board_id: null,
+    position: null,
+    done_at: null,
     client_request_id: null,
     created_at: "2026-09-17T10:00:00Z",
     updated_at: "2026-09-17T10:00:00Z",
@@ -56,6 +59,22 @@ describe("splitNotes", () => {
     expect(active.map((n) => n.text)).toEqual(["Подумать про склад"]);
     expect(converted).toHaveLength(2);
     expect(trash.map((n) => n.text)).toEqual(["Стала задачей и удалена", "Лишнее"]);
+  });
+
+  it("keeps the points of boards on their boards, and in the bin only while the board lives (D-102)", () => {
+    const thought = note({ text: "Мысль" });
+    const point = note({ text: "Пункт", board_id: "b-1", position: 1 });
+    const handed = note({ text: "Поручённый пункт", board_id: "b-1", position: 2, converted_task_id: "t-1" });
+    const gonePoint = note({ text: "Удалённый пункт", board_id: "b-1", position: 3, deleted_at: "2026-09-23T06:00:00Z" });
+    const orphan = note({ text: "Пункт удалённой доски", board_id: "b-2", position: 1, deleted_at: "2026-09-23T06:00:00Z" });
+
+    const piles = splitNotes([thought, point, handed, gonePoint, orphan], NOW, new Set(["b-1"]));
+
+    expect(piles.active.map((n) => n.text)).toEqual(["Мысль"]);
+    expect(piles.converted).toHaveLength(0);
+    expect(piles.trash.map((n) => n.text)).toEqual(["Удалённый пункт"]);
+    // without the boards known, no point reaches the bin
+    expect(splitNotes([gonePoint], NOW).trash).toHaveLength(0);
   });
 
   it("puts pinned notes on top and the rest newest first", () => {

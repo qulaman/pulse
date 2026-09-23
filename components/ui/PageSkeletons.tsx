@@ -336,7 +336,7 @@ export function NotesSkeleton() {
         <div aria-hidden className="h-px" />
         <div className="py-2">
           <SkeletonGroup className="seg rounded-[14px] p-1">
-            <Bone h={40} w="33%" className="rounded-[10px]" />
+            <Bone h={40} w="25%" className="rounded-[10px]" />
           </SkeletonGroup>
         </div>
       </div>
@@ -350,6 +350,52 @@ export function NotesSkeleton() {
             <div className="flex-1">
               <Bone h={21} w={i === 1 ? "58%" : "76%"} />
               <Bone h={16} w="88%" className="mt-1.5" />
+              <Bone h={12} w={60} className="mt-2" />
+            </div>
+          </div>
+        ))}
+      </SkeletonGroup>
+    </main>
+  );
+}
+
+/** A board of «Заметки» (D-102): the way back, the title, the status screen and numbered points. */
+export function BoardSkeleton() {
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+      <div className="flex items-end justify-between gap-3 px-0.5">
+        <div className="min-w-0 flex-1">
+          <SkeletonGroup>
+            <Bone h={16} w={96} />
+            <Bone h={30} w="62%" className="mt-1.5" />
+          </SkeletonGroup>
+        </div>
+        <span aria-hidden className="mb-0.5 h-10 w-10 rounded-full border border-border/80 bg-surface" />
+      </div>
+      <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
+        <div className="flex items-center justify-between">
+          <Bone h={16} w={110} />
+          <Bone h={16} w={80} />
+        </div>
+        <div className="mt-2.5 flex min-h-[64px] items-center gap-3.5">
+          <Bone h={46} w={46} className="rounded-[14px]" />
+          <div className="flex-1">
+            <Bone h={20} w="40%" />
+            <Bone h={14} w="70%" className="mt-2" />
+          </div>
+        </div>
+        <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
+          <Bone h={56} className="flex-1 rounded-[18px]" />
+          <Bone h={56} w={56} round className="shrink-0" />
+        </div>
+        <Bone h={14} w="70%" className="mx-auto mt-2" />
+      </SkeletonGroup>
+      <SkeletonGroup className="mt-4 flex flex-col gap-2">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
+            <Bone h={22} w={22} round className="shrink-0" />
+            <div className="flex-1">
+              <Bone h={21} w={i === 1 ? "58%" : "76%"} />
               <Bone h={12} w={60} className="mt-2" />
             </div>
           </div>

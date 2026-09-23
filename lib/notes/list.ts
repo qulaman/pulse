@@ -1,7 +1,34 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { pluralRu } from "@/lib/tasks/status-text";
 
+import type { PendingCreate } from "./pending";
 import type { Note } from "./queries";
+
+/** A note that exists only on the phone yet, drawn as a row of the feed or of its board (D-95, D-102). */
+export function phoneRow(entry: PendingCreate): Note {
+  return {
+    id: entry.id,
+    company_id: entry.companyId,
+    user_id: entry.userId,
+    text: entry.text,
+    raw_transcript: null,
+    audio_path: null,
+    inbox_item_id: null,
+    pinned: false,
+    converted_task_id: null,
+    converted_announcement_id: null,
+    converted_at: null,
+    deleted_at: null,
+    remind_at: null,
+    reminded_at: null,
+    board_id: entry.boardId ?? null,
+    position: entry.position ?? null,
+    done_at: null,
+    client_request_id: entry.crid,
+    created_at: entry.createdAt,
+    updated_at: entry.createdAt,
+  };
+}
 
 /**
  * Pure list arithmetic of the notes screen — three piles (thoughts, «В деле», the
@@ -32,15 +59,22 @@ export function trashExpiresAt(note: Note): Date {
  * The bin holds what was deleted, newest deletion first; «В деле» — what a note
  * became; the rest is the working feed, pinned on top. With `now`, a deletion past
  * its three days is gone already, even if the sweep has not come round yet.
+ *
+ * A point of a board (D-102) lives on its board, never in the feed or «В деле»; a deleted
+ * point lies in the bin only while its board is alive (`liveBoards`) — the points of a
+ * deleted board are represented by the board's own card there.
  */
-export function splitNotes(notes: readonly Note[], now?: Date): NotePiles {
+export function splitNotes(notes: readonly Note[], now?: Date, liveBoards?: ReadonlySet<string>): NotePiles {
   const active: Note[] = [];
   const converted: Note[] = [];
   const trash: Note[] = [];
   for (const note of notes) {
+    const point = note.board_id !== null;
     if (note.deleted_at !== null) {
+      if (point && !liveBoards?.has(note.board_id as string)) continue;
       if (!now || trashExpiresAt(note).getTime() > now.getTime()) trash.push(note);
     }
+    else if (point) continue;
     else if (isConverted(note)) converted.push(note);
     else active.push(note);
   }
@@ -212,7 +246,7 @@ export function markMatches(text: string, query: string): Segment[] {
 /* The status screen                                                            */
 /* -------------------------------------------------------------------------- */
 
-export type NoteFilter = "active" | "converted" | "trash";
+export type NoteFilter = "active" | "boards" | "converted" | "trash";
 
 /** The status screen of «Заметки» (D-93): one number, its word, and two quiet lines. */
 export type NotesHero = { value: number | null; label: string; detail: string; second: string };

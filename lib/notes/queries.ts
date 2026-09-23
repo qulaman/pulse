@@ -23,6 +23,8 @@ const OLDER_PAGE = 200;
 const TRASH_LIMIT = 200;
 /** Server hits beyond the loaded feed. */
 const SEARCH_LIMIT = 50;
+/** Points of live boards (D-102): boards are short, so all of them come at once. */
+const BOARD_POINTS_LIMIT = 1000;
 
 /**
  * How many live rows the feed holds per author: grows with «Показать раньше», so a
@@ -35,11 +37,12 @@ const newestFirst = (a: Note, b: Note) => new Date(b.created_at).getTime() - new
 async function fetchNotes(userId: string): Promise<Note[]> {
   const supabase = createBrowserSupabase();
   // no user filter: RLS already leaves the author nothing but his own notes
-  const [live, bin] = await Promise.all([
+  const [live, bin, points] = await Promise.all([
     supabase
       .from("notes")
       .select("*")
       .is("deleted_at", null)
+      .is("board_id", null)
       .order("created_at", { ascending: false })
       .limit(depth.get(userId) ?? LIMIT),
     supabase
@@ -48,10 +51,20 @@ async function fetchNotes(userId: string): Promise<Note[]> {
       .not("deleted_at", "is", null)
       .order("deleted_at", { ascending: false })
       .limit(TRASH_LIMIT),
+    // the points of the boards live in the same cache: every edit, the replay and Realtime
+    // treat them as the notes they are (D-102)
+    supabase
+      .from("notes")
+      .select("*")
+      .is("deleted_at", null)
+      .not("board_id", "is", null)
+      .order("position", { ascending: true })
+      .limit(BOARD_POINTS_LIMIT),
   ]);
   if (live.error) throw new Error(live.error.message);
   if (bin.error) throw new Error(bin.error.message);
-  return [...(live.data ?? []), ...(bin.data ?? [])].sort(newestFirst);
+  if (points.error) throw new Error(points.error.message);
+  return [...(live.data ?? []), ...(bin.data ?? []), ...(points.data ?? [])].sort(newestFirst);
 }
 
 /**
@@ -99,7 +112,7 @@ export type NoteCounts = { live: number; thoughts: number; converted: number };
 
 /**
  * What the server holds, not what the screen loaded: the thoughts (live, not turned into
- * anything) and «В деле». Two head-only counts, each of its own rows — a note landing
+ * anything) and «В деле». Points of boards are counted by their boards (D-102). Two head-only counts, each of its own rows — a note landing
  * between the two requests can make one stale, never invent a row in the other.
  */
 export function useNoteCounts(userId: string | undefined) {
@@ -113,12 +126,14 @@ export function useNoteCounts(userId: string | undefined) {
           .from("notes")
           .select("id", { count: "exact", head: true })
           .is("deleted_at", null)
+          .is("board_id", null)
           .is("converted_task_id", null)
           .is("converted_announcement_id", null),
         supabase
           .from("notes")
           .select("id", { count: "exact", head: true })
           .is("deleted_at", null)
+          .is("board_id", null)
           .or("converted_task_id.not.is.null,converted_announcement_id.not.is.null"),
       ]);
       if (thoughts.error) throw new Error(thoughts.error.message);
@@ -140,10 +155,10 @@ export function useOlderNotes(userId: string | undefined) {
       if (!userId) return 0;
       const key = noteKeys.mine(userId);
       const rows = queryClient.getQueryData<Note[]>(key) ?? [];
-      const live = rows.filter((note) => note.deleted_at === null);
+      const live = rows.filter((note) => note.deleted_at === null && note.board_id === null);
       const oldest = live.reduce<string | null>((min, note) => (min === null || note.created_at < min ? note.created_at : min), null);
       const supabase = createBrowserSupabase();
-      let request = supabase.from("notes").select("*").is("deleted_at", null).order("created_at", { ascending: false }).limit(OLDER_PAGE);
+      let request = supabase.from("notes").select("*").is("deleted_at", null).is("board_id", null).order("created_at", { ascending: false }).limit(OLDER_PAGE);
       if (oldest) request = request.lt("created_at", oldest);
       const { data, error } = await request;
       if (error) throw new Error(error.message);
@@ -180,8 +195,8 @@ export function useNoteSearch(userId: string | undefined, query: string, enabled
       const pattern = `%${likeEscape(needle)}%`;
       // two plain filters instead of one `or=`: the words need no PostgREST quoting then
       const [byText, bySpeech] = await Promise.all([
-        supabase.from("notes").select("*").is("deleted_at", null).ilike("text", pattern).order("created_at", { ascending: false }).limit(SEARCH_LIMIT),
-        supabase.from("notes").select("*").is("deleted_at", null).ilike("raw_transcript", pattern).order("created_at", { ascending: false }).limit(SEARCH_LIMIT),
+        supabase.from("notes").select("*").is("deleted_at", null).is("board_id", null).ilike("text", pattern).order("created_at", { ascending: false }).limit(SEARCH_LIMIT),
+        supabase.from("notes").select("*").is("deleted_at", null).is("board_id", null).ilike("raw_transcript", pattern).order("created_at", { ascending: false }).limit(SEARCH_LIMIT),
       ]);
       if (byText.error) throw new Error(byText.error.message);
       if (bySpeech.error) throw new Error(bySpeech.error.message);

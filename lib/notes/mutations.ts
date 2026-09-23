@@ -35,6 +35,9 @@ type NewNote = {
   client_request_id: string;
   audio_path?: string | null;
   inbox_item_id?: string | null;
+  /** A point of a board (D-102). */
+  board_id?: string | null;
+  position?: number | null;
 };
 
 /**
@@ -126,6 +129,8 @@ export function useCreateNote(me: Me | undefined) {
         audio: null,
         audioPath: null,
         inboxId: null,
+        boardId: row.board_id ?? null,
+        position: row.position ?? null,
       });
       await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       upsertCached(queryClient, me.userId, {
@@ -135,6 +140,9 @@ export function useCreateNote(me: Me | undefined) {
         audio_path: null,
         inbox_item_id: null,
         pinned: false,
+        board_id: null,
+        position: null,
+        done_at: null,
         converted_task_id: null,
         converted_announcement_id: null,
         converted_at: null,

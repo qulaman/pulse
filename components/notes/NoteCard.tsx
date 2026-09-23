@@ -33,7 +33,7 @@ import css from "./notes.module.css";
 const SAVE_DEBOUNCE_MS = 600;
 
 /** The words with every search hit under the accent. */
-function Marked({ text, query }: { text: string; query: string }) {
+export function Marked({ text, query }: { text: string; query: string }) {
   return (
     <>
       {markMatches(text, query).map((segment, index) =>
@@ -50,7 +50,7 @@ function Marked({ text, query }: { text: string; query: string }) {
 }
 
 /** A small status dot: breathing while something is on its way, still once it has landed. */
-function Dot({ tone, pulse = false }: { tone: "ok" | "warn" | "accent"; pulse?: boolean }) {
+export function Dot({ tone, pulse = false }: { tone: "ok" | "warn" | "accent"; pulse?: boolean }) {
   const color = tone === "ok" ? "var(--ok)" : tone === "warn" ? "var(--warn)" : "var(--accent)";
   return (
     <span
@@ -66,7 +66,17 @@ function Dot({ tone, pulse = false }: { tone: "ok" | "warn" | "accent"; pulse?: 
  * never by a «Сохранить» button (D-75 §6). It tells the card while a pause is pending,
  * so the receipt says «Сохраняю» from the first keystroke, not 600 ms later.
  */
-function NoteEditor({ text, onChangeText, onDirty }: { text: string; onChangeText: (text: string) => void; onDirty: (dirty: boolean) => void }) {
+export function NoteEditor({
+  text,
+  onChangeText,
+  onDirty,
+  label = "Текст заметки",
+}: {
+  text: string;
+  onChangeText: (text: string) => void;
+  onDirty: (dirty: boolean) => void;
+  label?: string;
+}) {
   const [draft, setDraft] = useState(text);
   const area = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,7 +133,7 @@ function NoteEditor({ text, onChangeText, onDirty }: { text: string; onChangeTex
       value={draft}
       onChange={(event) => schedule(event.target.value)}
       onBlur={flush}
-      aria-label="Текст заметки"
+      aria-label={label}
       placeholder="Что было сказано…"
       data-testid="note-editor"
       className="w-full resize-none rounded-[14px] bg-surface-2/60 px-3 py-2.5 text-[16px] leading-[22px] text-text outline-none placeholder:text-muted focus:bg-surface-2"
@@ -133,7 +143,7 @@ function NoteEditor({ text, onChangeText, onDirty }: { text: string; onChangeTex
 }
 
 /** The receipt of the autosave, in the same dot language as the status screen. */
-function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: boolean }) {
+export function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: boolean }) {
   const state = useNoteSaveState(id);
   if (state === "offline") {
     return (
@@ -161,7 +171,7 @@ function SaveReceipt({ id, dirty, saved }: { id: string; dirty: boolean; saved: 
 }
 
 /** What STT heard, when the text has been edited away from it (D-75 §1, transcript-first). */
-function Original({ raw }: { raw: string }) {
+export function Original({ raw }: { raw: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="mt-2">
@@ -191,7 +201,7 @@ function NoteGlyph({ note, waiting }: { note: Note; waiting: boolean }) {
   );
 }
 
-function Chevron({ open }: { open: boolean }) {
+export function Chevron({ open }: { open: boolean }) {
   return (
     <span aria-hidden className="mt-1 shrink-0 text-muted/70 transition-transform duration-[200ms] ease-out" style={{ transform: open ? "rotate(-90deg)" : "rotate(90deg)" }}>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -440,7 +450,7 @@ export function NoteCard(props: CardProps) {
   );
 }
 
-function IconButton({ label, icon, onClick, disabled, danger, testId }: { label: string; icon: "copy" | "share" | "trash"; onClick: () => void; disabled?: boolean; danger?: boolean; testId?: string }) {
+export function IconButton({ label, icon, onClick, disabled, danger, testId }: { label: string; icon: "copy" | "share" | "trash"; onClick: () => void; disabled?: boolean; danger?: boolean; testId?: string }) {
   return (
     <button
       type="button"
@@ -512,8 +522,23 @@ export function ConvertedCard({ note, task, now, query }: { note: Note; task: Ta
   );
 }
 
-/** A deleted note in the bin: the way back, and the way out for good. */
-export function TrashCard({ note, now, query, onRestore, onPurge }: { note: Note; now: Date; query: string; onRestore: () => void; onPurge: () => void }) {
+/** A deleted note in the bin: the way back, and the way out for good. A point says which board it goes back to (D-102). */
+export function TrashCard({
+  note,
+  now,
+  query,
+  board,
+  onRestore,
+  onPurge,
+}: {
+  note: Note;
+  now: Date;
+  query: string;
+  /** The title of the board this point was deleted from. */
+  board?: string;
+  onRestore: () => void;
+  onPurge: () => void;
+}) {
   return (
     <div className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5" data-closed data-testid="note-trashed">
       <span aria-hidden className="mt-[1px] flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted">
@@ -527,6 +552,11 @@ export function TrashCard({ note, now, query, onRestore, onPurge }: { note: Note
           Удалена {whenRu(note.deleted_at ?? note.updated_at, now)}
           {note.audio_path ? " · с голосом" : ""}
         </span>
+        {board ? (
+          <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted" data-testid="note-trashed-board">
+            из доски «{board}»
+          </span>
+        ) : null}
         <span className="nums mt-0.5 block text-[12px] leading-4" style={{ color: "var(--warn)" }} data-testid="note-expires">
           исчезнет {humanAqtobe(trashExpiresAt(note), now)}
         </span>

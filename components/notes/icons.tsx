@@ -24,7 +24,12 @@ export type NoteIconName =
   | "lock"
   | "note"
   | "bell"
-  | "cloud";
+  | "cloud"
+  | "board"
+  | "check"
+  | "grip"
+  | "plus"
+  | "wall";
 
 const PATHS: Record<NoteIconName, ReactNode> = {
   mic: (
@@ -81,6 +86,23 @@ const PATHS: Record<NoteIconName, ReactNode> = {
   ),
   // waiting for the network: a cloud with a gap in it
   cloud: <path d="M7 18.5h9.5a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 6.6 12 3.25 3.25 0 0 0 7 18.5zM4 4l16 16" />,
+  // a board of points (D-102): a sheet with numbered lines
+  board: (
+    <>
+      <rect x="3.5" y="4" width="17" height="16" rx="2.5" />
+      <path d="M7.5 9h.01M11 9h6M7.5 13h.01M11 13h6M7.5 17h.01M11 17h4" />
+    </>
+  ),
+  check: <path d="M5 12.5 10 17.5 19 7" />,
+  grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />,
+  plus: <path d="M12 5v14M5 12h14" />,
+  // the screen on the office wall
+  wall: (
+    <>
+      <rect x="3" y="4.5" width="18" height="12" rx="2" />
+      <path d="M9 20.5h6M12 16.5v4" />
+    </>
+  ),
 };
 
 export function NoteIcon({ name, size = 16, className = "" }: { name: NoteIconName; size?: number; className?: string }) {
