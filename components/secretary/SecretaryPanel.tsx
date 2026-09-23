@@ -405,7 +405,10 @@ function HoldButton({
       style={{
         borderColor: alarm ? "color-mix(in srgb, var(--danger) 60%, var(--border))" : "color-mix(in srgb, var(--border) 80%, transparent)",
         background: alarm ? "color-mix(in srgb, var(--danger) 14%, var(--surface-2))" : "color-mix(in srgb, var(--surface-2) 70%, transparent)",
-        touchAction: "none",
+        // a vertical drag still scrolls a card taller than the screen — and cancels the hold
+        // (pointercancel); a still finger holds. iOS: no callout menu under a long press (D-106 §9)
+        touchAction: "pan-y",
+        WebkitTouchCallout: "none",
         WebkitTapHighlightColor: "transparent",
         WebkitUserSelect: "none",
         userSelect: "none",
