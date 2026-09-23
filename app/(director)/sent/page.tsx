@@ -6,11 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { useTaskDelivery } from "@/components/tasks/DeliveryStatus";
 import { Desk, useDesk } from "@/components/tasks/desk/Desk";
+import { FilterKeys, type Filter } from "@/components/tasks/desk/FilterKeys";
 import { isUrgentNow, TaskHead } from "@/components/tasks/TaskChrome";
 import { Trace, TraceHeading, TraceLeaf, TraceNow } from "@/components/tasks/Trace";
 import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
 import { queueOf } from "@/lib/tasks/desk";
 import { GROUP_LABEL, groupTasks, overdueCount, TIME_BUCKETS, type GroupBy } from "@/lib/tasks/grouping";
@@ -18,15 +18,6 @@ import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
 import { toneOf, type Tone } from "@/lib/tasks/tone";
-
-type Filter = "active" | "review" | "closed" | "all";
-
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "active", label: "В работе" },
-  { key: "review", label: "На приёмке" },
-  { key: "closed", label: "Закрытые" },
-  { key: "all", label: "Все" },
-];
 
 const GROUP_OPTIONS: { key: GroupBy; title: string; hint: string }[] = [
   { key: "deadline", title: "По сроку", hint: "Сначала то, что горит: просрочено, сегодня, завтра" },
@@ -45,7 +36,6 @@ const HEAD_TONE: Record<string, Tone> = { overdue: "danger", urgent: "warn", rev
 const EMPTY: TaskWithPeople[] = [];
 
 function matches(task: TaskWithPeople, filter: Filter): boolean {
-  if (filter === "all") return true;
   if (filter === "review") return task.status === "pending_review";
   if (filter === "closed") return CLOSED.includes(task.status);
   return ACTIVE.includes(task.status);
@@ -143,7 +133,6 @@ export default function SentPage() {
       active: all.filter((t) => matches(t, "active")).length,
       review: all.filter((t) => matches(t, "review")).length,
       closed: all.filter((t) => matches(t, "closed")).length,
-      all: all.length,
     }),
     [all],
   );
@@ -178,7 +167,9 @@ export default function SentPage() {
         flash={desk.flash}
         delivery={delivery.data}
         actions={desk.wrap(actions)}
-      />
+      >
+        <FilterKeys value={filter} counts={counts} onChange={setFilter} />
+      </Desk>
 
       {/* a hairline, not a filled box: above a list with no boxes a solid field shouts */}
       <label className="mt-1 flex min-h-[44px] items-center gap-2 rounded-[12px] border border-border/70 px-3 transition-colors duration-[120ms] focus-within:border-accent/60">
@@ -200,15 +191,6 @@ export default function SentPage() {
           </button>
         ) : null}
       </label>
-
-      {/* one row, scrolled sideways: four chips wrapped to two lines and ate the first screen */}
-      <div className="no-bar -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
-        {FILTERS.map((f) => (
-          <Chip key={f.key} tone={filter === f.key ? "accent" : "neutral"} onClick={() => setFilter(f.key)}>
-            {f.label} <span className="nums opacity-70">{counts[f.key]}</span>
-          </Chip>
-        ))}
-      </div>
 
       <div className="mt-3 flex min-h-[36px] items-center justify-between gap-3">
         <button
