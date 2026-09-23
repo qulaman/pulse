@@ -40,6 +40,8 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
   Уместность не оценивай — извлекай как сказано.
 - points — начисление очков («Ерлану плюс десять за скорость»).
 - reminder — напоминание директора самому себе («напомни мне завтра позвонить в банк»).
+- note — мысль директора для себя, без исполнителя и без «напомни» («запиши мысль…»,
+  «заметка:», «идея:», «не забыть…»). Вводные слова не включай в text.
 - recurrence — повторяющееся правило («каждый понедельник Айгуль сдаёт отчёт»).
 - delegation — задача менеджеру «распредели в группе».
 - query — вопрос к системе о состоянии дел («что там по…», «кто не отчитался», «чем занят…»).
@@ -100,9 +102,14 @@ export interface SttProvider { name: string; transcribe(audio: Buffer, mime: str
 15. ТЕЛЕГРАФ ИЗ ДВУХ СЛОВ: имя + предмет («Марат сигареты», «Жандос кофе») — task
     этому сотруднику; title — предмет как действие («Купить сигареты», «Принести
     кофе»). Одно слово без имени — не сущность.
+16. ЗАМЕТКА vs ПОРУЧЕНИЕ vs НАПОМИНАНИЕ: «запиши/заметка/мысль/идея/не забыть» без
+    имени сотрудника → note. Есть имя сотрудника → task, даже если сказано «запиши»
+    («запиши Марату: позвонить Альфе» — task). «Напомни мне …» → reminder, как и
+    раньше. Заметка без времени и адресата — НЕ task с пустым исполнителем
+    (уточнение правила 14).
 ```
 
-Правила 14–15 и П9 (§4) — D-52: до них «сходи за сигаретами» без имени уходило в reminder (Sonnet после эскалации), а двухсловные команды не доходили до парсера вовсе (guard §1 (г)).
+Правило 16 и П10–П11 (§4) — D-75: «запиши мысль…» без имени — своя сущность `note` (приватная заметка директора), а не task без исполнителя; evals `nt-01…08`, прогон 2026-09-18: assignee 100%, F1 96,6%, 56 кейсов. Правила 14–15 и П9 (§4) — D-52: до них «сходи за сигаретами» без имени уходило в reminder (Sonnet после эскалации), а двухсловные команды не доходили до парсера вовсе (guard §1 (г)).
 
 **Шаблон user-сообщения** (дата и календарь здесь — ради кэша; строка «Ближайшие дни» — 7 дней вперёд из `upcomingDaysRu()`: без неё модель ошибалась в арифметике дней недели — живые провалы a-003/a-012, 2026-09-07):
 
@@ -145,12 +152,13 @@ export interface PointsEntity extends AssigneeFields {
   kind: 'points'; amount: number; reason: string | null; source_span: string;
 }
 export interface ReminderEntity { kind: 'reminder'; text: string; remind_at_iso: string | null; source_span: string }
+export interface NoteEntity { kind: 'note'; text: string; source_span: string }  // D-75: без исполнителя и времени, видит только автор
 export interface RecurrenceEntity extends AssigneeFields { kind: 'recurrence'; title: string; rrule: string; source_span: string }
 export interface DelegationEntity extends AssigneeFields { kind: 'delegation'; title: string; note: string | null; source_span: string }
 export interface QueryEntity { kind: 'query'; question: string; source_span: string }
 
 export type Entity = AnnouncementEntity | TaskEntity | PointsEntity
-  | ReminderEntity | RecurrenceEntity | DelegationEntity | QueryEntity;
+  | ReminderEntity | NoteEntity | RecurrenceEntity | DelegationEntity | QueryEntity;
 export interface ParseResult { entities: Entity[] }
 export const ENTITIES_JSON_SCHEMA = { /* JSON Schema mirror of ParseResult, strict */ };
 ```

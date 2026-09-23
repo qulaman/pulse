@@ -111,6 +111,8 @@ type IngestState = {
   /** The director's question when the phrase held nothing to send (stage «question»). */
   question: string | null;
   source: IngestSource;
+  /** The note «Поручить»/«Объявить» started from: the RPC marks it converted (D-75 §5). */
+  noteId: string | null;
   /** Editable copy shown on /confirm. */
   entities: PostprocessedEntity[];
   /** Untouched parser output — the diff behind the "share of edits" metric (D-35). */
@@ -128,6 +130,11 @@ type IngestActions = {
   runParse: () => Promise<void>;
   startManual: () => void;
   startManualEvent: () => void;
+  /** A note the director hands out: one entity built by hand, then the usual confirm screen. */
+  startFromNote: (
+    note: { id: string; text: string; audio_path: string | null },
+    as: "task" | "announcement",
+  ) => void;
   /** The director corrected the transcript by hand: parse it again, same request. */
   reparse: (text: string) => Promise<void>;
   /** Hand a question to the assistant on Пульс (a query-only phrase, or the questions of a sent batch). */
@@ -151,6 +158,7 @@ const initialState: IngestState = {
   transcript: "",
   question: null,
   source: "voice",
+  noteId: null,
   entities: [],
   parsedEntities: [],
   suspicious: false,
@@ -248,6 +256,23 @@ function noteIdsOf(result: Record<string, unknown>): string[] {
 }
 
 export const useIngestStore = create<IngestState & IngestActions>((set, get) => {
+  /**
+   * A phrase of nothing but thoughts (D-75 §3): send it, say «Записал» with a way back,
+   * and free the pipeline. Shared by the parse path and «повторить» after a failed
+   * send — the retry must not sit at stage «done» with no toast.
+   */
+  async function captureNotes(): Promise<void> {
+    const count = get().entities.length;
+    const res = await get().send(false, false);
+    if (!res) return; // send() already left the overlay on «повторить»
+    const ids = noteIdsOf(res.result);
+    toast(
+      count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
+      ids.length > 0 ? { action: { label: "Отменить", onClick: () => void softDeleteNotes(ids) } } : undefined,
+    );
+    get().reset();
+  }
+
   function fail(cause: unknown, from: RetryFrom) {
     const code = classify(cause);
     const body =
@@ -426,17 +451,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         // only thoughts: nothing to confirm — they are already saved, «Отменить» undoes it
         if (isNotesOnly(entities)) {
           set({ entities, parsedEntities: entities, error: null, retryFrom: null });
-          const res = await get().send(false, false);
-          if (!res) return; // send() already left the overlay on «повторить»
-          const ids = noteIdsOf(res.result);
-          const count = entities.length;
-          toast(
-            count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
-            ids.length > 0
-              ? { action: { label: "Отменить", onClick: () => void softDeleteNotes(ids) } }
-              : undefined,
-          );
-          get().reset();
+          await captureNotes();
           return;
         }
         set({ entities, parsedEntities: entities, stage: "confirm", error: null, retryFrom: null });
@@ -529,6 +544,48 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       });
     },
 
+    /**
+     * «Поручить» / «Объявить» on a note. The parser is not called: the text is already
+     * combed, and a second parse would only invent a deadline. The entity is built by
+     * hand and confirmed on the usual screen, where the director picks the assignee.
+     */
+    startFromNote(note, as) {
+      const text = note.text.trim();
+      const manual: PostprocessedEntity =
+        as === "task"
+          ? {
+              kind: "task",
+              assignee_queries: [],
+              assignee_id: null,
+              assignee_name: null,
+              assignee_confidence: 0,
+              group_id: null,
+              title: text,
+              body: null,
+              deadline_iso: null,
+              deadline_confidence: null,
+              deadline_source_text: null,
+              priority: "normal",
+              scheduled_send_at: null,
+              source_span: text,
+              assignee: { status: "unmatched", user_id: null, candidates: [], flag: "check" },
+              blocked: "assignee_unmatched",
+            }
+          : { kind: "announcement", text, source_span: text };
+      set({
+        ...initialState,
+        clientRequestId: crypto.randomUUID(),
+        source: "typed",
+        transcript: text,
+        // the recording of the thought follows it into the task (principle 5)
+        audioPath: note.audio_path,
+        noteId: note.id,
+        stage: "confirm",
+        entities: [manual],
+        parsedEntities: [],
+      });
+    },
+
     async retry() {
       const { retryFrom, audio } = get();
       switch (retryFrom) {
@@ -543,7 +600,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           await get().runParse();
           return;
         case "send":
-          await get().send();
+          // a notes-only batch must end the same way it would have from the parse path
+          if (isNotesOnly(get().entities)) await captureNotes();
+          else await get().send();
           return;
         default:
           get().reset();
@@ -563,7 +622,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     },
 
     async send(forceNow = false, pointsEnabled = false) {
-      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId } = get();
+      const { entities, parsedEntities, transcript, audioPath, source, clientRequestId, inboxId, noteId } = get();
       const confirmed = entities.filter((entity) => isSendable(entity, pointsEnabled)).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
@@ -578,6 +637,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           confirmed_entities: confirmed,
           ...(forceNow ? { force_now: true } : {}),
           ...(inboxId ? { inbox_id: inboxId } : {}),
+          ...(noteId ? { note_id: noteId } : {}),
         });
         set({ stage: "done" });
         return res;

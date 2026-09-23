@@ -162,6 +162,8 @@ payload jsonb not null, payload_guest jsonb not null, created_at
 `id, company_id, author_id, assignee_id, title, body, priority, rrule text, is_active bool, next_run_at timestamptz`.
 ### reminders
 `id, company_id, user_id, text, remind_at timestamptz, sent bool default false`.
+### notes — заметки директора (D-75)
+`id, company_id, user_id, text, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление), client_request_id uuid null (unique где not null), created_at, updated_at`. Правятся только `text` и `pinned`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
 
 ## Представления (обычные view, security_invoker = on)
 
@@ -232,6 +234,7 @@ create policy tasks_insert on tasks for insert with check (
 - **push_subscriptions, consents, absences (select)**: свои + director; absences insert/update — director.
 - **notification_deliveries, ingest_batches, ai_logs, inbox_items**: select — director (inbox_items — ещё автор); insert/update — service role (inbox_items — автор до confirmed).
 - **tv_events** (миграции `20260917190000_tv_events`, `20260917191000_tv_history`): select — `auth_role() in ('tv','director') and company_id = auth_company_id()`; политик на запись нет вовсе — строки рождают триггеры-проекции `security definer` на tasks / point_transactions / announcements / orders. Роль `tv` не видит НИЧЕГО, кроме tv_events (+ вызов `tv_summary(p_guest boolean)`, который отдаёт вердикт, три числа дня и карусель одним jsonb). Колонки `payload` / `payload_guest` — полная и предмаскированная копии `{name, title, amount}`; гостевая не содержит ни фамилий, ни очков, ни заголовков (D-33). Виды событий: `task_sent, task_accepted, task_review, task_done, points, announcement, merch` — отказ, доработка и просрочка не проецируются вообще (D-45: негатив по именам на стену не выносится). Хвост чистится `tv_events_prune(days)`. Realtime — Postgres Changes на tv_events под RLS; Пульт — таблица **`tv_state`** (миграция `20260918100000_tv_state`, D-76): одна строка на компанию (`mode`, `employee_id`, `task_id`, `scene`, `guest`, `expires_at`, `version`, `reload_requested_at`, `seen_at`, `applied_version`, `updated_by`); select — `auth_role() in ('tv','director') and company_id = auth_company_id()`, политик на запись нет вовсе — только RPC `tv_control(...)` (director, абсолютное состояние, без `client_request_id`), `tv_heartbeat(p_applied_version)` (tv) и чтение фокуса `tv_focus()` (tv/director; маска гостя и отсев негатива внутри). В публикации Realtime. Broadcast `tv_control` и `POST /api/tv/control` не строятся. Никакого anon. pgTAP — `019_tv_state.test.sql`.
+- **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят.
 - View и функции клиентским ролям — только `security_invoker` view и перечисленные security-definer-функции; прямых грантов на агрегаты нет.
 
 ## Атомарные операции — функции security definer (вызов через rpc())
@@ -275,7 +278,7 @@ tv_summary(p_guest bool default false) returns jsonb
 5. `trg_points_balance_guard` (constraint trigger) — SUM≥0 после отрицательного insert.
 6. `trg_tv_events_*` — денормализация в tv_events c payload_guest при записи.
 7. `trg_notify_outbox` — insert в notification_deliveries на событиях (переход в sent, вопрос, pending_review…).
-8. `moddatetime` (extension) — updated_at на tasks, orders, shop_items, inbox_items.
+8. `moddatetime` (extension) — updated_at на tasks, orders, shop_items, inbox_items, notes.
 9. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; service role (auth.uid() null) — без ограничений.
 10. `trg_tasks_field_guard` (before update on tasks) — не-директор и не-автор меняет ТОЛЬКО `status`; штампы `accepted_at/completed_at/closed_at` ставит только `trg_task_status_guard` при переходе (клиентское значение игнорируется — защита от фарминга «принял ≤10 мин»). `accepted_at` = первое принятие (переживает rework→accepted).
 
@@ -289,6 +292,7 @@ task_messages (task_id, created_at);  task_messages (company_id, seq desc);
 point_transactions (company_id, user_id, created_at);
 orders (company_id, status);  reactions (message_id);  profiles (company_id);
 recurrence_rules (next_run_at) where is_active;  reminders (remind_at) where not sent;
+notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
 notification_deliveries (status, created_at) where status='queued';
 tv_events (company_id, seq desc);  ai_logs (company_id, created_at);
 announcements (company_id, created_at desc);  absences (company_id, user_id, starts_on);

@@ -348,6 +348,20 @@ export function TasksListBone() {
   );
 }
 
+/** «Заметки»: three cards of a heading and one quiet line. */
+export function NotesListBone() {
+  return (
+    <SkeletonGroup className="mt-4 flex flex-col gap-3">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="card p-3">
+          <Bone h={22} w={i === 1 ? "58%" : "76%"} />
+          <Bone h={16} w="42%" className="mt-2" />
+        </div>
+      ))}
+    </SkeletonGroup>
+  );
+}
+
 export function TasksSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-4">
