@@ -68,8 +68,16 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       .single();
 
     if (error) {
-      // 23505: the same tap arrived twice — the first one already went out
-      if (error.code === "23505") return apiOk({ duplicate: true });
+      // 23505: the same tap arrived twice — the first one already went out; its row goes back,
+      // so «Отменить» after a replay still finds what to take back (D-106)
+      if (error.code === "23505") {
+        const { data: first } = await supabase
+          .from("errands")
+          .select("id, status")
+          .eq("client_request_id", body.client_request_id)
+          .maybeSingle();
+        return apiOk({ errand: first ?? null, duplicate: true });
+      }
       if (error.code === "42501") return apiError(403, "forbidden", "Нет доступа");
       throw new Error(`errand insert failed: ${error.message}`);
     }

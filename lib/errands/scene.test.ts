@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Errand } from "@/lib/errands/queries";
 import {
+  absenceLine,
   askedDetails,
   daypartOf,
   deskFocus,
@@ -284,5 +285,24 @@ describe("the link between the two desks (D-99)", () => {
     for (const scene of Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[]) expect(QUESTIONS[scene].length).toBeGreaterThan(0);
     expect(RESULTS.doctor).toContain("Врач едет");
     expect(RESULTS.dnd).toEqual([]);
+  });
+});
+
+describe("absenceLine — who is away, for the toast of a request that went (D-106)", () => {
+  const now = new Date("2026-09-23T09:00:00Z");
+  const aigul = { full_name: "Айгуль Сарсенова", away_until: "2026-09-23T09:30:00Z" };
+  const marat = { full_name: "Марат Оспанов", away_until: "2026-09-23T09:10:00Z" };
+
+  it("somebody is there — nothing to say", () => {
+    expect(absenceLine([], now)).toBeNull();
+    expect(absenceLine([aigul, { full_name: "Марат", away_until: null }], now)).toBeNull();
+  });
+
+  it("the one secretary is away — by name, until when (Aqtobe clock)", () => {
+    expect(absenceLine([aigul], now)).toBe("Айгуль не на месте до 14:30");
+  });
+
+  it("every secretary is away — the earliest return", () => {
+    expect(absenceLine([aigul, marat], now)).toBe("никого нет на месте до 14:10");
   });
 });

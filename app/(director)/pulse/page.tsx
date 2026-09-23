@@ -33,8 +33,8 @@ import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/Sec
 import { useEther } from "@/lib/ether/queries";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
 import { activeCount, isActive, useErrands, useSecretaries, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
-import { askSecretary } from "@/lib/errands/pending";
-import { etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
+import { askSecretary, setDeskAbsence, usePendingErrands } from "@/lib/errands/pending";
+import { absenceLine, etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector } from "@/lib/visits/text";
@@ -207,6 +207,14 @@ export default function PulsePage() {
     if (list.length === 0 || !list.every((p) => isAway(p, now))) return null;
     return list.map((p) => p.away_until as string).sort()[0] ?? null;
   }, [secretaryPeople.data, now]);
+  // the toast of a request that went says who is away — the request waits for them (D-106)
+  const absence = useMemo(() => absenceLine(secretaryPeople.data ?? [], now), [secretaryPeople.data, now]);
+  useEffect(() => {
+    setDeskAbsence(absence);
+    return () => setDeskAbsence(null);
+  }, [absence]);
+  // requests kept on the phone without network (D-106): the desk says they wait
+  const waitingErrands = usePendingErrands((state) => state.pending.filter((p) => p.waiting).length);
   // the director is in a meeting right now: «не беспокоить до конца встречи?» (D-99)
   const meetingNow = useMemo(() => {
     const at = now.getTime();
@@ -591,8 +599,9 @@ export default function PulsePage() {
                     scene={deskStage.scene}
                     phase={deskStage.phase}
                     urgency={urgencyOf(deskStage.phase === "asked" ? deskStage.errand : null, now, secretarySetup.data?.escalateAfterMin ?? 3)}
-                    count={activeCount(errandRows)}
+                    count={activeCount(errandRows) + waitingErrands}
                     away={awayUntil}
+                    waiting={waitingErrands}
                     etaLeft={deskStage.phase === "doing" ? etaLeftMin(deskStage.errand, now) : null}
                     asking={errandRows.some((e) => isActive(e) && e.question && !e.answer)}
                     listening={stage === "recording" && toSecretary}

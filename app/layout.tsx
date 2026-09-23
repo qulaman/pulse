@@ -6,6 +6,7 @@ import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
+import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { loadBrand } from "@/lib/brand";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
@@ -51,6 +52,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <MascotPower />
           {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}
           <SecretaryAlarmGate />
+          {/* a request to the secretary kept without network goes by itself (D-106) */}
+          <ErrandReplay />
         </QueryProvider>
       </body>
     </html>
