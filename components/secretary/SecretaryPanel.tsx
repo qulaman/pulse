@@ -71,12 +71,10 @@ export function SecretaryPanel({
 
   return (
     <div className={`flex flex-col ${compact ? "gap-2" : "gap-3"}`} data-testid="secretary-panel">
-      {/* the card over the face keeps the whole catalogue in one row: it has to fit over the
-          face on an iPhone SE, and four tiles side by side read as a keypad */}
-      <div
-        className={`grid ${compact ? "gap-2" : "grid-cols-2 gap-3"}`}
-        style={compact ? { gridTemplateColumns: `repeat(${Math.min(4, actions.length)}, minmax(0, 1fr))` } : undefined}
-      >
+      {/* the card over the face: each button is a pill as wide as its own label, and the pills
+          wrap into rows — a fixed grid cut «Не беспокоить» and «Пригласи гостя» on a narrow
+          phone (D-87); a label never truncates, a very long one wraps inside its pill */}
+      <div className={compact ? "flex flex-wrap gap-2" : "grid grid-cols-2 gap-3"}>
         {actions.map((action) => (
           <button
             key={action.code}
@@ -92,15 +90,18 @@ export function SecretaryPanel({
             onContextMenu={(e) => e.preventDefault()}
             className={
               compact
-                ? "flex min-h-[74px] flex-col items-center justify-center gap-1 rounded-[14px] border border-border/80 bg-surface-2/70 px-1 py-2 text-center transition-transform duration-[120ms] active:scale-[0.96]"
+                ? // a row of pills stretches to fill the line, like the keys of a keyboard
+                  "flex min-h-[44px] max-w-full flex-auto items-center justify-center gap-1.5 rounded-full border border-border/80 bg-surface-2/70 py-1.5 pl-2 pr-2.5 text-center transition-transform duration-[120ms] active:scale-[0.96]"
                 : "flex min-h-[92px] flex-col items-center justify-center gap-1 card px-3 py-4 text-center active:scale-[0.98]"
             }
             style={{ touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
           >
-            <span aria-hidden className={`${compact ? "text-[24px]" : "text-[28px]"} leading-none`}>
+            <span aria-hidden className={`${compact ? "shrink-0 text-[18px]" : "text-[28px]"} leading-none`}>
               {action.icon || "•"}
             </span>
-            <span className={`${compact ? "line-clamp-2 min-w-0 text-[12px] leading-[15px]" : "text-[16px] leading-[22px]"} font-semibold`}>{action.label}</span>
+            <span className={`${compact ? "min-w-0 break-words text-[15px] leading-5" : "text-[16px] leading-[22px]"} font-semibold`} data-label>
+              {action.label}
+            </span>
           </button>
         ))}
       </div>

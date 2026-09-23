@@ -29,42 +29,59 @@ export function SecretaryCard({
   onRefresh: () => void;
   onClose: () => void;
 }) {
-  // The card hangs over the face and must never slide under the app header: its height is
-  // capped by the room between the two, and what does not fit scrolls inside the card. The
-  // room is read off the wrapper, which does not move — the card itself is mid-spring.
+  // The card hangs over the face and must never slide under the app header. When the room
+  // above the face is too short for every button (a 667-px iPhone SE with six buttons), the
+  // card comes down over the face instead of hiding a row behind a scroll nobody sees
+  // (D-87); only a card taller than the whole screen between the header and the tab bar
+  // scrolls. Measured off the wrapper, which does not move — the card itself is mid-spring.
   const self = useRef<HTMLDivElement>(null);
-  const [room, setRoom] = useState<number | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<{ max: number; shift: number } | null>(null);
   useEffect(() => {
     const anchor = self.current?.parentElement;
-    if (!anchor) return;
+    const inner = box.current;
+    const list = scroller.current;
+    if (!anchor || !inner || !list) return;
     const measure = () => {
       const header = document.querySelector("header");
-      const top = header ? header.getBoundingClientRect().bottom : 0;
-      setRoom(Math.max(180, Math.floor(anchor.getBoundingClientRect().bottom - top - 12)));
+      const top = (header ? header.getBoundingClientRect().bottom : 0) + 12;
+      const bar = [...document.querySelectorAll("nav")].find((nav) => nav.getBoundingClientRect().top > window.innerHeight / 2);
+      const bottom = (bar ? bar.getBoundingClientRect().top : window.innerHeight) - 12;
+      const above = anchor.getBoundingClientRect().bottom - top;
+      // the card's own height with nothing capped: what is shown plus what would scroll
+      const natural = inner.offsetHeight - list.clientHeight + list.scrollHeight;
+      const max = Math.max(180, Math.floor(bottom - top));
+      const shift = Math.max(0, Math.ceil(Math.min(natural, max) - above));
+      setFit((prev) => (prev && prev.max === max && prev.shift === shift ? prev : { max, shift }));
     };
     const frame = requestAnimationFrame(measure);
     const observer = new ResizeObserver(measure);
     observer.observe(document.body);
+    // a pending «отправляю…» row or a live errand makes the card taller
+    if (list.firstElementChild) observer.observe(list.firstElementChild);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
   }, []);
+  const shift = fit?.shift ?? 0;
 
   return (
+    <div ref={self} style={{ transform: shift ? `translateY(${shift}px)` : undefined, transition: "transform 200ms var(--ease-out)" }}>
     <motion.div
-      ref={self}
       initial={{ opacity: 0, y: 22, scale: 0.9 }}
       // the look first, the buttons after it: the delay is the two faces turning
       animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 420, damping: 30, delay: 0.34 } }}
       exit={{ opacity: 0, y: 14, scale: 0.94, transition: { duration: 0.16 } }}
       style={{ transformOrigin: "80% 100%" }}
-      className="pointer-events-auto relative w-[min(90vw,340px)]"
+      className="pointer-events-auto relative w-[min(92vw,360px)]"
       data-testid="secretary-card"
     >
       <div
-        className="status-screen flex flex-col rounded-[20px] p-3.5"
-        style={{ "--tone": "var(--accent-2)", maxHeight: room ?? undefined } as CSSProperties}
+        ref={box}
+        className="status-screen flex flex-col rounded-[20px] p-3"
+        style={{ "--tone": "var(--accent-2)", maxHeight: fit?.max } as CSSProperties}
       >
         <div className="mb-3 flex shrink-0 items-center gap-3">
           <span
@@ -88,16 +105,20 @@ export function SecretaryCard({
             ×
           </button>
         </div>
-        <div className="no-bar min-h-0 flex-1 overflow-y-auto">
+        <div ref={scroller} className="no-bar min-h-0 flex-1 overflow-y-auto">
           <SecretaryPanel actions={actions} errands={errands} now={now} onRefresh={onRefresh} compact />
         </div>
       </div>
-      {/* the tail, towards the desk on the right of the face */}
-      <span
-        aria-hidden
-        className="absolute top-full block h-3 w-3 -translate-y-1.5 rotate-45 border-b border-r"
-        style={{ left: "78%", background: "var(--surface)", borderColor: "color-mix(in srgb, var(--border) 80%, white 6%)" }}
-      />
+      {/* the tail, towards the desk on the right of the face — gone while the card has come
+          down over the face: it would point into it */}
+      {shift === 0 ? (
+        <span
+          aria-hidden
+          className="absolute top-full block h-3 w-3 -translate-y-1.5 rotate-45 border-b border-r"
+          style={{ left: "78%", background: "var(--surface)", borderColor: "color-mix(in srgb, var(--border) 80%, white 6%)" }}
+        />
+      ) : null}
     </motion.div>
+    </div>
   );
 }
