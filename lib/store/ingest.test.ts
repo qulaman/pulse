@@ -187,6 +187,24 @@ describe("ingest store", () => {
     expect(useIngestStore.getState().entities).toEqual([]);
   });
 
+  it("retries a failed notes-only send and still says «Записал»", async () => {
+    api.parse.mockResolvedValue({ entities: [noteEntity()] });
+    api.confirm
+      .mockRejectedValueOnce(new VoiceApiError("network", 0, null))
+      .mockResolvedValueOnce({ result: { note_ids: ["n-1"] }, duplicate: false });
+
+    await useIngestStore.getState().submitText("запиши мысль: сделать акцию для Альфы");
+    expect(useIngestStore.getState().stage).toBe("error");
+    expect(useIngestStore.getState().retryFrom).toBe("send");
+
+    await useIngestStore.getState().retry();
+
+    expect(api.confirm).toHaveBeenCalledTimes(2);
+    // the second attempt ends exactly like the first would have: saved, toasted, pipeline free
+    expect(useIngestStore.getState().stage).toBe("idle");
+    expect(useIngestStore.getState().entities).toEqual([]);
+  });
+
   it("keeps a mixed phrase on the confirm screen", async () => {
     const task = taskEntity({ blocked: undefined, assignee_id: "u-1" });
     api.parse.mockResolvedValue({ entities: [noteEntity(), task] });
@@ -196,6 +214,30 @@ describe("ingest store", () => {
     expect(api.confirm).not.toHaveBeenCalled();
     expect(useIngestStore.getState().stage).toBe("confirm");
     expect(useIngestStore.getState().entities).toHaveLength(2);
+  });
+
+  it("hands a note out as a task titled by its first line, the rest under it", () => {
+    useIngestStore
+      .getState()
+      .startFromNote({ id: "n-1", text: "\nАкция для Альфы\nскидка 10% оптовикам\nдо пятницы ", audio_path: "c/u/n.webm" }, "task");
+    const state = useIngestStore.getState();
+
+    expect(api.parse).not.toHaveBeenCalled();
+    expect(state.stage).toBe("confirm");
+    expect(state.noteId).toBe("n-1");
+    expect(state.audioPath).toBe("c/u/n.webm");
+    expect(state.entities[0]).toMatchObject({
+      kind: "task",
+      title: "Акция для Альфы",
+      body: "скидка 10% оптовикам\nдо пятницы",
+      blocked: "assignee_unmatched",
+    });
+  });
+
+  it("announces a note with its whole text", () => {
+    useIngestStore.getState().startFromNote({ id: "n-2", text: "Собрание в пятницу\nв 10:00", audio_path: null }, "announcement");
+
+    expect(useIngestStore.getState().entities[0]).toMatchObject({ kind: "announcement", text: "Собрание в пятницу\nв 10:00" });
   });
 });
 

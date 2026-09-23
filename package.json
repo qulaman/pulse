@@ -25,6 +25,7 @@
     "smoke:board": "tsx scripts/smoke-board.ts",
     "smoke:tv": "tsx scripts/smoke-tv.ts",
     "smoke:cleanup": "tsx scripts/smoke-cleanup.ts",
+    "smoke:notes": "tsx scripts/smoke-notes.ts",
     "db:clean": "tsx scripts/db-clean.ts",
     "seed:client": "tsx scripts/seed-client.ts"
   },

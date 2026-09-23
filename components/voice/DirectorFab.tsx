@@ -24,6 +24,8 @@ export function DirectorFab() {
   // /confirm is about the phrase already spoken; /pulse hosts the button inline and
   // the assistant mentions the draft itself
   const onConfirm = pathname === "/confirm" || pathname === "/pulse";
+  // «Заметки» carries its own microphone that writes notes verbatim (D-81): one mic per screen
+  const ownMic = pathname === "/notes";
   const draft = stage === "confirm" && !onConfirm;
   const pointsEnabled = usePointsEnabled().data === true;
   const count = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;
@@ -53,7 +55,7 @@ export function DirectorFab() {
             </button>
           </div>
         </div>
-      ) : (
+      ) : ownMic ? null : (
         <VoiceButton />
       )}
       <IngestOverlay />

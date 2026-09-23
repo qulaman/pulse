@@ -20,6 +20,8 @@ const BodySchema = z.strictObject({
   duration_ms: z.number().positive().optional(),
   /** A voice message already in the thread: the transcript is written onto that row. */
   message_id: z.uuid().optional(),
+  /** A note dictated on «Заметки»: the transcript is written onto that row (D-81). */
+  note_id: z.uuid().optional(),
 });
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -169,6 +171,32 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         .eq("file_path", body.audio_path)
         .select("id");
       if (written.error) console.error("voice transcript write failed:", written.error.message);
+    }
+
+    // The same for a note dictated on «Заметки» (D-81): the row with the recording is
+    // born before STT, so a closed tab or a lost response cannot leave the thought
+    // without its words. Narrowed to the caller's note and this very recording; the
+    // text is filled only while it is still empty — the director may have typed into
+    // it meanwhile — and the raw transcript is kept either way.
+    if (body.context === "director_input" && body.note_id) {
+      const filled = await supabase
+        .from("notes")
+        .update({ text: result.text, raw_transcript: result.text })
+        .eq("id", body.note_id)
+        .eq("user_id", profile.userId)
+        .eq("audio_path", body.audio_path)
+        .eq("text", "")
+        .select("id");
+      if (filled.error) console.error("note transcript write failed:", filled.error.message);
+      else if (filled.data.length === 0) {
+        const raw = await supabase
+          .from("notes")
+          .update({ raw_transcript: result.text })
+          .eq("id", body.note_id)
+          .eq("user_id", profile.userId)
+          .eq("audio_path", body.audio_path);
+        if (raw.error) console.error("note raw transcript write failed:", raw.error.message);
+      }
     }
 
     return apiOk({

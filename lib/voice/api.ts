@@ -47,6 +47,8 @@ export type TranscribeRequest = {
   duration_ms?: number;
   /** The voice message the words belong to: the route writes the transcript onto it. */
   message_id?: string;
+  /** The note dictated on «Заметки»: the route writes the transcript onto it (D-81). */
+  note_id?: string;
 };
 
 export type ConfirmRequest = {
@@ -59,6 +61,8 @@ export type ConfirmRequest = {
   /** D-38: override of the 08:00–21:00 delivery window, set by an explicit tap. */
   force_now?: boolean;
   inbox_id?: string;
+  /** The note this batch grew out of: the RPC marks it converted (D-75 §5). */
+  note_id?: string;
 };
 
 export type ConfirmResponse = {
