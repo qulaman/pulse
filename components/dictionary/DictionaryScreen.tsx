@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { NamesPanel } from "@/components/dictionary/NamesPanel";
 import { WordsPanel } from "@/components/dictionary/WordsPanel";
 import type { RosterPerson } from "@/lib/dictionary";
-import { misheardQueryKey, useCompanySettings, useWaitingEdits } from "@/lib/dictionary-queries";
+import { misheardQueryKey, useCompanySettings, useWaitingEdits, wordStatsKey } from "@/lib/dictionary-queries";
 import { DICTIONARY_TABS, type DictionaryTab } from "@/lib/dictionary-tabs";
 import { peopleKeys, usePeople } from "@/lib/people/queries";
 import { useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
@@ -58,6 +58,7 @@ export function DictionaryScreen({ initialTab }: { initialTab: DictionaryTab }) 
       if (document.visibilityState !== "visible") return;
       void queryClient.invalidateQueries({ queryKey: settingsKey });
       void queryClient.invalidateQueries({ queryKey: misheardQueryKey });
+      void queryClient.invalidateQueries({ queryKey: wordStatsKey });
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
@@ -154,7 +155,7 @@ export function DictionaryScreen({ initialTab }: { initialTab: DictionaryTab }) 
                     matching={settings.data.matching}
                   />
                 ) : (
-                  <WordsPanel vocabulary={settings.data.vocabulary} people={roster} />
+                  <WordsPanel vocabulary={settings.data.vocabulary} meta={settings.data.vocabulary_meta} people={roster} />
                 )}
               </section>
             ) : null,

@@ -3,8 +3,9 @@
 import { useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
-import { ALIAS_MAX, VOCABULARY_MAX, entryKey, mergeEntries } from "@/lib/dictionary";
+import { ALIAS_MAX, applyVocabularyEdit, entryKey, mergeEntries, type VocabularyEdit } from "@/lib/dictionary";
 import type { Misheard } from "@/lib/dictionary-learn";
+import type { WordSuggestion, WordUsage } from "@/lib/dictionary-usage";
 import { NetworkError, isNetworkError } from "@/lib/net";
 import { dequeue, enqueue } from "@/lib/outbox";
 import { peopleKeys, type Person } from "@/lib/people/queries";
@@ -23,7 +24,9 @@ const ROOT = ["dictionary"] as const;
 const VOCABULARY_MUTATION = [...ROOT, "vocabulary"] as const;
 const ALIASES_MUTATION = [...ROOT, "aliases"] as const;
 const DISMISS_MUTATION = [...ROOT, "dismiss"] as const;
+const DISMISS_WORDS_MUTATION = [...ROOT, "dismiss-words"] as const;
 export const misheardQueryKey = [...ROOT, "misheard"] as const;
+export const wordStatsKey = [...ROOT, "words"] as const;
 
 const WAITING = "Нет связи — правка уйдёт сама, как появится";
 
@@ -67,15 +70,16 @@ function failed(queryClient: QueryClient, error: unknown, truth: readonly unknow
 }
 
 /**
- * A word in or out of the vocabulary, on the screen at once (D-111). The server merges
- * against the stored list; its answer lands only after the last edit in flight, so a
- * quick second tap is never shown undone and redone.
+ * A word in or out of the vocabulary, its kind, its spelling — on the screen at once
+ * (D-111). The server applies the same `applyVocabularyEdit` to the stored list; its
+ * answer lands only after the last edit in flight, so a quick second tap is never shown
+ * undone and redone. A word added or taken from «Часто встречается» leaves that list.
  */
 export function useEditVocabulary() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationKey: VOCABULARY_MUTATION,
-    mutationFn: async ({ key, ...edit }: Keyed<Edit>) =>
+    mutationFn: async ({ key, ...edit }: Keyed<VocabularyEdit>) =>
       (
         await postDictionary<{ settings: CompanySettings }>(
           "/api/settings/vocabulary",
@@ -88,8 +92,17 @@ export function useEditVocabulary() {
       await queryClient.cancelQueries({ queryKey: settingsKey });
       const previous = queryClient.getQueryData<CompanySettings>(settingsKey);
       if (previous) {
-        const { list } = mergeEntries(previous.vocabulary, edit.add ?? [], edit.remove ?? [], VOCABULARY_MAX);
-        queryClient.setQueryData<CompanySettings>(settingsKey, { ...previous, vocabulary: list });
+        const out = applyVocabularyEdit(previous.vocabulary, previous.vocabulary_meta, edit, {
+          at: new Date().toISOString(),
+          by: null,
+        });
+        if (!out.conflict) queryClient.setQueryData<CompanySettings>(settingsKey, { ...previous, vocabulary: out.vocabulary, vocabulary_meta: out.meta });
+      }
+      if (edit.add?.length) {
+        const taken = new Set(edit.add.map(entryKey));
+        queryClient.setQueryData<WordStats>(wordStatsKey, (stats) =>
+          stats ? { ...stats, suggestions: stats.suggestions.filter((s) => !taken.has(entryKey(s.word))) } : stats,
+        );
       }
     },
     onSuccess: (settings) => {
@@ -98,8 +111,50 @@ export function useEditVocabulary() {
       }
     },
     onError: (error) => failed(queryClient, error, settingsKey, "Не получилось сохранить словарь"),
+    onSettled: (_data, error) => {
+      // a new or renamed word gets its count once the burst is over
+      if (isNetworkError(error) || queryClient.isMutating({ mutationKey: VOCABULARY_MUTATION }) > 1) return;
+      void queryClient.invalidateQueries({ queryKey: wordStatsKey });
+    },
   });
-  return { ...mutation, mutate: (edit: Edit) => mutation.mutate({ ...edit, key: crypto.randomUUID() }) };
+  return { ...mutation, mutate: (edit: VocabularyEdit) => mutation.mutate({ ...edit, key: crypto.randomUUID() }) };
+}
+
+/** `phrases` — how many parsed phrases the month holds: too few, and «не встречалось» means nothing yet. */
+export type WordStats = { days: number; phrases: number; usage: Record<string, WordUsage>; suggestions: WordSuggestion[] };
+
+/**
+ * How often each word came up in the last month and the names that keep coming up without
+ * being in the vocabulary (`GET /api/dictionary/words`) — numbers and words, never phrases.
+ */
+export function useWordStats() {
+  return useQuery({
+    queryKey: wordStatsKey,
+    staleTime: 60_000,
+    queryFn: async (): Promise<WordStats> => {
+      const res = await fetch("/api/dictionary/words", { credentials: "include" });
+      if (!res.ok) throw new Error("word stats failed");
+      return (await res.json()) as WordStats;
+    },
+  });
+}
+
+/** «×» on a suggested word: gone at once, hidden for everybody who runs the dictionary. */
+export function useDismissWords() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationKey: DISMISS_WORDS_MUTATION,
+    mutationFn: ({ key, dismiss }: Keyed<{ dismiss: string[] }>) =>
+      postDictionary<{ dismissed_words: string[] }>("/api/dictionary/words", { dismiss }, key, "Не получилось скрыть"),
+    onMutate: ({ dismiss }) => {
+      const hidden = new Set(dismiss);
+      queryClient.setQueryData<WordStats>(wordStatsKey, (stats) =>
+        stats ? { ...stats, suggestions: stats.suggestions.filter((s) => !hidden.has(s.key)) } : stats,
+      );
+    },
+    onError: (error) => failed(queryClient, error, wordStatsKey, "Не получилось скрыть"),
+  });
+  return { ...mutation, mutate: (dismiss: string[]) => mutation.mutate({ dismiss, key: crypto.randomUUID() }) };
 }
 
 /** Puts an alias edit on the cached people at once — the screen does not wait for the server. */

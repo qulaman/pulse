@@ -1,5 +1,5 @@
 import { resolveMatchingConfig, type MatchingConfig } from "@/lib/ai/config";
-import { matchName, type RosterUser } from "@/lib/matchName";
+import { matchName, trigramSimilarity, type RosterUser } from "@/lib/matchName";
 import { suggestAliases } from "@/lib/people/aliases";
 import { firstNameOf, normalize } from "@/lib/text/normalize";
 
@@ -85,11 +85,89 @@ export function ownersOf(entry: string, people: readonly RosterPerson[], except?
   return people.filter((p) => p.id !== except && spokenKeys(p).has(key));
 }
 
+/** Spaces, hyphens and case do not make a different word: «Каз Азот» is «КазАзот». */
+function compactKey(entry: string): string {
+  return entryKey(entry).replace(/[\s-]/g, "");
+}
+
+/** Close enough by trigrams to be a misspelling of the same name — not a word of its own. */
+const SIMILAR_FROM = 0.7;
+
+/** Letters to change, add or drop to turn one string into the other. */
+function editDistance(a: string, b: string): number {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const row = [i];
+    for (let j = 1; j <= b.length; j++) {
+      row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = row;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Two spellings of one name: the same letters split differently («Каз Азот» / «КазАзот»),
+ * a letter or two off («Касхром» / «Казхром» — one letter in seven is only 0.57 by trigrams,
+ * so the edit distance speaks for short names), or close by trigrams. Keys shorter than five
+ * letters are left alone — three letters apart are different abbreviations, not typos.
+ */
+export function nearSpelling(a: string, b: string): number {
+  const x = a.replace(/[\s-]/g, "");
+  const y = b.replace(/[\s-]/g, "");
+  if (x === y) return 1;
+  if (x.length < 5 || y.length < 5) return 0;
+  const allowed = Math.min(x.length, y.length) >= 9 ? 2 : 1;
+  if (editDistance(x, y) <= allowed) return 0.9;
+  const score = trigramSimilarity(x, y);
+  return score >= SIMILAR_FROM ? score : 0;
+}
+
+/** The word of the list this entry is most likely a variant of — see `nearSpelling`. */
+export function similarWord(entry: string, words: readonly string[]): string | null {
+  const key = entryKey(entry);
+  const compact = compactKey(entry);
+  if (compact.length < 3) return null;
+  let best: { word: string; score: number } | null = null;
+  for (const word of words) {
+    if (entryKey(word) === key) continue;
+    const score = nearSpelling(compact, compactKey(word));
+    if (score > 0 && (!best || score > best.score)) best = { word, score };
+  }
+  return best?.word ?? null;
+}
+
+/** What one typed or pasted entry is to the list — the preview of a pasted column shows it per line. */
+export type WordVerdict = "new" | "existing" | "similar" | "name" | "too_long" | "overflow";
+export type WordLine = { entry: string; verdict: WordVerdict; /** the similar word, or the person */ to?: string };
+
+export function classifyWords(current: readonly string[], text: string, people: readonly RosterPerson[]): WordLine[] {
+  const have = new Set(current.map(entryKey));
+  const lines: WordLine[] = [];
+  let fresh = 0;
+  for (const entry of splitEntries(text)) {
+    const owner = ownersOf(entry, people)[0] ?? people.find((p) => entryKey(p.full_name) === entryKey(entry));
+    const like = similarWord(entry, current);
+    if (have.has(entryKey(entry))) lines.push({ entry, verdict: "existing" });
+    else if (owner) lines.push({ entry, verdict: "name", to: owner.full_name });
+    else if (entry.length > ENTRY_MAX_LENGTH) lines.push({ entry, verdict: "too_long" });
+    else if (like) lines.push({ entry, verdict: "similar", to: like });
+    else if (current.length + fresh >= VOCABULARY_MAX) lines.push({ entry, verdict: "overflow" });
+    else {
+      fresh += 1;
+      lines.push({ entry, verdict: "new" });
+    }
+  }
+  return lines;
+}
+
 /** What the vocabulary field will do with the text typed into it. */
 export type WordsPlan = {
   add: string[];
   /** Already in the list. */
   existing: string[];
+  /** Looks like a word already there — added only when asked for explicitly. */
+  similar: { entry: string; to: string }[];
   /** A person's name: it is in the STT prompt already, through the roster. */
   names: { entry: string; person: string }[];
   tooLong: string[];
@@ -98,17 +176,105 @@ export type WordsPlan = {
 };
 
 export function planWords(current: readonly string[], text: string, people: readonly RosterPerson[]): WordsPlan {
-  const have = new Set(current.map(entryKey));
-  const plan: WordsPlan = { add: [], existing: [], names: [], tooLong: [], overflow: [] };
-  for (const entry of splitEntries(text)) {
-    const owner = ownersOf(entry, people)[0] ?? people.find((p) => entryKey(p.full_name) === entryKey(entry));
-    if (have.has(entryKey(entry))) plan.existing.push(entry);
-    else if (owner) plan.names.push({ entry, person: owner.full_name });
-    else if (entry.length > ENTRY_MAX_LENGTH) plan.tooLong.push(entry);
-    else if (current.length + plan.add.length >= VOCABULARY_MAX) plan.overflow.push(entry);
-    else plan.add.push(entry);
+  const plan: WordsPlan = { add: [], existing: [], similar: [], names: [], tooLong: [], overflow: [] };
+  for (const line of classifyWords(current, text, people)) {
+    if (line.verdict === "new") plan.add.push(line.entry);
+    else if (line.verdict === "existing") plan.existing.push(line.entry);
+    else if (line.verdict === "similar") plan.similar.push({ entry: line.entry, to: line.to ?? "" });
+    else if (line.verdict === "name") plan.names.push({ entry: line.entry, person: line.to ?? "" });
+    else if (line.verdict === "too_long") plan.tooLong.push(line.entry);
+    else plan.overflow.push(line.entry);
   }
   return plan;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Word kinds and the meta of a word                                           */
+/* -------------------------------------------------------------------------- */
+
+/** What a word names — for order on the screen only; the STT prompt does not change (D-111). */
+export const WORD_KINDS = ["counterparty", "site", "product", "term"] as const;
+export type WordKind = (typeof WORD_KINDS)[number];
+
+export const WORD_KIND_LABEL: Record<WordKind, string> = {
+  counterparty: "Контрагент",
+  site: "Объект",
+  product: "Товар",
+  term: "Термин",
+};
+
+export const WORD_KIND_GROUP: Record<WordKind | "none", string> = {
+  counterparty: "Контрагенты",
+  site: "Объекты",
+  product: "Товары",
+  term: "Термины",
+  none: "Без типа",
+};
+
+/** Kept beside the list itself (`settings.vocabulary_meta`, keyed by `entryKey`). */
+export type WordMeta = { kind: WordKind | null; added_at: string | null; added_by: string | null };
+
+export type VocabularyEdit = {
+  add?: string[];
+  remove?: string[];
+  /** The kind the added words get. */
+  kind?: WordKind | null;
+  set_kind?: { word: string; kind: WordKind | null };
+  /** A spelling fixed: the word keeps its place, kind and history. */
+  rename?: { from: string; to: string };
+};
+
+/**
+ * One edit applied to the list and its meta — the server and the optimistic screen run
+ * the same function. Set semantics hold for every part, so a replay from the outbox is
+ * harmless: a rename whose `from` is gone and `to` is there has already happened.
+ */
+export function applyVocabularyEdit(
+  vocabulary: readonly string[],
+  meta: Readonly<Record<string, WordMeta>>,
+  edit: VocabularyEdit,
+  stamp: { at: string; by: string | null },
+): { vocabulary: string[]; meta: Record<string, WordMeta>; overflow: string[]; conflict: string | null } {
+  let list = [...vocabulary];
+  const next: Record<string, WordMeta> = { ...meta };
+  let conflict: string | null = null;
+
+  if (edit.rename) {
+    const to = edit.rename.to.replace(/\s+/g, " ").trim();
+    const fromKey = entryKey(edit.rename.from);
+    const toKey = entryKey(to);
+    const at = list.findIndex((word) => entryKey(word) === fromKey);
+    if (!toKey || to.length > ENTRY_MAX_LENGTH) conflict = "Так слово не записать";
+    else if (at !== -1 && toKey !== fromKey && list.some((word) => entryKey(word) === toKey)) conflict = `«${to}» уже есть`;
+    else if (at !== -1) {
+      list[at] = to;
+      if (toKey !== fromKey) {
+        next[toKey] = next[fromKey] ?? { kind: null, added_at: null, added_by: null };
+        delete next[fromKey];
+      }
+    }
+  }
+
+  const before = new Set(list.map(entryKey));
+  const merged = mergeEntries(list, edit.add ?? [], edit.remove ?? [], VOCABULARY_MAX);
+  list = merged.list;
+  for (const word of edit.remove ?? []) delete next[entryKey(word)];
+  for (const word of list) {
+    const key = entryKey(word);
+    if (!before.has(key) && !next[key]) next[key] = { kind: edit.kind ?? null, added_at: stamp.at, added_by: stamp.by };
+  }
+
+  if (edit.set_kind) {
+    const key = entryKey(edit.set_kind.word);
+    if (list.some((word) => entryKey(word) === key)) {
+      next[key] = { ...(next[key] ?? { added_at: null, added_by: null }), kind: edit.set_kind.kind };
+    }
+  }
+
+  // meta never outlives its word
+  const kept = new Set(list.map(entryKey));
+  for (const key of Object.keys(next)) if (!kept.has(key)) delete next[key];
+  return { vocabulary: list, meta: next, overflow: merged.overflow, conflict };
 }
 
 /** What the alias field of one person will do with the text typed into it. */

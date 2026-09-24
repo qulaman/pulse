@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
+import { WORD_KINDS } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
 
 /**
@@ -119,6 +120,19 @@ export const BrandPatchSchema = z
  */
 export const DictionarySettingsSchema = z.object({
   dismissed: z.array(z.string()).default([]),
+  /** Suggested words hidden with «×» on «Часто встречается» — stem keys (D-111, words wave). */
+  dismissed_words: z.array(z.string()).default([]),
+});
+
+/**
+ * The meta of one vocabulary word: what it names, who added it and when (D-111). Every
+ * field falls back to null on a bad value instead of failing — one broken entry must not
+ * drop the whole settings to defaults.
+ */
+const WordMetaSchema = z.object({
+  kind: z.enum(WORD_KINDS).nullable().catch(null),
+  added_at: z.string().nullable().catch(null),
+  added_by: z.string().nullable().catch(null),
 });
 
 /** How many hidden lessons are kept — the oldest go first. */
@@ -131,6 +145,8 @@ export const CompanySettingsSchema = z.object({
   parser: ParserSettingsSchema.prefault({}),
   /** Counterparties and site names — STT prompt hints (docs/AI.md §1). */
   vocabulary: z.array(z.string().min(1)).default([]),
+  /** Kind, author and date of each word, keyed by `entryKey` — the screen's, not the prompt's (D-111). */
+  vocabulary_meta: z.record(z.string(), WordMetaSchema).catch({}).default({}),
   /** What «до обеда» means here (D-15); rendered into the parser prompt. */
   conventions: z.array(ConventionSchema).max(40).default(DEFAULT_CONVENTIONS),
   /** Name-matcher thresholds (D-16, docs/AI.md §5) — tuned per company from the gate, no UI. */

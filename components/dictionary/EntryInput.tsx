@@ -21,6 +21,7 @@ export function EntryInput({
   label,
   autoFocus,
   onCancel,
+  onPasteText,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -31,6 +32,8 @@ export function EntryInput({
   autoFocus?: boolean;
   /** Escape, or leaving the field empty. */
   onCancel?: () => void;
+  /** A paste, before it lands in the field: `true` takes it over (a pasted list goes to a preview). */
+  onPasteText?: (text: string) => boolean;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -58,6 +61,9 @@ export function EntryInput({
         enterKeyHint="done"
         autoCapitalize="sentences"
         onChange={(e) => onChange(e.target.value)}
+        onPaste={(e) => {
+          if (onPasteText?.(value + e.clipboardData.getData("text"))) e.preventDefault();
+        }}
         onKeyDown={(e) => {
           if (e.key === "Escape" && onCancel) {
             e.preventDefault();
