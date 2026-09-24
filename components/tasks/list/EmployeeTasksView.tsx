@@ -83,7 +83,7 @@ export function EmployeeTasksView({
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24">
-      <PageHead eyebrow={DATE_LINE.format(now)} title="Мои дела" />
+      <PageHead eyebrow={DATE_LINE.format(now)} title="Мои дела" tone={screen.tone} />
 
       <div className="mt-3">
         <StatusScreen screen={screen} now={now} onNearest={showNearest} />

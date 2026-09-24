@@ -2148,11 +2148,13 @@ select,
   caret-color: var(--accent);
 }
 
-/* ---- the navigation bar and the large title (D-113, components/ui/PageHead.tsx) ------------
-   iOS grammar: a bar on top (back, buttons) and the screen's large title under it. At the
-   top of the page the bar is clear; anything scrolled under it turns it to glass with a
-   hairline; once the large title has gone under it, the small title fades in. Only opacity/transform move; the blur is
-   static (the tab bar's recipe, D-112). */
+/* ---- the screen head: «свет состояния» (D-117) in the bar grammar of D-113 ----------------
+   The screen is lit from above by the colour of its state (the tone the screen already
+   computes for its status card) and the colour belongs to the state alone — the controls
+   are neutral glass. No bar at rest: a tab's large title sits under the notch with its
+   buttons; scrolled, the title leaves with the finger and the sky folds into a horizon — a
+   tinted glass strip with the small title. Static paint everywhere; only opacity/transform
+   move: the crossfade of the sky, the collapse (scroll timeline, thresholds elsewhere). */
 .nav-glass {
   background: color-mix(in srgb, var(--bg) 76%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
@@ -2161,32 +2163,108 @@ select,
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .nav-glass { background: var(--bg); }
 }
+
+/* the sky: fixed behind the page (z -1 under the content), one layer per tone */
+.page-sky {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: -1;
+  height: 460px;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 55%, transparent);
+  mask-image: linear-gradient(180deg, #000 55%, transparent);
+}
+.page-sky-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-in-out);
+  /* a source just above the top edge: a bright core falling off fast reads as light —
+     a wide dim wash of amber alone reads as brown */
+  background:
+    radial-gradient(46% 26% at 28% -6%, color-mix(in oklch, var(--c) 62%, transparent), transparent 100%),
+    radial-gradient(70% 44% at 22% -10%, color-mix(in oklch, var(--c) 30%, transparent), transparent 100%),
+    radial-gradient(55% 34% at 86% -14%, color-mix(in oklch, var(--c) 22%, transparent), transparent 100%),
+    radial-gradient(130% 62% at 50% -26%, color-mix(in oklch, var(--c) 12%, transparent), transparent 100%);
+}
+.page-sky-layer[data-tone="accent"] { --c: var(--accent); }
+.page-sky-layer[data-tone="ok"] { --c: var(--ok); }
+.page-sky-layer[data-tone="warn"] { --c: var(--warn); }
+.page-sky-layer[data-tone="danger"] { --c: var(--danger); }
+.page-sky-layer[data-tone="none"] {
+  --c: #7b8aa0;
+  background: radial-gradient(90% 55% at 20% -10%, color-mix(in oklch, var(--c) 16%, transparent), transparent 72%);
+}
+.page-sky[data-tone="accent"] .page-sky-layer[data-tone="accent"],
+.page-sky[data-tone="ok"] .page-sky-layer[data-tone="ok"],
+.page-sky[data-tone="warn"] .page-sky-layer[data-tone="warn"],
+.page-sky[data-tone="danger"] .page-sky-layer[data-tone="danger"],
+.page-sky[data-tone="none"] .page-sky-layer[data-tone="none"] { opacity: 1; }
+/* film grain: a dark gradient on OLED bands into steps without it */
+.page-sky-grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+/* a lit screen owns the light: the page glow and the status card's own glow step aside */
+body:has(.page-sky) { background: var(--bg); }
+body:has(.page-sky:not([data-tone="none"])) .status-screen {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 72%, var(--surface)), var(--surface) 70%);
+}
+
+/* the bar: back and buttons over the light; the horizon strip once the page scrolls */
 .nav-bar {
+  --c: #7b8aa0;
+  --rest: 0px; /* how far the buttons stand below the bar row while the page is at its top */
+  --glass-from: 0px;
+  --glass-to: 16px;
+  --small-from: 30px;
+  --small-to: 64px;
   position: sticky;
   top: 0;
   z-index: 20;
   margin: 0 -16px;
   padding: env(safe-area-inset-top) 16px 0;
+  pointer-events: none;
 }
+/* a tab's root: no empty row — the large title starts under the notch, the buttons stand in
+   its row and glide up into the bar as the page scrolls */
+.nav-bar[data-compact] {
+  margin-bottom: -44px;
+  --rest: 2px;
+  --glass-from: 8px;
+  --glass-to: 40px;
+  --small-from: 26px;
+  --small-to: 60px;
+}
+.nav-bar[data-compact][data-eyebrow] { --rest: 19px; }
+.nav-bar[data-tone="accent"] { --c: var(--accent); }
+.nav-bar[data-tone="ok"] { --c: var(--ok); }
+.nav-bar[data-tone="warn"] { --c: var(--warn); }
+.nav-bar[data-tone="danger"] { --c: var(--danger); }
 .nav-bar-glass {
   position: absolute;
   inset: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--c) 15%, transparent), color-mix(in srgb, var(--c) 5%, transparent)),
+    color-mix(in srgb, var(--bg) 76%, transparent);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  backdrop-filter: blur(22px) saturate(160%);
+  border-bottom: 1px solid color-mix(in srgb, var(--c) 24%, transparent);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms var(--ease-out), border-color 160ms var(--ease-out);
 }
-.nav-bar[data-glass] .nav-bar-glass { opacity: 1; }
 /* a band stuck right under the bar (the segments of «Задачи», the pinned tiles of
    «Настройки») carries the one hairline of the pair */
 :root[data-band-stuck] .nav-bar-glass { border-bottom-color: transparent; }
 .nav-bar-row {
   position: relative;
   display: flex;
+  height: 52px;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  height: 52px;
 }
 .nav-bar-side {
   display: flex;
@@ -2194,33 +2272,44 @@ select,
   min-width: 0;
   align-items: center;
 }
-.nav-bar-end {
-  justify-content: flex-end;
+.nav-bar-side > * { pointer-events: auto; }
+.nav-bar-end { justify-content: flex-end; }
+.nav-bar-actions {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  transform: translateY(var(--rest));
 }
-/* the small title floats over the middle of the row: it takes no room from the sides while
-   hidden; shown, it keeps clear of a back button and two round buttons */
+/* the small title floats over the middle of the row; shown, it keeps clear of a back
+   button and two round buttons */
 .nav-bar-title {
   position: absolute;
   left: 50%;
   top: 50%;
+  display: flex;
   max-width: calc(100% - 192px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  align-items: center;
+  gap: 7px;
   font-family: var(--font-display);
   font-size: 16px;
   line-height: 20px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  white-space: nowrap;
   opacity: 0;
-  transform: translate(-50%, calc(-50% + 5px));
+  transform: translate(-50%, calc(-50% + 6px));
   pointer-events: none;
-  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
-.nav-bar[data-titled] .nav-bar-title { opacity: 1; transform: translate(-50%, -50%); }
-/* a long way back («Ерлан Байжанов») gives way to the small title, as iOS shortens it */
-.nav-bar[data-titled] .nav-back-label { max-width: 64px; }
+.nav-bar-title-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.nav-bar-dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 24%, transparent), 0 0 8px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.nav-bar[data-tone="none"] .nav-bar-dot { display: none; }
 .nav-back {
   display: inline-flex;
   min-width: 0;
@@ -2230,15 +2319,30 @@ select,
   gap: 1px;
   margin-left: -9px;
   padding: 0 8px 0 2px;
-  color: var(--accent);
+  color: color-mix(in srgb, var(--text) 88%, transparent);
   font-size: 16px;
   line-height: 20px;
   font-weight: 500;
   transition: opacity var(--t-instant) var(--ease-out);
 }
-.nav-back:active { opacity: 0.5; }
+.nav-back:active { opacity: 0.45; }
+/* a long way back gives way to the small title, as iOS shortens it */
+.nav-bar[data-titled] .nav-back-label { max-width: 64px; }
 
-.page-head { padding: 0 2px; }
+/* the words: a date, the large title, the state in its colour, a neutral line */
+.page-head {
+  --c: #93a2b4;
+  --title-from: 8px;
+  --title-to: 56px;
+  position: relative;
+  padding: 0 2px;
+  padding-right: calc(2px + var(--beside, 0px));
+}
+.page-head[data-compact] { --title-from: 0px; --title-to: 44px; }
+.page-head[data-tone="accent"] { --c: var(--accent); }
+.page-head[data-tone="ok"] { --c: var(--ok); }
+.page-head[data-tone="warn"] { --c: var(--warn); }
+.page-head[data-tone="danger"] { --c: var(--danger); }
 .page-head-eyebrow {
   display: flex;
   min-height: 16px;
@@ -2248,7 +2352,7 @@ select,
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--text) 62%, transparent);
 }
 .page-head-title {
   margin-top: 1px;
@@ -2257,7 +2361,34 @@ select,
   font-weight: 700;
   letter-spacing: -0.025em;
   overflow-wrap: anywhere;
+  transform-origin: 0 100%;
 }
+/* a long title shrinks to one line (34 → 26 px, `FitTitle`) and only then wraps */
+/* before the browser has measured (a hard load), a long title ends in «…» instead of running under the buttons */
+.page-head-title[data-fit] { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.page-head-title[data-fit][data-wrap] { white-space: normal; line-height: 32px; }
+.page-head-state {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 15px;
+  line-height: 20px;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--c) 82%, white);
+  transition: color 600ms var(--ease-in-out);
+}
+.page-head[data-tone="none"] .page-head-state { color: var(--text-muted); font-size: 14px; }
+.page-head-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--c);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 24%, transparent), 0 0 12px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.page-head[data-tone="none"] .page-head-dot { display: none; }
 .page-head-sub {
   margin-top: 3px;
   font-size: 14px;
@@ -2265,7 +2396,32 @@ select,
   color: var(--text-muted);
 }
 
-/* the round glass button of the bar: search, «на стену», «+», «⋯» */
+/* the collapse follows the scroll where the browser can (Chrome, Safari 26) */
+@supports (animation-timeline: scroll()) {
+  .page-sky { animation: page-sky-dim linear both; animation-timeline: scroll(root); animation-range: 0px 220px; }
+  .nav-bar-glass { animation: page-head-in linear both; animation-timeline: scroll(root); animation-range: var(--glass-from) var(--glass-to); }
+  .nav-bar-title { animation: nav-title-in linear both; animation-timeline: scroll(root); animation-range: var(--small-from) var(--small-to); }
+  .nav-bar[data-compact] .nav-bar-actions { animation: nav-actions-rise linear both; animation-timeline: scroll(root); animation-range: 0px 44px; }
+  .page-head-title { animation: page-title-out linear both; animation-timeline: scroll(root); animation-range: var(--title-from) var(--title-to); }
+  .page-head-eyebrow, .page-head-state, .page-head-sub { animation: page-words-out linear both; animation-timeline: scroll(root); animation-range: 0px 36px; }
+}
+@keyframes page-sky-dim { from { opacity: 1; } to { opacity: 0.4; } }
+@keyframes page-head-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nav-title-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 6px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@keyframes nav-actions-rise { from { transform: translateY(var(--rest)); } to { transform: translateY(0); } }
+@keyframes page-title-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.92); } }
+@keyframes page-words-out { from { opacity: 1; } to { opacity: 0.15; } }
+/* the thresholds of D-113: where there is no scroll timeline, and under reduced motion (a
+   running animation outranks these rules, so they only speak when nothing animates) */
+.nav-bar[data-glass] .nav-bar-glass { opacity: 1; }
+.nav-bar[data-titled] .nav-bar-title { opacity: 1; transform: translate(-50%, -50%); }
+.nav-bar[data-compact][data-glass] .nav-bar-actions { transform: none; }
+@supports not (animation-timeline: scroll()) {
+  .nav-bar-glass, .nav-bar-title, .nav-bar-actions { transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+}
+
+/* the round glass button of the bar: search, «на стену», «+», «⋯» — a specular edge, a
+   spring on release; no blur of its own (it stands on the horizon glass or on the sky) */
 .head-btn {
   position: relative;
   display: flex;
@@ -2275,30 +2431,43 @@ select,
   width: 38px;
   height: 38px;
   border-radius: 999px;
-  color: color-mix(in srgb, var(--text) 92%, transparent);
-  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 0 0 1px rgba(255, 255, 255, .04);
-  transition:
-    transform var(--t-instant) var(--ease-out),
-    color var(--t-instant) var(--ease-out),
-    background-color var(--t-instant) var(--ease-out);
+  color: color-mix(in srgb, var(--text) 94%, transparent);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .03) 40%, rgba(255, 255, 255, 0) 62%, rgba(255, 255, 255, .06)),
+    color-mix(in srgb, var(--surface-2) 70%, transparent);
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, .30),
+    inset 0 -1px 1px rgba(255, 255, 255, .07),
+    inset 0 0 0 0.5px rgba(255, 255, 255, .12),
+    0 1px 2px rgba(0, 0, 0, .35),
+    0 8px 18px rgba(0, 0, 0, .28);
+  /* let go: the circle springs back past its size and settles */
+  transition: transform 460ms cubic-bezier(.34, 1.56, .64, 1), color var(--t-instant) var(--ease-out);
 }
 /* 44 px to the finger (DESIGN §2), 38 to the eye */
 .head-btn::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; }
-.head-btn:active { transform: scale(0.92); }
+.head-btn:active { transform: scale(0.86); transition: transform 90ms ease-out; }
 .head-btn:disabled { opacity: 0.5; }
 .head-btn[data-on] {
   color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 17%, color-mix(in srgb, var(--surface-2) 70%, transparent));
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 55%),
+    color-mix(in srgb, var(--accent) 22%, color-mix(in srgb, var(--surface-2) 62%, transparent));
 }
 /* the screen's one «create»: a solid accent circle */
 .head-btn[data-tone="accent"] {
   color: var(--bg);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, white), var(--accent) 55%, var(--accent-2));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
+  background:
+    linear-gradient(165deg, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 45%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 88%, white), var(--accent) 55%, var(--accent-2));
+  box-shadow:
+    inset 0 1px 0.5px rgba(255, 255, 255, .55),
+    inset 0 -1px 1px rgba(0, 0, 0, .12),
+    0 1px 2px rgba(0, 0, 0, .3),
+    0 6px 18px color-mix(in srgb, var(--accent) 34%, transparent);
 }
 .head-btn-screen { fill: transparent; transition: fill var(--t-instant) var(--ease-out); }
-.head-btn[data-live] .head-btn-screen { fill: color-mix(in srgb, var(--accent) 26%, transparent); }
+.head-btn[data-live] .head-btn-screen { fill: color-mix(in srgb, var(--accent) 28%, transparent); }
 /* the diode: lit while something is on the office wall — a static glow, only opacity changes */
 .head-btn-led {
   position: absolute;
@@ -2314,7 +2483,9 @@ select,
 }
 .head-btn[data-live] .head-btn-led { opacity: 1; }
 @media (prefers-reduced-motion: reduce) {
-  .nav-bar-glass, .nav-bar-title, .head-btn { transition: none; }
+  .page-sky, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .page-head-title,
+  .page-head-eyebrow, .page-head-state, .page-head-sub { animation: none !important; }
+  .page-sky-layer, .page-head-state, .nav-bar-glass, .nav-bar-title, .nav-bar-actions, .head-btn, .head-btn:active { transition: none; }
 }
 
 /* ---- «Задачи» and «Мои дела» as cards (D-83) ------------------------------------------

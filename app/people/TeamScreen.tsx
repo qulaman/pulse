@@ -50,7 +50,9 @@ export function TeamScreen() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead
         title="Команда"
-        sub={<span className="nums block min-h-[18px] truncate">{summary}</span>}
+        // no status card here: the head says the team's state itself, red when someone is late (D-117)
+        tone={overdue > 0 ? "danger" : undefined}
+        state={<span className="nums">{summary}</span>}
         actions={<HeadButton label="Добавить сотрудника" icon="plus" tone="accent" href="/people/new" />}
       />
 

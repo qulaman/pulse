@@ -158,6 +158,7 @@ export function DirectorTasksView({
       <PageHead
         eyebrow={DATE_LINE.format(now)}
         title="Задачи"
+        tone={screen.tone}
         actions={
           <HeadButton
             label={searchOpen ? "Закрыть поиск" : "Поиск по задачам"}

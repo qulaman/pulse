@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { AppHeader } from "@/components/AppHeader";
 import { NotesReplay } from "@/components/notes/NotesReplay";
+import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { DirectorFab } from "@/components/voice/DirectorFab";
 
@@ -14,7 +15,7 @@ export function DirectorShell({ fullName, companyId, children }: { fullName: str
   return (
     <div className="app-shell flex min-h-dvh flex-col">
       <AppHeader fullName={fullName} companyId={companyId} />
-      {children}
+      <RoleScope role="director">{children}</RoleScope>
       <TabBar role="director" />
       <DirectorFab />
       <NotesReplay />

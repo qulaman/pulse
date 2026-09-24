@@ -41,11 +41,12 @@ export function HeadIcon({ name, size = 20 }: { name: HeadIconName; size?: numbe
 }
 
 /**
- * The round glass button of the navigation bar (D-113): search, «на стену», «+», «⋯». 38 px
- * with a 44 px hit area, the tab bar's glass. `pressed` — a toggle that is on (the search is
- * open); `live` — something is on the office wall right now: the accent LED in the corner
- * lights, like the diode of the remote (D-76 §11); `tone="accent"` — the screen's one
- * «create», a solid accent circle. Only transform on the press (DESIGN §2).
+ * The round glass button of the screen head (D-113, D-117): search, «на стену», «+», «⋯».
+ * 38 px with a 44 px hit area; glass with a specular edge, a spring on release. `pressed` —
+ * a toggle that is on (the search is open); `live` — something is on the office wall right
+ * now: the accent LED in the corner lights, like the diode of the remote (D-76 §11);
+ * `tone="accent"` — the screen's one «create», a solid accent circle. The buttons stay
+ * neutral: the colour of a screen belongs to its state (D-117).
  */
 export function HeadButton({
   label,

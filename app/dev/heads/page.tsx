@@ -1,53 +1,120 @@
+"use client";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useState, type ReactNode } from "react";
 
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
+import type { Tone } from "@/lib/tasks/tone";
 
 const DATE = "четверг, 24 сентября";
 
-const HEADS = {
-  tasks: <PageHead eyebrow={DATE} title="Задачи" actions={<HeadButton label="Поиск" icon="search" />} />,
-  calendar: (
-    <PageHead
-      eyebrow={DATE}
-      title="Календарь"
-      actions={
-        <>
-          <HeadButton label="На стену" icon="tv" live />
-          <HeadButton label="Новое" icon="plus" tone="accent" />
-        </>
-      }
-    />
-  ),
-  search: <PageHead eyebrow={DATE} title="Заметки" actions={<HeadButton label="Закрыть поиск" icon="close" pressed />} />,
-  board: (
-    <PageHead back={{ href: "/dev/heads", label: "Заметки" }} title="План на квартал и длинное имя доски" actions={<HeadButton label="На стену" icon="wall" />} />
-  ),
-  team: <PageHead title="Команда" sub="9 на месте · 3 задачи в работе · 1 просроч." actions={<HeadButton label="Добавить" icon="plus" tone="accent" href="/dev/heads" />} />,
-  settings: <PageHead title="Настройки" />,
-  task: <PageHead bare back={{ href: "/dev/heads", label: "Назад" }} actions={<HeadButton label="Все действия" icon="more" />} />,
-} as const;
+type Variant = {
+  title: string;
+  tone?: Tone;
+  state?: string;
+  sub?: string;
+  eyebrow?: string;
+  back?: { label: string; href: string };
+  bare?: boolean;
+  actions?: ReactNode;
+};
 
-type Key = keyof typeof HEADS;
+const VARIANTS: Record<string, Variant> = {
+  tasks: { title: "Задачи", tone: "warn", eyebrow: DATE, actions: <HeadButton label="Поиск" icon="search" /> },
+  calendar: {
+    title: "Календарь",
+    tone: "accent",
+    eyebrow: DATE,
+    actions: (
+      <>
+        <HeadButton label="Убрать со стены" icon="tv" live />
+        <HeadButton label="Новое мероприятие" icon="plus" tone="accent" />
+      </>
+    ),
+  },
+  team: {
+    title: "Команда",
+    tone: "danger",
+    state: "9 на месте · 3 задачи в работе · 1 просроч.",
+    back: { label: "Назад", href: "/dev/heads" },
+    actions: <HeadButton label="Добавить" icon="plus" tone="accent" />,
+  },
+  mine: { title: "Мои дела", tone: "ok", eyebrow: DATE },
+  settings: { title: "Настройки" },
+  person: {
+    title: "Константин Жумабаевич",
+    sub: "Менеджер по снабжению",
+    back: { label: "Команда", href: "/dev/heads" },
+    actions: <HeadButton label="Показать на экране" icon="tv" />,
+  },
+  task: { title: "", bare: true, back: { label: "Назад", href: "/dev/heads" }, actions: <HeadButton label="Все действия" icon="more" /> },
+};
 
-/** /dev/heads?v=tasks|calendar|search|board|team|settings|task — one screen head over a long page (dev only, D-113). */
-export default async function HeadsSandboxPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const { v } = await searchParams;
-  const key: Key = v && v in HEADS ? (v as Key) : "tasks";
+const TONES: (Tone | "none")[] = ["accent", "ok", "warn", "danger", "none"];
+
+function Sandbox() {
+  const v = useSearchParams().get("v") ?? "tasks";
+  const key = v in VARIANTS ? v : "tasks";
+  const variant = VARIANTS[key];
+  const [override, setOverride] = useState<Tone | "none" | null>(null);
+  const tone = override === "none" ? undefined : (override ?? variant.tone);
   return (
     <main className="mx-auto w-full max-w-lg px-4 pb-24">
-      {HEADS[key]}
+      <PageHead
+        key={key}
+        title={variant.title || undefined}
+        tone={tone}
+        state={variant.state}
+        sub={variant.sub}
+        eyebrow={variant.eyebrow}
+        back={variant.back}
+        bare={variant.bare}
+        actions={variant.actions}
+      />
       <div className="status-screen mt-3 h-[150px] rounded-[22px]" />
       <nav className="mt-4 flex flex-wrap gap-2">
-        {(Object.keys(HEADS) as Key[]).map((k) => (
-          <Link key={k} href={`/dev/heads?v=${k}`} className={`rounded-full px-3 py-1.5 text-[13px] ${k === key ? "bg-accent/20 text-accent" : "bg-surface-2 text-muted"}`}>
+        {Object.keys(VARIANTS).map((k) => (
+          <Link
+            key={k}
+            href={`/dev/heads?v=${k}`}
+            onClick={() => setOverride(null)}
+            className={`rounded-full px-3 py-1.5 text-[13px] ${k === key ? "bg-accent/20 text-accent" : "bg-surface-2 text-muted"}`}
+          >
             {k}
           </Link>
         ))}
       </nav>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[12px] text-muted">тон:</span>
+        {TONES.map((t) => (
+          <button
+            key={t}
+            type="button"
+            data-testid={`tone-${t}`}
+            onClick={() => setOverride(t)}
+            className={`rounded-full px-3 py-1.5 text-[13px] ${(tone ?? "none") === t ? "bg-text/15 text-text" : "bg-surface-2 text-muted"}`}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
       {Array.from({ length: 14 }, (_, i) => (
         <div key={i} className="task-card mt-2 h-[76px] rounded-[18px]" />
       ))}
     </main>
+  );
+}
+
+/**
+ * /dev/heads?v=tasks|calendar|team|mine|settings|person|task — the screen head of D-113 and
+ * D-117 over a long page, with a switch of the state's light (dev only).
+ */
+export default function HeadsSandboxPage() {
+  return (
+    <Suspense>
+      <Sandbox />
+    </Suspense>
   );
 }

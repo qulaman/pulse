@@ -2,34 +2,50 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+import { useTabRole } from "@/components/RoleScope";
 import { backTarget } from "@/components/TabBar";
 import { tabBarRole } from "@/lib/routes";
+import type { Tone } from "@/lib/tasks/tone";
 import { useMe } from "@/lib/tasks/queries";
 
 type Back = { label: string; href?: string; onClick?: () => void; testId?: string };
+type Light = "accent" | "ok" | "warn" | "danger" | "none";
+
+const LIGHTS: Light[] = ["accent", "ok", "warn", "danger", "none"];
+
+/** The state's colour lights the screen; «muted» and «gold» are not states of a screen. */
+function lightOf(tone: Tone | undefined): Light {
+  return tone === "accent" || tone === "ok" || tone === "warn" || tone === "danger" ? tone : "none";
+}
+
+// the server has no layout to measure: the fit waits for the browser
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 /**
- * The head of every screen that has a title (D-113, iOS grammar): a navigation bar on top —
- * «‹ Назад» in the accent on the left, round glass buttons (`HeadButton`) on the right — and
- * the large title under it with an optional eyebrow (the date on the screens of the day) and
- * one live line (a summary, never an explanation).
+ * The head of every screen that has a title — «свет состояния» (D-117) in the bar grammar of
+ * D-113. The screen is lit from above by the colour of its state (`tone` — the one it already
+ * computes for its status card) and the colour belongs to the state alone: «‹ Назад» and the
+ * round `HeadButton`s are neutral glass.
  *
- *   ‹ Команда                            (○)(○)
- *   ЧЕТВЕРГ, 24 СЕНТЯБРЯ
+ *   ЧЕТВЕРГ, 24 СЕНТЯБРЯ                   (○)     ← a tab: no bar row at rest
  *   Задачи
+ *   ● 3 ждут вашего решения                          ← `state`, in the tone's colour
  *
- * The bar sticks to the top. Clear at the top of the page; as soon as anything scrolls under
- * it, it turns to glass (iOS «scroll edge»); once the large title has gone under it, the
- * small title fades in — opacity and transform only. `bare` — the bar alone (the task screen: its title lives in the status
- * screen). The client brand is not here: it lives on the home screens (D-113 §4).
+ * A nested screen keeps the bar row for «‹ Назад» (its own `back`, or one by itself on every
+ * screen that is not a tab's root). Scrolled, the large title leaves with the finger and the
+ * sky folds into a horizon — a tinted glass strip with the small title and the state's dot.
+ * Opacity and transform only; `bare` — the bar alone (the task screen: its title lives in its
+ * status screen). The client brand lives on the home screens (D-113 §4).
  */
 export function PageHead({
   title,
   smallTitle,
   eyebrow,
   back,
+  tone,
+  state,
   sub,
   actions,
   heading,
@@ -46,7 +62,11 @@ export function PageHead({
    * screen with its own «×»).
    */
   back?: Back | false;
-  /** one live line under the title (a summary) */
+  /** the screen's state: the colour of its light (D-117); none — a quiet neutral sky */
+  tone?: Tone;
+  /** the state in words, in its colour — only where no status card below says it */
+  state?: ReactNode;
+  /** one neutral line under the title (a position, a role) */
   sub?: ReactNode;
   /** round `HeadButton`s on the right of the bar */
   actions?: ReactNode;
@@ -58,18 +78,29 @@ export function PageHead({
   const bar = useRef<HTMLDivElement>(null);
   const edge = useRef<HTMLDivElement>(null);
   const titleEnd = useRef<HTMLDivElement>(null);
+  const beside = useRef<HTMLDivElement>(null);
+  const head = useRef<HTMLElement>(null);
   const [glass, setGlass] = useState(false);
   const [titled, setTitled] = useState(false);
 
+  const small = smallTitle ?? (typeof title === "string" ? title : undefined);
+  const auto = useAutoBack(back === undefined);
+  const way = back === false ? undefined : (back ?? auto);
+  // a tab's root: no bar row at rest — the large title starts under the notch
+  const compact = !bare && !way;
+  const light = lightOf(tone);
+
+  // the D-113 thresholds: the fallback where scroll timelines are missing, and the state
+  // under reduced motion
   useEffect(() => {
-    const head = bar.current;
+    const barNode = bar.current;
     const marks = [edge.current, titleEnd.current];
-    if (!head || !marks[0] || !marks[1]) return;
+    if (!barNode || !marks[0] || !marks[1]) return;
     let observer: IntersectionObserver | null = null;
     // the bar's height moves with the safe area (rotation): re-observe with the new margin
     const watch = () => {
       observer?.disconnect();
-      const top = Math.round(head.getBoundingClientRect().height);
+      const top = Math.round(barNode.getBoundingClientRect().height) - (compact ? 44 : 0);
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
@@ -84,39 +115,77 @@ export function PageHead({
     };
     watch();
     const resize = new ResizeObserver(watch);
-    resize.observe(head);
+    resize.observe(barNode);
     return () => {
       resize.disconnect();
       observer?.disconnect();
     };
-  }, []);
+  }, [compact]);
 
-  const small = smallTitle ?? (typeof title === "string" ? title : undefined);
-  const auto = useAutoBack(back === undefined);
-  const way = back === false ? undefined : (back ?? auto);
+  // a tab's buttons stand in the title's row: the title keeps clear of them
+  useIsoLayoutEffect(() => {
+    const side = beside.current;
+    const header = head.current;
+    if (!header) return;
+    if (!compact || !side) {
+      header.style.removeProperty("--beside");
+      return;
+    }
+    const measure = () => header.style.setProperty("--beside", `${Math.ceil(side.getBoundingClientRect().width) + 12}px`);
+    measure();
+    const resize = new ResizeObserver(measure);
+    resize.observe(side);
+    return () => resize.disconnect();
+  }, [compact]);
 
   return (
     <>
-      <div ref={bar} data-nav-bar="" data-glass={glass ? "" : undefined} data-titled={titled ? "" : undefined} className="nav-bar">
-        <div aria-hidden className="nav-bar-glass nav-glass" />
+      <div aria-hidden className="page-sky" data-tone={light}>
+        {LIGHTS.map((key) => (
+          <div key={key} className="page-sky-layer" data-tone={key} />
+        ))}
+        <div className="page-sky-grain" />
+      </div>
+      <div
+        ref={bar}
+        data-nav-bar=""
+        className="nav-bar"
+        data-tone={light}
+        data-compact={compact ? "" : undefined}
+        data-eyebrow={eyebrow ? "" : undefined}
+        data-glass={glass ? "" : undefined}
+        data-titled={titled ? "" : undefined}
+      >
+        <div aria-hidden className="nav-bar-glass" />
         <div className="nav-bar-row">
           <div className="nav-bar-side">{way ? <BackButton back={way} /> : null}</div>
           <div aria-hidden className="nav-bar-title">
-            {small}
+            <span className="nav-bar-dot" />
+            <span className="nav-bar-title-text">{small}</span>
           </div>
-          <div className="nav-bar-side nav-bar-end">{actions}</div>
+          <div className="nav-bar-side nav-bar-end">
+            <div ref={beside} className="nav-bar-actions">
+              {actions}
+            </div>
+          </div>
         </div>
       </div>
       {/* scrolled under the bar: the first page pixel — glass; the end of the title — the small title */}
-      <div ref={edge} aria-hidden className="h-px -mb-px" />
+      <div ref={edge} aria-hidden className="-mb-px h-px" />
       {bare ? null : (
-        <header className="page-head">
+        <header ref={head} className="page-head" data-tone={light} data-compact={compact ? "" : undefined}>
           {eyebrow ? (
             <div className="page-head-eyebrow">
               <span className="min-w-0 truncate">{eyebrow}</span>
             </div>
           ) : null}
-          {heading ?? <h1 className="page-head-title">{title}</h1>}
+          {heading ?? (typeof title === "string" ? <FitTitle>{title}</FitTitle> : <h1 className="page-head-title">{title}</h1>)}
+          {state ? (
+            <p className="page-head-state">
+              <span aria-hidden className="page-head-dot" />
+              <span className="min-w-0 truncate">{state}</span>
+            </p>
+          ) : null}
           {sub ? <p className="page-head-sub">{sub}</p> : null}
         </header>
       )}
@@ -126,17 +195,52 @@ export function PageHead({
 }
 
 /**
- * «‹ Назад» for a screen the tab bar has no tab for (D-113): «Команда», «Магазин», «Данные»,
+ * A large title on one line: too long for the row, it shrinks (never below 26 px) and only
+ * then wraps. Measured before paint; one line keeps the 40 px box, so nothing under it moves.
+ */
+function FitTitle({ children }: { children: string }) {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useIsoLayoutEffect(() => {
+    const el = ref.current;
+    const room = el?.parentElement;
+    if (!el || !room) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      el.removeAttribute("data-wrap");
+      const natural = el.scrollWidth;
+      const width = el.clientWidth;
+      if (natural <= width) return;
+      const px = Math.max(26, Math.floor((34 * width) / natural));
+      el.style.fontSize = `${px}px`;
+      if ((natural * px) / 34 > width) el.setAttribute("data-wrap", "");
+    };
+    fit();
+    const resize = new ResizeObserver(fit);
+    resize.observe(room);
+    return () => resize.disconnect();
+  }, [children]);
+  return (
+    <h1 ref={ref} className="page-head-title" data-fit="">
+      {children}
+    </h1>
+  );
+}
+
+/**
+ * «‹ Назад» for a screen the tab bar has no tab for (D-113 §7): «Команда», «Магазин», «Данные»,
  * «Эфир», the director's «Рейтинг»… It goes back in the history when there is one inside the
- * app, otherwise (opened from a push) to the tab the screen lives in (`backTarget`).
+ * app, otherwise (opened from a push) to the tab the screen lives in (`backTarget`). The role
+ * comes from the layout (`RoleScope`), so the decision — and the layout of the head — is
+ * there on the first paint; the profile is the fallback outside a layout.
  */
 function useAutoBack(wanted: boolean): Back | undefined {
+  const scoped = useTabRole();
   const me = useMe();
   const path = usePathname();
   const router = useRouter();
-  const role = me.data?.role;
+  const role = scoped ?? (me.data ? tabBarRole(me.data.role) : null);
   if (!wanted || !role) return undefined;
-  const target = backTarget(tabBarRole(role), path);
+  const target = backTarget(role, path);
   if (!target) return undefined;
   return {
     label: "Назад",

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { DirectorShell } from "@/components/DirectorShell";
+import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
 import { canManageTeam } from "@/lib/routes";
@@ -31,7 +32,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell flex min-h-dvh flex-col">
-      {children}
+      <RoleScope role="secretary">{children}</RoleScope>
       <TabBar role="secretary" />
     </div>
   );

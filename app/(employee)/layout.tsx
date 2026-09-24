@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/AppHeader";
+import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
 import { isTeamRole, tabBarRole } from "@/lib/routes";
@@ -26,7 +27,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   return (
     <div className="app-shell flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} pointsFor={pointsEnabled ? profile.userId : undefined} />
-      {children}
+      <RoleScope role={tabBarRole(profile.role)}>{children}</RoleScope>
       <TabBar role={tabBarRole(profile.role)} />
     </div>
   );

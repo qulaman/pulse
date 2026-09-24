@@ -128,7 +128,9 @@ export default function ScreenPage() {
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead title="Экран в кабинете" />
+      {/* the wall's receipt lights the screen (D-117): green on the wall, amber when it does not answer;
+          the words are the LCD's */}
+      <PageHead title="Экран в кабинете" tone={receipt.tone === "muted" ? undefined : receipt.tone} />
 
       <Body className="mx-auto mt-4 w-full max-w-[380px]">
         <Lens tone={led} blink={inFlight} />

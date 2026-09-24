@@ -147,6 +147,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
       <PageHead
         eyebrow={DATE_LINE.format(now)}
         title="Календарь"
+        tone={screen.tone}
         actions={
           headExtra || isDirector ? (
             <>
