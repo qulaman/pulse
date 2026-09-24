@@ -7,7 +7,7 @@ import { SLEEP_COLOR } from "@/components/brand/Mascot";
 import { DreamFlight, TOUCHES, type DreamId, DREAMS } from "@/components/pulse/DreamOrbit";
 import { flyChase, MAX_OVERSHOOT, type Chase } from "@/lib/idle/flight";
 import { PeopleField } from "@/components/pulse/PeopleField";
-import type { Load, Orb, Person } from "@/lib/idle/people";
+import type { Member, Pick } from "@/lib/idle/people";
 import { looseSeed } from "@/lib/idle/random";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
 
@@ -65,8 +65,9 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
  * simulates a new flight for every dream (lib/idle/flight.ts). The dust takes the flight to
  * work out its own wake. Nothing runs per frame — after a dream starts, JS sleeps.
  *
- * Under `prefers-reduced-motion` there is no scene at all: it carries no state the director
- * needs, so the right amount of it is none.
+ * Under `prefers-reduced-motion` there is no dream: it carries no state the director needs,
+ * so the right amount of it is none. The team stays, still (D-118): who is at work and what
+ * waits for the director is exactly the state he needs.
  */
 export function IdleScene({
   active,
@@ -75,33 +76,34 @@ export function IdleScene({
   team,
   picked = null,
   onPick,
+  onLook,
 }: {
   /**
    * The screen is at rest: no panel open, nothing in flight — except the recording the
-   * director may have started from an orb of this very screen, which the team outlives.
+   * director may have started from a circle of this very screen, which the team outlives.
    */
   active: boolean;
   /**
    * false — the assistant has something to say (a thought over its head) or a phrase is in
    * flight. The dream stops, because a dream is for a face that is doing nothing; the team
    * stays, because those are the moments it has news — a task landing is exactly when
-   * somebody flies up to become a star.
+   * somebody flies through the face and comes out lit.
    */
   quiet?: boolean;
   only?: DreamId;
-  team?: { people: Person[]; loads: Record<string, Load>; now: number };
-  /** the circle picked on this screen (D-84) — the screen keeps it, the field draws it */
+  team?: { members: Member[]; allHref?: (id: string) => string };
+  /** the idler picked on this screen (D-84) — the screen keeps it, the field draws it */
   picked?: string | null;
-  onPick?: (orb: Orb | null) => void;
+  onPick?: (pick: Pick | null) => void;
+  /** the card of somebody at work opened or closed (D-118): the face looks at him meanwhile */
+  onLook?: (pick: Pick | null) => void;
 }) {
-  const reduced = useReducedMotion();
+  const reduced = useReducedMotion() ?? false;
   const playing = active && !reduced;
   const dreaming = playing && quiet;
   const anchor = useRef<HTMLDivElement>(null);
   const area = useArea(anchor);
   const [dream, setDream] = useState<{ id: DreamId; key: number; seed: number } | null>(null);
-  // where the team stands is settled once per session, not per render
-  const [fieldSeed] = useState(looseSeed);
 
   useEffect(() => {
     if (!dreaming) {
@@ -129,20 +131,21 @@ export function IdleScene({
     <>
       {/* the anchor is the face's own box: the whole scene is measured out from its centre */}
       <div ref={anchor} className="pointer-events-none absolute inset-0" aria-hidden />
-      {playing && area && team ? (
+      {active && area && team ? (
         <PeopleField
-          people={team.people}
-          loads={team.loads}
+          members={team.members}
           hx={area.hx}
           hy={area.hy}
           // the rows stand still, so they may use the room the flight has to leave at the edge
+          wide={area.hx + MARGIN - 6}
           reach={area.hy + MARGIN - 6}
-          seed={fieldSeed}
-          now={team.now}
           dream={dream}
           chase={chase}
           picked={picked}
+          still={reduced}
           onPick={onPick}
+          onLook={onLook}
+          allHref={team.allHref}
         />
       ) : null}
       <RimWake dream={dream} chase={chase} ms={FLIGHT_MS} />

@@ -12,7 +12,7 @@ import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
 import { IdleScene } from "@/components/pulse/IdleScene";
-import { loadsOf } from "@/lib/idle/people";
+import { tasksOf, type Pick } from "@/lib/idle/people";
 import { ConfirmInline, type ConfirmHandle } from "@/components/confirm/ConfirmInline";
 import { entitiesSummary } from "@/components/confirm/format";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
@@ -50,7 +50,7 @@ import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, emptyLanes, hasMessage, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, hasMessage, hasUnread, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { alarmOf } from "@/lib/pulse/mood";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
@@ -143,6 +143,8 @@ export default function PulsePage() {
   const [deskOpen, setDeskOpen] = useState(false);
   // the face is held for the picked person right now: the card drops its buttons (D-84)
   const [held, setHeld] = useState(false);
+  // the card of somebody at work is open on the waiting screen: the face looks at him (D-118)
+  const [looking, setLooking] = useState<Pick | null>(null);
   useEffect(
     () =>
       useIngestStore.subscribe((current) => {
@@ -409,6 +411,8 @@ export default function PulsePage() {
   const restFace: MascotState = mood ?? "sleeping";
   // a picked person wakes the face: it cannot look at anybody with its eyes shut
   const attending = picked !== null && (stage === "idle" || stage === "recording");
+  // the same for the person whose card is open — only while the waiting screen is up
+  const reading = looking !== null && mode === "idle" && stage === "idle" && !phraseInHand;
   // the desk is part of the waiting screen: shown there, and only when there is somebody at it
   const showDesk = hasSecretary && mode === "idle" && !phraseInHand && (stage === "idle" || stage === "recording");
   const asking = deskOpen && showDesk && stage === "idle";
@@ -419,12 +423,12 @@ export default function PulsePage() {
   // asking the secretary, the face brings the cup and looks at the desk (D-85)
   const mascot: MascotState =
     // the cup brought over outranks the news of it: the face takes it, the thought says it
-    confirmFace ?? (handoff ? "serving" : thought ? "processing" : mode === "idle" ? (asking ? "serving" : attending ? "calm" : restFace) : (panelFace ?? awake));
-  // where the face looks: the middle of the picked circle, or the small face at the desk
-  const gaze = attending && picked ? lookAt(picked.x, picked.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
+    confirmFace ?? (handoff ? "serving" : thought ? "processing" : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake));
+  // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
+  const gaze = attending && picked ? lookAt(picked.x, picked.y) : reading && looking ? lookAt(looking.x, looking.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
   // watchful (D-82); never while anything is in flight or said
-  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !asking && !handoff);
+  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !reading && !asking && !handoff);
 
   const onFaceTap = () => {
     // the errand card is out: a tap on the face puts it away, it does not wake the balls
@@ -470,21 +474,29 @@ export default function PulsePage() {
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
   // the secretaries sit at the desk, not among the circles (D-85)
   const secretaries = team.filter((p) => p.role === "secretary");
-  // the waiting screen's own view of the team: who is carrying what right now (D-90)
-  const field = useMemo(
-    () => ({
-      people: team
+  // the waiting screen's own view of the team: who is carrying what right now (D-90), each
+  // task with its stage, its deadline, a question, a refusal and an unread word (D-118)
+  const field = useMemo(() => {
+    const byPerson = tasksOf(
+      (rows ?? []).map((t) => ({
+        id: t.id,
+        assignee_id: t.assignee_id,
+        status: t.status,
+        deadline: t.deadline,
+        title: t.title,
+        question: t.question,
+        decline_reason: t.decline_reason,
+        unread: hasUnread(t, meId),
+      })),
+      now.getTime(),
+    );
+    return {
+      members: team
         .filter((p) => p.role !== "secretary")
-        .map((p) => ({ id: p.id, fullName: p.full_name, alias: p.aliases?.[0] ?? null, available: p.availability === "active" })),
-      loads: loadsOf(
-        (rows ?? []).map((t) => ({ id: t.id, assignee_id: t.assignee_id, status: t.status, deadline: t.deadline, title: t.title, question: t.question, decline_reason: t.decline_reason })),
-        now.getTime(),
-      ),
-      now: now.getTime(),
-    }),
+        .map((p) => ({ id: p.id, fullName: p.full_name, alias: p.aliases?.[0] ?? null, tasks: byPerson[p.id] ?? [] })),
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- team is derived from people.data
-    [people.data, rows, now],
-  );
+  }, [people.data, rows, now, meId]);
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
@@ -555,7 +567,7 @@ export default function PulsePage() {
             <IdleScene
               active={mode === "idle" && (stage === "idle" || stage === "recording")}
               // a face that is looking at somebody is not dreaming
-              quiet={!thought && stage === "idle" && !attending && !asking}
+              quiet={!thought && stage === "idle" && !attending && !reading && !asking}
               team={field}
               picked={picked?.id ?? null}
               onPick={(orb) => {
@@ -563,6 +575,12 @@ export default function PulsePage() {
                 if (orb && !picked && !asking && restFace === "sleeping") setWakeKey((key) => key + 1);
                 setDeskOpen(false);
                 setPicked(orb ? { id: orb.id, name: orb.name, address: orb.address, x: orb.x, y: orb.y } : null);
+              }}
+              onLook={(person) => {
+                // the face wakes up to look at the one whose card is open, as it does for a pick
+                if (person && !picked && !asking && restFace === "sleeping") setWakeKey((key) => key + 1);
+                if (person) setDeskOpen(false);
+                setLooking(person);
               }}
             />
             <MascotLever
@@ -693,7 +711,9 @@ export default function PulsePage() {
               <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} />
             ) : null}
             <AnimatePresence>
-              {thought ? (
+              {/* a person's card is open: it says the same news and stands where the thought
+                  would, so the thought waits (D-118) */}
+              {thought && !reading ? (
                 <ThoughtBubble
                   key={thought.id}
                   text={thought.text}

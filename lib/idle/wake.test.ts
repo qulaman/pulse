@@ -86,14 +86,14 @@ describe("keyframesOfBrushes", () => {
     expect(css).not.toMatch(/color|background|filter/);
   });
 
-  it("gives the ripple on the head its fade, and the star none", () => {
+  it("gives the ripple on the head its fade, and a person none", () => {
     const brushes = [{ t: 4_000, dx: 1, dy: 0, force: 1 }];
     expect(keyframesOfBrushes("x", brushes, MS, "rim")).toContain("opacity:");
-    expect(keyframesOfBrushes("x", brushes, MS, "star")).not.toContain("opacity:");
+    expect(keyframesOfBrushes("x", brushes, MS, "orb")).not.toContain("opacity:");
   });
 
   it("does not run off the end when a brush lands in the last moments", () => {
-    const css = keyframesOfBrushes("x", [{ t: MS - 100, dx: 1, dy: 0, force: 1 }], MS, "star");
+    const css = keyframesOfBrushes("x", [{ t: MS - 100, dx: 1, dy: 0, force: 1 }], MS, "orb");
     const at = [...css.matchAll(/([\d.]+)% \{/g)].map((m) => Number(m[1]));
     expect(Math.max(...at)).toBe(100);
     expect([...at]).toEqual([...at].sort((a, b) => a - b));

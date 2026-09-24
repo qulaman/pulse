@@ -6,7 +6,7 @@ import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/b
 import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import type { DreamId } from "@/components/pulse/DreamOrbit";
 import { IdleScene } from "@/components/pulse/IdleScene";
-import { loadsOf } from "@/lib/idle/people";
+import { tasksOf } from "@/lib/idle/people";
 
 /**
  * The mascot's animation bench (Лаб). Every existing motion of «Капля» in one place,
@@ -362,8 +362,8 @@ const DREAMS: { id: DreamId; title: string; note: string; keys: string }[] = [
 
 /**
  * A made-up company of fifty-two, so the waiting screen can be looked at the way it will
- * actually be seen — a star field over the face and a floor of idlers under it — instead of
- * the four people a dev database happens to hold.
+ * actually be seen — rows of lit circles over the face and rows of idlers under it (D-118) —
+ * instead of the four people a dev database happens to hold.
  */
 const CROWD = (() => {
   const names = ["Марат Оспанов", "Динара Ахметова", "Ерлан Бек", "Тимур Салимов", "Айгуль Сапарова", "Асель Ким", "Нурлан Ким", "Жанна Ли"];
@@ -371,9 +371,8 @@ const CROWD = (() => {
     id: `crowd-${i}`,
     fullName: `${names[i % names.length]!.split(" ")[0]} ${String.fromCharCode(1040 + (i % 32))}.`,
     alias: null,
-    available: true,
   }));
-  // two thirds of the company are carrying something, at every stage a star can be in
+  // two thirds of the company are carrying something, at every stage a circle can be in
   const now = Date.now();
   const stages = ["sent", "accepted", "pending_review", "declined", "rework", "accepted"] as const;
   const rows = people.slice(0, 34).flatMap((person, i) =>
@@ -385,10 +384,12 @@ const CROWD = (() => {
       title: `Задача ${k + 1} для ${person.fullName.split(" ")[0]}`,
       question: i % 11 === 0 && k === 0 ? "А когда?" : null,
       decline_reason: null,
+      unread: i % 9 === 4 && k === 0,
     })),
   );
   // the clock is read once, when the module loads: the bench only needs a plausible «now»
-  return { people, loads: loadsOf(rows, now), now };
+  const byPerson = tasksOf(rows, now);
+  return { members: people.map((person) => ({ ...person, tasks: byPerson[person.id] ?? [] })) };
 })();
 
 const SIZES = [32, 64, 96, 128];
@@ -662,9 +663,10 @@ export function MascotGallery() {
           один раз на старте сна и записывается в keyframes, дальше JS спит. Пометки, мимо которых прошёл полёт,
           вспыхивают. Первый сон — через 2,6 с, полёт 14 с, между снами 5 с; пробуждение гасит сцену за 180 мс. Здесь
           зона сцены — сама карточка, каждый сон закреплён (`only`); в продукте зона равна экрану, а сны идут по кругу.
-          Команда здесь выдуманная, 52 человека: сверху звёзды по стадиям задач (сверхновая — выдана, жёлтая — в работе,
-          зелёная — сдана, красная — вопрос или просрочка), снизу ряды бездельников. Тап по звезде — карточка, тап по
-          кружку — «Записать задачу?».
+          Команда здесь выдуманная, 52 человека: сверху те, у кого есть работа, — такие же кружки, подсвеченные цветом
+          стадии, как в «Задачах», с кольцом (крутится — в работе, дышит — выдана и не принята, замкнуто — сдана,
+          разорвано — отказ) и значком «?», сообщение или «×»; снизу ряды бездельников. Тап по светящемуся кружку — его
+          задачи со ссылками, тап по серому — «Записать задачу?».
         </p>
         <div className="mt-3 flex flex-col gap-4">
           {DREAMS.map((dream) => (

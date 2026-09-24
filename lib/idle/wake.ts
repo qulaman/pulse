@@ -160,33 +160,23 @@ export function brushesOf(chase: Chase, touches: Touch[], x: number, y: number, 
 type Frame = { dt: number; transform: string; opacity?: number; ease?: string };
 
 /** What a person does when the dream goes past him. */
-export type Reaction = "star" | "orb" | "rim";
+export type Reaction = "orb" | "rim";
 
 const round = (n: number) => Math.round(n * 10) / 10;
 
 /**
- * The three reactions, each as the frames of one brush.
+ * The two reactions, each as the frames of one brush.
  *
- * A star **flares**: it is a point of light, and light that is disturbed gets brighter before
- * it settles. An idler **ducks**: he is a body, so he is shoved along the way the figure went
- * past, squashes, and comes back with a wobble. The head gets a **ripple** on its rim — the
- * only thing in this scene the face itself can show, because the face is drawn over it and
- * anything inside the rim is never seen (the same trick the flight through the head uses).
+ * A person **ducks** — idler or at work, since D-118 every one of them is the same circle, a
+ * body: he is shoved along the way the figure went past, squashes, and comes back with a
+ * wobble. The head gets a **ripple** on its rim — the only thing in this scene the face itself
+ * can show, because the face is drawn over it and anything inside the rim is never seen (the
+ * same trick the flight through the head uses).
  *
- * Nothing here touches colour. A colour on this screen is the stage of a task (D-73): if a
+ * Nothing here touches colour. A colour on this screen is the stage of a task (D-118): if a
  * dream could paint somebody, the screen would be lying about the director's own work.
  */
 const SHAPES: Record<Reaction, (brush: Brush) => Frame[]> = {
-  star: (b) => {
-    const force = feel(b.force);
-    const push = round(6 * force);
-    return [
-      { dt: 0, transform: "none", ease: "cubic-bezier(0.2, 0.9, 0.3, 1)" },
-      { dt: 70, transform: `translate(${round(b.dx * push)}px, ${round(b.dy * push)}px) scale(${round(1 + 0.7 * force)})`, ease: "ease-in-out" },
-      { dt: 260, transform: `translate(${round(b.dx * push * 0.4)}px, ${round(b.dy * push * 0.4)}px) scale(${round(1 - 0.1 * force)})`, ease: "ease-out" },
-      { dt: 460, transform: "none" },
-    ];
-  },
   orb: (b) => {
     const force = feel(b.force);
     const push = round(20 * force);

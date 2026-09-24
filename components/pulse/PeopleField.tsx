@@ -1,274 +1,490 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
+import { CrewCard } from "@/components/pulse/CrewCard";
+import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
 import { TOUCHES, type DreamId } from "@/components/pulse/DreamOrbit";
-import { StarCard } from "@/components/pulse/StarCard";
 import { haptic } from "@/lib/haptics";
 import type { Chase } from "@/lib/idle/flight";
-import { peopleField, type Load, type Orb, type Person, type StarStage } from "@/lib/idle/people";
+import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
+import { addressOf, firstNameOf, initialsOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
 
-const TONE: Record<Orb["tone"], string> = {
-  idle: "var(--text-muted)",
-  green: "var(--ok)",
-  yellow: "var(--warn)",
-  red: "var(--danger)",
-};
-
-/** The stage of the task, as the sky paints it (D-73). */
-const STAGE: Record<StarStage, { color: string; beat: string }> = {
-  // handed out and not taken up yet: a supernova — the loudest thing up there, and the first
-  // thing the director sees right after he has given it
-  nova: { color: "var(--accent)", beat: "star-nova" },
-  work: { color: "var(--warn)", beat: "star-twinkle" },
-  review: { color: "var(--ok)", beat: "star-twinkle" },
-  alarm: { color: "var(--danger)", beat: "star-alarm" },
-};
-
-/**
- * The flight through the face, and the fall back down. The trip up is long on purpose: it is
- * three acts — sucked in, worked on, spat out — and each of them needs room to read (D-74).
- */
+/** The trip up is three acts (D-74) and needs room to read; the way back is a calm float. */
 const LAUNCH_MS = 1_700;
-const SINK_MS = 1_400;
-/** The rings live just outside the face — 128 px of it plus a hair (docs/DESIGN.md §3). */
-const RING = 136;
-/** And the mouth is on that rim: near enough the head to be its edge, far enough to be seen. */
+const RETURN_MS = 2_400;
+/** How long the ring stays closed in gold after the director accepts the last task. */
+const DONE_MS = 1_400;
+/** Nobody has touched the screen this long: the rings stop where they are, until a touch. */
+const SLEEP_MS = 180_000;
+/** The mouth is on the rim of the 128 px face, where things can still be seen (D-74 §4). */
 const RIM = 90;
+/** The rings of the swallow live just outside the face. */
+const RING = 136;
+
+type Flight = { up: boolean; from: Seat; to: Seat; look: Look };
+
+/** A person's tasks as one string: equal strings, nothing on his circle has changed. */
+function signOf(tasks: CrewTask[]): string {
+  return tasks.map((t) => `${t.id}~${t.status}~${t.overdue ? 1 : 0}~${t.question ?? ""}~${t.unread ? 1 : 0}~${t.reason ?? ""}~${t.title}`).join("|");
+}
 
 /**
- * The team on the waiting screen (D-91). Two halves with the face between them:
+ * The team on the waiting screen (D-90, D-91; circles since D-118). Two halves with the face
+ * between them, everybody the same circle of the same size:
  *
- * **Above** — everyone who has work on them, as small glowing points. A bigger, brighter,
- * quicker point is a more loaded person; red is overdue. Nobody is named: the top is the
- * volume of work in the air, and it reads at a glance.
+ * **Below** — the idlers, grey, standing in their rows and shivering (D-72). A tap **picks** one
+ * (D-84): the face turns to look at him and the ways to give him a task come out over its head
+ * — the screen owns that card, this layer only says who was picked.
  *
- * **Below** — the idlers, circles with their initials, drifting. Nothing is on them, and a
- * tap **picks** one (D-84): the face turns to look at them and the ways to give them a task
- * come out over its head — the screen owns that card, this layer only says who was picked.
- * The picked circle is ringed, the others step back.
+ * **Above** — the people with work, lit in the colour of the stage of their loudest task (the
+ * colours of «Задачи»), with a ring that says whether the work is moving and a badge when there
+ * is something to read or to settle (components/pulse/CrewCircle.tsx). A tap opens his card —
+ * what he is on, each task a tap away from its own screen — and the face looks at him meanwhile.
  *
- * Between the two — the flight. The moment a task lands on an idler his circle dives into the
- * face and is spat out above as a star; when his last task closes, the star sinks back down.
- * The assistant in the middle is the machine that turns one into the other, and that is the
- * whole story of the screen.
+ * Between the two — the flight. A task lands on an idler: his circle is pulled into the face
+ * and comes out lit above (D-74, without the change of size). The director accepts his last
+ * task: the ring closes in gold for a moment, the light goes out and he floats back down round
+ * the side of the face. The assistant in the middle is the machine that turns one into the
+ * other, and that is the whole story of the screen.
  *
- * And the dream over them is not in an aquarium of its own: it brushes the team (D-77).
+ * The dream over them brushes the team (D-77). Nobody touching the screen for three minutes
+ * stops the rings (the battery of a board left open); `still` — `prefers-reduced-motion` —
+ * shows the same team without any motion at all, since it carries the state of the work.
  */
 export function PeopleField({
-  people,
-  loads,
+  members,
   hx,
   hy,
-  seed,
-  now,
+  wide,
   reach,
   dream,
   chase,
   picked = null,
+  still = false,
   onPick,
+  onLook,
+  allHref,
 }: {
-  people: Person[];
-  loads: Record<string, Load>;
+  members: Member[];
+  /** half the play area, px from the middle of the face */
   hx: number;
   hy: number;
-  seed: number;
-  now: number;
-  /** how far down the rows of idlers may stand — further than the dream is allowed to fly */
+  /** how far out the rows may stand, further than the dream may fly */
+  wide?: number;
   reach?: number;
   /** the dream in the air right now, and the line it flies — the room reacts to it (D-77) */
   dream?: { id: DreamId; key: number } | null;
   chase?: Chase | null;
-  /** the id of the circle picked on this screen; the screen keeps it, this layer draws it */
+  /** the id of the idler picked on this screen; the screen keeps it, this layer draws it */
   picked?: string | null;
-  /** a tap on a circle: that person, or null when the picked one is tapped again */
-  onPick?: (orb: Orb | null) => void;
+  /** no motion at all: the circles, the rings and the badges stand still */
+  still?: boolean;
+  /** a tap on an idler: that person, or null when the picked one is tapped again */
+  onPick?: (pick: Pick | null) => void;
+  /** a lit one's card opened or closed: the face looks at him meanwhile */
+  onLook?: (pick: Pick | null) => void;
+  /** where «Все дела» of a person goes, when not his card on «Команда» */
+  allHref?: (id: string) => string;
 }) {
-  const [opened, setOpened] = useState<Orb | null>(null);
-  // the layout is redone when the team, their day or the screen changes — not on every tick
-  // of the clock; the ten-minute step is there so a deadline going yellow still lands
-  const digest = `${Math.floor(now / 600_000)}|${people.map((p) => `${p.id}:${loads[p.id]?.active ?? 0}:${loads[p.id]?.overdue ?? 0}:${loads[p.id]?.review ?? 0}`).join("|")}`;
-  const orbs = useMemo(
-    () => peopleField({ people, loads, hx, hy, seed, now, reach }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `digest` is the digest of people+loads
-    [digest, hx, hy, seed, reach],
-  );
-
-  // Who has just changed sides. A person does not jump from one half to the other: he flies,
-  // and until he lands he is drawn by the flight instead of by his new home. The comparison
-  // belongs to the render, not to an effect — it is state being adjusted to new data, and an
-  // effect would only get there a frame later, after the jump had already been painted.
-  const [side, setSide] = useState<Map<string, boolean>>(() => new Map(orbs.map((o) => [o.id, o.working])));
-  const [flying, setFlying] = useState<Map<string, { up: boolean }>>(new Map());
-  const moved = orbs.filter((o) => side.has(o.id) && side.get(o.id) !== o.working);
-  if (moved.length || orbs.some((o) => !side.has(o.id))) {
-    setSide(new Map(orbs.map((o) => [o.id, o.working])));
-    if (moved.length) setFlying((current) => new Map([...current, ...moved.map((o) => [o.id, { up: o.working }] as const)]));
+  // ---- the moment of acceptance: gold for a moment, then the circle goes down ---------------
+  // A task the screen saw open and now sees done has just been accepted. It keeps its person
+  // lit in gold for DONE_MS; a done task the screen never saw open is old news and is ignored.
+  const statuses = useMemo(() => new Map(members.flatMap((m) => m.tasks.map((t) => [t.id, t.status] as const))), [members]);
+  const [seen, setSeen] = useState(statuses);
+  const [golden, setGolden] = useState<Set<string>>(() => new Set());
+  // The gold counts in this very render, not only in the one the state update brings: whatever
+  // this render decides — a flight above all — is kept, and without it the accepted person would
+  // read as an idler for one pass, start down, and be sent back up by the next.
+  let gold = golden;
+  if (seen !== statuses) {
+    const accepted = [...statuses].filter(([id, status]) => status === "done" && seen.has(id) && seen.get(id) !== "done").map(([id]) => id);
+    setSeen(statuses);
+    if (accepted.length) {
+      gold = new Set([...golden, ...accepted]);
+      setGolden(gold);
+    }
   }
-
-  // every flight lands: the timer is the only thing here that touches state after the fact
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const goldTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
-    for (const [id, flight] of flying) {
-      if (timers.current.has(id)) continue;
-      const timer = setTimeout(
-        () => {
-          timers.current.delete(id);
-          setFlying((current) => {
-            if (current.get(id)?.up !== flight.up) return current;
-            const next = new Map(current);
+    for (const id of golden) {
+      if (goldTimers.current.has(id)) continue;
+      goldTimers.current.set(
+        id,
+        setTimeout(() => {
+          goldTimers.current.delete(id);
+          setGolden((current) => {
+            const next = new Set(current);
             next.delete(id);
             return next;
           });
-        },
-        flight.up ? LAUNCH_MS : SINK_MS,
+        }, DONE_MS),
       );
-      timers.current.set(id, timer);
     }
-  }, [flying]);
+  }, [golden]);
+
+  // what each circle says right now: a done task counts only during its moment of gold
+  const crew = useMemo(
+    () =>
+      members.map((member) => {
+        const tasks = member.tasks.filter((t) => t.status !== "done" || gold.has(t.id));
+        return { member, tasks, look: lookOf(tasks), sign: signOf(tasks) };
+      }),
+    [members, gold],
+  );
+  const looks = useMemo(() => new Map(crew.map((c) => [c.member.id, c.look])), [crew]);
+
+  // ---- where everybody stands --------------------------------------------------------------
+  const digest = crew.map((c) => `${c.member.id}:${c.member.fullName}:${c.look.busy ? 1 : 0}`).join("|");
+  const layout = useMemo(
+    () => teamField({ people: crew.map((c) => ({ id: c.member.id, fullName: c.member.fullName, busy: c.look.busy })), hx, hy, wide, reach }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `digest` is the digest of who stands where
+    [digest, hx, hy, wide, reach],
+  );
+
+  // Who has just changed halves. Nobody jumps across the face: they fly, and until they land
+  // they are drawn by the flight. The comparison belongs to the render (state adjusted to new
+  // data), not to an effect that would get there a frame after the jump was painted.
+  const [known, setKnown] = useState<{ busy: Map<string, boolean>; seats: Map<string, Seat>; looks: Map<string, Look> } | null>(null);
+  const [flights, setFlights] = useState<Map<string, Flight>>(() => new Map());
+  const [landed, setLanded] = useState<Set<string>>(() => new Set());
+  if (known?.seats !== layout.seats) {
+    if (known && !still) {
+      const started: [string, Flight][] = [];
+      for (const { member, look } of crew) {
+        const was = known.busy.get(member.id);
+        if (was === undefined || was === look.busy) continue;
+        const from = known.seats.get(member.id);
+        const to = layout.seats.get(member.id);
+        // up: the look he lands with; down: the look he leaves with — the gold of the accepted one
+        const flown = look.busy ? look : (known.looks.get(member.id) ?? look);
+        if (from && to) started.push([member.id, { up: look.busy, from, to, look: flown }]);
+      }
+      if (started.length) setFlights((current) => new Map([...current, ...started]));
+    }
+    setKnown({ busy: new Map(crew.map((c) => [c.member.id, c.look.busy])), seats: layout.seats, looks });
+  } else if (known.looks !== looks) {
+    // the same halves, a new stage: remember it, so the way down leaves with the latest look
+    setKnown({ ...known, looks });
+  }
+
+  const flightTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   useEffect(() => {
-    const running = timers.current;
-    return () => running.forEach(clearTimeout);
+    for (const [id, flight] of flights) {
+      const key = `${id}:${flight.up}`;
+      if (flightTimers.current.has(key)) continue;
+      flightTimers.current.set(
+        key,
+        setTimeout(
+          () => {
+            flightTimers.current.delete(key);
+            setFlights((current) => {
+              if (current.get(id)?.up !== flight.up) return current;
+              const next = new Map(current);
+              next.delete(id);
+              return next;
+            });
+            // he lands where his ring starts, so the ring swings in from there
+            setLanded((current) => new Set(current).add(id));
+          },
+          flight.up ? LAUNCH_MS : RETURN_MS,
+        ),
+      );
+    }
+  }, [flights]);
+  useEffect(() => {
+    const flying = flightTimers.current;
+    const gold = goldTimers.current;
+    return () => {
+      flying.forEach(clearTimeout);
+      gold.forEach(clearTimeout);
+    };
   }, []);
 
-  // What the dream does to the room (D-77). The flight and the team are measured from the same
-  // point — the middle of the face — so who it goes past, and when, is known the moment the
-  // flight is. Every reaction is written out as one animation over the whole dream and handed
-  // to the browser, and JS goes back to sleep. The name of every keyframe carries the number of
-  // the dream: these nodes are not remounted between dreams, and an animation whose name has
-  // not changed is never restarted.
+  // ---- deep sleep: a board left open does not spin its rings forever ------------------------
+  const [asleep, setAsleep] = useState(false);
+  useEffect(() => {
+    let timer = setTimeout(() => setAsleep(true), SLEEP_MS);
+    const poke = () => {
+      setAsleep(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => setAsleep(true), SLEEP_MS);
+    };
+    window.addEventListener("pointerdown", poke, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("pointerdown", poke);
+    };
+  }, []);
+
+  // ---- the card of a lit one -----------------------------------------------------------------
+  const [opened, setOpened] = useState<string | null>(null);
+  const openedCrew = opened ? (crew.find((c) => c.member.id === opened && c.look.busy && c.look.ring !== "done") ?? null) : null;
+  const openedSeat = openedCrew ? (layout.seats.get(openedCrew.member.id) ?? null) : null;
+  const closeCard = () => {
+    setOpened(null);
+    onLook?.(null);
+  };
+  // The handlers read the latest screen through a ref, so they never change and a move of one
+  // person re-renders that one person, not the whole team.
+  const latest = useRef({ crew, layout, opened, picked, onPick, onLook });
+  useLayoutEffect(() => {
+    latest.current = { crew, layout, opened, picked, onPick, onLook };
+  });
+  // his last task has just been accepted: there is no card to show any more
+  useEffect(() => {
+    if (opened && !openedCrew) onLook?.(null);
+  }, [opened, openedCrew, onLook]);
+  // A touch anywhere but the card and his own circle puts the card away — and still does what
+  // it touched: the field lives in the box of the face, so a veil under the card could not
+  // cover the screen, and a second tap for everything else would be one tap too many.
+  const card = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!opened) return;
+    const away = (event: PointerEvent) => {
+      const target = event.target as Element | null;
+      if (card.current?.contains(target)) return;
+      // his own circle toggles the card by itself, on its click
+      if (target?.closest(`[data-testid="crew"][data-person="${CSS.escape(opened)}"]`)) return;
+      setOpened(null);
+      latest.current.onLook?.(null);
+    };
+    document.addEventListener("pointerdown", away, true);
+    return () => document.removeEventListener("pointerdown", away, true);
+  }, [opened]);
+  // the scene leaves (the face woke up, a phrase went off): whatever the face was looking at is let go
+  useEffect(
+    () => () => {
+      if (latest.current.opened) latest.current.onLook?.(null);
+    },
+    [],
+  );
+  const tap = useCallback((id: string) => {
+    const { crew, layout, opened, picked, onPick, onLook } = latest.current;
+    const entry = crew.find((c) => c.member.id === id);
+    const seat = layout.seats.get(id);
+    if (!entry || !seat) return;
+    const busy = entry.look.busy;
+    haptic(busy ? [10] : [12, 24, 12]);
+    const pick: Pick = { id, name: firstNameOf(entry.member.fullName), address: addressOf(entry.member), x: seat.x, y: seat.y };
+    if (busy) {
+      // the moment of gold is not a card: the task is already closed
+      if (entry.look.ring === "done") return;
+      const again = opened === id;
+      setOpened(again ? null : id);
+      onLook?.(again ? null : pick);
+      onPick?.(null);
+      return;
+    }
+    if (opened) onLook?.(null);
+    setOpened(null);
+    // picking one does not give him a task by itself: the face turns to him and asks (D-84)
+    onPick?.(picked === id ? null : pick);
+  }, []);
+
+  // ---- what the dream does to the room (D-77) ------------------------------------------------
+  // The flight and the team are measured from the same point — the middle of the face — so who it
+  // goes past, and when, is known the moment the flight is. Every reaction is one animation over
+  // the whole dream; the name carries the number of the dream, because these nodes are not
+  // remounted between dreams and an animation whose name has not changed is never restarted.
   const base = `wake-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const wake = useMemo(() => {
     if (!chase || !dream) return null;
     const css: string[] = [];
     const byId = new Map<string, string>();
-    for (const orb of orbs) {
-      // the drawn size of the thing, not the size of the finger target around it
-      const radius = (orb.working ? orb.starSize * 1.45 : orb.size / 2) + 6;
-      const brushes = brushesOf(chase, TOUCHES[dream.id], orb.x, orb.y, radius);
+    for (const { member, look } of crew) {
+      const seat = layout.seats.get(member.id);
+      if (!seat) continue;
+      // the drawn size of the thing, ring included, not the finger target round it
+      const radius = layout.size / 2 + (look.busy ? RING_OUT : 0) + 6;
+      const brushes = brushesOf(chase, TOUCHES[dream.id], seat.x, seat.y, radius);
       if (!brushes.length) continue;
-      const name = `${base}-${dream.key}-${orb.id.replace(/[^a-zA-Z0-9]/g, "")}`;
-      css.push(keyframesOfBrushes(name, brushes, chase.ms, orb.working ? "star" : "orb"));
-      byId.set(orb.id, `${name} ${chase.ms}ms linear both`);
+      const name = `${base}-${dream.key}-${member.id.replace(/[^a-zA-Z0-9]/g, "")}`;
+      css.push(keyframesOfBrushes(name, brushes, chase.ms, "orb"));
+      byId.set(member.id, `${name} ${chase.ms}ms linear both`);
     }
     return byId.size ? { css: css.join(" "), byId } : null;
-  }, [orbs, chase, dream, base]);
+  }, [crew, layout, chase, dream, base]);
 
-  // picking one does not give him a task by itself: the face turns to him and asks (D-84)
-  const grab = (orb: Orb) => {
-    haptic([12, 24, 12]);
-    onPick?.(picked === orb.id ? null : orb);
-  };
-
-  if (!orbs.length) return null;
+  const box = { w: Math.max(hx, wide ?? hx) * 2, h: Math.max(hy, reach ?? hy) * 2 };
+  const busyCount = crew.filter((c) => c.look.busy).length;
+  if (!crew.length) return null;
   return (
     <div
       className="pointer-events-none absolute inset-0"
       data-testid="people-field"
-      data-stars={orbs.filter((o) => o.working).length}
-      data-idlers={orbs.filter((o) => !o.working).length}
+      data-busy={busyCount}
+      data-idle={crew.length - busyCount}
+      data-still={still ? "" : undefined}
+      data-asleep={asleep ? "" : undefined}
     >
       {wake ? <style>{wake.css}</style> : null}
-      <LookLine orb={orbs.find((o) => o.id === picked && !o.working) ?? null} />
-      {orbs.map((orb) => {
-        const flight = flying.get(orb.id);
-        // somebody mid-flight is busy being thrown across the screen: the dream does not get him
-        if (flight) return <Flight key={`${orb.id}:${flight.up}`} orb={orb} up={flight.up} />;
-        const brush = wake?.byId.get(orb.id);
-        return orb.working ? (
-          <Star key={orb.id} orb={orb} brush={brush} onOpen={() => setOpened(orb)} />
-        ) : (
-          <Idler key={orb.id} orb={orb} brush={brush} caught={picked === orb.id} dimmed={picked !== null && picked !== orb.id} onCatch={() => grab(orb)} />
+      <LookLine seat={picked ? (layout.seats.get(picked) ?? null) : null} size={layout.size} />
+      {crew.map(({ member, tasks, look, sign }) => {
+        const seat = layout.seats.get(member.id);
+        if (!seat || flights.has(member.id)) return null;
+        return (
+          <Seated
+            key={member.id}
+            id={member.id}
+            fullName={member.fullName}
+            tasks={tasks}
+            sign={sign}
+            look={look}
+            x={seat.x}
+            y={seat.y}
+            size={layout.size}
+            hit={layout.spacing - 2}
+            brush={wake?.byId.get(member.id)}
+            fresh={landed.has(member.id)}
+            picked={picked === member.id}
+            dimmed={(picked !== null && picked !== member.id && !look.busy) || (opened !== null && opened !== member.id)}
+            lifted={opened === member.id}
+            onTap={tap}
+          />
         );
       })}
-      {/* the card of a star hangs at the top of the sky, out of the way of the face */}
-      {opened ? (
-        <div className="absolute left-1/2 block" style={{ top: `calc(50% - ${hy}px)`, transform: "translateX(-50%)" }}>
-          <StarCard orb={opened} onClose={() => setOpened(null)} />
-        </div>
+      {[...flights].map(([id, flight]) => {
+        const entry = crew.find((c) => c.member.id === id);
+        return entry ? <FlightOf key={`${id}:${flight.up}`} id={id} fullName={entry.member.fullName} flight={flight} size={layout.size} /> : null;
+      })}
+      <Overflow count={layout.overflow.top} y={-box.h / 2 + 2} x={box.w / 2 - 48} />
+      <Overflow count={layout.overflow.bottom} y={box.h / 2 - 22} x={box.w / 2 - 48} />
+      {openedCrew && openedSeat ? (
+        <CrewCard ref={card} member={{ ...openedCrew.member, tasks: openedCrew.tasks }} seat={openedSeat} box={box} reach={layout.size / 2 + RING_OUT + 6} allHref={allHref?.(openedCrew.member.id)} onClose={closeCard} />
       ) : null}
     </div>
   );
 }
 
 /**
- * A person with work on them: a star whose colour is the stage of the task (D-73) — a
- * supernova for one just handed out, yellow while it is being done, green when it has been
- * handed back, red when something needs the director. A tap says whose it is and what it is;
- * it does nothing else, and that is the point of a sky.
+ * One person in his place. Memoised on what his circle says (`sign`) and plain values, with a
+ * stable handler: when one of fifty gets a task, one re-renders. A neighbour leaving the row
+ * makes room, and the others slide over instead of jumping.
  */
-function Star({ orb, brush, onOpen }: { orb: Orb; brush?: string; onOpen: () => void }) {
-  const { color, beat } = STAGE[orb.load.stage];
-  const size = orb.starSize;
-  // the drawn star is tiny; the finger gets a target it can actually hit
-  // The target is the star plus a margin, deliberately smaller than the 44 px a control gets
-  // (docs/DESIGN.md): a sky of thirty with 44 px targets is a sheet of overlapping buttons,
-  // and the wrong card would open. Here a miss costs a glance, so the smaller target wins.
-  const hit = Math.max(28, Math.min(40, size * 2.9));
-  return (
-    <button
-      type="button"
-      data-testid="star"
-      data-person={orb.id}
-      data-stage={orb.load.stage}
-      onClick={onOpen}
-      aria-label={`${orb.name}: ${orb.load.tasks[0]?.title ?? "в работе"}`}
-      className="pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full"
-      style={{
-        width: hit,
-        height: hit,
-        marginLeft: -hit / 2,
-        marginTop: -hit / 2,
-        transform: `translate(${orb.x}px, ${orb.y}px)`,
-        color,
-        touchAction: "manipulation",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      {/* the flare when the dream goes past (D-77): a layer of its own, because the beat under
-          it is already using the transform */}
-      <span className="block" style={{ animation: brush }}>
-        <span className="block" style={{ animation: `${beat} ${orb.load.stage === "alarm" ? 1_100 : orb.beatMs}ms ease-in-out ${orb.delayMs}ms infinite` }}>
-          <svg width={size * 2.9} height={size * 2.9} viewBox="-10 -10 20 20" style={{ display: "block", pointerEvents: "none" }} aria-hidden>
-            {/* the rays: four long and four short, so it reads as a star from any distance and
-                never as a dot with a halo */}
-            <g style={{ transformOrigin: "0px 0px", animation: `star-rays ${Math.round(orb.beatMs * 0.62)}ms ease-in-out ${orb.delayMs}ms infinite` }}>
-              <path d="M0 -9.5 L0.7 -1 L0 0 L-0.7 -1 Z M0 9.5 L0.7 1 L0 0 L-0.7 1 Z M-9.5 0 L-1 -0.7 L0 0 L-1 0.7 Z M9.5 0 L1 -0.7 L0 0 L1 0.7 Z" fill="currentColor" />
-              <path
-                d="M-4.2 -4.2 L-0.6 -0.6 L0 0 L-0.6 0.6 Z M4.2 4.2 L0.6 0.6 L0 0 L0.6 -0.6 Z M4.2 -4.2 L0.6 -0.6 L0 0 L-0.6 -0.6 Z M-4.2 4.2 L-0.6 0.6 L0 0 L0.6 0.6 Z"
-                fill="currentColor"
-                opacity="0.55"
-              />
-            </g>
-            <circle cx="0" cy="0" r="2.2" fill="currentColor" />
-            {/* a supernova throws a shell: the task has just left, and it shows */}
-            {orb.load.stage === "nova" ? (
-              <circle cx="0" cy="0" r="3.4" fill="none" stroke="currentColor" strokeWidth="1" style={{ transformOrigin: "0px 0px", animation: "star-shell 2.4s ease-out infinite" }} />
-            ) : null}
-          </svg>
+const Seated = memo(
+  function Seated({
+    id,
+    fullName,
+    look,
+    x,
+    y,
+    size,
+    hit,
+    brush,
+    fresh,
+    picked,
+    dimmed,
+    lifted,
+    onTap,
+  }: {
+    id: string;
+    fullName: string;
+    tasks: CrewTask[];
+    sign: string;
+    look: Look;
+    x: number;
+    y: number;
+    size: number;
+    hit: number;
+    brush?: string;
+    fresh: boolean;
+    picked: boolean;
+    dimmed: boolean;
+    lifted: boolean;
+    onTap: (id: string) => void;
+  }) {
+    const name = firstNameOf(fullName);
+    const initials = initialsOf(fullName);
+    const label = look.busy
+      ? look.lead
+        ? `${name}: ${look.lead.title} — ${wordOf(look.lead)}`
+        : `${name}: в работе`
+      : picked
+        ? `${name}: выбран — снять выбор`
+        : `${name}: без задач — дать задачу`;
+    return (
+      <button
+        type="button"
+        data-testid="crew"
+        data-person={id}
+        data-busy={look.busy ? "1" : "0"}
+        data-ring={look.ring}
+        data-picked={picked ? "1" : undefined}
+        aria-label={label}
+        aria-pressed={look.busy ? undefined : picked}
+        onClick={() => onTap(id)}
+        className="crew-hit pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center"
+        style={{
+          width: hit,
+          height: hit,
+          marginLeft: -hit / 2,
+          marginTop: -hit / 2,
+          transform: `translate(${x}px, ${y}px)`,
+          transition: "transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 260ms var(--ease-out)",
+          // the others step back while one is picked or read: the room looks where the face looks
+          opacity: dimmed ? 0.3 : 1,
+          zIndex: lifted ? 30 : undefined,
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
+        {/* the shove when the dream goes past (D-77): a layer of its own, the circle owns the rest */}
+        <span className="crew-anim block" style={{ animation: brush }}>
+          <span className="crew-press block">
+            <span className="block" style={{ animation: lifted ? "crew-lift 240ms var(--ease-out) forwards" : undefined }}>
+              {look.busy ? <CrewCircle id={id} initials={initials} size={size} look={look} fresh={fresh} /> : <IdleCircle id={id} initials={initials} size={size} picked={picked} />}
+            </span>
+          </span>
         </span>
-      </span>
-    </button>
-  );
-}
+        {/* the name of the picked one, whom the face asks about (a card says its own) */}
+        {picked ? (
+          <span
+            className="pointer-events-none absolute left-1/2 block -translate-x-1/2 whitespace-nowrap font-display text-[10px] font-semibold leading-3 text-text"
+            style={{ top: `calc(50% + ${size / 2 + RING_OUT + 3}px)` }}
+          >
+            {name}
+          </span>
+        ) : null}
+      </button>
+    );
+  },
+  (a, b) =>
+    a.sign === b.sign &&
+    a.look.busy === b.look.busy &&
+    a.look.ring === b.look.ring &&
+    a.look.accepted === b.look.accepted &&
+    a.fullName === b.fullName &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.size === b.size &&
+    a.hit === b.hit &&
+    a.brush === b.brush &&
+    a.fresh === b.fresh &&
+    a.picked === b.picked &&
+    a.dimmed === b.dimmed &&
+    a.lifted === b.lifted &&
+    a.onTap === b.onTap,
+);
 
 /**
- * The face's look made visible (D-84): a faint dashed line from the rim of the head to the
- * picked circle — who the face is looking at, and who the task will be for. It fades in once
- * and holds still; the ring on the circle is the only thing that keeps moving.
+ * The face's look made visible (D-84): a faint dashed line from the rim of the head to the picked
+ * circle — who the face is looking at, and who the task will be for. It fades in once and holds
+ * still; the ring on the circle is the only thing that keeps moving.
  */
-function LookLine({ orb }: { orb: Orb | null }) {
-  if (!orb) return null;
-  const length = Math.hypot(orb.x, orb.y) || 1;
+function LookLine({ seat, size }: { seat: Seat | null; size: number }) {
+  if (!seat) return null;
+  const length = Math.hypot(seat.x, seat.y) || 1;
   const from = RIM - 14;
-  const to = length - orb.size / 2 - 10;
+  const to = length - size / 2 - RING_OUT - 8;
   if (to <= from) return null;
-  const ux = orb.x / length;
-  const uy = orb.y / length;
+  const ux = seat.x / length;
+  const uy = seat.y / length;
   return (
     <svg
-      key={orb.id}
+      key={seat.id}
       aria-hidden
       data-testid="look-line"
       className="absolute left-1/2 top-1/2 overflow-visible"
@@ -276,189 +492,122 @@ function LookLine({ orb }: { orb: Orb | null }) {
       height="1"
       style={{ animation: "overlay-in 360ms var(--ease-out) both" }}
     >
-      <line
-        x1={ux * from}
-        y1={uy * from}
-        x2={ux * to}
-        y2={uy * to}
-        stroke="var(--accent)"
-        strokeOpacity="0.5"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeDasharray="1 7"
-      />
+      <line x1={ux * from} y1={uy * from} x2={ux * to} y2={uy * to} stroke="var(--accent)" strokeOpacity="0.5" strokeWidth="2" strokeLinecap="round" strokeDasharray="1 7" />
     </svg>
   );
 }
 
-/** A person with nothing on them: a circle with his initials, drifting, waiting to be caught. */
-function Idler({ orb, brush, caught, dimmed, onCatch }: { orb: Orb; brush?: string; caught: boolean; dimmed: boolean; onCatch: () => void }) {
-  const hit = Math.max(40, orb.size + 10);
-  return (
-    <button
-      type="button"
-      data-testid="orb"
-      data-person={orb.id}
-      data-tone={orb.tone}
-      data-working="0"
-      onClick={onCatch}
-      aria-label={caught ? `${orb.name}: выбран — снять выбор` : `${orb.name}: без задач — дать задачу`}
-      aria-pressed={caught}
-      data-picked={caught ? "1" : undefined}
-      className="pointer-events-auto absolute left-1/2 top-1/2 flex items-center justify-center rounded-full"
-      style={{
-        width: hit,
-        height: hit,
-        marginLeft: -hit / 2,
-        marginTop: -hit / 2,
-        transform: `translate(${orb.x}px, ${orb.y}px)`,
-        // the others step back while one is picked: the room looks where the face looks
-        opacity: dimmed ? 0.38 : 1,
-        transition: "opacity 240ms var(--ease-out)",
-        touchAction: "manipulation",
-        WebkitTapHighlightColor: "transparent",
-      }}
-    >
-      {/* the shove when the dream goes past (D-77): over the drift, which owns the transform
-          under this one */}
-      <span className="block" style={{ animation: brush }}>
-        <span
-          className="relative block"
-          style={
-            {
-              "--orb-dx": `${orb.dx}px`,
-              "--orb-dy": `${orb.dy}px`,
-              animation: `orb-drift ${orb.driftMs}ms ease-in-out ${orb.delayMs}ms infinite alternate`,
-            } as React.CSSProperties
-          }
-        >
-          <span
-            className="flex items-center justify-center rounded-full font-display font-bold"
-            style={{
-              width: orb.size,
-              height: orb.size,
-              fontSize: Math.round(orb.size * 0.36),
-              color: "var(--bg)",
-              // picked: the brand colour — the same one the face looks at it with
-              background: caught ? "var(--accent)" : TONE.idle,
-              transition: "background-color 240ms var(--ease-out)",
-              animation: caught ? "orb-caught 640ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "orb-breathe 5.2s ease-in-out infinite",
-            }}
-          >
-            {orb.initials}
-          </span>
-          {/* the ring of the picked one: it keeps breathing out, a beacon for the face's look */}
-          {caught ? (
-            <>
-              <span aria-hidden className="absolute rounded-full border-2 border-accent" style={{ inset: -5 }} />
-              <span aria-hidden className="absolute rounded-full border-2 border-accent" style={{ inset: -5, animation: "pick-pulse 1.6s ease-out infinite" }} />
-            </>
-          ) : null}
-        </span>
-      </span>
-    </button>
-  );
-}
-
-/**
- * The trip between the two halves (D-74).
- *
- * Up, it is three acts, and each has its own physics, because one even glide reads as nothing:
- *
- *   sucked in   he flinches back first — the wind-up every animator draws before a move — and
- *               is then torn towards the face with acceleration, stretched along the way he is
- *               going. Squash and stretch is the whole reason it reads as suction.
- *   worked on   he is gone inside the head. A ring closes inwards (the breath in) and a spark
- *               shakes itself brighter in the middle. The face is playing `processing` on its
- *               own at that moment — the task has just landed on the board (D-65) — so the
- *               assistant really is chewing it.
- *   spat out    out of the middle towards his star: a hard start, stretched the new way, past
- *               the mark and elastic back onto it, with a shock ring left behind.
- *
- * The two headings are worked out here, in px, and handed to CSS as custom properties, so the
- * stretch is always along the real path; the initials ride a counter-rotation so they stay the
- * right way up. Everything is transform and opacity.
- *
- * Down is one act on purpose: nothing has happened to him, something has *stopped*.
- */
-/** One ring around the face: the only place an effect of the head itself is visible. */
-function Ring({ animation }: { animation: string }) {
+/** A ring round the face: the only place an effect of the head itself can be seen. */
+function Ring({ animation, color }: { animation: string; color: string }) {
   return (
     <span
+      aria-hidden
       className="absolute left-0 top-0 block rounded-full border-2"
-      style={{ width: RING, height: RING, marginLeft: -RING / 2, marginTop: -RING / 2, borderColor: "var(--accent)", opacity: 0, animation }}
+      style={{ width: RING, height: RING, marginLeft: -RING / 2, marginTop: -RING / 2, borderColor: color, opacity: 0, animation }}
     />
   );
 }
 
-function Flight({ orb, up }: { orb: Orb; up: boolean }) {
-  const from = up ? { x: orb.idleX, y: orb.idleY } : { x: orb.starX, y: orb.starY };
-  const to = up ? { x: orb.starX, y: orb.starY } : { x: orb.idleX, y: orb.idleY };
-  const size = up ? orb.size : orb.starSize;
-  const end = up ? orb.starSize / orb.size : orb.size / orb.starSize;
-  const deg = (dx: number, dy: number) => (Math.atan2(dy, dx) * 180) / Math.PI;
-  const inDeg = deg(-from.x, -from.y);
-  const outDeg = deg(to.x, to.y);
-  // Where the mouth is: both the swallow and the spit happen on the rim of the head, not in
-  // its middle — the face is drawn over this layer, so anything that happens at the centre
-  // happens behind it and is never seen. The two points are the path crossing that rim.
+/**
+ * The trip between the halves (D-74, redrawn in D-118).
+ *
+ * Up, three acts: a squat before the jump, pulled into the face and stretched on the way; gone
+ * inside while the rim chews; out of the top of the head, past his new place and elastic back
+ * onto it. He goes in grey and comes out lit — the light comes on inside the head, out of sight,
+ * which is exactly what the face is for — and the ring swings in once he has landed.
+ *
+ * Down, one calm act: the light goes out where he stands and he floats down round the side of
+ * the face, not through it — nothing is being made here, something has stopped.
+ *
+ * The points are worked out here in px and handed to CSS as custom properties; transform and
+ * opacity only.
+ */
+function FlightOf({ id, fullName, flight, size }: { id: string; fullName: string; flight: Flight; size: number }) {
+  const { from, to, up, look } = flight;
+  const initials = initialsOf(fullName);
+  const px = (n: number) => `${n.toFixed(1)}px`;
   const rim = (x: number, y: number) => {
     const len = Math.hypot(x, y) || 1;
-    return { x: Math.round((x / len) * RIM), y: Math.round((y / len) * RIM) };
+    return { x: (x / len) * RIM, y: (y / len) * RIM };
   };
-  const mouthIn = rim(from.x, from.y);
-  const mouthOut = rim(to.x, to.y);
-  return (
-    <span aria-hidden data-testid="orb-flight" data-dir={up ? "up" : "down"} className="absolute left-1/2 top-1/2 block">
-      {up ? (
-        <>
-          {/* Everything the face does while he is inside it has to happen on the rim: the head
-              is drawn over this layer, so a ring smaller than it is a ring nobody sees. */}
-          <Ring animation={`orb-suck ${LAUNCH_MS}ms ease-in both`} />
-          <Ring animation={`orb-chew ${LAUNCH_MS}ms ease-in-out both`} />
-          <Ring animation={`orb-burst ${LAUNCH_MS}ms ease-out both`} />
-        </>
-      ) : null}
-      <span
-        className="absolute left-0 top-0 flex items-center justify-center rounded-full"
-        style={
-          {
-            width: size,
-            height: size,
-            marginLeft: -size / 2,
-            marginTop: -size / 2,
-            background: up ? TONE.idle : STAGE[orb.load.stage].color,
-            "--from-x": `${from.x}px`,
-            "--from-y": `${from.y}px`,
-            "--to-x": `${to.x}px`,
-            "--to-y": `${to.y}px`,
-            "--to-scale": end.toFixed(2),
-            "--in-x": `${mouthIn.x}px`,
-            "--in-y": `${mouthIn.y}px`,
-            "--out-x": `${mouthOut.x}px`,
-            "--out-y": `${mouthOut.y}px`,
-            "--in-deg": `${inDeg.toFixed(1)}deg`,
-            "--out-deg": `${outDeg.toFixed(1)}deg`,
-            animation: `${up ? `orb-launch ${LAUNCH_MS}ms` : `orb-sink ${SINK_MS}ms ease-in-out`} both`,
-          } as React.CSSProperties
-        }
-      >
-        {up ? (
-          <span
-            className="font-display font-bold"
-            style={
-              {
-                fontSize: Math.round(size * 0.36),
-                color: "var(--bg)",
-                // the body is stretched and turned along the path; the letters are not
-                animation: `orb-launch-label ${LAUNCH_MS}ms step-end both`,
-              } as React.CSSProperties
-            }
-          >
-            {orb.initials}
+  const box: CSSProperties = { width: size, height: size, marginLeft: -size / 2, marginTop: -size / 2 };
+  const grey = (
+    <span
+      className="absolute inset-0 flex items-center justify-center rounded-full font-display font-bold"
+      style={{ fontSize: Math.round(size * 0.36), color: "var(--bg)", background: "var(--text-muted)" }}
+    >
+      {initials}
+    </span>
+  );
+
+  if (up) {
+    const mouthIn = rim(from.x, from.y);
+    const mouthOut = rim(to.x, to.y);
+    const vars = {
+      "--from-x": px(from.x),
+      "--from-y": px(from.y),
+      "--wind-x": px(from.x * 1.03),
+      "--wind-y": px(from.y * 1.03 + 4),
+      "--pull-x": px((from.x + mouthIn.x) / 2),
+      "--pull-y": px((from.y + mouthIn.y) / 2),
+      "--in-x": px(mouthIn.x),
+      "--in-y": px(mouthIn.y),
+      "--peek-x": px(mouthOut.x * 0.3),
+      "--peek-y": px(mouthOut.y * 0.3),
+      "--out-x": px(mouthOut.x),
+      "--out-y": px(mouthOut.y),
+      "--near-x": px(mouthOut.x + (to.x - mouthOut.x) * 0.8),
+      "--near-y": px(mouthOut.y + (to.y - mouthOut.y) * 0.8),
+      "--over-x": px(to.x + (to.x - mouthOut.x) * 0.08),
+      "--over-y": px(to.y + (to.y - mouthOut.y) * 0.08),
+      "--to-x": px(to.x),
+      "--to-y": px(to.y),
+    } as CSSProperties;
+    // the lit circle flies without its ring and badge: those come on once he has landed
+    const lit: Look = { ...look, ring: "idle", badge: null, accepted: false };
+    return (
+      <span aria-hidden data-testid="crew-flight" data-dir="up" className="pointer-events-none absolute left-1/2 top-1/2 block">
+        <Ring animation={`orb-suck ${LAUNCH_MS}ms ease-in both`} color="var(--accent)" />
+        <Ring animation={`orb-chew ${LAUNCH_MS}ms ease-in-out both`} color="var(--accent)" />
+        <Ring animation={`orb-burst ${LAUNCH_MS}ms ease-out both`} color={look.tone} />
+        <span className="absolute left-0 top-0 block" style={{ ...box, ...vars, animation: `crew-launch ${LAUNCH_MS}ms both` }}>
+          {grey}
+          <span className="absolute inset-0 block" style={{ animation: `crew-swap-in ${LAUNCH_MS}ms linear both` }}>
+            <CrewCircle id={id} initials={initials} size={size} look={lit} />
           </span>
-        ) : null}
+        </span>
+      </span>
+    );
+  }
+
+  // round the side he is on, level with the face and clear of it
+  const side = { x: (from.x >= 0 ? 1 : -1) * (RING / 2 + 50), y: 12 };
+  const vars = { "--from-x": px(from.x), "--from-y": px(from.y), "--side-x": px(side.x), "--side-y": px(side.y), "--to-x": px(to.x), "--to-y": px(to.y) } as CSSProperties;
+  return (
+    <span aria-hidden data-testid="crew-flight" data-dir="down" className="pointer-events-none absolute left-1/2 top-1/2 block">
+      <span className="absolute left-0 top-0 block" style={{ ...box, ...vars, animation: `crew-return ${RETURN_MS}ms both` }}>
+        {grey}
+        {/* the moment of gold is over: the ring stays closed and still while the light fades */}
+        <span className="absolute inset-0 block" data-still="" style={{ animation: `crew-cool ${RETURN_MS}ms linear both` }}>
+          <CrewCircle id={id} initials={initials} size={size} look={{ ...look, ring: look.ring === "done" ? "closed" : look.ring, badge: null, accepted: false }} />
+        </span>
       </span>
     </span>
+  );
+}
+
+/** More people than places: the rest are counted, and the count opens the whole team. */
+function Overflow({ count, x, y }: { count: number; x: number; y: number }) {
+  if (count <= 0) return null;
+  return (
+    <Link
+      href="/people"
+      aria-label={`Ещё ${count} — вся команда`}
+      data-testid="crew-more"
+      className="pointer-events-auto absolute left-1/2 top-1/2 block rounded-full border border-border bg-surface px-2 py-0.5 font-display text-[11px] font-semibold leading-4 text-muted"
+      style={{ transform: `translate(${x}px, ${y}px)` }}
+    >
+      +{count}
+    </Link>
   );
 }

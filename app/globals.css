@@ -1812,38 +1812,76 @@ h1 { letter-spacing: -0.025em; }
   38%, 92% { transform: scale(1); }
   100% { transform: scale(1); opacity: 0; }
 }
-/* ---- the team on the waiting screen (D-90, two halves in D-91) ----------------------
-   Above the face the people who have work on them, as points of light; below it the idlers,
-   as circles that drift. Give an idler a task and his circle dives through the face and is
-   spat out above as a star; close his last one and the star sinks back home. Transform and
-   opacity only, and everything that differs per person arrives as a custom property. */
-@keyframes star-twinkle {
-  0%, 100% { transform: scale(0.82); opacity: 0.5; }
-  50% { transform: scale(1.12); opacity: 1; }
+/* ---- the team on the waiting screen (D-90, two halves in D-91, circles in D-118) ------------
+   Everybody is the same circle: below the face the idlers, grey, standing in their rows and
+   shivering; above it the people with work, lit in the colour of the stage, with a ring that
+   says whether the work is moving (components/pulse/CrewCircle.tsx). A task lands — the grey
+   circle dives through the face and comes out lit; the last task accepted — the ring closes in
+   gold, the light goes out and the circle floats back down. Transform and opacity only, and
+   everything that differs per person arrives as a custom property. The one thing that runs all
+   the time is the turn of a ring. */
+@media (prefers-reduced-motion: reduce) {
+  .crew-anim { animation: none !important; }
 }
-/* The rays breathe out of step with the star itself, and that is what makes it twinkle rather
-   than merely pulse: a real one glitters because its spikes come and go, not its middle. */
-@keyframes star-rays {
-  0%, 100% { transform: scale(0.7) rotate(-6deg); opacity: 0.55; }
-  50% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+[data-still] .crew-anim { animation: none !important; }
+/* deep sleep: nobody has touched the board for a while, the rings stop where they are */
+[data-asleep] .crew-anim { animation-play-state: paused !important; }
+/* the ring round a circle: a band cut out of whatever paints it */
+.crew-band {
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
 }
-/* a task just handed out: a supernova, the loudest thing in the sky */
-@keyframes star-nova {
-  0%, 100% { transform: scale(1.05); opacity: 0.85; }
-  18% { transform: scale(1.5); opacity: 1; }
-  46% { transform: scale(1.12); opacity: 0.95; }
+/* the press: the circle gives under the finger and springs back */
+.crew-hit .crew-press { transition: transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1); }
+.crew-hit:active .crew-press { transform: scale(0.92); transition-duration: 90ms; }
+/* work in hand: the arc goes round, evenly — a machine running, not a warning */
+@keyframes crew-spin {
+  to { transform: rotate(1turn); }
 }
-/* and the shell it throws */
-@keyframes star-shell {
-  0% { transform: scale(0.3); opacity: 0; }
-  18% { opacity: 0.8; }
-  100% { transform: scale(2.4); opacity: 0; }
+/* handed out, not taken up yet: the ring is whole and breathes */
+@keyframes crew-wait {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.95; }
 }
-/* something needs him: it does not twinkle, it blinks */
-@keyframes star-alarm {
-  0%, 100% { transform: scale(0.9); opacity: 0.55; }
-  40% { transform: scale(1.3); opacity: 1; }
-  60% { transform: scale(1.1); opacity: 0.9; }
+/* handed in: now and then a ring leaves the closed one — «готово, посмотри» */
+@keyframes crew-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  32%, 100% { transform: scale(1.5); opacity: 0; }
+}
+/* the ring comes on after the flight: it swings round into place */
+@keyframes crew-ignite {
+  0% { transform: rotate(-150deg) scale(0.82); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+/* a new stage: the ring fades over */
+@keyframes crew-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+/* accepted: the gold ring flashes out once, and the circle lights up for a moment */
+@keyframes crew-done {
+  0% { transform: scale(1); opacity: 0.95; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+@keyframes crew-glow {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  100% { opacity: 0.35; }
+}
+/* a badge, a tick: in with a small spring */
+@keyframes crew-pop {
+  0% { transform: scale(0); }
+  70% { transform: scale(1.18); }
+  100% { transform: scale(1); }
+}
+/* the one whose card is open stands up out of the crowd */
+@keyframes crew-lift {
+  to { transform: scale(1.1); }
+}
+/* his card comes up next to him */
+@keyframes crew-card {
+  0% { transform: translateY(6px) scale(0.96); opacity: 0; }
+  100% { transform: none; opacity: 1; }
 }
 /* an idler: the slowest breath on the screen, and nothing else */
 @keyframes orb-breathe {
@@ -1864,32 +1902,28 @@ h1 { letter-spacing: -0.025em; }
   35% { transform: scale(1.32); filter: brightness(1.4); }
   100% { transform: scale(1.1); }
 }
-/* The flight up, in three acts (D-74). Act one: he flinches back, then is torn towards the
-   face with acceleration and stretched along the way he is going — squash and stretch is what
-   makes it read as being sucked in. Act two: he is inside, and only the rings and the spark
-   tell what is happening. Act three: out of the middle towards his star, hard, stretched the
-   new way, past the mark and elastically back onto it. */
-@keyframes orb-launch {
-  0% { transform: translate(var(--from-x), var(--from-y)) rotate(var(--in-deg)) scale(1, 1); opacity: 1; animation-timing-function: var(--ease-out); }
-  /* the wind-up: half a step back before the move, the way it is drawn on paper */
-  9% { transform: translate(calc(var(--from-x) * 1.06), calc(var(--from-y) * 1.06)) rotate(var(--in-deg)) scale(0.94, 1.06); animation-timing-function: cubic-bezier(0.7, 0, 0.9, 0.4); }
-  28% { transform: translate(calc(var(--from-x) * 0.5), calc(var(--from-y) * 0.5)) rotate(var(--in-deg)) scale(1.4, 0.64); animation-timing-function: cubic-bezier(0.8, 0, 1, 0.6); }
-  /* swallowed at the rim, where a mouth would be, and not a frame later */
-  38% { transform: translate(var(--in-x), var(--in-y)) rotate(var(--in-deg)) scale(1.75, 0.46); opacity: 1; }
-  43% { transform: translate(0px, 0px) rotate(var(--in-deg)) scale(0.12, 0.12); opacity: 0; }
-  /* act two: he is in there, out of sight. The rings on the rim carry it — orb-suck, orb-chew. */
-  57% { transform: translate(calc(var(--out-x) * 0.3), calc(var(--out-y) * 0.3)) rotate(var(--out-deg)) scale(0.12, 0.12); opacity: 0; animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
-  61% { transform: translate(var(--out-x), var(--out-y)) rotate(var(--out-deg)) scale(1.8, 0.44); opacity: 1; }
-  75% { transform: translate(calc(var(--to-x) * 0.82), calc(var(--to-y) * 0.82)) rotate(var(--out-deg)) scale(calc(var(--to-scale) * 1.9), calc(var(--to-scale) * 0.72)); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
-  /* past his own mark, then back onto it: the spit has force behind it */
-  87% { transform: translate(calc(var(--to-x) * 1.14), calc(var(--to-y) * 1.14)) rotate(var(--out-deg)) scale(calc(var(--to-scale) * 1.15)); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
-  100% { transform: translate(var(--to-x), var(--to-y)) rotate(var(--out-deg)) scale(var(--to-scale)); opacity: 1; }
+/* The flight up, in three acts (D-74, without the change of size since D-118). Act one: a squat
+   before the jump, then he is torn towards the face with acceleration and stretched along the
+   way — squash and stretch is what makes it read as being sucked in; swallowed at the rim,
+   where a mouth would be. Act two: he is inside, and only the rings on the rim tell what is
+   happening — orb-suck, orb-chew. Act three: out of the top of the head, hard, past his new
+   place and elastically back onto it. The points come in px from the field. */
+@keyframes crew-launch {
+  0% { transform: translate(var(--from-x), var(--from-y)) scale(1); opacity: 1; animation-timing-function: var(--ease-out); }
+  9% { transform: translate(var(--wind-x), var(--wind-y)) scale(1.12, 0.88); animation-timing-function: cubic-bezier(0.7, 0, 0.9, 0.4); }
+  28% { transform: translate(var(--pull-x), var(--pull-y)) scale(0.8, 1.26); animation-timing-function: cubic-bezier(0.8, 0, 1, 0.6); }
+  38% { transform: translate(var(--in-x), var(--in-y)) scale(0.62, 1.4); opacity: 1; }
+  43% { transform: translate(0px, 0px) scale(0.2); opacity: 0; }
+  57% { transform: translate(var(--peek-x), var(--peek-y)) scale(0.2); opacity: 0; animation-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1); }
+  61% { transform: translate(var(--out-x), var(--out-y)) scale(0.62, 1.4); opacity: 1; }
+  76% { transform: translate(var(--near-x), var(--near-y)) scale(0.88, 1.14); animation-timing-function: cubic-bezier(0.2, 0, 0.2, 1); }
+  88% { transform: translate(var(--over-x), var(--over-y)) scale(1.06, 0.94); animation-timing-function: cubic-bezier(0.34, 1.4, 0.64, 1); }
+  100% { transform: translate(var(--to-x), var(--to-y)) scale(1); opacity: 1; }
 }
-/* the letters do not tumble: they step from one heading to the other while he is out of sight */
-@keyframes orb-launch-label {
-  0% { transform: rotate(calc(var(--in-deg) * -1)); }
-  50% { transform: rotate(calc(var(--out-deg) * -1)); }
-  100% { transform: rotate(calc(var(--out-deg) * -1)); }
+/* inside the head the grey circle becomes the lit one, out of sight */
+@keyframes crew-swap-in {
+  0%, 49.9% { opacity: 0; }
+  50%, 100% { opacity: 1; }
 }
 /* The breath in: a ring closing on the face while he is pulled into it. It stops at the rim
    of the head rather than at nothing — everything inside the head is hidden behind it. */
@@ -1914,11 +1948,16 @@ h1 { letter-spacing: -0.025em; }
   62% { transform: scale(1.2); opacity: 0.9; }
   100% { transform: scale(2.6); opacity: 0; }
 }
-/* and the way back: no fuss, he simply has nothing on him again */
-@keyframes orb-sink {
-  0% { transform: translate(var(--from-x), var(--from-y)) scale(1); opacity: 1; }
-  55% { transform: translate(calc(var(--to-x) * 0.5), calc(var(--to-y) * 0.5)) scale(calc(var(--to-scale) * 0.6)); opacity: 0.8; }
-  100% { transform: translate(var(--to-x), var(--to-y)) scale(var(--to-scale)); opacity: 1; }
+/* The way back: no fuss — he cools down where he stands and floats down round the side of the
+   face, not through it: nothing is being made here, something has stopped. */
+@keyframes crew-return {
+  0%, 30% { transform: translate(var(--from-x), var(--from-y)); animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1); }
+  66% { transform: translate(var(--side-x), var(--side-y)); animation-timing-function: cubic-bezier(0.45, 0, 0.35, 1); }
+  100% { transform: translate(var(--to-x), var(--to-y)); }
+}
+@keyframes crew-cool {
+  0%, 8% { opacity: 1; }
+  34%, 100% { opacity: 0; }
 }
 
 /* the run: a short bob on every step */
