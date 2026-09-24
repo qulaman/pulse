@@ -34,7 +34,7 @@ export default function NewPersonPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead back={{ href: "/settings?tab=team", label: "Сотрудники" }} title="Новый сотрудник" />
       <div className="mt-5">
         {/* mounted only in the browser, once the roster is in: the ready password is random

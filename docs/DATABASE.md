@@ -57,6 +57,7 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `rating_mode` | `top5 \| full`, дефолт `top5` | D-11 |
 | `delivery_window` | `{from, to}`, дефолт 08:00–21:00 Asia/Aqtobe | D-38 |
 | `secretary` | `escalate_after_min` (дефолт 3), `actions[]` — `{code, label, icon, synonyms}` | D-79 |
+| `dictionary` | `dismissed[]` — уроки «Из ваших записей», спрятанные «×» (`personId:форма`, до 200, пишет `/api/dictionary/misheard`) | D-111 |
 
 Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет `[не построено]`.
 

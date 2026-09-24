@@ -6,6 +6,7 @@ import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
+import { PageHead } from "@/components/ui/PageHead";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
 import { VersionRow } from "@/components/profile/VersionRow";
@@ -23,7 +24,8 @@ async function signOut() {
 }
 
 /**
- * Профиль: who is signed in (the card is the page's heading), the points card for an
+ * Профиль: the large title (D-113), who is signed in (the card, as the account card of
+ * iOS Settings), the points card for an
  * employee, then the short list of everything this person can actually change about
  * themselves. Company configuration is the director's and the secretary's screen (D-104) —
  * here it is one row, not a second settings page.
@@ -37,8 +39,11 @@ export default async function ProfilePage() {
   const pointsEnabled = (company.data?.settings as { points_enabled?: boolean } | null)?.points_enabled === true;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <ProfileCard userId={profile.userId} fullName={profile.fullName} role={profile.role} />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Профиль" />
+      <div className="mt-3">
+        <ProfileCard userId={profile.userId} fullName={profile.fullName} role={profile.role} />
+      </div>
       {director ? null : <PointsCard userId={profile.userId} enabled={pointsEnabled} />}
 
       <h2 className="eyebrow mt-6 px-1">Личное</h2>

@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AppHeader } from "@/components/AppHeader";
 import { DirectorShell } from "@/components/DirectorShell";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
@@ -32,7 +31,6 @@ export async function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role="secretary" />
     </div>

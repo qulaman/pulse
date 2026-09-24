@@ -14,7 +14,7 @@ import { NotesRecorder, type RecorderWords } from "@/components/notes/NotesRecor
 import { Mascot } from "@/components/brand/Mascot";
 import { useAccordion, useMinute, useRevealOpen } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
-import { HeadTrace, PageHead } from "@/components/ui/PageHead";
+import { PageHead } from "@/components/ui/PageHead";
 import { BoardSkeleton } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
@@ -230,9 +230,10 @@ export default function BoardPage() {
     );
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
-        back={{ href: "/notes?tab=boards", label: "Заметки · доски", testId: "board-back" }}
+        back={{ href: "/notes?tab=boards", label: "Заметки", testId: "board-back" }}
+        smallTitle={board.title}
         heading={
           <BoardTitle
             key={board.title}
@@ -393,11 +394,11 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
         }}
         aria-label="Название доски"
         data-testid="board-title-input"
-        className="-ml-2 min-w-0 flex-1 rounded-[10px] bg-surface-2/60 px-2 font-display text-[30px] font-extrabold leading-[36px] tracking-[-0.03em] outline-none"
+        className="-ml-2 mt-px w-[calc(100%+16px)] rounded-[10px] bg-surface-2/60 px-2 font-display text-[34px] font-bold leading-[40px] tracking-[-0.025em] outline-none"
       />
     );
   }
-  // the head's title (D-109): the same face and the pulse trace after the last word
+  // the screen's large title (D-113): the same face, a tap renames
   return (
     <h1 className="page-head-title">
       <button
@@ -408,7 +409,6 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
         className="line-clamp-2 text-left"
       >
         {title}
-        <HeadTrace />
       </button>
     </h1>
   );

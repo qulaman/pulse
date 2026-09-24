@@ -143,7 +143,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
   if (!hydrated) return <CalendarSkeleton />;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
         eyebrow={DATE_LINE.format(now)}
         title="Календарь"

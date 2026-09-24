@@ -60,7 +60,7 @@ export function AdminShop({ me }: { me: Me | undefined }) {
   const taken = takenCounts(allOrders);
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Магазин" />
 
       <Reveal index={0}>

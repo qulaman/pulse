@@ -17,11 +17,8 @@ export default function EtherPage() {
   const empty = !feed.isLoading && !me.isLoading && (feed.data ?? []).length === 0;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead
-        title="Эфир"
-        sub={isDirector ? "Скажи «всем: …» — объявление появится здесь у каждого" : "Объявления директора для всей компании"}
-      />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Эфир" />
 
       {empty ? (
         <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">

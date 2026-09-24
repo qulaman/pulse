@@ -8,8 +8,8 @@ import { PageHead } from "@/components/ui/PageHead";
  */
 export function ShopSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Магазин" sub="Очки за работу превращаются в награды" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Магазин" />
       <SkeletonGroup className="mt-4 space-y-2">
         <Bone h={92} className="rounded-[16px]" />
         {Array.from({ length: 4 }, (_, i) => (

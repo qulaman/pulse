@@ -22,8 +22,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
     },
   );
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <PageHead title="Настройки" sub="Всё здесь — конфигурация компании: код одинаков для всех клиентов" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Настройки" />
       {/* keyed by the tab: a link to another ?tab= from inside the page (the secretary
           section's «карточке человека») opens that tab instead of keeping the old one */}
       <SettingsTabs key={parseSettingsTab(tab)} initialTab={parseSettingsTab(tab)} role={role} />

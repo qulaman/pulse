@@ -47,7 +47,7 @@ export function TeamScreen() {
     : " ";
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead
         title="Команда"
         sub={<span className="nums block min-h-[18px] truncate">{summary}</span>}
