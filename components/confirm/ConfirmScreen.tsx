@@ -118,6 +118,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8">
         <PageHead
           title={`Понял так: ${entitiesSummary(entities)}`}
+          // the draft closes with its own «×» on the right: no «Назад» on the left
+          back={false}
           actions={
             <>
               <Mascot state={sendableCount === countable && countable > 0 ? "happy" : "thinking"} size={40} />
