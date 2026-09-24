@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { errandKeys, secretaryKeys, type ErrandStatus, type SecretaryPerson } from "@/lib/errands/queries";
+import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type ErrandTransition = {
@@ -29,6 +30,8 @@ export function useErrandActions() {
         client_request_id: crypto.randomUUID(),
       });
       if (error) throw new Error(error.message);
+      // «Принято» / «Не выйдет» reach the director now, not on the minute sweep (D-114)
+      kickPush();
       return data;
     },
     onSuccess: () => {
@@ -102,6 +105,7 @@ async function callLink(call: LinkCall) {
             ? await supabase.rpc("errand_result", { p_id: call.id, p_result: call.text, client_request_id })
             : await supabase.rpc("errand_nudge", { p_id: call.id, client_request_id });
   if (error) throw new Error(error.message);
+  kickPush();
   return data;
 }
 

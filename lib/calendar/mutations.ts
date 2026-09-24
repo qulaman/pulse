@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient, type QueryClient, type QueryKey } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { calendarKeys, type CalendarEvent } from "./queries";
@@ -70,6 +71,7 @@ export function useRespondEvent(meId: string | undefined) {
         p_reason: reason ?? undefined,
       });
       if (error) throw new Error(error.message);
+      kickPush();
     },
     onMutate: ({ eventId, status, reason }) => {
       const snapshot = patchEverywhere(queryClient, eventId, (event) => ({
@@ -132,6 +134,7 @@ export function useEditEvent() {
         p_participant_ids: draft.participant_ids,
       });
       if (error) throw new Error(error.message);
+      kickPush();
     },
     onMutate: ({ eventId, draft }) => ({
       snapshot: patchEverywhere(queryClient, eventId, (event) => ({
@@ -163,6 +166,7 @@ export function useDeleteEvent() {
       const supabase = createBrowserSupabase();
       const { error } = await supabase.rpc("delete_event", { p_event: eventId });
       if (error) throw new Error(error.message);
+      kickPush();
     },
     onMutate: ({ eventId }) => ({ snapshot: patchEverywhere(queryClient, eventId, () => null) }),
     // no «Вернуть» on this toast: the notices of the cancellation are already queued

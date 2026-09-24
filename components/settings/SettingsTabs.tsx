@@ -37,6 +37,7 @@ import { Button } from "@/components/ui/Button";
 import { TeamListBone } from "@/components/ui/PageSkeletons";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { usePeople } from "@/lib/people/queries";
+import { usePushHealth } from "@/lib/push/health-query";
 import type { Role } from "@/lib/routes";
 import { useMe } from "@/lib/tasks/queries";
 import { useHeaderHeight } from "@/lib/useHeaderHeight";
@@ -322,6 +323,11 @@ function AppPanel({ director }: { director: boolean }) {
 function TeamPanel({ director }: { director: boolean }) {
   const people = usePeople();
   const me = useMe();
+  const push = usePushHealth();
+  // people who hear about work only by opening Pulse (D-114); the wall has no phone
+  const deaf = (people.data ?? []).filter(
+    (p) => p.is_active && p.role !== "tv" && ["off", "broken"].includes(push.data?.get(p.id)?.state ?? "ok"),
+  ).length;
 
   return (
     <>
@@ -345,10 +351,20 @@ function TeamPanel({ director }: { director: boolean }) {
           <Button size="sm">+ Добавить</Button>
         </Link>
       </div>
+      {deaf > 0 ? (
+        <p className="mt-2 rounded-[12px] border border-danger/40 bg-danger/10 px-3 py-2 text-[13px] leading-[18px] text-danger">
+          {deaf === 1 ? "У 1 человека не работают уведомления" : `У ${deaf} человек не работают уведомления`} — о задачах они узнают, только
+          открыв Pulse. Откройте карточку: там «Прислать проверку».
+        </p>
+      ) : null}
       {people.isLoading ? (
         <TeamListBone />
       ) : (
-        <TeamRoster people={people.data ?? []} me={me.data ? { id: me.data.userId, role: me.data.role } : null} />
+        <TeamRoster
+          people={people.data ?? []}
+          me={me.data ? { id: me.data.userId, role: me.data.role } : null}
+          push={push.data}
+        />
       )}
     </>
   );

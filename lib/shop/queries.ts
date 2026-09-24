@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { kickPush } from "@/lib/push/client";
 import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
@@ -135,7 +136,12 @@ function useShopMutation<TInput>(
 ) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: TInput) => call(input, crypto.randomUUID()),
+    mutationFn: async (input: TInput) => {
+      const result = await call(input, crypto.randomUUID());
+      // the shopkeeper / the buyer hears it now, not on the minute sweep (D-114)
+      kickPush();
+      return result;
+    },
     onSuccess: (_data, input) => {
       void queryClient.invalidateQueries({ queryKey: shopKeys.root });
       void queryClient.invalidateQueries({ queryKey: ["points"] });

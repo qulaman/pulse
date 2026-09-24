@@ -3,6 +3,18 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
+/** The number on the icon (D-114): what waits for this person's hand, asked after each push. */
+function refreshBadge() {
+  if (!("setAppBadge" in self.navigator)) return Promise.resolve();
+  return fetch("/api/push/badge", { credentials: "include" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (!data) return undefined;
+      return data.count > 0 ? self.navigator.setAppBadge(data.count) : self.navigator.clearAppBadge();
+    })
+    .catch(() => undefined);
+}
+
 self.addEventListener("push", (event) => {
   let data = {};
   try {
@@ -17,15 +29,19 @@ self.addEventListener("push", (event) => {
     badge: "/icons/icon-192.png",
     // one bubble per task: a newer word replaces the older one instead of stacking
     tag: data.tag || data.delivery_id || undefined,
-    renotify: Boolean(data.tag),
+    renotify: Boolean(data.tag) && !data.silent,
+    // «тихо» (the fixed policy for good news, the director's own choice): no sound, no buzz —
+    // Android and desktop; iPhone plays what the phone decides
+    silent: Boolean(data.silent),
     data: { url: data.url || "/", delivery_id: data.delivery_id || null, kind: data.kind || null },
-    vibrate: [80, 40, 80],
+    vibrate: data.silent ? undefined : [80, 40, 80],
   };
   // an alarm («вызови охрану», D-99) stays on the screen until it is touched and shakes the
   // phone long enough to be felt through a pocket
   if (data.urgent) {
     options.requireInteraction = true;
     options.renotify = true;
+    options.silent = false;
     options.tag = options.tag || "errand-alarm";
     options.vibrate = [400, 150, 400, 150, 400, 150, 800];
   }
@@ -47,7 +63,7 @@ self.addEventListener("push", (event) => {
         body: JSON.stringify({ delivery_id: data.delivery_id }),
       }).catch(() => undefined)
     : Promise.resolve();
-  event.waitUntil(Promise.all([shown, ack]));
+  event.waitUntil(Promise.all([shown, ack, refreshBadge()]));
 });
 
 self.addEventListener("notificationclick", (event) => {
@@ -62,7 +78,9 @@ self.addEventListener("notificationclick", (event) => {
         credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ delivery_id: info.delivery_id }),
-      }).catch(() => undefined),
+      })
+        .then(() => refreshBadge())
+        .catch(() => undefined),
     );
     return;
   }
@@ -77,4 +95,47 @@ self.addEventListener("notificationclick", (event) => {
       return self.clients.openWindow(url);
     }),
   );
+});
+
+// The browser renewed (or the push service dropped) the subscription: register the new one at
+// once, so the person keeps getting pushes without opening the app (D-114).
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const old = event.oldSubscription || null;
+      let sub = event.newSubscription || null;
+      if (!sub && old && old.options && old.options.applicationServerKey) {
+        sub = await self.registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: old.options.applicationServerKey,
+        });
+      }
+      if (!sub) return;
+      const json = sub.toJSON();
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          endpoint: json.endpoint,
+          keys: json.keys,
+          user_agent: self.navigator.userAgent.slice(0, 300),
+          replaces: old ? old.endpoint : undefined,
+        }),
+      });
+    })().catch(() => undefined),
+  );
+});
+
+// The app opened a task (or the person read it there): its bubbles leave the shade.
+self.addEventListener("message", (event) => {
+  const msg = event.data || {};
+  if (msg.type === "clear" && msg.tag) {
+    event.waitUntil(
+      self.registration
+        .getNotifications({ tag: msg.tag })
+        .then((list) => list.forEach((n) => n.close()))
+        .then(() => refreshBadge()),
+    );
+  }
 });

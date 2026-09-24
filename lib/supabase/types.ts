@@ -718,16 +718,23 @@ export type Database = {
         Row: {
           acted_at: string | null
           attempts: number
+          category: string | null
           channel: Database["public"]["Enums"]["delivery_channel"]
+          claimed_at: string | null
           company_id: string
           created_at: string
           deliver_after: string
+          digest_id: string | null
           event_kind: string
+          held: string | null
           id: string
           last_error: string | null
           meta: Json
+          mode: string
+          private: boolean
           seen_at: string | null
           sent_at: string | null
+          silent: boolean
           status: Database["public"]["Enums"]["delivery_status"]
           task_id: string | null
           tier: number
@@ -736,16 +743,23 @@ export type Database = {
         Insert: {
           acted_at?: string | null
           attempts?: number
+          category?: string | null
           channel?: Database["public"]["Enums"]["delivery_channel"]
+          claimed_at?: string | null
           company_id: string
           created_at?: string
           deliver_after?: string
+          digest_id?: string | null
           event_kind: string
+          held?: string | null
           id?: string
           last_error?: string | null
           meta?: Json
+          mode?: string
+          private?: boolean
           seen_at?: string | null
           sent_at?: string | null
+          silent?: boolean
           status?: Database["public"]["Enums"]["delivery_status"]
           task_id?: string | null
           tier?: number
@@ -754,16 +768,23 @@ export type Database = {
         Update: {
           acted_at?: string | null
           attempts?: number
+          category?: string | null
           channel?: Database["public"]["Enums"]["delivery_channel"]
+          claimed_at?: string | null
           company_id?: string
           created_at?: string
           deliver_after?: string
+          digest_id?: string | null
           event_kind?: string
+          held?: string | null
           id?: string
           last_error?: string | null
           meta?: Json
+          mode?: string
+          private?: boolean
           seen_at?: string | null
           sent_at?: string | null
+          silent?: boolean
           status?: Database["public"]["Enums"]["delivery_status"]
           task_id?: string | null
           tier?: number
@@ -792,6 +813,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_prefs: {
+        Row: {
+          company_id: string
+          prefs: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          prefs?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          prefs?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -1005,9 +1047,15 @@ export type Database = {
           auth: string
           company_id: string
           created_at: string
+          enabled: boolean
           endpoint: string
           id: string
+          label: string | null
+          last_error: string | null
+          last_error_at: string | null
+          last_ok_at: string | null
           p256dh: string
+          updated_at: string
           user_agent: string | null
           user_id: string
         }
@@ -1015,9 +1063,15 @@ export type Database = {
           auth: string
           company_id: string
           created_at?: string
+          enabled?: boolean
           endpoint: string
           id?: string
+          label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_ok_at?: string | null
           p256dh: string
+          updated_at?: string
           user_agent?: string | null
           user_id: string
         }
@@ -1025,9 +1079,15 @@ export type Database = {
           auth?: string
           company_id?: string
           created_at?: string
+          enabled?: boolean
           endpoint?: string
           id?: string
+          label?: string | null
+          last_error?: string | null
+          last_error_at?: string | null
+          last_ok_at?: string | null
           p256dh?: string
+          updated_at?: string
           user_agent?: string | null
           user_id?: string
         }
@@ -1717,6 +1777,10 @@ export type Database = {
         Returns: Json
       }
       can_see_event: { Args: { p_event: string }; Returns: boolean }
+      claim_deliveries: {
+        Args: { p_limit?: number }
+        Returns: Database["public"]["Tables"]["notification_deliveries"]["Row"][]
+      }
       cancel_shop_order: {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
@@ -1755,6 +1819,8 @@ export type Database = {
       }
       delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      director_day_summaries_due: { Args: { p_now?: string }; Returns: number }
+      director_digests_due: { Args: { p_now?: string }; Returns: number }
       edit_event: {
         Args: {
           p_body?: string
@@ -1864,7 +1930,22 @@ export type Database = {
       }
       notes_due_reminders: { Args: { p_now?: string }; Returns: number }
       notes_purge_trash: { Args: { p_now?: string }; Returns: number }
+      overdue_alerts_due: { Args: { p_now?: string }; Returns: number }
+      publish_due_scheduled: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
+      push_health: {
+        Args: never
+        Returns: {
+          devices: number
+          enabled_devices: number
+          last_error: string | null
+          last_error_at: string | null
+          last_ok_at: string | null
+          last_seen_at: string | null
+          no_device_at: string | null
+          user_id: string
+        }[]
+      }
       reassign_task: {
         Args: {
           client_request_id?: string
@@ -1894,6 +1975,7 @@ export type Database = {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
       }
+      set_notify_prefs: { Args: { p_prefs: Json }; Returns: Json }
       set_event_participants: {
         Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
         Returns: undefined
@@ -2006,6 +2088,7 @@ export type Database = {
         Args: { p_company: string; p_guest_minutes?: number }
         Returns: number
       }
+      unseen_task_alerts_due: { Args: { p_now?: string }; Returns: number }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
       visits_due_expiry: { Args: { p_now?: string }; Returns: number }

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { use } from "react";
 
 import { LoginCard } from "@/components/people/LoginCard";
+import { PersonPushCard } from "@/components/people/PersonPushCard";
 import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
@@ -95,6 +96,8 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
               footer={canResetLogin(editor, p) ? <LoginCard person={p} /> : null}
             />
           </div>
+          {/* does their phone hear the work (D-114): the truth and «Прислать проверку», no switches */}
+          {p.is_active && p.role !== "tv" ? <PersonPushCard userId={p.id} /> : null}
         </>
       )}
     </main>
