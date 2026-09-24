@@ -1,18 +1,18 @@
 "use client";
 
-import { useIsMutating, useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useSendQueue } from "@/components/OfflineBanner";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
-import { applyUpdate, hasUnsaved, isTyping, takeMark, useUpdateRequest } from "@/lib/update/client";
+import { applyUpdate, fetchServerVersion, hasUnsaved, isTyping, takeMark, useUpdateRequest } from "@/lib/update/client";
 import { useServerVersion, versionKey } from "@/lib/update/queries";
+import { useHydrated } from "@/lib/useHydrated";
 import {
   BUILD,
   LONG_HIDE_MS,
-  RESUME_WINDOW_MS,
   RETRY_AFTER_FAIL_MS,
   looksLikeStaleBuild,
   updateAction,
@@ -21,10 +21,8 @@ import {
   versionStatus,
 } from "@/lib/version";
 
-/** Drafts come and go without telling anyone: while an update is due, look again this often. */
+/** While a decision waits on unsaved work (a tap, a required update), look at the page this often. */
 const BUSY_POLL_MS = 1_500;
-
-const noSubscribe = () => () => {};
 
 /**
  * The phone is on the server's build, or it knows it is not (D-115). One line at the top —
@@ -43,17 +41,42 @@ export function AppUpdate() {
   const mutating = useIsMutating();
   const requested = useUpdateRequest((state) => state.requested);
   const request = useUpdateRequest((state) => state.request);
-
-  const [unsaved, setUnsaved] = useState(false);
-  const [typing, setTyping] = useState(false);
-  const [freshResume, setFreshResume] = useState(false);
+  const cancel = useUpdateRequest((state) => state.cancel);
   const [recentlyFailed, setRecentlyFailed] = useState(false);
+  const failed = useRef(false);
 
   // the server drew nothing here; hydrate the same even if an answer is already cached
-  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
+  const hydrated = useHydrated();
   // offline, nothing can be checked or fetched: a reload would open a dead page
   const status = hydrated && queue.isOnline ? versionStatus(BUILD, server.data) : "unknown";
   const due = status === "outdated" || status === "required";
+
+  // what a reload would lose is read from the page in the very render that decides — never
+  // a value a timer left behind; the tick only re-reads while the decision can turn on it
+  const watching = due && (requested || status === "required");
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!watching) return;
+    const timer = setInterval(() => setTick((n) => n + 1), BUSY_POLL_MS);
+    return () => clearInterval(timer);
+  }, [watching]);
+  const busy = due && (mutating > 0 || hasUnsaved());
+
+  const action = updateAction({
+    status,
+    busy,
+    typing: due && isTyping(),
+    kiosk,
+    requested,
+    // the quiet update after a long absence is decided once, on the return (below)
+    freshResume: false,
+    recentlyFailed,
+  });
+
+  // a tap is for this update only
+  useEffect(() => {
+    if (status === "current" && requested) cancel();
+  }, [status, requested, cancel]);
 
   // the page after an update says how it went (read once: StrictMode runs effects twice)
   const outcome = useRef<ReturnType<typeof updateOutcome> | undefined>(undefined);
@@ -66,6 +89,7 @@ export function AppUpdate() {
         toast(`Обновил до версии ${versionLabel(BUILD)}`);
       } else {
         toast("Не получилось обновить. Попробую позже");
+        failed.current = true;
         setRecentlyFailed(true);
       }
     }, 0);
@@ -74,49 +98,47 @@ export function AppUpdate() {
 
   useEffect(() => {
     if (!recentlyFailed) return;
-    const timer = setTimeout(() => setRecentlyFailed(false), RETRY_AFTER_FAIL_MS);
+    const timer = setTimeout(() => {
+      failed.current = false;
+      setRecentlyFailed(false);
+    }, RETRY_AFTER_FAIL_MS);
     return () => clearTimeout(timer);
   }, [recentlyFailed]);
 
-  // a return after a long time away: the session is over, a reload surprises nobody
+  // back after a long time away: the session is over, a reload surprises nobody — asked
+  // once, with a fresh answer and the page as it is now; missed, it stays a line
   useEffect(() => {
+    if (kiosk) return;
     let hiddenAt: number | null = null;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
         hiddenAt = Date.now();
         return;
       }
-      if (hiddenAt !== null && Date.now() - hiddenAt >= LONG_HIDE_MS) {
-        setFreshResume(true);
-        clearTimeout(timer);
-        timer = setTimeout(() => setFreshResume(false), RESUME_WINDOW_MS);
-      }
+      const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
       hiddenAt = null;
+      if (away < LONG_HIDE_MS || !onlineManager.isOnline()) return;
+      void queryClient
+        .fetchQuery({ queryKey: versionKey, queryFn: fetchServerVersion, staleTime: 0, networkMode: "always", retry: false })
+        .then((answer) => {
+          const quiet = updateAction({
+            status: versionStatus(BUILD, answer),
+            busy: queryClient.isMutating() > 0 || hasUnsaved(),
+            typing: isTyping(),
+            kiosk: false,
+            requested: false,
+            freshResume: true,
+            recentlyFailed: failed.current,
+          });
+          if (quiet === "apply") void applyUpdate();
+        })
+        .catch(() => undefined);
     };
     document.addEventListener("visibilitychange", onVisibility);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      clearTimeout(timer);
-    };
-  }, []);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [kiosk, queryClient]);
 
-  // what a reload would lose is only worth watching while an update is due
-  useEffect(() => {
-    if (!due) return;
-    const read = () => {
-      setUnsaved(hasUnsaved());
-      setTyping(isTyping());
-    };
-    const first = setTimeout(read, 0);
-    const timer = setInterval(read, BUSY_POLL_MS);
-    return () => {
-      clearTimeout(first);
-      clearInterval(timer);
-    };
-  }, [due]);
-
-  // an old build's own errors mean the server has moved on: ask now, not in ten minutes
+  // an old build's own errors mean the server may have moved on: ask now, not in ten minutes
   useEffect(() => {
     let last = 0;
     const check = (message: string) => {
@@ -136,16 +158,6 @@ export function AppUpdate() {
       window.removeEventListener("unhandledrejection", onRejection);
     };
   }, [queryClient]);
-
-  const action = updateAction({
-    status,
-    busy: unsaved || mutating > 0,
-    typing,
-    kiosk,
-    requested,
-    freshResume,
-    recentlyFailed,
-  });
 
   useEffect(() => {
     if (action === "apply") void applyUpdate();

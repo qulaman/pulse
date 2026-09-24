@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { MIN_RECORDING_MS } from "@/lib/store/ingest";
+import { useUpdateHold } from "@/lib/update/client";
 import { createRecorder, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
 
 import { firstLine } from "./list";
@@ -66,6 +67,9 @@ export function useDictation(
   const [latched, setLatched] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [busy, setBusy] = useState<ReadonlySet<string>>(() => new Set());
+  // a recording, one on its way to the phone's store, or one that failed to get there lives
+  // only in this page: an app update waits (D-115). From «transcribing» on it is in Storage.
+  useUpdateHold(stage === "recording" || stage === "saving" || stage === "failed");
 
   const recorder = useRef<Recorder | null>(null);
   const starting = useRef<Promise<boolean>>(Promise.resolve(false));

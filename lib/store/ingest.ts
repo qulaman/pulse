@@ -693,9 +693,10 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
 
 // A phrase on its way — being recorded, uploaded, heard, parsed, or waiting on the board —
 // lives only in this page's memory: an app update waits until it is sent or dropped (D-115).
+// «question» is a finished exchange (see startVoice), not work in progress.
 let releaseUpdateHold: (() => void) | null = null;
 useIngestStore.subscribe(({ stage }) => {
-  const busy = stage !== "idle" && stage !== "done";
+  const busy = stage !== "idle" && stage !== "done" && stage !== "question";
   if (busy && !releaseUpdateHold) releaseUpdateHold = holdUpdate();
   if (!busy && releaseUpdateHold) {
     releaseUpdateHold();

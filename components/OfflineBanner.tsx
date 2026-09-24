@@ -9,9 +9,14 @@ import { isNetworkError } from "@/lib/net";
 const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
 const online = () => onlineManager.isOnline();
 
+/** Only the network, as the mutation queue sees it. */
+export function useOnline(): boolean {
+  return useSyncExternalStore(subscribe, online, () => true);
+}
+
 /** The network and the taps waiting for it; while `shown`, the top line belongs to this banner. */
 export function useSendQueue(): { isOnline: boolean; paused: number; shown: boolean } {
-  const isOnline = useSyncExternalStore(subscribe, online, () => true);
+  const isOnline = useOnline();
   // taps made without network wait in the mutation cache (QueryProvider, networkMode offlineFirst)
   const paused = useMutationState({
     filters: { status: "pending" },

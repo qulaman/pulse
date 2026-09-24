@@ -14,10 +14,12 @@ function git(args: string): string {
  * workers, so nothing here may read the clock: a Date.now() would give the client and the
  * server bundles different ids, and the «new version» line would never go away. The id is
  * the Vercel deployment — a redeploy or a rollback changes it exactly as it changes what
- * the server runs; without it (a local build), the commit.
+ * the server runs. A build outside Vercel (a client's own hosting, V-02) gets its id from
+ * CI as PULSE_BUILD_ID (a run id); a local build falls back to the commit.
  */
 const sha = process.env.VERCEL_GIT_COMMIT_SHA || git("rev-parse HEAD");
-const buildId = process.env.VERCEL_DEPLOYMENT_ID || (sha ? `git-${sha.slice(0, 12)}` : "dev");
+const buildId =
+  process.env.PULSE_BUILD_ID || process.env.VERCEL_DEPLOYMENT_ID || (sha ? `git-${sha.slice(0, 12)}` : "dev");
 
 const nextConfig: NextConfig = {
   // next dev would otherwise append an `nextjs-agent-rules` block to our CLAUDE.md

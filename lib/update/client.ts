@@ -5,15 +5,20 @@ import { create } from "zustand";
 
 import { BUILD, type BuildInfo, type UpdateMark } from "@/lib/version";
 
-/** «Обновить» was tapped — on the line or in Профиль; the update waits only for unsaved work. */
-export const useUpdateRequest = create<{ requested: boolean; request: () => void }>((set) => ({
+/**
+ * «Обновить» was tapped — on the line or in Профиль; the update waits only for unsaved work.
+ * Spent once the phone is current again, so a later deploy never rides an old tap.
+ */
+export const useUpdateRequest = create<{ requested: boolean; request: () => void; cancel: () => void }>((set) => ({
   requested: false,
   request: () => set({ requested: true }),
+  cancel: () => set({ requested: false }),
 }));
 
 /** What the server runs now (D-115). Throws on a dead network — the query keeps the last answer. */
 export async function fetchServerVersion(): Promise<BuildInfo> {
-  const res = await fetch("/api/version", { cache: "no-store", credentials: "omit" });
+  // same-origin credentials: a protected preview deployment answers only with its cookie
+  const res = await fetch("/api/version", { cache: "no-store" });
   if (!res.ok) throw new Error(`version ${res.status}`);
   const body = (await res.json()) as Partial<BuildInfo>;
   if (typeof body.id !== "string" || typeof body.compat !== "number") throw new Error("version: bad body");
@@ -44,19 +49,23 @@ export function useUpdateHold(active: boolean): void {
   }, [active]);
 }
 
-const EDITABLE =
-  "textarea, select, [contenteditable]:not([contenteditable='false']), input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='range']):not([type='file'])";
+const TEXT_INPUT =
+  "input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color'])";
+const EDITABLE = `textarea, select, [contenteditable]:not([contenteditable='false']), ${TEXT_INPUT}`;
 
 /**
- * A reload now would lose something: an explicit hold, or a text box on the screen with
- * words in it (every free-text draft here is a textarea). Requests in flight are counted by
- * the caller — the query client lives there.
+ * A reload now would lose something: an explicit hold, or a field on the screen with words
+ * in it — a half-typed thread reply, a person's card, an event's title. Whatever keeps
+ * itself (an autosaving editor) opts out with `data-update-safe` and holds only while its
+ * save is pending. Requests in flight are counted by the caller — the query client lives there.
  */
 export function hasUnsaved(): boolean {
   if (holds.size > 0) return true;
   if (typeof document === "undefined") return false;
-  for (const area of document.querySelectorAll("textarea")) {
-    if (area.value.trim() !== "" && area.getClientRects().length > 0) return true;
+  for (const field of document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(`textarea, ${TEXT_INPUT}`)) {
+    if (field.disabled || field.readOnly || field.value.trim() === "") continue;
+    if (field.closest("[data-update-safe]")) continue;
+    if (field.getClientRects().length > 0) return true;
   }
   return false;
 }

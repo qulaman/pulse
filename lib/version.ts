@@ -18,7 +18,7 @@
 export const COMPAT = 1;
 
 export type BuildInfo = {
-  /** Compared by machines: the Vercel deployment, or `git-<commit>` where there is none. */
+  /** Compared by machines: the Vercel deployment, a CI run id outside Vercel, or `git-<commit>`. */
   id: string;
   /** Short commit, for support: «версия от 24 сент., 14:05 · 4c1bbfa». */
   sha: string;
@@ -69,8 +69,6 @@ export function versionLabel(info: Pick<BuildInfo, "at" | "sha">): string {
 
 /** Back from this long in the background, a reload surprises nobody: the session is over. */
 export const LONG_HIDE_MS = 30 * 60_000;
-/** How long after such a return the quiet update may still happen (the check takes a moment). */
-export const RESUME_WINDOW_MS = 20_000;
 /** A reload that brought back the same build is not retried by itself for this long. */
 export const RETRY_AFTER_FAIL_MS = 10 * 60_000;
 
@@ -93,7 +91,7 @@ export type UpdateContext = {
   kiosk: boolean;
   /** The person tapped «Обновить» and the update has not happened yet. */
   requested: boolean;
-  /** Back from a long stay in the background a moment ago. */
+  /** This is the one decision taken on the return from a long stay in the background. */
   freshResume: boolean;
   /** A reload a moment ago brought back the same build. */
   recentlyFailed: boolean;
@@ -110,8 +108,8 @@ export function updateAction(c: UpdateContext): UpdateAction {
 
 /**
  * The errors an old build meets after a deploy: a lazy chunk of the previous build is gone
- * (404), a server action id changed (Next renames them every build). Either one means the
- * server has moved on — worth a check right away instead of in ten minutes.
+ * (404), a server action id changed (Next renames them every build). The chunk errors also
+ * come from a dead network, so they only prompt a check — `/api/version` decides.
  */
 export function looksLikeStaleBuild(message: string): boolean {
   return /ChunkLoadError|Loading (?:CSS )?chunk \S+ failed|Failed to fetch dynamically imported module|Importing a module script failed|Failed to find Server Action|UnrecognizedActionError|Server Action "[^"]*" was not found on the server/i.test(

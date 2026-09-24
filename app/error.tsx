@@ -2,21 +2,31 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 import { applyUpdate } from "@/lib/update/client";
-import { looksLikeStaleBuild } from "@/lib/version";
+import { useServerVersion, versionKey } from "@/lib/update/queries";
+import { useHydrated } from "@/lib/useHydrated";
+import { BUILD, looksLikeStaleBuild, versionStatus } from "@/lib/version";
 
 /** Route-level error boundary: the assistant owns the failure, the director keeps the phone. */
 export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const router = useRouter();
-  // the screen belongs to a build the server no longer serves: «Повторить» would fail
-  // the same way, only the update helps (D-115)
-  const stale = looksLikeStaleBuild(`${error.name}: ${error.message}`);
+  const queryClient = useQueryClient();
+  const server = useServerVersion();
+  const hydrated = useHydrated();
+  // a chunk or an action the server no longer has — or just a dead network: the server's
+  // own answer tells which (D-115). A new build: «Повторить» would fail the same way, only
+  // the update helps.
+  const suspect = looksLikeStaleBuild(`${error.name}: ${error.message}`);
+  const status = hydrated ? versionStatus(BUILD, server.data) : "unknown";
+  const stale = suspect && (status === "outdated" || status === "required");
   useEffect(() => {
     console.error("route error:", error.message, error.digest);
-  }, [error]);
+    if (suspect) void queryClient.invalidateQueries({ queryKey: versionKey });
+  }, [error, suspect, queryClient]);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col items-center justify-center px-6 text-center">

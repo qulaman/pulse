@@ -26,6 +26,7 @@ import { useNoteSaveState } from "@/lib/notes/mutations";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, SHORT_STATUS } from "@/lib/tasks/status-text";
+import { holdUpdate } from "@/lib/update/client";
 
 import { NoteIcon } from "./icons";
 import css from "./notes.module.css";
@@ -80,6 +81,9 @@ export function NoteEditor({
   const [draft, setDraft] = useState(text);
   const area = useRef<HTMLTextAreaElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // words typed but not saved yet live only in this page: an app update waits for the save
+  // (D-115); the saved text itself is safe, hence `data-update-safe` on the field
+  const hold = useRef<(() => void) | null>(null);
 
   // autogrow: the field is as tall as the thought, never a scrollbar inside a card
   useLayoutEffect(() => {
@@ -90,6 +94,8 @@ export function NoteEditor({
   }, [draft]);
 
   const save = (next: string) => {
+    hold.current?.();
+    hold.current = null;
     onDirty(false);
     if (next.trim() && next !== text) onChangeText(next);
   };
@@ -111,6 +117,7 @@ export function NoteEditor({
   const schedule = (next: string) => {
     setDraft(next);
     pending.current = next;
+    hold.current ??= holdUpdate();
     onDirty(true);
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
@@ -136,6 +143,7 @@ export function NoteEditor({
       aria-label={label}
       placeholder="Что было сказано…"
       data-testid="note-editor"
+      data-update-safe
       className="w-full resize-none rounded-[14px] bg-surface-2/60 px-3 py-2.5 text-[16px] leading-[22px] text-text outline-none placeholder:text-muted focus:bg-surface-2"
       rows={1}
     />
