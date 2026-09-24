@@ -51,13 +51,14 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `stt` | `provider`, `fallback` (`openai \| whisper1 \| deepgram \| elevenlabs`), `language` (`auto \| ru`) | D-53 |
 | `parser` | `model`, `escalation_model`, `escalate` | G.17 |
 | `vocabulary` | контрагенты и объекты — подсказка STT | D-55 |
+| `vocabulary_meta` | по `entryKey` слова — `{kind: counterparty \| site \| product \| term \| null, added_at, added_by}`; только для экрана, в подсказку не идёт; битое поле читается как null | D-111 |
 | `conventions` | что значит «до обеда» здесь; уходит в промпт | D-15 |
 | `matching` | пороги матчера имён (переопределения) | D-16 |
 | `points_enabled` | очки и рейтинг, дефолт `false` | D-48 |
 | `rating_mode` | `top5 \| full`, дефолт `top5` | D-11 |
 | `delivery_window` | `{from, to}`, дефолт 08:00–21:00 Asia/Aqtobe | D-38 |
 | `secretary` | `escalate_after_min` (дефолт 3), `actions[]` — `{code, label, icon, synonyms}` | D-79 |
-| `dictionary` | `dismissed[]` — уроки «Из ваших записей», спрятанные «×» (`personId:форма`, до 200, пишет `/api/dictionary/misheard`) | D-111 |
+| `dictionary` | `dismissed[]` — уроки «Из ваших записей», спрятанные «×» (`personId:форма`, до 200, пишет `/api/dictionary/misheard`); `dismissed_words[]` — спрятанные предложения «Часто встречается» (ключи основ, до 200, пишет `/api/dictionary/words`) | D-111 |
 
 Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет `[не построено]`.
 
