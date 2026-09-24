@@ -5,6 +5,7 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { toast } from "@/components/ui/Toast";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { dequeue, enqueue } from "@/lib/outbox";
+import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -356,6 +357,8 @@ export function useSendMessage(me: Me | undefined) {
       }
       if (error) throw new Error(GENERIC_ERROR);
       dequeue(input.id);
+      // the other side hears it now, not on the minute sweep (D-114)
+      kickPush();
     },
     onMutate: async (input) => {
       const queryKey = taskKeys.thread(input.taskId);

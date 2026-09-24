@@ -49,7 +49,7 @@ export default async function ProfilePage() {
       <h2 className="eyebrow mt-6 px-1">Личное</h2>
       <RowGroup className="mt-2">
         <PasswordRow />
-        <NotificationsRow />
+        <NotificationsRow director={director} />
         <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
       </RowGroup>
 

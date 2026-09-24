@@ -5,6 +5,7 @@ import { onlineManager, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { outboxSize, replayOutbox } from "@/lib/outbox";
+import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { taskKeys } from "@/lib/tasks/queries";
 import type { Database } from "@/lib/supabase/types";
@@ -32,6 +33,7 @@ export function OutboxReplay() {
       if (queryClient.getMutationCache().getAll().some((m) => m.state.isPaused)) return;
       const { sent } = await replayOutbox(writeMessage);
       if (cancelled || sent === 0) return;
+      kickPush();
       void queryClient.invalidateQueries({ queryKey: taskKeys.root });
       void queryClient.invalidateQueries({ queryKey: ["task-thread"] });
       // the dictionary's words and names go through the same outbox (D-111)

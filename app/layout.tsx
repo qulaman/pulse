@@ -6,6 +6,7 @@ import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { loadBrand } from "@/lib/brand";
@@ -57,6 +58,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SecretaryAlarmGate />
           {/* a request to the secretary kept without network goes by itself (D-106) */}
           <ErrandReplay />
+          {/* the push channel re-registers itself and the icon keeps its number (D-114) */}
+          <PushSync />
         </QueryProvider>
       </body>
     </html>

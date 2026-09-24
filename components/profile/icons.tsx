@@ -53,3 +53,10 @@ export const ExitIcon = () => (
     <path d="M8.5 10h8M14 7.5 16.5 10 14 12.5" />
   </svg>
 );
+
+/** «Проверить уведомления»: a heartbeat line — the channel is alive or it is not. */
+export const PulseIcon = () => (
+  <svg {...stroke}>
+    <path d="M2.5 10.5h3.2l1.8-4.5 3 8.5 2-5.5 1.3 1.5h3.7" />
+  </svg>
+);

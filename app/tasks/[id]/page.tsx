@@ -7,6 +7,7 @@ import { TaskDetail } from "@/components/tasks/detail/TaskDetail";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { PageHead } from "@/components/ui/PageHead";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
+import { clearTaskNotifications } from "@/lib/push/client";
 import { homeForRole } from "@/lib/routes";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useTaskThread } from "@/lib/tasks/queries";
@@ -40,6 +41,10 @@ export default function TaskThreadPage() {
     marked.current = cursor;
     markRead({ taskId, companyId, seq: newestSeq });
   }, [taskId, companyId, newestSeq, markRead]);
+  // a task on screen is a task seen: its bubbles leave the shade and the icon's number follows (D-114)
+  useEffect(() => {
+    clearTaskNotifications(taskId);
+  }, [taskId, newestSeq]);
   const home = me.data ? homeForRole(me.data.role) : "/";
 
   const back = () => {

@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { Chip } from "@/components/ui/Chip";
 import { canEditPerson, type Who } from "@/lib/people/access";
+import type { Health } from "@/lib/push/health";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Person, type Role } from "@/lib/people/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 
@@ -30,7 +31,7 @@ function matches(p: Person, q: string): boolean {
   return q.split(/\s+/).every((word) => hay.includes(word));
 }
 
-function Line({ person, editable, me }: { person: Person; editable: boolean; me: boolean }) {
+function Line({ person, editable, me, push }: { person: Person; editable: boolean; me: boolean; push?: Health }) {
   const body = (
     <>
       <span
@@ -58,6 +59,10 @@ function Line({ person, editable, me }: { person: Person; editable: boolean; me:
         ) : person.role !== "tv" && person.availability !== "active" ? (
           <span className="text-[12px] leading-4 text-warn">{AVAILABILITY_LABEL[person.availability]}</span>
         ) : null}
+        {/* a dead push channel (D-114): this person hears about work only by opening Pulse */}
+        {person.is_active && push && (push.state === "off" || push.state === "broken") ? (
+          <span className="text-[12px] leading-4 text-danger">без уведомлений</span>
+        ) : null}
       </span>
     </>
   );
@@ -82,7 +87,7 @@ function Line({ person, editable, me }: { person: Person; editable: boolean; me:
  * glance, search by name, position or spoken alias, a chip per role; a tap opens the
  * person's editor directly — role, card, password. The load board stays on «Команда».
  */
-export function TeamRoster({ people, me }: { people: Person[]; me: Who | null }) {
+export function TeamRoster({ people, me, push }: { people: Person[]; me: Who | null; push?: Map<string, Health> }) {
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role | null>(null);
   const [showInactive, setShowInactive] = useState(false);
@@ -148,7 +153,7 @@ export function TeamRoster({ people, me }: { people: Person[]; me: Who | null })
       ) : (
         <ul className="mt-3 space-y-2">
           {visible.map((p) => (
-            <Line key={p.id} person={p} editable={editable(p)} me={p.id === me?.id} />
+            <Line key={p.id} person={p} editable={editable(p)} me={p.id === me?.id} push={push?.get(p.id)} />
           ))}
         </ul>
       )}

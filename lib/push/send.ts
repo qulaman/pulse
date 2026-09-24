@@ -3,12 +3,20 @@ import "server-only";
 import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
+import { lockScreenText, pushTag, transportFor } from "@/lib/push/policy";
 import { createServiceSupabase } from "@/lib/supabase/service";
+import type { Database } from "@/lib/supabase/types";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
+/** Pushes in flight at once: an announcement to 500 people goes in one tick, not ten. */
+const CONCURRENCY = 8;
 
-type Payload = { title?: string; body?: string; url?: string; tag?: string };
+type Row = Database["public"]["Tables"]["notification_deliveries"]["Row"];
+type Sub = { id: string; user_id: string; endpoint: string; p256dh: string; auth: string };
+type Meta = { title?: string; body?: string; url?: string; urgent?: boolean } & Record<string, unknown>;
+type Service = ReturnType<typeof createServiceSupabase>;
+type Result = { sent: number; failed: number; skipped: number };
 
 function vapidReady(): boolean {
   const env = getServerEnv();
@@ -17,94 +25,135 @@ function vapidReady(): boolean {
   return true;
 }
 
+/** What the service worker gets: the words (or only the kind, when the director hid them), where a tap leads, how to show it. */
+export function pushPayload(row: Row): string {
+  const meta = (row.meta ?? {}) as Meta;
+  const transport = transportFor(row);
+  const text = lockScreenText(row, { title: meta.title ?? "Pulse", body: meta.body ?? "" });
+  // a hidden row carries nothing of its words — not even in fields the worker does not show
+  const base = row.private && row.category !== "alarm" ? { url: meta.url, urgent: meta.urgent } : meta;
+  return JSON.stringify({
+    ...base,
+    title: text.title,
+    body: text.body,
+    tag: pushTag(meta, row.task_id),
+    kind: row.event_kind,
+    delivery_id: row.id,
+    silent: transport.silent,
+  });
+}
+
+async function inPool<T>(items: T[], size: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(size, items.length) }, async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      await fn(item);
+    }
+  });
+  await Promise.all(lanes);
+}
+
 /**
- * The outbox worker (docs/BACKEND.md §4): queued push rows → web-push → sent / failed.
- * Called right after a mutation as a kick and by the minute sweep as insurance.
+ * The outbox worker (docs/BACKEND.md §4): claimed push rows → web-push → sent / failed.
+ * Called right after a mutation as a kick and by the minute sweep as insurance; rows are
+ * claimed first (`claim_deliveries`, D-114), so two workers at once never send one push twice.
  * Without VAPID keys it leaves the rows queued — a receipt is never faked.
  */
-export async function sweepDeliveries(): Promise<{ sent: number; failed: number; skipped: number }> {
-  const result = { sent: 0, failed: 0, skipped: 0 };
+export async function sweepDeliveries({ budgetMs = 8_000 }: { budgetMs?: number } = {}): Promise<Result> {
+  const result: Result = { sent: 0, failed: 0, skipped: 0 };
   if (!vapidReady()) return result;
 
   const service = createServiceSupabase();
-  // quiet hours are already in the rows: the trigger set deliver_after from the company window
-  const { data: rows, error } = await service
-    .from("notification_deliveries")
-    .select("id, user_id, company_id, meta, attempts, event_kind")
-    .eq("status", "queued")
-    .eq("channel", "push")
-    .lt("attempts", MAX_ATTEMPTS)
-    .lte("deliver_after", new Date().toISOString())
-    .order("created_at")
-    .limit(BATCH);
-  if (error) throw new Error(`outbox read failed: ${error.message}`);
-  const sendable = rows ?? [];
-  if (sendable.length === 0) return result;
+  const started = Date.now();
+  while (Date.now() - started < budgetMs) {
+    const { data, error } = await service.rpc("claim_deliveries", { p_limit: BATCH });
+    if (error) throw new Error(`outbox claim failed: ${error.message}`);
+    const rows = (data ?? []) as Row[];
+    if (rows.length === 0) break;
 
-  const userIds = [...new Set(sendable.map((r) => r.user_id))];
-  const { data: subs } = await service
-    .from("push_subscriptions")
-    .select("id, user_id, endpoint, p256dh, auth")
-    .in("user_id", userIds);
-  const byUser = new Map<string, NonNullable<typeof subs>>();
-  for (const sub of subs ?? []) {
-    const list = byUser.get(sub.user_id) ?? [];
-    list.push(sub);
-    byUser.set(sub.user_id, list);
-  }
-
-  for (const row of sendable) {
-    const targets = byUser.get(row.user_id) ?? [];
-    if (targets.length === 0) {
-      // nobody to send to: failed with a readable reason — tier 2 (Telegram) picks it up later
-      await service
-        .from("notification_deliveries")
-        .update({ status: "failed", attempts: MAX_ATTEMPTS, last_error: "no_subscription" })
-        .eq("id", row.id);
-      result.failed += 1;
-      continue;
+    const userIds = [...new Set(rows.map((r) => r.user_id))];
+    // a device the director switched off («присылать сюда») is not a target
+    const { data: subs } = await service
+      .from("push_subscriptions")
+      .select("id, user_id, endpoint, p256dh, auth")
+      .in("user_id", userIds)
+      .eq("enabled", true);
+    const byUser = new Map<string, Sub[]>();
+    for (const sub of (subs ?? []) as Sub[]) {
+      const list = byUser.get(sub.user_id) ?? [];
+      list.push(sub);
+      byUser.set(sub.user_id, list);
     }
 
-    // `tag` collapses the bubbles of one task on the phone, `kind` tells the worker's
-    // notification from a plain one (a message carries the «Прочитал» button)
-    const meta = row.meta as Payload;
-    const payload = JSON.stringify({ ...meta, tag: meta.tag ?? null, kind: row.event_kind, delivery_id: row.id });
-    let delivered = false;
-    let lastError = "";
-    for (const sub of targets) {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-          payload,
-          { TTL: 60 * 60 * 12, urgency: "high" },
-        );
-        delivered = true;
-      } catch (err) {
-        const status = (err as { statusCode?: number }).statusCode;
-        lastError = `push ${status ?? "error"}`;
-        // 404/410: the browser dropped the subscription — forget it
-        if (status === 404 || status === 410) {
-          await service.from("push_subscriptions").delete().eq("id", sub.id);
-        }
-      }
-    }
-
-    if (delivered) {
+    const okSubs = new Set<string>();
+    await inPool(rows, CONCURRENCY, (row) => deliver(service, row, byUser.get(row.user_id) ?? [], okSubs, result));
+    if (okSubs.size > 0) {
       await service
-        .from("notification_deliveries")
-        .update({ status: "sent", sent_at: new Date().toISOString(), attempts: row.attempts + 1, last_error: null })
-        .eq("id", row.id);
-      result.sent += 1;
-    } else {
-      const attempts = row.attempts + 1;
-      await service
-        .from("notification_deliveries")
-        .update({ status: attempts >= MAX_ATTEMPTS ? "failed" : "queued", attempts, last_error: lastError })
-        .eq("id", row.id);
-      result.failed += 1;
+        .from("push_subscriptions")
+        .update({ last_ok_at: new Date().toISOString() })
+        .in("id", [...okSubs]);
     }
+    if (rows.length < BATCH) break;
   }
   return result;
+}
+
+async function deliver(service: Service, row: Row, targets: Sub[], okSubs: Set<string>, result: Result): Promise<void> {
+  if (targets.length === 0) {
+    // nobody to send to: failed with a readable reason — the director reads it as
+    // «уведомления не включены», tier 2 (Telegram) picks it up later
+    await service
+      .from("notification_deliveries")
+      .update({ status: "failed", attempts: MAX_ATTEMPTS, last_error: "no_subscription", claimed_at: null })
+      .eq("id", row.id);
+    result.failed += 1;
+    return;
+  }
+
+  const payload = pushPayload(row);
+  const transport = transportFor(row);
+  let delivered = false;
+  let lastError = "";
+  for (const sub of targets) {
+    try {
+      await webpush.sendNotification(
+        { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+        payload,
+        { TTL: transport.ttl, urgency: transport.urgency },
+      );
+      delivered = true;
+      okSubs.add(sub.id);
+    } catch (err) {
+      const status = (err as { statusCode?: number }).statusCode;
+      lastError = `push ${status ?? "error"}`;
+      if (status === 404 || status === 410) {
+        // the browser dropped the subscription — forget it; the app re-registers on its next start
+        await service.from("push_subscriptions").delete().eq("id", sub.id);
+      } else {
+        await service
+          .from("push_subscriptions")
+          .update({ last_error: lastError, last_error_at: new Date().toISOString() })
+          .eq("id", sub.id);
+      }
+    }
+  }
+
+  if (delivered) {
+    await service
+      .from("notification_deliveries")
+      .update({ status: "sent", sent_at: new Date().toISOString(), attempts: row.attempts + 1, last_error: null, claimed_at: null })
+      .eq("id", row.id);
+    result.sent += 1;
+  } else {
+    const attempts = row.attempts + 1;
+    await service
+      .from("notification_deliveries")
+      .update({ status: attempts >= MAX_ATTEMPTS ? "failed" : "queued", attempts, last_error: lastError, claimed_at: null })
+      .eq("id", row.id);
+    result.failed += 1;
+  }
 }
 
 /** Fire-and-forget kick after a mutation; the sweep is the safety net, so errors only log. */

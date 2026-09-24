@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import { backTarget } from "@/components/TabBar";
+import { tabBarRole } from "@/lib/routes";
+import { useMe } from "@/lib/tasks/queries";
 
 type Back = { label: string; href?: string; onClick?: () => void; testId?: string };
 
@@ -35,8 +40,12 @@ export function PageHead({
   smallTitle?: string;
   /** the line above the large title: the date on the screens of the day */
   eyebrow?: ReactNode;
-  /** a nested screen: «‹ label» on the left of the bar, a link or a callback */
-  back?: Back;
+  /**
+   * «‹ label» on the left of the bar, a link or a callback. Left out, every screen that is not
+   * a tab's own root gets «‹ Назад» by itself (`useAutoBack`); `false` — none (a sheet-like
+   * screen with its own «×»).
+   */
+  back?: Back | false;
   /** one live line under the title (a summary) */
   sub?: ReactNode;
   /** round `HeadButton`s on the right of the bar */
@@ -83,13 +92,15 @@ export function PageHead({
   }, []);
 
   const small = smallTitle ?? (typeof title === "string" ? title : undefined);
+  const auto = useAutoBack(back === undefined);
+  const way = back === false ? undefined : (back ?? auto);
 
   return (
     <>
       <div ref={bar} data-nav-bar="" data-glass={glass ? "" : undefined} data-titled={titled ? "" : undefined} className="nav-bar">
         <div aria-hidden className="nav-bar-glass nav-glass" />
         <div className="nav-bar-row">
-          <div className="nav-bar-side">{back ? <BackButton back={back} /> : null}</div>
+          <div className="nav-bar-side">{way ? <BackButton back={way} /> : null}</div>
           <div aria-hidden className="nav-bar-title">
             {small}
           </div>
@@ -112,6 +123,28 @@ export function PageHead({
       <div ref={titleEnd} aria-hidden className="h-px" />
     </>
   );
+}
+
+/**
+ * «‹ Назад» for a screen the tab bar has no tab for (D-113): «Команда», «Магазин», «Данные»,
+ * «Эфир», the director's «Рейтинг»… It goes back in the history when there is one inside the
+ * app, otherwise (opened from a push) to the tab the screen lives in (`backTarget`).
+ */
+function useAutoBack(wanted: boolean): Back | undefined {
+  const me = useMe();
+  const path = usePathname();
+  const router = useRouter();
+  const role = me.data?.role;
+  if (!wanted || !role) return undefined;
+  const target = backTarget(tabBarRole(role), path);
+  if (!target) return undefined;
+  return {
+    label: "Назад",
+    onClick: () => {
+      if (window.history.length > 1) router.back();
+      else router.push(target);
+    },
+  };
 }
 
 function BackButton({ back }: { back: Back }) {
