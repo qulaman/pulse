@@ -142,10 +142,13 @@ export const DIGEST_LABEL: Record<DigestEvery, string> = {
   twice: "в 12:00 и 17:00",
 };
 
-/** The right-hand word of a category row: «Сразу», «Сводкой», «30 мин · сразу». */
+/** The right-hand word of a category row: «Сразу», «Сводкой»; «не открыли» — «30 мин» or «30 мин · тихо». */
 export function categoryValue(prefs: NotifyPrefs, category: NotifyCategory): string {
-  const word = MODE_LABEL[prefs.modes[category]];
-  if (category === "unseen" && prefs.modes.unseen !== "off") return `${prefs.unseen_after_min} мин · ${word.toLowerCase()}`;
+  const mode = prefs.modes[category];
+  const word = MODE_LABEL[mode];
+  if (category === "unseen" && mode !== "off") {
+    return mode === "now" ? `${prefs.unseen_after_min} мин` : `${prefs.unseen_after_min} мин · ${word.toLowerCase()}`;
+  }
   return word;
 }
 

@@ -42,7 +42,8 @@ describe("director push rules (D-114)", () => {
 
   it("words the rows", () => {
     expect(categoryValue(DEFAULT_NOTIFY_PREFS, "overdue")).toBe("Сводкой");
-    expect(categoryValue(DEFAULT_NOTIFY_PREFS, "unseen")).toBe("30 мин · сразу");
+    expect(categoryValue(DEFAULT_NOTIFY_PREFS, "unseen")).toBe("30 мин");
+    expect(categoryValue(parseNotifyPrefs({ modes: { unseen: "digest" } }), "unseen")).toBe("30 мин · сводкой");
     expect(quietValue(DEFAULT_NOTIFY_PREFS)).toBe("выключено");
     expect(quietValue(parseNotifyPrefs({ quiet: { on: true, weekends: true } }))).toBe("21:00–08:00, сб–вс");
   });

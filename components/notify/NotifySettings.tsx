@@ -136,8 +136,8 @@ export function NotifySettings({ meId }: { meId: string }) {
         <Row icon={<StarIcon />} title="Важные люди" value={vipNames || "никого"} onClick={() => setSheet({ kind: "vip" })} />
         <Row
           icon={<EyeIcon />}
-          title="Текст на блокировке"
-          value={prefs.lock_text === "full" ? "полностью" : "только что случилось"}
+          title="Экран блокировки"
+          value={prefs.lock_text === "full" ? "весь текст" : "без слов"}
           onClick={() => setSheet({ kind: "lock" })}
         />
       </RowGroup>

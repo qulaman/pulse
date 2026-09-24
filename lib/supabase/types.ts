@@ -799,6 +799,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "notification_deliveries_digest_id_fkey"
+            columns: ["digest_id"]
+            isOneToOne: false
+            referencedRelation: "notification_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "notification_deliveries_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
@@ -833,7 +840,22 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "notification_prefs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_prefs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       orders: {
         Row: {
@@ -1777,13 +1799,43 @@ export type Database = {
         Returns: Json
       }
       can_see_event: { Args: { p_event: string }; Returns: boolean }
-      claim_deliveries: {
-        Args: { p_limit?: number }
-        Returns: Database["public"]["Tables"]["notification_deliveries"]["Row"][]
-      }
       cancel_shop_order: {
         Args: { client_request_id?: string; p_order_id: string }
         Returns: Json
+      }
+      claim_deliveries: {
+        Args: { p_limit?: number }
+        Returns: {
+          acted_at: string | null
+          attempts: number
+          category: string | null
+          channel: Database["public"]["Enums"]["delivery_channel"]
+          claimed_at: string | null
+          company_id: string
+          created_at: string
+          deliver_after: string
+          digest_id: string | null
+          event_kind: string
+          held: string | null
+          id: string
+          last_error: string | null
+          meta: Json
+          mode: string
+          private: boolean
+          seen_at: string | null
+          sent_at: string | null
+          silent: boolean
+          status: Database["public"]["Enums"]["delivery_status"]
+          task_id: string | null
+          tier: number
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_deliveries"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       close_visit: {
         Args: { p_id: string }
@@ -1819,8 +1871,24 @@ export type Database = {
       }
       delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      delivery_category: {
+        Args: { p_kind: string; p_meta: Json }
+        Returns: string
+      }
       director_day_summaries_due: { Args: { p_now?: string }; Returns: number }
+      director_digest_slot: {
+        Args: { p_at: string; p_prefs: Json }
+        Returns: string
+      }
       director_digests_due: { Args: { p_now?: string }; Returns: number }
+      director_meeting_until: {
+        Args: { p_at: string; p_user: string }
+        Returns: string
+      }
+      director_quiet_until: {
+        Args: { p_at: string; p_prefs: Json }
+        Returns: string
+      }
       edit_event: {
         Args: {
           p_body?: string
@@ -1930,6 +1998,12 @@ export type Database = {
       }
       notes_due_reminders: { Args: { p_now?: string }; Returns: number }
       notes_purge_trash: { Args: { p_now?: string }; Returns: number }
+      notify_hhmm: {
+        Args: { p_default: string; p_value: string }
+        Returns: string
+      }
+      notify_prefs_defaults: { Args: never; Returns: Json }
+      notify_prefs_of: { Args: { p_user: string }; Returns: Json }
       overdue_alerts_due: { Args: { p_now?: string }; Returns: number }
       publish_due_scheduled: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
@@ -1938,11 +2012,11 @@ export type Database = {
         Returns: {
           devices: number
           enabled_devices: number
-          last_error: string | null
-          last_error_at: string | null
-          last_ok_at: string | null
-          last_seen_at: string | null
-          no_device_at: string | null
+          last_error: string
+          last_error_at: string
+          last_ok_at: string
+          last_seen_at: string
+          no_device_at: string
           user_id: string
         }[]
       }
@@ -1975,11 +2049,15 @@ export type Database = {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
       }
-      set_notify_prefs: { Args: { p_prefs: Json }; Returns: Json }
+      ru_plural: {
+        Args: { p_few: string; p_many: string; p_n: number; p_one: string }
+        Returns: string
+      }
       set_event_participants: {
         Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
         Returns: undefined
       }
+      set_notify_prefs: { Args: { p_prefs: Json }; Returns: Json }
       set_shop_order_status: {
         Args: {
           client_request_id?: string
