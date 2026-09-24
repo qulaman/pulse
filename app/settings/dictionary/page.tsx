@@ -17,7 +17,7 @@ export default async function DictionaryPage({
   const initialTab = parseDictionaryTab(tab);
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <DictionaryHead back={from === "team" ? "/settings?tab=team" : "/settings?tab=ai"} />
+      <DictionaryHead from={from === "team" ? "team" : undefined} />
       <DictionaryScreen key={initialTab} initialTab={initialTab} />
     </main>
   );

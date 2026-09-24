@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { DeadlineSheet } from "@/components/confirm/DeadlineSheet";
 import { EntityCard } from "@/components/confirm/EntityCard";
+import { useRememberOffer } from "@/components/dictionary/useRememberOffer";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { useRoster } from "@/lib/people/roster";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -48,7 +49,12 @@ export function ConfirmList({
     [roster.data, myId],
   );
 
-  const pickAssignee = (index: number, user: { user_id: string; full_name: string }) =>
+  const offerToRemember = useRememberOffer();
+
+  const pickAssignee = (index: number, user: { user_id: string; full_name: string }) => {
+    // a name the AI could not place, now placed by hand: offer to remember it (D-111)
+    const before = entities[index];
+    if (before) offerToRemember(before, user);
     editEntity(index, {
       assignee_id: user.user_id,
       assignee_name: null,
@@ -60,6 +66,7 @@ export function ConfirmList({
       },
       blocked: undefined,
     });
+  };
 
   const nameOf = useMemo(() => {
     const byId = new Map<string, string>();

@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 
 /**
@@ -68,17 +67,15 @@ export function DictionarySkeleton() {
 }
 
 /**
- * The head is static text: it renders at once and is never a bone (DESIGN §2, rule 2).
- * «Назад» leads to the settings tab the page was opened from.
+ * The head of the screen (D-109) is static text: it renders at once and is never a bone
+ * (DESIGN §2, rule 2). «Назад» leads to the settings tab the page was opened from.
  */
-export function DictionaryHead({ back = "/settings?tab=ai" }: { back?: string }) {
+export function DictionaryHead({ from }: { from?: "team" }) {
   return (
-    <>
-      <Link href={back} className="text-[13px] leading-4 text-muted">
-        ← Настройки
-      </Link>
-      <h1 className="mt-2 text-[24px] font-bold leading-[30px]">Словарь</h1>
-      <p className="mt-1 text-[13px] leading-[18px] text-muted">Как ИИ узнаёт людей и названия в вашей речи</p>
-    </>
+    <PageHead
+      back={from === "team" ? { href: "/settings?tab=team", label: "Сотрудники" } : { href: "/settings?tab=ai", label: "Настройки" }}
+      title="Словарь"
+      sub="Как ИИ узнаёт людей и названия в вашей речи"
+    />
   );
 }

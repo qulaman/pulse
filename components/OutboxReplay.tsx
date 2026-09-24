@@ -34,6 +34,10 @@ export function OutboxReplay() {
       if (cancelled || sent === 0) return;
       void queryClient.invalidateQueries({ queryKey: taskKeys.root });
       void queryClient.invalidateQueries({ queryKey: ["task-thread"] });
+      // the dictionary's words and names go through the same outbox (D-111)
+      void queryClient.invalidateQueries({ queryKey: ["settings"] });
+      void queryClient.invalidateQueries({ queryKey: ["people"] });
+      void queryClient.invalidateQueries({ queryKey: ["dictionary"] });
       toast(sent === 1 ? "Отправил то, что ждало связи" : `Отправил ${sent}, что ждало связи`);
     };
     void run();
