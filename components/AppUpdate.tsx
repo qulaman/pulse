@@ -2,7 +2,7 @@
 
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { useSendQueue } from "@/components/OfflineBanner";
 import { Button } from "@/components/ui/Button";
@@ -23,6 +23,8 @@ import {
 
 /** Drafts come and go without telling anyone: while an update is due, look again this often. */
 const BUSY_POLL_MS = 1_500;
+
+const noSubscribe = () => () => {};
 
 /**
  * The phone is on the server's build, or it knows it is not (D-115). One line at the top —
@@ -47,8 +49,10 @@ export function AppUpdate() {
   const [freshResume, setFreshResume] = useState(false);
   const [recentlyFailed, setRecentlyFailed] = useState(false);
 
+  // the server drew nothing here; hydrate the same even if an answer is already cached
+  const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
   // offline, nothing can be checked or fetched: a reload would open a dead page
-  const status = queue.isOnline ? versionStatus(BUILD, server.data) : "unknown";
+  const status = hydrated && queue.isOnline ? versionStatus(BUILD, server.data) : "unknown";
   const due = status === "outdated" || status === "required";
 
   // the page after an update says how it went (read once: StrictMode runs effects twice)
