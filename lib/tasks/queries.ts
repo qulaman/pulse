@@ -327,8 +327,8 @@ type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage
  * Everything on the board in one request: tasks in work or waiting for the director,
  * each with the messages that matter to the board (open questions, decline reasons).
  * Company scoping is RLS's job — a director sees their company and nothing else.
- * An employee asks for their own rows only: RLS would also hand a manager their
- * subordinates', and Лента is about the person (the same narrowing as useMyTasks).
+ * Everybody but the director asks for their own rows only: RLS would also hand a manager
+ * their subordinates', and Лента is about the person (the same narrowing as useMyTasks).
  */
 async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
   const supabase = createBrowserSupabase();
@@ -370,10 +370,10 @@ export function usePulseBoard(me: Me | undefined, enabled = true) {
   const queryKey = taskKeys.board();
   const queryClient = useQueryClient();
   const meId = me?.userId ?? "";
-  // the employee's own rows, on the socket as in the query; the director and the
-  // manager take the whole company and let RLS decide
-  // the secretary is an employee with an extra pile of cards: the same private filter
-  const assigneeId = me?.role === "employee" || me?.role === "secretary" ? meId : undefined;
+  // the person's own rows, on the socket as in the query; only the director takes the
+  // whole company. A manager lands on Лента like anyone else, and RLS would hand them their
+  // subordinates' tasks — a secretary's task then played on the manager's mascot as theirs.
+  const assigneeId = me && me.role !== "director" ? meId : undefined;
   const live = enabled && Boolean(me);
 
   const query = useRealtimeQuery<BoardTask[], TaskRow>({

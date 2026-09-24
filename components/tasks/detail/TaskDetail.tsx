@@ -232,7 +232,10 @@ export function TaskDetail({
             })}
           </div>
         ) : null}
-        {!isDirector ? <EmployeeButtons task={task} onAction={(action) => employee.press(action, task)} now={now} /> : null}
+        {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}
+        {!isDirector && task.assignee_id === me.userId ? (
+          <EmployeeButtons task={task} onAction={(action) => employee.press(action, task)} now={now} />
+        ) : null}
 
         {/* the foot: how much time is left, and — for the director — whether the push was seen */}
         <div className="mt-4 border-t border-border/60 pt-3">
