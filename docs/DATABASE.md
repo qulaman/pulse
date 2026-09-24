@@ -157,7 +157,7 @@ deliver_after timestamptz not null default now(),   -- окно доставки
 created_at, sent_at, seen_at, acted_at timestamptz null,
 claimed_at timestamptz null,           -- воркер взял строку (claim_deliveries, D-114); старше 2 мин — снова в очереди
 category text null,                    -- категория для правил директора: review / declined / questions / messages /
-                                       -- unseen / overdue / secretary / calendar / shop / reminders / alarm / system / tasks
+                                       -- unseen / overdue / team / secretary / calendar / shop / reminders / alarm / system / tasks
 mode text not null default 'now',      -- now | digest (ждёт сводки, воркер не берёт)
 held text null,                        -- почему ждёт: quiet / meeting / schedule
 silent boolean default false, private boolean default false,   -- «Тихо» и «текст на блокировке» директора
@@ -165,7 +165,7 @@ digest_id uuid null → notification_deliveries   -- строка ушла вн�
 ```
 Триггеры и RPC **вставляют строку**, не зовут HTTP; отправляет воркер `lib/push/send.ts` (BACKEND §4). Виды `event_kind` (матрица — BACKEND §4): директору (автору задачи) — `pending_review`, `declined`, `message`; исполнителю — `task_sent`, `rework`, `done`, `revoked`, `deadline_extended`, `message`; всем активным, кроме `tv` и автора, — `announcement`; магазин — `shop_order`, `shop_approved`, `shop_ready`, `shop_cancelled`; календарь — `event_invite`, `event_moved`, `event_cancelled`, `event_reminder`, `event_declined`; заявки — `errand_sent`, `errand_accepted`, `errand_done`, `errand_declined` (адрес карточки — `meta.errand_id`, `task_id` пуст). Строки прежних видов `question`/`reply` могут остаться, новых нет.
 **Маршрут строки** — триггер `trg_notification_deliveries_deliver_after` (before insert; тело с D-114 — `20260924150200_notify_prefs.sql`) ставит `category` каждой строке и дальше делит по получателю. **Не директор** (сотрудник, секретарь, завхоз — фиксированная политика): `deliver_after = next_delivery_slot(company, now())` для `reply, rework, done, revoked, deadline_extended, announcement, shop_order, shop_approved, shop_ready, shop_cancelled, event_invite, event_moved, event_cancelled`, а также для `message` человеку, который не автор задачи; остальные виды (все `errand_*`, `visit_*`, `event_reminder`, `event_declined`, `note_reminder`, `test`) уходят сразу; `task_sent` при «Настоять» (`declined → sent`) производитель сам кладёт на открытие окна. **Директор**: категории `alarm` и `system` не трогаются; «Не присылать» → `failed` + `last_error='muted'`; «Тихо» → `silent`; «текст на блокировке» → `private`; «Не беспокоить» → `mode='digest'`, `held='quiet'`, `deliver_after` = конец тишины (пробивают свои напоминания, посетитель, важные люди — по флагам `pass`); встреча из календаря при `meetings` → `held='meeting'` до её конца (проходят «скоро», посетитель, важные люди); «Сводкой» → `held='schedule'` до слота сводки; важные люди (исполнитель задачи в `vip`) поднимают «Тихо»/«Сводкой» до «Сразу». Сбой правила строку не ломает — уходит как раньше. Воркер берёт только `mode='now'` и `deliver_after <= now()` (`claim_deliveries`), индекс `notification_deliveries_due_idx`; сводки — `notification_deliveries_digest_idx`.
-`channel` сейчас всегда `push`, `tier` — всегда 1; Telegram-ярус и эскалация по таймауту `[не построено]` (D-21, D-32); `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
+**Самоочистка** (D-114 §10): ушедшие и неудавшиеся строки живут 30 дней, не ушедшие (`queued`) — 7; `notification_deliveries_purge()` из минутного тика удаляет до 2000 самых старых за раз, индекс `notification_deliveries_created_idx`. `channel` сейчас всегда `push`, `tier` — всегда 1; Telegram-ярус и эскалация по таймауту `[не построено]` (D-21, D-32); `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
 
 ### ingest_batches — идемпотентность мутаций
 `id, company_id, user_id, client_request_id uuid not null, result jsonb not null default '{}', created_at`, constraint `ingest_batches_company_request_key unique (company_id, client_request_id)`. При дубле RPC возвращает сохранённый result (те же id сущностей). `client_request_id` обязателен на мутирующих вызовах; исключения — BACKEND §0.
@@ -357,7 +357,9 @@ claim_deliveries(p_limit int default 50) returns setof notification_deliveries  
 set_notify_prefs(p_prefs jsonb) returns jsonb           -- только директор; перестраивает ждущую очередь
 push_health() returns table (user_id, devices, enabled_devices, last_ok_at, last_error, last_error_at,
                              last_seen_at, no_device_at)   -- директору и секретарю
-unseen_task_alerts_due(p_now timestamptz default now()) returns int   -- «Задача не открыта»
+unseen_task_alerts_due(p_now timestamptz default now()) returns int   -- «Задача не принята» (с 20260924160000)
+team_channel_alerts_due(p_now timestamptz default now()) returns int  -- «Уведомления не доходят», раз в неделю на человека
+notification_deliveries_purge(p_now, p_keep_days int default 30, p_stale_days int default 7, p_batch int default 2000) returns int   -- самоочистка
 overdue_alerts_due(p_now timestamptz default now()) returns int       -- «Просрочено»
 director_day_summaries_due(p_now timestamptz default now()) returns int   -- «Итог дня»
 director_digests_due(p_now timestamptz default now()) returns int     -- сводки
