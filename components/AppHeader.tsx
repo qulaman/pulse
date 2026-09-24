@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import { HeaderPoints } from "@/components/HeaderPoints";
 import { HomeOnly } from "@/components/HomeOnly";
 import { loadBrand } from "@/lib/brand";
 import { firstNameOf } from "@/lib/text/normalize";
@@ -15,11 +16,11 @@ function initials(fullName: string): string {
 /**
  * The brand of the home screens (Пульс, Лента): the client's logo and name on the left when
  * the director set them (D-44), the product mark otherwise; who is signed in on the right —
- * a tap opens the profile. Every other screen has its own navigation bar instead (D-113 §4),
+ * a tap opens the profile; `pointsFor` adds that person's points under the name. Every other screen has its own navigation bar instead (D-113 §4),
  * so this bar shows on the home routes only. Clear, over the page's glow; the height is
  * the one the centred face was measured with (D-60, D-87 §7) — the border stays, transparent.
  */
-export async function AppHeader({ fullName, companyId }: { fullName: string; companyId?: string }) {
+export async function AppHeader({ fullName, companyId, pointsFor }: { fullName: string; companyId?: string; pointsFor?: string }) {
   const brand = await loadBrand(companyId);
   const branded = Boolean(brand.logoUrl) || brand.name !== "Pulse";
 
@@ -44,8 +45,12 @@ export async function AppHeader({ fullName, companyId }: { fullName: string; com
             <PulseMark />
           )}
           <Link href="/profile" aria-label="Профиль" className="flex min-w-0 shrink-0 items-center gap-2 transition-opacity duration-[120ms] active:opacity-60">
-            {/* first name only: «Марат Оспанов» next to the client's name left «West Arla…» on a phone */}
-            <span className="max-w-[110px] truncate text-[13px] leading-4 text-muted">{firstNameOf(fullName)}</span>
+            {/* first name only: «Марат Оспанов» next to the client's name left «West Arla…» on a phone;
+                the team sees its points under it — two lines still fit the avatar's 32 px */}
+            <span className="flex min-w-0 flex-col items-end">
+              <span className="max-w-[110px] truncate text-[13px] leading-4 text-muted">{firstNameOf(fullName)}</span>
+              {pointsFor ? <HeaderPoints userId={pointsFor} /> : null}
+            </span>
             <span
               aria-hidden
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-bg"
