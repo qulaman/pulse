@@ -31,8 +31,8 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
   const affordable = canOrder ? list.filter((item) => item.price <= points).length : 0;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Магазин" sub="Очки за работу превращаются в награды" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Магазин" />
 
       {!pointsEnabled ? (
         <p className="mt-3 text-[14px] leading-5" style={{ color: "var(--warn)" }}>

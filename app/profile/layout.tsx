@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
 import { tabBarRole } from "@/lib/routes";
@@ -16,7 +15,6 @@ export default async function ProfileLayout({ children }: { children: React.Reac
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role={tabBarRole(profile.role)} />
     </div>

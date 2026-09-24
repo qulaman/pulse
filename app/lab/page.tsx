@@ -9,8 +9,8 @@ import { parseLabTab } from "@/lib/lab/tabs";
 export default async function LabPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
   const tab = parseLabTab((await searchParams).tab);
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Лаборатория" sub="Модели распознавания и разбора, цена каждого распознавания и себестоимость программы" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Лаборатория" />
       <LabTabs
         key={tab}
         initialTab={tab}

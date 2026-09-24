@@ -39,8 +39,8 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   // fix the text and parse again, make the words a task by hand, or close.
   if (entities.length === 0 && transcript.trim() && stage !== "parsing") {
     return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
-        <PageHead title="Не разобрал" actions={<Mascot state="thinking" size={44} />} />
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
+        <PageHead title="Не разобрал" actions={<Mascot state="thinking" size={40} />} />
         <p className="mt-4 text-[13px] leading-4 text-muted">Услышал так:</p>
         <p className="mt-1 rounded-[12px] bg-surface-2 px-3 py-2 text-[16px] leading-[22px]">«{transcript}»</p>
         <p className="mt-4 text-[16px] leading-[22px] text-muted">
@@ -91,7 +91,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
 
   if (entities.length === 0) {
     return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
         <PageHead title="Пока нечего подтверждать" />
         <p className="mt-3 text-[16px] leading-[22px] text-muted">
           Зажми кнопку на экране Пульса и скажи, что нужно сделать.
@@ -115,12 +115,12 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-8">
         <PageHead
           title={`Понял так: ${entitiesSummary(entities)}`}
           actions={
             <>
-              <Mascot state={sendableCount === countable && countable > 0 ? "happy" : "thinking"} size={44} />
+              <Mascot state={sendableCount === countable && countable > 0 ? "happy" : "thinking"} size={40} />
               <HeadButton label="Закрыть" icon="close" onClick={close} />
             </>
           }

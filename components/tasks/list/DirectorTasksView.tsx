@@ -154,7 +154,7 @@ export function DirectorTasksView({
   );
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead
         eyebrow={DATE_LINE.format(now)}
         title="Задачи"

@@ -124,8 +124,8 @@ export default function ScreenPage() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Экран в кабинете" />
 
       <Body className="mx-auto mt-4 w-full max-w-[380px]">
         <Lens tone={led} blink={inFlight} />

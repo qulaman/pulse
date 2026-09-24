@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
-import { useHeaderHeight } from "@/lib/useHeaderHeight";
+import { useBandStuck, useHeaderHeight } from "@/lib/useHeaderHeight";
 
 export type TabItem<K extends string> = {
   key: K;
@@ -19,7 +19,7 @@ const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 
 /**
  * The three piles of the list as one segmented control (iOS-style): a raised thumb slides
  * to the chosen tab, each tab carries its count. It sticks under the app header while the
- * list scrolls and draws a hairline once it is stuck; `children` rides in the same sticky
+ * list scrolls (under the navigation bar, D-113) and draws a hairline once it is stuck; `children` rides in the same sticky
  * band (the search field when it is open).
  */
 export function Tabs<K extends string>({
@@ -57,12 +57,14 @@ export function Tabs<K extends string>({
     observer.observe(node);
     return () => observer.disconnect();
   }, [top]);
+  useBandStuck(stuck);
 
   return (
     <>
       <div ref={sentinel} aria-hidden className={`h-px ${className}`} />
       <div
-        className={`sticky z-[5] -mx-4 bg-bg px-4 pb-2 pt-2 transition-[border-color] duration-[160ms] ${stuck ? "border-b border-border/70" : "border-b border-transparent"}`}
+        // the bar's glass under the bar (D-113): stuck, the pair reads as one bar with one hairline
+        className={`nav-glass sticky z-[5] -mx-4 px-4 pb-2 pt-2 transition-[border-color] duration-[160ms] ${stuck ? "border-b border-border/70" : "border-b border-transparent"}`}
         style={{ top }}
       >
         <div role="tablist" aria-label="Стопки задач" className={`seg gap-1 rounded-[14px] p-1 ${many ? "flex" : "grid grid-cols-3"}`}>

@@ -190,7 +190,7 @@ export function ProfileCard({ userId, fullName, role }: Props) {
           <span aria-hidden className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 1.5px 0 rgba(255,255,255,.35)" }} />
         </span>
 
-        <h1 className="mt-3.5 text-[24px] font-bold leading-[30px]">{fullName}</h1>
+        <h2 className="mt-3.5 text-[24px] font-bold leading-[30px]">{fullName}</h2>
         <p className="mt-1 text-[14px] leading-[18px] text-muted">{stat ? (stat.position ?? ROLE_LABEL[role]) : " "}</p>
 
         <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">

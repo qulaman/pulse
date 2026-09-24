@@ -2148,126 +2148,164 @@ select,
   caret-color: var(--accent);
 }
 
-/* ---- the head of a screen (D-109, components/ui/PageHead.tsx) ---------------------------
-   Eyebrow, a 30 px title, round buttons on the right, the pulse rule under it. Static:
-   the rule is drawn, never animated; the buttons move only by transform on a press. */
+/* ---- the navigation bar and the large title (D-113, components/ui/PageHead.tsx) ------------
+   iOS grammar: a bar on top (back, buttons) and the screen's large title under it. At the
+   top of the page the bar is clear; anything scrolled under it turns it to glass with a
+   hairline; once the large title has gone under it, the small title fades in. Only opacity/transform move; the blur is
+   static (the tab bar's recipe, D-112). */
+.nav-glass {
+  background: color-mix(in srgb, var(--bg) 76%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nav-glass { background: var(--bg); }
+}
+.nav-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  margin: 0 -16px;
+  padding: env(safe-area-inset-top) 16px 0;
+}
+.nav-bar-glass {
+  position: absolute;
+  inset: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out), border-color 160ms var(--ease-out);
+}
+.nav-bar[data-glass] .nav-bar-glass { opacity: 1; }
+/* a band stuck right under the bar (the segments of «Задачи», the pinned tiles of
+   «Настройки») carries the one hairline of the pair */
+:root[data-band-stuck] .nav-bar-glass { border-bottom-color: transparent; }
+.nav-bar-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 52px;
+}
+.nav-bar-side {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+}
+.nav-bar-end {
+  justify-content: flex-end;
+  gap: 10px;
+}
+/* the small title floats over the middle of the row: it takes no room from the sides while
+   hidden; shown, it keeps clear of a back button and two round buttons */
+.nav-bar-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  max-width: calc(100% - 192px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0;
+  transform: translate(-50%, calc(-50% + 5px));
+  pointer-events: none;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+}
+.nav-bar[data-titled] .nav-bar-title { opacity: 1; transform: translate(-50%, -50%); }
+/* a long way back («Ерлан Байжанов») gives way to the small title, as iOS shortens it */
+.nav-bar[data-titled] .nav-back-label { max-width: 64px; }
+.nav-back {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  height: 44px;
+  align-items: center;
+  gap: 1px;
+  margin-left: -9px;
+  padding: 0 8px 0 2px;
+  color: var(--accent);
+  font-size: 16px;
+  line-height: 20px;
+  font-weight: 500;
+  transition: opacity var(--t-instant) var(--ease-out);
+}
+.nav-back:active { opacity: 0.5; }
+
 .page-head { padding: 0 2px; }
 .page-head-eyebrow {
   display: flex;
-  align-items: center;
-  gap: 7px;
   min-height: 16px;
-  font-size: 13px;
+  align-items: center;
+  font-size: 12px;
   line-height: 16px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
-/* a 32 px tall zone for the finger around a 16 px line; the margins give the room back */
-.page-head-back {
-  width: fit-content;
-  gap: 3px;
-  margin: -8px 0 -8px -3px;
-  padding: 8px 8px 8px 0;
-  transition: color var(--t-instant) var(--ease-out);
-}
-.page-head-back:active { color: var(--text); }
-.page-head-row {
-  display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  margin-top: 2px;
-}
 .page-head-title {
-  flex: 1 1 0;
-  min-width: 0;
-  overflow: hidden;
-  font-size: 30px;
-  line-height: 36px;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  margin-top: 1px;
+  font-size: 34px;
+  line-height: 40px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
   overflow-wrap: anywhere;
 }
-/* the trace after the last word: 150 px wide, but it asks the line only for the room of its
-   beat (44 px) — the margin gives the rest back (the dot-leader trick). A last line without
-   that room sends the whole beat to a line of its own, never a stub; the title box clips
-   the fading tail before the buttons */
-.page-head-trace {
-  display: inline-flex;
-  align-items: center;
-  width: 150px;
-  height: 18px;
-  margin-right: -106px;
-  padding-left: 10px;
-  vertical-align: 2px;
-}
-.page-head-trace-lead {
-  width: 6px;
-  height: 1.5px;
-  border-radius: 1px;
-  background: var(--accent);
-}
-.page-head-trace-tail {
-  flex: 1;
-  height: 1.5px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 25%, transparent) 55%, transparent);
-}
-/* 42 px buttons centred on the 36 px title line without making it taller: a head with
-   buttons and one without stand at the same height */
-.page-head-actions {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 8px;
-  margin: -3px 0;
-}
 .page-head-sub {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 18px;
+  margin-top: 3px;
+  font-size: 14px;
+  line-height: 19px;
   color: var(--text-muted);
 }
 
+/* the round glass button of the bar: search, «на стену», «+», «⋯» */
 .head-btn {
   position: relative;
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   border-radius: 999px;
-  color: var(--text-muted);
-  border: 1px solid color-mix(in srgb, var(--border) 90%, white 4%);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 85%, white 5%), var(--surface) 80%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 6px 14px rgba(0, 0, 0, .3);
+  color: color-mix(in srgb, var(--text) 92%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), inset 0 0 0 1px rgba(255, 255, 255, .04);
   transition:
     transform var(--t-instant) var(--ease-out),
     color var(--t-instant) var(--ease-out),
-    border-color var(--t-instant) var(--ease-out),
     background-color var(--t-instant) var(--ease-out);
 }
-/* 44 px to the finger (DESIGN §2), 42 to the eye */
-.head-btn::before { content: ""; position: absolute; inset: -2px; border-radius: inherit; }
-.head-btn:active { transform: scale(0.93); }
+/* 44 px to the finger (DESIGN §2), 38 to the eye */
+.head-btn::before { content: ""; position: absolute; inset: -3px; border-radius: inherit; }
+.head-btn:active { transform: scale(0.92); }
 .head-btn:disabled { opacity: 0.5; }
-.head-btn[data-on],
-.head-btn[data-tone="accent"] {
+.head-btn[data-on] {
   color: var(--accent);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-  background:
-    radial-gradient(100% 100% at 50% 0%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 80%, var(--accent) 8%), var(--surface) 85%);
+  background: color-mix(in srgb, var(--accent) 17%, color-mix(in srgb, var(--surface-2) 70%, transparent));
+}
+/* the screen's one «create»: a solid accent circle */
+.head-btn[data-tone="accent"] {
+  color: var(--bg);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 86%, white), var(--accent) 55%, var(--accent-2));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 4px 14px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .head-btn-screen { fill: transparent; transition: fill var(--t-instant) var(--ease-out); }
 .head-btn[data-live] .head-btn-screen { fill: color-mix(in srgb, var(--accent) 26%, transparent); }
 /* the diode: lit while something is on the office wall — a static glow, only opacity changes */
 .head-btn-led {
   position: absolute;
-  top: 5px;
-  right: 5px;
-  width: 7px;
-  height: 7px;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--bg), 0 0 8px color-mix(in srgb, var(--accent) 80%, transparent);
@@ -2275,6 +2313,9 @@ select,
   transition: opacity var(--t-instant) var(--ease-out);
 }
 .head-btn[data-live] .head-btn-led { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-bar-glass, .nav-bar-title, .head-btn { transition: none; }
+}
 
 /* ---- «Задачи» and «Мои дела» as cards (D-83) ------------------------------------------
    One status screen, one segmented control, cards that open in place. Static shadows and

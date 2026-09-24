@@ -13,8 +13,8 @@ export default function RatingPage() {
   const pointsEnabled = usePointsEnabled();
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Рейтинг" sub="Очки за закрытые в срок задачи и поощрения директора" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Рейтинг" />
 
       {/* куда очки тратятся — сразу под тем, где они считаются (D-71) */}
       <Link

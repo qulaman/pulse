@@ -22,14 +22,14 @@ import {
   TaskListBone,
 } from "./Skeleton";
 
-const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5";
+const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36";
 
-/** The screen head (D-109) as the page draws it; `sub=" "` keeps the room of a line that loads. */
+/** The screen head (D-113) as the page draws it; `sub=" "` keeps the room of a line that loads. */
 function Title({ text, sub }: { text: string; sub?: string }) {
   return <PageHead title={text} sub={sub} />;
 }
 
-/** The date above the title, still grey: the phone's «now» draws it (D-109). */
+/** The date above the title, still grey: the phone's «now» draws it (D-113). */
 const DATE_BONE = (
   <SkeletonGroup>
     <Bone h={16} w={148} />
@@ -71,7 +71,7 @@ export function PulseSkeleton() {
  */
 function CardsSkeleton({ title, director }: { title: string; director: boolean }) {
   return (
-    <main className={`mx-auto w-full max-w-lg flex-1 px-4 pt-3 ${director ? "pb-36" : "pb-24"}`}>
+    <main className={`mx-auto w-full max-w-lg flex-1 px-4 ${director ? "pb-36" : "pb-24"}`}>
       <PageHead eyebrow={DATE_BONE} title={title} actions={director ? <HeadButtonBone /> : null} />
 
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-0.5 pt-3">
@@ -228,8 +228,8 @@ export function PersonSkeleton() {
 
 export function SettingsSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <Title text="Настройки" sub="Всё здесь — конфигурация компании: код одинаков для всех клиентов" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <Title text="Настройки" />
       {/* the four tab tiles, then the closed sections of whichever tab opens */}
       <SkeletonGroup className="mt-5 grid grid-cols-2 gap-2">
         {[0, 1, 2, 3].map((i) => (
@@ -247,7 +247,7 @@ export function SettingsSkeleton() {
 export function ScreenSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
+      <Title text="Экран в кабинете" />
       <SkeletonGroup className="mt-4 card p-4">
         <Bone h={26} w={200} />
         <Bone h={16} w={120} className="mt-2" />
@@ -265,8 +265,8 @@ export function ScreenSkeleton() {
 
 export function AdminSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36 pt-5">
-      <Title text="Данные" sub="Таблицы компании как есть, только чтение. Под правами директора: чужих компаний здесь нет" />
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36">
+      <Title text="Данные" />
       <SkeletonGroup className="mt-4 flex flex-wrap gap-2">
         {[84, 110, 72, 68, 90, 160, 120].map((w, i) => (
           <Bone key={i} h={36} w={w} className="rounded-full" />
@@ -288,15 +288,9 @@ export function AdminSkeleton() {
 
 /* ---- employee ---------------------------------------------------------------- */
 
+/** Лента (D-62): the face alone in the middle, as on Пульс — the home screen has no title. */
 export function FeedSkeleton() {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-10 pt-5">
-      <Title text="Лента" />
-      <SkeletonGroup className="mt-4">
-        <TaskListBone count={3} />
-      </SkeletonGroup>
-    </main>
-  );
+  return <PulseSkeleton />;
 }
 
 /** «Заметки»: a printed day label and cards of a heading, a line and the time. */
@@ -306,7 +300,7 @@ export function FeedSkeleton() {
  */
 export function NotesSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead eyebrow={DATE_BONE} title="Заметки" actions={<HeadButtonBone />} />
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
         <div className="flex items-center justify-between">
@@ -356,9 +350,9 @@ export function NotesSkeleton() {
 /** A board of «Заметки» (D-102): the way back, the title, the status screen and numbered points. */
 export function BoardSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
-        back={{ href: "/notes?tab=boards", label: "Заметки · доски" }}
+        back={{ href: "/notes?tab=boards", label: "Заметки" }}
         heading={
           <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
             <Bone h={30} w="62%" />
@@ -418,7 +412,7 @@ export function EtherListBone() {
 export function EtherSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Эфир" sub=" " />
+      <Title text="Эфир" />
       <EtherListBone />
     </main>
   );
@@ -466,7 +460,7 @@ export function CalendarListBone() {
  */
 export function CalendarSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead eyebrow={DATE_BONE} title="Календарь" />
       <SkeletonGroup className="mt-3">
         <div className="h-[223px] rounded-[22px] border border-border/70 bg-surface px-4 pt-3">
@@ -509,7 +503,7 @@ export function RatingListBone({ withAward = true }: { withAward?: boolean }) {
 export function RatingSkeleton() {
   return (
     <main className={MAIN}>
-      <Title text="Рейтинг" sub="Очки за закрытые в срок задачи и поощрения директора" />
+      <Title text="Рейтинг" />
       <div className="mt-4 flex gap-2">
         <Bone h={32} w={92} className="rounded-full" />
         <Bone h={32} w={84} className="rounded-full" />
@@ -522,8 +516,9 @@ export function RatingSkeleton() {
 
 export function ProfileSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-4">
-      <SkeletonGroup>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Профиль" />
+      <SkeletonGroup className="mt-3">
         <section className="card px-4 pb-4 pt-7 text-center">
           <Bone round w={84} h={84} className="mx-auto" />
           <Bone h={30} w={190} className="mx-auto mt-3.5" />
@@ -564,8 +559,8 @@ export function ProfileSkeleton() {
 export function TaskPageSkeleton() {
   // the task's own screen (D-87): the top bar, the status screen, «О задаче», the thread
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pt-2">
-      <p className="-ml-2 flex min-h-[44px] items-center gap-0.5 px-2 text-[15px] font-semibold text-accent">‹ Назад</p>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4">
+      <PageHead bare back={{ label: "Назад" }} />
       <SkeletonGroup>
         <div className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5">
           <div className="flex items-center justify-between">

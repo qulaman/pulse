@@ -1,5 +1,4 @@
-import Link from "next/link";
-
+import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 
 /**
@@ -55,7 +54,7 @@ export function DictionaryBody() {
 /** The whole route while it loads: the static head, the switch, the body. */
 export function DictionarySkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <DictionaryHead />
       <SkeletonGroup className="mt-5">
         <Bone h={50} className="rounded-[14px]" />
@@ -69,16 +68,8 @@ export function DictionarySkeleton() {
 
 /**
  * The head is static text: it renders at once and is never a bone (DESIGN §2, rule 2).
- * «Назад» leads to the settings tab the page was opened from.
+ * «‹ Настройки» in the bar leads to the settings tab the page was opened from (D-113).
  */
 export function DictionaryHead({ back = "/settings?tab=ai" }: { back?: string }) {
-  return (
-    <>
-      <Link href={back} className="text-[13px] leading-4 text-muted">
-        ← Настройки
-      </Link>
-      <h1 className="mt-2 text-[24px] font-bold leading-[30px]">Словарь</h1>
-      <p className="mt-1 text-[13px] leading-[18px] text-muted">Как ИИ узнаёт людей и названия в вашей речи</p>
-    </>
-  );
+  return <PageHead back={{ href: back, label: "Настройки" }} title="Словарь" />;
 }

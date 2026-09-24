@@ -90,7 +90,7 @@ export function PersonCard() {
   if (person.isLoading) return <PersonSkeleton />;
   if (!person.data) {
     return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
         <PageHead back={{ href: "/people", label: "Команда" }} title="Сотрудник не найден" />
       </main>
     );
@@ -112,7 +112,7 @@ export function PersonCard() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       {/* «На экран» is the head's round TV button (D-109): the diode is lit while the person is on the wall;
           the kiosk is not shown on the kiosk, a person who left — neither */}
       <PageHead
