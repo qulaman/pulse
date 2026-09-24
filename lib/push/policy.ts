@@ -64,8 +64,8 @@ const RULES: Record<string, Rule> = {
   errand_question: { ttl: 30 * MIN, urgency: "high" },
   errand_answer: { ttl: 30 * MIN, urgency: "high" },
   visit_arrived: { ttl: 20 * MIN, urgency: "high" },
+  visit_message: { ttl: 30 * MIN, urgency: "high" },
   visit_answered: { ttl: 20 * MIN, urgency: "high" },
-  visit_message: { ttl: 20 * MIN, urgency: "high" },
   test: { ttl: 10 * MIN, urgency: "high" },
 };
 

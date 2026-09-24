@@ -1674,6 +1674,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          kind: string
           note: string | null
           shown_at: string | null
           status: string
@@ -1689,6 +1690,7 @@ export type Database = {
           company_id: string
           created_at?: string
           id?: string
+          kind?: string
           note?: string | null
           shown_at?: string | null
           status?: string
@@ -1704,6 +1706,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           id?: string
+          kind?: string
           note?: string | null
           shown_at?: string | null
           status?: string
@@ -1740,7 +1743,7 @@ export type Database = {
     }
     Functions: {
       announce_visit: {
-        Args: { client_request_id?: string; p_note?: string }
+        Args: { client_request_id?: string; p_kind?: string; p_note?: string }
         Returns: {
           answered_at: string | null
           answered_by: string | null
@@ -1750,6 +1753,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          kind: string
           note: string | null
           shown_at: string | null
           status: string
@@ -1774,6 +1778,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          kind: string
           note: string | null
           shown_at: string | null
           status: string
@@ -1848,6 +1853,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          kind: string
           note: string | null
           shown_at: string | null
           status: string

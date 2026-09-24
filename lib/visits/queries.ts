@@ -5,12 +5,14 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
 /**
- * «К вам посетитель» (D-96): визиты читают директор и секретари своей компании (RLS);
- * киоск таблицу не читает — надпись ему отдаёт `tv_overlay()`.
+ * «К вам посетитель» (D-96) и «Сообщение на экран» (D-116): визиты читают директор и
+ * секретари своей компании (RLS); киоск таблицу не читает — надпись ему отдаёт `tv_overlay()`.
  */
 
 export type VisitRow = Database["public"]["Tables"]["visits"]["Row"];
-export type VisitAnswer = "invited" | "wait" | "declined";
+export type VisitKind = "visitor" | "message";
+/** Посетителю — дверь; сообщению — «прочитал» («Понятно»). */
+export type VisitAnswer = "invited" | "wait" | "declined" | "read";
 
 export type Visit = VisitRow & { author: { full_name: string } | null };
 

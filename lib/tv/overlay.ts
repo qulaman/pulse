@@ -5,25 +5,26 @@ import type { TvEventRow, TvOverlay } from "./queries";
 
 /**
  * Что висит поверх любой сцены стены (D-96) — чистой функцией. Посетитель важнее всего:
- * человек стоит у стола секретаря сейчас. Потом — мероприятие, которое вот-вот начнётся.
- * «Подождёт» — уже не надпись во всю стену, а тихая плашка в углу: директор ответил, но
- * человек всё ещё ждёт.
+ * человек стоит у стола секретаря сейчас. Потом — сообщение секретаря (D-116), потом —
+ * мероприятие, которое вот-вот начнётся. «Подождёт» — уже не надпись во всю стену, а тихая
+ * плашка в углу: директор ответил, но человек всё ещё ждёт.
  *
- * Негатива здесь нет (D-45): «Не приму» надпись просто убирает, а имя сотрудника на
- * стену не попадает вовсе — только слова секретаря, и те гостю не приезжают (D-33).
+ * «Пусть заходит» надпись просто убирает, как и «Не приму» (D-116 §1): стена висит в
+ * кабинете, посетитель стоит в приёмной — «Заходите» на ней не видел никто.
+ *
+ * Негатива здесь нет (D-45): имя сотрудника на стену не попадает вовсе — только слова
+ * секретаря, и те гостю не приезжают (D-33).
  */
 
 export type OverlayBanner =
   | { kind: "visit"; id: string; title: string; note: string | null; since: string; more: number }
-  | { kind: "visit-in"; id: string; title: string }
+  | { kind: "message"; id: string; title: string; text: string | null; since: string; more: number }
   | { kind: "event"; id: string; title: string; detail: string };
 
 export type OverlayPill = { kind: "visit-wait"; id: string; text: string };
 
 export type OverlayView = { banner: OverlayBanner | null; pill: OverlayPill | null };
 
-/** «Заходите» висит несколько секунд после ответа директора — и уходит. */
-export const INVITED_MS = 6_000;
 /** За сколько минут стена говорит о мероприятии надписью. */
 export const EVENT_SOON_MIN = 15;
 /** Сколько надпись о мероприятии держится — минуту в начале окна и минуту на старте. */
@@ -58,8 +59,15 @@ function eventBanner(events: readonly TvEventRow[], now: Date): OverlayBanner | 
   return null;
 }
 
+/** «только что», «3 мин назад» — когда секретарь написал. */
+function sentAgo(fromIso: string, now: Date): string {
+  const ago = waited(fromIso, now);
+  return ago === "только что" ? ago : `${ago} назад`;
+}
+
 export function overlayOf(overlay: TvOverlay | null | undefined, events: readonly TvEventRow[], now: Date): OverlayView {
   const visit = overlay?.visit ?? null;
+  const message = overlay?.message ?? null;
 
   if (visit?.status === "waiting") {
     return {
@@ -75,18 +83,25 @@ export function overlayOf(overlay: TvOverlay | null | undefined, events: readonl
     };
   }
 
-  if (visit?.status === "invited" && visit.answered_at) {
-    const answered = new Date(visit.answered_at).getTime();
-    // the kiosk clock decides when «Заходите» goes: the server keeps it a little longer
-    if (now.getTime() - answered < INVITED_MS) {
-      return { banner: { kind: "visit-in", id: visit.id, title: "Заходите" }, pill: null };
-    }
-  }
-
   const pill: OverlayPill | null =
     visit?.status === "wait"
       ? { kind: "visit-wait", id: visit.id, text: `Посетитель ждёт · ${waited(visit.created_at, now)}` }
       : null;
+
+  if (message) {
+    return {
+      banner: {
+        kind: "message",
+        id: message.id,
+        title: "Сообщение от секретаря",
+        // a guest in the office: the words stay on the director's phone (D-33)
+        text: message.note?.trim() || null,
+        since: sentAgo(message.created_at, now),
+        more: Math.max(0, (overlay?.messages ?? 1) - 1),
+      },
+      pill,
+    };
+  }
 
   return { banner: eventBanner(events, now), pill };
 }

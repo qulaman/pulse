@@ -38,7 +38,7 @@ import {
 } from "@/lib/tv/state";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import { useVisits } from "@/lib/visits/queries";
-import { awaitingDirector, waitedSince } from "@/lib/visits/text";
+import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text";
 
 /**
  * «Экран в кабинете» — пульт от телевизора в кармане директора (D-76 §10, D-96).
@@ -113,6 +113,9 @@ export default function ScreenPage() {
   const remainingMs = focusRemainingMs(row, now);
   const onScreenId = mode === "employee" ? row?.employee_id ?? null : null;
   const visitor = awaitingDirector(visits.data ?? [])[0] ?? null;
+  // the secretary's words on the wall (D-116): the newest one, as the wall shows it
+  const messages = unreadMessages(visits.data ?? []);
+  const message = messages[messages.length - 1] ?? null;
   // экран ни разу не поднимался: сначала объясняем, как его завести, потом команды
   const neverSeen = !row?.seen_at;
   // диод мигает, пока команда в пути: от нажатия до того, как киоск отметил её показанной
@@ -156,6 +159,10 @@ export default function ScreenPage() {
                 <p className="mt-1 text-[13px] leading-[18px]" style={{ color: "var(--accent)" }}>
                   Поверх всего — «К вам посетитель»
                 </p>
+              ) : message ? (
+                <p className="mt-1 text-[13px] leading-[18px]" style={{ color: "var(--accent)" }}>
+                  Поверх всего — сообщение секретаря
+                </p>
               ) : null}
               {mode === "employee" ? (
                 <div className="mt-3">
@@ -187,6 +194,28 @@ export default function ScreenPage() {
                   <span className="text-[13px] leading-4">{option.label}</span>
                 </Key>
               ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* the secretary's message on the wall: «Понятно» from the remote takes it down (D-116) */}
+        {message ? (
+          <div className="mt-3 rounded-[14px] p-3" style={{ background: "color-mix(in srgb, var(--accent) 10%, transparent)" }} data-testid="remote-message">
+            <p className="text-[13px] leading-4 text-muted">
+              Сообщение · {waitedSince(message.created_at, now)}
+              {messages.length > 1 ? ` · ещё ${messages.length - 1}` : ""}
+            </p>
+            <p className="mt-0.5 line-clamp-2 font-display text-[17px] font-semibold leading-[22px] [overflow-wrap:anywhere]">
+              {message.note?.trim()}
+            </p>
+            <div className="mt-2 grid">
+              <Key
+                on
+                disabled={answer.isPending && answer.variables?.id === message.id}
+                onClick={() => answer.mutate({ id: message.id, answer: "read" })}
+              >
+                <span className="text-[13px] leading-4">Понятно</span>
+              </Key>
             </div>
           </div>
         ) : null}

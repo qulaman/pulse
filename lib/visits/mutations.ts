@@ -5,13 +5,15 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-import { visitKeys, type Visit, type VisitAnswer } from "./queries";
+import { visitKeys, type Visit, type VisitAnswer, type VisitKind } from "./queries";
 
 /**
- * «К вам посетитель» (D-96) — три действия: секретарь объявляет, директор отвечает, карточку
- * убирают. Оффлайн-очереди нет ни у одного намеренно: человек стоит у стола сейчас, и
- * «к вам посетитель», доехавшее через полчаса, хуже честного «нет связи» (то же правило, что
- * у пульта, D-76 §3). Поэтому `networkMode: "always"` перебивает глобальный `offlineFirst`.
+ * «К вам посетитель» (D-96) и «Сообщение на экран» (D-116) — три действия: секретарь
+ * объявляет или пишет, директор отвечает, карточку убирают. Оффлайн-очереди нет ни у одного
+ * намеренно: человек стоит у стола сейчас, и «к вам посетитель», доехавшее через полчаса,
+ * хуже честного «нет связи» (то же правило, что у пульта, D-76 §3); сообщение на экран —
+ * о том, что происходит сейчас, тоже. Поэтому `networkMode: "always"` перебивает глобальный
+ * `offlineFirst`.
  */
 
 const OFFLINE = "Нет связи — директор не узнал. Попробуй ещё раз";
@@ -39,16 +41,19 @@ async function post(url: string, body: unknown, message: string): Promise<void> 
   }
 }
 
-/** Секретарь: «Посетитель». Ключ идемпотентности чеканится в момент тапа (принцип 7). */
-export function useAnnounceVisit() {
+/**
+ * Секретарь: «Посетитель» или «Сообщение». Ключ идемпотентности чеканится в момент тапа
+ * (принцип 7).
+ */
+export function useAnnounceVisit(kind: VisitKind = "visitor") {
   const queryClient = useQueryClient();
   return useMutation({
     networkMode: "always",
     mutationFn: async ({ note, id }: { note: string; id: string }) => {
-      await post("/api/visits", { note: note.trim() || undefined, client_request_id: id }, OFFLINE);
+      await post("/api/visits", { note: note.trim() || undefined, client_request_id: id, kind }, OFFLINE);
     },
     onSuccess: () => {
-      toast("Директору сообщено");
+      toast(kind === "message" ? "Сообщение отправлено" : "Директору сообщено");
       void queryClient.invalidateQueries({ queryKey: visitKeys.root });
     },
     onError: (error: Error) => toast(error.message || OFFLINE),
@@ -61,7 +66,7 @@ function patchVisit(queryClient: ReturnType<typeof useQueryClient>, id: string, 
   return snapshot;
 }
 
-/** Директор: «Пусть заходит» / «Подождёт» / «Не приму» — на Пульсе и на пульте. */
+/** Директор: «Пусть заходит» / «Подождёт» / «Не приму», сообщению — «Понятно»; на Пульсе и на пульте. */
 export function useAnswerVisit() {
   const queryClient = useQueryClient();
   return useMutation({

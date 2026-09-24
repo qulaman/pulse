@@ -6,6 +6,8 @@ import {
   reception,
   recentNotes,
   statusLine,
+  statusTone,
+  unreadMessages,
   waitedSince,
   wallLine,
   type VisitLike,
@@ -15,6 +17,7 @@ const NOW = new Date("2026-09-25T09:00:00Z");
 
 function visit(patch: Partial<VisitLike> & Pick<VisitLike, "id">): VisitLike {
   return {
+    kind: "visitor",
     status: "waiting",
     note: null,
     created_at: "2026-09-25T08:55:00Z",
@@ -35,6 +38,23 @@ describe("awaitingDirector", () => {
       visit({ id: "gone", closed_at: "2026-09-25T08:59:00Z" }),
     ]);
     expect(list.map((v) => v.id)).toEqual(["early", "late", "wait"]);
+  });
+
+  it("сообщение секретаря — не посетитель", () => {
+    expect(awaitingDirector([visit({ id: "m", kind: "message" })])).toEqual([]);
+  });
+});
+
+describe("unreadMessages", () => {
+  it("непрочитанные сообщения по порядку; прочитанные, убранные и посетители — нет", () => {
+    const list = unreadMessages([
+      visit({ id: "late", kind: "message", note: "Б", created_at: "2026-09-25T08:58:00Z" }),
+      visit({ id: "early", kind: "message", note: "А", created_at: "2026-09-25T08:50:00Z" }),
+      visit({ id: "read", kind: "message", note: "В", status: "read" }),
+      visit({ id: "gone", kind: "message", note: "Г", closed_at: "2026-09-25T08:59:00Z" }),
+      visit({ id: "visitor" }),
+    ]);
+    expect(list.map((v) => v.id)).toEqual(["early", "late"]);
   });
 });
 
@@ -61,6 +81,18 @@ describe("тексты карточки", () => {
     expect(closeLabel(visit({ id: "1", status: "invited" }))).toBe("Готово");
     expect(closeLabel(visit({ id: "1", status: "expired" }))).toBe("Понятно");
   });
+
+  it("сообщение: ждём прочтения, прочитал, не прочитал", () => {
+    const message = (patch: Partial<VisitLike> = {}) => visit({ id: "m", kind: "message", note: "Звонил Ахметов", ...patch });
+    expect(statusLine(message())).toBe("Ждём, пока директор прочитает");
+    expect(statusLine(message({ status: "read" }))).toBe("Директор прочитал");
+    expect(statusLine(message({ status: "expired" }))).toBe("Директор не прочитал");
+    expect(statusTone(message({ status: "read" }))).toBe("ok");
+    expect(wallLine(message({ shown_at: "2026-09-25T08:55:05Z" }))).toBe("На экране у директора");
+    expect(wallLine(message({ status: "read" }))).toBeNull();
+    expect(closeLabel(message())).toBe("Отменить");
+    expect(closeLabel(message({ status: "read" }))).toBe("Понятно");
+  });
 });
 
 describe("recentNotes", () => {
@@ -72,6 +104,15 @@ describe("recentNotes", () => {
       visit({ id: "4", note: "Курьер", created_at: "2026-09-25T08:30:00Z" }),
     ]);
     expect(notes).toEqual(["Курьер", "Иванов, поставки"]);
+  });
+
+  it("посетители и сообщения — разными списками", () => {
+    const list = [
+      visit({ id: "1", note: "Курьер", created_at: "2026-09-25T08:00:00Z" }),
+      visit({ id: "2", kind: "message", note: "Звонил Ахметов", created_at: "2026-09-25T08:30:00Z" }),
+    ];
+    expect(recentNotes(list)).toEqual(["Курьер"]);
+    expect(recentNotes(list, "message")).toEqual(["Звонил Ахметов"]);
   });
 });
 

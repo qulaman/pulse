@@ -275,6 +275,8 @@ created_at, accepted_at null, done_at null, updated_at
 ### visits — «К вам посетитель» (D-96)
 Секретарь → директор (миграция `20260923230100_visits`). Колонки: `author_id` (секретарь), `note` (≤120, необязательно), `status` (`waiting → wait → invited | declined`, либо `expired`), `answered_by/at`, `tv_version` (версия `tv_state`, которая несла надпись), `shown_at` (квитанция стены: `tv_heartbeat` отметил эту версию), `closed_at` (карточку убрали), `client_request_id` (уникальный). Политик на запись нет — только `announce_visit` (secretary), `answer_visit` (director; `invited` включает гостя на час), `close_visit`; каждая поднимает версию стены через `tv_touch`. Outbox: `visit_arrived` директорам, `visit_answered` автору — мимо окна доставки; истечение — `visits_due_expiry` в минутном свипе. В публикации Realtime. pgTAP — `023_visits.test.sql`.
 
+**Сообщение секретаря на стену (D-116)** — та же таблица, `kind` (`visitor` по умолчанию | `message`; миграция `20260924180000_visit_messages`). Проверка статуса по виду: посетитель — `waiting | wait | invited | declined | expired`, сообщение — `waiting → read | expired`; у сообщения `note` обязателен (`visits_message_note_check`). Outbox: `visit_message` директорам (категория «Секретарь»), автору — только `visit_answered` «Директор не прочитал» при истечении (30 минут); `read` снимает неушедший `visit_message`. `tv_overlay()` отдаёт свежее непрочитанное сообщение и их число, гостю — без текста; приглашённый визит больше не отдаёт. pgTAP — `032_visit_messages.test.sql`.
+
 ### consents — `[не построено]` (G.12)
 Таблицы согласий нет; анонимизации «Сотрудник №N» по согласию нет ни в рейтинге, ни на ТВ.
 
@@ -402,7 +404,7 @@ errands_due_remind(p_now timestamptz default now()) returns int          -- то
 thank_errand(p_id uuid, client_request_id uuid default null) returns jsonb   -- D-97
 
 -- посетители (D-96)
-announce_visit(p_note text default null, client_request_id uuid default null) returns visits
+announce_visit(p_note text default null, client_request_id uuid default null, p_kind text default 'visitor') returns visits  -- D-116: 'message'
 answer_visit(p_id uuid, p_answer text) returns visits
 close_visit(p_id uuid) returns visits
 visits_due_expiry(p_now timestamptz default now()) returns int           -- только service_role
@@ -416,7 +418,7 @@ tv_summary(p_guest boolean default false) returns jsonb
 -- пульс дня, ближайшие мероприятия, вердикт числами, три числа дня, топ-5 недели (fn_rating),
 -- загрузка людей (team_role), неделя, выдачи; при p_guest — маскированные поля; роли tv/director
 tv_calendar(p_guest boolean default false, p_days int default 7, p_from date default null) returns jsonb   -- D-96; до 42 дней с p_from (месяц), D-98
-tv_overlay() returns jsonb                                                -- D-96: посетитель, скорое мероприятие
+tv_overlay() returns jsonb                                                -- D-96, D-116: посетитель, сообщение секретаря
 tv_touch(p_company uuid, p_guest_minutes int default null) returns int  -- внутренняя: поднять версию стены
 tv_events_prune(p_days int default 30) returns int
 
@@ -534,5 +536,6 @@ pg_cron и pg_net не подключены. Единственное распи
 | `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
 | `026_secretary_admin.test.sql` | секретарь: правит чужие карточки и роли, кроме директора, директором никого не делает, своё не трогает; настройки и название компании — да, сотрудник — нет (D-104) |
 | `027_tv_wake.test.sql` | разбудка стены: два часа от «сейчас», `false` усыпляет, другие команды не трогают, будит только директор |
+| `032_visit_messages.test.sql` | сообщение секретаря на стену: только со словами, пуш директору, «Понятно» только директор и только сообщению, маска гостя, «Заходите» нет, 30 минут без ответа (D-116); счёт по своим строкам — проходит и на dev |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).

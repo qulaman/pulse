@@ -28,6 +28,7 @@ import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
 import { SecretaryCard } from "@/components/pulse/SecretaryCard";
+import { MessageAsk } from "@/components/visits/MessageAsk";
 import { VisitAsk } from "@/components/visits/VisitAsk";
 import { DESK_FACE, DESK_H, DESK_W, SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { useEther } from "@/lib/ether/queries";
@@ -45,7 +46,7 @@ import { askSecretary, setDeskAbsence, usePendingErrands } from "@/lib/errands/p
 import { absenceLine, etaLeftMin, isAway, sceneOfAction, untilLine, urgencyOf } from "@/lib/errands/scene";
 import type { SecretaryAction } from "@/lib/settings";
 import { useVisits } from "@/lib/visits/queries";
-import { awaitingDirector } from "@/lib/visits/text";
+import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
@@ -252,6 +253,8 @@ export default function PulsePage() {
   const visits = useVisits(hasSecretary);
   const visitRows = useMemo(() => visits.data ?? [], [visits.data]);
   const visitorsWaiting = awaitingDirector(visitRows).length > 0;
+  // the secretary's words on the wall (D-116): the same words under the face, «Понятно» clears both
+  const messagesWaiting = unreadMessages(visitRows).length > 0;
   // Эфир is news too: an announcement going out and every «ознакомился» coming back;
   // so are the calendar — an answer, a move, the reminder the tick has just written —
   // and the errands: «Айгуль · кофе принят»
@@ -723,6 +726,7 @@ export default function PulsePage() {
                 hospitality={(catalogue.data ?? NO_ACTIONS).filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
                 onErrand={() => void errands.refetch()}
               /> : null}
+            {!phraseInHand && messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
             {/* service cards only once the face has been tapped — the idle screen is the face alone */}
             {!phraseInHand && mode !== "idle" ? serviceLines : null}
             {mode === "panel" && !phraseInHand ? (
@@ -765,7 +769,7 @@ export default function PulsePage() {
 
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
-      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting ? (
+      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}
