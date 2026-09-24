@@ -485,6 +485,14 @@ function CategoryIcon({ category }: { category: NotifyCategory }) {
           <path d="M3.5 8.5h13M7 3.5v3M13 3.5v3" />
         </Icon>
       );
+    case "team":
+      return (
+        <Icon>
+          <circle cx="8" cy="7.5" r="2.5" />
+          <path d="M3.5 15.5a4.5 4.5 0 0 1 9 0" />
+          <path d="M14 6.5 17 9.5M17 6.5 14 9.5" />
+        </Icon>
+      );
     case "shop":
       return (
         <Icon>

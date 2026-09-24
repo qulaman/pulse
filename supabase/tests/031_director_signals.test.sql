@@ -1,6 +1,6 @@
 -- What the director is told on top of the events (D-114): held rows become one «Сводка», one
 -- held row goes as itself, what he saw in the app is not told again; «Задача не открыта»
--- after N minutes inside the window, once; «Просрочено» once per deadline; «Итог дня» once.
+-- (since 20260924160000: «не принята») after N minutes inside the window, once; «Просрочено» once per deadline; «Итог дня» once.
 -- Counts are scoped to this file's rows: dev holds other people's tasks and queues.
 -- Fixtures — supabase/seed.sql: director …0001, Марат …0007, Ерлан Б. …0005.
 begin;
@@ -109,8 +109,8 @@ select unseen_task_alerts_due(now());
 select is(
   (select meta ->> 'title' from notification_deliveries
     where task_id = '94000000-0000-0000-0000-000000000001' and event_kind = 'task_unseen'),
-  'Задача не открыта · Марат',
-  'forty minutes unseen: the director is told'
+  'Задача не принята · Марат',
+  'forty minutes not accepted: the director is told'
 );
 select unseen_task_alerts_due(now() + interval '5 minutes');
 select is(

@@ -1998,6 +1998,15 @@ export type Database = {
       }
       notes_due_reminders: { Args: { p_now?: string }; Returns: number }
       notes_purge_trash: { Args: { p_now?: string }; Returns: number }
+      notification_deliveries_purge: {
+        Args: {
+          p_batch?: number
+          p_keep_days?: number
+          p_now?: string
+          p_stale_days?: number
+        }
+        Returns: number
+      }
       notify_hhmm: {
         Args: { p_default: string; p_value: string }
         Returns: string
@@ -2166,6 +2175,7 @@ export type Database = {
         Args: { p_company: string; p_guest_minutes?: number }
         Returns: number
       }
+      team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
       unseen_task_alerts_due: { Args: { p_now?: string }; Returns: number }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }

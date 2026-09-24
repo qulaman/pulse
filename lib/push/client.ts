@@ -43,7 +43,11 @@ export async function registerWorker(): Promise<ServiceWorkerRegistration | null
 
 /** This browser's subscription — made when there is none and `create` is set. */
 async function currentSubscription(create: boolean): Promise<PushSubscription | null> {
-  const registration = (await registerWorker()) ?? (await navigator.serviceWorker.ready);
+  // no worker (a failed registration) — `ready` would wait forever
+  if (!(await registerWorker())) return null;
+  // subscribe only through an ACTIVE worker: on the very first start the fresh registration is
+  // still installing and `subscribe` fails («no active Service Worker») — found by smoke:push
+  const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
   if (existing || !create) return existing;
   return registration.pushManager.subscribe({

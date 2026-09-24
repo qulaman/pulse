@@ -14,6 +14,7 @@ describe("director push rules (D-114)", () => {
       secretary: "now",
       calendar: "now",
       shop: "now",
+      team: "now",
     });
     expect(DEFAULT_NOTIFY_PREFS.quiet.on).toBe(false);
     expect(DEFAULT_NOTIFY_PREFS.meetings).toBe(false);

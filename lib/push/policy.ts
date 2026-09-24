@@ -41,6 +41,7 @@ const RULES: Record<string, Rule> = {
   declined: { ttl: 24 * HOUR, urgency: "high" },
   task_unseen: { ttl: 4 * HOUR, urgency: "high" },
   task_overdue: { ttl: 12 * HOUR, urgency: "normal" },
+  team_channel: { ttl: 12 * HOUR, urgency: "normal" },
   digest: { ttl: 6 * HOUR, urgency: "normal" },
   day_summary: { ttl: 6 * HOUR, urgency: "normal" },
   // everybody
@@ -64,6 +65,7 @@ const RULES: Record<string, Rule> = {
   errand_answer: { ttl: 30 * MIN, urgency: "high" },
   visit_arrived: { ttl: 20 * MIN, urgency: "high" },
   visit_answered: { ttl: 20 * MIN, urgency: "high" },
+  visit_message: { ttl: 20 * MIN, urgency: "high" },
   test: { ttl: 10 * MIN, urgency: "high" },
 };
 
@@ -100,11 +102,12 @@ const PRIVATE_TITLE: Record<string, string> = {
   declined: "Отказ по задаче",
   questions: "Вопрос по задаче",
   messages: "Новое сообщение",
-  unseen: "Задачу не открыли",
+  unseen: "Задачу не приняли",
   overdue: "Просрочка",
   secretary: "От секретаря",
   calendar: "Календарь",
   shop: "Магазин",
+  team: "Уведомления команды",
   reminders: "Напоминание",
   tasks: "Задачи",
   system: "Pulse",

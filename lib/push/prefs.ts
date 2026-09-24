@@ -4,8 +4,8 @@ import { z } from "zod";
  * The director's push rules (D-114). Stored per person in `notification_prefs` and applied by
  * the database when a row is queued (the routing trigger, migration 20260924150200) — so the
  * defaults live twice: here and in `notify_prefs_defaults()`. Keep both. The defaults are
- * today's behaviour (everything «сразу», no quiet hours); the two new signals are on:
- * «задачу не открыли» after 30 minutes, overdue in a digest.
+ * today's behaviour (everything «сразу», no quiet hours); the new signals are on: «задачу не
+ * приняли» after 30 minutes, overdue in a digest, «уведомления не доходят» at once.
  *
  * Nobody else has rules: employees, the secretary and the shopkeeper live by the fixed policy
  * of lib/push/policy.ts and the company delivery window.
@@ -21,6 +21,7 @@ export const NOTIFY_CATEGORIES = [
   "secretary",
   "calendar",
   "shop",
+  "team",
 ] as const;
 export type NotifyCategory = (typeof NOTIFY_CATEGORIES)[number];
 
@@ -48,9 +49,10 @@ export const NotifyPrefsSchema = z.object({
       secretary: mode("now"),
       calendar: mode("now"),
       shop: mode("now"),
+      team: mode("now"),
     })
     .prefault({}),
-  /** «Задачу не открыли» after this many minutes in working hours. */
+  /** «Задачу не приняли» after this many minutes in working hours. */
   unseen_after_min: z.number().int().min(5).max(240).default(30),
   digest_every: z.enum(DIGEST_EVERY).default("hour"),
   /** «Итог дня» at this Aqtobe time; null — off. */
@@ -103,11 +105,12 @@ export const CATEGORY_LABEL: Record<NotifyCategory, string> = {
   declined: "Отказы «Не могу»",
   questions: "Вопросы по задачам",
   messages: "Сообщения в задачах",
-  unseen: "Задачу не открыли",
+  unseen: "Задачу не приняли",
   overdue: "Просрочки",
   secretary: "Секретарь и посетители",
   calendar: "Календарь",
   shop: "Магазин",
+  team: "Уведомления команды",
 };
 
 export const CATEGORY_HINT: Record<NotifyCategory, string> = {
@@ -115,11 +118,12 @@ export const CATEGORY_HINT: Record<NotifyCategory, string> = {
   declined: "Сотрудник нажал «Не могу» и назвал причину",
   questions: "«Уточнить» в задаче — ждёт вашего ответа",
   messages: "Ответы, фото и голосовые в переписке задачи",
-  unseen: "Задача ушла, а сотрудник её так и не открыл — только в рабочие часы",
+  unseen: "Задача ушла, а «Принял» так никто и не нажал. В пуше — увидел ли её сотрудник. Только в рабочие часы",
   overdue: "Срок прошёл, а задача не сдана",
   secretary: "Готово с результатом, вопрос секретаря, «не выйдет», посетитель",
   calendar: "«Скоро» перед встречей, «не сможет», перенос и отмена",
   shop: "Сотрудник заказал награду",
+  team: "У человека перестали доходить уведомления — о задачах он узнает, только открыв Pulse. Раз в неделю на человека",
 };
 
 export const MODE_LABEL: Record<NotifyMode, string> = {
@@ -142,7 +146,7 @@ export const DIGEST_LABEL: Record<DigestEvery, string> = {
   twice: "в 12:00 и 17:00",
 };
 
-/** The right-hand word of a category row: «Сразу», «Сводкой»; «не открыли» — «30 мин» or «30 мин · тихо». */
+/** The right-hand word of a category row: «Сразу», «Сводкой»; «не приняли» — «30 мин» or «30 мин · тихо». */
 export function categoryValue(prefs: NotifyPrefs, category: NotifyCategory): string {
   const mode = prefs.modes[category];
   const word = MODE_LABEL[mode];

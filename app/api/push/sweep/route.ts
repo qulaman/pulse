@@ -18,7 +18,9 @@ type Tick =
   | "unseen_task_alerts_due"
   | "overdue_alerts_due"
   | "director_day_summaries_due"
-  | "director_digests_due";
+  | "director_digests_due"
+  | "team_channel_alerts_due"
+  | "notification_deliveries_purge";
 
 /** Each tick on its own: a failing one is logged and the rest — and the queue — still go. */
 async function tick(service: Service, name: Tick): Promise<number> {
@@ -50,12 +52,15 @@ export async function POST(req: Request) {
     const noteReminders = await tick(service, "notes_due_reminders"); // «напомни мне», D-95
     const notesPurged = await tick(service, "notes_purge_trash");
     const visitsExpired = await tick(service, "visits_due_expiry"); // D-96
-    // the director's signals (D-114): «задача не открыта», «просрочено», «итог дня» — and
-    // last, the digests, so a signal held for one goes into it on the same tick
+    // the director's signals (D-114): «задача не принята», «просрочено», «уведомления не
+    // доходят», «итог дня» — and last, the digests, so a signal held for one goes into it
     const unseen = await tick(service, "unseen_task_alerts_due");
     const overdue = await tick(service, "overdue_alerts_due");
+    const team = await tick(service, "team_channel_alerts_due"); // «уведомления не доходят»
     const summaries = await tick(service, "director_day_summaries_due");
     const digests = await tick(service, "director_digests_due");
+    // the outbox cleans itself: 30 days for what went, 7 for what never did, a batch a minute
+    const purged = await tick(service, "notification_deliveries_purge");
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
@@ -68,8 +73,10 @@ export async function POST(req: Request) {
       visits_expired: visitsExpired,
       unseen,
       overdue,
+      team,
       summaries,
       digests,
+      purged,
     });
   } catch (err) {
     console.error("sweep failed:", err instanceof Error ? err.message : err);
