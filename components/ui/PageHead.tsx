@@ -1,83 +1,171 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+
+import { backTarget } from "@/components/TabBar";
+import { tabBarRole } from "@/lib/routes";
+import { useMe } from "@/lib/tasks/queries";
+
+type Back = { label: string; href?: string; onClick?: () => void; testId?: string };
 
 /**
- * The head of every screen that has a title (D-109): one shape everywhere.
+ * The head of every screen that has a title (D-113, iOS grammar): a navigation bar on top —
+ * «‹ Назад» in the accent on the left, round glass buttons (`HeadButton`) on the right — and
+ * the large title under it with an optional eyebrow (the date on the screens of the day) and
+ * one live line (a summary, never an explanation).
  *
- *   Среда, 23 сентября
- *   Задачи ─∿────────        (○)(○)
- *   one quiet line of context
+ *   ‹ Команда                            (○)(○)
+ *   ЧЕТВЕРГ, 24 СЕНТЯБРЯ
+ *   Задачи
  *
- * Above the title — an eyebrow: the date on the screens of the day, «‹ Заметки» on a nested
- * screen. After the title runs the trace — the cardiomonitor line of the brand mark
- * (`PulseMark`: the line and the word), one beat, fading out before the round buttons
- * (`HeadButton`: search, «на стену», «+»). Static: nothing moves on a navigation
- * (DESIGN §1.5). Server-safe: the buttons bring their own client code.
+ * The bar sticks to the top. Clear at the top of the page; as soon as anything scrolls under
+ * it, it turns to glass (iOS «scroll edge»); once the large title has gone under it, the
+ * small title fades in — opacity and transform only. `bare` — the bar alone (the task screen: its title lives in the status
+ * screen). The client brand is not here: it lives on the home screens (D-113 §4).
  */
 export function PageHead({
   title,
+  smallTitle,
   eyebrow,
   back,
   sub,
   actions,
   heading,
-  className = "",
+  bare = false,
 }: {
   title?: ReactNode;
-  /** the line above the title: a date, a place; `back` wins over it */
+  /** the bar's title once the large one is gone; defaults to `title` when it is text */
+  smallTitle?: string;
+  /** the line above the large title: the date on the screens of the day */
   eyebrow?: ReactNode;
-  /** a nested screen: the eyebrow becomes the way back */
-  back?: { href: string; label: string; testId?: string };
-  /** one line of context under the title (a summary, what the screen is for) */
+  /**
+   * «‹ label» on the left of the bar, a link or a callback. Left out, every screen that is not
+   * a tab's own root gets «‹ Назад» by itself (`useAutoBack`); `false` — none (a sheet-like
+   * screen with its own «×»).
+   */
+  back?: Back | false;
+  /** one live line under the title (a summary) */
   sub?: ReactNode;
-  /** round `HeadButton`s, right of the title */
+  /** round `HeadButton`s on the right of the bar */
   actions?: ReactNode;
-  /** replaces the <h1> (an editable title renders its own) */
+  /** replaces the large <h1> (an editable title renders its own) */
   heading?: ReactNode;
-  className?: string;
+  /** the bar only, no large title */
+  bare?: boolean;
 }) {
+  const bar = useRef<HTMLDivElement>(null);
+  const edge = useRef<HTMLDivElement>(null);
+  const titleEnd = useRef<HTMLDivElement>(null);
+  const [glass, setGlass] = useState(false);
+  const [titled, setTitled] = useState(false);
+
+  useEffect(() => {
+    const head = bar.current;
+    const marks = [edge.current, titleEnd.current];
+    if (!head || !marks[0] || !marks[1]) return;
+    let observer: IntersectionObserver | null = null;
+    // the bar's height moves with the safe area (rotation): re-observe with the new margin
+    const watch = () => {
+      observer?.disconnect();
+      const top = Math.round(head.getBoundingClientRect().height);
+      observer = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const under = !entry.isIntersecting && entry.boundingClientRect.top < top + 1;
+            if (entry.target === marks[0]) setGlass(under);
+            else setTitled(under);
+          }
+        },
+        { rootMargin: `-${top}px 0px 0px 0px` },
+      );
+      for (const mark of marks) if (mark) observer.observe(mark);
+    };
+    watch();
+    const resize = new ResizeObserver(watch);
+    resize.observe(head);
+    return () => {
+      resize.disconnect();
+      observer?.disconnect();
+    };
+  }, []);
+
+  const small = smallTitle ?? (typeof title === "string" ? title : undefined);
+  const auto = useAutoBack(back === undefined);
+  const way = back === false ? undefined : (back ?? auto);
+
   return (
-    <header className={`page-head ${className}`}>
-      {back ? (
-        <Link href={back.href} className="page-head-eyebrow page-head-back" data-testid={back.testId}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M15 5.5 8.5 12 15 18.5" />
-          </svg>
-          {back.label}
-        </Link>
-      ) : eyebrow ? (
-        <div className="page-head-eyebrow">
-          <span className="min-w-0 truncate first-letter:uppercase">{eyebrow}</span>
+    <>
+      <div ref={bar} data-nav-bar="" data-glass={glass ? "" : undefined} data-titled={titled ? "" : undefined} className="nav-bar">
+        <div aria-hidden className="nav-bar-glass nav-glass" />
+        <div className="nav-bar-row">
+          <div className="nav-bar-side">{way ? <BackButton back={way} /> : null}</div>
+          <div aria-hidden className="nav-bar-title">
+            {small}
+          </div>
+          <div className="nav-bar-side nav-bar-end">{actions}</div>
         </div>
-      ) : null}
-      <div className="page-head-row">
-        {heading ?? (
-          <h1 className="page-head-title">
-            {title}
-            <HeadTrace />
-          </h1>
-        )}
-        {actions ? <div className="page-head-actions">{actions}</div> : null}
       </div>
-      {sub ? <p className="page-head-sub">{sub}</p> : null}
-    </header>
+      {/* scrolled under the bar: the first page pixel — glass; the end of the title — the small title */}
+      <div ref={edge} aria-hidden className="h-px -mb-px" />
+      {bare ? null : (
+        <header className="page-head">
+          {eyebrow ? (
+            <div className="page-head-eyebrow">
+              <span className="min-w-0 truncate">{eyebrow}</span>
+            </div>
+          ) : null}
+          {heading ?? <h1 className="page-head-title">{title}</h1>}
+          {sub ? <p className="page-head-sub">{sub}</p> : null}
+        </header>
+      )}
+      <div ref={titleEnd} aria-hidden className="h-px" />
+    </>
   );
 }
 
 /**
- * One beat of the cardiomonitor on a line that fades out, glued to the last word of the
- * title (a wrapped title carries it on its last line). It takes no room in the line —
- * `margin-right` cancels its width — so it never pushes a word over; the title box clips
- * it before the buttons. A custom `heading` puts it after its own text.
+ * «‹ Назад» for a screen the tab bar has no tab for (D-113): «Команда», «Магазин», «Данные»,
+ * «Эфир», the director's «Рейтинг»… It goes back in the history when there is one inside the
+ * app, otherwise (opened from a push) to the tab the screen lives in (`backTarget`).
  */
-export function HeadTrace() {
-  return (
-    <span aria-hidden className="page-head-trace">
-      <span className="page-head-trace-lead" />
-      <svg width="28" height="18" viewBox="0 0 28 18" className="shrink-0">
-        <polyline points="0,9 6,9 9.5,2 14,16 17.5,6 20.5,9 28,9" fill="none" stroke="var(--accent)" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+function useAutoBack(wanted: boolean): Back | undefined {
+  const me = useMe();
+  const path = usePathname();
+  const router = useRouter();
+  const role = me.data?.role;
+  if (!wanted || !role) return undefined;
+  const target = backTarget(tabBarRole(role), path);
+  if (!target) return undefined;
+  return {
+    label: "Назад",
+    onClick: () => {
+      if (window.history.length > 1) router.back();
+      else router.push(target);
+    },
+  };
+}
+
+function BackButton({ back }: { back: Back }) {
+  const body = (
+    <>
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden className="shrink-0">
+        <path d="M14.5 5.5 8 12l6.5 6.5" />
       </svg>
-      <span className="page-head-trace-tail" />
-    </span>
+      <span className="nav-back-label min-w-0 truncate">{back.label}</span>
+    </>
+  );
+  if (back.href) {
+    return (
+      <Link href={back.href} className="nav-back" data-testid={back.testId}>
+        {body}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" onClick={back.onClick} className="nav-back" data-testid={back.testId}>
+      {body}
+    </button>
   );
 }

@@ -16,6 +16,7 @@ import { ThreadView } from "@/components/tasks/thread/ThreadView";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { HeadButton } from "@/components/ui/HeadButton";
+import { PageHead } from "@/components/ui/PageHead";
 import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
 import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -101,21 +102,14 @@ export function TaskDetail({
   const person = isDirector ? task.assignee?.full_name : task.author?.full_name;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pt-2">
-      {/* the top bar: back, and — for the director — every move this task allows */}
-      <div className="flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="-ml-2 flex min-h-[44px] items-center gap-0.5 rounded-full px-2 text-[15px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
-        >
-          <Icon name="left" size={20} />
-          Назад
-        </button>
-        {isDirector ? (
-          <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} />
-        ) : null}
-      </div>
+    <main className="mx-auto w-full max-w-lg flex-1 px-4">
+      {/* the navigation bar (D-113): back, and — for the director — every move this task allows;
+          the title lives in the status screen, so the bar carries none (as a letter in Mail) */}
+      <PageHead
+        bare
+        back={{ label: "Назад", onClick: onBack }}
+        actions={isDirector ? <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} /> : null}
+      />
 
       {/* the status screen of this one task */}
       <article

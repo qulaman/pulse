@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 
 import { TaskDetail } from "@/components/tasks/detail/TaskDetail";
 import { useMinute } from "@/components/tasks/list/TaskList";
+import { PageHead } from "@/components/ui/PageHead";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
 import { clearTaskNotifications } from "@/lib/push/client";
 import { homeForRole } from "@/lib/routes";
@@ -55,10 +56,8 @@ export default function TaskThreadPage() {
 
   if (!task.data) {
     return (
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-5">
-        <button type="button" onClick={back} className="flex min-h-[44px] items-center gap-1 text-[15px] font-semibold text-accent">
-          ‹ Назад
-        </button>
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
+        <PageHead bare back={{ label: "Назад", onClick: back }} />
         <p className="mt-4 text-[16px] leading-[22px] text-muted">Задача не найдена — возможно, её удалили</p>
       </main>
     );

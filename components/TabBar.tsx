@@ -136,9 +136,19 @@ const TABS: Record<TabRole, Tab[]> = {
  * the announcements in Пульс and Лента, the shop behind «Рейтинг» (D-59, docs/FRONTEND.md).
  */
 const SECTIONS: Record<TabRole, Record<string, string>> = {
-  director: { "/tasks": "/sent", "/people": "/settings", "/shop": "/settings", "/ether": "/pulse", "/confirm": "/pulse" },
+  // «Данные», «Рейтинг», «Заявки» open from the director's «Настройки» rows too (D-113: «Назад» leads there)
+  director: {
+    "/tasks": "/sent",
+    "/people": "/settings",
+    "/shop": "/settings",
+    "/rating": "/settings",
+    "/admin": "/settings",
+    "/secretary": "/settings",
+    "/ether": "/pulse",
+    "/confirm": "/pulse",
+  },
   employee: { "/ether": "/feed", "/shop": "/rating" },
-  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings" },
+  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings", "/secretary": "/settings" },
 };
 
 /** The lit tab and whether the screen is that tab's own (`page`) or lives inside it. */
@@ -149,6 +159,18 @@ function activeTab(role: TabRole, pathname: string): { index: number; own: boole
   if (own >= 0) return { index: own, own: true };
   const section = Object.entries(SECTIONS[role]).find(([base]) => within(base));
   return { index: section ? tabs.findIndex((tab) => tab.href === section[1]) : -1, own: false };
+}
+
+/**
+ * Where «Назад» leads from this screen (D-113): `null` on a tab's own root — a tab needs no
+ * way back; anywhere else — the tab the screen lives in (the one the bar lights), or the
+ * first tab, the home screen, when it lives in none.
+ */
+export function backTarget(role: TabRole, pathname: string): string | null {
+  const tabs = TABS[role];
+  if (tabs.some((tab) => tab.href === pathname)) return null;
+  const { index } = activeTab(role, pathname);
+  return tabs[index >= 0 ? index : 0].href;
 }
 
 /**

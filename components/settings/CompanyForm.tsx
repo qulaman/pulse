@@ -131,7 +131,7 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
       title="Название и логотип"
       dirty={dirty}
       summary={`${company.name} · ${company.brand.logo_url ? "логотип есть" : "без логотипа"}${company.brand.accent ? " · свой акцент" : ""}`}
-      hint="Название и логотип видят все в шапке и на экране входа. Стиль Pulse остаётся, меняется только акцент"
+      hint="Название и логотип видят все на главном экране и на экране входа. Стиль Pulse остаётся, меняется только акцент"
     >
       {/* header preview */}
       <div className="flex items-center gap-3 rounded-[12px] border border-border bg-bg px-3 py-2">

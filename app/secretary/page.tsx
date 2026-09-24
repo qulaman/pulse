@@ -30,7 +30,7 @@ const STATUS_WORD: Record<string, string> = {
  */
 export default function SecretaryPage() {
   return (
-    <Suspense fallback={<SkeletonGroup className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5"><SectionBone fields={3} /></SkeletonGroup>}>
+    <Suspense fallback={<SecretarySkeleton />}>
       <SecretaryScreen />
     </Suspense>
   );
@@ -56,20 +56,11 @@ function SecretaryScreen() {
     return rows.filter((row) => !isActive(row) && new Date(row.created_at) >= start);
   }, [rows, now]);
 
-  if (me.isLoading || history.isLoading) {
-    return (
-      <SkeletonGroup className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-        <SectionBone fields={3} />
-      </SkeletonGroup>
-    );
-  }
+  if (me.isLoading || history.isLoading) return <SecretarySkeleton />;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead
-        title="Заявки"
-        sub={isDirector ? "Кофе, чай, врач — без срока и приёмки, живут минуты" : "Что просит директор прямо сейчас"}
-      />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Заявки" />
 
       {isDirector ? (
         <>
@@ -194,5 +185,17 @@ function ErrandLine({ errand, now, onOpen }: { errand: Errand; now: Date; onOpen
     </button>
   ) : (
     <div className={className}>{body}</div>
+  );
+}
+
+/** Заявки before the data: the head is the page's own (D-113), the list is bones. */
+function SecretarySkeleton() {
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Заявки" />
+      <SkeletonGroup className="mt-4">
+        <SectionBone fields={3} />
+      </SkeletonGroup>
+    </main>
   );
 }

@@ -82,7 +82,7 @@ export function EmployeeTasksView({
 
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24">
       <PageHead eyebrow={DATE_LINE.format(now)} title="Мои дела" />
 
       <div className="mt-3">

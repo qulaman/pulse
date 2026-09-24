@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
-import { AppHeader } from "@/components/AppHeader";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
 import { homeForRole, tabBarRole } from "@/lib/routes";
@@ -22,7 +21,6 @@ export default async function SecretaryLayout({ children }: { children: React.Re
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <AppHeader fullName={profile.fullName} companyId={profile.companyId} />
       {children}
       <TabBar role={tabBarRole(profile.role)} />
     </div>

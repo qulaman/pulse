@@ -158,8 +158,8 @@ export default function AdminPage() {
   const spec = TABLES.find((t) => t.table === active) ?? TABLES[0];
 
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Данные" sub="Таблицы компании как есть, только чтение. Под правами директора: чужих компаний здесь нет" />
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36">
+      <PageHead title="Данные" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         {TABLES.map((t) => (

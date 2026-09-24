@@ -61,8 +61,8 @@ export function RemoteSkeleton() {
 /** The whole `/screen` page while loading: header, remote, the channel list. */
 export function ScreenPageSkeleton() {
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead title="Экран в кабинете" sub="Пульт от телевизора: что сейчас на стене и что показать" />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Экран в кабинете" />
       <RemoteSkeleton />
     </main>
   );

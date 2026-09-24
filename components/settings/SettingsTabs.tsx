@@ -40,7 +40,7 @@ import { usePeople } from "@/lib/people/queries";
 import { usePushHealth } from "@/lib/push/health-query";
 import type { Role } from "@/lib/routes";
 import { useMe } from "@/lib/tasks/queries";
-import { useHeaderHeight } from "@/lib/useHeaderHeight";
+import { useBandStuck, useHeaderHeight } from "@/lib/useHeaderHeight";
 
 const TABS: Record<SettingsTab, { title: string; short: string; about: string; icon: ReactNode }> = {
   company: { title: "Компания", short: "Компания", about: "название, логотип, часы", icon: <BuildingIcon /> },
@@ -125,6 +125,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
   const [hold, setHold] = useState(false);
   const release = useCallback(() => setHold(false), []);
   const pinned = useScrolledPast(tilesRef, top, release);
+  useBandStuck(pinned);
 
   const select = (next: SettingsTab) => {
     if (next === tab) return;
@@ -190,7 +191,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
       </div>
 
       {pinned ? (
-        <div className="settings-bar-in fixed inset-x-0 z-[6] border-b border-border/70 bg-bg" style={{ top }}>
+        <div className="settings-bar-in nav-glass fixed inset-x-0 z-[6] border-b border-border/70" style={{ top }}>
           <div className="mx-auto w-full max-w-lg px-4 py-2">
             <div role="tablist" aria-label="Разделы настроек" className="seg flex gap-1 rounded-[14px] p-1">
               {SETTINGS_TABS.map((key) => {

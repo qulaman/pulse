@@ -9,7 +9,7 @@ import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { Bone, SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { assignableRoles, canChangeAccess, canEditPerson, canResetLogin } from "@/lib/people/access";
-import { ROLE_LABEL, initialsOf, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
+import { ROLE_LABEL, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
 import { useMe } from "@/lib/tasks/queries";
 
 /**
@@ -31,7 +31,7 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
   const editor = me.data ? { id: me.data.userId, role: me.data.role } : null;
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40 pt-5">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
       {loading ? (
         <PageHead
           back={back}
@@ -44,7 +44,7 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
       ) : !p || !editor ? (
         <PageHead back={back} title="Сотрудник не найден" />
       ) : (
-        // the head of the screen (D-109): the name, what the person is, the face on the right
+        // the head of the screen (D-113): the name and what the person is
         <PageHead
           back={back}
           title={p.full_name}
@@ -55,15 +55,6 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
           ]
             .filter(Boolean)
             .join(" · ")}
-          actions={
-            <span
-              aria-hidden
-              className="flex h-[42px] w-[42px] items-center justify-center rounded-full text-[15px] font-semibold text-bg"
-              style={{ background: "linear-gradient(135deg, var(--accent), #1FA88F)", opacity: p.is_active ? 1 : 0.55 }}
-            >
-              {initialsOf(p.full_name)}
-            </span>
-          }
         />
       )}
       {loading ? (

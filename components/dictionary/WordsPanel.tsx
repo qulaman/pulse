@@ -15,7 +15,7 @@ import {
   planWords,
   type RosterPerson,
 } from "@/lib/dictionary";
-import { useEditVocabulary } from "@/lib/dictionary-queries";
+import { useEditVocabulary, useWaitingEdits } from "@/lib/dictionary-queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 const STEPS: GuideStep[] = [
@@ -58,6 +58,7 @@ function words(n: number): string {
  */
 export function WordsPanel({ vocabulary, people }: { vocabulary: string[]; people: RosterPerson[] }) {
   const edit = useEditVocabulary();
+  const waiting = useWaitingEdits();
   const [text, setText] = useState("");
   const [query, setQuery] = useState("");
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
@@ -140,7 +141,13 @@ export function WordsPanel({ vocabulary, people }: { vocabulary: string[]; peopl
       ) : (
         <div className="card flex flex-wrap gap-1.5 px-3 py-3">
           {visible.map((word) => (
-            <EntryChip key={word} label={word} fresh={fresh.has(entryKey(word))} onRemove={() => remove(word)} />
+            <EntryChip
+              key={word}
+              label={word}
+              fresh={fresh.has(entryKey(word))}
+              waiting={waiting.words.has(entryKey(word))}
+              onRemove={() => remove(word)}
+            />
           ))}
         </div>
       )}

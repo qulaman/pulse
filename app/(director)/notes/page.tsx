@@ -348,7 +348,7 @@ export default function NotesPage() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28 pt-3">
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
         eyebrow={DATE_LINE.format(now)}
         title="Заметки"
