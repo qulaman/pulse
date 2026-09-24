@@ -2,13 +2,13 @@ import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { ENTRY_MAX_LENGTH, VOCABULARY_MAX, WORD_KINDS, applyVocabularyEdit } from "@/lib/dictionary";
+import { ENTRY_MAX_LENGTH, VOCABULARY_MAX, applyVocabularyEdit } from "@/lib/dictionary";
 import { loadCompanySettings } from "@/lib/roster";
 import { parseCompanySettings } from "@/lib/settings";
 import type { Json } from "@/lib/supabase/types";
 
 const Word = z.string().trim().min(1).max(ENTRY_MAX_LENGTH);
-const Kind = z.enum(WORD_KINDS).nullable();
+const Kind = z.string().min(1).max(40).nullable();
 
 const BodySchema = z
   .object({
@@ -33,10 +33,13 @@ export const POST = withAuth<Body>(
   ["director", "secretary"],
   async ({ req, profile, body }) => {
     const current = parseCompanySettings(await loadCompanySettings(profile.companyId));
-    const out = applyVocabularyEdit(current.vocabulary, current.vocabulary_meta, body, {
-      at: new Date().toISOString(),
-      by: profile.fullName,
-    });
+    const out = applyVocabularyEdit(
+      current.vocabulary,
+      current.vocabulary_meta,
+      body,
+      { at: new Date().toISOString(), by: profile.fullName },
+      current.word_kinds,
+    );
     if (out.overflow.length) {
       return apiError(422, "vocabulary_full", `В словаре уже ${VOCABULARY_MAX} слов — сначала уберите лишние`);
     }

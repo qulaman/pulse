@@ -5,7 +5,7 @@ import { useState } from "react";
 import { STALE_DAYS, type WordFact } from "@/components/dictionary/word-facts";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { WORD_KIND_LABEL } from "@/lib/dictionary";
+import { kindLabel, type WordKindDef } from "@/lib/dictionary";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -15,23 +15,33 @@ import { pluralRu } from "@/lib/tasks/status-text";
  */
 export function CleanupSheet({
   facts,
+  kinds,
   open,
   onClose,
   onRemove,
 }: {
   facts: WordFact[];
+  kinds: readonly WordKindDef[];
   open: boolean;
   onClose: () => void;
   onRemove: (facts: WordFact[]) => void;
 }) {
   return (
     <Sheet open={open} onClose={onClose} title={`Не встречались ${STALE_DAYS} дней`}>
-      {open ? <CleanupBody facts={facts} onRemove={onRemove} /> : null}
+      {open ? <CleanupBody facts={facts} kinds={kinds} onRemove={onRemove} /> : null}
     </Sheet>
   );
 }
 
-function CleanupBody({ facts, onRemove }: { facts: WordFact[]; onRemove: (facts: WordFact[]) => void }) {
+function CleanupBody({
+  facts,
+  kinds,
+  onRemove,
+}: {
+  facts: WordFact[];
+  kinds: readonly WordKindDef[];
+  onRemove: (facts: WordFact[]) => void;
+}) {
   const [ticked, setTicked] = useState<ReadonlySet<string>>(() => new Set(facts.map((f) => f.key)));
   const chosen = facts.filter((f) => ticked.has(f.key));
   const toggle = (key: string) =>
@@ -71,7 +81,7 @@ function CleanupBody({ facts, onRemove }: { facts: WordFact[]; onRemove: (facts:
                   ) : null}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-[16px] leading-[22px]">{fact.word}</span>
-                {fact.kind ? <span className="shrink-0 text-[13px] leading-4 text-muted">{WORD_KIND_LABEL[fact.kind]}</span> : null}
+                {fact.kind ? <span className="shrink-0 text-[13px] leading-4 text-muted">{kindLabel(kinds, fact.kind)}</span> : null}
               </button>
             </li>
           );

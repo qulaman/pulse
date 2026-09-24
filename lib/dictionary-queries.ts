@@ -3,7 +3,15 @@
 import { useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
-import { ALIAS_MAX, applyVocabularyEdit, entryKey, mergeEntries, type VocabularyEdit } from "@/lib/dictionary";
+import {
+  ALIAS_MAX,
+  applyKindEdit,
+  applyVocabularyEdit,
+  entryKey,
+  mergeEntries,
+  type KindEdit,
+  type VocabularyEdit,
+} from "@/lib/dictionary";
 import type { Misheard } from "@/lib/dictionary-learn";
 import type { WordSuggestion, WordUsage } from "@/lib/dictionary-usage";
 import { NetworkError, isNetworkError } from "@/lib/net";
@@ -25,6 +33,7 @@ const VOCABULARY_MUTATION = [...ROOT, "vocabulary"] as const;
 const ALIASES_MUTATION = [...ROOT, "aliases"] as const;
 const DISMISS_MUTATION = [...ROOT, "dismiss"] as const;
 const DISMISS_WORDS_MUTATION = [...ROOT, "dismiss-words"] as const;
+const KINDS_MUTATION = [...ROOT, "kinds"] as const;
 export const misheardQueryKey = [...ROOT, "misheard"] as const;
 export const wordStatsKey = [...ROOT, "words"] as const;
 
@@ -79,6 +88,8 @@ export function useEditVocabulary() {
   const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationKey: VOCABULARY_MUTATION,
+    // one after another: «переименовать, затем сменить тип» must reach the server in that order
+    scope: { id: "dictionary-words" },
     mutationFn: async ({ key, ...edit }: Keyed<VocabularyEdit>) =>
       (
         await postDictionary<{ settings: CompanySettings }>(
@@ -92,10 +103,13 @@ export function useEditVocabulary() {
       await queryClient.cancelQueries({ queryKey: settingsKey });
       const previous = queryClient.getQueryData<CompanySettings>(settingsKey);
       if (previous) {
-        const out = applyVocabularyEdit(previous.vocabulary, previous.vocabulary_meta, edit, {
-          at: new Date().toISOString(),
-          by: null,
-        });
+        const out = applyVocabularyEdit(
+          previous.vocabulary,
+          previous.vocabulary_meta,
+          edit,
+          { at: new Date().toISOString(), by: null },
+          previous.word_kinds,
+        );
         if (!out.conflict) queryClient.setQueryData<CompanySettings>(settingsKey, { ...previous, vocabulary: out.vocabulary, vocabulary_meta: out.meta });
       }
       if (edit.add?.length) {
@@ -121,6 +135,35 @@ export function useEditVocabulary() {
 }
 
 /** `phrases` — how many parsed phrases the month holds: too few, and «не встречалось» means nothing yet. */
+/**
+ * The company's word types — added, renamed, moved, removed (D-111 §19) — on the screen at
+ * once; the server applies the same `applyKindEdit`. A refusal (a name another type has)
+ * reads the truth back and says why.
+ */
+export function useEditKinds() {
+  const queryClient = useQueryClient();
+  const mutation = useMutation({
+    mutationKey: KINDS_MUTATION,
+    // «Вернуть» is «add» then «move»: the move must find the type already there
+    scope: { id: "dictionary-kinds" },
+    mutationFn: async ({ key, ...edit }: Keyed<{ edit: KindEdit }>) =>
+      (await postDictionary<{ settings: CompanySettings }>("/api/dictionary/kinds", edit.edit, key, "Не получилось сохранить тип"))
+        .settings,
+    onMutate: async ({ edit }) => {
+      await queryClient.cancelQueries({ queryKey: settingsKey });
+      const previous = queryClient.getQueryData<CompanySettings>(settingsKey);
+      if (!previous) return;
+      const out = applyKindEdit(previous.word_kinds, previous.vocabulary_meta, edit);
+      if (!out.conflict) queryClient.setQueryData<CompanySettings>(settingsKey, { ...previous, word_kinds: out.kinds, vocabulary_meta: out.meta });
+    },
+    onSuccess: (settings) => {
+      if (queryClient.isMutating({ mutationKey: KINDS_MUTATION }) === 1) queryClient.setQueryData(settingsKey, settings);
+    },
+    onError: (error) => failed(queryClient, error, settingsKey, "Не получилось сохранить тип"),
+  });
+  return { ...mutation, mutate: (edit: KindEdit) => mutation.mutate({ edit, key: crypto.randomUUID() }) };
+}
+
 export type WordStats = { days: number; phrases: number; usage: Record<string, WordUsage>; suggestions: WordSuggestion[] };
 
 /**

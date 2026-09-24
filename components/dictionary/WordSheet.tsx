@@ -6,7 +6,7 @@ import { KindPicker } from "@/components/dictionary/KindPicker";
 import { STALE_DAYS, timesLine, type WordFact } from "@/components/dictionary/word-facts";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { ENTRY_MAX_LENGTH, entryKey, type WordKind } from "@/lib/dictionary";
+import { ENTRY_MAX_LENGTH, entryKey, type WordKind, type WordKindDef } from "@/lib/dictionary";
 import { dayMonth, whenLine } from "@/lib/dictionary-usage";
 
 const FIELD =
@@ -20,6 +20,7 @@ const FIELD =
  */
 export function WordSheet({
   fact,
+  kinds,
   days,
   taken,
   onClose,
@@ -29,6 +30,7 @@ export function WordSheet({
 }: {
   /** The word open; null — the sheet is closed. */
   fact: WordFact | null;
+  kinds: readonly WordKindDef[];
   days: number;
   /** Keys of the other words — a new spelling must not become one of them. */
   taken: ReadonlySet<string>;
@@ -43,6 +45,7 @@ export function WordSheet({
         <WordBody
           key={fact.word}
           fact={fact}
+          kinds={kinds}
           days={days}
           taken={taken}
           onRename={onRename}
@@ -56,6 +59,7 @@ export function WordSheet({
 
 function WordBody({
   fact,
+  kinds,
   days,
   taken,
   onRename,
@@ -63,6 +67,7 @@ function WordBody({
   onRemove,
 }: {
   fact: WordFact;
+  kinds: readonly WordKindDef[];
   days: number;
   taken: ReadonlySet<string>;
   onRename: (from: string, to: string) => void;
@@ -110,6 +115,7 @@ function WordBody({
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-medium leading-[18px] text-muted">Что это</span>
         <KindPicker
+          kinds={kinds}
           allowNone
           value={kind}
           onChange={(value) => {

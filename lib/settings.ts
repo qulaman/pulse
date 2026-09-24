@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
-import { WORD_KINDS } from "@/lib/dictionary";
+import { DEFAULT_WORD_KINDS, KIND_LABEL_MAX, WORD_KINDS_MAX } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
 
 /**
@@ -130,7 +130,7 @@ export const DictionarySettingsSchema = z.object({
  * drop the whole settings to defaults.
  */
 const WordMetaSchema = z.object({
-  kind: z.enum(WORD_KINDS).nullable().catch(null),
+  kind: z.string().max(40).nullable().catch(null),
   added_at: z.string().nullable().catch(null),
   added_by: z.string().nullable().catch(null),
 });
@@ -147,6 +147,12 @@ export const CompanySettingsSchema = z.object({
   vocabulary: z.array(z.string().min(1)).default([]),
   /** Kind, author and date of each word, keyed by `entryKey` — the screen's, not the prompt's (D-111). */
   vocabulary_meta: z.record(z.string(), WordMetaSchema).catch({}).default({}),
+  /** The company's word types, in order (D-111 §19); a broken list falls back to the defaults. */
+  word_kinds: z
+    .array(z.object({ id: z.string().min(1).max(40), label: z.string().trim().min(1).max(KIND_LABEL_MAX) }))
+    .max(WORD_KINDS_MAX)
+    .catch(DEFAULT_WORD_KINDS)
+    .default(DEFAULT_WORD_KINDS),
   /** What «до обеда» means here (D-15); rendered into the parser prompt. */
   conventions: z.array(ConventionSchema).max(40).default(DEFAULT_CONVENTIONS),
   /** Name-matcher thresholds (D-16, docs/AI.md §5) — tuned per company from the gate, no UI. */

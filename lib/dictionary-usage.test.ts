@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyVocabularyEdit, classifyWords, similarWord, type WordMeta } from "./dictionary";
+import { DEFAULT_WORD_KINDS, applyKindEdit, applyVocabularyEdit, classifyWords, similarWord, type WordMeta } from "./dictionary";
 import { daysSince, suggestWords, usageOf, whenLine } from "./dictionary-usage";
 
 const at = (day: number) => `2026-09-${String(day).padStart(2, "0")}T06:00:00Z`;
@@ -63,6 +63,52 @@ describe("applyVocabularyEdit", () => {
     const kinded = applyVocabularyEdit(["КазАзот"], meta, { set_kind: { word: "казазот", kind: "product" } }, stamp);
     expect(kinded.meta.казазот.kind).toBe("product");
     expect(applyVocabularyEdit(["КазАзот"], meta, { remove: ["КазАзот"] }, stamp)).toMatchObject({ vocabulary: [], meta: {} });
+  });
+});
+
+describe("applyKindEdit", () => {
+  const meta: Record<string, WordMeta> = {
+    казазот: { kind: "counterparty", added_at: at(1), added_by: "Директор" },
+    шубарколь: { kind: "site", added_at: at(2), added_by: "Директор" },
+  };
+
+  it("adds a type once — a replay with the same id changes nothing", () => {
+    const once = applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "add", id: "k_1", label: " Поставщик " });
+    expect(once.kinds.at(-1)).toEqual({ id: "k_1", label: "Поставщик" });
+    expect(applyKindEdit(once.kinds, meta, { op: "add", id: "k_1", label: "Поставщик" }).kinds).toEqual(once.kinds);
+  });
+
+  it("refuses a name another type has, an empty one and a thirteenth type", () => {
+    expect(applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "add", id: "k_2", label: "товар" }).conflict).toBe("Тип «товар» уже есть");
+    expect(applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "rename", id: "site", label: "Контрагент" }).conflict).toBe("Тип «Контрагент» уже есть");
+    expect(applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "add", id: "k_3", label: "  " }).conflict).toBe("Так тип не назвать");
+    const twelve = Array.from({ length: 12 }, (_, i) => ({ id: `k${i}`, label: `Тип ${i}` }));
+    expect(applyKindEdit(twelve, meta, { op: "add", id: "k_x", label: "Ещё" }).conflict).toBe("Типов уже 12");
+  });
+
+  it("renames a type — its words keep it, by id", () => {
+    const out = applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "rename", id: "counterparty", label: "Клиент" });
+    expect(out.kinds[0]).toEqual({ id: "counterparty", label: "Клиент" });
+    expect(out.meta.казазот.kind).toBe("counterparty");
+  });
+
+  it("removes a type, moving its words to another one or to «Без типа»", () => {
+    const moved = applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "remove", id: "counterparty", move_to: "site" });
+    expect(moved.kinds.map((k) => k.id)).toEqual(["site", "product", "term"]);
+    expect(moved.meta.казазот.kind).toBe("site");
+    expect(applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "remove", id: "counterparty", move_to: null }).meta.казазот.kind).toBeNull();
+    // a target that is the type itself or gone means «Без типа»
+    expect(applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "remove", id: "site", move_to: "k_gone" }).meta.шубарколь.kind).toBeNull();
+  });
+
+  it("moves a type up and down", () => {
+    const out = applyKindEdit(DEFAULT_WORD_KINDS, meta, { op: "move", id: "term", index: 0 });
+    expect(out.kinds.map((k) => k.id)).toEqual(["term", "counterparty", "site", "product"]);
+  });
+
+  it("writes a word's unknown type as «Без типа»", () => {
+    const out = applyVocabularyEdit([], {}, { add: ["Шубарколь"], kind: "k_gone" }, { at: at(24), by: null }, DEFAULT_WORD_KINDS);
+    expect(out.meta.шубарколь.kind).toBeNull();
   });
 });
 

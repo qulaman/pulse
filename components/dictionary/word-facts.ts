@@ -1,4 +1,4 @@
-import { entryKey, type WordKind, type WordMeta } from "@/lib/dictionary";
+import { entryKey, type WordKind, type WordKindDef, type WordMeta } from "@/lib/dictionary";
 import type { WordStats } from "@/lib/dictionary-queries";
 import { daysSince, whenLine, type WordUsage } from "@/lib/dictionary-usage";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -29,8 +29,10 @@ export function wordFacts(
   vocabulary: readonly string[],
   meta: Readonly<Record<string, WordMeta>>,
   stats: WordStats | undefined,
+  kinds: readonly WordKindDef[],
   now = Date.now(),
 ): WordFact[] {
+  const known = new Set(kinds.map((k) => k.id));
   const enough = (stats?.phrases ?? 0) >= MIN_PHRASES;
   return vocabulary.map((word) => {
     const key = entryKey(word);
@@ -45,6 +47,8 @@ export function wordFacts(
       stale = true;
       line = `не встречалось ${STALE_DAYS} дней`;
     } else if (usage) line = added ? `пока не встречалось · ${added}` : "пока не встречалось";
-    return { word, key, kind: own?.kind ?? null, meta: own, usage, stale, line };
+    // a type since removed reads as «Без типа»
+    const kind = own?.kind && known.has(own.kind) ? own.kind : null;
+    return { word, key, kind, meta: own, usage, stale, line };
   });
 }

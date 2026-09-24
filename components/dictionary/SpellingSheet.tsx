@@ -6,7 +6,7 @@ import { KindPicker } from "@/components/dictionary/KindPicker";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Sheet } from "@/components/ui/Sheet";
-import { ENTRY_MAX_LENGTH, entryKey, type WordKind } from "@/lib/dictionary";
+import { ENTRY_MAX_LENGTH, entryKey, type WordKind, type WordKindDef } from "@/lib/dictionary";
 import type { WordSuggestion } from "@/lib/dictionary-usage";
 
 const FIELD =
@@ -20,12 +20,14 @@ const FIELD =
  */
 export function SpellingSheet({
   suggestion,
+  kinds,
   kind,
   taken,
   onClose,
   onAdd,
 }: {
   suggestion: WordSuggestion | null;
+  kinds: readonly WordKindDef[];
   kind: WordKind | null;
   /** Keys of the words already in the vocabulary. */
   taken: ReadonlySet<string>;
@@ -34,18 +36,20 @@ export function SpellingSheet({
 }) {
   return (
     <Sheet open={suggestion !== null} onClose={onClose} title="Как пишется правильно?">
-      {suggestion ? <SpellingBody key={suggestion.key} suggestion={suggestion} kind={kind} taken={taken} onAdd={onAdd} /> : null}
+      {suggestion ? <SpellingBody key={suggestion.key} suggestion={suggestion} kinds={kinds} kind={kind} taken={taken} onAdd={onAdd} /> : null}
     </Sheet>
   );
 }
 
 function SpellingBody({
   suggestion,
+  kinds,
   kind: initialKind,
   taken,
   onAdd,
 }: {
   suggestion: WordSuggestion;
+  kinds: readonly WordKindDef[];
   kind: WordKind | null;
   taken: ReadonlySet<string>;
   onAdd: (word: string, kind: WordKind | null, suggestion: WordSuggestion) => void;
@@ -85,7 +89,7 @@ function SpellingBody({
       </label>
       <div className="flex flex-col gap-2">
         <span className="text-[14px] font-medium leading-[18px] text-muted">Что это</span>
-        <KindPicker value={kind} onChange={setKind} />
+        <KindPicker kinds={kinds} value={kind} onChange={setKind} />
       </div>
       <Button block size="lg" disabled={!valid} onClick={() => onAdd(word, kind, suggestion)}>
         Добавить «{word || "…"}»

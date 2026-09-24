@@ -155,7 +155,12 @@ export function DictionaryScreen({ initialTab }: { initialTab: DictionaryTab }) 
                     matching={settings.data.matching}
                   />
                 ) : (
-                  <WordsPanel vocabulary={settings.data.vocabulary} meta={settings.data.vocabulary_meta} people={roster} />
+                  <WordsPanel
+                    vocabulary={settings.data.vocabulary}
+                    meta={settings.data.vocabulary_meta}
+                    kinds={settings.data.word_kinds}
+                    people={roster}
+                  />
                 )}
               </section>
             ) : null,

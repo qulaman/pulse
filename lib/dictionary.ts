@@ -192,27 +192,82 @@ export function planWords(current: readonly string[], text: string, people: read
 /* Word kinds and the meta of a word                                           */
 /* -------------------------------------------------------------------------- */
 
-/** What a word names — for order on the screen only; the STT prompt does not change (D-111). */
-export const WORD_KINDS = ["counterparty", "site", "product", "term"] as const;
-export type WordKind = (typeof WORD_KINDS)[number];
+/**
+ * What a word names — the company's own list (`settings.word_kinds`, D-111 §19): added,
+ * renamed, reordered and removed on the screen; for order in the list only, the STT prompt
+ * does not change. A word keeps the id, so a renamed type keeps its words.
+ */
+export type WordKindDef = { id: string; label: string };
+/** The id of a type in `settings.word_kinds`. */
+export type WordKind = string;
 
-export const WORD_KIND_LABEL: Record<WordKind, string> = {
-  counterparty: "Контрагент",
-  site: "Объект",
-  product: "Товар",
-  term: "Термин",
-};
-
-export const WORD_KIND_GROUP: Record<WordKind | "none", string> = {
-  counterparty: "Контрагенты",
-  site: "Объекты",
-  product: "Товары",
-  term: "Термины",
-  none: "Без типа",
-};
+/** What a company starts with; the ids are the ones words were stamped with before types were editable. */
+export const DEFAULT_WORD_KINDS: WordKindDef[] = [
+  { id: "counterparty", label: "Контрагент" },
+  { id: "site", label: "Объект" },
+  { id: "product", label: "Товар" },
+  { id: "term", label: "Термин" },
+];
+export const WORD_KINDS_MAX = 12;
+export const KIND_LABEL_MAX = 24;
+export const NO_KIND_LABEL = "Без типа";
 
 /** Kept beside the list itself (`settings.vocabulary_meta`, keyed by `entryKey`). */
 export type WordMeta = { kind: WordKind | null; added_at: string | null; added_by: string | null };
+
+/** One change to the list of types. Each is replay-safe: a new type brings its own id. */
+export type KindEdit =
+  | { op: "add"; id: string; label: string }
+  | { op: "rename"; id: string; label: string }
+  /** The type's words go to `move_to`, or become «Без типа». */
+  | { op: "remove"; id: string; move_to: string | null }
+  | { op: "move"; id: string; index: number };
+
+/**
+ * A change to the types applied to the list and to the words that carry them — the server
+ * and the optimistic screen run the same function. Two types with one name would make two
+ * groups nobody can tell apart, so a name is refused when another type has it.
+ */
+export function applyKindEdit(
+  kinds: readonly WordKindDef[],
+  meta: Readonly<Record<string, WordMeta>>,
+  edit: KindEdit,
+): { kinds: WordKindDef[]; meta: Record<string, WordMeta>; conflict: string | null } {
+  const list = [...kinds];
+  const next: Record<string, WordMeta> = { ...meta };
+  const at = list.findIndex((k) => k.id === edit.id);
+  const label = "label" in edit ? edit.label.replace(/\s+/g, " ").trim() : "";
+  const taken = (except: string) => list.some((k) => k.id !== except && entryKey(k.label) === entryKey(label));
+  const nope = (conflict: string) => ({ kinds: [...kinds], meta: { ...meta }, conflict });
+
+  if (edit.op === "add") {
+    if (at !== -1) return { kinds: list, meta: next, conflict: null };
+    if (!entryKey(label) || label.length > KIND_LABEL_MAX) return nope("Так тип не назвать");
+    if (taken(edit.id)) return nope(`Тип «${label}» уже есть`);
+    if (list.length >= WORD_KINDS_MAX) return nope(`Типов уже ${WORD_KINDS_MAX}`);
+    list.push({ id: edit.id, label });
+  } else if (edit.op === "rename") {
+    if (at === -1) return { kinds: list, meta: next, conflict: null };
+    if (!entryKey(label) || label.length > KIND_LABEL_MAX) return nope("Так тип не назвать");
+    if (taken(edit.id)) return nope(`Тип «${label}» уже есть`);
+    list[at] = { ...list[at], label };
+  } else if (edit.op === "remove") {
+    if (at === -1) return { kinds: list, meta: next, conflict: null };
+    list.splice(at, 1);
+    const to = edit.move_to && edit.move_to !== edit.id && list.some((k) => k.id === edit.move_to) ? edit.move_to : null;
+    for (const [key, m] of Object.entries(next)) if (m.kind === edit.id) next[key] = { ...m, kind: to };
+  } else {
+    if (at === -1) return { kinds: list, meta: next, conflict: null };
+    const [moved] = list.splice(at, 1);
+    list.splice(Math.max(0, Math.min(edit.index, list.length)), 0, moved);
+  }
+  return { kinds: list, meta: next, conflict: null };
+}
+
+/** A type's label by id; an id no longer among the types reads as «Без типа». */
+export function kindLabel(kinds: readonly WordKindDef[], id: string | null | undefined): string {
+  return kinds.find((k) => k.id === id)?.label ?? NO_KIND_LABEL;
+}
 
 export type VocabularyEdit = {
   add?: string[];
@@ -234,7 +289,11 @@ export function applyVocabularyEdit(
   meta: Readonly<Record<string, WordMeta>>,
   edit: VocabularyEdit,
   stamp: { at: string; by: string | null },
+  /** The company's types: a kind that is not among them is written as «Без типа». */
+  kinds?: readonly WordKindDef[],
 ): { vocabulary: string[]; meta: Record<string, WordMeta>; overflow: string[]; conflict: string | null } {
+  const known = (kind: WordKind | null | undefined): WordKind | null =>
+    kind && (!kinds || kinds.some((k) => k.id === kind)) ? kind : null;
   let list = [...vocabulary];
   const next: Record<string, WordMeta> = { ...meta };
   let conflict: string | null = null;
@@ -261,13 +320,13 @@ export function applyVocabularyEdit(
   for (const word of edit.remove ?? []) delete next[entryKey(word)];
   for (const word of list) {
     const key = entryKey(word);
-    if (!before.has(key) && !next[key]) next[key] = { kind: edit.kind ?? null, added_at: stamp.at, added_by: stamp.by };
+    if (!before.has(key) && !next[key]) next[key] = { kind: known(edit.kind), added_at: stamp.at, added_by: stamp.by };
   }
 
   if (edit.set_kind) {
     const key = entryKey(edit.set_kind.word);
     if (list.some((word) => entryKey(word) === key)) {
-      next[key] = { ...(next[key] ?? { added_at: null, added_by: null }), kind: edit.set_kind.kind };
+      next[key] = { ...(next[key] ?? { added_at: null, added_by: null }), kind: known(edit.set_kind.kind) };
     }
   }
 

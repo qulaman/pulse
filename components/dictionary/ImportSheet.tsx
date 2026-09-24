@@ -5,7 +5,7 @@ import { useState } from "react";
 import { KindPicker } from "@/components/dictionary/KindPicker";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { VOCABULARY_MAX, classifyWords, type RosterPerson, type WordKind, type WordLine } from "@/lib/dictionary";
+import { VOCABULARY_MAX, classifyWords, type RosterPerson, type WordKind, type WordKindDef, type WordLine } from "@/lib/dictionary";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 const VERDICT: Record<WordLine["verdict"], { text: (line: WordLine) => string; tone: string }> = {
@@ -30,10 +30,12 @@ export function ImportSheet({
   text,
   vocabulary,
   people,
+  kinds,
   kind,
   onClose,
   onAdd,
 }: {
+  kinds: readonly WordKindDef[];
   /** The pasted text; null — the sheet is closed. */
   text: string | null;
   vocabulary: readonly string[];
@@ -45,7 +47,7 @@ export function ImportSheet({
   return (
     <Sheet open={text !== null} onClose={onClose} title="Добавить списком">
       {text !== null ? (
-        <ImportBody key={text} text={text} vocabulary={vocabulary} people={people} kind={kind} onAdd={onAdd} />
+        <ImportBody key={text} text={text} vocabulary={vocabulary} people={people} kinds={kinds} kind={kind} onAdd={onAdd} />
       ) : null}
     </Sheet>
   );
@@ -55,9 +57,11 @@ function ImportBody({
   text,
   vocabulary,
   people,
+  kinds,
   kind: initialKind,
   onAdd,
 }: {
+  kinds: readonly WordKindDef[];
   text: string;
   vocabulary: readonly string[];
   people: readonly RosterPerson[];
@@ -126,7 +130,7 @@ function ImportBody({
       </ul>
       <div className="flex flex-col gap-2 border-t border-border/70 pt-3">
         <span className="text-[13px] leading-4 text-muted">Тип для всех</span>
-        <KindPicker value={kind} onChange={setKind} />
+        <KindPicker kinds={kinds} value={kind} onChange={setKind} />
       </div>
       {chosen.length > room ? (
         <p className="text-[13px] leading-[18px] text-warn">Места осталось на {room} — снимите лишние отметки</p>

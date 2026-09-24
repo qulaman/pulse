@@ -9,19 +9,21 @@ import { ImportSheet } from "@/components/dictionary/ImportSheet";
 import { KindPicker } from "@/components/dictionary/KindPicker";
 import { SearchField } from "@/components/dictionary/SearchField";
 import { SpellingSheet } from "@/components/dictionary/SpellingSheet";
+import { TypesSheet } from "@/components/dictionary/TypesSheet";
 import { WordSheet } from "@/components/dictionary/WordSheet";
 import { STALE_DAYS, timesLine, wordFacts, type WordFact } from "@/components/dictionary/word-facts";
 import { toast } from "@/components/ui/Toast";
 import {
+  NO_KIND_LABEL,
   VOCABULARY_SOFT_MAX,
-  WORD_KINDS,
-  WORD_KIND_GROUP,
   byRussian,
   entryKey,
   planWords,
   splitEntries,
   type RosterPerson,
+  kindLabel,
   type WordKind,
+  type WordKindDef,
   type WordMeta,
 } from "@/lib/dictionary";
 import { useDismissWords, useEditVocabulary, useWaitingEdits, useWordStats } from "@/lib/dictionary-queries";
@@ -58,16 +60,15 @@ const SORTS: { key: Sort; label: string }[] = [
   { key: "abc", label: "А–Я" },
   { key: "new", label: "Новые" },
 ];
-const GROUP_ORDER: (WordKind | "none")[] = [...WORD_KINDS, "none"];
 
 const KIND_STORE = "pulse:dictionary-kind";
 const SORT_STORE = "pulse:dictionary-sort";
 
 /** A per-browser convenience: the kind of the last added word, the chosen order. Never state that matters. */
-function remembered<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+function remembered<T extends string | null>(key: string, allowed: readonly string[], fallback: T): T {
   try {
-    const value = window.localStorage.getItem(key) as T | null;
-    return value && allowed.includes(value) ? value : fallback;
+    const value = window.localStorage.getItem(key);
+    return value && allowed.includes(value) ? (value as T) : fallback;
   } catch {
     return fallback;
   }
@@ -112,10 +113,13 @@ function sortFacts(facts: WordFact[], sort: Sort): WordFact[] {
 export function WordsPanel({
   vocabulary,
   meta,
+  kinds,
   people,
 }: {
   vocabulary: string[];
   meta: Record<string, WordMeta>;
+  /** The company's types, in order (`settings.word_kinds`, D-111 §19). */
+  kinds: WordKindDef[];
   people: RosterPerson[];
 }) {
   const edit = useEditVocabulary();
@@ -124,13 +128,16 @@ export function WordsPanel({
   const waiting = useWaitingEdits();
 
   const [text, setText] = useState("");
-  const [kind, setKindState] = useState<WordKind | null>(() => remembered(KIND_STORE, WORD_KINDS, "counterparty"));
+  const [kindState, setKindState] = useState<WordKind | null>(() => remembered(KIND_STORE, kinds.map((k) => k.id), kinds[0]?.id ?? null));
+  // a remembered type since removed is no choice at all
+  const kind = kindState && kinds.some((k) => k.id === kindState) ? kindState : null;
   const [sort, setSortState] = useState<Sort>(() => remembered(SORT_STORE, ["often", "abc", "new"] as const, "often"));
   const [query, setQuery] = useState("");
   const [importText, setImportText] = useState<string | null>(null);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [cleanup, setCleanup] = useState(false);
   const [spelling, setSpelling] = useState<WordSuggestion | null>(null);
+  const [typesOpen, setTypesOpen] = useState(false);
   const [fresh, setFresh] = useState<ReadonlySet<string>>(new Set());
 
   const setKind = (value: WordKind | null) => {
@@ -142,7 +149,12 @@ export function WordsPanel({
     remember(SORT_STORE, value);
   };
 
-  const facts = useMemo(() => wordFacts(vocabulary, meta, stats.data), [vocabulary, meta, stats.data]);
+  const facts = useMemo(() => wordFacts(vocabulary, meta, stats.data, kinds), [vocabulary, meta, stats.data, kinds]);
+  const perKind = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of facts) if (f.kind) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
+    return counts;
+  }, [facts]);
   const stale = facts.filter((f) => f.stale);
   const open = facts.find((f) => f.key === openKey) ?? null;
   const keys = useMemo(() => new Set(vocabulary.map(entryKey)), [vocabulary]);
@@ -187,7 +199,7 @@ export function WordsPanel({
 
   const q = entryKey(query);
   const visible = q ? facts.filter((f) => f.key.includes(q)) : facts;
-  const groups = GROUP_ORDER.map((group) => ({
+  const groups = [...kinds.map((k) => k.id), "none"].map((group) => ({
     group,
     facts: sortFacts(
       visible.filter((f) => (f.kind ?? "none") === group),
@@ -237,7 +249,7 @@ export function WordsPanel({
           />
         </div>
         <div className="mt-3">
-          <KindPicker value={kind} onChange={setKind} />
+          <KindPicker kinds={kinds} value={kind} onChange={setKind} onEdit={() => setTypesOpen(true)} />
         </div>
 
         {/* what the field will do, said before Enter */}
@@ -362,7 +374,7 @@ export function WordsPanel({
             groups.map(({ group, facts: list }) => (
               <section key={group} className="mt-2" data-testid={`words-group-${group}`}>
                 <h3 className="eyebrow px-1">
-                  {WORD_KIND_GROUP[group]} · {list.length}
+                  {group === "none" ? NO_KIND_LABEL : kindLabel(kinds, group)} · {list.length}
                 </h3>
                 <ul className="card mt-1.5 overflow-hidden [&>*+*]:border-t [&>*+*]:border-border/70">
                   {list.map((f) => (
@@ -423,6 +435,7 @@ export function WordsPanel({
         text={importText}
         vocabulary={vocabulary}
         people={people}
+        kinds={kinds}
         kind={kind}
         onClose={() => setImportText(null)}
         onAdd={(list, as) => {
@@ -434,6 +447,7 @@ export function WordsPanel({
       />
       <WordSheet
         fact={open}
+        kinds={kinds}
         days={stats.data?.days ?? 30}
         taken={keys}
         onClose={() => setOpenKey(null)}
@@ -451,6 +465,7 @@ export function WordsPanel({
       />
       <SpellingSheet
         suggestion={spelling}
+        kinds={kinds}
         kind={kind}
         taken={keys}
         onClose={() => setSpelling(null)}
@@ -461,8 +476,10 @@ export function WordsPanel({
           dismiss.mutate(suggestion.keys);
         }}
       />
+      <TypesSheet open={typesOpen} onClose={() => setTypesOpen(false)} kinds={kinds} counts={perKind} />
       <CleanupSheet
         facts={stale}
+        kinds={kinds}
         open={cleanup}
         onClose={() => setCleanup(false)}
         onRemove={(list) => {
