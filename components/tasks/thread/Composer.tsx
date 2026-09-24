@@ -7,6 +7,7 @@ import { uploadPhoto } from "@/lib/files/photo";
 import { haptic } from "@/lib/haptics";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { TEXT } from "@/lib/tasks/status-text";
+import { useUpdateHold } from "@/lib/update/client";
 import { voiceApi } from "@/lib/voice/api";
 import { createRecorder, extForMime, MicUnavailableError, type Recorder } from "@/lib/voice/recorder";
 
@@ -58,6 +59,8 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   // the timer fires outside React's render, so the slide-to-cancel state it reads
   // has to be a ref — a stale closure would send a recording meant to be forgotten
   const cancelling = useRef(false);
+  // a voice reply lives only in memory until it is uploaded: an app update waits (D-115)
+  useUpdateHold(recording || uploading);
 
   const stopTicking = () => {
     if (ticker.current) clearInterval(ticker.current);

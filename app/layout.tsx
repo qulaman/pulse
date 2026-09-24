@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Golos_Text, Manrope } from "next/font/google";
 
+import { AppUpdate } from "@/components/AppUpdate";
 import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
@@ -48,6 +49,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {children}
           <ToastHost />
           <OfflineBanner />
+          {/* the phone knows whether it runs the server's build, and updates with one tap (D-115) */}
+          <AppUpdate />
           <OutboxReplay />
           <MascotPower />
           {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}

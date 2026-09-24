@@ -2,6 +2,11 @@
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+// «Обновить» (D-115, lib/update/client.ts): a worker left waiting takes over before the reload —
+// a no-op while install skips waiting, the contract once an offline cache makes it wait
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
+});
 
 self.addEventListener("push", (event) => {
   let data = {};

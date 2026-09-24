@@ -8,10 +8,12 @@ import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
+import { VersionRow } from "@/components/profile/VersionRow";
 import { GearIcon, SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
 import { canManageTeam } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { BUILD, versionLabel } from "@/lib/version";
 
 async function signOut() {
   "use server";
@@ -29,7 +31,6 @@ async function signOut() {
 export default async function ProfilePage() {
   const profile = await getSessionProfile();
   const director = profile.role === "director";
-  const build = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
   // read here, not in the browser: whether points exist at all decides the page's shape
   const supabase = await createServerSupabase();
   const company = await supabase.from("companies").select("settings").limit(1).maybeSingle();
@@ -56,13 +57,22 @@ export default async function ProfilePage() {
         </>
       ) : null}
 
+      <h2 className="eyebrow mt-6 px-1">Приложение</h2>
+      <RowGroup className="mt-2">
+        <VersionRow />
+      </RowGroup>
+
       <InstallHint />
 
       <SignOutRow action={signOut} className="mt-6" />
 
       <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
         <PulseMark />
-        {build ? <p className="nums text-[12px] leading-4 text-muted">сборка {build}</p> : null}
+        {/* the build this page came from — the same one the phone runs (D-115) */}
+        <p className="nums text-[12px] leading-4 text-muted">
+          версия {versionLabel(BUILD)}
+          {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
+        </p>
       </footer>
     </main>
   );

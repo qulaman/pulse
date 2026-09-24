@@ -40,6 +40,13 @@ export const GearIcon = () => (
   </svg>
 );
 
+export const UpdateIcon = () => (
+  <svg {...stroke}>
+    <path d="M15.8 8.2A6 6 0 0 0 4.6 6.6M4.2 11.8a6 6 0 0 0 11.2 1.6" />
+    <path d="M4.2 3.6v3.2h3.2M15.8 16.4v-3.2h-3.2" />
+  </svg>
+);
+
 export const ExitIcon = () => (
   <svg {...stroke}>
     <path d="M12 6V4.5A1.5 1.5 0 0 0 10.5 3h-5A1.5 1.5 0 0 0 4 4.5v11A1.5 1.5 0 0 0 5.5 17h5a1.5 1.5 0 0 0 1.5-1.5V14" />

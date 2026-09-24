@@ -9,19 +9,25 @@ import { isNetworkError } from "@/lib/net";
 const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
 const online = () => onlineManager.isOnline();
 
-/**
- * A thin line at the top while the phone has no network: the assistant's own words
- * (docs/DESIGN.md §4 «Оффлайн»), no red, no exclamation. Layout stays put — the line
- * overlays the header instead of pushing it.
- */
-export function OfflineBanner() {
+/** The network and the taps waiting for it; while `shown`, the top line belongs to this banner. */
+export function useSendQueue(): { isOnline: boolean; paused: number; shown: boolean } {
   const isOnline = useSyncExternalStore(subscribe, online, () => true);
   // taps made without network wait in the mutation cache (QueryProvider, networkMode offlineFirst)
   const paused = useMutationState({
     filters: { status: "pending" },
     select: (m) => m.state.isPaused || (m.state.failureCount > 0 && isNetworkError(m.state.failureReason)),
   }).filter(Boolean).length;
-  if (isOnline && paused === 0) return null;
+  return { isOnline, paused, shown: !isOnline || paused > 0 };
+}
+
+/**
+ * A thin line at the top while the phone has no network: the assistant's own words
+ * (docs/DESIGN.md §4 «Оффлайн»), no red, no exclamation. Layout stays put — the line
+ * overlays the header instead of pushing it.
+ */
+export function OfflineBanner() {
+  const { isOnline, paused, shown } = useSendQueue();
+  if (!shown) return null;
   const queue = paused > 0 ? ` (${paused} в очереди)` : "";
   const text = isOnline ? `Отправляю${queue}` : `Нет связи. Отправлю, как появится${queue}`;
   return (

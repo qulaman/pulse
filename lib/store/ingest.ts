@@ -18,6 +18,7 @@ import type {
   TaskEntity,
 } from "../ai/schema";
 import type { AssigneeMatch } from "../matchName";
+import { holdUpdate } from "../update/client";
 import { VoiceApiError, voiceApi, type ConfirmResponse, type IngestSource } from "../voice/api";
 import {
   createRecorder,
@@ -688,4 +689,16 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       set({ ...initialState });
     },
   };
+});
+
+// A phrase on its way — being recorded, uploaded, heard, parsed, or waiting on the board —
+// lives only in this page's memory: an app update waits until it is sent or dropped (D-115).
+let releaseUpdateHold: (() => void) | null = null;
+useIngestStore.subscribe(({ stage }) => {
+  const busy = stage !== "idle" && stage !== "done";
+  if (busy && !releaseUpdateHold) releaseUpdateHold = holdUpdate();
+  if (!busy && releaseUpdateHold) {
+    releaseUpdateHold();
+    releaseUpdateHold = null;
+  }
 });
