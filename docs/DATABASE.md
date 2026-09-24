@@ -51,7 +51,8 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `stt` | `provider`, `fallback` (`openai \| whisper1 \| deepgram \| elevenlabs`), `language` (`auto \| ru`) | D-53 |
 | `parser` | `model`, `escalation_model`, `escalate` | G.17 |
 | `vocabulary` | контрагенты и объекты — подсказка STT | D-55 |
-| `vocabulary_meta` | по `entryKey` слова — `{kind: counterparty \| site \| product \| term \| null, added_at, added_by}`; только для экрана, в подсказку не идёт; битое поле читается как null | D-111 |
+| `vocabulary_meta` | по `entryKey` слова — `{kind: id типа из word_kinds \| null, added_at, added_by}`; только для экрана, в подсказку не идёт; битое поле читается как null | D-111 |
+| `word_kinds` | типы слов компании по порядку — `[{id, label}]`, до 12; по умолчанию Контрагент / Объект / Товар / Термин (`counterparty`, `site`, `product`, `term`); битый список читается как умолчание | D-111 §19 |
 | `conventions` | что значит «до обеда» здесь; уходит в промпт | D-15 |
 | `matching` | пороги матчера имён (переопределения) | D-16 |
 | `points_enabled` | очки и рейтинг, дефолт `false` | D-48 |
