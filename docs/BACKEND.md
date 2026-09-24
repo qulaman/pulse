@@ -57,10 +57,15 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/visits` | POST | secretary | `{note?, client_request_id}` → RPC `announce_visit`; пуш `visit_arrived` директорам сразу (D-96) |
 | `/api/visits/:id/answer` | POST | director | `{answer: 'invited' \| 'wait' \| 'declined'}` → RPC `answer_visit`; «invited» включает гостя на час; пуш `visit_answered` автору сразу (D-96) |
 | магазин | — | — | роутов нет: клиент зовёт RPC `create_shop_order`, `cancel_shop_order`, `set_shop_order_status` напрямую (D-71); права и идемпотентность — внутри функций. Ассортимент (`shop_items`) директор и завхоз правят upsert'ом под RLS с заранее выданным id |
-| `/api/push/subscribe` | POST, DELETE | любая | POST `{endpoint, keys: {p256dh, auth}, user_agent?}`; DELETE `{endpoint}` — своя подписка |
+| `/api/push/subscribe` | POST, DELETE | любая | POST `{endpoint, keys: {p256dh, auth}, user_agent?, replaces?}` — адрес этого браузера, service role строго от имени вызывающего: тот же человек — обновление (выключатель устройства сохраняется), другой — подписка переходит к нему; `replaces` — прежний адрес из `pushsubscriptionchange`. DELETE `{endpoint}` — выход из аккаунта (D-114) |
+| `/api/push/devices` | GET, PATCH, DELETE | director | свои устройства: список с последним исходом, PATCH `{id, enabled}` — «присылать сюда», DELETE `{id}` (D-114) |
+| `/api/push/test` | POST, GET | любая | POST `{client_request_id, user_id?}` — «Проверить»: строка `test` в outbox и пинок; чужой телефон — только director/secretary своей компании. GET `?id=` — судьба проверки (`status`, `sent_at`, `seen_at`, `last_error`) (D-114) |
+| `/api/push/kick` | POST | любая | пинок воркера после записи мимо API-роутов (сообщение, кнопки секретаря, ответ на мероприятие, магазин) → `after(kickDeliveries)`, 202 (D-114) |
+| `/api/push/badge` | GET | любая | число на иконке: директору — на приёмке + отказы, остальным — новые + на доработке (под своим RLS) |
+| `/api/me/notifications` | GET, PUT | director | правила пушей директора целиком: GET — с дефолтами (`lib/push/prefs.ts`), PUT — zod → RPC `set_notify_prefs` (D-114) |
 | `/api/push/seen` | POST | любая | «увидел» (D-32): `{delivery_id}` из SW при показе уведомления; без `delivery_id` (открытие приложения) — все незакрытые строки человека |
 | `/api/push/acted` | POST | любая | «Прочитал» из шторки (D-64): `{delivery_id}` своей доставки → `mark_thread_read` до `meta.last_seq` под токеном пользователя |
-| `/api/push/sweep` | POST | — (`Authorization: Bearer <CRON_SECRET>`) | минутный тик §10 |
+| `/api/push/sweep` | GET, POST | — (`Authorization: Bearer <CRON_SECRET>`) | минутный тик §10 (Vercel cron шлёт GET) |
 | `/api/files/upload-url` | POST | любая | `{ext: jpg\|png\|webp, client_request_id}` → signed upload URL в бакет `photos`, путь `{company}/{user}/{client_request_id}.{ext}` (G.20b) |
 | `/api/files/url` | GET | любая | `?message_id=` → signed URL файла сообщения на 10 мин; доступ решает RLS `task_messages`, бакет по типу: `photo` → `photos`, `voice` → `voice`; путь в Storage клиент не называет |
 | `/api/people` | POST | director | создаёт auth-пользователя через admin API service role + профиль (роли — весь enum, в т.ч. `secretary`, `tv`); при провале профиля auth-пользователь удаляется; `409 email_exists` |
@@ -122,7 +127,7 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 `confirm_voice_batch(payload jsonb, client_request_id uuid, p_now timestamptz default now()) returns jsonb` (security definer, только director):
 1. `insert into ingest_batches ... on conflict do nothing`; при конфликте — сохранённый `result` + `duplicate: true`.
 2. В одной транзакции по видам: `task` / `delegation` → `tasks` (N копий с общим `group_id`, D-02; без исполнителя — `assignee_required`); `announcement` → `announcements`; `reminder` → заметка с `remind_at` (D-95; ключ ответа `reminder_ids` — id заметок); `event` → `events` + `event_participants` (автор — `going`, «всем» материализуется составом компании; без времени — `event_time_required`, D-78); `note` → `notes` (D-75); `recurrence` → `recurrence_rules`; `points` → `point_transactions` только при `points_enabled` и сумме > 0, иначе в `skipped` (D-48, D-30); `query` → в `skipped`.
-3. Окно доставки (D-38): задача с явным `scheduled_send_at` или вне `settings.delivery_window` (если нет `force_now`) → статус `scheduled` с `scheduled_send_at` = открытие окна. Выпуск `scheduled → sent` — `[не построено]`, наряд 017.
+3. Окно доставки (D-38): задача с явным `scheduled_send_at` или вне `settings.delivery_window` (если нет `force_now`) → статус `scheduled` с `scheduled_send_at` = открытие окна. Выпуск `scheduled → sent` — минутный тик `publish_due_scheduled` (§10, D-114).
 4. Триггеры БД вставляют строки в `notification_deliveries` (§4) — HTTP из транзакции не зовётся.
 5. `confirmed_entities`, `was_edited`, `edit_fields` — в строку `ai_logs` разбора того же `client_request_id` (метрика «доля правок», D-35); `inbox_items` → `confirmed`; заметка `note_id` → `converted_*` (D-75 §5).
 
@@ -180,9 +185,15 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 Таблица `notification_deliveries` (схема в DATABASE.md): `event_kind`, `status enum('queued','sent','failed')`, `channel enum('push','telegram','sms')` (используется только `push`), `tier` (всегда 1), `attempts`, `last_error`, `meta` (`title`, `body`, `url`, `tag`… рендерит триггер — воркер ничего не сочиняет), `deliver_after`, `sent_at`, `seen_at`, `acted_at`.
 
 - **Триггер БД вставляет строку `queued` — и НИКОГДА не зовёт HTTP.** Push задачи `task_sent` рождается только при вставке со статусом `sent` или при переходе в `sent`.
-- **Воркер — `lib/push/send.ts` `sweepDeliveries()`** (G.20c): до 50 строк `queued`, `channel='push'`, `attempts < 3`, `deliver_after <= now()` → web-push на все подписки человека → `sent`; неудача → `attempts+1`, на третьей — `failed`; нет ни одной подписки → сразу `failed`, `last_error='no_subscription'` (директору — «уведомления не включены у сотрудника»). Без VAPID-ключей строки остаются `queued` — квитанция не подделывается.
-- **Пинок** — `kickDeliveries()` через `after()` из `/api/voice/confirm`, `/api/tasks/:id/transition`, `/deadline`, `/reassign`, `/api/errands`; **страховка** — минутный тик `/api/push/sweep` (§10).
-- **Минутный свип** `POST /api/push/sweep` (Vercel cron, сервисный ключ) перед отправкой очереди зовёт тики, каждый сам по себе (ошибка одного пишется в лог и не валит свип): `events_due_reminders` (D-78), `errands_due_escalation` (D-79), `notes_due_reminders` — напоминания заметок, пуш `note_reminder` автору без тихих часов, ссылка `/notes?n=<id>` — и `notes_purge_trash` — корзина заметок старше 3 дней (D-95), `visits_due_expiry` — визит без ответа гаснет (D-96), `errands_expire` — заявка со сроком («не беспокоить на 30 мин») кончается сама (D-99), `errands_due_remind` — напоминание за 10 минут до «к 18:00» (D-106 §8).
+- **Воркер — `lib/push/send.ts` `sweepDeliveries()`** (G.20c, D-114): строки сначала **захватываются** — RPC `claim_deliveries` (`queued`, `channel='push'`, `mode='now'`, `attempts < 3`, `deliver_after <= now()`, `for update skip locked`, `claimed_at`; захват старше 2 минут возвращается в очередь), так что пинок и свип одновременно никогда не шлют один пуш дважды. По 50 строк, по 8 пушей одновременно, пока очередь не пуста (пинок — до 8 с, свип — до 40 с) → web-push на все **включённые** подписки человека → `sent`; неудача → `attempts+1`, на третьей — `failed`; нет ни одной включённой подписки → сразу `failed`, `last_error='no_subscription'` (директору — «уведомления не включены у сотрудника»). Срок жизни, срочность и «тихо» — по виду события из `lib/push/policy.ts` (фиксированная политика, §4 «Политика сотрудника»); строка директора с `private` уходит без слов — только что случилось. Исход пишется в подписку (`last_ok_at` / `last_error*`). Без VAPID-ключей строки остаются `queued` — квитанция не подделывается.
+- **Пинок** — `kickDeliveries()` через `after()` из `/api/voice/confirm`, `/api/tasks/:id/transition`, `/deadline`, `/reassign`, `/api/errands`, `/api/visits`, `/api/push/test`; записи мимо API-роутов (сообщение в треде, кнопки секретаря, ответ на мероприятие, магазин, досылка из офлайн-очереди) зовут `/api/push/kick` (`kickPush()` на клиенте); **страховка** — минутный тик `/api/push/sweep` (§10).
+- **Минутный свип** `GET|POST /api/push/sweep` (Vercel cron, сервисный ключ) перед отправкой очереди зовёт тики, каждый сам по себе (ошибка одного пишется в лог и не валит свип): `events_due_reminders` (D-78), `errands_due_escalation` (D-79), `notes_due_reminders` — напоминания заметок, пуш `note_reminder` автору без тихих часов, ссылка `/notes?n=<id>` — и `notes_purge_trash` — корзина заметок старше 3 дней (D-95), `visits_due_expiry` — визит без ответа гаснет (D-96), `errands_expire` — заявка со сроком («не беспокоить на 30 мин») кончается сама (D-99), `errands_due_remind` — напоминание за 10 минут до «к 18:00» (D-106 §8); с D-114 — первым `publish_due_scheduled`, последними сигналы директора и сводки (§10).
+
+### Политика сотрудника (D-114)
+Сотрудник, секретарь и завхоз настроек не имеют: у них только «включены / нет» и «Проверить». Что ждёт окна компании — матрица ниже; как пуш едет — `lib/push/policy.ts`: работа (новая, доработка, отзыв, сообщение, на приёмку, отказ) — `high`, 24 ч; хорошие новости («Принято», «Срок продлён», магазин) — тихо, `normal`; объявления и календарь — `normal`; заявки секретаря — 30 мин, визит — 20 мин, «скоро» — 1 ч; тревога («Охрана», `meta.urgent`) — громко всегда, 5 мин. Уведомления одной задачи — один пузырь (`tag = task:{id}`); открыл задачу — её пузыри уходят из шторки. Карточка «Включить» — «Не сейчас» до завтра, iPhone вне экрана «Домой» и запрет — инструкция платформы. Приложение само перерегистрирует подписку (§4 «Гигиена канала»).
+
+### Правила директора (D-114)
+«Профиль → Уведомления», таблица `notification_prefs` (DATABASE), применяет триггер при постановке строки в очередь — матрица «Маршрут строки» в DATABASE. Девять категорий: `review` (на приёмку), `declined`, `questions`, `messages`, `unseen` («Задача не открыта»), `overdue`, `secretary` (заявки и визиты, кроме тревоги), `calendar`, `shop`; режимы «Сразу / Тихо / Сводкой / Не присылать». Не настраиваются: `alarm` (тревога и её квитанции), `reminders` (свои «напомни мне» — всегда, тишину пробивают по флагу), `system` (сводки, итог дня, проверка). Дефолты — прежнее поведение: всё «сразу», тишины нет; новые сигналы включены — «не открыта» через 30 мин «сразу», просрочки «сводкой». Смена правил перестраивает ждущую очередь директора (`set_notify_prefs`: delete + insert через тот же триггер).
 
 ### Ack-семантика (D-32)
 «Увидел» = SW шлёт `POST /api/push/seen {delivery_id}` при показе уведомления, ЛИБО открытое приложение шлёт тот же роут без `delivery_id` и закрывает все незакрытые строки человека (`seen_at`). «Принял» = переход задачи в `accepted` ставит `acted_at` строке `task_sent`; для `message` — `mark_thread_read`. Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
@@ -192,8 +203,9 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 ### Гигиена канала
 - Чистка подписок: ответ `404`/`410` → подписка удаляется немедленно `[есть]`.
-- Еженедельный health-check подписок с отчётом «у кого канал мёртв» — `[не построено]`.
-- Окно доставки (D-38, `company.settings.delivery_window`, дефолт 08:00–21:00 Asia/Aqtobe): триггер `trg_notification_deliveries_deliver_after` ставит `deliver_after = next_delivery_slot(...)` видам, которые ждут окна (матрица ниже); задачи вне окна производители кладут `scheduled` (§2, §3), их выпуск — `[не построено]`, наряд 017.
+- Подписка чинится сама (D-114): приложение при старте и возврате на экран сверяет её с сервером (`syncPush`, не чаще раза в 6 ч), SW отвечает на `pushsubscriptionchange`; выход из аккаунта отписывает телефон.
+- «У кого канал мёртв» (D-114) — не еженедельный отчёт, а всегда: RPC `push_health()` (директор, секретарь) → «без уведомлений» у человека в «Сотрудниках», строка «У N человек не работают уведомления», в карточке — состояние и «Прислать проверку» (`/api/push/test`).
+- Окно доставки (D-38, `company.settings.delivery_window`, дефолт 08:00–21:00 Asia/Aqtobe): триггер `trg_notification_deliveries_deliver_after` ставит `deliver_after = next_delivery_slot(...)` видам, которые ждут окна (матрица ниже); задачи вне окна производители кладут `scheduled` (§2, §3), их выпускает минутный тик (`publish_due_scheduled`, D-114).
 
 ### Матрица нотификаций (по триггерам и RPC в миграциях)
 
@@ -208,21 +220,26 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 | `revoked` | триггер на `tasks` (из открытых статусов, в т.ч. при переназначении) | исполнитель | «Отозвано директором» | `/tasks/{id}` | ждёт окна |
 | `deadline_extended` | `extend_task_deadline` | исполнитель | «Срок продлён до …» | `/tasks/{id}` | ждёт окна |
 | `announcement` | триггер на `announcements` | все активные, кроме `tv` и автора | «Объявление» | `/ether` | ждёт окна |
-| `shop_order` | `create_shop_order` | director и shopkeeper, кроме заказчика | «Заказ в магазине» | `/shop` | сразу |
+| `shop_order` | `create_shop_order` | director и shopkeeper, кроме заказчика | «Заказ в магазине» | `/shop` | завхозу — ждёт окна (D-114), директору — по его правилам |
 | `shop_approved` / `shop_ready` | `set_shop_order_status` | владелец заказа | «Заказ подтверждён» / «Заказ готов» | `/shop` | ждёт окна |
 | `shop_cancelled` | `cancel_shop_order`, если отменил не владелец | владелец заказа | «Заказ отменён» | `/shop` | ждёт окна |
 | `event_invite` | триггер на `event_participants` | позванный (не автор) | «Приглашение» | `/calendar?e={id}` | ждёт окна |
 | `event_moved` / `event_cancelled` | триггер на `events` | участники, кроме автора (перенос — кроме отказавшихся) | «Перенос» / «Отмена» | `/calendar?e={id}` | ждёт окна |
 | `event_reminder` | `events_due_reminders` | участники, кроме отказавшихся (и автор) | «Скоро» | `/calendar?e={id}` | сразу (D-78 §5) |
-| `event_declined` | `respond_event` | автор мероприятия | «Не сможет» | `/calendar?e={id}` | сразу |
+| `event_declined` | `respond_event` (только на смене ответа на «не смогу», D-114) | автор мероприятия | «Не сможет» | `/calendar?e={id}` | сразу |
 | `errand_sent` | триггер на `errands`; повтор — `errands_due_escalation`, «Напомнить» — `errand_nudge` | активные `secretary`, кроме автора, **кто на месте** (`errand_recipients`; никого — все, D-99) | надпись кнопки / «Ещё раз: …»; тревога — «🚨 Вызови охрану!», `meta.urgent` (`requireInteraction`, повтор каждую минуту, пока не взяли) | `/secretary?e={id}` | сразу (D-79 §6) |
 | `errand_accepted` / `errand_done` / `errand_declined` | триггер на `errands`; `errand_done` с результатом — `errand_result` | автор заявки | «Принято · Имя» и обычное «Готово» — **только по тревоге** (D-99 §6); «Готово · Имя: результат»; «Не может · Имя» | `/pulse` / `/secretary?e={id}` | сразу |
 | `errand_question` / `errand_answer` | `errand_ask` / `errand_answer` | автор / взявший секретарь | «Айгуль спрашивает» / «Директор ответил» | `/pulse` / `/feed` | сразу (D-99 §3) |
 | `note_reminder` | `notes_due_reminders` | автор заметки | напоминание заметки | `/notes?n={id}` | сразу (D-95) |
 | `visit_arrived` | триггер на `visits` | директора компании | «К вам посетитель» | `/pulse` | сразу (D-96) |
 | `visit_answered` | триггер на `visits` | секретарь-автор | ответ директора | `/feed` | сразу (D-96) |
+| `task_unseen` | `unseen_task_alerts_due` (тик) | автор-директор | «Задача не открыта · Имя» — «„…“ · отправлена в 9:14» / «уведомления не включены» | `/tasks/{id}` | в окне компании, раз на отправку (D-114) |
+| `task_overdue` | `overdue_alerts_due` (тик) | автор-директор | «Просрочено · Имя» — «„…“ · срок был 18:00» | `/tasks/{id}` | раз на срок (D-114) |
+| `digest` | `director_digests_due` (тик) | директор | «Сводка» / «Пока вы отдыхали» / «Пока вы были на встрече» — «3 на приёмку · 2 вопроса» | `/pulse` | по слоту сводки, концу тишины или встречи (D-114) |
+| `day_summary` | `director_day_summaries_due` (тик) | директор | «Итог дня» — «принято 5 · на приёмке 2 · …» | `/sent` | в его время, раз в день (D-114) |
+| `test` | `/api/push/test` | себе или (director/secretary) человеку команды | «Проверка связи» | `/profile` | сразу (D-114) |
 
-Про `message`: **схлопывание** — пока строка ещё `queued`, следующее сообщение того же треда не создаёт новую, а обновляет её («N новых сообщения · последние слова»), один сигнал на очередь, а не N. **Не сообщения:** причина отказа, комментарий к доработке и отчёт при сдаче — у них свои события (`declined`, `rework`, `pending_review`). **Квитанцию закрывает** `mark_thread_read` — «Прочитал» из шторки или открытый тред. В таблице могут лежать строки прежних видов `question` и `reply` — новых не появляется. Очки (`award_points`) уведомлений не порождают.
+Про `message`: **схлопывание** — пока строка ещё `queued`, следующее сообщение того же треда не создаёт новую, а обновляет её («N новых сообщения · последние слова»), один сигнал на очередь, а не N. **Не сообщения:** причина отказа, комментарий к доработке и отчёт при сдаче — у них свои события (`declined`, `rework`, `pending_review`). **Квитанцию закрывает** `mark_thread_read` — «Прочитал» из шторки или открытый тред. В таблице могут лежать строки прежних видов `question` и `reply` — новых не появляется. Очки (`award_points`) уведомлений не порождают. Удалённое объявление забирает свои ещё не ушедшие пуши (`meta.announcement_id`, D-114). У `errand_declined` ссылка — `/secretary?e={id}`, у «принято / готово» — `/pulse`.
 
 ## 5. Telegram — `[не построено]` (D-21 🔴)
 
@@ -284,11 +301,11 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 ## 10. Минутный тик
 
-pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `* * * * *` → `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`). Роут экспортирует только `POST`, а Vercel cron вызывает `GET` — исправление в наряде 017.
+pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `* * * * *` → `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`); роут отвечает и на `GET` (так зовёт Vercel cron), и на `POST`, `maxDuration = 60`. Раз в минуту cron Vercel работает на тарифе Pro.
 
-Один вызов тика делает по порядку: `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. Выпуск отложенных задач `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
+Один вызов тика делает по порядку: `publish_due_scheduled()` — выпуск отложенных задач `scheduled → sent` (D-38, tasks/017, D-114), `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()`, `director_day_summaries_due()` и последними сводки `director_digests_due()` (D-114), затем `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку.
 
-Исполнителя нет `[не построено]` у: повторов (`recurrence_rules`) — записываются, но не исполняются (наряд 017, «Вне скоупа»); «напомни мне» с D-95 — заметка со временем, её исполняет `notes_due_reminders`; пометки просрочек и авто-очков (D-28); вечерней сводки директору; еженедельной проверки подписок (§4); чистки аудио старше срока хранения (D-18 ◐, D-66 п.6); чистки `tv_events` (`tv_events_prune`); подсчёта streak.
+Исполнителя нет `[не построено]` у: повторов (`recurrence_rules`) — записываются, но не исполняются (наряд 017, «Вне скоупа»); «напомни мне» с D-95 — заметка со временем, её исполняет `notes_due_reminders`; авто-очков (D-28); чистки аудио старше срока хранения (D-18 ◐, D-66 п.6); чистки `tv_events` (`tv_events_prune`); подсчёта streak.
 
 ## 11. Environments (D-19)
 

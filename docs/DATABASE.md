@@ -138,7 +138,10 @@ orders: id, company_id, user_id, item_id references shop_items on delete restric
 Ассортимент правят директор и завхоз прямо из приложения: запись в `shop_items` идёт **не через RPC, а обычным upsert под RLS** — id выдаётся клиентом заранее, поэтому повтор запроса не создаёт второй товар. Товар с заказами не удаляется — `is_active=false`. Отмена pending — сам сотрудник, director, shopkeeper; после approved — только director/shopkeeper (D-37). Мутации заказов — только через RPC ниже.
 
 ### push_subscriptions
-`id, company_id, user_id → profiles on delete cascade, endpoint text unique, p256dh text, auth text, user_agent text null, created_at`. Ответ push-сервиса `404`/`410` — подписка удаляется воркером.
+`id, company_id, user_id → profiles on delete cascade, endpoint text unique, p256dh text, auth text, user_agent text null, created_at`; с D-114 ещё `label text` («iPhone · Safari», `lib/push/device.ts`), `enabled boolean default true` (директорское «присылать сюда»), `last_ok_at`, `last_error`, `last_error_at`, `updated_at` — как прошёл последний пуш на это устройство (пишет воркер). Ответ push-сервиса `404`/`410` — подписка удаляется воркером; браузер регистрирует себя заново при каждом открытии приложения и в `pushsubscriptionchange`. Запись — `/api/push/subscribe` (service role, строго от имени вызывающего: адрес принадлежит браузеру — вошёл другой человек, подписка переходит к нему).
+
+### notification_prefs — правила пушей директора (D-114)
+`user_id pk → profiles on delete cascade, company_id, prefs jsonb default '{}', updated_at`. Строка только у директора: RLS — select своей строки при `auth_role()='director'`, политик на запись нет; пишет RPC `set_notify_prefs`, сотруднику — `forbidden`. Форма `prefs` и дефолты — `lib/push/prefs.ts` и `notify_prefs_defaults()` (держать одинаковыми): `modes` по девяти категориям (`now | quiet | digest | off`), `unseen_after_min`, `digest_every` (`30min | hour | twice`), `day_summary_at`, `quiet {on, from, to, weekends}`, `pass {reminders, visitors, vip}`, `meetings`, `vip uuid[]`, `lock_text (full | short)`.
 
 ### notification_deliveries — outbox доставки
 ```
@@ -148,10 +151,17 @@ channel delivery_channel not null default 'push', status delivery_status not nul
 tier int not null default 1, attempts int not null default 0, last_error text null,
 meta jsonb not null default '{}',      -- title / body / url / tag … рендерит производитель; воркер ничего не сочиняет
 deliver_after timestamptz not null default now(),   -- окно доставки как данные (D-51)
-created_at, sent_at, seen_at, acted_at timestamptz null
+created_at, sent_at, seen_at, acted_at timestamptz null,
+claimed_at timestamptz null,           -- воркер взял строку (claim_deliveries, D-114); старше 2 мин — снова в очереди
+category text null,                    -- категория для правил директора: review / declined / questions / messages /
+                                       -- unseen / overdue / secretary / calendar / shop / reminders / alarm / system / tasks
+mode text not null default 'now',      -- now | digest (ждёт сводки, воркер не берёт)
+held text null,                        -- почему ждёт: quiet / meeting / schedule
+silent boolean default false, private boolean default false,   -- «Тихо» и «текст на блокировке» директора
+digest_id uuid null → notification_deliveries   -- строка ушла внутри этой сводки
 ```
 Триггеры и RPC **вставляют строку**, не зовут HTTP; отправляет воркер `lib/push/send.ts` (BACKEND §4). Виды `event_kind` (матрица — BACKEND §4): директору (автору задачи) — `pending_review`, `declined`, `message`; исполнителю — `task_sent`, `rework`, `done`, `revoked`, `deadline_extended`, `message`; всем активным, кроме `tv` и автора, — `announcement`; магазин — `shop_order`, `shop_approved`, `shop_ready`, `shop_cancelled`; календарь — `event_invite`, `event_moved`, `event_cancelled`, `event_reminder`, `event_declined`; заявки — `errand_sent`, `errand_accepted`, `errand_done`, `errand_declined` (адрес карточки — `meta.errand_id`, `task_id` пуст). Строки прежних видов `question`/`reply` могут остаться, новых нет.
-**Окно доставки** — триггер `trg_notification_deliveries_deliver_after` (тело из `20260918150000_calendar_events.sql`): `deliver_after = next_delivery_slot(company, now())` для `reply, rework, done, revoked, deadline_extended, announcement, shop_approved, shop_ready, shop_cancelled, event_invite, event_moved, event_cancelled`, а также для `message` человеку, который не автор задачи; остальные виды (в т.ч. все `errand_*`, `event_reminder`, `event_declined`, сообщения автору) уходят сразу. Воркер берёт только `deliver_after <= now()`, индекс `notification_deliveries_due_idx`.
+**Маршрут строки** — триггер `trg_notification_deliveries_deliver_after` (before insert; тело с D-114 — `20260924150200_notify_prefs.sql`) ставит `category` каждой строке и дальше делит по получателю. **Не директор** (сотрудник, секретарь, завхоз — фиксированная политика): `deliver_after = next_delivery_slot(company, now())` для `reply, rework, done, revoked, deadline_extended, announcement, shop_order, shop_approved, shop_ready, shop_cancelled, event_invite, event_moved, event_cancelled`, а также для `message` человеку, который не автор задачи; остальные виды (все `errand_*`, `visit_*`, `event_reminder`, `event_declined`, `note_reminder`, `test`) уходят сразу; `task_sent` при «Настоять» (`declined → sent`) производитель сам кладёт на открытие окна. **Директор**: категории `alarm` и `system` не трогаются; «Не присылать» → `failed` + `last_error='muted'`; «Тихо» → `silent`; «текст на блокировке» → `private`; «Не беспокоить» → `mode='digest'`, `held='quiet'`, `deliver_after` = конец тишины (пробивают свои напоминания, посетитель, важные люди — по флагам `pass`); встреча из календаря при `meetings` → `held='meeting'` до её конца (проходят «скоро», посетитель, важные люди); «Сводкой» → `held='schedule'` до слота сводки; важные люди (исполнитель задачи в `vip`) поднимают «Тихо»/«Сводкой» до «Сразу». Сбой правила строку не ломает — уходит как раньше. Воркер берёт только `mode='now'` и `deliver_after <= now()` (`claim_deliveries`), индекс `notification_deliveries_due_idx`; сводки — `notification_deliveries_digest_idx`.
 `channel` сейчас всегда `push`, `tier` — всегда 1; Telegram-ярус и эскалация по таймауту `[не построено]` (D-21, D-32); `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
 
 ### ingest_batches — идемпотентность мутаций
@@ -309,8 +319,9 @@ create policy tasks_insert on tasks for insert with check (
 - **point_transactions**: select — свои + director; insert/update/delete — нет (только security-definer-функции). Рейтинг клиентом из сырых транзакций НЕ читается — только `fn_rating()`.
 - **shop_items**: select — компания, кроме `tv`; всё остальное — director/shopkeeper. **orders**: select — свои + director/shopkeeper; мутации — только RPC.
 - **announcements**: select — компания, кроме `tv`; insert — director (автор — он сам); delete — director. **announcement_acks**: select — компания, кроме `tv`; insert — своё.
-- **push_subscriptions**: select — свои + director; insert/delete — свои.
+- **push_subscriptions**: select — свои + director; insert/delete — свои (приложение пишет через `/api/push/subscribe` и `/api/push/devices` service role'ом, строго от имени вызывающего).
 - **notification_deliveries**: select — свои + director; запись — service role и security-definer-функции.
+- **notification_prefs**: select — своя строка и только директору; записи нет — RPC `set_notify_prefs` (D-114).
 - **ingest_batches, ai_logs**: select — director; запись — service role и security-definer-функции.
 - **inbox_items**: select — автор + director; insert — своё; update — автор до `confirmed`.
 - **recurrence_rules**: select — компания, кроме `tv`; insert/update/delete — director. **reminders**: select — свои; записи нет (таблица выведена из оборота, D-95).
@@ -336,6 +347,19 @@ delete_task(task_id uuid) returns jsonb                       -- D-58
 purge_closed_tasks() returns jsonb                            -- D-58
 mark_thread_read(task_id uuid, seq bigint) returns bigint     -- D-61, D-64
 next_delivery_slot(p_company uuid, p_now timestamptz default now()) returns timestamptz   -- D-38
+
+-- доставка (D-114); тики — только service_role, из минутного свипа
+publish_due_scheduled(p_now timestamptz default now()) returns int   -- scheduled → sent, tasks/017
+claim_deliveries(p_limit int default 50) returns setof notification_deliveries   -- воркер берёт строки
+set_notify_prefs(p_prefs jsonb) returns jsonb           -- только директор; перестраивает ждущую очередь
+push_health() returns table (user_id, devices, enabled_devices, last_ok_at, last_error, last_error_at,
+                             last_seen_at, no_device_at)   -- директору и секретарю
+unseen_task_alerts_due(p_now timestamptz default now()) returns int   -- «Задача не открыта»
+overdue_alerts_due(p_now timestamptz default now()) returns int       -- «Просрочено»
+director_day_summaries_due(p_now timestamptz default now()) returns int   -- «Итог дня»
+director_digests_due(p_now timestamptz default now()) returns int     -- сводки
+-- служебные: notify_prefs_defaults(), notify_prefs_of(user), delivery_category(kind, meta), notify_hhmm(text, time),
+-- director_quiet_until(prefs, at), director_meeting_until(user, at), director_digest_slot(prefs, at), ru_plural(n, …)
 
 -- очки, настройки
 award_points(p_user_id uuid, p_amount int, p_reason text, client_request_id uuid default null) returns jsonb
