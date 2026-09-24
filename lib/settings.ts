@@ -113,6 +113,17 @@ export const BrandPatchSchema = z
   })
   .partial();
 
+/**
+ * No max here on purpose: one section that fails to parse drops the whole settings to
+ * defaults (`parseCompanySettings`), so the bound lives in the route that writes it.
+ */
+export const DictionarySettingsSchema = z.object({
+  dismissed: z.array(z.string()).default([]),
+});
+
+/** How many hidden lessons are kept — the oldest go first. */
+export const DICTIONARY_DISMISSED_MAX = 200;
+
 export const CompanySettingsSchema = z.object({
   brand: BrandSchema.prefault({}),
   // prefault: the empty object goes through the section schema, so its own defaults apply
@@ -130,6 +141,8 @@ export const CompanySettingsSchema = z.object({
   delivery_window: DeliveryWindowSchema.prefault({}),
   /** The secretary's buttons and the repeat-push timeout (D-79). */
   secretary: SecretarySettingsSchema.prefault({}),
+  /** «Словарь» (D-111): lessons hidden with «×» on «Из ваших записей», `${personId}:${form}`. */
+  dictionary: DictionarySettingsSchema.prefault({}),
 });
 
 export type CompanySettings = z.infer<typeof CompanySettingsSchema>;

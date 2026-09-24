@@ -67,9 +67,14 @@ export function DictionarySkeleton() {
 }
 
 /**
- * The head is static text: it renders at once and is never a bone (DESIGN §2, rule 2).
- * «‹ Настройки» in the bar leads to the settings tab the page was opened from (D-113).
+ * The head of the screen (D-113) is static text: it renders at once and is never a bone
+ * (DESIGN §2, rule 2). «‹ Настройки» / «‹ Сотрудники» leads to the tab the page was opened from.
  */
-export function DictionaryHead({ back = "/settings?tab=ai" }: { back?: string }) {
-  return <PageHead back={{ href: back, label: "Настройки" }} title="Словарь" />;
+export function DictionaryHead({ from }: { from?: "team" }) {
+  return (
+    <PageHead
+      back={from === "team" ? { href: "/settings?tab=team", label: "Сотрудники" } : { href: "/settings?tab=ai", label: "Настройки" }}
+      title="Словарь"
+    />
+  );
 }

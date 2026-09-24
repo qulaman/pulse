@@ -9,20 +9,30 @@
 export function EntryChip({
   label,
   fresh,
+  waiting,
   onRemove,
 }: {
   label: string;
   /** Added on this visit: an accent edge says where it landed. */
   fresh?: boolean;
+  /** Added without network: on the screen, not on the server yet — a dashed edge and a clock. */
+  waiting?: boolean;
   /** Absent — the entry is read-only for this viewer. */
   onRemove?: () => void;
 }) {
   return (
     <span
-      className={`card-in inline-flex min-h-[34px] max-w-full items-center rounded-full border bg-surface-2 font-display text-[14px] font-semibold leading-[18px] tracking-[-0.01em] text-text ${
-        fresh ? "border-accent/60" : "border-border"
+      title={waiting ? "Ждёт связи — сохранится сам" : undefined}
+      className={`card-in inline-flex min-h-[34px] max-w-full items-center rounded-full border bg-surface-2 font-display text-[14px] font-semibold leading-[18px] tracking-[-0.01em] ${
+        waiting ? "border-dashed border-muted/60 text-muted" : fresh ? "border-accent/60 text-text" : "border-border text-text"
       } ${onRemove ? "pl-3" : "px-3"}`}
     >
+      {waiting ? (
+        <svg width="13" height="13" viewBox="0 0 16 16" aria-label="ждёт связи" className="-ml-0.5 mr-1 shrink-0">
+          <circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="M8 4.8V8l2.2 1.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      ) : null}
       <span className="min-w-0 truncate py-1">{label}</span>
       {onRemove ? (
         <button

@@ -5,7 +5,7 @@ import { useState } from "react";
 import { EntryChip, SuggestChip } from "@/components/dictionary/chips";
 import { EntryInput } from "@/components/dictionary/EntryInput";
 import { toast } from "@/components/ui/Toast";
-import { ALIAS_MAX, byRussian, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
+import { ALIAS_MAX, byRussian, entryKey, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
 import { useEditAliases } from "@/lib/dictionary-queries";
 import { initialsOf } from "@/lib/people/queries";
 
@@ -25,6 +25,7 @@ export function PersonNames({
   people,
   editable,
   fresh,
+  waiting,
   onAdded,
 }: {
   person: RosterPerson;
@@ -34,6 +35,8 @@ export function PersonNames({
   /** False for a director seen by the secretary (D-104). */
   editable: boolean;
   fresh: ReadonlySet<string>;
+  /** `${personId}:${entryKey(alias)}` of the names still waiting for the network. */
+  waiting: ReadonlySet<string>;
   onAdded: (entries: string[]) => void;
 }) {
   const edit = useEditAliases();
@@ -95,6 +98,7 @@ export function PersonNames({
             key={alias}
             label={alias}
             fresh={fresh.has(`${person.id}:${alias}`)}
+            waiting={waiting.has(`${person.id}:${entryKey(alias)}`)}
             onRemove={editable ? () => remove(alias) : undefined}
           />
         ))}

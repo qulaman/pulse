@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { Guide, type GuideStep } from "@/components/dictionary/Guide";
+import { Misheard } from "@/components/dictionary/Misheard";
 import { NameCheck } from "@/components/dictionary/NameCheck";
 import { PersonNames } from "@/components/dictionary/PersonNames";
 import { SearchField } from "@/components/dictionary/SearchField";
@@ -10,6 +11,7 @@ import { Chip } from "@/components/ui/Chip";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
 import type { MatchingConfig } from "@/lib/ai/config";
 import { byRussian, entryKey, nameReport, type RosterPerson } from "@/lib/dictionary";
+import { useMisheard, useWaitingEdits } from "@/lib/dictionary-queries";
 import { canEditPerson, type Who } from "@/lib/people/access";
 import type { Person } from "@/lib/people/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -63,6 +65,9 @@ export function NamesPanel({ people, me, matching }: { people: Person[]; me: Who
   );
   const reports = useMemo(() => new Map(roster.map((p) => [p.id, nameReport(p, roster)])), [roster]);
   const editable = (p: Person) => (me ? canEditPerson(me, { id: p.id, role: p.role }) : false);
+  const locked = people.filter((p) => !editable(p)).map((p) => p.id);
+  const misheard = useMisheard();
+  const waiting = useWaitingEdits();
 
   const suggestCount = people.filter((p) => editable(p) && reports.get(p.id)?.suggestions.length).length;
   const sharedCount = people.filter((p) => reports.get(p.id)?.shared.length).length;
@@ -86,13 +91,10 @@ export function NamesPanel({ people, me, matching }: { people: Person[]; me: Who
 
   return (
     <div className="flex flex-col gap-2">
+      {/* what the director's own recordings taught first: the work that is already waiting */}
+      <Misheard items={misheard.data ?? []} lockedIds={new Set(locked)} onAdded={markFresh} />
       <Guide id="names" steps={STEPS} />
-      <NameCheck
-        people={roster}
-        matching={matching}
-        lockedIds={people.filter((p) => !editable(p)).map((p) => p.id)}
-        onAdded={markFresh}
-      />
+      <NameCheck people={roster} matching={matching} lockedIds={locked} onAdded={markFresh} />
 
       <div className="mt-4">
         <SearchField value={query} onChange={setQuery} placeholder="Имя, должность или как зовут" label="Поиск по людям" />
@@ -128,6 +130,7 @@ export function NamesPanel({ people, me, matching }: { people: Person[]; me: Who
               people={roster}
               editable={editable(p)}
               fresh={fresh}
+              waiting={waiting.aliases}
               onAdded={(entries) => markFresh(p.id, entries)}
             />
           ))}
