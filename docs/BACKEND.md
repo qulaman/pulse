@@ -32,7 +32,7 @@ withAuth(roles: Role[] | 'any', fn, schema?)   // auth → zod тела (400 val
 userSupabase(req)                              // клиент с JWT вызывающего: RPC идут под его ролью и RLS
 ```
 
-`'any'` = любой активный профиль. Без `withAuth`: `/api/company/logo` (multipart; те же `getSessionProfile` + `requireRole`), `/api/me`, `/api/health`, `/api/push/sweep` (секрет cron). Роли: `director | manager | employee | shopkeeper | secretary | tv` (`secretary` — D-79).
+`'any'` = любой активный профиль. Без `withAuth`: `/api/company/logo` (multipart; те же `getSessionProfile` + `requireRole`), `/api/me`, `/api/health`, `/api/version`, `/api/push/sweep` (секрет cron). Роли: `director | manager | employee | shopkeeper | secretary | tv` (`secretary` — D-79).
 
 Лимитов частоты запросов нет `[не построено]`: ни `company.settings.limits`, ни счётчиков в БД.
 
@@ -72,6 +72,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/lab` | GET, PATCH | director, secretary (D-63) | GET — последние 400 строк `ai_logs` (stt/parse) с ценой по `lib/ai/pricing.ts`; PATCH — секции `stt`, `parser` service-клиентом |
 | `/api/me` | GET | любая сессия | `{profile}` |
 | `/api/health` | GET | публичный | liveness `{ok, version, time}`, без БД |
+| `/api/version` | GET | публичный | сборка сервера `{id, sha, at, compat}` — с ней телефон сверяет свою (D-115); `no-store`, без БД |
 
 ## 2. Голосовой конвейер
 
