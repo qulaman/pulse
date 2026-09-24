@@ -18,6 +18,7 @@ describe("transportFor — the fixed policy (D-114)", () => {
   it("lets a push die with its moment", () => {
     expect(transportFor({ event_kind: "errand_sent", meta: {} }).ttl).toBe(1_800);
     expect(transportFor({ event_kind: "visit_arrived", meta: {} }).ttl).toBe(1_200);
+    expect(transportFor({ event_kind: "visit_message", meta: {} }).ttl).toBe(1_800);
     expect(transportFor({ event_kind: "event_reminder", meta: {} }).ttl).toBe(3_600);
   });
 

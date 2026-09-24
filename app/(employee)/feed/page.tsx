@@ -32,7 +32,7 @@ import { DndLamp } from "@/components/secretary/DndLamp";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
-import { VisitorButton } from "@/components/visits/VisitorButton";
+import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { useSecretaryActs } from "@/components/secretary/useSecretaryActs";
 import { haptic } from "@/lib/haptics";
 import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
@@ -588,9 +588,11 @@ export default function FeedPage() {
                   </p>
                 ) : null}
               </div>
-              {/* «Посетитель» (D-96): a person at the desk — one tap, and the director's wall says so */}
-              <div className="mt-4">
+              {/* «Посетитель» (D-96): a person at the desk — one tap, and the director's wall says so;
+                  «Сообщение» (D-116): the secretary's own words on the same wall */}
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
                 <VisitorButton visits={visitRows} />
+                <MessageButton visits={visitRows} />
               </div>
             </div>
           ) : null}

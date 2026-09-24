@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EVENT_SOON_MIN, INVITED_MS, overlayOf, waited } from "./overlay";
+import { EVENT_SOON_MIN, overlayOf, waited } from "./overlay";
 import type { TvEventRow, TvOverlay } from "./queries";
 
 const NOW = new Date("2026-09-25T09:00:00Z");
@@ -11,6 +11,17 @@ function visit(patch: Partial<NonNullable<TvOverlay["visit"]>> = {}): TvOverlay 
   return {
     visit: { id: "v1", status: "waiting", note: "Иванов, по поставкам", created_at: minutesAgo(3), answered_at: null, ...patch },
     waiting: 1,
+    message: null,
+    messages: 0,
+  };
+}
+
+function message(patch: Partial<NonNullable<TvOverlay["message"]>> = {}, messages = 1): TvOverlay {
+  return {
+    visit: null,
+    waiting: 0,
+    message: { id: "m1", note: "Звонил Ахметов, просит перезвонить", created_at: minutesAgo(2), ...patch },
+    messages,
   };
 }
 
@@ -41,13 +52,6 @@ describe("overlayOf — посетитель", () => {
     expect(view.banner && "since" in view.banner ? view.banner.since : "").toBe("только что");
   });
 
-  it("«Пусть заходит» — «Заходите» на несколько секунд, потом ничего", () => {
-    const invited = visit({ status: "invited", answered_at: new Date(NOW.getTime() - 2_000).toISOString() });
-    expect(overlayOf(invited, [], NOW).banner?.kind).toBe("visit-in");
-    const later = new Date(NOW.getTime() + INVITED_MS);
-    expect(overlayOf(invited, [], later).banner).toBeNull();
-  });
-
   it("«Подождёт» — тихая плашка вместо надписи", () => {
     const view = overlayOf(visit({ status: "wait", answered_at: minutesAgo(1), created_at: minutesAgo(7) }), [], NOW);
     expect(view.banner).toBeNull();
@@ -57,6 +61,41 @@ describe("overlayOf — посетитель", () => {
   it("ждут двое — надпись говорит «ещё 1»", () => {
     const view = overlayOf({ ...visit(), waiting: 2 }, [], NOW);
     expect(view.banner && "more" in view.banner ? view.banner.more : 0).toBe(1);
+  });
+});
+
+describe("overlayOf — сообщение секретаря", () => {
+  it("во всю стену: слова секретаря и когда написано", () => {
+    expect(overlayOf(message(), [], NOW).banner).toEqual({
+      kind: "message",
+      id: "m1",
+      title: "Сообщение от секретаря",
+      text: "Звонил Ахметов, просит перезвонить",
+      since: "2 мин назад",
+      more: 0,
+    });
+    expect(overlayOf(message({ created_at: NOW.toISOString() }), [], NOW).banner).toMatchObject({ since: "только что" });
+  });
+
+  it("гость в кабинете: надпись есть, слов нет", () => {
+    expect(overlayOf(message({ note: null }), [], NOW).banner).toMatchObject({ kind: "message", text: null });
+  });
+
+  it("три непрочитанных — «ещё 2»", () => {
+    expect(overlayOf(message({}, 3), [], NOW).banner).toMatchObject({ more: 2 });
+  });
+
+  it("посетитель у стола важнее сообщения; «Подождёт» — плашкой под сообщением", () => {
+    const both: TvOverlay = { ...message(), visit: visit().visit, waiting: 1 };
+    expect(overlayOf(both, [], NOW).banner?.kind).toBe("visit");
+    const waits: TvOverlay = { ...message(), visit: { ...visit().visit!, status: "wait", answered_at: minutesAgo(1) }, waiting: 1 };
+    const view = overlayOf(waits, [], NOW);
+    expect(view.banner?.kind).toBe("message");
+    expect(view.pill?.kind).toBe("visit-wait");
+  });
+
+  it("сообщение важнее мероприятия", () => {
+    expect(overlayOf(message(), [meeting(NOW.toISOString())], NOW).banner?.kind).toBe("message");
   });
 });
 

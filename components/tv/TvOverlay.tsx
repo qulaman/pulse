@@ -1,45 +1,41 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { markRung, playChime, rungBefore } from "@/lib/tv/chime";
-import { INVITED_MS, type OverlayView } from "@/lib/tv/overlay";
+import type { OverlayView } from "@/lib/tv/overlay";
 
 import s from "./tv.module.css";
 
 /**
- * Слой «важно сейчас» поверх любой сцены стены (D-96): посетитель у стола секретаря и
- * мероприятие, которое вот-вот начнётся. Пока надпись висит, на стене только она: яркое лицо
- * маскота сквозь полупрозрачную подложку спорило с текстом. Сцена под ней остаётся
- * смонтированной — надпись ушла, и карточка сотрудника или часы на месте без перехода.
+ * Слой «важно сейчас» поверх любой сцены стены (D-96): посетитель у стола секретаря,
+ * сообщение секретаря (D-116) и мероприятие, которое вот-вот начнётся. Пока надпись висит, на
+ * стене только она: яркое лицо маскота сквозь полупрозрачную подложку спорило с текстом.
+ * Сцена под ней остаётся смонтированной — надпись ушла, и карточка сотрудника или часы на
+ * месте без перехода.
  *
- * «Подождёт» — не надпись, а тихая плашка в углу: ответ дан, человек ждёт.
- * Движение — только opacity и transform (перф-контракт D-45); звонок — один раз на визит.
+ * «Подождёт» — не надпись, а тихая плашка в углу: ответ дан, человек ждёт. «Пусть заходит»
+ * надпись просто убирает (D-116 §1).
+ * Движение — только opacity и transform (перф-контракт D-45); звонок — один раз на визит
+ * и на сообщение.
  */
 
 const EASE = [0.2, 0, 0, 1] as const;
 
-export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }) {
-  const banner = view.banner;
-  // «Заходите» leaves by the kiosk's own timer: the wall clock ticks only every ten seconds
-  const [gone, setGone] = useState<string | null>(null);
-  const invitedId = banner?.kind === "visit-in" ? banner.id : null;
-  useEffect(() => {
-    if (!invitedId) return;
-    const timer = setTimeout(() => setGone(invitedId), INVITED_MS);
-    return () => clearTimeout(timer);
-  }, [invitedId]);
+/** A short message is read from across the room; a long one still fits in four lines. */
+const SHORT_MESSAGE = 40;
 
-  // one ring per visitor, and not again after the kiosk restarts
-  const ringId = banner?.kind === "visit" ? banner.id : null;
+export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }) {
+  const shown = view.banner;
+
+  // one ring per visitor or message, and not again after the kiosk restarts
+  const ringId = shown?.kind === "visit" || shown?.kind === "message" ? shown.id : null;
   useEffect(() => {
     if (!ringId || !sound || rungBefore(ringId)) return;
     markRung(ringId);
     playChime();
   }, [ringId, sound]);
-
-  const shown = banner && !(banner.kind === "visit-in" && gone === banner.id) ? banner : null;
 
   return (
     <>
@@ -76,13 +72,37 @@ export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }
                     {shown.more > 0 ? ` · ждут ещё ${shown.more}` : ""}
                   </p>
                 </>
-              ) : shown.kind === "visit-in" ? (
-                <>
-                  <DoorMark tone="var(--ok)" open />
-                  <p className="mt-[4vh] text-[12vh] font-bold leading-[13vh] tracking-[-0.03em]" style={{ color: "var(--ok)" }}>
-                    {shown.title}
-                  </p>
-                </>
+              ) : shown.kind === "message" ? (
+                shown.text ? (
+                  <>
+                    <BubbleMark />
+                    <p
+                      className="mt-[3.4vh] text-[3.6vh] font-semibold uppercase leading-[4.4vh] tracking-[0.08em]"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      {shown.title}
+                    </p>
+                    <p
+                      className={`mt-[2vh] line-clamp-4 font-bold tracking-[-0.02em] [overflow-wrap:anywhere] ${
+                        shown.text.length <= SHORT_MESSAGE ? "text-[9vh] leading-[10.4vh]" : "text-[6.4vh] leading-[7.8vh]"
+                      }`}
+                      data-testid="tv-message-text"
+                    >
+                      {shown.text}
+                    </p>
+                    <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">
+                      {shown.since}
+                      {shown.more > 0 ? ` · ещё ${shown.more}` : ""}
+                    </p>
+                  </>
+                ) : (
+                  // a guest in the office (D-33): the notice without the words
+                  <>
+                    <BubbleMark />
+                    <p className="mt-[4vh] text-[9vh] font-bold leading-[10vh] tracking-[-0.03em]">{shown.title}</p>
+                    <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">Текст — в вашем телефоне</p>
+                  </>
+                )
               ) : (
                 <>
                   <CalendarMark />
@@ -121,18 +141,38 @@ export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }
 }
 
 /** A door in a breathing ring: the visitor is at the reception, not in the room yet. */
-function DoorMark({ tone, open = false }: { tone: string; open?: boolean }) {
+function DoorMark({ tone }: { tone: string }) {
   return (
     <span className="relative flex h-[22vh] w-[22vh] items-center justify-center">
       <span
         aria-hidden
-        className={`absolute inset-0 rounded-full ${open ? "" : s.ring}`}
+        className={`absolute inset-0 rounded-full ${s.ring}`}
         style={{ boxShadow: `0 0 0 0.6vh color-mix(in srgb, ${tone} 60%, transparent)`, background: `color-mix(in srgb, ${tone} 12%, transparent)` }}
       />
       <svg viewBox="0 0 48 48" className="relative h-[11vh] w-[11vh]" fill="none" stroke={tone} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         <path d="M10 42h28" />
         <path d="M14 42V8h20v34" />
-        {open ? <path d="M14 8l12 4v32l-12-2" fill={`color-mix(in srgb, ${tone} 25%, transparent)`} /> : <circle cx="29" cy="26" r="1.8" fill={tone} stroke="none" />}
+        <circle cx="29" cy="26" r="1.8" fill={tone} stroke="none" />
+      </svg>
+    </span>
+  );
+}
+
+/** A speech bubble in the same breathing ring, smaller: the words are the point, not the mark. */
+function BubbleMark() {
+  return (
+    <span className="relative flex h-[16vh] w-[16vh] items-center justify-center">
+      <span
+        aria-hidden
+        className={`absolute inset-0 rounded-full ${s.ring}`}
+        style={{
+          boxShadow: "0 0 0 0.6vh color-mix(in srgb, var(--accent) 60%, transparent)",
+          background: "color-mix(in srgb, var(--accent) 12%, transparent)",
+        }}
+      />
+      <svg viewBox="0 0 48 48" className="relative h-[8vh] w-[8vh]" fill="none" stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <path d="M9 12.5A4.5 4.5 0 0 1 13.5 8h21A4.5 4.5 0 0 1 39 12.5v14a4.5 4.5 0 0 1-4.5 4.5H22l-8 7v-7h-.5A4.5 4.5 0 0 1 9 26.5z" />
+        <path d="M17 17h14M17 23h9" />
       </svg>
     </span>
   );

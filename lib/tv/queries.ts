@@ -287,7 +287,7 @@ export function useTvBoard(guest: boolean, enabled: boolean) {
   return query;
 }
 
-export type TvVisitStatus = "waiting" | "wait" | "invited";
+export type TvVisitStatus = "waiting" | "wait";
 
 export type TvOverlayVisit = {
   id: string;
@@ -298,15 +298,29 @@ export type TvOverlayVisit = {
   answered_at: string | null;
 };
 
-export type TvOverlay = { visit: TvOverlayVisit | null; waiting: number };
+/** Сообщение секретаря на экран (D-116): самое свежее непрочитанное. */
+export type TvOverlayMessage = {
+  id: string;
+  /** Слова секретаря; гостю не приезжают (D-33). */
+  note: string | null;
+  created_at: string;
+};
+
+export type TvOverlay = {
+  visit: TvOverlayVisit | null;
+  waiting: number;
+  message: TvOverlayMessage | null;
+  /** Сколько сообщений ждут «Понятно». */
+  messages: number;
+};
 
 /** Страховка, если сокет промолчал: посетитель у стола не должен ждать дольше. */
 const OVERLAY_REFRESH_MS = 20_000;
 
 /**
- * «К вам посетитель» (D-96): роль `tv` таблицу `visits` не читает — функция отдаёт
- * готовую надпись с маской гостя. Каждое изменение визита поднимает версию `tv_state`,
- * которую киоск и так слушает, поэтому отдельного сокета здесь нет.
+ * «К вам посетитель» (D-96) и сообщение секретаря (D-116): роль `tv` таблицу `visits` не
+ * читает — функция отдаёт готовую надпись с маской гостя. Каждое изменение визита поднимает
+ * версию `tv_state`, которую киоск и так слушает, поэтому отдельного сокета здесь нет.
  */
 export function useTvOverlay() {
   const query = useQuery({
@@ -317,7 +331,12 @@ export function useTvOverlay() {
       const { data, error } = await supabase.rpc("tv_overlay");
       if (error) throw new Error(error.message);
       const value = (data ?? {}) as Partial<TvOverlay>;
-      return { visit: value.visit ?? null, waiting: value.waiting ?? 0 };
+      return {
+        visit: value.visit ?? null,
+        waiting: value.waiting ?? 0,
+        message: value.message ?? null,
+        messages: value.messages ?? 0,
+      };
     },
   });
   useRealtimeInvalidate({ table: "tv_state" }, tvKeys.overlay);

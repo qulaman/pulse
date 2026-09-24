@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 
+import { MessageAsk } from "@/components/visits/MessageAsk";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
 import { VisitAsk } from "@/components/visits/VisitAsk";
-import { VisitorButton } from "@/components/visits/VisitorButton";
+import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import type { Visit } from "@/lib/visits/queries";
 
 /**
- * /dev/visits — «К вам посетитель» on fixtures (D-96, dev only): the secretary's button and
- * cards, the director's answer card. Taps would call the real API — look, do not press.
+ * /dev/visits — «К вам посетитель» (D-96) and «Сообщение на экран» (D-116) on fixtures (dev
+ * only): the secretary's buttons and cards, the director's answer cards. Taps would call the
+ * real API — look, do not press.
  */
 export default function VisitsSandbox() {
   const [base] = useState(() => Date.now());
@@ -18,6 +20,7 @@ export default function VisitsSandbox() {
     company_id: "c",
     author_id: "s",
     author: { full_name: "Айгуль Нурланова" },
+    kind: "visitor",
     note: null,
     status: "waiting",
     answered_by: null,
@@ -36,6 +39,9 @@ export default function VisitsSandbox() {
     visit({ id: "v3", note: "Сауле из банка", status: "invited", created_at: ago(14), answered_at: ago(1) }),
     visit({ id: "v4", status: "expired", created_at: ago(40) }),
     visit({ id: "v5", note: "Иванов, по поставкам бетона", created_at: ago(60 * 26), closed_at: ago(60 * 25) }),
+    visit({ id: "m1", kind: "message", note: "Звонил Ахметов, просит перезвонить до 17:00", created_at: ago(3), shown_at: ago(3) }),
+    visit({ id: "m2", kind: "message", note: "Документы по тендеру готовы", status: "read", created_at: ago(20), answered_at: ago(12) }),
+    visit({ id: "m3", kind: "message", note: "Звонил Ахметов", created_at: ago(60 * 30), closed_at: ago(60 * 29) }),
   ];
   const now = new Date(base);
 
@@ -43,14 +49,16 @@ export default function VisitsSandbox() {
     <main className="mx-auto flex w-full max-w-lg flex-col gap-6 px-4 py-6">
       <section className="flex flex-col gap-3" data-testid="secretary">
         <p className="text-[13px] uppercase tracking-[0.1em] text-muted">Секретарь · Лента</p>
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-2">
           <VisitorButton visits={visits} />
+          <MessageButton visits={visits} />
         </div>
         <ReceptionCards visits={visits} now={now} />
       </section>
       <section className="flex flex-col gap-3" data-testid="director">
         <p className="text-[13px] uppercase tracking-[0.1em] text-muted">Директор · Пульс</p>
         <VisitAsk visits={visits} now={now} />
+        <MessageAsk visits={visits} now={now} />
       </section>
     </main>
   );

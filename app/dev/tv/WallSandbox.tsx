@@ -27,7 +27,8 @@ export type WallCase =
   | "focus-empty"
   | "visit"
   | "wait"
-  | "in"
+  | "message"
+  | "message-long"
   | "event"
   | "night";
 
@@ -180,16 +181,21 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
 
 function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay {
   const note = guest ? null : "Иванов, по поставкам бетона";
+  const none = { visit: null, waiting: 0, message: null, messages: 0 };
   if (wallCase === "visit") {
-    return { visit: { id: "v1", status: "waiting", note, created_at: at(base, -3), answered_at: null }, waiting: 1 };
+    return { ...none, visit: { id: "v1", status: "waiting", note, created_at: at(base, -3), answered_at: null }, waiting: 1 };
   }
   if (wallCase === "wait") {
-    return { visit: { id: "v1", status: "wait", note, created_at: at(base, -9), answered_at: at(base, -2) }, waiting: 1 };
+    return { ...none, visit: { id: "v1", status: "wait", note, created_at: at(base, -9), answered_at: at(base, -2) }, waiting: 1 };
   }
-  if (wallCase === "in") {
-    return { visit: { id: "v1", status: "invited", note: null, created_at: at(base, -4), answered_at: new Date(base).toISOString() }, waiting: 0 };
+  if (wallCase === "message" || wallCase === "message-long") {
+    const words =
+      wallCase === "message"
+        ? "Звонил Ахметов, перезвоните"
+        : "Через 20 минут приедет проверка из акимата — нужны документы по тендеру и договор поставки";
+    return { ...none, message: { id: "m1", note: guest ? null : words, created_at: at(base, -2) }, messages: wallCase === "message" ? 1 : 2 };
   }
-  return { visit: null, waiting: 0 };
+  return none;
 }
 
 export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; clock: ClockStyle; guest: boolean }) {

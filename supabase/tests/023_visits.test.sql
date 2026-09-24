@@ -92,11 +92,12 @@ select throws_ok($$ select answer_visit((select id from v1), 'declined') $$, 'P0
                  'a decided visit is decided');
 
 -- ---------------------------------------------------------------------------
--- 5. Гость на стене: текст секретаря не приезжает
+-- 5. Приглашённый уходит со стены: «Заходите» там никто не видит (D-116 §1);
+--    маска гостя для текста секретаря — в 032
 -- ---------------------------------------------------------------------------
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000004","role":"authenticated"}';
-select is((select tv_overlay()->'visit'->>'status'), 'invited', 'the wall says «заходите» for a moment');
-select is((select tv_overlay()->'visit'->>'note'), null, 'and without the visitor''s name: a guest is in (D-33)');
+select is((select tv_overlay()->'visit'), 'null'::jsonb, 'the invited visitor leaves the wall at once');
+select is((select (tv_overlay()->>'waiting')::int), 0, 'nobody waits any more');
 
 set local role postgres;
 select is(
