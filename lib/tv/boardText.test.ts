@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { emWidth, lineWidth, textLines, wrapLines } from "./boardText";
+import { emWidth, lineWidth, snugWidth, textLines, wrapLines } from "./boardText";
 
 describe("wrapLines", () => {
   it("короткий текст — одна строка, пустой — тоже одна", () => {
@@ -43,5 +43,33 @@ describe("textLines и lineWidth", () => {
   it("широкие буквы шире узких, запас гарнитуры — сверху", () => {
     expect(emWidth("ЖЖЖ")).toBeGreaterThan(emWidth("иии"));
     expect(lineWidth("Кофе", 3, "leaf")).toBeGreaterThan(lineWidth("Кофе", 3, "title"));
+  });
+
+  it("«→ Марат» не рвётся на стрелке, а стрелка Golos — широкая (1.09 em в Chrome)", () => {
+    // with a plain space the arrow may end a line («ааааа →» / «Марат»); with the
+    // non-breaking one «→ Марат» is one word, wider than this line, and is broken as one
+    expect(wrapLines("ааааа → Марат", 4.2)).toBe(2);
+    expect(wrapLines("ааааа → Марат", 4.2)).toBe(3);
+    expect(emWidth("→")).toBeGreaterThanOrEqual(1.08);
+    expect(emWidth("→ Марат")).toBeCloseTo(emWidth("→ Марат"), 5);
+  });
+});
+
+describe("snugWidth", () => {
+  const text = "Новый прайс на мерч — согласовать с бухгалтерией";
+
+  it("многострочный текст — самая узкая колонка с тем же числом строк", () => {
+    const width = 40;
+    const lines = textLines(text, width, 4, 4, "point").lines;
+    const snug = snugWidth(text, width, 4, 4, "point");
+    expect(snug).toBeLessThan(width);
+    expect(textLines(text, snug, 4, 4, "point").all).toBe(lines);
+    // a hair narrower and the text needs another line
+    expect(textLines(text, snug - 0.5, 4, 4, "point").all).toBeGreaterThan(lines);
+  });
+
+  it("одна строка — ширина строки; обрезанный текст — вся колонка", () => {
+    expect(snugWidth("Коротко", 40, 4, 2, "point")).toBeCloseTo(lineWidth("Коротко", 4, "point"), 5);
+    expect(snugWidth("слово ".repeat(80), 30, 3, 2, "point")).toBe(30);
   });
 });
