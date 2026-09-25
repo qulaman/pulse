@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { enablePush, pushPlatform, pushState, type PushState } from "@/lib/push/client";
-import { pushBlocker } from "@/lib/push/words";
+import { pushBlocker, pushEnabledToast } from "@/lib/push/words";
 
 type Device = {
   id: string;
@@ -102,7 +102,8 @@ export function NotifyDevices() {
       const next = await enablePush();
       setState(next);
       if (next === "granted") {
-        toast("Уведомления включены на этом устройстве");
+        const done = pushEnabledToast(pushPlatform(), "Уведомления включены на этом устройстве");
+        toast(done.text, { lifetimeMs: done.lifetimeMs });
         void queryClient.invalidateQueries({ queryKey: devicesKey });
       } else if (next === "denied") toast("Уведомления запрещены в настройках браузера");
     } catch {

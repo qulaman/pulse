@@ -130,6 +130,23 @@ describe("ingest store", () => {
     expect(api.parse).not.toHaveBeenCalled();
   });
 
+  it("silence the guard threw away (200, transcript null) is «не расслышал», not «что-то пошло не так»", async () => {
+    api.uploadUrl.mockResolvedValue({ audio_path: "c/u/3.webm", signed_url: "https://s", token: "t" });
+    api.uploadAudio.mockResolvedValue(undefined);
+    // what /api/voice/transcribe really answers when the STT guard rejects the words
+    api.transcribe.mockResolvedValue({ transcript: null, code: "empty_transcript", guard: "too_dense" });
+    useIngestStore.setState({ address: "Динаре, " });
+
+    await useIngestStore.getState().ingestAudio(audio);
+    const state = useIngestStore.getState();
+
+    expect(state.stage).toBe("error");
+    expect(state.error?.code).toBe("empty_transcript");
+    expect(state.retryFrom).toBeNull();
+    expect(state.transcript).toBe("");
+    expect(api.parse).not.toHaveBeenCalled();
+  });
+
   it("keeps the audio path on stt_failed and retries transcription", async () => {
     api.uploadUrl.mockResolvedValue({ audio_path: "c/u/2.webm", signed_url: "https://s", token: "t" });
     api.uploadAudio.mockResolvedValue(undefined);

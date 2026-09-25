@@ -23,17 +23,29 @@ self.addEventListener("push", (event) => {
     data = { body: event.data ? event.data.text() : "" };
   }
   const title = data.title || "Pulse";
+  const at = data.at ? Date.parse(data.at) : NaN;
   const options = {
     body: data.body || "",
+    lang: "ru",
     icon: "/icons/icon-192.png",
-    badge: "/icons/icon-192.png",
+    // the status bar and the shade header draw only the alpha of the badge (Android): the
+    // colour app icon came out as a blank white square there, so the badge is the bare
+    // pulse line on transparency (D-125)
+    badge: "/icons/badge-96.png",
+    // when it happened, not when the worker got to it (a word held for the morning window)
+    timestamp: Number.isNaN(at) ? undefined : at,
     // one bubble per task: a newer word replaces the older one instead of stacking
     tag: data.tag || data.delivery_id || undefined,
     renotify: Boolean(data.tag) && !data.silent,
     // «тихо» (the fixed policy for good news, the director's own choice): no sound, no buzz —
     // Android and desktop; iPhone plays what the phone decides
     silent: Boolean(data.silent),
-    data: { url: data.url || "/", delivery_id: data.delivery_id || null, kind: data.kind || null },
+    data: {
+      url: data.url || "/",
+      delivery_id: data.delivery_id || null,
+      kind: data.kind || null,
+      task_id: data.task_id || null,
+    },
     vibrate: data.silent ? undefined : [80, 40, 80],
   };
   // an alarm («вызови охрану», D-99) stays on the screen until it is touched and shakes the
@@ -53,6 +65,14 @@ self.addEventListener("push", (event) => {
       { action: "open", title: "Открыть" },
     ];
   }
+  // a new task is taken from the shade with one tap (D-125) — «Уточнить» and «Не могу» need
+  // words, so they stay on the card behind «Открыть»
+  if (data.kind === "task_sent" && data.task_id) {
+    options.actions = [
+      { action: "accept", title: "Принял" },
+      { action: "open", title: "Открыть" },
+    ];
+  }
   const shown = self.registration.showNotification(title, options);
   // «увидел»: the notification is on the screen (D-32)
   const ack = data.delivery_id
@@ -66,10 +86,45 @@ self.addEventListener("push", (event) => {
   event.waitUntil(Promise.all([shown, ack, refreshBadge()]));
 });
 
+/** The app on `url`: an open window is brought forward, otherwise a new one. */
+function openApp(url) {
+  return self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+    for (const client of list) {
+      if ("focus" in client) {
+        client.navigate(url);
+        return client.focus();
+      }
+    }
+    return self.clients.openWindow(url);
+  });
+}
+
+/**
+ * «Принял» from the shade (D-125): the same door as the card's button — the transition with its
+ * own client_request_id, the «принял» receipt follows on the server. Anything but a clean yes
+ * (the task was revoked meanwhile, the session is gone, no network) opens the task instead,
+ * so the person sees why it did not go. Resolves to whether the task was taken.
+ */
+function acceptFromShade(info) {
+  return fetch("/api/tasks/" + info.task_id + "/transition", {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ to_status: "accepted", client_request_id: self.crypto.randomUUID() }),
+  })
+    .then((res) => res.ok)
+    .catch(() => false)
+    .then((ok) => (ok ? refreshBadge() : openApp(info.url || "/tasks/" + info.task_id)).then(() => ok));
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const info = event.notification.data || {};
   const url = info.url || "/";
+  if (event.action === "accept" && info.task_id) {
+    event.waitUntil(acceptFromShade(info));
+    return;
+  }
   if (event.action === "read" && info.delivery_id) {
     // the cursor moves on the server; the app is not woken for it
     event.waitUntil(
@@ -84,17 +139,7 @@ self.addEventListener("notificationclick", (event) => {
     );
     return;
   }
-  event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-      for (const client of list) {
-        if ("focus" in client) {
-          client.navigate(url);
-          return client.focus();
-        }
-      }
-      return self.clients.openWindow(url);
-    }),
-  );
+  event.waitUntil(openApp(url));
 });
 
 // The browser renewed (or the push service dropped) the subscription: register the new one at
