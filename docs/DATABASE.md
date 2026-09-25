@@ -218,6 +218,8 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 
 **Стена v2 (D-96, миграция `20260923230000_tv_wall_v2`):** `tv_control(..., p_clock)` пересоздан; `tv_focus()` отдаёт ещё `counts {new, work, review}` по всем открытым делам, `done_today`, `points_week`, `employee.avatar_url` (гостю — null); `tv_calendar(p_guest, p_days)` — неделя мероприятий для роли `tv`, которая `events` не читает; `tv_overlay()` — надпись поверх сцены. pgTAP — `022_tv_wall_v2.test.sql`.
 
+**Карточки с хронологией (D-120, миграция `20260925120000_tv_focus_story`):** `tv_focus()` v3 — до 12 открытых дел с `source` и `story` (события `posted | seen | accepted | question | text | photo | voice | director | deadline | review | again | done` со временем, без слов; отказ, «Настоять», отзыв и комментарий к доработке не отдаются — D-45), `done_recent` (до 6 сданных за 7 суток с историей), `rating {points, rank (только ≤ 5), weeks[4], done_week, on_time_week}` — гостю `null`; `points_week` считается без фильтра `fn_rating` по смотрящему. Историю одного дела собирает `tv_task_story(uuid)` (не security definer, execute у ролей API отозван, зовётся только из `tv_focus`). pgTAP — `033_tv_focus_story.test.sql`.
+
 **Месяц на стене (D-98, миграция `20260923233000_tv_calendar_month`):** `calendar_view` (`week | month`) — вид заставки «Календарь»; `tv_control(..., p_calendar)` пересоздан; `tv_calendar(p_guest, p_days, p_from)` отдаёт до 42 дней с `p_from` (по умолчанию сегодня по Актобе) — сетка месяца с понедельника первой недели. pgTAP — `024_tv_calendar_month.test.sql`.
 
 **Доска на стене (D-102, миграция `20260924090000_mind_boards`):** сцену `board` ставит только `tv_control(..., p_board)` — автор своей живой доски (`p_scene => 'board'` отклоняется, `bad_scene`; чужая или удалённая — `bad_board`); любая другая `p_scene` снимает доску; `p_board_guest` — «Показать гостю». `tv_board(p_guest)` (tv/director) отдаёт `{board, hidden}`: доску, стоящую на стене и живую по `board_until`, с пунктами по `position` (непустые, не удалённые) и нейтральными пометками (`assignee` — имя без фамилии исполнителя поручения, кроме `revoked`; `handed_done`); при госте без `board_guest` — `hidden: true`, если доску показали гостю — без имён. Правка доски на стене поднимает версию строки (`tv_touch`) — киоск перечитывает `tv_board`. pgTAP — `025_mind_boards.test.sql`.
@@ -412,7 +414,8 @@ visits_due_expiry(p_now timestamptz default now()) returns int           -- то
 -- ТВ (D-76)
 tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text, p_board uuid, p_board_guest boolean, p_wake boolean) returns tv_state   -- p_board* — D-102, p_wake — D-105
 tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102
-tv_focus() returns jsonb
+tv_focus() returns jsonb   -- v3: дела с историей, сданное за неделю, рейтинг человека, D-120
+tv_task_story(p_task uuid) returns jsonb   -- история дела для стены, только изнутри tv_focus, D-120
 tv_heartbeat(p_applied_version int default null) returns void
 tv_summary(p_guest boolean default false) returns jsonb
 -- пульс дня, ближайшие мероприятия, вердикт числами, три числа дня, топ-5 недели (fn_rating),
@@ -536,6 +539,7 @@ pg_cron и pg_net не подключены. Единственное распи
 | `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
 | `026_secretary_admin.test.sql` | секретарь: правит чужие карточки и роли, кроме директора, директором никого не делает, своё не трогает; настройки и название компании — да, сотрудник — нет (D-104) |
 | `027_tv_wake.test.sql` | разбудка стены: два часа от «сейчас», `false` усыпляет, другие команды не трогают, будит только директор |
+| `033_tv_focus_story.test.sql` | стена v3: история дела видом и временем, без слов, отказа и комментария к доработке; место только из пятёрки, очки для любого места, гостю без рейтинга; хелпер истории напрямую не зовут (D-120) |
 | `032_visit_messages.test.sql` | сообщение секретаря на стену: только со словами, пуш директору, «Понятно» только директор и только сообщению, маска гостя, «Заходите» нет, 30 минут без ответа (D-116); счёт по своим строкам — проходит и на dev |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).
