@@ -80,6 +80,53 @@ describe("wallNow", () => {
     expect(wallNow(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T08:00:00Z" }), PEOPLE, NOW)).toBe("Эфир · лицо");
   });
 
+  describe("доска с ведущим (D-121)", () => {
+    const BOARDS = [{ id: "b-1", title: "Планёрка" }];
+    const POINTS = ["p1", "p2", "p3", "p4", "p5", "p6", "p7"];
+    const onWall = (patch: Partial<TvState> = {}) =>
+      state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T16:00:00Z", ...patch });
+
+    it("называет подсвеченный пункт: «пункт 3 из 7»", () => {
+      expect(wallNow(onWall({ board_point: "p3" }), PEOPLE, NOW, BOARDS, POINTS)).toBe("Доска «Планёрка» · пункт 3 из 7 · до 21:00");
+      // без подсветки — как раньше
+      expect(wallNow(onWall(), PEOPLE, NOW, BOARDS, POINTS)).toBe("Доска «Планёрка» · до 21:00");
+      // подсвеченного пункта уже нет на доске — стена его не светит, и пульт не называет
+      expect(wallNow(onWall({ board_point: "gone" }), PEOPLE, NOW, BOARDS, POINTS)).toBe("Доска «Планёрка» · до 21:00");
+    });
+
+    it("карта — только когда она влезает на стену", () => {
+      expect(wallNow(onWall({ board_view: "map", board_point: "p3" }), PEOPLE, NOW, BOARDS, POINTS)).toBe(
+        "Доска «Планёрка» · карта · пункт 3 из 7 · до 21:00",
+      );
+      const many = Array.from({ length: 13 }, (_, i) => `p${i + 1}`);
+      expect(wallNow(onWall({ board_view: "map" }), PEOPLE, NOW, BOARDS, many)).toBe("Доска «Планёрка» · до 21:00");
+      // пустая доска картой не рисуется
+      expect(wallNow(onWall({ board_view: "map" }), PEOPLE, NOW, BOARDS, [])).toBe("Доска «Планёрка» · до 21:00");
+    });
+
+    it("при госте без «Показать гостю» — доска скрыта (D-102 §7)", () => {
+      expect(wallNow(onWall({ guest: true, board_point: "p3" }), PEOPLE, NOW, BOARDS, POINTS)).toBe("Доска «Планёрка» · скрыта от гостя");
+      expect(wallNow(onWall({ guest: true, board_guest: true, board_point: "p3" }), PEOPLE, NOW, BOARDS, POINTS)).toBe(
+        "Доска «Планёрка» · пункт 3 из 7 · до 21:00",
+      );
+      // гость визита истёк — доска снова на стене
+      expect(wallNow(onWall({ guest: true, guest_until: "2026-09-18T08:30:00Z" }), PEOPLE, NOW, BOARDS, POINTS)).toBe("Доска «Планёрка» · до 21:00");
+    });
+
+    it("длинное название режется, чтобы пункт и время остались на дисплее", () => {
+      const long = [{ id: "b-1", title: "Совещание по новому складу и логистике  на октябрь" }];
+      expect(wallNow(onWall({ board_point: "p1" }), PEOPLE, NOW, long, POINTS)).toBe(
+        "Доска «Совещание по новому скл…» · пункт 1 из 7 · до 21:00",
+      );
+    });
+
+    it("ночью доска будит стену — дисплей говорит о доске, а не о сне", () => {
+      const night = new Date("2026-09-18T17:00:00Z"); // 22:00 в Актобе
+      const late = onWall({ board_until: "2026-09-18T19:00:00Z", board_point: "p2" }); // до 00:00
+      expect(wallNow(late, PEOPLE, night, BOARDS, POINTS)).toBe("Доска «Планёрка» · пункт 2 из 7 · до 00:00");
+    });
+  });
+
   it("в фокусе — имя и сколько осталось", () => {
     const row = state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T09:07:00Z" });
     expect(wallNow(row, PEOPLE, NOW)).toBe("Марат Ахметов · ещё 7 мин");
