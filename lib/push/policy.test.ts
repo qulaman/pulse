@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { lockScreenText, pushTag, transportFor } from "./policy";
+import { lockScreenText, pushTag, transportFor, ttlLeft } from "./policy";
 
 describe("transportFor — the fixed policy (D-114)", () => {
   it("wakes the phone for work that needs an answer", () => {
@@ -57,6 +57,31 @@ describe("lockScreenText", () => {
 
   it("never hides the alarm", () => {
     expect(lockScreenText({ category: "alarm", private: true }, text)).toBe(text);
+  });
+});
+
+describe("ttlLeft — a push dies with its moment (D-125)", () => {
+  const at = (iso: string) => new Date(iso);
+
+  it("counts the kind's life from when the row was written", () => {
+    const row = { event_kind: "visit_arrived", meta: {}, created_at: "2026-09-25T13:28:00Z", deliver_after: "2026-09-25T13:28:00Z" };
+    expect(ttlLeft(row, at("2026-09-25T13:28:30Z"))).toBe(1_170);
+    // the guest from yesterday evening is not news at 08:00
+    expect(ttlLeft(row, at("2026-09-26T03:00:00Z"))).toBeLessThanOrEqual(0);
+  });
+
+  it("counts from the window, not from the night, for a word that waited for the morning", () => {
+    const row = { event_kind: "done", meta: {}, created_at: "2026-09-25T17:00:00Z", deliver_after: "2026-09-26T03:00:00Z" };
+    expect(ttlLeft(row, at("2026-09-26T03:00:05Z"))).toBe(86_395);
+  });
+
+  it("keeps the alarm's five minutes, whatever its kind would give", () => {
+    const row = { event_kind: "errand_sent", meta: { urgent: true }, created_at: "2026-09-25T10:00:00Z", deliver_after: "2026-09-25T10:00:00Z" };
+    expect(ttlLeft(row, at("2026-09-25T10:06:00Z"))).toBeLessThan(0);
+  });
+
+  it("never drops a row whose dates it cannot read", () => {
+    expect(ttlLeft({ event_kind: "task_sent", meta: {}, created_at: "", deliver_after: "" })).toBe(86_400);
   });
 });
 

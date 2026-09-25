@@ -93,6 +93,20 @@ export function transportFor(row: PolicyRow): Transport {
   return { ttl: rule.ttl, urgency: silent && rule.urgency === "high" ? "normal" : rule.urgency, silent };
 }
 
+export type AgedRow = PolicyRow & { created_at: string; deliver_after: string };
+
+/**
+ * Seconds this row still makes sense (D-125): its kind's `ttl`, counted from the moment it
+ * became due — a word held for the morning window is due at 08:00, not when it was written.
+ * Zero or less: the moment is gone (a frozen worker, an outage, a night in the queue), and a
+ * «к вам посетитель» at 08:00 for a guest from yesterday evening is noise, not news.
+ */
+export function ttlLeft(row: AgedRow, now: Date = new Date()): number {
+  const due = Math.max(Date.parse(row.created_at), Date.parse(row.deliver_after));
+  if (Number.isNaN(due)) return transportFor(row).ttl;
+  return transportFor(row).ttl - Math.floor((now.getTime() - due) / 1000);
+}
+
 /**
  * «Текст на блокировке: только что случилось» (the director's `private` rows): the kind of
  * news without its words — no task title, no name, no message. The alarm keeps its words.

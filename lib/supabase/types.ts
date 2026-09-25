@@ -2064,6 +2064,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      push_when: { Args: { p_at: string; p_now?: string }; Returns: string }
       reassign_task: {
         Args: {
           client_request_id?: string

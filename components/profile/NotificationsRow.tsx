@@ -7,7 +7,7 @@ import { Row } from "@/components/ui/Row";
 import { BellIcon, PulseIcon } from "@/components/profile/icons";
 import { toast } from "@/components/ui/Toast";
 import { enablePush, pushPlatform, pushState, type PushState } from "@/lib/push/client";
-import { pushBlocker } from "@/lib/push/words";
+import { pushBlocker, pushEnabledToast } from "@/lib/push/words";
 
 const LABEL: Record<PushState, string> = {
   granted: "включены",
@@ -47,8 +47,10 @@ export function NotificationsRow({ director = false }: { director?: boolean }) {
     try {
       const next = await enablePush();
       setState(next);
-      if (next === "granted") toast("Уведомления включены");
-      else if (next === "denied") toast("Уведомления запрещены в настройках браузера");
+      if (next === "granted") {
+        const done = pushEnabledToast(pushPlatform());
+        toast(done.text, { lifetimeMs: done.lifetimeMs });
+      } else if (next === "denied") toast("Уведомления запрещены в настройках браузера");
     } catch {
       toast("Не получилось включить уведомления");
     } finally {
