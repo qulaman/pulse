@@ -11,7 +11,10 @@ import type { Note } from "@/lib/notes/queries";
  * Why a line waits: for the network — or, with the network up, for its own point. A
  * sub-point said under a point that has not left the phone yet cannot land first (the
  * server refuses a parent it has not seen, `bad_parent`); the replay sends the point and the
- * sub-point right after it, so «нет связи» would be a lie.
+ * sub-point right after it, so «нет связи» would be a lie. A point that exists only on the
+ * phone is not in flight — its sub-point says so at once; a point merely on its way (drawn
+ * from the tap, a moment from landing) makes its sub-point wait only once both are late, so
+ * nothing flickers for the half-second of an ordinary write.
  */
 export type Wait = "network" | "point";
 
@@ -20,14 +23,17 @@ export function waitOf(
   look: {
     /** Something of this line is owed to the server and it has waited too long (or there is no network). */
     late: (id: string) => boolean;
-    /** This line exists only on the phone so far (a create not yet on the server). */
+    /** Created on the phone and not on the server yet. */
     owed: (id: string) => boolean;
+    /** Exists only on the phone (not drawn from a write in flight). */
+    phone: (id: string) => boolean;
     online: boolean;
   },
 ): Wait | null {
+  const underOwed = look.online && look.owed(row.id) && row.parent_id !== null && look.owed(row.parent_id);
+  if (underOwed && look.phone(row.parent_id as string)) return "point";
   if (!look.late(row.id)) return null;
-  if (look.online && look.owed(row.id) && row.parent_id !== null && look.owed(row.parent_id)) return "point";
-  return "network";
+  return underOwed ? "point" : "network";
 }
 
 /** The fields of an edit that change the shape of a branch (D-121): the parent and the place under it. */

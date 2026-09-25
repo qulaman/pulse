@@ -164,7 +164,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
 
   const look: RowLook = {
     phone: (rowId) => phone.has(rowId),
-    wait: (row) => waitOf(row, { late: (rowId) => late.has(rowId), owed: (rowId) => owed.has(rowId), online }),
+    wait: (row) => waitOf(row, { late: (rowId) => late.has(rowId), owed: (rowId) => owed.has(rowId), phone: (rowId) => phone.has(rowId), online }),
     hearing: (rowId) => hearing.has(rowId),
     task: taskOf,
   };
@@ -426,7 +426,8 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
       node.style.fontSize = "";
       node.style.lineHeight = "";
       node.style.whiteSpace = "nowrap";
-      const natural = node.scrollWidth;
+      // scrollWidth is rounded: a line that measures «376 of 376» may need 376.4 px and wrap
+      const natural = node.scrollWidth + 1;
       const width = node.clientWidth;
       node.style.whiteSpace = "";
       if (natural <= width) return;
@@ -437,7 +438,15 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
     fit();
     const resize = new ResizeObserver(fit);
     resize.observe(room);
-    return () => resize.disconnect();
+    // on a hard load the first measure may take the fallback face: measure again with the title's own
+    let alive = true;
+    void document.fonts?.ready.then(() => {
+      if (alive) fit();
+    });
+    return () => {
+      alive = false;
+      resize.disconnect();
+    };
   }, [title, editing]);
 
   // the field is as tall as the title

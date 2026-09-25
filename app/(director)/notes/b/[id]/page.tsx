@@ -71,6 +71,15 @@ export default function BoardPage() {
   const now = useMinute();
 
   const [receipt, setReceipt] = useState<Receipt | null>(null);
+  // «stuck» is judged on a finer clock while something waits on the phone: after 20 s, not
+  // «whenever the minute turns»
+  const [tick, setTick] = useState(() => Date.now());
+  const owedCount = pending.creates.length + pending.edits.length;
+  useEffect(() => {
+    if (owedCount === 0) return;
+    const timer = setInterval(() => setTick(Date.now()), 5_000);
+    return () => clearInterval(timer);
+  }, [owedCount]);
   // «Поручить»: the people sheet over the board, the task leaves from here (D-108)
   const [assigning, setAssigning] = useState<Note | null>(null);
 
@@ -108,7 +117,7 @@ export default function BoardPage() {
       phoneOnly.add(entry.id);
       byId.set(entry.id, phoneRow(entry));
     }
-    const stuck = (at: number) => !online || now.getTime() - at > STUCK_MS;
+    const stuck = (at: number) => !online || tick - at > STUCK_MS;
     return {
       rows: [...byId.values()].filter((note) => note.deleted_at === null),
       phone: phoneOnly,
@@ -118,7 +127,7 @@ export default function BoardPage() {
         ...pending.edits.filter((edit) => stuck(edit.at)).map((edit) => edit.id),
       ]),
     };
-  }, [notes.data, pending, id, online, now]);
+  }, [notes.data, pending, id, online, tick]);
 
   // the one microphone of the screen (D-121): whose words it takes is decided when it opens —
   // the status screen says points, «+ подпункт» of an open point says its sub-points

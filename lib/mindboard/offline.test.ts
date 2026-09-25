@@ -10,31 +10,41 @@ const set = (...ids: string[]) => {
 describe("waitOf", () => {
   const point = { id: "p", parent_id: null };
   const sub = { id: "s", parent_id: "p" };
+  const look = (over: { late?: string[]; owed?: string[]; phone?: string[]; online?: boolean }) => ({
+    late: set(...(over.late ?? [])),
+    owed: set(...(over.owed ?? [])),
+    phone: set(...(over.phone ?? [])),
+    online: over.online ?? true,
+  });
 
   it("says nothing while a line is simply on its way", () => {
-    expect(waitOf(sub, { late: set(), owed: set("p", "s"), online: true })).toBeNull();
-    expect(waitOf(point, { late: set(), owed: set("p"), online: true })).toBeNull();
+    expect(waitOf(sub, look({ owed: ["p", "s"] }))).toBeNull();
+    expect(waitOf(point, look({ owed: ["p"], phone: ["p"] }))).toBeNull();
   });
 
   it("a sub-point under a point still on the phone waits for its point, not for the network", () => {
-    expect(waitOf(sub, { late: set("p", "s"), owed: set("p", "s"), online: true })).toBe("point");
+    expect(waitOf(sub, look({ late: ["p", "s"], owed: ["p", "s"] }))).toBe("point");
+  });
+
+  it("says so at once when the point exists only on the phone (not a write in flight)", () => {
+    expect(waitOf(sub, look({ owed: ["p", "s"], phone: ["p", "s"] }))).toBe("point");
   });
 
   it("without network everything waits for the network — the point too", () => {
-    expect(waitOf(sub, { late: set("p", "s"), owed: set("p", "s"), online: false })).toBe("network");
-    expect(waitOf(point, { late: set("p"), owed: set("p"), online: false })).toBe("network");
+    expect(waitOf(sub, look({ late: ["p", "s"], owed: ["p", "s"], phone: ["p", "s"], online: false }))).toBe("network");
+    expect(waitOf(point, look({ late: ["p"], owed: ["p"], online: false }))).toBe("network");
   });
 
   it("a sub-point whose point has landed waits for the network like any line", () => {
-    expect(waitOf(sub, { late: set("s"), owed: set("s"), online: true })).toBe("network");
+    expect(waitOf(sub, look({ late: ["s"], owed: ["s"] }))).toBe("network");
   });
 
   it("an owed edit of a landed sub-point (its point landed long ago) is the network's", () => {
-    expect(waitOf(sub, { late: set("s"), owed: set(), online: true })).toBe("network");
+    expect(waitOf(sub, look({ late: ["s"] }))).toBe("network");
   });
 
   it("a point never waits for a point", () => {
-    expect(waitOf(point, { late: set("p"), owed: set("p"), online: true })).toBe("network");
+    expect(waitOf(point, look({ late: ["p"], owed: ["p"], phone: ["p"] }))).toBe("network");
   });
 });
 

@@ -230,8 +230,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
         }
       >
         {phone ? (
-          <p className="text-[14px] leading-[19px]" style={{ color: "var(--warn)" }}>
-            Пункт ещё на телефоне — отправлю сам, как появится связь. Подпункты можно добавлять уже сейчас.
+          <p className={`text-[14px] leading-[19px] ${wait ? "text-warn" : "text-muted"}`} data-testid="point-phone">
+            {wait ? "Пункт ещё на телефоне — отправлю сам, как появится связь." : "Пункт ещё на телефоне — отправляю."} Подпункты можно добавлять уже сейчас.
           </p>
         ) : (
           <>
