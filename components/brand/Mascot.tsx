@@ -3,7 +3,26 @@ import type { CSSProperties } from "react";
 import { FADE_OUT, Linger } from "@/components/brand/Linger";
 import { SeasonWear } from "@/components/brand/MascotSeason";
 import type { MascotSeason } from "@/lib/mascot/season";
-import { BRINGS_CARD, BRINGS_LETTER, CallCard, handFill, Hourglass, Letter, MIRROR, Stack, WorkActBehind, WorkActFront, WorkActOver, WorkActUnder, type WorkAct } from "@/components/brand/MascotWork";
+import {
+  BoardActBehind,
+  BoardActFront,
+  BoardActOver,
+  BRINGS_CARD,
+  BRINGS_LETTER,
+  CallCard,
+  handFill,
+  Hourglass,
+  Letter,
+  MIRROR,
+  Stack,
+  TAKES_HAND,
+  WorkActBehind,
+  WorkActFront,
+  WorkActOver,
+  WorkActUnder,
+  type BoardAct,
+  type WorkAct,
+} from "@/components/brand/MascotWork";
 
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
@@ -110,10 +129,22 @@ export type MascotAct =
   | "orbit"
   | "peek"
   | "tiptoe"
-  | WorkAct;
+  | WorkAct
+  | BoardAct;
 
 /** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
 export const ACT_MS: Record<MascotAct, number> = {
+  // the director's face answers the board (tasks/020)
+  tick: 1200,
+  receive: 1600,
+  hmm: 1800,
+  puzzle: 1600,
+  stamp: 1800,
+  flick: 1400,
+  crumple: 1700,
+  push: 1600,
+  clock: 1800,
+  reply: 2000,
   catch: 1500,
   insist: 1500,
   nod: 1200,
@@ -382,6 +413,17 @@ const ACT_BODY: Record<MascotAct, string> = {
   wipe: "mascot-act-wipe 1.8s ease-in-out both",
   shuffle: "mascot-act-content 1.4s ease-in-out both",
   coin: "mascot-act-gulp 1.6s both",
+  // the director's face answers the board (tasks/020)
+  tick: "mascot-act-tick-nod 1.2s ease-in-out both",
+  receive: "mascot-act-receive 1.6s ease-in-out both",
+  hmm: "mascot-act-hmm 1.8s ease-in-out both",
+  puzzle: "mascot-act-puzzle 1.6s ease-in-out both",
+  stamp: "mascot-act-stamp 1.8s both",
+  flick: "mascot-act-flick 1.4s both",
+  crumple: "mascot-act-crumple 1.7s both",
+  push: "mascot-act-push-body 1.6s both",
+  clock: "mascot-act-clock 1.8s ease-in-out both",
+  reply: "mascot-act-reply 2s ease-in-out both",
 };
 
 /** Where an act sends the gaze — both eyes together, on top of the state's own look. */
@@ -405,6 +447,21 @@ const ACT_GAZE: Partial<Record<MascotAct, string>> = {
   watch: "mascot-act-watch-eyes 1.8s ease-in-out both",
   shuffle: "mascot-act-shuffle-eyes 1.4s ease-in-out both",
   coin: "mascot-act-look-up 1.6s ease-in-out both",
+  tick: "mascot-act-tick-eyes 1.2s ease-in-out both",
+  receive: "mascot-act-receive-eyes 1.6s both",
+  hmm: "mascot-act-hmm-eyes 1.8s ease-in-out both",
+  puzzle: "mascot-act-puzzle-eyes 1.6s ease-in-out both",
+  stamp: "mascot-act-stamp-eyes 1.8s ease-in-out both",
+  flick: "mascot-act-flick-eyes 1.4s ease-in-out both",
+  crumple: "mascot-act-crumple-eyes 1.7s ease-in-out both",
+  push: "mascot-act-push-eyes 1.6s ease-in-out both",
+  clock: "mascot-act-clock-eyes 1.8s ease-in-out both",
+  reply: "mascot-act-reply-eyes 2s ease-in-out both",
+};
+/** On «Задачи» the card of these acts lies on the clipboard, on the right: the eyes go there instead. */
+const ACT_GAZE_ON_BOARD: Partial<Record<MascotAct, string>> = {
+  stamp: "mascot-act-look-board 1.8s ease-in-out both",
+  reply: "mascot-act-look-board 2s ease-in-out both",
 };
 
 /** How an act shapes each eye: [left, right]. A wink is the one act that tells them apart. */
@@ -423,6 +480,9 @@ const ACT_LIDS: Partial<Record<MascotAct, [string, string]>> = {
   relief: ["mascot-act-relax 1.8s ease-in-out both", "mascot-act-relax 1.8s ease-in-out both"],
   thumb: ["mascot-act-glad 1.3s ease-in-out both", "mascot-act-glad 1.3s ease-in-out both"],
   wipe: ["mascot-act-squeeze 1.8s ease-in-out both", "mascot-act-squeeze 1.8s ease-in-out both"],
+  tick: ["mascot-act-glad 1.2s ease-in-out both", "mascot-act-glad 1.2s ease-in-out both"],
+  // one slow blink while it thinks it over
+  hmm: ["mascot-act-hmm-lids 1.8s both", "mascot-act-hmm-lids 1.8s both"],
 };
 
 /** The acts that warm the cheeks. */
@@ -440,6 +500,8 @@ const ACT_SMILE: Partial<Record<MascotAct, string>> = {
   thumb: "mascot-act-smile 1.3s ease-in-out both",
   coin: "mascot-act-smile 1.6s ease-in-out both",
   nod: "mascot-act-smile 1.2s ease-in-out both",
+  tick: "mascot-act-smile 1.2s ease-in-out both",
+  stamp: "mascot-act-smile 1.8s ease-in-out both",
 };
 
 /**
@@ -587,6 +649,11 @@ export function Mascot({
   // the stack of orders in the hands (D-110); a held job of a ball keeps the hands for itself
   const holding = detailed && carry !== null && carry.count > 0;
   const flatMouth = act ? FLAT_MOUTH[act] : undefined;
+  // «Задачи» in the hands (the clipboard and the pencil): an act of the board that takes a hand
+  // puts the pencil down for its length — two hands, never three (tasks/020)
+  const onBoard = state === "checking";
+  const penDown = onBoard && acting !== null && TAKES_HAND.has(acting);
+  const actGaze = act ? ((onBoard ? ACT_GAZE_ON_BOARD[act] : undefined) ?? ACT_GAZE[act] ?? "none") : "none";
   const actSmile = act === "smile" ? "mascot-act-smile 3.2s ease-in-out both" : act ? ACT_SMILE[act] : undefined;
   // the jumps of an act leave the ground too, and while they do the ground answers them
   // instead of the state's breath
@@ -991,6 +1058,7 @@ export function Mascot({
               ) : null}
               {/* the hands of the work, behind the body the same way: a hand up, palms out, a thumb, the watch (D-110) */}
               {acting ? <WorkActBehind act={acting} body={COLOR[state]} holding={holding} /> : null}
+              {acting ? <BoardActBehind act={acting} body={COLOR[state]} /> : null}
               <path
                 d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
                 fill={COLOR[state]}
@@ -1078,11 +1146,15 @@ export function Mascot({
                     ))}
                     {/* the thumb over the bottom edge: the board is held, not floating */}
                     <ellipse cx="59.5" cy="62.4" rx="3" ry="2.3" fill={COLOR[state]} />
-                    {/* the other hand ticks the rows off with a pencil, in step with the ticks */}
-                    <g style={{ animation: "mascot-check-pen 3.6s ease-in-out infinite" }}>
-                      <path d="M54.6 41.4 L48 44.6" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
-                      <path d="M54.6 41.4 L53.2 42.1" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
-                      <ellipse cx="47.8" cy="45" rx="2.8" ry="2.4" fill={handFill(COLOR[state])} />
+                    {/* the other hand ticks the rows off with a pencil, in step with the ticks; an act
+                        of the board that needs that hand puts the pencil down for its length. It fades
+                        rather than unmounts, so its stroke keeps step with the ticks when it is back */}
+                    <g style={{ opacity: penDown ? 0 : 1, transition: "opacity 180ms var(--ease-out)" }}>
+                      <g style={{ animation: "mascot-check-pen 3.6s ease-in-out infinite" }}>
+                        <path d="M54.6 41.4 L48 44.6" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
+                        <path d="M54.6 41.4 L53.2 42.1" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
+                        <ellipse cx="47.8" cy="45" rx="2.8" ry="2.4" fill={handFill(COLOR[state])} />
+                      </g>
                     </g>
                   </g>
                 ) : null}
@@ -1126,12 +1198,14 @@ export function Mascot({
               </Linger>
               {/* what the work puts in front of the body for a moment: the medal, the hand at the brow, the ear */}
               {acting ? <WorkActFront act={acting} body={COLOR[state]} /> : null}
+              {/* the director's hands on the card of the board: taken, stamped, flicked, crumpled (tasks/020) */}
+              {acting ? <BoardActFront act={acting} body={COLOR[state]} board={onBoard} /> : null}
 
               <g style={{ transform: gazeShift, transition: LOOK_EASE }}>
               <g style={{ transformOrigin: "32px 33px", animation: DRAG[state] ?? "none" }}>
                 <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: gaze ? "none" : EYES[state] }}>
                   {/* where an act sends the gaze, over the state's own look */}
-                  <g style={{ transformOrigin: "32px 33px", animation: act ? (ACT_GAZE[act] ?? "none") : "none" }}>
+                  <g style={{ transformOrigin: "32px 33px", animation: actGaze }}>
                     {/* The eye keeps one geometry and changes shape by transform: animating rx/ry
                         would re-run layout and paint of the SVG on every frame of the change. */}
                     <g key={`l-${gazeKey}`} style={{ transformOrigin: "24px 33px", animation: gazeBlink }}>
@@ -1270,6 +1344,7 @@ export function Mascot({
       {/* what flies in the work's acts: the card caught, stashed, put aside, thrown up, back to
           redo; the «?», the letter, the clock, the coin (D-110) */}
       {acting ? <WorkActOver act={acting} /> : null}
+      {acting ? <BoardActOver act={acting} /> : null}
 
       {/* processing: the new status itself — the tick lands with the top of the hop, and it
           is drawn last so the badge sits on the face instead of under it */}
