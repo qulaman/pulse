@@ -8,6 +8,7 @@ import { InstallHint } from "@/components/InstallHint";
 import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { EtherSection } from "@/components/ether/EtherSection";
+import { RatingPanel } from "@/components/rating/RatingPanel";
 import type { MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
@@ -95,6 +96,8 @@ const PANEL_FACE: Record<OrbitId, MascotState> = {
   calendar: "scheduling",
   // the director has no «Секретарь» ball since D-85 (the secretary's own Лента keeps one)
   secretary: "serving",
+  // the week's first five: the face is glad for them (D-123)
+  rating: "happy",
 };
 
 /**
@@ -295,8 +298,11 @@ export default function PulsePage() {
         tone: eventSoon ? "var(--warn)" : "var(--accent)",
       },
       // the secretary is not a ball: it sits at its own desk next to the face (D-85)
+      // the rating, one tap from the face — only while points are on (D-48, D-123); a quiet
+      // ball: there is nothing to count, only to look at
+      ...(pointsEnabled ? [{ id: "rating" as const, label: "Рейтинг", count: 0, tone: "var(--gold)" }] : []),
     ],
-    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon],
+    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, pointsEnabled],
   );
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);
@@ -774,6 +780,7 @@ export default function PulsePage() {
                     <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
                   )
                 ) : null}
+                {panel === "rating" ? <RatingPanel /> : null}
                 {panel === "ether" ? (
                   (ether.data ?? []).length === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>

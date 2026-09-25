@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
-export type OrbitId = "tasks" | "messages" | "ether" | "calendar" | "secretary";
+export type OrbitId = "tasks" | "messages" | "ether" | "calendar" | "secretary" | "rating";
 
 export type OrbitBall = {
   id: OrbitId;
@@ -50,6 +50,14 @@ const ICON: Record<OrbitId, ReactNode> = {
     <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} aria-hidden>
       <rect x="3.5" y="5.5" width="17" height="14" rx="3" />
       <path d="M8 3.5v4M16 3.5v4M3.5 10.5h17" />
+    </svg>
+  ),
+  // a podium with a star: the week's first five, one tap from the face (D-123)
+  rating: (
+    <svg width="22" height="22" viewBox="0 0 24 24" {...stroke} aria-hidden>
+      <path d="M8.6 20v-9.4h6.8V20" />
+      <path d="M3.4 20v-5.8h5.2M15.4 20v-4.2h5.2V20M2.8 20h18.4" />
+      <path d="M12 3.2l1 2 2.1.3-1.5 1.5.4 2.1-2-1-2 1 .4-2.1-1.5-1.5 2.1-.3z" strokeWidth="1.5" />
     </svg>
   ),
   // a cup: the errands of D-79 are coffee, tea and a knock on the door

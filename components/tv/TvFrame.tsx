@@ -6,7 +6,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import type { TvBoard as TvBoardData } from "@/lib/tv/board";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { OverlayView } from "@/lib/tv/overlay";
-import type { TvCalendar as TvCalendarData, TvFocusEmployee, TvSummary } from "@/lib/tv/queries";
+import type { TvCalendar as TvCalendarData, TvFocusEmployee, TvRatingScene, TvSummary, TvTaskFocus as TvTaskFocusData } from "@/lib/tv/queries";
 import { burnInShift, type CalendarView, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import type { TickerItem } from "@/lib/tv/ticker";
 import type { TvSpeech } from "@/lib/tv/voice";
@@ -17,8 +17,10 @@ import { TvAnalogClock } from "./TvAnalogClock";
 import { TvCalendar } from "./TvCalendar";
 import { TvClock } from "./TvClock";
 import { TvFocus } from "./TvFocus";
+import { TvLeaders } from "./TvLeaders";
 import { TvMascot } from "./TvMascot";
 import { TvOverlay } from "./TvOverlay";
+import { TvTaskFocus } from "./TvTaskFocus";
 import { TvTeam } from "./TvTeam";
 import { TvTicker } from "./TvTicker";
 
@@ -54,7 +56,11 @@ export type TvFrameProps = {
   speech: TvSpeech;
   summary: TvSummary | null;
   focus: TvFocusEmployee | null;
+  /** Одно дело во весь экран (D-123). */
+  task?: TvTaskFocusData | null;
   focusRemainingMs: number;
+  /** Заставка «Рейтинг» (D-123): пятёрка, рост, награды — или «скрыт», пока гость в кабинете. */
+  rating?: TvRatingScene | null;
   calendar: TvCalendarData | null;
   /** «Сегодня» с неделей или месяц сеткой (D-98). */
   calendarView: CalendarView;
@@ -85,14 +91,19 @@ export function TvFrame(props: TvFrameProps) {
   const shift = burnInShift(now);
   // a board to show: its points, or the honest «скрыта» for a guest (D-102)
   const board = scene === "board" && (props.board?.board || props.board?.hidden) ? props.board : null;
-  // a person, a board or a notice on the wall wakes the night up: somebody is in the office
-  const dim = night && !focus && !overlay.banner && !board;
+  const task = props.task ?? null;
+  // a person, an order, a board or a notice on the wall wakes the night up: somebody is in the office
+  const dim = night && !focus && !task && !overlay.banner && !board;
   // the scene key: changing it plays the transition, everything else updates in place
   const sceneKey = dim
     ? "night"
     : focus
       ? `focus:${focus.employee.id}`
-      : scene === "calendar"
+      : task
+        ? `task:${task.task.id}`
+        : scene === "rating"
+          ? `rating:${props.rating?.period ?? "week"}`
+          : scene === "calendar"
         ? `calendar:${props.calendarView}`
         : scene === "board"
           ? `board:${board?.board?.id ?? (board?.hidden ? "hidden" : "none")}`
@@ -130,6 +141,10 @@ export function TvFrame(props: TvFrameProps) {
                 <Night now={now} clock={clock} />
               ) : focus ? (
                 <TvFocus focus={focus} remainingMs={props.focusRemainingMs} now={now} />
+              ) : task ? (
+                <TvTaskFocus focus={task} remainingMs={props.focusRemainingMs} now={now} />
+              ) : scene === "rating" ? (
+                <TvLeaders data={props.rating ?? null} now={now} />
               ) : scene === "clock" ? (
                 <TvClock company={company} logoUrl={logoUrl} now={now} next={summary?.events[0] ?? null} clock={clock} />
               ) : scene === "team" ? (
@@ -154,6 +169,7 @@ export function TvFrame(props: TvFrameProps) {
             <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
             {guest ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· гость в кабинете</span> : null}
             {focus ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· на экране: {focus.employee.name}</span> : null}
+            {task?.employee ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· дело: {task.employee.name}</span> : null}
           </div>
 
           <div className="flex items-center gap-[2.4vh]">

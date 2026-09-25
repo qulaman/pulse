@@ -2,9 +2,21 @@
 
 import { lineOf } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
-import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvState, useTvSummary } from "@/lib/tv/queries";
+import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvRating, useTvState, useTvSummary } from "@/lib/tv/queries";
 import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
-import { awakeUntil, calendarViewOf, clockStyleOf, effectiveMode, focusRemainingMs, guestOf, isNight, sceneOf } from "@/lib/tv/state";
+import {
+  awakeUntil,
+  calendarViewOf,
+  carouselOn,
+  carouselScenes,
+  clockStyleOf,
+  effectiveMode,
+  focusRemainingMs,
+  guestOf,
+  isNight,
+  ratingViewOf,
+  sceneOf,
+} from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
@@ -41,21 +53,27 @@ export function TvScreen({
 
   const mode = effectiveMode(row, now);
   const guest = guestOf(row, initialGuest, now);
-  const scene = sceneOf(row, now);
 
   const feed = useTvFeed();
   const summary = useTvSummary(guest);
-  const focus = useTvFocus(mode === "employee");
+  // the rating needs points (D-48); before the summary comes, the base decides (D-123)
+  const points = summary.data?.points_enabled ?? true;
+  const scene = sceneOf(row, now, points, guest);
+  // the round prefetches its scenes, so a turn never lands on an empty screen (D-123)
+  const round = carouselOn(row) ? carouselScenes(points && !guest) : [];
+  const focus = useTvFocus(mode !== "ether");
   // the week from today, or six weeks from the Monday the month starts in (D-98)
   const calendarView = calendarViewOf(row);
   const calendar = useTvCalendar(
     guest,
-    scene === "calendar",
+    scene === "calendar" || round.includes("calendar"),
     calendarView === "month" ? { from: monthGridFrom(now), days: MONTH_DAYS } : { from: null, days: 7 },
   );
   const overlay = useTvOverlay();
   // the director's board, only while it is on the wall (D-102)
   const board = useTvBoard(guest, scene === "board");
+  // the rating scene: the first five, the riser, the rewards (D-123)
+  const rating = useTvRating(guest, scene === "rating" || round.includes("rating"), ratingViewOf(row));
   const offline = useOffline(summary.dataUpdatedAt);
 
   useNightReload();
@@ -68,6 +86,7 @@ export function TvScreen({
   // «стареет» сама, без отдельного таймера
   const speech = speechOf(lines, data?.today ?? { sent: 0, done: 0, in_work: 0 }, now);
   const focused = mode === "employee" && focus.data?.mode === "employee" ? focus.data : null;
+  const task = mode === "task" && focus.data?.mode === "task" ? focus.data : null;
 
   return (
     <div className="h-dvh w-full">
@@ -85,7 +104,9 @@ export function TvScreen({
         speech={speech}
         summary={data ?? null}
         focus={focused}
+        task={task}
         focusRemainingMs={focusRemainingMs(row, now)}
+        rating={scene === "rating" ? (rating.data ?? null) : null}
         calendar={calendar.data ?? null}
         calendarView={calendarView}
         board={scene === "board" ? (board.data ?? null) : null}

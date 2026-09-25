@@ -11,6 +11,7 @@ import {
   storyBoard,
   storyRows,
   storyTime,
+  taskSteps,
 } from "./focus";
 import type { TvFocusEmployee, TvFocusTask, TvStoryEvent } from "./queries";
 
@@ -290,6 +291,44 @@ describe("storyBoard — дела карточками", () => {
       NOW,
     );
     expect([board.total, board.hidden]).toEqual([15, 14]);
+  });
+});
+
+describe("taskSteps — одно дело во весь экран (D-123)", () => {
+  const story: TvStoryEvent[] = [
+    { k: "posted", at: today(9, 12) },
+    { k: "accepted", at: today(9, 20) },
+    { k: "review", at: today(12, 30) },
+    { k: "again", at: today(13, 0) },
+    { k: "review", at: today(15, 45) },
+  ];
+
+  it("пройденные шаги — со временем, текущий — подсвечен", () => {
+    const steps = taskSteps(task({ status: "pending_review", story }), NOW);
+    expect(steps.map((step) => [step.label, step.time, step.state])).toEqual([
+      ["Поставлена", "09:12", "passed"],
+      ["Принята в работу", "09:20", "passed"],
+      ["Сдана на проверку", "15:45", "passed"],
+      ["Принята директором", null, "now"],
+    ]);
+  });
+
+  it("возврат на доработку откатывает «Сдана»: шаг снова впереди (D-45)", () => {
+    const steps = taskSteps(task({ status: "rework", story }), NOW);
+    expect(steps.map((step) => step.state)).toEqual(["passed", "passed", "now", "next"]);
+    expect(steps[2].time).toBeNull();
+  });
+
+  it("новая ждёт принятия; принятая директором — все четыре пройдены", () => {
+    expect(taskSteps(task({ status: "sent", story: [story[0]] }), NOW).map((step) => step.state)).toEqual([
+      "passed",
+      "now",
+      "next",
+      "next",
+    ]);
+    const done = taskSteps(task({ status: "done", story: [...story, { k: "done", at: today(16) }] }), NOW);
+    expect(done.map((step) => step.state)).toEqual(["passed", "passed", "passed", "passed"]);
+    expect(done[3].time).toBe("16:00");
   });
 });
 
