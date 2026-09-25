@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { onlineManager, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 
 import { MIN_RECORDING_MS } from "@/lib/store/ingest";
@@ -8,8 +8,8 @@ import { useUpdateHold } from "@/lib/update/client";
 import { createRecorder, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
 
 import { firstLine } from "./list";
-import { upsertCached } from "./mutations";
-import { claim, dropCreate, keepCreate, release, type PendingCreate } from "./pending";
+import { refusedBranch, upsertCached } from "./mutations";
+import { claim, dropCreate, hasCreate, keepCreate, release, requestReplay, type PendingCreate } from "./pending";
 import type { Note } from "./queries";
 import { applyWords, deliverCreate, fetchWords } from "./replay";
 
@@ -43,6 +43,20 @@ const MIC_DENIED: Receipt = { tone: "warn", eyebrow: "Микрофон", headlin
 const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Недоступен здесь", line: "Открой приложение по https" };
 const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Аудио сохранил", line: "Заметка в ленте — распознаю ещё раз по тапу" };
 const KEPT_ON_PHONE: Receipt = { tone: "warn", eyebrow: "Нет связи", headline: "Голос на телефоне", line: "Отправлю сам, как появится связь" };
+/**
+ * A sub-point said under a point that has not left the phone yet (D-121): the network is
+ * fine, the server just cannot take a sub-point before its point — the replay sends both.
+ */
+export const WAITS_FOR_POINT: Receipt = { tone: "ok", eyebrow: "Голос сохранён", headline: "Подпункт ждёт свой пункт", line: "Отправлю вместе с ним" };
+
+/**
+ * What the display says when a capture could not land and is kept on the phone: a
+ * sub-point refused only because its point is still on the phone waits for that point;
+ * anything else waits for the network.
+ */
+export function keptReceipt(waitsForPoint: boolean): Receipt {
+  return waitsForPoint ? WAITS_FOR_POINT : KEPT_ON_PHONE;
+}
 
 /**
  * Where the capture goes: a loose thought by default, or the next point of a board (D-102).
@@ -125,14 +139,19 @@ export function useDictation(
     let note: Note;
     try {
       note = await deliverCreate(me, current.entry);
-    } catch {
+    } catch (error) {
       if (current.kept) {
         // on the phone: the replay sends it when the network is back (the feed shows it as
         // «ждёт связи»), and the dictaphone is free for the next thought right now
         release(current.entry.id);
         job.current = null;
         setStage("idle");
-        live.current.onReceipt(KEPT_ON_PHONE);
+        // a sub-point under a point still on the phone (D-121): not the network's fault —
+        // with the network up the replay sends the point and this one right after it
+        const parent = current.entry.parentId;
+        const waits = Boolean(parent) && refusedBranch(error) && (await hasCreate(parent as string));
+        live.current.onReceipt(keptReceipt(waits));
+        if (waits && onlineManager.isOnline()) requestReplay();
         return;
       }
       // kept in memory only (no IndexedDB here): the display offers «Повторить»

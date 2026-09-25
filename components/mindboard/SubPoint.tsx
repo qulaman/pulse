@@ -12,14 +12,34 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import type { LineState } from "@/lib/mindboard/branch";
 import { handedLabel } from "@/lib/mindboard/handed";
+import type { Wait } from "@/lib/mindboard/offline";
 
 /** What a line without words says instead. */
 export const STATE_WORDS: Record<Exclude<LineState, "words">, string> = {
   saving: "Сохраняю голос…",
   phone: "Голос на телефоне",
+  point: "Голос ждёт свой пункт",
   hearing: "Распознаю…",
   deaf: "Не расслышал — голос сохранён",
 };
+
+/** The tone of the words of a line without words: a warning only where the director may have to act. */
+export function stateTone(state: LineState): string {
+  return state === "deaf" || state === "phone" ? "text-warn" : "text-muted";
+}
+
+/** «ждёт связи» / «ждёт свой пункт» in the meta line of a waiting line (D-121). */
+export function WaitMark({ wait }: { wait: Wait }) {
+  return wait === "point" ? (
+    <span data-testid="line-wait" data-wait="point">
+      ждёт свой пункт
+    </span>
+  ) : (
+    <span data-testid="line-wait" data-wait="network" style={{ color: "var(--warn)" }}>
+      ждёт связи
+    </span>
+  );
+}
 
 /**
  * The marker of a sub-point (D-121): a dot where a point has its number — a tick once it is
@@ -33,7 +53,7 @@ export function SubMarker({ done, state }: { done: boolean; state: LineState }) 
       </span>
     );
   }
-  if (state === "hearing" || state === "saving" || state === "phone") {
+  if (state === "hearing" || state === "saving" || state === "phone" || state === "point") {
     return (
       <span aria-hidden className="flex h-5 w-[14px] shrink-0 items-center justify-center">
         <Dot tone={state === "phone" ? "warn" : "accent"} pulse />
@@ -54,11 +74,7 @@ export function SubLine({ sub, state }: { sub: Note; state: LineState }) {
   return (
     <span className="flex items-start gap-2" data-testid="point-sub" data-sub-id={sub.id}>
       <SubMarker done={done} state={state} />
-      <span
-        className={`line-clamp-2 min-w-0 text-[15px] leading-5 ${
-          state !== "words" ? (state === "deaf" || state === "phone" ? "text-warn" : "text-muted") : done ? "text-text/45" : "text-text/85"
-        }`}
-      >
+      <span className={`line-clamp-2 min-w-0 text-[15px] leading-5 ${state !== "words" ? stateTone(state) : done ? "text-text/45" : "text-text/85"}`}>
         {words}
       </span>
     </span>
@@ -104,11 +120,13 @@ type RowProps = {
   now: Date;
   open: boolean;
   state: LineState;
-  /** Something of this sub-point waits on the phone for the network. */
-  offline: boolean;
+  /** Something of this sub-point waits on the phone: for the network, or for its point to land first. */
+  wait: Wait | null;
   /** It exists only on the phone yet: nothing to edit until it lands. */
   phone: boolean;
   task: TaskWithPeople | undefined;
+  /** The handle that moves it among its siblings (D-121); absent while it cannot move. */
+  grip?: ReactNode;
   onToggle: () => void;
   onChangeText: (text: string) => void;
   onDone: () => void;
@@ -125,7 +143,7 @@ type RowProps = {
  * «Удалить». A sub-point is a note underneath, like its point: the same editor, the same STT.
  */
 export function SubPointRow(props: RowProps) {
-  const { sub, now, open, state, offline, phone, task, onToggle, onChangeText, onDone, onAssign, onPromote, onDelete, onRetranscribe } = props;
+  const { sub, now, open, state, wait, phone, task, grip, onToggle, onChangeText, onDone, onAssign, onPromote, onDelete, onRetranscribe } = props;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const done = sub.done_at !== null;
@@ -145,7 +163,8 @@ export function SubPointRow(props: RowProps) {
       </span>,
     );
   }
-  if (offline) meta.push(<span key="offline" style={{ color: "var(--warn)" }}>ждёт связи</span>);
+  // a line without words already says what it waits for in its own words («Голос на телефоне»)
+  if (wait && state === "words") meta.push(<WaitMark key="wait" wait={wait} />);
 
   if (!open) {
     return (
@@ -155,13 +174,13 @@ export function SubPointRow(props: RowProps) {
           aria-expanded={false}
           onClick={onToggle}
           data-testid="sub-row"
-          className="flex min-h-[44px] w-full items-start gap-2 rounded-[12px] py-3 pl-1 pr-2 text-left transition-colors duration-[120ms] active:bg-white/[0.05]"
+          className={`flex min-h-[44px] w-full items-start gap-2 rounded-[12px] py-3 pl-1 text-left transition-colors duration-[120ms] active:bg-white/[0.05] ${grip ? "pr-11" : "pr-2"}`}
         >
           <SubMarker done={done} state={state} />
           <span className="min-w-0 flex-1">
             <span
-              className={`block whitespace-pre-line text-[15px] leading-5 ${
-                state !== "words" ? (state === "deaf" || state === "phone" ? "text-warn" : "text-muted") : done ? "text-text/45" : "text-text/90"
+              className={`block whitespace-pre-line text-[15px] leading-5 [overflow-wrap:anywhere] ${
+                state !== "words" ? stateTone(state) : done ? "text-text/45" : "text-text/90"
               }`}
             >
               {words}
@@ -182,6 +201,7 @@ export function SubPointRow(props: RowProps) {
             ) : null}
           </span>
         </button>
+        {grip ? <span className="absolute right-0 top-0">{grip}</span> : null}
       </div>
     );
   }
@@ -213,13 +233,18 @@ export function SubPointRow(props: RowProps) {
       </div>
 
       {phone ? (
-        <p className="pb-1 text-[14px] leading-[19px]" style={{ color: "var(--warn)" }}>
-          Подпункт ещё на телефоне — отправлю сам, как появится связь
+        <p className={`pb-1 text-[14px] leading-[19px] ${wait === "point" ? "text-muted" : "text-warn"}`} data-testid="sub-phone">
+          {wait === "point"
+            ? "Подпункт ждёт свой пункт — отправлю вместе с ним"
+            : wait === "network"
+              ? "Подпункт ещё на телефоне — отправлю сам, как появится связь"
+              : "Подпункт ещё на телефоне — отправляю"}
         </p>
       ) : (
         <>
           <NoteEditor
-            key={sub.id}
+            // born again when STT brings the words (raw_transcript), never while the director types
+            key={`${sub.id}:${sub.raw_transcript ?? ""}`}
             text={sub.text}
             label="Текст подпункта"
             onDirty={setDirty}
