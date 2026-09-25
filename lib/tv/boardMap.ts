@@ -93,7 +93,7 @@ const CENTER_SMALL: readonly CenterFit[] = [
 const SMALL = { center: CENTER_SMALL, centerPadX: 2.4, centerPadY: 1.8, centerMinW: 20, centerRadius: 2.6 } as const;
 
 export const MAP_TIERS: Record<MapTier["key"], MapTier> = {
-  // 1–2 branches: big cards (a line of text as tall as the list's), the runs stretch across the wall
+  // 1–2 branches: big cards, the runs stretch across the wall
   xl: tier({
     key: "xl",
     size: 4.6,
@@ -258,6 +258,12 @@ export type MapBranch = {
   leaves: MapLeaf[];
   /** Лента от центра к ветви — залитый контур. */
   path: string;
+  /**
+   * Где лежат связи ветви — лента, стебли, точки листьев — с запасом на толщину линий. Стена
+   * рисует их своим слоем этого размера: ведущий гасит ветвь прозрачностью слоя, а не
+   * перерисовкой общего SVG на каждом кадре.
+   */
+  links: MapRect;
 };
 
 export type MapLayout = {
@@ -444,7 +450,7 @@ export function mapLayout(title: string, items: readonly TvBoardItem[], frame: {
 function place(center: MapCenter, right: Block[], left: Block[], t: MapTier, frame: { width: number; height: number }, sideW: number): MapLayout {
   const cy = frame.height / 2;
   const c = { ...center.rect, y: cy - center.rect.h / 2 };
-  const branches: MapBranch[] = [];
+  const branches: Omit<MapBranch, "links">[] = [];
 
   const stack = (blocks: Block[], side: "right" | "left") => {
     if (blocks.length === 0) return;
@@ -501,13 +507,26 @@ function place(center: MapCenter, right: Block[], left: Block[], t: MapTier, fra
     height: frame.height,
     tier: t,
     center: { ...center, rect: shift(c) },
-    branches: branches.map((branch) => ({
-      ...branch,
-      rect: shift(branch.rect),
-      path: movePath(branch.path, dx),
-      leaves: branch.leaves.map((leaf) => ({ ...leaf, rect: shift(leaf.rect), dotX: r2(leaf.dotX + dx), dotY: r2(leaf.dotY), path: movePath(leaf.path, dx) })),
-    })),
+    branches: branches.map((branch) => {
+      const path = movePath(branch.path, dx);
+      const leaves = branch.leaves.map((leaf) => ({ ...leaf, rect: shift(leaf.rect), dotX: r2(leaf.dotX + dx), dotY: r2(leaf.dotY), path: movePath(leaf.path, dx) }));
+      return { ...branch, rect: shift(branch.rect), path, leaves, links: linksOf(path, leaves, t) };
+    }),
   };
+}
+
+/** Охват связей ветви: лента, стебли и точки листьев, с запасом на толщину линий и сглаживание. */
+function linksOf(path: string, leaves: readonly MapLeaf[], t: MapTier): MapRect {
+  const boxes = [
+    boxOf(path),
+    ...leaves.flatMap((leaf) => [boxOf(leaf.path), { x: leaf.dotX - t.dot, y: leaf.dotY - t.dot, w: t.dot * 2, h: t.dot * 2 }]),
+  ];
+  const pad = t.stem + 0.4;
+  const x = Math.floor((Math.min(...boxes.map((b) => b.x)) - pad) * 100) / 100;
+  const y = Math.floor((Math.min(...boxes.map((b) => b.y)) - pad) * 100) / 100;
+  const right = Math.ceil((Math.max(...boxes.map((b) => b.x + b.w)) + pad) * 100) / 100;
+  const bottom = Math.ceil((Math.max(...boxes.map((b) => b.y + b.h)) + pad) * 100) / 100;
+  return { x, y, w: r2(right - x), h: r2(bottom - y) };
 }
 
 /** Сдвигает путь по горизонтали: все пары «x y» в нём. */

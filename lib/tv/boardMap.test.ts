@@ -256,6 +256,20 @@ describe("кривые и проверка", () => {
     expect(boxOf(elbow(0, 0, 5, 10))).toEqual({ x: 0, y: 0, w: 5, h: 10 });
   });
 
+  it("слой связей ветви охватывает её ленту, стебли и точки листьев", () => {
+    const layout = layoutOf([point(1, SUBS.slice(0, 3)), point(2, SUBS.slice(0, 2)), point(3)]);
+    const inside = (outer: { x: number; y: number; w: number; h: number }, inner: { x: number; y: number; w: number; h: number }) =>
+      inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+    for (const branch of layout.branches) {
+      expect(inside(branch.links, boxOf(branch.path))).toBe(true);
+      for (const leaf of branch.leaves) {
+        expect(inside(branch.links, boxOf(leaf.path))).toBe(true);
+        const r = layout.tier.dot;
+        expect(inside(branch.links, { x: leaf.dotX - r, y: leaf.dotY - r, w: r * 2, h: r * 2 })).toBe(true);
+      }
+    }
+  });
+
   it("находит пересечение и выход за край", () => {
     expect(rectsOverlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 })).toBe(true);
     expect(rectsOverlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 10, h: 10 })).toBe(false);
