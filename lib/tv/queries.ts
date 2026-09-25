@@ -159,12 +159,59 @@ export function useTvState() {
   });
 }
 
+/**
+ * Одно событие из жизни дела (D-120): только вид и время — слов переписки на стене нет.
+ * Отказ, «Настоять» и отзыв база не отдаёт вовсе, возврат на доработку — `again` (D-45).
+ */
+export type TvStoryKind =
+  | "posted"
+  | "seen"
+  | "accepted"
+  | "question"
+  | "text"
+  | "photo"
+  | "voice"
+  | "director"
+  | "deadline"
+  | "review"
+  | "again"
+  | "done";
+
+export type TvStoryEvent = {
+  k: TvStoryKind;
+  at: string;
+  /** Вопрос: когда директор ответил. */
+  ans?: string;
+  /** Новый срок. */
+  to?: string;
+  /** Срок снят. */
+  cleared?: boolean;
+  /** Сдача: с фото или с текстом отчёта. */
+  rep?: "photo" | "text";
+};
+
 export type TvFocusTask = {
   id: string;
   /** Гостю заголовков не отдают вовсе — экран скажет «Поручение» (D-33). */
   title: string | null;
   status: string;
   deadline: string | null;
+  /** Поля v3 (D-120) необязательны: киоск новее базы между деплоем и миграцией не падает. */
+  source?: "voice" | "typed" | "shared" | null;
+  story?: TvStoryEvent[];
+};
+
+/**
+ * Рейтинг человека на стене (D-120). Гостю — `null` (D-33). Место — только из первой
+ * пятёрки, иначе `null` (D-45); очки и недели — только при включённых очках.
+ */
+export type TvFocusRating = {
+  points: boolean;
+  rank?: number | null;
+  /** Очки по неделям, старая первой; последняя — текущие 7 суток. */
+  weeks?: number[] | null;
+  done_week: number;
+  on_time_week: number;
 };
 
 /** Числа над колонками карточки — по всем открытым делам, а не по показанным (D-96). */
@@ -182,6 +229,10 @@ export type TvFocusEmployee = {
   done_today?: { count: number; titles: (string | null)[] };
   /** Очки недели — только при включённых очках и без гостя (D-33, D-40). */
   points_week?: number | null;
+  /** v3: рейтинг и итоги недели; `null` — гость в кабинете. */
+  rating?: TvFocusRating | null;
+  /** v3: сданное за неделю с хронологией — на стене, когда открытых дел нет. */
+  done_recent?: TvFocusTask[];
 };
 
 export type TvFocus = { mode: "ether" } | TvFocusEmployee;

@@ -1,26 +1,28 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
-import { pluralRu } from "@/lib/tasks/status-text";
-import { focusCard, initialsOfName, type FocusLane, type FocusTone } from "@/lib/tv/focus";
+import { focusCard, initialsOfName, ratingView, storyBoard, type FocusLane, type FocusTone } from "@/lib/tv/focus";
 import type { TvFocusEmployee } from "@/lib/tv/queries";
 import { FOCUS_MS } from "@/lib/tv/state";
 
+import { TvRating } from "./TvRating";
+import { TvTaskCard } from "./TvTaskCard";
 import s from "./tv.module.css";
 
 /**
- * Сотрудник на стене (D-76 §10, редизайн D-96): директор нажал в телефоне — на стене его
- * дела, и с двух метров за секунду понятно, сколько их, где основной вес и что уже сделано.
+ * Сотрудник на стене (D-76 §10; D-96; карточки с хронологией — D-120): директор нажал в
+ * телефоне — на стене человек и его дела, и по каждому делу видно, как оно шло.
  *
- * Композиция: человек (фото или инициалы, имя, должность) и «сегодня сдано» справа; под
- * ним три колонки по стадиям — «Новые → В работе → На проверке» — с крупным числом над
- * каждой и карточками дел внутри; внизу тающая полоска времени на стене.
+ * Композиция: слева колонка человека — фото или инициалы, имя, должность, числа по
+ * стадиям, рейтинг недели и итоги недели, «Сегодня сдано»; справа — дела карточками с
+ * хронологией (до двух — одной строкой крупно, дальше сеткой 2 × 2; больше четырёх — стена
+ * листает сама раз в 20 секунд). Открытых дел нет — сданное за неделю, его история.
+ * Внизу тающая полоска времени на стене.
  *
  * Чего здесь нет и не будет: слова «просрочено», красного цвета, отказов и доработок
- * отдельным словом. Негатив по именам на экран в кабинете не выносится (D-45) — срок
- * печатается датой, «сегодня» подсвечено акцентом, только пока он впереди. Правила
- * живут в lib/tv/focus.ts, здесь только раскладка.
+ * отдельным словом, места ниже пятого и падения очков. Негатив по именам на экран в
+ * кабинете не выносится (D-45). Правила живут в lib/tv/focus.ts, здесь только раскладка.
  */
 
 const TONE: Record<FocusTone, string> = {
@@ -29,84 +31,143 @@ const TONE: Record<FocusTone, string> = {
   muted: "var(--text-muted)",
 };
 
+const LANE_WORD: Record<FocusLane["key"], string> = { new: "новые", work: "в работе", review: "на проверке" };
+
 const EASE = [0.2, 0, 0, 1] as const;
 
 export function TvFocus({ focus, remainingMs, now }: { focus: TvFocusEmployee; remainingMs: number; now: Date }) {
   const card = focusCard(focus, now);
+  const board = storyBoard(focus, now);
+  const rating = ratingView(focus);
   const minutes = Math.ceil(remainingMs / 60_000);
   const { name, position } = focus.employee;
   const avatar = focus.employee.avatar_url ?? null;
+  const large = board.rows === 1;
 
   return (
-    <div className="flex w-full max-w-[92vw] flex-col gap-[3vh]" data-testid="tv-focus">
-      {/* the person */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: EASE }}
-        className="flex items-center gap-[3.4vh]"
-      >
-        <span
-          className="flex h-[13vh] w-[13vh] shrink-0 items-center justify-center overflow-hidden rounded-full text-[5.4vh] font-bold leading-none"
-          style={{
-            background: "color-mix(in srgb, var(--accent-2) 30%, var(--surface-2))",
-            boxShadow: "0 0 0 0.5vh color-mix(in srgb, var(--accent-2) 55%, transparent)",
-          }}
+    <div className="flex h-[76vh] w-full max-w-[94vw] flex-col gap-[2vh]" data-testid="tv-focus">
+      <div className="grid min-h-0 flex-1 gap-[4vh]" style={{ gridTemplateColumns: "44vh minmax(0,1fr)" }}>
+        {/* the person */}
+        <motion.aside
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="flex min-h-0 flex-col gap-[2.6vh] overflow-hidden p-[0.6vh]"
         >
-          {avatar ? (
-            // eslint-disable-next-line @next/next/no-img-element -- a profile photo from the public bucket
-            <img src={avatar} alt="" className="h-full w-full object-cover" />
-          ) : (
-            initialsOfName(name)
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[6.8vh] font-bold leading-[7.8vh] tracking-[-0.02em]">{name}</p>
-          {position ? <p className="truncate text-[3.2vh] leading-[4.2vh] text-muted">{position}</p> : null}
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-[1vh]">
-          {card.done.count > 0 ? (
-            <p className="flex items-center gap-[1.2vh] text-[3.4vh] font-semibold leading-[4.4vh]" style={{ color: "var(--ok)" }}>
+          <div className="flex flex-col gap-[1.8vh]">
+            <span
+              className="flex h-[12vh] w-[12vh] shrink-0 items-center justify-center overflow-hidden rounded-full text-[5.2vh] font-bold leading-none"
+              style={{
+                background: "color-mix(in srgb, var(--accent-2) 30%, var(--surface-2))",
+                boxShadow: "0 0 0 0.5vh color-mix(in srgb, var(--accent-2) 55%, transparent)",
+              }}
+            >
+              {avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element -- a profile photo from the public bucket
+                <img src={avatar} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initialsOfName(name)
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="line-clamp-2 text-[5vh] font-bold leading-[5.6vh] tracking-[-0.02em]">{name}</p>
+              {position ? <p className="mt-[0.4vh] line-clamp-2 text-[2.6vh] leading-[3.2vh] text-muted">{position}</p> : null}
+            </div>
+          </div>
+
+          {/* how many are where: all open orders, not only the shown ones */}
+          <div className="grid grid-cols-3 gap-[1.6vh]">
+            {card.lanes.map((lane) => (
+              <div key={lane.key} className="min-w-0" data-lane={lane.key}>
+                <p
+                  className="text-[6vh] font-bold leading-[6.4vh] tabular-nums"
+                  style={{ color: lane.count > 0 ? TONE[lane.tone] : "var(--text-muted)" }}
+                >
+                  {lane.count}
+                </p>
+                <p className="truncate text-[2.1vh] leading-[2.6vh] text-muted">{LANE_WORD[lane.key]}</p>
+              </div>
+            ))}
+          </div>
+
+          {rating ? <TvRating view={rating} today={card.done.count} /> : null}
+
+          {/* a guest or a v2 base: no week block to carry «today», so it stands alone */}
+          {card.done.count > 0 && !rating?.week ? (
+            <p className="flex items-center gap-[1.2vh] text-[3vh] font-semibold leading-[3.8vh]" style={{ color: "var(--ok)" }}>
               <CheckIcon />
               Сегодня сдано: {card.done.count}
             </p>
           ) : null}
-          {typeof focus.points_week === "number" && focus.points_week > 0 ? (
-            <p className="text-[2.8vh] font-semibold leading-[3.6vh]" style={{ color: "var(--gold)" }}>
-              {focus.points_week} {pluralRu(focus.points_week, ["очко", "очка", "очков"])} за неделю
-            </p>
-          ) : null}
-        </div>
-      </motion.div>
+        </motion.aside>
 
-      {card.total === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
-          className="flex flex-col gap-[1.4vh] py-[4vh]"
-        >
-          <p className="text-[5vh] font-semibold leading-[6.4vh]">Открытых дел нет</p>
-          {card.done.titles.map((title, i) => (
-            <p key={i} className="flex items-center gap-[1.4vh] text-[3.2vh] leading-[4.2vh] text-muted">
-              <span style={{ color: "var(--ok)" }}>
-                <CheckIcon />
-              </span>
-              {title}
+        {/* the orders, each with its story */}
+        <section className="flex min-h-0 flex-col gap-[1.8vh]">
+          <header className="flex items-baseline justify-between gap-[2vh]">
+            <p className="text-[3vh] font-semibold leading-[3.8vh]">
+              {board.mode === "open" ? (
+                <>
+                  Открытые дела <span className="tabular-nums text-muted">· {board.total}</span>
+                </>
+              ) : board.mode === "done" ? (
+                <>
+                  Открытых дел нет <span className="text-muted">· сдано за неделю</span>
+                </>
+              ) : null}
             </p>
-          ))}
-        </motion.div>
-      ) : (
-        <div className="grid grid-cols-3 gap-[3vh]">
-          {card.lanes.map((lane, index) => (
-            <Lane key={lane.key} lane={lane} index={index} last={index === card.lanes.length - 1} />
-          ))}
-        </div>
-      )}
+            <div className="flex items-center gap-[2vh]">
+              {board.hidden > 0 ? (
+                <span className="text-[2.2vh] leading-[2.8vh] text-muted tabular-nums">показаны {board.total - board.hidden}</span>
+              ) : null}
+              {board.pages > 1 ? <PageDots page={board.page} pages={board.pages} /> : null}
+            </div>
+          </header>
+
+          {board.mode === "empty" ? (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.15, ease: EASE }}
+              className="flex flex-1 flex-col justify-center gap-[1.4vh]"
+            >
+              <p className="text-[5vh] font-semibold leading-[6.4vh]">Открытых дел нет</p>
+              {card.done.titles.map((title, i) => (
+                <p key={i} className="flex items-center gap-[1.4vh] text-[3.2vh] leading-[4.2vh] text-muted">
+                  <span style={{ color: "var(--ok)" }}>
+                    <CheckIcon />
+                  </span>
+                  {title}
+                </p>
+              ))}
+            </motion.div>
+          ) : (
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={board.page}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: 0.25 } }}
+                transition={{ duration: 0.4, ease: EASE }}
+                className="grid min-h-0 flex-1 gap-[2.4vh]"
+                style={{
+                  gridTemplateColumns: `repeat(${board.cols}, minmax(0, 1fr))`,
+                  gridTemplateRows: large ? undefined : `repeat(${board.rows}, minmax(0, 1fr))`,
+                  alignContent: large ? "start" : undefined,
+                }}
+                data-page={board.page}
+              >
+                {board.cards.map((item, index) => (
+                  <TvTaskCard key={item.id} card={item} index={index} large={large} />
+                ))}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </section>
+      </div>
 
       {/* how long the person stays on the wall: the bar melts, the words say it */}
       {minutes > 0 ? (
-        <div className="flex items-center gap-[2vh]">
+        <div className="flex shrink-0 items-center gap-[2vh]">
           <div className="h-[0.5vh] flex-1 overflow-hidden rounded-full" style={{ background: "var(--border)" }}>
             <div
               className={`h-full w-full rounded-full ${s.gauge}`}
@@ -120,65 +181,21 @@ export function TvFocus({ focus, remainingMs, now }: { focus: TvFocusEmployee; r
   );
 }
 
-function Lane({ lane, index, last }: { lane: FocusLane; index: number; last: boolean }) {
-  const color = TONE[lane.tone];
+/** Где стена сейчас, если дел больше шести: точки страниц, текущая — светлая. Цвет — единственное, что меняется. */
+function PageDots({ page, pages }: { page: number; pages: number }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.12 + index * 0.08, ease: EASE }}
-      className="relative flex min-w-0 flex-col gap-[1.4vh]"
-      data-lane={lane.key}
-    >
-      {/* the stage: a big number and its word; the chevron says where work goes next */}
-      <header className="flex items-baseline gap-[1.6vh] pb-[0.6vh]">
-        <span className="text-[8vh] font-bold leading-[8vh] tabular-nums" style={{ color: lane.count > 0 ? color : "var(--text-muted)" }}>
-          {lane.count}
-        </span>
-        <span className="text-[3vh] font-semibold leading-[3.8vh]" style={{ color: lane.count > 0 ? "var(--text)" : "var(--text-muted)" }}>
-          {lane.label}
-        </span>
-        {!last ? (
-          <span aria-hidden className="ml-auto text-[4vh] leading-none text-muted opacity-60">
-            ›
-          </span>
-        ) : null}
-      </header>
-
-      {lane.rows.length === 0 ? (
-        <p
-          className="rounded-[1.6vh] px-[2vh] py-[1.8vh] text-[2.6vh] leading-[3.4vh] text-muted opacity-60"
-          style={{ background: "color-mix(in srgb, var(--surface) 45%, transparent)" }}
-        >
-          —
-        </p>
-      ) : (
-        <ul className="flex flex-col gap-[1.2vh]">
-          {lane.rows.map((row, i) => (
-            <motion.li
-              key={row.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.24 + index * 0.08 + i * 0.05, ease: EASE }}
-              className="relative overflow-hidden rounded-[1.6vh] py-[1.5vh] pl-[2.4vh] pr-[2vh]"
-              style={{ background: "color-mix(in srgb, var(--surface) 88%, transparent)" }}
-            >
-              <span aria-hidden className="absolute inset-y-[1.2vh] left-0 w-[0.6vh] rounded-r-full" style={{ background: color }} />
-              <p className="line-clamp-2 text-[3.1vh] font-medium leading-[4vh] [overflow-wrap:anywhere]">{row.title}</p>
-              {row.deadline ? (
-                <p
-                  className="mt-[0.4vh] text-[2.3vh] leading-[3vh]"
-                  style={{ color: row.soon ? "var(--accent)" : "var(--text-muted)", fontWeight: row.soon ? 600 : 400 }}
-                >
-                  {row.deadline}
-                </p>
-              ) : null}
-            </motion.li>
-          ))}
-          {lane.more > 0 ? <li className="px-[1vh] text-[2.4vh] leading-[3vh] text-muted">+ ещё {lane.more}</li> : null}
-        </ul>
-      )}
-    </motion.section>
+    <span className="flex items-center gap-[1vh]" aria-label={`Страница ${page + 1} из ${pages}`}>
+      {Array.from({ length: pages }, (_, index) => (
+        <span
+          key={index}
+          className="h-[1.2vh] w-[1.2vh] rounded-full"
+          style={{
+            background: index === page ? "var(--text)" : "var(--border)",
+            transition: "background-color 400ms var(--ease-in-out)",
+          }}
+        />
+      ))}
+    </span>
   );
 }
 

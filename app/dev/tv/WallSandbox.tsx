@@ -7,7 +7,7 @@ import { useClock } from "@/components/tv/useKiosk";
 import type { TvBoard, TvBoardItem } from "@/lib/tv/board";
 import { lineOf, type TvEvent } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
-import type { TvCalendar, TvFocusEmployee, TvOverlay, TvSummary } from "@/lib/tv/queries";
+import type { TvCalendar, TvFocusEmployee, TvFocusTask, TvOverlay, TvStoryEvent, TvSummary } from "@/lib/tv/queries";
 import type { ClockStyle, TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
@@ -24,6 +24,10 @@ export type WallCase =
   | "board-pages"
   | "board-hidden"
   | "focus"
+  | "focus-few"
+  | "focus-many"
+  | "focus-done"
+  | "focus-nopoints"
   | "focus-empty"
   | "visit"
   | "wait"
@@ -40,6 +44,53 @@ function todayAt(base: number, hh: number, mm = 0, dayOffset = 0): string {
   const offset = 5 * 3_600_000;
   const day = Math.floor((base + offset) / 86_400_000) + dayOffset;
   return new Date(day * 86_400_000 - offset + (hh * 60 + mm) * MIN).toISOString();
+}
+
+/** Seven open orders of the person on the wall — every stage, voice and typed, with and without a deadline. */
+function openTasks(base: number): TvFocusTask[] {
+  return [
+    { id: "t1", title: "Смета по кровле для нового корпуса", status: "sent", deadline: todayAt(base, 18), source: "voice" },
+    { id: "t2", title: "Забрать пропуска на объект", status: "sent", deadline: todayAt(base, 12, 0, 1), source: "voice" },
+    { id: "t3", title: "Бетон на третий этаж", status: "accepted", deadline: todayAt(base, 18, 0, 3), source: "typed" },
+    { id: "t4", title: "Замер окон", status: "rework", deadline: todayAt(base, 10, 0, 1), source: "voice" },
+    { id: "t5", title: "Договор с поставщиком арматуры: согласовать объёмы на октябрь", status: "in_progress", deadline: null, source: "voice" },
+    { id: "t6", title: "Фотоотчёт по фасаду", status: "accepted", deadline: todayAt(base, 12, 0, 5), source: "typed" },
+    { id: "t7", title: "Акт по забору", status: "pending_review", deadline: null, source: "voice" },
+  ];
+}
+
+/** What the director accepted this week — the wall shows it when nothing is open. */
+function doneTasks(base: number): TvFocusTask[] {
+  return [
+    { id: "d1", title: "Сверка с бухгалтерией", status: "done", deadline: todayAt(base, 18), source: "voice" },
+    { id: "d2", title: "Вывоз мусора со склада", status: "done", deadline: null, source: "typed" },
+    { id: "d3", title: "Пропуска для субподрядчика", status: "done", deadline: todayAt(base, 12, 0, -3), source: "voice" },
+  ];
+}
+
+/**
+ * The life of an order on fixtures (D-120): from «Поставлена» to its stage, on different
+ * days, with questions, photos and a new deadline — every kind of row and the squeeze.
+ */
+function storyOf(status: string, base: number, id: string): TvStoryEvent[] {
+  const seed = Number(id.slice(1)) || 1;
+  const day = -((seed % 3) + (status === "sent" ? 0 : 1));
+  const t = (hh: number, mm = 0) => todayAt(base, hh, mm, day);
+  const story: TvStoryEvent[] = [{ k: "posted", at: t(9, 10 + seed) }];
+  if (status === "sent") {
+    if (seed % 2) story.push({ k: "seen", at: t(9, 14 + seed) });
+    return story;
+  }
+  story.push({ k: "seen", at: t(9, 12 + seed) }, { k: "accepted", at: t(9, 25 + seed) });
+  if (seed % 2 === 0) story.push({ k: "question", at: t(11, 5), ans: t(11, 40) });
+  if (seed % 3 === 0) story.push({ k: "deadline", at: t(12, 0), to: todayAt(base, 18, 0, 3) });
+  if (seed !== 3) story.push({ k: "photo", at: t(14, 20) }, { k: "photo", at: t(14, 22) });
+  if (seed % 4 === 1) story.push({ k: "director", at: t(15, 0) }, { k: "text", at: t(15, 30) }, { k: "voice", at: t(16, 5) });
+  if (status === "accepted" || status === "in_progress") return story;
+  story.push({ k: "review", at: t(17, 10), rep: seed % 2 ? "photo" : "text" });
+  if (status === "rework") return [...story, { k: "again", at: t(17, 45) }];
+  if (status === "pending_review") return story;
+  return [...story, { k: "done", at: t(18, 5) }];
 }
 
 function fixtures(base: number, guest: boolean) {
@@ -92,18 +143,12 @@ function fixtures(base: number, guest: boolean) {
     guest,
     expires_at: at(base, 7),
     employee: { id: "p1", name: name("Марат Ахметов"), position: "Прораб, участок «Север»", avatar_url: null },
-    tasks: [
-      { id: "t1", title: "Смета по кровле для нового корпуса", status: "sent", deadline: todayAt(base, 18) },
-      { id: "t2", title: "Забрать пропуска на объект", status: "sent", deadline: todayAt(base, 12, 0, 1) },
-      { id: "t3", title: "Бетон на третий этаж", status: "accepted", deadline: todayAt(base, 18, 0, 3) },
-      { id: "t4", title: "Замер окон", status: "rework", deadline: todayAt(base, 10, 0, 1) },
-      { id: "t5", title: "Договор с поставщиком арматуры: согласовать объёмы на октябрь", status: "in_progress", deadline: null },
-      { id: "t6", title: "Фотоотчёт по фасаду", status: "accepted", deadline: todayAt(base, 12, 0, 5) },
-      { id: "t7", title: "Акт по забору", status: "pending_review", deadline: null },
-    ].map((t) => (guest ? { ...t, title: null } : t)),
-    counts: { new: 2, work: 5, review: 1 },
+    tasks: openTasks(base).map((t) => ({ ...t, story: storyOf(t.status, base, t.id), title: guest ? null : t.title })),
+    counts: { new: 2, work: 4, review: 1 },
     done_today: { count: 2, titles: guest ? [null, null] : ["Сверка с бухгалтерией", "Вывоз мусора"] },
-    points_week: guest ? null : 42,
+    points_week: guest ? null : 340,
+    rating: guest ? null : { points: true, rank: 2, weeks: [180, 240, 280, 340], done_week: 9, on_time_week: 8 },
+    done_recent: doneTasks(base).map((t) => ({ ...t, story: storyOf("done", base, t.id), title: guest ? null : t.title })),
   };
 
   const calendar: TvCalendar = {
@@ -198,6 +243,29 @@ function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay
   return none;
 }
 
+/** The person on the wall per case (D-120): seven orders, two, twelve of fifteen, only the week done, points off, nothing. */
+function focusFor(wallCase: WallCase, focus: TvFocusEmployee): TvFocusEmployee | null {
+  const none = { tasks: [], counts: { new: 0, work: 0, review: 0 } };
+  switch (wallCase) {
+    case "focus":
+      return focus;
+    case "focus-few":
+      return { ...focus, tasks: focus.tasks.filter((t) => t.id === "t4" || t.id === "t7"), counts: { new: 0, work: 1, review: 1 } };
+    case "focus-many": {
+      const more = Array.from({ length: 5 }, (_, i) => ({ ...focus.tasks[2 + (i % 4)], id: `m${i}` }));
+      return { ...focus, tasks: [...focus.tasks, ...more], counts: { new: 3, work: 9, review: 3 } };
+    }
+    case "focus-done":
+      return { ...focus, ...none };
+    case "focus-nopoints":
+      return focus.rating ? { ...focus, points_week: null, rating: { ...focus.rating, points: false, rank: null, weeks: null } } : focus;
+    case "focus-empty":
+      return { ...focus, ...none, done_recent: [], done_today: { count: 0, titles: [] } };
+    default:
+      return null;
+  }
+}
+
 export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; clock: ClockStyle; guest: boolean }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
@@ -232,7 +300,7 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
         items={tickerItems(lines, summary)}
         speech={speechOf(lines, summary.today, now)}
         summary={summary}
-        focus={wallCase === "focus" ? data.focus : wallCase === "focus-empty" ? { ...data.focus, tasks: [], counts: { new: 0, work: 0, review: 0 } } : null}
+        focus={focusFor(wallCase, data.focus)}
         focusRemainingMs={7 * MIN}
         calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
         calendarView={wallCase === "calendar-month" ? "month" : "week"}
