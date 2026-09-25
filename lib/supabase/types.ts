@@ -1768,7 +1768,16 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      point_balances: {
+        Row: {
+          balance: number | null
+          company_id: string | null
+          earned_30d: number | null
+          spent: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       announce_visit: {

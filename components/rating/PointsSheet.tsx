@@ -5,7 +5,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { initialsOf } from "@/lib/people/queries";
-import { balanceOf, usePointHistory, type RatingRow } from "@/lib/points/queries";
+import { useBalance, usePointHistory, type RatingRow } from "@/lib/points/queries";
 
 const SOURCE_LABEL: Record<string, string> = {
   manual: "от директора",
@@ -33,7 +33,9 @@ export function PointsSheet({
   onAward: (row: RatingRow) => void;
 }) {
   const history = usePointHistory(row && canRead ? row.user_id : undefined);
-  const balance = balanceOf(history.data);
+  // the whole ledger summed by the database — the list below shows only its last rows (D-126)
+  const total = useBalance(row && canRead ? row.user_id : undefined);
+  const balance = total.data ?? 0;
 
   return (
     <Sheet open={row !== null} onClose={onClose} title={row?.display_name ?? ""}>
@@ -52,7 +54,7 @@ export function PointsSheet({
               </p>
               <p className="nums text-[24px] font-bold leading-[30px]" style={{ color: "var(--gold)" }}>
                 {row.points} <span className="text-[13px] font-normal text-muted">за период</span>
-                {canRead && history.data ? (
+                {canRead && total.data !== undefined ? (
                   <span className="ml-2 text-[13px] font-normal text-muted">· всего {balance}</span>
                 ) : null}
               </p>

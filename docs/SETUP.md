@@ -89,12 +89,14 @@
   провижининг добавит: region, domain
 Шаги (идемпотентно, с чекпоинтами — повторный запуск продолжает):
   1. supabase projects create pulse-<slug> --region <region>   # юрисдикция клиента — аргумент продажи
+     + асимметричный ключ подписи JWT (Authentication → JWT Keys, ECC): getClaims проверяет сессию без похода в Auth (D-126)
   2. supabase migration up --db-url <new-project>              # ВСЕ миграции с нуля
   3. [есть] seed компании — `pnpm seed:client <анкета.json>` (цель — проект из .env.local;
      `--dry-run` показывает план, `--undo` откатывает ровно анкету; идемпотентен; алиасы подсказываются по D-54;
      пароли без значения в анкете генерируются и печатаются один раз): insert company (settings из анкеты), профили из employees[],
      служебный tv-пользователь; демо-данные НЕ сеются
-  4. vercel project create pulse-<slug> + домен/поддомен клиента
+  4. vercel project create pulse-<slug> + домен/поддомен клиента; регион функций = регион базы клиента
+     (`vercel.json` "regions", dev — fra1): иначе каждый запрос к базе идёт через океан (D-126)
   5. env: генерация VAPID-пары и CRON_SECRET (плюс TELEGRAM_WEBHOOK_SECRET, INTERNAL_FN_SECRET — когда появятся Telegram и Edge Functions);
      прокладка всех переменных §2 (Vercel env + supabase secrets)
   6. Telegram-бот клиента у BotFather (ручной шаг — API нет; скрипт ждёт токен),

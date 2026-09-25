@@ -24,7 +24,6 @@ export const shopKeys = {
   allItems: ["shop", "items", "all"] as const,
   orders: ["shop", "orders"] as const,
   ledger: ["shop", "ledger"] as const,
-  balance: (userId: string) => ["shop", "balance", userId] as const,
 };
 
 const ORDER_SELECT =
@@ -90,27 +89,10 @@ export function useOrders() {
 }
 
 /**
- * Баланс = SUM(point_transactions) целиком, а не по последним строкам истории
- * (принцип 4): в магазине цена сверяется с точным числом, иначе кнопка соврёт.
+ * Баланс = SUM(point_transactions) целиком (принцип 4): в магазине цена сверяется с точным
+ * числом, иначе кнопка соврёт. Один источник на всё приложение — lib/points (D-126).
  */
-export function useBalance(userId: string | undefined) {
-  const query = useQuery({
-    queryKey: shopKeys.balance(userId ?? ""),
-    enabled: Boolean(userId),
-    queryFn: async (): Promise<number> => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase
-        .from("point_transactions")
-        .select("amount")
-        .eq("user_id", userId as string);
-      if (error) throw new Error(error.message);
-      return (data ?? []).reduce((sum, row) => sum + row.amount, 0);
-    },
-  });
-  // a hold and a release are rows of another table — the balance follows them live
-  useRealtimeInvalidate({ table: "point_transactions" }, shopKeys.balance(userId ?? ""), Boolean(userId));
-  return query;
-}
+export { useBalance } from "@/lib/points/queries";
 
 const ERRORS_RU: Record<string, string> = {
   insufficient_points: "Не хватает очков",
@@ -319,9 +301,10 @@ export type ShopSummary = {
 };
 
 /**
- * Одна выборка транзакций — все цифры пульта: сколько на руках, сколько унесено в
- * магазин, сколько роздано за месяц и у кого сколько. Второго источника правды об
- * очках не существует (принцип 4), поэтому считаем здесь, а не храним.
+ * Все цифры пульта из одной строки на человека (`point_balances`, D-126): сколько на руках,
+ * сколько унесено в магазин, сколько роздано за месяц и у кого сколько. База суммирует
+ * транзакции сама — второго источника правды об очках нет (принцип 4), а телефон больше
+ * не тянет всю ленту, которую PostgREST всё равно обрезал бы на max_rows.
  */
 export function useShopSummary(enabled: boolean) {
   const query = useQuery({
@@ -329,22 +312,21 @@ export function useShopSummary(enabled: boolean) {
     enabled,
     queryFn: async (): Promise<ShopSummary> => {
       const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("point_transactions").select("amount, source, user_id, created_at");
+      const { data, error } = await supabase.from("point_balances").select("user_id, balance, spent, earned_30d");
       if (error) throw new Error(error.message);
-      const monthAgo = Date.now() - 30 * 86_400_000;
-      const perUser = new Map<string, number>();
       let onHands = 0;
       let spent = 0;
       let earned30 = 0;
+      const balances: ShopSummary["balances"] = [];
       for (const row of data ?? []) {
-        onHands += row.amount;
-        perUser.set(row.user_id, (perUser.get(row.user_id) ?? 0) + row.amount);
-        if (row.source === "shop_hold" || row.source === "shop_release") spent -= row.amount;
-        else if (row.amount > 0 && new Date(row.created_at).getTime() >= monthAgo) earned30 += row.amount;
+        if (!row.user_id) continue;
+        const points = row.balance ?? 0;
+        onHands += points;
+        spent += row.spent ?? 0;
+        earned30 += row.earned_30d ?? 0;
+        balances.push({ userId: row.user_id, points });
       }
-      const balances = [...perUser.entries()]
-        .map(([userId, points]) => ({ userId, points }))
-        .sort((a, b) => b.points - a.points);
+      balances.sort((a, b) => b.points - a.points);
       return { onHands, spent, earned30, balances };
     },
   });

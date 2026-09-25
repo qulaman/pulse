@@ -22,7 +22,7 @@ import {
   usePerson,
   usePersonMessages,
 } from "@/lib/people/queries";
-import { balanceOf, useAwardPoints, usePointHistory, usePointsEnabled } from "@/lib/points/queries";
+import { useAwardPoints, useBalance, usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
@@ -64,7 +64,7 @@ export function PersonCard() {
   const actions = useTaskActions(me.data);
   const compose = useComposeStore((state) => state.request);
   const [showClosed, setShowClosed] = useState(false);
-  const points = usePointHistory(id);
+  const points = useBalance(id);
   const pointsSwitch = usePointsEnabled();
   const pointsEnabled = pointsSwitch.data === true;
   const award = useAwardPoints();
@@ -164,7 +164,7 @@ export function PersonCard() {
           <Stat value={tasks.isLoading ? null : groups.open.length + groups.review.length} label="в работе" />
           <Stat value={tasks.isLoading ? null : groups.overdue} label="просрочено" tone={groups.overdue > 0 ? "danger" : undefined} />
           <Stat value={tasks.isLoading ? null : groups.done30} label="закрыто за 30 дн." tone={groups.done30 > 0 ? "ok" : undefined} />
-          <Stat value={points.isLoading ? null : balanceOf(points.data)} label="очков" tone="gold" />
+          <Stat value={points.isLoading ? null : (points.data ?? 0)} label="очков" tone="gold" />
         </div>
 
         {/* the main action on its own line — three buttons in a row wrap on a 375px phone */}

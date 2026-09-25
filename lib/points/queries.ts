@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { useState } from "react";
 
 import { toast } from "@/components/ui/Toast";
-import { useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
+import { useRealtimeInvalidate, useRealtimeListener } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 export type RatingPeriod = "week" | "month" | "all";
@@ -61,7 +61,37 @@ export type PointRow = {
   created_at: string;
 };
 
-/** Own transactions under RLS — the balance is their sum, never a stored field. */
+/**
+ * A person's balance = SUM(point_transactions), summed by the database (`point_balances`,
+ * D-126): the history below is capped, and PostgREST cuts any read at max_rows, so a sum made
+ * on the phone goes wrong once the ledger grows. RLS applies through the view — a person reads
+ * their own line, the director anyone's. A new row of this person refreshes it live.
+ */
+export function useBalance(userId: string | undefined) {
+  const query = useQuery({
+    queryKey: pointKeys.balance(userId ?? ""),
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<number> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("point_balances")
+        .select("balance")
+        .eq("user_id", userId as string)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data?.balance ?? 0;
+    },
+  });
+  // a hold and a release are rows of this table too — the balance follows the shop live
+  useRealtimeInvalidate(
+    { table: "point_transactions", filter: userId ? `user_id=eq.${userId}` : undefined },
+    pointKeys.balance(userId ?? ""),
+    Boolean(userId),
+  );
+  return query;
+}
+
+/** The last transactions of a person under RLS — the list, not the balance (`useBalance`). */
 export function usePointHistory(userId: string | undefined) {
   return useQuery({
     queryKey: pointKeys.history(userId ?? ""),
@@ -80,17 +110,17 @@ export function usePointHistory(userId: string | undefined) {
   });
 }
 
-/** Every active balance of the company in one query (director RLS) — the team list's «очк.». */
+/** Every balance of the company, one row a person (director RLS) — the team list's «очк.». */
 export function useTeamBalances(enabled: boolean) {
   return useQuery({
     queryKey: ["points", "team-balances"],
     enabled,
     queryFn: async (): Promise<Record<string, number>> => {
       const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("point_transactions").select("user_id, amount");
+      const { data, error } = await supabase.from("point_balances").select("user_id, balance");
       if (error) throw new Error(error.message);
       const sums: Record<string, number> = {};
-      for (const row of data ?? []) sums[row.user_id] = (sums[row.user_id] ?? 0) + row.amount;
+      for (const row of data ?? []) if (row.user_id) sums[row.user_id] = row.balance ?? 0;
       return sums;
     },
   });
@@ -116,10 +146,6 @@ export function usePointsArrival(userId: string | undefined, enabled: boolean): 
     enabled && Boolean(userId),
   );
   return arrival;
-}
-
-export function balanceOf(rows: PointRow[] | undefined): number {
-  return (rows ?? []).reduce((sum, row) => sum + row.amount, 0);
 }
 
 export function useAwardPoints() {

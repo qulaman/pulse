@@ -125,6 +125,8 @@ task_id uuid null → tasks, order_id uuid null, actor_id uuid null → profiles
 ```
 Insert-политик нет: строки пишут только security-definer-функции — `award_points` (ручные ± директора, `source='manual'`), `confirm_voice_batch` (очки голосом: только плюс и только при `points_enabled`), магазинные RPC (`shop_hold` / `shop_release`). Авто-правил и реакций нет `[не построено]`, но ключ заложен: `unique (task_id, rule_code) where source='auto_rule'` — бонус только за **первый** done (D-31). Заморозка магазина — **hold-final** (D-10): заказ → `shop_hold`(−price); отмена → `shop_release`(+price, ровно сумма hold по order_id); выдача → новых транзакций НЕТ, hold финален. Максимум один hold и один release на заказ: `unique (order_id, source) where order_id is not null`. Страховка — `trg_point_transactions_hold_guard`: после `shop_hold` баланс ≥ 0; ручной минус директора уводить баланс в минус вправе (D-12).
 
+**View `point_balances`** (D-126) — баланс считает база, телефон ленту не суммирует: `company_id, user_id, balance` (= SUM(amount)), `spent` (холды минус возвраты), `earned_30d` (поощрения за 30 дней без магазина). `security_invoker` — читается под RLS `point_transactions`: человек видит свою строку, директор — все, anon — доступа нет. Хранимого поля по-прежнему нет. pgTAP — `038_point_balances`.
+
 ### shop_items / orders
 ```
 shop_items: id, company_id, title not null, description null, icon null, photo_path null,
@@ -233,7 +235,7 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 **Разбудка ночью (D-105, миграция `20260924095000_tv_wake`):** `tv_control(..., p_wake)` пересоздан: `true` ставит `awake_until = now() + 2 часа` (повтор — от нового «сейчас»), `false` — `null`; остальные команды колонку не трогают. Ночь (21:00–08:00) киоск считает по своим часам, пока `awake_until` впереди — стена в эфире. pgTAP — `027_tv_wake.test.sql`.
 
 ### inbox_items — staging голосового конвейера
-`id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, created_at, updated_at`. Заводит `/api/voice/upload-url` (`director_input`), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
+`id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, created_at, updated_at`; `unique (company_id, client_request_id)` — одна строка на захват, NULL-ключи не сталкиваются (D-126). Заводит `/api/voice/upload-url` (`director_input`: сразу вставка, конфликт 23505 — ответ существующей строкой), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
 
 ### recurrence_rules
 `id, company_id, author_id, assignee_id, title not null, body null, priority task_priority, rrule text not null, is_active bool default true, next_run_at timestamptz null`, без `created_at`. Пишет `confirm_voice_batch` (сущность `recurrence`, `next_run_at = now`). Исполнителя, который порождает задачи по правилу, нет `[не построено]`.

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { humanAqtobe } from "@/lib/ai/time";
-import { balanceOf, usePointHistory, useRating } from "@/lib/points/queries";
+import { useBalance, usePointHistory, useRating } from "@/lib/points/queries";
 
 /** The balance before it loads: inline, so the 44 px line of the number keeps its height (D-122). */
 function BalanceBone() {
@@ -42,7 +42,9 @@ function ChevronRight() {
 export function PointsCard({ userId, enabled }: { userId: string; enabled: boolean }) {
   const history = usePointHistory(userId);
   const rows = history.data ?? [];
-  const balance = balanceOf(history.data);
+  // the whole ledger summed by the database — the history above is only its last rows (D-126)
+  const total = useBalance(userId);
+  const balance = total.data ?? 0;
   const rating = useRating("all", balance > 0);
   const myRow = (rating.data ?? []).find((row) => row.user_id === userId);
 
@@ -59,10 +61,10 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
             className="nums mt-0.5 text-[40px] font-bold leading-[44px]"
             style={{ color: "var(--gold)" }}
           >
-            {history.isLoading ? <BalanceBone /> : balance}
+            {total.isLoading ? <BalanceBone /> : balance}
           </p>
           <p className="mt-0.5 text-[13px] leading-4 text-muted">
-            {history.isLoading
+            {total.isLoading
               ? " "
               : myRow
                 ? `${myRow.rank}-е место из ${(rating.data ?? []).length}`

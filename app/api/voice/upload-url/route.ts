@@ -38,29 +38,34 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiOk(slot);
     }
 
-    // Idempotent by client_request_id: a retried FAB tap reuses the staging row (G.11).
-    const existing = await supabase
+    // Idempotent by client_request_id: a retried FAB tap reuses the staging row (G.11). The
+    // insert goes first — one round trip for a new capture — and the unique key
+    // (company_id, client_request_id) turns a retry, even a concurrent one, into a conflict
+    // answered with the row that is already there (D-126).
+    const inserted = await supabase
       .from("inbox_items")
+      .insert({
+        company_id: profile.companyId,
+        user_id: profile.userId,
+        status: "recorded",
+        audio_path: path,
+        client_request_id: body.client_request_id,
+      })
       .select("id")
-      .eq("company_id", profile.companyId)
-      .eq("client_request_id", body.client_request_id)
-      .maybeSingle();
+      .single();
 
-    let inboxId = existing.data?.id;
-    if (!inboxId) {
-      const inserted = await supabase
+    let inboxId = inserted.data?.id;
+    if (inserted.error?.code === "23505") {
+      const existing = await supabase
         .from("inbox_items")
-        .insert({
-          company_id: profile.companyId,
-          user_id: profile.userId,
-          status: "recorded",
-          audio_path: path,
-          client_request_id: body.client_request_id,
-        })
         .select("id")
+        .eq("company_id", profile.companyId)
+        .eq("client_request_id", body.client_request_id)
         .single();
-      if (inserted.error) throw new Error(`inbox insert failed: ${inserted.error.message}`);
-      inboxId = inserted.data.id;
+      if (existing.error) throw new Error(`inbox lookup failed: ${existing.error.message}`);
+      inboxId = existing.data.id;
+    } else if (inserted.error || !inboxId) {
+      throw new Error(`inbox insert failed: ${inserted.error?.message ?? "no row"}`);
     }
 
     return apiOk({ ...slot, inbox_id: inboxId });

@@ -4,10 +4,13 @@ import { AppHeader } from "@/components/AppHeader";
 import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
+import { loadBrand } from "@/lib/brand";
 import { isTeamRole, tabBarRole } from "@/lib/routes";
-import { createServerSupabase } from "@/lib/supabase/server";
 
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
+  // the company row goes out beside the session check, and the header below reads the same
+  // cached promise (D-126); loadBrand never throws
+  const brand = loadBrand();
   let profile;
   try {
     profile = await getSessionProfile();
@@ -20,9 +23,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   if (!isTeamRole(profile.role) || profile.role === "shopkeeper") redirect(homeForRole(profile.role));
   // the points under the name are behind the same switch as the points themselves (D-48);
   // read here, so the line is in the first paint or not there at all
-  const supabase = await createServerSupabase();
-  const company = await supabase.from("companies").select("settings").limit(1).maybeSingle();
-  const pointsEnabled = (company.data?.settings as { points_enabled?: boolean } | null)?.points_enabled === true;
+  const { pointsEnabled } = await brand;
 
   return (
     <div className="app-shell flex min-h-dvh flex-col">
