@@ -137,7 +137,7 @@ function EmptyState({
 }) {
   if (nothingAtAll) {
     return (
-      <div className="mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
+      <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
         <Mascot state="calm" size={64} />
         <p className="mt-4 text-[16px] leading-[22px]">{TEXT.emptyFeed}</p>
       </div>
@@ -145,7 +145,7 @@ function EmptyState({
   }
   if (tab === "new") {
     return (
-      <div className="mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center">
+      <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ok/15 text-ok">
           <Icon name="check" size={24} />
         </span>
@@ -160,7 +160,7 @@ function EmptyState({
     );
   }
   return (
-    <p className="mt-3 rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
+    <p className="rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
       {tab === "working" ? TEXT.emptyTasks : "Закрытых пока нет"}
     </p>
   );

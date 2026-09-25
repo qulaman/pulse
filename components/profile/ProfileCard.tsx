@@ -7,11 +7,10 @@ import { aqtobeDay } from "@/lib/ai/time";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Availability, type Role } from "@/lib/people/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-type Props = {
-  userId: string;
-  fullName: string;
-  role: Role;
-};
+type Props =
+  | { userId: string; fullName: string; role: Role; pending?: false }
+  /** The card before the page knows who this is (the route skeleton, D-122): same boxes, grey. */
+  | { pending: true; role: Role; userId?: undefined; fullName?: undefined };
 
 /** Fourteen day-buckets, oldest first — the strip inside the identity card. */
 const STRIP_DAYS = 14;
@@ -65,13 +64,14 @@ function stripOf(dates: (string | null)[], now = Date.now()): number[] {
 
 const sum = (values: number[]) => values.reduce((total, n) => total + n, 0);
 
-function useProfileStats(userId: string, role: Role) {
+function useProfileStats(userId: string | undefined, role: Role) {
   return useQuery({
+    enabled: Boolean(userId),
     queryKey: ["profile-stats", userId],
     queryFn: async (): Promise<Stats> => {
       const supabase = createBrowserSupabase();
       const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const me = await supabase.from("profiles").select("position, availability, created_at").eq("id", userId).single();
+      const me = await supabase.from("profiles").select("position, availability, created_at").eq("id", userId!).single();
       const common = {
         position: me.data?.position ?? null,
         availability: me.data?.availability ?? ("active" as Availability),
@@ -97,8 +97,8 @@ function useProfileStats(userId: string, role: Role) {
       }
 
       const [done, open] = await Promise.all([
-        supabase.from("tasks").select("deadline, closed_at").eq("assignee_id", userId).eq("status", "done").gte("closed_at", since),
-        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assignee_id", userId).in("status", ["sent", "accepted", "rework", "pending_review"]),
+        supabase.from("tasks").select("deadline, closed_at").eq("assignee_id", userId!).eq("status", "done").gte("closed_at", since),
+        supabase.from("tasks").select("id", { count: "exact", head: true }).eq("assignee_id", userId!).in("status", ["sent", "accepted", "rework", "pending_review"]),
       ]);
       const rows = done.data ?? [];
       const onTime = rows.filter((task) => !task.deadline || (task.closed_at && task.closed_at <= task.deadline)).length;
@@ -168,8 +168,8 @@ function DayStrip({ days, title, caption }: { days: number[] | null; title: stri
  * has none, and an employee sees the card only once the company switched them on (D-40)
  * or something is already on the balance.
  */
-export function ProfileCard({ userId, fullName, role }: Props) {
-  const stats = useProfileStats(userId, role);
+export function ProfileCard({ userId, fullName, role, pending = false }: Props) {
+  const stats = useProfileStats(pending ? undefined : userId, role);
   const stat = stats.data;
   const since = sinceLabel(stat?.since ?? null);
 
@@ -182,19 +182,32 @@ export function ProfileCard({ userId, fullName, role }: Props) {
         style={{ background: "radial-gradient(circle, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%)" }}
       />
       <div className="relative">
-        <span
-          className="relative mx-auto flex h-[84px] w-[84px] items-center justify-center rounded-full"
-          style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", boxShadow: "var(--accent-glow)" }}
-        >
-          <span className="font-display text-[30px] font-bold tracking-[-0.02em] text-bg">{initialsOf(fullName)}</span>
-          <span aria-hidden className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 1.5px 0 rgba(255,255,255,.35)" }} />
-        </span>
+        {pending ? (
+          <span aria-hidden className="skeleton mx-auto block h-[84px] w-[84px] rounded-full bg-surface-2" />
+        ) : (
+          <span
+            className="relative mx-auto flex h-[84px] w-[84px] items-center justify-center rounded-full"
+            style={{ background: "linear-gradient(135deg, var(--accent), var(--accent-2))", boxShadow: "var(--accent-glow)" }}
+          >
+            <span className="font-display text-[30px] font-bold tracking-[-0.02em] text-bg">{initialsOf(fullName ?? "")}</span>
+            <span aria-hidden className="absolute inset-0 rounded-full" style={{ boxShadow: "inset 0 1.5px 0 rgba(255,255,255,.35)" }} />
+          </span>
+        )}
 
-        <h2 className="mt-3.5 text-[24px] font-bold leading-[30px]">{fullName}</h2>
+        {pending ? (
+          <h2 className="mt-3.5 flex h-[30px] items-center justify-center">
+            <NumBone w={170} h={24} />
+          </h2>
+        ) : (
+          <h2 className="mt-3.5 text-[24px] font-bold leading-[30px]">{fullName}</h2>
+        )}
         <p className="mt-1 text-[14px] leading-[18px] text-muted">{stat ? (stat.position ?? ROLE_LABEL[role]) : " "}</p>
 
         <div className="mt-2.5 flex flex-wrap items-center justify-center gap-x-2 gap-y-1.5">
-          <Chip tone="neutral" interactive={false}>{ROLE_LABEL[role]}</Chip>
+          {/* before the data the chip keeps its box: its word is there, unseen */}
+          <Chip tone="neutral" interactive={false} className={pending ? "skeleton" : ""}>
+            {pending ? <span className="invisible">{ROLE_LABEL[role]}</span> : ROLE_LABEL[role]}
+          </Chip>
           {stat && stat.availability !== "active" ? (
             <Chip tone="warn" interactive={false}>{AVAILABILITY_LABEL[stat.availability]}</Chip>
           ) : null}

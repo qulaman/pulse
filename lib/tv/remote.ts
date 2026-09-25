@@ -1,10 +1,16 @@
+import { stepLabel } from "@/lib/mindboard/tree";
+
+import { mapFits } from "./board";
 import { tvTime } from "./clock";
 import type { TvState } from "./queries";
 import {
+  boardPointOf,
+  boardViewOf,
   calendarViewOf,
   carouselOn,
   effectiveMode,
   focusRemainingMs,
+  guestOf,
   ratingViewOf,
   sceneOf,
   wallAsleep,
@@ -83,18 +89,37 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
   return { tone: "ok", text: "На стене" };
 }
 
+/** Название доски на дисплее: длинное режется, чтобы «пункт 3 из 7 · до 21:00» не ушло за край. */
+const TITLE_MAX = 24;
+
+function clip(title: string): string {
+  const flat = title.replace(/\s+/g, " ").trim();
+  return flat.length > TITLE_MAX ? `${flat.slice(0, TITLE_MAX - 1).trimEnd()}…` : flat;
+}
+
 /**
  * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин»,
- * «Дело «Замер окон» · ещё 7 мин» (D-123), «Доска «Планёрка» · до 21:00» (D-102) —
- * названия досок пульт отдаёт списком — или «Ночь · тусклые часы», пока стена спит (D-105):
- * иначе пульт ночью обещал бы лицо. Круг заставок — «· по кругу» после сцены (D-123).
+ * «Дело «Замер окон» · ещё 7 мин» (D-123), «Доска «Планёрка» · пункт 3 из 7 · до 21:00»
+ * (D-102, D-121) — названия досок и пункты доски на стене пульт отдаёт сам — или
+ * «Ночь · тусклые часы», пока стена спит (D-105): иначе пульт ночью обещал бы лицо. Круг
+ * заставок — «· по кругу» после сцены (D-123).
+ *
+ * Про доску дисплей говорит то, что видно на стене, а не то, что просили: карта — только
+ * когда она влезает (`mapFits`), иначе стена рисует список; при госте без «Показать гостю»
+ * на стене часы и «Доска скрыта» (D-102 §7).
  */
 export function wallNow(
   state: TvState | null,
   people: { id: string; full_name: string }[],
   now: Date,
   boards: { id: string; title: string }[] = [],
-  extra: { points?: boolean; guest?: boolean; taskTitle?: string | null } = {},
+  extra: {
+    points?: boolean;
+    guest?: boolean;
+    taskTitle?: string | null;
+    /** Пункты доски на стене (верхнего уровня, со словами) по порядку — для «пункт 3 из 7» (D-121). */
+    boardPoints?: readonly string[];
+  } = {},
 ): string {
   const mode = effectiveMode(state, now);
   const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
@@ -113,7 +138,15 @@ export function wallNow(
   if (scene === "rating") return `${ratingViewOf(state) === "month" ? "Эфир · рейтинг месяца" : SCENE_NOW.rating}${round}`;
   if (scene === "board" && state?.board_until) {
     const title = boards.find((board) => board.id === state.board_id)?.title;
-    return `${title ? `Доска «${title}»` : "Доска"} · до ${tvTime(new Date(state.board_until))}`;
+    const boardPoints = extra.boardPoints ?? [];
+    const name = title ? `Доска «${clip(title)}»` : "Доска";
+    if (guestOf(state, false, now) && !state.board_guest) return `${name} · скрыта от гостя`;
+    const parts = [name];
+    if (boardViewOf(state) === "map" && mapFits(boardPoints.length)) parts.push("карта");
+    const step = stepLabel(boardPoints, boardPointOf(state, now));
+    if (step) parts.push(`пункт ${step}`);
+    parts.push(`до ${tvTime(new Date(state.board_until))}`);
+    return parts.join(" · ");
   }
   return `${SCENE_NOW[scene]}${round}`;
 }

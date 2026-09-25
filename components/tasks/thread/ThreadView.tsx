@@ -51,11 +51,22 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
     bottom.current?.scrollIntoView({ block: "end" });
   }, []);
 
-  // the thread opens at its end, and follows it while new words arrive
+  // The thread follows its end while new words arrive. In a sheet it also opens there — the
+  // sheet is its own scroller. On the task's screen the thread is part of the page, and the
+  // page opens at its top, status first: scrolling the window the moment the messages landed
+  // threw the whole screen up under the finger (D-122).
   const count = rows.length;
+  const settled = useRef<number | null>(null);
   useEffect(() => {
-    if (count > 0) scrollToEnd();
-  }, [count, scrollToEnd]);
+    if (loading) return;
+    if (settled.current === null) {
+      settled.current = count;
+      if (compact && count > 0) scrollToEnd();
+      return;
+    }
+    if (count > settled.current) scrollToEnd();
+    settled.current = count;
+  }, [count, loading, compact, scrollToEnd]);
   // the keyboard takes half the screen: keep the last word above it
   useEffect(() => {
     if (offsetBottom > 0) scrollToEnd();

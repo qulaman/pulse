@@ -20,6 +20,7 @@ import { NotesSkeleton } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { binCards } from "@/lib/mindboard/branch";
 import { boardOnWall, defaultTitle, splitBoards, summariesOf } from "@/lib/mindboard/list";
 import { useCreateBoard, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
@@ -50,8 +51,11 @@ const DATE_LINE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "nume
 
 const TABS: readonly NoteFilter[] = ["active", "boards", "converted", "trash"];
 
-/** What waits to be removed for good: notes of the bin, and boards with their points (D-102). */
-type Purge = { notes: string[]; boards: string[] };
+/**
+ * What waits to be removed for good: notes of the bin, and boards with their points (D-102);
+ * `branch` — one point of a board with the sub-points that rode with it (D-121).
+ */
+type Purge = { notes: string[]; boards: string[]; branch?: boolean };
 
 /**
  * «Заметки» — the director's own thoughts (D-75), in the language of «Задачи» (D-83, D-93):
@@ -163,7 +167,11 @@ export default function NotesPage() {
     return needle ? boardPiles.live.filter((board) => board.title.toLowerCase().includes(needle)) : boardPiles.live;
   }, [boardPiles.live, query]);
 
-  const piles = useMemo(() => splitNotes(rows, now, liveBoards), [rows, now, liveBoards]);
+  const split = useMemo(() => splitNotes(rows, now, liveBoards), [rows, now, liveBoards]);
+  // the bin by branches (D-121): sub-points that left with their point ride on its card
+  const bin = useMemo(() => binCards(split.trash), [split.trash]);
+  const piles = useMemo(() => ({ ...split, trash: bin.map((entry) => entry.card) }), [split, bin]);
+  const ridersOf = useMemo(() => new Map(bin.map((entry) => [entry.card.id, entry.riders.map((rider) => rider.id)])), [bin]);
   const pile = filter === "active" ? piles.active : filter === "converted" ? piles.converted : filter === "trash" ? piles.trash : EMPTY;
   const shown = useMemo(() => filterNotes(pile, query), [pile, query]);
   const hero = useMemo(() => notesHero(piles, now, serverCounts.data?.thoughts), [piles, now, serverCounts.data]);
@@ -291,17 +299,20 @@ export default function NotesPage() {
       return <PendingCard note={note} voiced={phone.audio !== null} now={now} onDiscard={() => void dropCreate(note.id)} />;
     }
     if (filter === "trash") {
+      const riders = ridersOf.get(note.id) ?? [];
       return (
         <TrashCard
           note={note}
           now={now}
           query={query}
           board={note.board_id ? titleOf.get(note.board_id) : undefined}
+          riders={riders.length}
           onRestore={() => {
             restore.mutate({ id: note.id });
             toast(note.board_id ? "Вернул на доску" : "Вернул в мысли");
           }}
-          onPurge={() => setPurging({ notes: [note.id], boards: [] })}
+          // the point goes for good with the sub-points that rode with it
+          onPurge={() => setPurging({ notes: [note.id, ...riders], boards: [], branch: riders.length > 0 })}
         />
       );
     }
@@ -411,7 +422,7 @@ export default function NotesPage() {
             variant="ghost"
             size="sm"
             className="!text-danger/80"
-            onClick={() => setPurging({ notes: piles.trash.map((note) => note.id), boards: boardPiles.trash.map((board) => board.id) })}
+            onClick={() => setPurging({ notes: split.trash.map((note) => note.id), boards: boardPiles.trash.map((board) => board.id) })}
           >
             Очистить ({piles.trash.length + boardPiles.trash.length})
           </Button>
@@ -457,7 +468,7 @@ export default function NotesPage() {
         }}
       />
 
-      <Sheet open={purging !== null} onClose={() => setPurging(null)} title={purging && purging.notes.length + purging.boards.length > 1 ? "Очистить корзину" : "Удалить навсегда"}>
+      <Sheet open={purging !== null} onClose={() => setPurging(null)} title={purging && !purging.branch && purging.notes.length + purging.boards.length > 1 ? "Очистить корзину" : "Удалить навсегда"}>
         <p className="text-[16px] leading-[22px] text-muted">{purgeText(purging)}</p>
         <div className="mt-4 flex gap-2">
           <Button
@@ -486,6 +497,7 @@ function purgeText(purging: Purge | null): string {
   if (!purging) return "";
   const notes = purging.notes.length;
   const boards = purging.boards.length;
+  if (purging.branch) return "Пункт исчезнет вместе с подпунктами. Вернуть будет нельзя.";
   if (boards === 0) {
     return notes > 1
       ? `${notes} ${pluralRu(notes, ["заметка исчезнет", "заметки исчезнут", "заметок исчезнут"])} вместе с текстом. Вернуть будет нельзя.`

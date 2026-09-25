@@ -6,7 +6,7 @@ import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealt
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database, Json } from "@/lib/supabase/types";
 
-import type { TvBoard } from "./board";
+import { boardFrom, type TvBoard } from "./board";
 import { isTvKind, type TvEvent, type TvPayload } from "./feed";
 
 /**
@@ -416,8 +416,7 @@ export function useTvBoard(guest: boolean, enabled: boolean) {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase.rpc("tv_board", { p_guest: guest });
       if (error) throw new Error(error.message);
-      const value = (data ?? {}) as Partial<TvBoard>;
-      return { board: value.board ?? null, hidden: value.hidden ?? false };
+      return boardFrom(data);
     },
   });
   useRealtimeInvalidate({ table: "tv_state" }, key, enabled);

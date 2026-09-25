@@ -208,6 +208,8 @@ calendar_view text not null default 'week' check (calendar_view in ('week','mont
 board_id uuid null → mind_boards on delete set null,   -- доска на стене при scene = 'board', D-102
 board_until timestamptz null,     -- доска уходит со стены: 21:00 Актобе, поставленная после 21:00 — через 2 часа
 board_guest bool not null default false,   -- «Показать гостю»; сбрасывают новая доска и выключенный гость
+board_point uuid null → notes on delete set null,   -- обсуждаемый пункт доски на стене (ведущий), D-121
+board_view text not null default 'list' check (board_view in ('list','map')),   -- доска на стене: список или карта, D-121
 awake_until timestamptz null,     -- разбудка с пульта: ночь не гасит стену до этой отметки, D-105
 expires_at timestamptz null,      -- фокус гаснет по часам киоска, без cron
 version int not null default 0,   -- поднимает каждый tv_control; киоск квитирует
@@ -226,6 +228,8 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 
 **Доска на стене (D-102, миграция `20260924090000_mind_boards`):** сцену `board` ставит только `tv_control(..., p_board)` — автор своей живой доски (`p_scene => 'board'` отклоняется, `bad_scene`; чужая или удалённая — `bad_board`); любая другая `p_scene` снимает доску; `p_board_guest` — «Показать гостю». `tv_board(p_guest)` (tv/director) отдаёт `{board, hidden}`: доску, стоящую на стене и живую по `board_until`, с пунктами по `position` (непустые, не удалённые) и нейтральными пометками (`assignee` — имя без фамилии исполнителя поручения, кроме `revoked`; `handed_done`); при госте без `board_guest` — `hidden: true`, если доску показали гостю — без имён. Правка доски на стене поднимает версию строки (`tv_touch`) — киоск перечитывает `tv_board`. pgTAP — `025_mind_boards.test.sql`.
 
+**Доска v2 (D-121, миграция `20260925150000_mind_board_v2`):** `tv_board_control(p_point, p_clear_point, p_view)` (director) — ведущий с пульта: подсветить живой пункт верхнего уровня с текстом той доски, что сейчас на стене, может только её автор (`bad_point`); снять подсветку; вид `list | map` (`bad_view`) — настройка стены, переживает смену доски; строки стены ещё нет — `no_wall`. Поднимает версию. Новая доска и любая другая сцена гасят подсветку (`trg_tv_state_board_point`, before update). `tv_board(p_guest)` v2 отдаёт пункты веткой: `items[].children[]` (живые подпункты с текстом по `position`, до 50), `focus` (подсветка, если её пункт ещё жив и с текстом), `view`; `total/done` — по пунктам верхнего уровня. pgTAP — `034_mind_board_v2.test.sql`.
+
 **Разбудка ночью (D-105, миграция `20260924095000_tv_wake`):** `tv_control(..., p_wake)` пересоздан: `true` ставит `awake_until = now() + 2 часа` (повтор — от нового «сейчас»), `false` — `null`; остальные команды колонку не трогают. Ночь (21:00–08:00) киоск считает по своим часам, пока `awake_until` впереди — стена в эфире. pgTAP — `027_tv_wake.test.sql`.
 
 ### inbox_items — staging голосового конвейера
@@ -236,10 +240,10 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 ### reminders
 `id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
-`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), board_id uuid null → mind_boards (cascade; пункт доски, D-102), position double precision null (порядок на доске, дробный — перестановка пишет одну строку; обязателен у пункта — check), done_at timestamptz null (пункт отмечен), created_at, updated_at`. Правятся только `text`, `pinned`, `remind_at` и у пунктов `done_at` / `position`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
+`id, company_id, user_id, text not null, raw_transcript text null, audio_path text null, inbox_item_id uuid null → inbox_items (set null), pinned bool default false, converted_task_id uuid null → tasks (set null), converted_announcement_id uuid null → announcements (set null), converted_at timestamptz null, deleted_at timestamptz null (мягкое удаление; через 3 дня строку удаляет `notes_purge_trash`, D-95), remind_at timestamptz null (напомнить автору — D-95), reminded_at timestamptz null (ставит `notes_due_reminders`; новое `remind_at` сбрасывает его триггером), client_request_id uuid null (unique где not null), board_id uuid null → mind_boards (cascade; пункт доски, D-102), position double precision null (порядок на доске, дробный — перестановка пишет одну строку; обязателен у пункта — check), done_at timestamptz null (пункт отмечен), parent_id uuid null → notes (cascade; подпункт пункта доски, один уровень — D-121; `position` подпункта — порядок среди братьев), created_at, updated_at`. Правятся только `text`, `pinned`, `remind_at` и у пунктов `done_at` / `position` / `parent_id`; `raw_transcript`/`audio_path` — то, что было сказано, не меняются. Пишется `confirm_voice_batch` (сущность `note`; `payload.note_id` помечает заметку, из которой родилась задача или объявление — `converted_*`, `converted_at`) или напрямую с клиента под RLS (ввод на странице заметок). Состоит в публикации `supabase_realtime`.
 
 ### mind_boards — доски директора (D-102)
-`id, company_id, user_id (автор), title text not null (1–120), deleted_at timestamptz null (мягкое удаление; через 3 дня строку вместе с пунктами удаляет `notes_purge_trash`), client_request_id uuid null (unique где not null), created_at, updated_at`. Контейнер: пункты — строки `notes` с `board_id`. Пишется напрямую с клиента под RLS (ключ — с телефона, повтор перечитывает строку). `updated_at` поднимает и правка любого пункта (триггер) — «последние доски» на пульте. Состоит в публикации `supabase_realtime`.
+`id, company_id, user_id (автор), title text not null (1–120), deleted_at timestamptz null (мягкое удаление; через 3 дня строку вместе с пунктами удаляет `notes_purge_trash`), client_request_id uuid null (unique где not null), created_at, updated_at`. Контейнер: пункты — строки `notes` с `board_id`, подпункты — ещё и с `parent_id` (D-121): родитель — живой пункт верхнего уровня той же доски и того же автора, пункт с живыми подпунктами подпунктом не становится (`bad_parent`, триггер `trg_notes_branch_guard`); подпункт, вставленный под удалённый пункт, ложится в корзину с ним; возвращённый из корзины без своего пункта — становится пунктом. Корзина — веткой: удаление пункта уводит его живые подпункты с тем же `deleted_at`, возвращение — ровно их (`trg_notes_branch_cascade`). Пишется напрямую с клиента под RLS (ключ — с телефона, повтор перечитывает строку). `updated_at` поднимает и правка любого пункта (триггер) — «последние доски» на пульте. Состоит в публикации `supabase_realtime`.
 
 ### events + event_participants — календарь (D-78)
 ```
@@ -416,7 +420,8 @@ visits_due_expiry(p_now timestamptz default now()) returns int           -- то
 -- ТВ (D-76)
 tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_guest boolean, p_reload boolean, p_clock text, p_calendar text, p_board uuid, p_board_guest boolean, p_wake boolean, p_rating text, p_carousel boolean) returns tv_state   -- p_board* — D-102, p_wake — D-105, p_rating/p_carousel — D-123
 tv_rating(p_guest boolean default false, p_period text default 'week') returns jsonb   -- заставка «Рейтинг», D-123
-tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102
+tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102; ветки, подсветка и вид — D-121
+tv_board_control(p_point uuid default null, p_clear_point boolean default false, p_view text default null) returns tv_state   -- ведущий с пульта, D-121
 tv_focus() returns jsonb   -- v3: дела с историей, сданное за неделю, рейтинг человека, D-120
 tv_task_story(p_task uuid) returns jsonb   -- история дела для стены, только изнутри tv_focus, D-120
 tv_heartbeat(p_applied_version int default null) returns void
@@ -449,7 +454,7 @@ tv_emit(p_company, p_kind, p_actor, p_task, p_title, p_amount, p_title_guest) re
 8. Проекции ТВ: `trg_tv_events_task` (after insert or update on tasks), `trg_tv_events_points` (after insert on point_transactions), `trg_tv_events_announcement` (after insert on announcements), `trg_tv_events_order` (after update on orders).
 9. `trg_events_reset_reminder` (before update on events) — перенос `starts_at` обнуляет `reminded_at`.
 10. `moddatetime` (extension) — `updated_at` на tasks, inbox_items, shop_items, orders, notes, mind_boards, tv_state, events, errands.
-11. `trg_notes_mind_board` (after insert/update/delete on notes, пункты досок) поднимает `mind_boards.updated_at`; `trg_mind_boards_touch_tv` (after update on mind_boards) зовёт `tv_touch`, если доска на стене (D-102).
+11. `trg_notes_mind_board` (after insert/update/delete on notes, пункты досок) поднимает `mind_boards.updated_at`; `trg_mind_boards_touch_tv` (after update on mind_boards) зовёт `tv_touch`, если доска на стене (D-102). `trg_notes_branch_guard` (before insert or update of parent_id, board_id, deleted_at on notes) держит форму ветки, `trg_notes_branch_cascade` (after update of deleted_at on notes) водит подпункты в корзину и обратно с пунктом, `trg_tv_state_board_point` (before update on tv_state) гасит подсветку при смене доски или сцены (D-121).
 
 ## Индексы (полный список; ставит миграция, не «агент по вкусу»)
 
@@ -468,6 +473,7 @@ push_subscriptions (user_id);
 notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
 notes (remind_at) where remind_at is not null and reminded_at is null and deleted_at is null;  notes (deleted_at) where deleted_at is not null;
 notes (board_id, position) where board_id is not null;   -- пункты доски по порядку, D-102
+notes (parent_id, position) where parent_id is not null;   -- подпункты пункта по порядку, D-121
 mind_boards (user_id, updated_at desc) where deleted_at is null;  mind_boards (client_request_id) unique where not null;  mind_boards (deleted_at) where deleted_at is not null;
 notification_deliveries (status, created_at) where status='queued';
 notification_deliveries (task_id, event_kind);  notification_deliveries (user_id, status);

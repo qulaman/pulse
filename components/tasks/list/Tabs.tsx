@@ -20,7 +20,8 @@ const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 
  * The three piles of the list as one segmented control (iOS-style): a raised thumb slides
  * to the chosen tab, each tab carries its count. It sticks under the app header while the
  * list scrolls (under the navigation bar, D-113) and draws a hairline once it is stuck; `children` rides in the same sticky
- * band (the search field when it is open).
+ * band (the search field when it is open). `pending` is the same band before the data (the
+ * screen's skeleton, D-122): the words in place, the counts empty, no tab chosen yet.
  */
 export function Tabs<K extends string>({
   id,
@@ -30,11 +31,15 @@ export function Tabs<K extends string>({
   children,
   className = "",
   testIdPrefix = "tab-",
+  pending = false,
 }: {
   id: string;
   items: readonly TabItem<K>[];
   value: K;
-  onChange: (key: K) => void;
+  /** Left out in a skeleton: a server component cannot hand a function to the browser. */
+  onChange?: (key: K) => void;
+  /** Before the data: counts and the chosen tab are not known yet. */
+  pending?: boolean;
   children?: ReactNode;
   /** Spacing above the band; the band itself must stay a direct child of the long page, or it cannot stick. */
   className?: string;
@@ -69,16 +74,17 @@ export function Tabs<K extends string>({
       >
         <div role="tablist" aria-label="Стопки задач" className={`seg gap-1 rounded-[14px] p-1 ${many ? "flex" : "grid grid-cols-3"}`}>
           {items.map((item) => {
-            const active = item.key === value;
-            const lit = item.alert && item.count > 0;
+            const active = !pending && item.key === value;
+            const lit = !pending && item.alert && item.count > 0;
             return (
               <button
                 key={item.key}
                 type="button"
                 role="tab"
                 aria-selected={active}
-                data-testid={`${testIdPrefix}${item.key}`}
-                onClick={() => onChange(item.key)}
+                data-testid={pending ? undefined : `${testIdPrefix}${item.key}`}
+                disabled={pending}
+                onClick={() => onChange?.(item.key)}
                 className={`relative min-h-[40px] rounded-[10px] px-1 font-display font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
                   many ? "min-w-0 flex-auto text-[13px]" : "text-[14px]"
                 } ${active ? "text-text" : "text-muted active:text-text"}`}
@@ -90,7 +96,7 @@ export function Tabs<K extends string>({
                     className={`nums inline-flex h-[19px] items-center justify-center rounded-full text-[12px] leading-none ${many ? "min-w-[14px] px-0.5" : "min-w-[19px] px-1.5"} ${lit ? "font-bold" : "font-semibold opacity-80"}`}
                     style={lit ? { background: TONE_VAR[item.alert as Tone], color: "var(--bg)" } : undefined}
                   >
-                    {item.count}
+                    {pending ? "" : item.count}
                   </span>
                 </span>
               </button>

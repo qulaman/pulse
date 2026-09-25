@@ -10,6 +10,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { extForMime } from "@/lib/voice/recorder";
 
+import { parentsFirst } from "@/lib/mindboard/branch";
 import { insertBoard, upsertBoardCached } from "@/lib/mindboard/mutations";
 
 import { insertNote, upsertCached } from "./mutations";
@@ -154,7 +155,8 @@ export function flushPendingNotes(me: Me, queryClient: QueryClient): Promise<num
           // refused for good: its points would be refused too, the board stays on the phone
         }
       }
-      for (const entry of await listCreates(me.userId)) {
+      // a sub-point goes after its point, whatever the clocks said (D-121)
+      for (const entry of parentsFirst(await listCreates(me.userId))) {
         // the dictaphone or a create mutation is sending this one right now
         if (!claim(entry.id)) continue;
         try {

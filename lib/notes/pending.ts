@@ -137,6 +137,12 @@ export async function dropCreate(id: string): Promise<void> {
   if (ok) changed();
 }
 
+/** Is this note still only on the phone — e.g. the point a sub-point waits for (D-121)? */
+export async function hasCreate(id: string): Promise<boolean> {
+  const { value } = await run<PendingCreate | undefined>(CREATES, "readonly", (store) => store.get(id));
+  return value !== undefined;
+}
+
 /** What this author still owes the server, oldest first. */
 export async function listCreates(userId: string): Promise<PendingCreate[]> {
   const { value } = await run<PendingCreate[]>(CREATES, "readonly", (store) => store.getAll());

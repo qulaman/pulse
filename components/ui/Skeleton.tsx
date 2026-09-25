@@ -23,10 +23,14 @@ export function Bone({ className = "", w, h = 16, round = false }: BoneProps) {
   );
 }
 
-/** Wrapper that pulses everything inside and hides it from assistive tech. */
-export function SkeletonGroup({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+/**
+ * Wrapper that pulses everything inside and hides it from assistive tech. `grow` marks the
+ * part whose length only the data knows (a list): the screen may lengthen from there, and
+ * `pnpm smoke:stages` measures everything above it to the pixel (D-122).
+ */
+export function SkeletonGroup({ children, className = "", grow = false }: { children: React.ReactNode; className?: string; grow?: boolean }) {
   return (
-    <div className={`skeleton ${className}`} aria-hidden aria-busy="true">
+    <div className={`skeleton ${className}`} aria-hidden aria-busy="true" data-grow={grow ? "" : undefined}>
       {children}
     </div>
   );
@@ -184,7 +188,7 @@ export function SectionRowBone() {
 /** The settings screen is a stack of closed sections — the same picture before and after. */
 export function SettingsSectionsBone({ count = 6 }: { count?: number }) {
   return (
-    <SkeletonGroup className="flex flex-col gap-2">
+    <SkeletonGroup grow className="flex flex-col gap-2">
       {Array.from({ length: count }, (_, i) => (
         <SectionRowBone key={i} />
       ))}

@@ -8,18 +8,15 @@ import { TeamRoster } from "@/components/people/TeamRoster";
 import { CompanyForm } from "@/components/settings/CompanyForm";
 import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
+import { DirtyDot, SETTINGS_TAB_META, SETTINGS_THUMB, SettingsTiles } from "@/components/settings/SettingsTiles";
 import {
-  AppsIcon,
   BookIcon,
-  BuildingIcon,
   CalendarIcon,
   CupIcon,
   GiftIcon,
   ListIcon,
   LoadIcon,
-  PeopleIcon,
   PodiumIcon,
-  SparkIcon,
   TableIcon,
   TvIcon,
 } from "@/components/settings/icons";
@@ -43,14 +40,6 @@ import type { Role } from "@/lib/routes";
 import { useMe } from "@/lib/tasks/queries";
 import { useBandStuck, useHeaderHeight } from "@/lib/useHeaderHeight";
 
-const TABS: Record<SettingsTab, { title: string; short: string; about: string; icon: ReactNode }> = {
-  company: { title: "Компания", short: "Компания", about: "название, логотип, часы", icon: <BuildingIcon /> },
-  app: { title: "Программа", short: "Программа", about: "модули и секретарь", icon: <AppsIcon /> },
-  team: { title: "Сотрудники", short: "Сотрудники", about: "люди, роли, очки", icon: <PeopleIcon /> },
-  ai: { title: "ИИ-модель", short: "ИИ", about: "речь, разбор, словарь", icon: <SparkIcon /> },
-};
-
-const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
 /** The pinned bar's height, 36px segments in a padded band: a switch from it starts the new tab below it. */
 const BAR_H = 54;
 
@@ -80,10 +69,6 @@ function useScrolledPast(ref: RefObject<HTMLElement | null>, top: number, onBack
     return () => observer.disconnect();
   }, [ref, top, onBack]);
   return past;
-}
-
-function DirtyDot() {
-  return <span aria-label="есть несохранённое" className="block h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />;
 }
 
 /**
@@ -145,51 +130,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
 
   return (
     <>
-      <div ref={tilesRef} role="tablist" aria-label="Разделы настроек" className="mt-5 grid grid-cols-2 gap-2">
-        {SETTINGS_TABS.map((key) => {
-          const meta = TABS[key];
-          const active = key === tab;
-          return (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              id={`settings-tab-${key}`}
-              aria-controls={`settings-panel-${key}`}
-              aria-selected={active}
-              data-testid={`settings-tab-${key}`}
-              onClick={() => select(key)}
-              className="settings-tile relative flex min-h-[104px] flex-col rounded-[16px] p-3 text-left transition-transform duration-[120ms] active:scale-[0.98]"
-            >
-              {active ? (
-                <motion.span layoutId="settings-tile" transition={THUMB} className="settings-tile-on absolute -inset-px rounded-[16px]" />
-              ) : null}
-              <span className="relative z-[1] flex items-start justify-between">
-                <span
-                  aria-hidden
-                  className="flex h-9 w-9 items-center justify-center rounded-[11px] transition-colors duration-[160ms]"
-                  style={
-                    active
-                      ? { background: "color-mix(in srgb, var(--accent) 18%, transparent)", color: "var(--accent)" }
-                      : { background: "var(--surface-2)", color: "var(--text-muted)" }
-                  }
-                >
-                  {meta.icon}
-                </span>
-                {dirty[key] ? (
-                  <span className="mr-0.5 mt-0.5">
-                    <DirtyDot />
-                  </span>
-                ) : null}
-              </span>
-              <span className="relative z-[1] mt-3 block min-w-0">
-                <span className="block font-display text-[16px] font-semibold leading-5 tracking-[-0.01em]">{meta.title}</span>
-                <span className="mt-0.5 line-clamp-2 text-[12px] leading-4 text-muted">{meta.about}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <SettingsTiles tab={tab} dirty={dirty} onSelect={select} tilesRef={tilesRef} />
 
       {pinned ? (
         <div className="settings-bar-in nav-glass fixed inset-x-0 z-[6] border-b border-border/70" style={{ top }}>
@@ -210,9 +151,9 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
                       active ? "text-text" : "text-muted active:text-text"
                     }`}
                   >
-                    {active ? <motion.span layoutId="settings-bar" transition={THUMB} className="seg-thumb absolute inset-0 rounded-[10px]" /> : null}
+                    {active ? <motion.span layoutId="settings-bar" transition={SETTINGS_THUMB} className="seg-thumb absolute inset-0 rounded-[10px]" /> : null}
                     <span className="relative z-[1] flex items-center justify-center gap-1 whitespace-nowrap">
-                      {TABS[key].short}
+                      {SETTINGS_TAB_META[key].short}
                       {dirty[key] ? <DirtyDot /> : null}
                     </span>
                   </button>

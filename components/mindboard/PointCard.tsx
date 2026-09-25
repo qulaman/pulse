@@ -1,76 +1,124 @@
 "use client";
 
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { Dot, NoteEditor, Original, SaveReceipt } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
-import { CardShell } from "@/components/tasks/list/TaskList";
+import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
-import { humanAqtobe } from "@/lib/ai/time";
-import { awaitsWords, firstLine, restLines } from "@/lib/notes/list";
+import { glimpse, lineState, type LineState } from "@/lib/mindboard/branch";
+import { handedLabel } from "@/lib/mindboard/handed";
+import type { Branch } from "@/lib/mindboard/tree";
+import type { Dictation } from "@/lib/notes/dictation";
+import { firstLine, restLines, whenRu } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, SHORT_STATUS } from "@/lib/tasks/status-text";
 
-/** «→ Марат · принял» — what a handed-over point became, as the director's own phone says it. */
-export function handedLabel(task: TaskWithPeople | undefined, now: Date): string {
-  if (!task) return "→ поручено";
-  const name = task.assignee?.full_name?.trim().split(/\s+/)[0];
-  const state = isOverdue(task, now) ? "просрочена" : SHORT_STATUS[task.status];
-  return [name ? `→ ${name}` : "→ поручено", state].filter(Boolean).join(" · ");
+import { SubComposer } from "./SubComposer";
+import { STATE_WORDS, SubLine, SubPointRow } from "./SubPoint";
+
+/** How the screen sees each row: still only on the phone, stuck without network, being heard, what it became. */
+export type RowLook = {
+  phone: (id: string) => boolean;
+  waiting: (id: string) => boolean;
+  hearing: (id: string) => boolean;
+  task: (row: Note) => TaskWithPeople | undefined;
+};
+
+export function stateOf(row: Note, look: RowLook): LineState {
+  return lineState(row, { phone: look.phone(row.id), waiting: look.waiting(row.id), hearing: look.hearing(row.id) });
 }
 
-/** The number of a point, or its tick once it is done — read before any word. */
-function Number({ n, done, waiting }: { n: number; done: boolean; waiting: boolean }) {
-  const color = done ? "var(--ok)" : waiting ? "var(--warn)" : "var(--accent)";
+/** The number of a point as the wall has it, its tick once done, or its voice while it has no words yet. */
+function Number({ n, done, state }: { n: number | null; done: boolean; state: LineState }) {
+  const color = done ? "var(--ok)" : state === "deaf" || state === "phone" ? "var(--warn)" : "var(--accent)";
   return (
     <span
       aria-hidden
       className="nums mt-[1px] flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-full px-1 text-[12px] font-bold"
       style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}
     >
-      {done ? <NoteIcon name="check" size={13} /> : n}
+      {done ? <NoteIcon name="check" size={13} /> : n !== null ? n : <NoteIcon name="wave" size={12} />}
     </span>
   );
 }
 
+function Meta({ items }: { items: ReactNode[] }) {
+  if (items.length === 0) return null;
+  return (
+    <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-4 text-muted">
+      {items.map((item, index) => (
+        <span key={index} className="inline-flex items-center gap-1.5">
+          {index > 0 ? (
+            <span aria-hidden className="opacity-40">
+              ·
+            </span>
+          ) : null}
+          {item}
+        </span>
+      ))}
+    </span>
+  );
+}
+
+export type PointHandlers = {
+  toggle: () => void;
+  toggleSub: (id: string) => void;
+  text: (row: Note, text: string) => void;
+  done: (row: Note) => void;
+  assign: (row: Note) => void;
+  remove: (row: Note) => void;
+  retranscribe: (row: Note) => void;
+  /** A sub-point typed under this point. */
+  write: (text: string) => void;
+  /** The screen's microphone is about to open for a sub-point of this point. */
+  aim: () => void;
+  /** «Сделать подпунктом» — offered only where the server will take it. */
+  demote?: () => void;
+  /** «Вынести в пункты» of one of its sub-points; absent for a sub-point still on the phone. */
+  promote: (sub: Note) => (() => void) | undefined;
+  /** «Показать на стене» — only while the board is on the wall and the point can be lit. */
+  spotlight?: (on: boolean) => void;
+};
+
 type Props = {
-  point: Note;
-  /** Place on the board, from 1. */
-  n: number;
+  branch: Branch<Note>;
+  /** The number the wall gives it; null — no words yet. */
+  n: number | null;
+  /** Words of the button that puts it under the point above: «пункта 2». */
+  demoteLabel: string | null;
   now: Date;
   open: boolean;
-  /** The words of this point are on their way from STT right now. */
-  busy: boolean;
-  /** Something of this point waits on the phone for the network. */
-  offline: boolean;
-  /** It exists only on the phone yet: no editing until it lands. */
-  phoneOnly: boolean;
-  task: TaskWithPeople | undefined;
-  /** The handle to drag the point by — drawn over the card's corner by the list. */
+  openSub: string | null;
+  /** The wall shows this point now (D-121). */
+  lit: boolean;
+  look: RowLook;
   grip?: ReactNode;
-  onToggle: () => void;
-  onChangeText: (text: string) => void;
-  onDone: () => void;
-  onAssign: () => void;
-  onDelete: () => void;
-  onRetranscribe: () => void;
+  dictation: Dictation;
+  aimed: string | null;
+  on: PointHandlers;
 };
 
 /**
- * One point of a board (D-102 §3), a card of the «Задачи» language: closed — the number (a
- * tick once it is done), the first line and the rest, voice, what it became; open, in place —
- * the text that saves itself, the recording, and three buttons: «Отметить», «Поручить»,
- * «Удалить». A point is a note underneath: the same editor, the same receipt, the same STT.
+ * One branch of a board (D-102 §3, D-121), a card of the «Задачи» language. Closed — the
+ * number the wall gives it (a tick once done), the words, its first sub-points under a dot
+ * marker and «ещё N», what it became; lit with the accent while the wall shows it. Open, in
+ * place — the text that saves itself, the recording, the sub-points (each opens in place and
+ * moves by its handle), «+ подпункт» with the microphone, «Показать на стене» during a meeting,
+ * and «Отметить / Поручить / Удалить». A point is a note underneath, and so is a sub-point.
  */
-export function PointCard(props: Props) {
-  const { point, n, now, open, busy, offline, phoneOnly, task, grip, onToggle, onChangeText, onDone, onAssign, onDelete, onRetranscribe } = props;
+export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, look, grip, dictation, aimed, on }: Props) {
+  const { point, children } = branch;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
-  const waiting = awaitsWords(point) || (phoneOnly && !point.text.trim());
+  const phone = look.phone(point.id);
+  const offline = look.waiting(point.id);
+  const state = stateOf(point, look);
+  const task = look.task(point);
   const done = point.done_at !== null;
   const handed = point.converted_task_id !== null;
   const empty = !point.text.trim();
@@ -79,35 +127,40 @@ export function PointCard(props: Props) {
   const raw = point.raw_transcript?.trim() ?? "";
   const edited = raw !== "" && raw !== point.text.trim();
 
-  const heading = waiting ? (
-    busy || phoneOnly ? (
-      <span className="block" data-testid="point-transcribing">
-        <span className="flex items-center gap-2 font-display text-[16px] font-semibold leading-[21px] text-muted">
-          <Dot tone={phoneOnly ? "warn" : "accent"} pulse />
-          {phoneOnly ? "Голос на телефоне" : "Распознаю…"}
+  const heading =
+    state === "words" ? (
+      <>
+        <span className={`${open ? "" : "line-clamp-2"} block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${done ? "text-text/55" : ""}`}>
+          {head || "Без текста"}
         </span>
-        {open ? null : <Bone h={13} w="72%" className="mt-2" />}
-      </span>
-    ) : (
+        {rest && !open ? <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
+      </>
+    ) : state === "deaf" ? (
       <span className="block">
         <span className="block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">Голосовой пункт</span>
         <span className="mt-0.5 block text-[13px] leading-[18px]" style={{ color: "var(--warn)" }}>
-          Не расслышал — голос сохранён
+          {STATE_WORDS.deaf}
         </span>
       </span>
-    )
-  ) : (
-    <>
-      <span
-        className={`${open ? "" : "line-clamp-2"} block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${done ? "text-text/55" : ""}`}
-      >
-        {head || "Без текста"}
+    ) : (
+      <span className="block" data-testid="point-transcribing">
+        <span className="flex items-center gap-2 font-display text-[16px] font-semibold leading-[21px] text-muted">
+          <Dot tone={state === "phone" ? "warn" : "accent"} pulse />
+          {STATE_WORDS[state]}
+        </span>
+        {open || state !== "hearing" ? null : <Bone h={13} w="72%" className="mt-2" />}
       </span>
-      {rest && !open ? <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
-    </>
-  );
+    );
 
   const meta: ReactNode[] = [];
+  if (lit) {
+    meta.push(
+      <span key="lit" className="inline-flex items-center gap-1.5 font-semibold text-accent" data-testid="point-lit">
+        <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" style={{ boxShadow: "0 0 8px var(--accent)" }} />
+        на стене сейчас
+      </span>,
+    );
+  }
   if (done) meta.push(<span key="done" style={{ color: "var(--ok)" }}>отмечен</span>);
   if (handed) meta.push(<span key="handed" className="text-accent">{handedLabel(task, now)}</span>);
   if (point.audio_path) {
@@ -118,49 +171,58 @@ export function PointCard(props: Props) {
       </span>,
     );
   }
-  if (offline || phoneOnly) meta.push(<span key="offline" style={{ color: "var(--warn)" }}>ждёт связи</span>);
+  if (offline) meta.push(<span key="offline" style={{ color: "var(--warn)" }}>ждёт связи</span>);
+
+  const { shown, more } = glimpse(children);
 
   return (
-    <div className="relative" data-point-id={point.id}>
+    <div
+      className={`relative ${
+        lit
+          ? "[&>article]:!border-accent/70 [&>article]:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent),0_10px_28px_color-mix(in_srgb,var(--accent)_12%,transparent)]"
+          : ""
+      }`}
+      data-point-id={point.id}
+      data-lit={lit || undefined}
+    >
       <CardShell
         id={point.id}
         open={open}
         closed={done}
-        onToggle={onToggle}
+        onToggle={on.toggle}
         testId="point-card"
         headData={{ "data-point-id": point.id }}
         head={
           <>
-            <Number n={n} done={done} waiting={waiting} />
-            <span className="min-w-0 flex-1 pr-7">
+            <Number n={n} done={done} state={state} />
+            <span className={`min-w-0 flex-1 ${grip ? "pr-8" : ""}`}>
               {heading}
-              {meta.length > 0 ? (
-                <span className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] leading-4 text-muted">
-                  {meta.map((item, index) => (
-                    <span key={index} className="inline-flex items-center gap-1.5">
-                      {index > 0 ? (
-                        <span aria-hidden className="opacity-40">
-                          ·
-                        </span>
-                      ) : null}
-                      {item}
-                    </span>
+              {!open && shown.length > 0 ? (
+                <span className="mt-2 flex flex-col gap-1" data-testid="point-glimpse">
+                  {shown.map((sub) => (
+                    <SubLine key={sub.id} sub={sub} state={stateOf(sub, look)} />
                   ))}
+                  {more > 0 ? (
+                    <span className="pl-[22px] text-[13px] leading-[18px] text-muted" data-testid="point-more">
+                      ещё {more}
+                    </span>
+                  ) : null}
                 </span>
               ) : null}
+              <Meta items={meta} />
             </span>
           </>
         }
       >
-        {phoneOnly ? (
+        {phone ? (
           <p className="text-[14px] leading-[19px]" style={{ color: "var(--warn)" }}>
-            Пункт ещё на телефоне — отправлю сам, как появится связь
+            Пункт ещё на телефоне — отправлю сам, как появится связь. Подпункты можно добавлять уже сейчас.
           </p>
         ) : (
           <>
             <div className="flex min-h-[20px] items-center justify-between gap-2 text-[12px] leading-4 text-muted">
               <span className="nums">
-                {humanAqtobe(new Date(point.created_at))}
+                {whenRu(point.created_at, now)}
                 {point.audio_path ? " · голосом" : ""}
               </span>
               <SaveReceipt id={point.id} dirty={dirty} saved={saved} />
@@ -174,17 +236,17 @@ export function PointCard(props: Props) {
                 onDirty={setDirty}
                 onChangeText={(text) => {
                   setSaved(true);
-                  onChangeText(text);
+                  on.text(point, text);
                 }}
               />
             </div>
 
             {empty && point.audio_path ? (
-              <div className="mt-2 flex items-center gap-2 text-[13px] leading-4" style={{ color: busy ? "var(--text-muted)" : "var(--warn)" }}>
-                {busy ? <Dot tone="accent" pulse /> : null}
-                {busy ? "Распознаю…" : "Не расслышал — впишите сами или распознайте ещё раз"}
-                {busy ? null : (
-                  <Button variant="secondary" size="sm" className="ml-auto" icon={<NoteIcon name="retry" size={14} />} onClick={onRetranscribe}>
+              <div className="mt-2 flex items-center gap-2 text-[13px] leading-4" style={{ color: state === "hearing" ? "var(--text-muted)" : "var(--warn)" }}>
+                {state === "hearing" ? <Dot tone="accent" pulse /> : null}
+                {state === "hearing" ? "Распознаю…" : "Не расслышал — впишите сами или распознайте ещё раз"}
+                {state === "hearing" ? null : (
+                  <Button variant="secondary" size="sm" className="ml-auto shrink-0" icon={<NoteIcon name="retry" size={14} />} onClick={() => on.retranscribe(point)}>
                     Распознать
                   </Button>
                 )}
@@ -193,6 +255,86 @@ export function PointCard(props: Props) {
 
             {point.audio_path ? <AudioOriginal path={point.audio_path} /> : null}
             {edited ? <Original raw={raw} /> : null}
+          </>
+        )}
+
+        {/* the branch: sub-points in their order, then the row that adds the next one */}
+        <section className="mt-4" aria-label="Подпункты" data-testid="point-branch">
+          {children.length > 0 ? (
+            <h3 className="flex items-center gap-2 px-1 pb-0.5 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted">
+              Подпункты
+              <span className="nums">{children.length}</span>
+            </h3>
+          ) : null}
+          {children.length > 0 ? (
+            <div className="flex flex-col">
+              <AnimatePresence initial={false} mode="popLayout">
+                {children.map((sub) => (
+                  <motion.div
+                    key={sub.id}
+                    layout="position"
+                    transition={CARD_SPRING}
+                    initial={{ opacity: 0, scale: 0.97 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
+                  >
+                    <SubPointRow
+                      sub={sub}
+                      now={now}
+                      open={openSub === sub.id}
+                      state={stateOf(sub, look)}
+                      offline={look.waiting(sub.id)}
+                      phone={look.phone(sub.id)}
+                      task={look.task(sub)}
+                      onToggle={() => on.toggleSub(sub.id)}
+                      onChangeText={(text) => on.text(sub, text)}
+                      onDone={() => on.done(sub)}
+                      onAssign={() => on.assign(sub)}
+                      onPromote={on.promote(sub)}
+                      onDelete={() => on.remove(sub)}
+                      onRetranscribe={() => on.retranscribe(sub)}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : null}
+
+          <SubComposer pointId={point.id} dictation={dictation} aimed={aimed} onAim={on.aim} onWrite={on.write} first={children.length === 0} />
+
+          {on.demote && demoteLabel ? (
+            <button
+              type="button"
+              onClick={on.demote}
+              data-testid="point-demote"
+              className="-mx-1 mt-1 flex min-h-[44px] items-center gap-2 rounded-[12px] px-2 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
+            >
+              <NoteIcon name="indent" size={17} />
+              Сделать подпунктом {demoteLabel}
+            </button>
+          ) : null}
+        </section>
+
+        {phone ? null : (
+          <>
+            {on.spotlight ? (
+              <button
+                type="button"
+                aria-pressed={lit}
+                onClick={() => on.spotlight?.(!lit)}
+                data-testid="point-spotlight"
+                className={`mt-4 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] border px-3 text-[15px] font-semibold transition-[transform,background-color,border-color] duration-[120ms] active:scale-[0.98] ${
+                  lit ? "border-accent/60 bg-accent/[0.12] text-accent" : "border-border/80 bg-white/[0.03] text-text"
+                }`}
+              >
+                {lit ? (
+                  <span aria-hidden className="h-2 w-2 rounded-full bg-accent" style={{ boxShadow: "0 0 10px var(--accent)" }} />
+                ) : (
+                  <NoteIcon name="wall" size={18} />
+                )}
+                {lit ? "На стене сейчас — снять" : "Показать на стене"}
+              </button>
+            ) : null}
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               <Button
@@ -201,35 +343,45 @@ export function PointCard(props: Props) {
                 icon={<NoteIcon name="check" size={16} />}
                 aria-pressed={done}
                 data-testid="point-done"
-                onClick={onDone}
+                onClick={() => on.done(point)}
               >
                 {done ? "Снять" : "Отметить"}
               </Button>
-              <Button className="!px-2 whitespace-nowrap !text-[14px]" icon={<NoteIcon name="task" size={16} />} disabled={empty || handed} data-testid="point-assign" onClick={onAssign}>
+              <Button className="!px-2 whitespace-nowrap !text-[14px]" icon={<NoteIcon name="task" size={16} />} disabled={empty || handed} data-testid="point-assign" onClick={() => on.assign(point)}>
                 {handed ? "Поручено" : "Поручить"}
               </Button>
-              <Button variant="secondary" className="!px-2 whitespace-nowrap !text-[14px] !text-danger/80" icon={<NoteIcon name="trash" size={16} />} data-testid="point-delete" onClick={onDelete}>
+              <Button
+                variant="secondary"
+                className="!px-2 whitespace-nowrap !text-[14px] !text-danger/80"
+                icon={<NoteIcon name="trash" size={16} />}
+                data-testid="point-delete"
+                onClick={() => on.remove(point)}
+              >
                 Удалить
               </Button>
             </div>
-
-            <div className="-mx-1.5 mt-2 flex items-center">
-              {handed && point.converted_task_id ? (
-                <Link
-                  href={`/tasks/${point.converted_task_id}`}
-                  className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
-                >
-                  Открыть задачу
-                </Link>
-              ) : null}
-              <button type="button" onClick={onToggle} className="ml-auto min-h-[40px] rounded-[10px] px-2 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-white/[0.05]">
-                Свернуть
-              </button>
-            </div>
           </>
         )}
+
+        <div className="-mx-1.5 mt-2 flex items-center">
+          {handed && point.converted_task_id ? (
+            <Link
+              href={`/tasks/${point.converted_task_id}`}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
+            >
+              Открыть задачу
+            </Link>
+          ) : null}
+          <button
+            type="button"
+            onClick={on.toggle}
+            className="ml-auto min-h-[44px] rounded-[10px] px-2 text-[14px] font-semibold text-muted transition-colors duration-[120ms] active:bg-white/[0.05]"
+          >
+            Свернуть
+          </button>
+        </div>
       </CardShell>
-      {grip ? <span className="absolute right-1.5 top-2">{grip}</span> : null}
+      {grip ? <span className="absolute right-0.5 top-[5px]">{grip}</span> : null}
     </div>
   );
 }

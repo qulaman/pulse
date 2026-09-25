@@ -14,6 +14,7 @@ import {
   positionBetween,
   splitBoards,
   summariesOf,
+  summaryLine,
 } from "./list";
 import type { MindBoard } from "./queries";
 
@@ -86,7 +87,20 @@ describe("boardSummary and summariesOf", () => {
       point({ done_at: "2026-09-23T06:00:00Z", created_at: "2026-09-23T05:00:00Z" }),
       point({ created_at: "2026-09-23T06:30:00Z" }),
     ]);
-    expect(summary).toEqual({ total: 2, done: 1, lastAt: "2026-09-23T06:30:00Z" });
+    expect(summary).toEqual({ total: 2, subs: 0, done: 1, lastAt: "2026-09-23T06:30:00Z" });
+  });
+
+  it("counts sub-points apart and ticks by the points, as the wall does (D-121)", () => {
+    const a = point({ id: "a" });
+    const summary = boardSummary([
+      a,
+      point({ id: "a1", parent_id: "a", done_at: "2026-09-23T06:00:00Z", created_at: "2026-09-23T07:00:00Z" }),
+      point({ id: "a2", parent_id: "a" }),
+      point({ id: "b", done_at: "2026-09-23T06:00:00Z" }),
+      // its point is not among the rows: drawn as a point, counted as one
+      point({ id: "orphan", parent_id: "gone" }),
+    ]);
+    expect(summary).toMatchObject({ total: 3, subs: 2, done: 1, lastAt: "2026-09-23T07:00:00Z" });
   });
 
   it("files the live points of every board from one cache", () => {
@@ -156,5 +170,18 @@ describe("splitBoards", () => {
     expect(live.map((b) => b.id)).toEqual(["fresh", "old"]);
     expect(trash.map((b) => b.id)).toEqual(["binned"]);
     expect(boardExpiresAt(binned).toISOString()).toBe("2026-09-25T05:00:00.000Z");
+  });
+});
+
+describe("summaryLine", () => {
+  it("says the points, the sub-points apart and the ticked ones", () => {
+    expect(summaryLine({ total: 5, subs: 3, done: 2, lastAt: null })).toBe("5 пунктов · 3 подпункта · 2 отмечено");
+    expect(summaryLine({ total: 1, subs: 1, done: 0, lastAt: null })).toBe("1 пункт · 1 подпункт");
+    expect(summaryLine({ total: 2, subs: 0, done: 1, lastAt: null })).toBe("2 пункта · 1 отмечен");
+  });
+
+  it("is «Пока пусто» for an empty board", () => {
+    expect(summaryLine(undefined)).toBe("Пока пусто");
+    expect(summaryLine({ total: 0, subs: 0, done: 0, lastAt: null })).toBe("Пока пусто");
   });
 });

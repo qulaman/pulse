@@ -35,7 +35,8 @@ function Fact({ label, value, color }: { label: string; value: number; color?: s
  */
 export function ShopHero({ delivered, onHands, waiting, loading }: Props) {
   return (
-    <section className="card relative mt-4 overflow-hidden px-5 pb-4 pt-5">
+    // `data-grow`: the card's height is the month's (a first-award line when nothing was given yet) — D-122
+    <section className="card relative mt-4 overflow-hidden px-5 pb-4 pt-5" data-grow="">
       <span
         aria-hidden
         className="pointer-events-none absolute -right-12 -top-20 h-48 w-48 rounded-full"

@@ -1,16 +1,17 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { BoardPresenter, usePresenterBusy } from "@/components/mindboard/BoardPresenter";
+import { BoardSeam } from "@/components/screen/BoardSeam";
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
+import { useWallBoard } from "@/components/screen/useWallBoard";
 import { PageHead } from "@/components/ui/PageHead";
 import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { PersonPad } from "@/components/ui/device/PersonPad";
 import { toast } from "@/components/ui/Toast";
 import { ANSWERS } from "@/components/visits/VisitAsk";
-import { boardOnWall, splitBoards } from "@/lib/mindboard/list";
 import { useBoards } from "@/lib/mindboard/queries";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -66,8 +67,11 @@ import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text
  * «Гость в кабинете» вместо «Посетителя» (посетитель теперь — событие от секретаря) и
  * ответ посетителю прямо с пульта, когда он ждёт.
  *
- * С D-102: шов «Доска на стене» — три последние доски директора клавишами, горит стоящая
- * на стене; при госте в кабинете — ползунок «Показать гостю».
+ * С D-102: шов «Доска на стене» — три последние доски директора клавишами; при госте в
+ * кабинете — ползунок «Показать гостю».
+ *
+ * С D-121: доска на стене — картридж в шве (открыть, убрать, «Все доски» шторкой), а сразу
+ * под дисплеем — ведущий: ◀ ✓ ▶ по пунктам, «Снять подсветку», «Список / Карта».
  *
  * С D-105: ночью, с 21:00 до 08:00, под дисплеем ползунок «Разбудить экран» — стена
  * возвращается из тусклых часов в эфир на два часа; тот же ползунок усыпляет её сразу.
@@ -77,9 +81,6 @@ import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text
  * команду раз в три минуты, любая заставка руками круг останавливает; одно дело во весь
  * экран ставится с экрана задачи, а дисплей пульта называет его.
  */
-
-/** Клавиш досок на пульте — три последние: мышечной памяти хватает, остальное — в «Заметках». */
-const BOARD_KEYS = 3;
 
 const SCENE_HINT: Record<TvScene, string> = {
   face: "Лицо говорит о последних событиях",
@@ -127,6 +128,8 @@ export default function ScreenPage() {
   const boards = useBoards(me.data?.userId);
   const pointsEnabled = usePointsEnabled();
   const taskTitle = useTaskTitle(state.data?.mode === "task" ? (state.data.task_id ?? null) : null);
+  const wall = useWallBoard(state.data ?? null, now);
+  const presenting = usePresenterBusy();
 
   if (state.isLoading || people.isLoading) return <ScreenPageSkeleton />;
 
@@ -142,7 +145,6 @@ export default function ScreenPage() {
   const next = carouselNext(now, roundPoints);
   const ratingView = ratingViewOf(row);
   const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || pointsEnabled.data === true);
-  const lastBoards = splitBoards(boards.data ?? [], now).live.slice(0, BOARD_KEYS);
   const clock = clockStyleOf(row);
   const calendarView = calendarViewOf(row);
   const guestEnds = guestEndsAt(row, now);
@@ -158,7 +160,7 @@ export default function ScreenPage() {
   // экран ни разу не поднимался: сначала объясняем, как его завести, потом команды
   const neverSeen = !row?.seen_at;
   // диод мигает, пока команда в пути: от нажатия до того, как киоск отметил её показанной
-  const inFlight = control.isPending || (receipt.tone === "muted" && !neverSeen);
+  const inFlight = control.isPending || presenting || (receipt.tone === "muted" && !neverSeen);
   const led: LedTone = inFlight ? "accent" : neverSeen ? "off" : receipt.tone;
 
   const show = (input: Parameters<typeof control.mutate>[0], message: string) => {
@@ -190,8 +192,13 @@ export default function ScreenPage() {
             </>
           ) : (
             <>
-              <p className="mt-2 truncate font-display text-[21px] font-bold leading-7 tracking-[-0.02em]">
-                {wallNow(row, people.data ?? [], now, boards.data ?? [], { points, guest, taskTitle: taskTitle.data })}
+              <p className="mt-2 line-clamp-2 font-display text-[21px] font-bold leading-7 tracking-[-0.02em] [overflow-wrap:anywhere]">
+                {wallNow(row, people.data ?? [], now, boards.data ?? [], {
+                  points,
+                  guest,
+                  taskTitle: taskTitle.data,
+                  boardPoints: wall.points.map((point) => point.id),
+                })}
               </p>
               <p className="mt-1 text-[13px] leading-[18px]" style={{ color: RECEIPT_COLOR[receipt.tone] }}>
                 {receipt.text}
@@ -259,6 +266,12 @@ export default function ScreenPage() {
               </Key>
             </div>
           </div>
+        ) : null}
+
+        {/* the presenter (D-121): right under the display while the director's board is on the wall —
+            a meeting is run from here without scrolling the remote */}
+        {wall.board && !wall.board.deleted_at ? (
+          <BoardPresenter variant="remote" boardId={wall.board.id} points={wall.points} now={now} />
         ) : null}
 
         {/* the night dims the wall to its clock (D-96 §8); the director working late wakes it
@@ -397,48 +410,8 @@ export default function ScreenPage() {
           ))}
         </div>
 
-        {/* the director's boards (D-102): the latest three as keys, the one on the wall lit; a tap
-            on the lit one gives the wall back to the face */}
-        <Seam label="Доска на стене" />
-        {lastBoards.length > 0 ? (
-          <div className="mt-2 grid grid-cols-1 gap-2" data-testid="remote-boards">
-            {lastBoards.map((board) => {
-              const lit = boardOnWall(row, board.id, now);
-              return (
-                <Key
-                  key={board.id}
-                  on={lit}
-                  icon={<BoardIcon />}
-                  aria-pressed={lit}
-                  data-testid="remote-board"
-                  onClick={() =>
-                    lit ? show({ scene: "face" }, "Доска убрана со стены") : show({ board: board.id }, `На стене — «${board.title}»`)
-                  }
-                >
-                  <span className="block min-w-0 truncate">{board.title}</span>
-                </Key>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="mt-2 px-1 text-center text-[13px] leading-[18px] text-muted">
-            Досок пока нет —{" "}
-            <Link href="/notes?tab=boards" className="font-semibold text-accent">
-              создать в «Заметках»
-            </Link>
-          </p>
-        )}
-        {guest && scene === "board" ? (
-          <div className="mt-2">
-            <Switch
-              on={row?.board_guest ?? false}
-              icon={<BoardIcon />}
-              title="Показать гостю"
-              value={row?.board_guest ? "доска видна гостю" : "доска скрыта, пока гость здесь"}
-              onToggle={(next) => show({ boardGuest: next }, next ? "Доска видна гостю" : "Доска скрыта от гостя")}
-            />
-          </div>
-        ) : null}
+        {/* the director's boards (D-102, D-121): the one on the wall as a cartridge, the others on a shelf */}
+        <BoardSeam wall={wall} row={row} now={now} guest={guest} show={show} />
 
         {/* the clock on the wall: digits or hands, everywhere it is drawn (D-96) */}
         <Seam label="Часы на стене" />

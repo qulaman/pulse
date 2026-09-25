@@ -100,7 +100,8 @@ export function PageHead({
     // the bar's height moves with the safe area (rotation): re-observe with the new margin
     const watch = () => {
       observer?.disconnect();
-      const top = Math.round(barNode.getBoundingClientRect().height) - (compact ? 44 : 0);
+      // a bar not laid out yet measures 0: a negative margin would read «--44px» and throw
+      const top = Math.max(0, Math.round(barNode.getBoundingClientRect().height) - (compact ? 44 : 0));
       observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {

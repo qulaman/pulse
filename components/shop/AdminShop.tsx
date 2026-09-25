@@ -58,6 +58,7 @@ export function AdminShop({ me }: { me: Me | undefined }) {
   const allOrders = orders.data ?? [];
   const waiting = allOrders.filter((order) => isOpenOrder(order.status) && order.user_id !== me?.userId);
   const taken = takenCounts(allOrders);
+  const heroLoading = orders.isLoading || summary.isLoading;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
@@ -68,60 +69,66 @@ export function AdminShop({ me }: { me: Me | undefined }) {
           delivered={deliveredInPeriod(allOrders)}
           onHands={summary.data?.onHands ?? 0}
           waiting={waiting.length}
-          loading={orders.isLoading || summary.isLoading}
+          loading={heroLoading}
         />
       </Reveal>
 
-      <Reveal index={1}>
-        <DeliverList orders={allOrders} meId={me?.userId} />
-      </Reveal>
+      {/* under the hero only once it has its height: it grows with the month, and what stood
+          under it while it loaded jumped down when it arrived (D-122) */}
+      {heroLoading ? null : (
+        <>
+          <Reveal index={1}>
+            <DeliverList orders={allOrders} meId={me?.userId} />
+          </Reveal>
 
-      <Reveal index={2}>
-        <section className="mt-8">
-          <div className="flex items-baseline justify-between gap-3 px-1">
-            <h2 className="eyebrow">Награды</h2>
-            <span className="nums text-[12px] leading-4 text-muted">{list.length}</span>
-          </div>
-          {items.isLoading ? (
-            <SkeletonGroup className="mt-2 grid grid-cols-2 gap-2.5">
-              {Array.from({ length: 4 }, (_, i) => (
-                <Bone key={i} h={176} className="rounded-[16px]" />
-              ))}
-            </SkeletonGroup>
-          ) : (
-            <ul className="mt-2 grid grid-cols-2 gap-2.5">
-              {list.map((item) => (
-                <li key={item.id} className="contents">
-                  <RewardTile item={item} taken={taken[item.id] ?? 0} onOpen={setEditing} />
-                </li>
-              ))}
-              <li className="contents">
-                <AddRewardTile onClick={() => setEditing("new")} />
-              </li>
-            </ul>
-          )}
-        </section>
-      </Reveal>
+          <Reveal index={2}>
+            <section className="mt-8">
+              <div className="flex items-baseline justify-between gap-3 px-1">
+                <h2 className="eyebrow">Награды</h2>
+                <span className="nums text-[12px] leading-4 text-muted">{list.length}</span>
+              </div>
+              {items.isLoading ? (
+                <SkeletonGroup className="mt-2 grid grid-cols-2 gap-2.5">
+                  {Array.from({ length: 4 }, (_, i) => (
+                    <Bone key={i} h={176} className="rounded-[16px]" />
+                  ))}
+                </SkeletonGroup>
+              ) : (
+                <ul className="mt-2 grid grid-cols-2 gap-2.5">
+                  {list.map((item) => (
+                    <li key={item.id} className="contents">
+                      <RewardTile item={item} taken={taken[item.id] ?? 0} onOpen={setEditing} />
+                    </li>
+                  ))}
+                  <li className="contents">
+                    <AddRewardTile onClick={() => setEditing("new")} />
+                  </li>
+                </ul>
+              )}
+            </section>
+          </Reveal>
 
-      <Reveal index={3}>
-        <RecentDeliveries orders={allOrders} />
-      </Reveal>
+          <Reveal index={3}>
+            <RecentDeliveries orders={allOrders} />
+          </Reveal>
 
-      <Reveal index={4}>
-        <TeamPoints items={list} />
-      </Reveal>
+          <Reveal index={4}>
+            <TeamPoints items={list} />
+          </Reveal>
 
-      <Reveal index={5}>
-        <Link
-          href="/rating"
-          className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px] transition-colors duration-[120ms] active:bg-surface-2"
-        >
-          Поощрить очками
-          <span className="flex items-center gap-1.5 text-[13px] leading-4 text-muted">
-            рейтинг команды <Chevron />
-          </span>
-        </Link>
-      </Reveal>
+          <Reveal index={5}>
+            <Link
+              href="/rating"
+              className="mt-2 flex min-h-[52px] items-center justify-between gap-3 card px-4 text-[16px] leading-[22px] transition-colors duration-[120ms] active:bg-surface-2"
+            >
+              Поощрить очками
+              <span className="flex items-center gap-1.5 text-[13px] leading-4 text-muted">
+                рейтинг команды <Chevron />
+              </span>
+            </Link>
+          </Reveal>
+        </>
+      )}
 
       <ItemEditor
         key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}

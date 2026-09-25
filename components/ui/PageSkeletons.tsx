@@ -2,29 +2,42 @@
  * Page compositions of the skeleton blocks. Each keeps the page's real static chrome
  * (title, subtitle, filters) so only the dynamic area pulses, and each is used twice:
  * by the route's loading.tsx during navigation and by the page while its data loads.
- * Server-safe.
+ * The rule (D-122): a skeleton draws the screen down to the first block whose place depends
+ * on the data, each block with the box of the real one (the real component in its pending
+ * form where there is one), and below it one placeholder for the rest — so when the data
+ * lands, things fill in and appear under what is there, nothing that is there moves.
+ * `pnpm smoke:stages` measures every screen at every stage. Importable from loading.tsx.
  */
+import { DataTable } from "@/components/admin/DataTable";
+import { TableChips } from "@/components/admin/tables";
 import { Mascot } from "@/components/brand/Mascot";
+import { PeriodChips } from "@/components/rating/PeriodChips";
+import { ShopRow } from "@/components/rating/ShopRow";
+import { SettingsTiles } from "@/components/settings/SettingsTiles";
+import { Tabs } from "@/components/tasks/list/Tabs";
 import { HeadButtonBone } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
+import { ADMIN_TABLES } from "@/lib/admin/tables";
 
 import {
   AnnouncementBone,
   Bone,
-  ChatBone,
   PeopleGridBone,
   RatingRowBone,
   RowListBone,
+  SectionBone,
   SettingsSectionsBone,
   SkeletonGroup,
   StatBone,
-  TableBone,
   TaskListBone,
 } from "./Skeleton";
 
 const MAIN = "mx-auto w-full max-w-lg flex-1 px-4 pb-36";
 
-/** The screen head (D-113) as the page draws it; `sub=" "` keeps the room of a line that loads. */
+/**
+ * The screen head (D-113) as the page draws it. A line that loads keeps its room with a
+ * no-break space: a plain " " collapses to nothing and the head grew by a line on arrival.
+ */
 function Title({ text, sub }: { text: string; sub?: string }) {
   return <PageHead title={text} sub={sub} />;
 }
@@ -41,7 +54,7 @@ const DATE_BONE = (
 /** The inbox part of Пульс (below the verdict card, which renders itself while loading). */
 export function PulseInboxBone() {
   return (
-    <SkeletonGroup className="mt-6">
+    <SkeletonGroup grow className="mt-6">
       <div className="flex items-center gap-2">
         <Bone round w={10} h={10} />
         <Bone h={24} w={120} />
@@ -53,21 +66,60 @@ export function PulseInboxBone() {
   );
 }
 
-/** Пульс (D-60): the face alone in the middle of the screen while its data loads. */
+/**
+ * Пульс and Лента (D-60) before their data: the page's own three bands with the face asleep
+ * in the middle one — the box of MascotLever (128 + 24) and its 0.82 on a low screen — so the
+ * face is where the page will put it, at the size it will have.
+ */
 export function PulseSkeleton() {
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center justify-center px-4 pb-28">
-      <div className="flex h-[152px] w-[152px] items-center justify-center">
-        <Mascot state="sleeping" size={128} />
+    <main className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4" data-board="">
+      <div className="min-h-0 flex-1" data-band="said" />
+      <div className="relative flex shrink-0 flex-col items-center">
+        <div className="flex h-[152px] w-[152px] items-center justify-center">
+          <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
+            <Mascot state="sleeping" size={128} />
+          </span>
+        </div>
       </div>
+      <div className="min-h-0 flex-1" data-band="cards" />
     </main>
   );
 }
 
 /**
- * «Задачи» and «Мои дела» before their data (D-83): the page title, the status screen with
- * grey where the numbers go, the people strip (director), the tabs and a column of closed
- * cards. Every box has the height of the real one, so nothing moves when the data lands.
+ * A column of closed task cards under a section label: the part of a list screen whose
+ * length only the data knows, so it is always the last block of a skeleton (D-122); its top
+ * margin puts it where the page's first data block will start.
+ */
+function CardColumnBone({ className = "mt-1", count = 4 }: { className?: string; count?: number }) {
+  return (
+    <SkeletonGroup grow className={`flex flex-col gap-2 ${className}`}>
+      <div className="px-1 pb-0.5 pt-4">
+        <Bone h={16} w={104} />
+      </div>
+      {Array.from({ length: count }, (_, i) => (
+        <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
+          <Bone h={22} w={22} round className="shrink-0" />
+          <div className="flex-1">
+            <div className="flex gap-3">
+              <Bone h={21} w={i % 2 ? "58%" : "74%"} />
+              <Bone h={16} w={72} className="ml-auto mt-0.5 shrink-0" />
+            </div>
+            <Bone h={16} w={140} className="mt-1.5" />
+          </div>
+        </div>
+      ))}
+    </SkeletonGroup>
+  );
+}
+
+/**
+ * «Задачи» and «Мои дела» before their data (D-83): the page head, the status screen with
+ * grey where the numbers go, then only what stands where the data will not move it (D-122).
+ * The director's people strip exists only when two people have open work, and the tabs
+ * stand under it — so his skeleton stops at the status screen and a column of cards holds
+ * the place of both; «Мои дела» has no strip, so its real tabs stand ready (`pending`).
  */
 function CardsSkeleton({ title, director }: { title: string; director: boolean }) {
   return (
@@ -98,42 +150,24 @@ function CardsSkeleton({ title, director }: { title: string; director: boolean }
       </SkeletonGroup>
 
       {director ? (
-        <SkeletonGroup className="-mx-4 mt-3 flex gap-2 overflow-hidden px-4 pb-0.5">
-          {[64, 96, 88, 104].map((w, i) => (
-            <Bone key={i} h={40} w={w} className="shrink-0 rounded-full" />
-          ))}
-        </SkeletonGroup>
-      ) : null}
-
-      <div className="mt-2">
-        <div aria-hidden className="h-px" />
-        <div className="py-2">
-          <SkeletonGroup className="seg rounded-[14px] p-1">
-            <Bone h={40} w="33%" className="rounded-[10px]" />
-          </SkeletonGroup>
-        </div>
-      </div>
-
-      <SkeletonGroup className="mt-1 flex flex-col gap-2">
-        <div className="px-1 pb-0.5 pt-4">
-          <Bone h={16} w={104} />
-        </div>
-        {[0, 1, 2, 3].map((i) => (
-          <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
-            <Bone h={22} w={22} round className="shrink-0" />
-            <div className="flex-1">
-              <div className="flex gap-3">
-                <Bone h={21} w={i % 2 ? "58%" : "74%"} />
-                <Bone h={16} w={72} className="ml-auto mt-0.5 shrink-0" />
-              </div>
-              <Bone h={16} w={140} className="mt-1.5" />
-            </div>
-          </div>
-        ))}
-      </SkeletonGroup>
+        // where the tabs start when there is no strip (the tabs' 1 px sentinel under mt-2)
+        <CardColumnBone className="mt-[9px]" />
+      ) : (
+        <>
+          <Tabs id="mine" pending value="new" className="mt-2" items={MINE_TABS} />
+          <CardColumnBone />
+        </>
+      )}
     </main>
   );
 }
+
+/** The piles of «Мои дела», as EmployeeTasksView names them. */
+const MINE_TABS = [
+  { key: "new", label: "Новые", count: 0 },
+  { key: "working", label: "В работе", count: 0 },
+  { key: "closed", label: "Закрытые", count: 0 },
+] as const;
 
 /** «Задачи» директора: the same page, grey. */
 export function SentSkeleton() {
@@ -142,7 +176,7 @@ export function SentSkeleton() {
 
 export function TeamListBone() {
   return (
-    <SkeletonGroup className="mt-4">
+    <SkeletonGroup grow className="mt-4">
       <Bone h={44} className="rounded-[12px]" />
       <div className="mt-3 flex flex-wrap gap-2">
         {[52, 92, 118, 122, 96].map((w) => (
@@ -161,64 +195,109 @@ export function TeamListBone() {
   );
 }
 
+/**
+ * «Команда» (D-104): the head with its state line and the grid «Сейчас» as PeopleGrid draws
+ * it while loading. The grid is as long as the team, so the skeleton stops there — the page
+ * shows the rows under it only once the grid has its size.
+ */
 export function PeopleSkeleton() {
   return (
     <main className={MAIN}>
-      <PageHead title="Команда" sub=" " actions={<HeadButtonBone />} />
-      <SkeletonGroup className="mt-7">
-        <Bone h={24} w={80} />
+      <PageHead title="Команда" state={LOADING_LINE} actions={<HeadButtonBone />} />
+      <SkeletonGroup grow className="mt-6">
+        <h2 className="text-[19px] font-semibold leading-6">Сейчас</h2>
         <div className="mt-3">
           <PeopleGridBone />
         </div>
       </SkeletonGroup>
-      <div className="mt-6 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]">
-        Рейтинг
-        <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
-      </div>
-      <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
-      <TeamListBone />
     </main>
   );
 }
 
+/**
+ * The person editor (D-104) before the person is in: the head — the name and the line of role
+ * and position the editor always has — and the form's sections, as long as the form will be.
+ */
+export function EditPersonSkeleton({ back = { href: "/settings?tab=team", label: "Сотрудники" } }: { back?: { href: string; label: string } }) {
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
+      <PageHead
+        back={back}
+        heading={
+          <SkeletonGroup className="mt-px min-w-0 flex-1 py-[5px]">
+            <Bone h={30} w="62%" />
+          </SkeletonGroup>
+        }
+        sub={LOADING_LINE}
+      />
+      <SkeletonGroup grow className="mt-5 flex flex-col gap-4">
+        <SectionBone fields={3} />
+        <SectionBone fields={4} />
+        <SectionBone fields={2} />
+      </SkeletonGroup>
+    </main>
+  );
+}
+
+/** «Новый сотрудник» (D-104): its head is known, the form waits for the roster. */
+export function NewPersonSkeleton() {
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead back={{ href: "/settings?tab=team", label: "Сотрудники" }} title="Новый сотрудник" />
+      <div className="mt-5">
+        <NewPersonFormBone />
+      </div>
+    </main>
+  );
+}
+
+/** The new-person form while the roster loads: the page's own placeholder too. */
+export function NewPersonFormBone() {
+  return (
+    <SkeletonGroup grow className="flex flex-col gap-4">
+      <SectionBone fields={2} />
+      <SectionBone fields={3} />
+    </SkeletonGroup>
+  );
+}
+
+/**
+ * A person's card (D-104): the head — the name, the position line (kept even without a
+ * position), the TV button — and the card with the numbers and the buttons. The card is as
+ * tall as the person makes it (their names in speech, the points switch), so the skeleton
+ * stops at it and the tasks appear under it.
+ */
 export function PersonSkeleton() {
   return (
     <main className={MAIN}>
       <PageHead
         back={{ href: "/people", label: "Команда" }}
         heading={
-          <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+          <SkeletonGroup className="mt-px min-w-0 flex-1 py-[5px]">
             <Bone h={30} w="62%" />
           </SkeletonGroup>
         }
-        sub=" "
+        sub={LOADING_LINE}
+        actions={<HeadButtonBone />}
       />
-      <SkeletonGroup>
-        <section className="mt-4 card p-4">
-          <div className="flex items-center gap-3">
-            <Bone round w={64} h={64} className="shrink-0" />
-            <div className="min-w-0 flex-1">
-              <Bone h={28} w={96} className="rounded-full" />
-            </div>
+      <SkeletonGroup grow className="mt-4 card p-4">
+        <div className="flex items-center gap-3">
+          <Bone round w={64} h={64} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <Bone h={26} w={96} className="rounded-full" />
           </div>
-          <div className="mt-4 grid grid-cols-4 gap-2">
-            <StatBone label="в работе" />
-            <StatBone label="просрочено" />
-            <StatBone label="закрыто за 30 дн." />
-            <StatBone label="очков" />
-          </div>
-          <div className="mt-4 flex flex-col gap-2">
+        </div>
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          <StatBone label="в работе" />
+          <StatBone label="просрочено" />
+          <StatBone label="закрыто за 30 дн." />
+          <StatBone label="очков" />
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          <Bone h={44} className="rounded-[12px]" />
+          <div className="grid grid-cols-2 gap-2">
             <Bone h={44} className="rounded-[12px]" />
-            <div className="grid grid-cols-2 gap-2">
-              <Bone h={44} className="rounded-[12px]" />
-              <Bone h={44} className="rounded-[12px]" />
-            </div>
-          </div>
-        </section>
-        <div className="mt-6">
-          <Bone h={24} w={100} />
-          <div className="mt-3">
-            <TaskListBone count={2} variant="director" />
+            <Bone h={44} className="rounded-[12px]" />
           </div>
         </div>
       </SkeletonGroup>
@@ -226,16 +305,15 @@ export function PersonSkeleton() {
   );
 }
 
+/**
+ * «Настройки»: the four tiles themselves (they are the screen's chrome; «Компания» lit, the
+ * tab of a plain /settings), then the closed sections of whichever tab opens.
+ */
 export function SettingsSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <Title text="Настройки" />
-      {/* the four tab tiles, then the closed sections of whichever tab opens */}
-      <SkeletonGroup className="mt-5 grid grid-cols-2 gap-2">
-        {[0, 1, 2, 3].map((i) => (
-          <Bone key={i} h={104} className="rounded-[16px]" />
-        ))}
-      </SkeletonGroup>
+      <SettingsTiles tab="company" />
       <div className="mt-5">
         <SettingsSectionsBone count={3} />
       </div>
@@ -263,25 +341,18 @@ export function ScreenSkeleton() {
   );
 }
 
+/**
+ * «Данные»: the page itself before its rows — the chips of the tables and the first table,
+ * which draws its own head and grey rows while it loads (and starts loading right away).
+ */
 export function AdminSkeleton() {
   return (
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-36">
       <Title text="Данные" />
-      <SkeletonGroup className="mt-4 flex flex-wrap gap-2">
-        {[84, 110, 72, 68, 90, 160, 120].map((w, i) => (
-          <Bone key={i} h={36} w={w} className="rounded-full" />
-        ))}
-      </SkeletonGroup>
-      <SkeletonGroup className="mt-4 card">
-        <div className="px-4 pt-4">
-          <Bone h={26} w={140} />
-          <Bone h={16} w={200} className="mt-1" />
-          <Bone h={40} w={240} className="mt-3 rounded-[12px]" />
-        </div>
-        <div className="mt-3">
-          <TableBone rows={6} columns={3} />
-        </div>
-      </SkeletonGroup>
+      <TableChips active={ADMIN_TABLES[0].table} />
+      <div className="mt-4">
+        <DataTable spec={ADMIN_TABLES[0]} />
+      </div>
     </main>
   );
 }
@@ -293,7 +364,46 @@ export function FeedSkeleton() {
   return <PulseSkeleton />;
 }
 
-/** «Заметки»: a printed day label and cards of a heading, a line and the time. */
+/** A line of the head that loads (a position, a count): a no-break space keeps its room. */
+const LOADING_LINE = "\u00a0";
+
+/**
+ * The status screen that is also the recorder (NotesRecorder, D-93): its boxes are fixed —
+ * the eyebrow row, an 82 px body, the field and the microphone, the hint line under them.
+ */
+function RecorderBone() {
+  return (
+    <SkeletonGroup className="status-screen rounded-[22px] px-4 pb-3.5 pt-3.5">
+      <div className="flex h-4 items-center justify-between">
+        <Bone h={12} w={110} />
+        <Bone h={12} w={80} />
+      </div>
+      <div className="mt-2.5 flex h-[82px] items-center gap-3.5 overflow-hidden">
+        <Bone h={46} w={46} className="shrink-0 rounded-[14px]" />
+        <div className="flex-1">
+          <Bone h={20} w="40%" />
+          <Bone h={14} w="70%" className="mt-2" />
+        </div>
+      </div>
+      <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
+        <Bone h={56} className="flex-1 rounded-[18px]" />
+        <Bone h={56} w={56} round className="shrink-0" />
+      </div>
+      <div className="mt-2 flex h-4 items-center justify-center">
+        <Bone h={12} w="70%" />
+      </div>
+    </SkeletonGroup>
+  );
+}
+
+/** The four piles of «Заметки» (D-102), as the page names them. */
+const NOTES_TABS = [
+  { key: "active", label: "Мысли", count: 0 },
+  { key: "boards", label: "Доски", count: 0 },
+  { key: "converted", label: "В деле", count: 0 },
+  { key: "trash", label: "Корзина", count: 0 },
+] as const;
+
 /**
  * «Заметки» while the feed loads (D-93): the title, the status screen with the field and the
  * microphone, the tabs and a column of closed cards — the boxes of the real ones.
@@ -302,33 +412,11 @@ export function NotesSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead eyebrow={DATE_BONE} title="Заметки" actions={<HeadButtonBone />} />
-      <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
-        <div className="flex items-center justify-between">
-          <Bone h={16} w={110} />
-          <Bone h={16} w={80} />
-        </div>
-        <div className="mt-2.5 flex min-h-[64px] items-center gap-3.5">
-          <Bone h={46} w={46} className="rounded-[14px]" />
-          <div className="flex-1">
-            <Bone h={20} w="40%" />
-            <Bone h={14} w="70%" className="mt-2" />
-          </div>
-        </div>
-        <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
-          <Bone h={56} className="flex-1 rounded-[18px]" />
-          <Bone h={56} w={56} round className="shrink-0" />
-        </div>
-        <Bone h={14} w="70%" className="mx-auto mt-2" />
-      </SkeletonGroup>
-      <div className="mt-2">
-        <div aria-hidden className="h-px" />
-        <div className="py-2">
-          <SkeletonGroup className="seg rounded-[14px] p-1">
-            <Bone h={40} w="25%" className="rounded-[10px]" />
-          </SkeletonGroup>
-        </div>
+      <div className="mt-3">
+        <RecorderBone />
       </div>
-      <SkeletonGroup className="mt-1 flex flex-col gap-2">
+      <Tabs id="notes" pending value="active" className="mt-2" items={NOTES_TABS} />
+      <SkeletonGroup grow className="mt-1 flex flex-col gap-2">
         <div className="px-1 pb-0.5 pt-4">
           <Bone h={16} w={90} />
         </div>
@@ -354,37 +442,21 @@ export function BoardSkeleton() {
       <PageHead
         back={{ href: "/notes?tab=boards", label: "Заметки" }}
         heading={
-          <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+          <SkeletonGroup className="mt-px min-w-0 flex-1 py-[5px]">
             <Bone h={30} w="62%" />
           </SkeletonGroup>
         }
         actions={<HeadButtonBone />}
       />
-      <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
-        <div className="flex items-center justify-between">
-          <Bone h={16} w={110} />
-          <Bone h={16} w={80} />
-        </div>
-        <div className="mt-2.5 flex min-h-[64px] items-center gap-3.5">
-          <Bone h={46} w={46} className="rounded-[14px]" />
-          <div className="flex-1">
-            <Bone h={20} w="40%" />
-            <Bone h={14} w="70%" className="mt-2" />
-          </div>
-        </div>
-        <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
-          <Bone h={56} className="flex-1 rounded-[18px]" />
-          <Bone h={56} w={56} round className="shrink-0" />
-        </div>
-        <Bone h={14} w="70%" className="mx-auto mt-2" />
-      </SkeletonGroup>
-      <SkeletonGroup className="mt-4 flex flex-col gap-2">
+      <div className="mt-3">
+        <RecorderBone />
+      </div>
+      <SkeletonGroup grow className="mt-4 flex flex-col gap-2">
         {[0, 1, 2].map((i) => (
           <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
             <Bone h={22} w={22} round className="shrink-0" />
-            <div className="flex-1">
-              <Bone h={21} w={i === 1 ? "58%" : "76%"} />
-              <Bone h={12} w={60} className="mt-2" />
+            <div className="flex-1 py-[2px]">
+              <Bone h={17} w={i === 1 ? "58%" : "76%"} />
             </div>
           </div>
         ))}
@@ -402,7 +474,7 @@ export function TasksSkeleton() {
 
 export function EtherListBone() {
   return (
-    <SkeletonGroup className="mt-5 flex flex-col gap-3">
+    <SkeletonGroup grow className="mt-5 flex flex-col gap-3">
       <AnnouncementBone />
       <AnnouncementBone />
     </SkeletonGroup>
@@ -421,7 +493,7 @@ export function EtherSkeleton() {
 /** The ribbon of /calendar: a day heading and its cards — the geometry of EventCard (D-94). */
 export function CalendarListBone() {
   return (
-    <SkeletonGroup className="mt-1">
+    <SkeletonGroup grow className="mt-1">
       {[0, 1].map((group) => (
         <div key={group}>
           <div className={`flex min-h-[32px] items-end px-1 pb-0.5 ${group ? "pt-4" : "pt-3"}`}>
@@ -492,7 +564,7 @@ export function CalendarSkeleton() {
 
 export function RatingListBone({ withAward = true }: { withAward?: boolean }) {
   return (
-    <SkeletonGroup className="mt-4 space-y-2">
+    <SkeletonGroup grow className="mt-4 space-y-2">
       {Array.from({ length: 6 }, (_, i) => (
         <RatingRowBone key={i} withAward={withAward} />
       ))}
@@ -500,103 +572,52 @@ export function RatingListBone({ withAward = true }: { withAward?: boolean }) {
   );
 }
 
+/** «Рейтинг»: the head, the «Магазин» row and the period chips as they are, then the rows. */
 export function RatingSkeleton() {
   return (
     <main className={MAIN}>
       <Title text="Рейтинг" />
-      <div className="mt-4 flex gap-2">
-        <Bone h={32} w={92} className="rounded-full" />
-        <Bone h={32} w={84} className="rounded-full" />
-        <Bone h={32} w={104} className="rounded-full" />
+      <ShopRow />
+      <div className="mt-4">
+        <PeriodChips value="week" />
+        <RatingListBone />
       </div>
-      <RatingListBone />
     </main>
   );
 }
 
-export function ProfileSkeleton() {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead title="Профиль" />
-      <SkeletonGroup className="mt-3">
-        <section className="card px-4 pb-4 pt-7 text-center">
-          <Bone round w={84} h={84} className="mx-auto" />
-          <Bone h={30} w={190} className="mx-auto mt-3.5" />
-          <Bone h={18} w={120} className="mx-auto mt-1" />
-          <Bone h={26} w={104} className="mx-auto mt-2.5 rounded-full" />
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-[12px] bg-surface-2 py-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex flex-col items-center">
-                <Bone h={20} w={26} className="bg-border" />
-                <Bone h={12} w={64} className="mt-2 bg-border" />
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 rounded-[12px] bg-surface-2 px-3 pb-3 pt-2.5">
-            <div className="flex items-center justify-between">
-              <Bone h={16} w={110} className="bg-border" />
-              <Bone h={16} w={72} className="bg-border" />
-            </div>
-            <div className="mt-2 flex h-[36px] items-end gap-[3px]">
-              {Array.from({ length: 14 }, (_, i) => (
-                <span key={i} className="flex-1 rounded-[3px] bg-border" style={{ height: 3 }} />
-              ))}
-            </div>
-          </div>
-        </section>
-      </SkeletonGroup>
-      <h2 className="eyebrow mt-6 px-1">Личное</h2>
-      <SkeletonGroup className="mt-2">
-        <Bone h={176} className="rounded-[16px]" />
-      </SkeletonGroup>
-      <SkeletonGroup className="mt-6">
-        <Bone h={58} className="rounded-[16px]" />
-      </SkeletonGroup>
-    </main>
-  );
-}
-
+/**
+ * The task's own screen (D-87): the bar and the status screen. The status screen is as tall
+ * as the task's state makes it (buttons, a reason, «Удалить»), so the skeleton stops at it
+ * and «О задаче» and the thread appear under it — nothing below the card is drawn to move.
+ */
 export function TaskPageSkeleton() {
-  // the task's own screen (D-87): the top bar, the status screen, «О задаче», the thread
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4">
       <PageHead bare back={{ label: "Назад" }} />
-      <SkeletonGroup>
-        <div className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5">
-          <div className="flex items-center justify-between">
-            <Bone h={18} w={120} />
-            <Bone h={26} w={112} className="rounded-full" />
-          </div>
-          <Bone h={26} w="84%" className="mt-3" />
-          <Bone h={26} w="52%" className="mt-1" />
-          <Bone h={22} w={190} className="mt-2" />
-          <div className="mt-4 grid grid-cols-4 gap-2">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex flex-col items-center gap-1.5">
-                <Bone h={14} w={14} round />
-                <Bone h={12} w="70%" />
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {[0, 1, 2].map((i) => (
-              <Bone key={i} h={44} className="rounded-[12px]" />
-            ))}
-          </div>
-          <div className="mt-4 border-t border-border/60 pt-3">
-            <Bone h={18} w={140} />
-          </div>
+      <SkeletonGroup grow className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5">
+        <div className="flex items-center justify-between">
+          <Bone h={18} w={120} />
+          <Bone h={26} w={112} className="rounded-full" />
         </div>
-        <div className="task-card mt-3 rounded-[18px] px-4 py-3.5">
-          <Bone h={16} w={80} />
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-            {[0, 1, 2, 3].map((i) => (
-              <Bone key={i} h={34} />
-            ))}
-          </div>
+        <Bone h={26} w="84%" className="mt-3" />
+        <Bone h={26} w="52%" className="mt-1" />
+        <Bone h={22} w={190} className="mt-2" />
+        <div className="mt-4 grid grid-cols-4 gap-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5">
+              <Bone h={14} w={14} round />
+              <Bone h={12} w="70%" />
+            </div>
+          ))}
         </div>
-        <div className="mt-5">
-          <ChatBone />
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {[0, 1, 2].map((i) => (
+            <Bone key={i} h={44} className="rounded-[12px]" />
+          ))}
+        </div>
+        <div className="mt-4 border-t border-border/60 pt-3">
+          <Bone h={18} w={140} />
         </div>
       </SkeletonGroup>
     </main>

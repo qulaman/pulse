@@ -14,6 +14,8 @@ export type TvScene = "face" | "clock" | "team" | "calendar" | "board" | "rating
 export type ClockStyle = "digital" | "analog";
 /** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
 export type CalendarView = "week" | "month";
+/** Доска на стене: крупный список для чтения издалека — или карта мыслей вокруг названия (D-121). */
+export type BoardView = "list" | "map";
 
 /**
  * The scene keys of the remote; the board comes on the wall only with a board (D-102), the
@@ -24,6 +26,7 @@ export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar
 export const WALL_SCENES: readonly TvScene[] = [...TV_SCENES, "board"];
 export const CLOCK_STYLES: readonly ClockStyle[] = ["digital", "analog"];
 export const CALENDAR_VIEWS: readonly CalendarView[] = ["week", "month"];
+export const BOARD_VIEWS: readonly BoardView[] = ["list", "map"];
 /** Заставка «Рейтинг»: последние 7 суток или последний месяц — как экран «Рейтинг» (D-123). */
 export type RatingView = "week" | "month";
 export const RATING_VIEWS: readonly RatingView[] = ["week", "month"];
@@ -140,6 +143,19 @@ export function clockStyleOf(state: TvState | null): ClockStyle {
 /** Вид календаря на стене. Незнакомое — неделя: она показывает и «Сегодня». */
 export function calendarViewOf(state: TvState | null): CalendarView {
   return state?.calendar_view === "month" ? "month" : "week";
+}
+
+/** Вид доски на стене. Незнакомое — список: он читается при любом числе пунктов (D-121). */
+export function boardViewOf(state: TvState | null): BoardView {
+  return state?.board_view === "map" ? "map" : "list";
+}
+
+/**
+ * Обсуждаемый пункт доски — только пока доска на стене жива (D-121). Что пункт ещё жив и с
+ * текстом, проверяет `tv_board()`; пульт сверяет с пунктами доски сам.
+ */
+export function boardPointOf(state: TvState | null, now: Date): string | null {
+  return boardLive(state, now) ? (state?.board_point ?? null) : null;
 }
 
 /** Период заставки «Рейтинг». Незнакомое — неделя (D-123). */

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
+import { NotificationsScreen } from "@/components/notify/NotificationsScreen";
 import { NotifySettings } from "@/components/notify/NotifySettings";
-import { PageHead } from "@/components/ui/PageHead";
 import { getSessionProfile } from "@/lib/auth";
 
 /**
@@ -14,13 +14,8 @@ export default async function NotificationsPage() {
   if (profile.role !== "director") redirect("/profile");
 
   return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36 pt-5">
-      <PageHead
-        back={{ href: "/profile", label: "Профиль" }}
-        title="Уведомления"
-        sub="Как и когда Pulse зовёт вас. Всё видно и в приложении — здесь только то, что будит телефон."
-      />
+    <NotificationsScreen>
       <NotifySettings meId={profile.userId} />
-    </main>
+    </NotificationsScreen>
   );
 }

@@ -65,7 +65,8 @@ export function PersonCard() {
   const compose = useComposeStore((state) => state.request);
   const [showClosed, setShowClosed] = useState(false);
   const points = usePointHistory(id);
-  const pointsEnabled = usePointsEnabled().data === true;
+  const pointsSwitch = usePointsEnabled();
+  const pointsEnabled = pointsSwitch.data === true;
   const award = useAwardPoints();
   const [awardTarget, setAwardTarget] = useState<AwardTarget | null>(null);
   // пульт ТВ прямо с карточки: жест «сотрудник зашёл — я нажал — его дела на стене» (D-76 §10)
@@ -87,7 +88,9 @@ export function PersonCard() {
     };
   }, [tasks.data, now]);
 
-  if (person.isLoading) return <PersonSkeleton />;
+  // the switch decides a line of the card («Очки выключены»): the card waits for it, or it
+  // grew under the finger a moment later (D-122)
+  if (person.isLoading || pointsSwitch.isPending) return <PersonSkeleton />;
   if (!person.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
@@ -118,7 +121,8 @@ export function PersonCard() {
       <PageHead
         back={{ href: "/people", label: "Команда" }}
         title={p.full_name}
-        sub={p.position || undefined}
+        // the line keeps its room without a position: the head is one height for everyone
+        sub={p.position || "\u00a0"}
         actions={
           p.is_active && p.role !== "tv" ? (
             <HeadButton

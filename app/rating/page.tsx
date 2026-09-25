@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-
 import { RatingList } from "@/components/rating/RatingList";
+import { ShopRow } from "@/components/rating/ShopRow";
 import { PageHead } from "@/components/ui/PageHead";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
@@ -17,18 +16,12 @@ export default function RatingPage() {
       <PageHead title="Рейтинг" />
 
       {/* куда очки тратятся — сразу под тем, где они считаются (D-71) */}
-      <Link
-        href="/shop"
-        className="mt-4 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
-      >
-        Магазин
-        <span className="text-[13px] leading-4 text-muted">обменять очки ›</span>
-      </Link>
+      <ShopRow />
 
       <RatingList
         canAward={me.data?.role === "director"}
         isDirector={me.data?.role === "director"}
-        pointsEnabled={pointsEnabled.data === true}
+        pointsEnabled={pointsEnabled.isPending ? null : pointsEnabled.data === true}
       />
     </main>
   );

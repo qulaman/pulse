@@ -1,23 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { boardCountLine, boardLayout, isFresh, pageAt, pageItems, PAGE_MS, tagOf, type TvBoardItem } from "./board";
+import { boardCountLine, boardFrame, boardFrom, freshKey, isFresh, mapFits, pageAt, PAGE_MS, tagOf, wallView, type TvBoardItem } from "./board";
 
 function item(n: number, patch: Partial<TvBoardItem> = {}): TvBoardItem {
-  return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, ...patch };
+  return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, children: [], ...patch };
 }
 
-describe("boardLayout", () => {
-  it("один столбец до шести, два до четырнадцати, дальше страницы", () => {
-    expect(boardLayout(0)).toEqual({ columns: 1, pages: 1, perPage: 1 });
-    expect(boardLayout(6)).toEqual({ columns: 1, pages: 1, perPage: 6 });
-    expect(boardLayout(7)).toEqual({ columns: 2, pages: 1, perPage: 14 });
-    expect(boardLayout(14)).toEqual({ columns: 2, pages: 1, perPage: 14 });
-    expect(boardLayout(15)).toEqual({ columns: 2, pages: 2, perPage: 14 });
-    expect(boardLayout(29)).toEqual({ columns: 2, pages: 3, perPage: 14 });
-  });
-});
-
-describe("pageAt и pageItems", () => {
+describe("pageAt", () => {
   it("листает страницы по часам киоска", () => {
     const start = new Date(PAGE_MS * 1000);
     expect(pageAt(start, 1)).toBe(0);
@@ -26,11 +15,47 @@ describe("pageAt и pageItems", () => {
     expect(pageAt(new Date(start.getTime() + 2 * PAGE_MS), 2)).toBe(0);
   });
 
-  it("нумерует пункты сквозь страницы", () => {
-    const items = Array.from({ length: 20 }, (_, i) => item(i + 1));
-    const layout = boardLayout(items.length);
-    expect(pageItems(items, layout, 0).map((row) => row.n)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
-    expect(pageItems(items, layout, 1).map((row) => row.n)).toEqual([15, 16, 17, 18, 19, 20]);
+  it("стоит на странице подсвеченного пункта, пока подсветка не снята", () => {
+    const start = new Date(PAGE_MS * 1000);
+    expect(pageAt(start, 3, 2)).toBe(2);
+    expect(pageAt(new Date(start.getTime() + PAGE_MS), 3, 2)).toBe(2);
+    // a stale page number (the board got shorter) does not stop the clock
+    expect(pageAt(start, 2, 5)).toBe(0);
+  });
+});
+
+describe("wallView и mapFits", () => {
+  it("карта — только до двенадцати ветвей и не пустая, иначе список", () => {
+    const items = (n: number) => Array.from({ length: n }, (_, i) => item(i + 1));
+    expect(mapFits(0)).toBe(false);
+    expect(wallView({ view: "map", items: items(12) })).toBe("map");
+    expect(wallView({ view: "map", items: items(13) })).toBe("list");
+    expect(wallView({ view: "map", items: [] })).toBe("list");
+    expect(wallView({ view: "list", items: items(3) })).toBe("list");
+  });
+});
+
+describe("boardFrame", () => {
+  it("16:9 — 164 vh в ширину, уже экран — уже поле, высота одна", () => {
+    expect(boardFrame(16 / 9).width).toBe(163.6);
+    expect(boardFrame(16 / 10).width).toBe(147.2);
+    expect(boardFrame(21 / 9).width).toBe(164);
+    expect(boardFrame(16 / 9).height).toBe(boardFrame(4 / 3).height);
+  });
+});
+
+describe("boardFrom", () => {
+  it("база старше клиента: без веток, вида и подсветки — список без подсветки", () => {
+    const old = boardFrom({ hidden: false, board: { id: "b1", title: "Доска", items: [{ id: "p1", text: "Пункт" }] } });
+    expect(old.board?.view).toBe("list");
+    expect(old.board?.focus).toBeNull();
+    expect(old.board?.items[0].children).toEqual([]);
+  });
+
+  it("подсветка на пункте, которого нет, — не светит", () => {
+    const data = boardFrom({ board: { id: "b1", title: "Доска", view: "map", focus: "gone", items: [{ id: "p1", text: "Пункт" }] } });
+    expect(data.board?.focus).toBeNull();
+    expect(data.board?.view).toBe("map");
   });
 });
 
@@ -43,6 +68,17 @@ describe("isFresh", () => {
     expect(isFresh(item(1, { created_at: "2026-09-18T08:00:32Z" }), now)).toBe(true);
     // а на пять минут «из будущего» — нет
     expect(isFresh(item(1, { created_at: "2026-09-18T08:05:00Z" }), now)).toBe(false);
+  });
+
+  it("ключ свежих — пункты и подпункты, меняется только со свечением", () => {
+    const now = new Date("2026-09-18T08:00:30Z");
+    const old = "2026-09-18T07:00:00Z";
+    const items = [
+      item(1, { created_at: old, children: [{ ...item(2), id: "c1" }] }),
+      item(3, { created_at: old }),
+    ];
+    expect(freshKey(items, now)).toBe("c1");
+    expect(freshKey(items, new Date("2026-09-18T08:05:00Z"))).toBe("");
   });
 });
 
