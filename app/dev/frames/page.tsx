@@ -116,6 +116,12 @@ const ACT_ON: Record<MascotAct, { on: MascotState; carry?: { count: number; hot?
   push: { on: "calm" },
   clock: { on: "calm" },
   reply: { on: "calm" },
+  // a phrase that did not make it (tasks/020, phase B)
+  ear: { on: "calm" },
+  scratch: { on: "calm" },
+  pinch: { on: "calm" },
+  nomic: { on: "calm" },
+  signal: { on: "calm" },
 };
 
 function dropStates(size: number): Row[] {
@@ -162,6 +168,10 @@ const BOARD_ON: [MascotAct, MascotState][] = [
   ["tick", "alert"],
   ["puzzle", "alert"],
   ["clock", "alert"],
+  // the failures of the pipeline on the watchful face: its ear on the crown meets the arms
+  ["ear", "alert"],
+  ["nomic", "alert"],
+  ["signal", "alert"],
 ];
 
 function dropActs(size: number): Row[] {

@@ -8,7 +8,7 @@ import { MascotScene, type Scene } from "@/components/brand/MascotScene";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { subscribeIngestLevel, useIngestStore, type IngestErrorCode } from "@/lib/store/ingest";
-import { STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
+import { ERROR_ACT, STAGE_LINE, elapsedSince } from "@/lib/voice/stages";
 
 /**
  * Visible progress of the pipeline (D-43) and every failure state of docs/AI.md §11.
@@ -140,7 +140,8 @@ export function IngestOverlay({ navigate = true, progress = true }: { navigate?:
           style={{ boxShadow: "var(--shadow-raised)" }}
         >
           <div className="flex items-start gap-3">
-            <Mascot state="thinking" size={40} />
+            {/* the face plays what went wrong once, then rests in the pose's end (tasks/020, phase B) */}
+            <Mascot key={error.code} state="calm" act={ERROR_ACT[error.code]} size={40} />
             <p className="text-[16px] leading-[22px]">{error.message ?? ERRORS[error.code].line}</p>
           </div>
 

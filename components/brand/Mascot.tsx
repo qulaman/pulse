@@ -10,6 +10,9 @@ import {
   BRINGS_CARD,
   BRINGS_LETTER,
   CallCard,
+  ErrorActBehind,
+  ErrorActFront,
+  ErrorActOver,
   handFill,
   Hourglass,
   Letter,
@@ -21,6 +24,7 @@ import {
   WorkActOver,
   WorkActUnder,
   type BoardAct,
+  type ErrorAct,
   type WorkAct,
 } from "@/components/brand/MascotWork";
 
@@ -130,7 +134,8 @@ export type MascotAct =
   | "peek"
   | "tiptoe"
   | WorkAct
-  | BoardAct;
+  | BoardAct
+  | ErrorAct;
 
 /** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
 export const ACT_MS: Record<MascotAct, number> = {
@@ -145,6 +150,12 @@ export const ACT_MS: Record<MascotAct, number> = {
   push: 1600,
   clock: 1800,
   reply: 2000,
+  // a phrase that did not make it (tasks/020, phase B)
+  ear: 1800,
+  scratch: 1800,
+  pinch: 1600,
+  nomic: 2000,
+  signal: 2200,
   catch: 1500,
   insist: 1500,
   nod: 1200,
@@ -424,6 +435,11 @@ const ACT_BODY: Record<MascotAct, string> = {
   push: "mascot-act-push-body 1.6s both",
   clock: "mascot-act-clock 1.8s ease-in-out both",
   reply: "mascot-act-reply 2s ease-in-out both",
+  ear: "mascot-act-ear-tilt 1.8s ease-in-out both",
+  scratch: "mascot-act-scratch 1.8s ease-in-out both",
+  pinch: "mascot-act-pinch 1.6s ease-in-out both",
+  nomic: "mascot-act-nomic 2s ease-in-out both",
+  signal: "mascot-act-tiptoe 2.2s ease-in-out both",
 };
 
 /** Where an act sends the gaze — both eyes together, on top of the state's own look. */
@@ -457,6 +473,11 @@ const ACT_GAZE: Partial<Record<MascotAct, string>> = {
   push: "mascot-act-push-eyes 1.6s ease-in-out both",
   clock: "mascot-act-clock-eyes 1.8s ease-in-out both",
   reply: "mascot-act-reply-eyes 2s ease-in-out both",
+  ear: "mascot-act-ear-eyes 1.8s ease-in-out both",
+  scratch: "mascot-act-scratch-eyes 1.8s ease-in-out both",
+  pinch: "mascot-act-pinch-eyes 1.6s ease-in-out both",
+  nomic: "mascot-act-nomic-eyes 2s ease-in-out both",
+  signal: "mascot-act-signal-eyes 2.2s ease-in-out both",
 };
 /** On «Задачи» the card of these acts lies on the clipboard, on the right: the eyes go there instead. */
 const ACT_GAZE_ON_BOARD: Partial<Record<MascotAct, string>> = {
@@ -483,6 +504,8 @@ const ACT_LIDS: Partial<Record<MascotAct, [string, string]>> = {
   tick: ["mascot-act-glad 1.2s ease-in-out both", "mascot-act-glad 1.2s ease-in-out both"],
   // one slow blink while it thinks it over
   hmm: ["mascot-act-hmm-lids 1.8s both", "mascot-act-hmm-lids 1.8s both"],
+  // «вот столечко»: one eye narrowed at the gap between the fingers
+  pinch: ["none", "mascot-act-squint 1.6s ease-in-out both"],
 };
 
 /** The acts that warm the cheeks. */
@@ -1059,6 +1082,7 @@ export function Mascot({
               {/* the hands of the work, behind the body the same way: a hand up, palms out, a thumb, the watch (D-110) */}
               {acting ? <WorkActBehind act={acting} body={COLOR[state]} holding={holding} /> : null}
               {acting ? <BoardActBehind act={acting} body={COLOR[state]} /> : null}
+              {acting ? <ErrorActBehind act={acting} body={COLOR[state]} /> : null}
               <path
                 d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
                 fill={COLOR[state]}
@@ -1200,6 +1224,7 @@ export function Mascot({
               {acting ? <WorkActFront act={acting} body={COLOR[state]} /> : null}
               {/* the director's hands on the card of the board: taken, stamped, flicked, crumpled (tasks/020) */}
               {acting ? <BoardActFront act={acting} body={COLOR[state]} board={onBoard} /> : null}
+              {acting ? <ErrorActFront act={acting} body={COLOR[state]} /> : null}
 
               <g style={{ transform: gazeShift, transition: LOOK_EASE }}>
               <g style={{ transformOrigin: "32px 33px", animation: DRAG[state] ?? "none" }}>
@@ -1345,6 +1370,7 @@ export function Mascot({
           redo; the «?», the letter, the clock, the coin (D-110) */}
       {acting ? <WorkActOver act={acting} /> : null}
       {acting ? <BoardActOver act={acting} /> : null}
+      {acting ? <ErrorActOver act={acting} /> : null}
 
       {/* processing: the new status itself — the tick lands with the top of the hop, and it
           is drawn last so the badge sits on the face instead of under it */}

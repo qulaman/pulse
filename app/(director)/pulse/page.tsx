@@ -9,7 +9,7 @@ import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { EtherSection } from "@/components/ether/EtherSection";
 import { RatingPanel } from "@/components/rating/RatingPanel";
-import type { MascotState } from "@/components/brand/Mascot";
+import { ACT_MS, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { CardDeck } from "@/components/pulse/CardDeck";
 import { IdleScene } from "@/components/pulse/IdleScene";
@@ -55,7 +55,8 @@ import { answer } from "@/lib/pulse/answers";
 import { countsOf, emptyLanes, hasMessage, hasUnread, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { alarmOf } from "@/lib/pulse/mood";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
-import { isCountable, isSendable, useIngestStore } from "@/lib/store/ingest";
+import { isCountable, isSendable, useIngestStore, type IngestError } from "@/lib/store/ingest";
+import { ERROR_ACT } from "@/lib/voice/stages";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 import { firstNameOf } from "@/lib/text/normalize";
@@ -131,6 +132,10 @@ export default function PulsePage() {
   const directorName = firstNameOf(me.data?.fullName);
 
   const stage = useIngestStore((state) => state.stage);
+  const ingestError = useIngestStore((state) => state.error);
+  // the act of the latest failure, while it plays (tasks/020, phase B)
+  const [oops, setOops] = useState<MascotAct | null>(null);
+  const oopsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const entities = useIngestStore((state) => state.entities);
   const question = useIngestStore((state) => state.question);
   const requestId = useIngestStore((state) => state.clientRequestId);
@@ -432,10 +437,15 @@ export default function PulsePage() {
   // when a panel is open; a change without one is still «reads the data» (D-65)
   const newsAct = thought ? thoughtAct(thought.kind) : null;
   const thoughtFace: MascotState = newsAct ? (panelFace ?? mood ?? "calm") : "processing";
+  // A phrase that did not make it (tasks/020, phase B): the face stays awake while the error is up
+  // and while its act plays — «слишком коротко» is gone from the store in the same tick, and a
+  // sleeper pinching its fingers with its eyes shut would say nothing
+  const oopsFace: MascotState | null = stage === "error" || oops ? (panelFace ?? mood ?? "calm") : null;
   // asking the secretary, the face brings the cup and looks at the desk (D-85)
   const mascot: MascotState =
     // the cup brought over outranks the news of it: the face takes it, the thought says it
-    confirmFace ?? (handoff ? "serving" : thought ? thoughtFace : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake));
+    confirmFace ??
+    (handoff ? "serving" : (oopsFace ?? (thought ? thoughtFace : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake))));
   // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
   const gaze = attending && picked ? lookAt(picked.x, picked.y) : reading && looking ? lookAt(looking.x, looking.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
@@ -449,6 +459,24 @@ export default function PulsePage() {
     playedThought.current = thought.id;
     playAct(newsAct);
   }, [thought, newsAct, playAct]);
+  // each failure plays its act once — the error object is new with every failure
+  const playedError = useRef<IngestError | null>(null);
+  useEffect(() => {
+    if (stage !== "error" || !ingestError || playedError.current === ingestError) return;
+    playedError.current = ingestError;
+    const act = ERROR_ACT[ingestError.code];
+    playAct(act);
+    setOops(act);
+    // one timer for the whole page: a newer failure restarts it, the stage going idle does not cut it
+    if (oopsTimer.current) clearTimeout(oopsTimer.current);
+    oopsTimer.current = setTimeout(() => setOops(null), ACT_MS[act]);
+  }, [stage, ingestError, playAct]);
+  useEffect(
+    () => () => {
+      if (oopsTimer.current) clearTimeout(oopsTimer.current);
+    },
+    [],
+  );
 
   const onFaceTap = () => {
     // the errand card is out: a tap on the face puts it away, it does not wake the balls

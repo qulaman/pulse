@@ -831,6 +831,132 @@ export function BoardActOver({ act }: { act: string }) {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/* A phrase that did not make it (tasks/020, phase B)                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the face plays when the voice pipeline fails (the thirteen codes of docs/AI.md §11, grouped
+ * by what the director should understand — lib/voice/stages.ts `ERROR_ACT`): a palm to the ear —
+ * «не расслышал»; a scratch of the crown — «не разобрал»; two fingers a hair apart — «слишком
+ * коротко»; the ear of `listening` crossed out — «микрофона нет»; a phone held up for signal —
+ * «нет связи». No feelings (D-70): the face explains, it does not sulk.
+ */
+export type ErrorAct = "ear" | "scratch" | "pinch" | "nomic" | "signal";
+
+/** The signal bars over the phone, outermost first — they go out in that order. */
+const SIGNAL_ARCS = [8.2, 5.6, 3];
+
+/** Behind the body: the arms that reach out of it — to the ear, to the crown, up with the phone. */
+export function ErrorActBehind({ act, body }: { act: string; body: string }) {
+  if (act === "ear") {
+    // the right hand cupped behind where the ear would be: «а? не расслышал»
+    return (
+      <g style={{ transformOrigin: "51px 40px", animation: "mascot-act-reach 1.8s ease-in-out both" }}>
+        <path d="M51 40 Q58 38.5 60 32" fill="none" stroke={body} strokeWidth="5.2" strokeLinecap="round" />
+        {/* the palm against the side of the head, where an ear would be, cupped to the voice */}
+        <ellipse cx="61.8" cy="26.4" rx="4.2" ry="6.4" transform="rotate(-6 61.8 26.4)" fill={body} />
+        <path d="M63.6 21.4 Q66 26.4 63.4 31.4" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="1" strokeLinecap="round" />
+        <path d="M60.4 20.8 L61.2 19.4 M62.4 20.4 L63.4 19.2" stroke="var(--bg)" strokeOpacity="0.25" strokeWidth="0.8" strokeLinecap="round" />
+      </g>
+    );
+  }
+  if (act === "scratch") {
+    // the left arm goes up round the side of the head; the hand itself lies on the crown, in
+    // front of the head (ErrorActFront) — behind it, the head hid the scratching
+    return (
+      <g style={{ transformOrigin: "13px 30px", animation: "mascot-act-reach-left 1.8s ease-in-out both" }}>
+        <path d="M13 30 Q1 18 13.4 9" fill="none" stroke={body} strokeWidth="5.2" strokeLinecap="round" />
+      </g>
+    );
+  }
+  if (act === "pinch") {
+    // the right hand up at the side, level with the eyes: a finger and a thumb pointing out, a hair
+    // apart — «вот столечко»
+    return (
+      <g style={{ transformOrigin: "51px 40px", animation: "mascot-act-reach 1.6s ease-in-out both" }}>
+        <path d="M51 40 Q57 39 60 35" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
+        <g transform="translate(62 33) scale(1.3)">
+          <ellipse cx="0" cy="0.4" rx="3.2" ry="3.4" fill={body} />
+          <g style={{ transformOrigin: "1px -1.6px", animation: "mascot-act-pinch-finger 1.6s ease-in-out both" }}>
+            <ellipse cx="4.2" cy="-1.6" rx="3.4" ry="1.5" fill={body} />
+          </g>
+          <ellipse cx="3.8" cy="2.6" rx="2.9" ry="1.5" fill={body} />
+          {/* the gap, drawn: two ticks either side of it */}
+          <path d="M8.6 -1.6 v4.2 M9.8 -1.6 v4.2" stroke="var(--text-muted)" strokeWidth="0.5" strokeLinecap="round" opacity="0.8" />
+        </g>
+      </g>
+    );
+  }
+  if (act === "signal") {
+    // the left hand holds the phone up high, and it sways a little, looking for a bar
+    return (
+      <g style={{ transformOrigin: "13px 36px", animation: "mascot-act-watch-arm 2.2s ease-in-out both" }}>
+        <path d="M13 36 Q1 30 2.6 15" fill="none" stroke={body} strokeWidth="5.2" strokeLinecap="round" />
+        <g style={{ transformOrigin: "2.6px 14px", animation: "mascot-act-phone-sway 2.2s ease-in-out both" }}>
+          <rect x="-1.4" y="1" width="8" height="13" rx="1.8" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.2" />
+          <rect x="0.2" y="3" width="4.8" height="7.4" rx="0.8" fill="color-mix(in srgb, var(--accent) 28%, var(--surface))" />
+          <ellipse cx="2.4" cy="13.6" rx="3.6" ry="2.8" fill={body} />
+          <g fill="none" stroke="var(--accent)" strokeWidth="1.3" strokeLinecap="round">
+            {SIGNAL_ARCS.map((r, i) => {
+              // a quarter of a circle over the phone, the way a signal is drawn
+              const k = r * 0.7071;
+              const y = (-0.5 - k).toFixed(2);
+              return (
+                <path
+                  key={r}
+                  d={`M${(2.6 - k).toFixed(2)} ${y} A${r} ${r} 0 0 1 ${(2.6 + k).toFixed(2)} ${y}`}
+                  style={{ animation: `mascot-act-signal-arc-${i + 1} 2.2s both`, opacity: 0 }}
+                />
+              );
+            })}
+          </g>
+        </g>
+      </g>
+    );
+  }
+  return null;
+}
+
+/** In front of the body: the hand scratching the crown; the ear of `listening`, crossed out. */
+export function ErrorActFront({ act, body }: { act: string; body: string }) {
+  if (act === "scratch") {
+    // rides the same reach as the arm behind the head, so the two come and go together
+    return (
+      <g style={{ transformOrigin: "13px 30px", animation: "mascot-act-reach-left 1.8s ease-in-out both" }}>
+        <g style={{ transformOrigin: "15px 10px", animation: "mascot-act-scratch-hand 1.8s ease-in-out both" }}>
+          <ellipse cx="19" cy="8.2" rx="5" ry="3.6" transform="rotate(-26 19 8.2)" fill={handFill(body)} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+          <path d="M20.4 5.6 l1.6 2.2 M22.6 6.8 l1.2 2.2" stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" strokeLinecap="round" />
+        </g>
+      </g>
+    );
+  }
+  if (act !== "nomic") return null;
+  return (
+    <g style={{ transformOrigin: "53px 26px", animation: "mascot-act-ear 2s ease-in-out both" }}>
+      <path d="M52 16 C58 8 69 12 68 22 C67.5 29 61 33 55 31 C53 30 51.5 28 52 26 Z" fill={body} />
+      <path d="M56 19 C60 15.5 65.5 18.5 64.5 24 C64 27.5 60 29.5 57.5 27.5 C56 26.5 55.5 24.5 56.5 23 Z" fill="var(--bg)" opacity="0.26" />
+      <path d="M52.6 11.4 L69 32.6" fill="none" stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="3.6" strokeLinecap="round" style={{ transformBox: "fill-box", transformOrigin: "0% 0%", animation: "mascot-act-slash 2s both" }} />
+      <path d="M52.6 11.4 L69 32.6" fill="none" stroke="var(--danger)" strokeWidth="2.4" strokeLinecap="round" style={{ transformBox: "fill-box", transformOrigin: "0% 0%", animation: "mascot-act-slash 2s both" }} />
+    </g>
+  );
+}
+
+/** Over everything: the «?» of a word not heard. */
+export function ErrorActOver({ act }: { act: string }) {
+  if (act !== "ear") return null;
+  return (
+    <g transform="translate(13 -3)">
+      <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-act-ask 1.8s both", opacity: 0 }}>
+        <circle r="5.4" fill="var(--surface)" stroke="var(--warn)" strokeWidth="1.4" />
+        <text y="0.4" fontSize="8" fontWeight="800" textAnchor="middle" dominantBaseline="central" fill="var(--warn)" fontFamily="var(--font-display), system-ui, sans-serif">
+          ?
+        </text>
+      </g>
+    </g>
+  );
+}
+
 /** The tick of a thing done, the badge of `processing` in small (D-65). */
 function Tick({ at, timing }: { at: { x: number; y: number }; timing: string }) {
   return (
