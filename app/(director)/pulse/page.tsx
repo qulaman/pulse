@@ -20,6 +20,7 @@ import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
+import { thoughtAct } from "@/components/pulse/thoughtActs";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
@@ -426,15 +427,28 @@ export default function PulsePage() {
   const handoff = showDesk && !asking && stage === "idle" && deskStage.phase === "done" && DRINKS.has(deskStage.scene ?? "");
   // an open ball is a job in the face's hands, and it does it while the panel is open (D-82)
   const panelFace: MascotState | null = mode === "panel" && panel ? PANEL_FACE[panel] : null;
+  // A change on the board with an act of its own (tasks/020) is played by an awake face — a stamp
+  // for «Принять», a crumpled card for «Отозвать», a card taken for «сдана» — over the ball's job
+  // when a panel is open; a change without one is still «reads the data» (D-65)
+  const newsAct = thought ? thoughtAct(thought.kind) : null;
+  const thoughtFace: MascotState = newsAct ? (panelFace ?? mood ?? "calm") : "processing";
   // asking the secretary, the face brings the cup and looks at the desk (D-85)
   const mascot: MascotState =
     // the cup brought over outranks the news of it: the face takes it, the thought says it
-    confirmFace ?? (handoff ? "serving" : thought ? "processing" : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake));
+    confirmFace ?? (handoff ? "serving" : thought ? thoughtFace : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake));
   // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
   const gaze = attending && picked ? lookAt(picked.x, picked.y) : reading && looking ? lookAt(looking.x, looking.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
-  // watchful (D-82); never while anything is in flight or said
-  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !reading && !asking && !handoff);
+  // watchful (D-82); never while anything is in flight or said, nor under a thought
+  const acts = useMascotActs(mascot, stage === "idle" && !phraseInHand && !cheering && !exchange && mode !== "panel" && !attending && !reading && !asking && !handoff && !thought);
+  // each thought plays its act once: a re-render for another reason must not replay it
+  const playAct = acts.play;
+  const playedThought = useRef<string | null>(null);
+  useEffect(() => {
+    if (!thought || !newsAct || playedThought.current === thought.id) return;
+    playedThought.current = thought.id;
+    playAct(newsAct);
+  }, [thought, newsAct, playAct]);
 
   const onFaceTap = () => {
     // the errand card is out: a tap on the face puts it away, it does not wake the balls

@@ -131,6 +131,21 @@ describe("employeeEvents — что только что случилось (D-11
     expect(events([declined], [{ ...declined, status: "sent" }])).toEqual(["insisted"]);
   });
 
+  it("дело удалили — рассыпалась, как при отзыве (tasks/020)", () => {
+    const task = row("accepted");
+    const other = row("sent");
+    expect(events([task, other], [other])).toEqual(["gone"]);
+    expect(events([row("rework")], [])).toEqual(["gone"]);
+    expect(weightiest(["gone", "arrived"])).toBe("gone");
+    expect(weightiest(["revoked", "gone"])).toBe("revoked");
+  });
+
+  it("закрытая строка пропала из кэша — не событие", () => {
+    for (const status of ["done", "revoked", "declined", "pending_review"] as const) {
+      expect(events([row(status)], [])).toEqual([]);
+    }
+  });
+
   it("откат оптимистичного тапа — не событие", () => {
     const task = row("accepted");
     expect(events([task], [{ ...task, status: "sent" }])).toEqual([]);

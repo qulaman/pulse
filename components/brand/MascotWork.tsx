@@ -595,8 +595,9 @@ function HeldThumb({ body, animation }: { body: string; animation: string }) {
 function PaperBall() {
   return (
     <>
-      <path d="M-4.6 -1.2 L-3.2 -4 L-0.4 -4.8 L2.6 -3.8 L4.6 -1.4 L4.2 1.8 L2.2 4.2 L-1.2 4.6 L-3.8 2.8 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" />
-      <path d="M-2.6 -2.2 L0.4 0.2 L2.8 -1.6 M0.4 0.2 L-0.6 3" fill="none" stroke="var(--text-muted)" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M-5.4 -1 L-4 -4.4 L-1 -5.6 L2.2 -5 L5 -2.6 L5.6 0.8 L3.8 4 L0.6 5.4 L-2.8 4.8 L-5 2.6 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" />
+      {/* creases that never meet in the middle — a star there reads as an emblem, not paper */}
+      <path d="M-3.6 -1.8 L-1.4 -0.6 L-0.2 -3 M1 1.2 L3.4 2 M-2.4 2.6 L-0.6 3.4" fill="none" stroke="var(--text-muted)" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
     </>
   );
 }
@@ -638,19 +639,25 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       );
     }
     case "hmm":
-      // a fist under the chin; on «Задачи» it is the left hand — the right one holds the clipboard
+      // a fist under the chin, knuckles up; on «Задачи» it is the left hand — the right one holds
+      // the clipboard. A short thick forearm and a flat fist: a thin arm with a round end read as a
+      // lollipop
       return (
         <g transform={board ? MIRROR : undefined}>
-          <g style={{ transformBox: "fill-box", transformOrigin: "80% 100%", animation: "mascot-act-hmm-hand 1.8s ease-in-out both", opacity: 0 }}>
-            <path d="M48 61 L39 53.4" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="6.2" strokeLinecap="round" />
-            <path d="M48 61 L39 53.4" fill="none" stroke={hand} strokeWidth="4.6" strokeLinecap="round" />
-            <ellipse cx="37.4" cy="51.2" rx="3.6" ry="3.1" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+          <g style={{ transformBox: "fill-box", transformOrigin: "85% 100%", animation: "mascot-act-hmm-hand 1.8s ease-in-out both", opacity: 0 }}>
+            <path d="M51 60 L40.5 53" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="7" strokeLinecap="round" />
+            <path d="M51 60 L40.5 53" fill="none" stroke={hand} strokeWidth="5.4" strokeLinecap="round" />
+            <g transform="rotate(-10 36 50)">
+              <rect x="30.6" y="46.4" width="10.8" height="7.4" rx="3.2" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+              <path d="M33.6 46.8 v2.4 M36 46.6 v2.6 M38.4 46.8 v2.4" stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" strokeLinecap="round" />
+            </g>
           </g>
         </g>
       );
     case "stamp": {
-      // the card in the left hand, the stamp comes down on it; on «Задачи» it comes down on the clipboard
-      const at = board ? ON_BOARD : { x: 17, y: 50 };
+      // the card held out in the left hand, clear of the face; the stamp comes down on it from above,
+      // outside the head, so it never crosses an eye. On «Задачи» it comes down on the clipboard
+      const at = board ? ON_BOARD : { x: -1, y: 51 };
       return (
         <g transform={`translate(${at.x} ${at.y})`}>
           {board ? null : (
@@ -658,7 +665,8 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
               <g transform="rotate(-5)">
                 <CardShape badge={null} stroke="var(--accent)" />
               </g>
-              <ellipse cx="-8.6" cy="1.6" rx="2.3" ry="3.1" transform="rotate(18 -8.6 1.6)" fill={body} />
+              {/* the thumb over the edge nearest the body */}
+              <ellipse cx="8.4" cy="2" rx="2.3" ry="3.1" transform="rotate(-18 8.4 2)" fill={body} />
             </g>
           )}
           {/* what the stamp leaves: a tick in a ring */}
@@ -667,18 +675,21 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
             <path d="M-2.2 0.2 l1.6 1.7 l3 -3.3" fill="none" stroke="var(--ok)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </g>
           <g style={{ animation: "mascot-act-stamp-tool 1.8s both", opacity: 0 }}>
-            <ellipse cx="0" cy="-11.4" rx="3.4" ry="2.8" fill="var(--gold)" />
-            <rect x="-1.5" y="-9.4" width="3" height="6.4" fill="color-mix(in srgb, var(--gold) 70%, var(--bg))" />
-            <rect x="-5.8" y="-3.6" width="11.6" height="3.6" rx="1" fill="var(--gold)" />
-            <rect x="-5.2" y="-0.9" width="10.4" height="0.9" fill="var(--ok)" />
-            {/* the fist on the neck */}
-            <ellipse cx="0" cy="-6.6" rx="3.4" ry="2.8" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+            <g transform="scale(1.2)">
+              <ellipse cx="0" cy="-11.4" rx="3.4" ry="2.8" fill="var(--gold)" />
+              <rect x="-1.5" y="-9.4" width="3" height="6.4" fill="color-mix(in srgb, var(--gold) 70%, var(--bg))" />
+              <rect x="-5.8" y="-3.6" width="11.6" height="3.6" rx="1" fill="var(--gold)" />
+              <rect x="-5.2" y="-0.9" width="10.4" height="0.9" fill="var(--ok)" />
+              {/* the fist on the neck */}
+              <ellipse cx="0" cy="-6.6" rx="3.4" ry="2.8" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+            </g>
           </g>
         </g>
       );
     }
     case "flick": {
-      // the card sent back to redo leaves the hand with a flick of the wrist, down and away to the left
+      // the card sent back to redo leaves the hand with a flick of the wrist, down and away from the
+      // body — never across the face
       const at = board ? ON_BOARD : HELD_AT;
       return (
         <>
@@ -690,9 +701,9 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
             </g>
           </g>
           {board ? (
-            // the left hand's fingertip snaps it off the clipboard
+            // the left hand's fingertip snaps it off the clipboard, outwards
             <ellipse
-              cx={at.x + 11}
+              cx={at.x - 11}
               cy={at.y + 1}
               rx="2.6"
               ry="2.2"
@@ -753,10 +764,11 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       );
     case "reply": {
       // the answer to a question: the hand writes a note and the note goes up to the person
+      // it goes up on the side it was written on: past the left eye, or off the clipboard on the right
       const at = board ? { x: 58, y: 44 } : { x: 18, y: 49 };
       return (
         <g transform={`translate(${at.x} ${at.y})`}>
-          <g style={{ animation: "mascot-act-reply-note 2s both", opacity: 0 }}>
+          <g style={{ animation: `${board ? "mascot-act-reply-note-board" : "mascot-act-reply-note"} 2s both`, opacity: 0 }}>
             <g transform="rotate(-6)">
               <rect x="-8" y="-6" width="16" height="12" rx="1.8" fill="var(--surface)" stroke="var(--accent)" strokeWidth="1.4" />
               {[0, 1, 2].map((line) => (
