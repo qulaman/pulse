@@ -135,8 +135,8 @@ export function MascotLever({
   // this face is being held with the microphone open — the screen may want to know
   const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
   const [cancelArmed, setCancelArmed] = useState(false);
-  // the voice swells the blob; throttled to ~20 fps, and only while the microphone is open
-  const [level, setLevel] = useState(0);
+  // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
+  const faceRef = useRef<HTMLSpanElement>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,15 +150,24 @@ export function MascotLever({
   // waiting for the throw is NOT busy — there the face is the send button (D-60, sixth)
   const busy = stage === "uploading" || stage === "transcribing" || stage === "parsing" || stage === "sending";
 
+  // The voice level goes straight into `--mascot-level` on the face's wrapper, ~20 times a
+  // second while the microphone is open. As React state it re-rendered the whole board at that
+  // rate, and every render re-measured the layout group around the face (D-126).
   useEffect(() => {
     if (stage !== "recording") return;
+    const node = faceRef.current;
     let last = 0;
-    return subscribeIngestLevel((value) => {
+    const off = subscribeIngestLevel((value) => {
       const now = performance.now();
       if (now - last < 50) return;
       last = now;
-      setLevel(value);
+      // read each time: a wake animation remounts the wrapper
+      faceRef.current?.style.setProperty("--mascot-level", Math.min(1, Math.max(0, value)).toFixed(3));
     });
+    return () => {
+      off();
+      node?.style.removeProperty("--mascot-level");
+    };
   }, [stage]);
 
   // the counter is painted into the node: a board re-render twice a second is not worth it
@@ -309,10 +318,11 @@ export function MascotLever({
             />
             <span
               key={wakeKey}
+              ref={faceRef}
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
               style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
             >
-              <Mascot state={face} size={BASE} level={recording ? level : 0} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} />
+              <Mascot state={face} size={BASE} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} />
             </span>
           </button>
         </motion.div>

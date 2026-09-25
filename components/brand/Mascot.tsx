@@ -635,9 +635,12 @@ export function Mascot({
   const content = state === "serving"; // a cup in the hands: the eyes soften, a small smile
   const shouting = state === "announcing";
   const clamped = Math.min(1, Math.max(0, level));
-  const swell = state === "listening" ? 1 + clamped * 0.14 : 1;
-  // the voice pushes the nod: louder — a deeper dip
-  const dip = state === "listening" ? clamped * 2.2 : 0;
+  // The voice swells the blob and pushes the nod: louder — bigger and a deeper dip. The level
+  // is read from `--mascot-level` when an ancestor paints it (the lever writes it straight into
+  // the DOM — twenty board renders a second otherwise, D-126), from the prop when it does not.
+  const voice = `var(--mascot-level, ${clamped.toFixed(3)})`;
+  const voiceTransform =
+    state === "listening" ? `translateY(calc(${voice} * 2.2px)) scale(calc(1 + ${voice} * 0.14))` : "translateY(0px) scale(1)";
   // How far the eye is open, as a share of the drawn eye: the size lives in EYE_RX/EYE_RY
   // alone, so the whole cast grows or shrinks together and no state has to be re-tuned.
   const calling = state === "calling"; // «обрати внимание!»: wide eyes and an «!» over the head
@@ -819,7 +822,9 @@ export function Mascot({
               d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
               style={{
                 transformOrigin: "62px 25px",
-                animation: `mascot-wave-in ${(state === "tuned" ? 1.6 : 1.5 - clamped * 0.5).toFixed(2)}s ease-out ${wave * 0.28}s infinite`,
+                // an even pace: a duration that followed the voice restarted the waves
+                // mid-flight twenty times a second — they jittered instead of travelling (D-126)
+                animation: `mascot-wave-in ${state === "tuned" ? "1.6s" : "1.3s"} ease-out ${wave * 0.28}s infinite`,
                 opacity: 0,
               }}
             />
@@ -1019,7 +1024,7 @@ export function Mascot({
         data-face
         style={{
           transformOrigin: "32px 60px",
-          transform: `translateY(${dip.toFixed(2)}px) scale(${swell.toFixed(3)})`,
+          transform: voiceTransform,
           transition: "transform 90ms linear",
           // the only transform JS rewrites frame by frame; promoted while it does, released after
           willChange: state === "listening" ? "transform" : "auto",
