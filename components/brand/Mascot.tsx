@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 
-import { BRINGS_CARD, BRINGS_LETTER, CallCard, Hourglass, Letter, Stack, WorkActBehind, WorkActFront, WorkActOver, type WorkAct } from "@/components/brand/MascotWork";
+import { BRINGS_CARD, BRINGS_LETTER, CallCard, handFill, Hourglass, Letter, MIRROR, Stack, WorkActBehind, WorkActFront, WorkActOver, type WorkAct } from "@/components/brand/MascotWork";
 
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
@@ -46,6 +46,9 @@ import { BRINGS_CARD, BRINGS_LETTER, CallCard, Hourglass, Letter, Stack, WorkAct
  * is asked of it — a yawn, a snore bubble, rolling over, a wave, a wink (see MascotAct) — and,
  * on the employee's face, what has just happened to the work: a card caught, «есть!», a hand
  * up, a shrug, the card thrown up to the director, a medal, the card back to redo (D-110).
+ * Two hands, never three: whatever the face holds is held by a hand you can see (a thumb over the
+ * edge, a mitten under the saucer, a fist on the grip), and a gesture takes the hand that is free —
+ * the employee's stack is in the right hand, so a wave, a shrug or a wiped brow uses the left.
  * Perf contract: a single SVG, animation on transform and opacity only, CSS keyframes
  * (app/globals.css), nothing on filter or box-shadow. Pass `level` (0..1, from the
  * microphone) while listening — the blob swells and nods harder with the voice.
@@ -369,6 +372,8 @@ const ACT_BODY: Record<MascotAct, string> = {
 /** Where an act sends the gaze — both eyes together, on top of the state's own look. */
 const ACT_GAZE: Partial<Record<MascotAct, string>> = {
   orbit: "mascot-act-orbit-eyes 3.6s linear both",
+  // turned round in the air, it shows its back: no eyes while the body is past edge-on
+  spin: "mascot-act-spin-eyes 1.3s linear both",
   peek: "mascot-act-peek-eyes 2.8s ease-in-out both",
   tiptoe: "mascot-act-tiptoe-eyes 2.2s ease-in-out both",
   heart: "mascot-act-look-up 2.4s ease-in-out both",
@@ -670,23 +675,6 @@ export function Mascot({
         </>
       ) : null}
 
-      {/* scheduling: a tear-off calendar over the left shoulder; the top page lifts, turns and
-          falls away, the next day is already under it, and today's cell keeps pulsing */}
-      {state === "scheduling" && detailed ? (
-        <g style={{ transformBox: "fill-box", transformOrigin: "100% 100%", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
-          <CalendarPage />
-          <g style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "mascot-page-flip 3s ease-in infinite" }}>
-            <CalendarPage />
-          </g>
-          {/* the header and its rings stay put: only the page under them turns */}
-          <path d="M-18 -3 V-3.5 A3 3 0 0 1 -15 -6.5 H-1 A3 3 0 0 1 2 -3.5 V-0.5 H-18 Z" fill={TONE.calendar} />
-          <g fill="var(--text-muted)">
-            <rect x="-13.5" y="-9" width="1.8" height="4.6" rx="0.9" />
-            <rect x="-4.3" y="-9" width="1.8" height="4.6" rx="0.9" />
-          </g>
-        </g>
-      ) : null}
-
       {/* announcing: the words leave the bell of the megaphone in arcs, on the shout */}
       {state === "announcing" && detailed ? (
         <g transform={MEGAPHONE_AT} fill="none" stroke={TONE.ether} strokeWidth="1.7" strokeLinecap="round">
@@ -922,19 +910,43 @@ export function Mascot({
           <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
             {/* loop: the body's own motion */}
             <g style={{ transformOrigin: "32px 44px", animation: BODY[state] }}>
+              {/* scheduling: a tear-off calendar held up over the left shoulder by the left hand —
+                  the arm comes out behind the body, so the calendar leans with it; the top page
+                  lifts, turns and falls away, the next day is already under it, and today's cell
+                  keeps pulsing */}
+              {state === "scheduling" && detailed ? (
+                <g style={{ transformOrigin: "12px 30px", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
+                  <CalendarPage />
+                  <g style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "mascot-page-flip 3s ease-in infinite" }}>
+                    <CalendarPage />
+                  </g>
+                  {/* the header and its rings stay put: only the page under them turns */}
+                  <path d="M-18 -3 V-3.5 A3 3 0 0 1 -15 -6.5 H-1 A3 3 0 0 1 2 -3.5 V-0.5 H-18 Z" fill={TONE.calendar} />
+                  <g fill="var(--text-muted)">
+                    <rect x="-13.5" y="-9" width="1.8" height="4.6" rx="0.9" />
+                    <rect x="-4.3" y="-9" width="1.8" height="4.6" rx="0.9" />
+                  </g>
+                  {/* the arm under it and the hand on its lower edge */}
+                  <path d="M12 30 Q2 27 -5.5 17.5" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
+                  <ellipse cx="-6.2" cy="15.4" rx="4.2" ry="3.2" transform="rotate(-24 -6.2 15.4)" fill={COLOR[state]} />
+                </g>
+              ) : null}
               {/* wave: a small hand comes out from behind the body and waves — drawn first, so
-                  the body covers its root and it reads as growing out of it */}
+                  the body covers its root and it reads as growing out of it. The right hand holds
+                  the employee's stack, so then the left one waves (D-110) */}
               {acting === "wave" ? (
-                <g style={{ transformOrigin: "53px 30px", animation: "mascot-act-hand 1.8s ease-in-out both" }}>
-                  {/* an arm raised out of the side, a mitten with its thumb out at the end of it */}
-                  <path d="M50 32 Q60 27 64 14" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
-                  <ellipse cx="65" cy="9.5" rx="4.8" ry="5.8" transform="rotate(18 65 9.5)" fill={COLOR[state]} />
-                  <ellipse cx="60.4" cy="12" rx="1.9" ry="2.9" transform="rotate(-38 60.4 12)" fill={COLOR[state]} />
-                  <ellipse cx="64" cy="7.4" rx="2" ry="1.2" transform="rotate(18 64 7.4)" fill="#ffffff" opacity="0.2" />
+                <g transform={holding ? MIRROR : undefined}>
+                  <g style={{ transformOrigin: "53px 30px", animation: "mascot-act-hand 1.8s ease-in-out both" }}>
+                    {/* an arm raised out of the side, a mitten with its thumb out at the end of it */}
+                    <path d="M50 32 Q60 27 64 14" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
+                    <ellipse cx="65" cy="9.5" rx="4.8" ry="5.8" transform="rotate(18 65 9.5)" fill={COLOR[state]} />
+                    <ellipse cx="60.4" cy="12" rx="1.9" ry="2.9" transform="rotate(-38 60.4 12)" fill={COLOR[state]} />
+                    <ellipse cx="64" cy="7.4" rx="2" ry="1.2" transform="rotate(18 64 7.4)" fill="#ffffff" opacity="0.2" />
+                  </g>
                 </g>
               ) : null}
               {/* the hands of the work, behind the body the same way: a hand up, palms out, a thumb, the watch (D-110) */}
-              {acting ? <WorkActBehind act={acting} body={COLOR[state]} /> : null}
+              {acting ? <WorkActBehind act={acting} body={COLOR[state]} holding={holding} /> : null}
               <path
                 d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z"
                 fill={COLOR[state]}
@@ -1011,6 +1023,14 @@ export function Mascot({
                       />
                     </g>
                   ))}
+                  {/* the thumb over the bottom edge: the board is held, not floating */}
+                  <ellipse cx="59.5" cy="62.4" rx="3" ry="2.3" fill={COLOR[state]} />
+                  {/* the other hand ticks the rows off with a pencil, in step with the ticks */}
+                  <g style={{ animation: "mascot-check-pen 3.6s ease-in-out infinite" }}>
+                    <path d="M54.6 41.4 L48 44.6" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M54.6 41.4 L53.2 42.1" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
+                    <ellipse cx="47.8" cy="45" rx="2.8" ry="2.4" fill={handFill(COLOR[state])} />
+                  </g>
                 </g>
               ) : null}
 
@@ -1023,6 +1043,8 @@ export function Mascot({
                     <path d="M6 3.4 L7.6 8.6" stroke={`color-mix(in srgb, ${TONE.ether} 70%, var(--bg))`} strokeWidth="2.6" strokeLinecap="round" />
                     <ellipse cx="17" cy="0" rx="2.3" ry="9.6" fill={`color-mix(in srgb, ${TONE.ether} 62%, var(--bg))`} />
                     <path d="M6 -2.6 L15.6 -7.6" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.1" strokeLinecap="round" />
+                    {/* the fist on the grip */}
+                    <ellipse cx="7.2" cy="7.6" rx="2.6" ry="3.2" transform="rotate(-16 7.2 7.6)" fill={handFill(COLOR[state])} />
                   </g>
                 </g>
               ) : null}
@@ -1034,13 +1056,14 @@ export function Mascot({
                   <path d="M60.6 48.6 a3.4 3.4 0 0 1 0 6.8" fill="none" stroke={TONE.secretary} strokeWidth="1.8" />
                   <path d="M44.4 47 H60.6 V52 A6 6 0 0 1 54.6 58 H50.4 A6 6 0 0 1 44.4 52 Z" fill="var(--surface)" stroke={TONE.secretary} strokeWidth="1.5" strokeLinejoin="round" />
                   <ellipse cx="52.5" cy="47.4" rx="7.4" ry="1.5" fill={`color-mix(in srgb, ${TONE.secretary} 55%, var(--bg))`} />
+                  {/* both hands under the saucer: a cup is carried with care */}
+                  <ellipse cx="41.6" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
+                  <ellipse cx="63.4" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
                 </g>
               ) : null}
 
               {/* the employee's orders in work, a stack of cards in the hands (D-110) */}
               {holding ? <Stack count={carry!.count} hot={carry!.hot === true} body={COLOR[state]} shuffle={acting === "shuffle"} /> : null}
-              {/* everything handed over: the hourglass runs until the director answers */}
-              {state === "awaiting" && detailed ? <Hourglass /> : null}
               {/* what the work puts in front of the body for a moment: the medal, the hand at the brow, the ear */}
               {acting ? <WorkActFront act={acting} body={COLOR[state]} /> : null}
 
@@ -1171,11 +1194,14 @@ export function Mascot({
         </g>
       </g>
 
+      {/* everything handed over: the hourglass stands on the ground by the face and runs until the
+          director answers — it is not held, so it does not breathe with the body */}
+      {state === "awaiting" && detailed ? <Hourglass /> : null}
       {/* nervous: the unread word itself, by the head (D-110) — unless it is flying in or being opened */}
       {state === "nervous" && detailed && !(acting && BRINGS_LETTER.has(acting)) ? <Letter /> : null}
       {/* what flies in the work's acts: the card caught, stashed, put aside, thrown up, back to
           redo; the «?», the letter, the clock, the coin (D-110) */}
-      {acting ? <WorkActOver act={acting} /> : null}
+      {acting ? <WorkActOver act={acting} body={COLOR[state]} /> : null}
 
       {/* processing: the new status itself — the tick lands with the top of the hop, and it
           is drawn last so the badge sits on the face instead of under it */}
@@ -1191,6 +1217,8 @@ export function Mascot({
         <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite", opacity: 0 }}>
           <rect x="34" y="5" width="17" height="12" rx="3" fill="var(--surface)" stroke={COLOR.sending} strokeWidth="1.5" />
           <path d="M37.5 9.5h10M37.5 13h6" stroke={COLOR.sending} strokeWidth="1.2" strokeLinecap="round" />
+          {/* the hand on its corner through the wind-up; it lets go at the release */}
+          <ellipse cx="35.4" cy="16.4" rx="3" ry="2.6" fill={handFill(COLOR.sending)} style={{ animation: "mascot-card-grip 1.2s linear infinite" }} />
         </g>
       ) : null}
 

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
-import { Glyph, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
+import { Glyph, Mitten, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
 import { untilLine, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
 
 /** The desk is drawn in this box; the screen places the box, not its parts. */
@@ -140,6 +140,9 @@ export function SecretaryDesk({
     return () => clearTimeout(timer);
   }, [nod]);
   const nodding = nod && saw && !move && !attending;
+  // the hands are on the keys only while the secretary sits at them: not at a job, not carrying
+  // the cup over, not on the way out or in (a character has two hands — they go where it goes)
+  const typing = !working && !handing && !standing && !move && !gone;
   return (
     <button
       type="button"
@@ -382,9 +385,18 @@ export function SecretaryDesk({
             height="1.8"
             rx="0.5"
             fill="var(--accent)"
-            style={{ animation: `sec-key 0.95s ease-in-out ${(key * 0.23).toFixed(2)}s infinite`, opacity: 0.3 }}
+            style={{ animation: typing ? `sec-key 0.95s ease-in-out ${(key * 0.23).toFixed(2)}s infinite` : "none", opacity: 0.3 }}
           />
         ))}
+        {/* the small secretary's hands on the keys, tapping in turn */}
+        <g style={{ opacity: typing ? 1 : 0, transition: FADE }} data-testid="desk-hands">
+          {[
+            { cx: 41, d: "0s" },
+            { cx: 49, d: "0.24s" },
+          ].map((hand) => (
+            <Mitten key={hand.cx} cx={hand.cx} cy={49.2} rx={2.4} ry={1.8} style={{ animation: typing ? `smc-tap 0.48s ease-in-out ${hand.d} infinite` : "none" }} />
+          ))}
+        </g>
       </svg>
 
       {/* how many errands are in the air — the number the ball used to carry */}

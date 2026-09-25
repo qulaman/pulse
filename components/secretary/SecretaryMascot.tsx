@@ -16,7 +16,6 @@ import {
   Hearts,
   Hush,
   MeetingTable,
-  Mitten,
   Notepad,
   PourCup,
   Pourer,
@@ -26,6 +25,7 @@ import {
   SECRETARY_TONE,
   ShutDoor,
   Sign,
+  SignArm,
   Siren,
   TEA,
   TypingHands,
@@ -112,6 +112,8 @@ const ACT_BODY: Partial<Record<SecretaryAct, string>> = {
   accept: "smc-nod 0.9s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   stretch: "smc-stretch 2.4s ease-in-out both",
   arrive: "smc-arrive 2.6s cubic-bezier(0.3, 0.7, 0.3, 1) both",
+  // the head leans into the hand that sets the headset right
+  headset: "smc-tilt-ear 2.2s ease-in-out both",
 };
 const ACT_EYES: Partial<Record<SecretaryAct, string>> = {
   clock: "smc-look-clock 2.2s ease-in-out both",
@@ -232,7 +234,9 @@ export function SecretaryMascot({
           : asleep
             ? "mascot-sleep 7s ease-in-out infinite"
             : rest
-              ? "smc-type 0.84s ease-in-out infinite"
+              ? act === "arrive"
+                ? "smc-walk 0.52s ease-in-out 3"
+                : "smc-type 0.84s ease-in-out infinite"
               : IDLE;
   // the outer motion: an act moves the whole body; the finish carries the job out and back
   // (the director's desk walks its small secretary over to the big face instead — SecretaryDesk)
@@ -316,15 +320,24 @@ export function SecretaryMascot({
               </g>
             ) : null}
             {(show("tea") || show("water")) && room ? <Arm d="M10 38 Q3 34 -1 31" /> : null}
-            {show("dnd") ? <Arm d="M52 41 Q60 39 63 31.5" /> : null}
+            {/* the sign is held up by the right hand; after «Готово» the hand lets go once it is put away */}
+            {show("dnd") ? <SignArm style={{ transformOrigin: "52px 41px", animation: "smc-arm-in 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both" }} /> : null}
+            {detailed && finish === "dnd" ? <SignArm style={{ animation: "smc-fade-out 0.3s ease-in 0.8s both" }} /> : null}
             {show("guest") ? <Arm d="M10 41 Q4 45 -1 43.5" hand={{ cx: -2.8, cy: 43, rx: 3.6, ry: 2.6 }} /> : null}
             {show("print") && room ? <Arm d="M10 36 Q2 33 -4 31" /> : null}
-            {show("meeting") && room ? <Arm d="M10 40 Q2 38 -6 37.5" /> : null}
+            {/* the hand brings the glass in and sets it down (in step with smc-place), then withdraws */}
+            {show("meeting") && room ? <Arm d="M10 40 Q2 38 -6 37.5" style={{ animation: "smc-place-arm 2.6s ease-in-out infinite" }} /> : null}
+            {/* the stretch: the hands leave the keys (TypingHands) and the arms go up over the head,
+                out of the shoulders behind it */}
             {act === "stretch" && detailed ? (
-              <g style={{ animation: "smc-arms-up 2.4s ease-in-out both" }}>
-                <Arm d="M12 26 Q6 14 5 4" />
-                <Arm d="M52 26 Q58 14 59 4" />
-              </g>
+              <>
+                <g style={{ transformOrigin: "10px 40px", animation: "smc-arm-up 2.4s ease-in-out both" }}>
+                  <Arm d="M10 40 Q-2 22 7 0" hand={{ cx: 7.4, cy: -2.6, rx: 3.8, ry: 4.2 }} />
+                </g>
+                <g style={{ transformOrigin: "54px 40px", animation: "smc-arm-up 2.4s ease-in-out both" }}>
+                  <Arm d="M54 40 Q66 22 57 0" hand={{ cx: 56.6, cy: -2.6, rx: 3.8, ry: 4.2 }} />
+                </g>
+              </>
             ) : null}
             {act === "arrive" && detailed ? (
               // the bag of the morning, in the left hand; it goes under the desk
@@ -385,13 +398,18 @@ export function SecretaryMascot({
 
             {/* ---- what is held in front of the body ---- */}
             {show("dnd") ? <Hush /> : null}
-            {show("come") ? <Notepad x={50} y={37} tilt={10} /> : null}
+            {show("come") ? <Notepad x={50} y={40} tilt={10} grip /> : null}
             {show("other") ? <Writing /> : null}
             {show("lunch") || show("courier") ? <Carried scene={job!} /> : null}
             {/* the small secretary at the director's desk holds the job itself (D-97) */}
             {mini && !room && detailed && job && ["coffee", "tea", "water", "print", "meeting"].includes(job) ? <Carried scene={job} /> : null}
-            {detailed && finish && CARRY_OUT.has(finish) ? <Carried scene={finish} /> : null}
-            {act === "headset" && detailed ? <Mitten cx={8} cy={46} rx={3.2} ry={2.8} style={{ animation: "smc-hand-ear 2.2s ease-in-out both", opacity: 0 }} /> : null}
+            {/* the thing carried out stays where it was taken: the big face keeps the cup the small
+                secretary brings it (SecretaryDesk), the room keeps what went out of the frame */}
+            {detailed && finish && CARRY_OUT.has(finish) ? (
+              <g style={{ animation: `${mini ? "smc-handed" : "smc-left-behind"} ${FINISH_MS}ms linear both` }}>
+                <Carried scene={finish} />
+              </g>
+            ) : null}
           </g>
         </g>
       </g>
@@ -400,7 +418,7 @@ export function SecretaryMascot({
       {room && rest ? (
         <>
           <RoomFront act={act} asleep={asleep} />
-          <TypingHands asleep={asleep} />
+          <TypingHands asleep={asleep} act={act} />
         </>
       ) : null}
       {asleep && detailed ? <Zzz /> : null}

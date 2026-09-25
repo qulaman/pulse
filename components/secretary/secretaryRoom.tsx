@@ -113,9 +113,12 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
 
 /**
  * In front of the body: the desk, the monitor typing, the keyboard, the mug, the papers and
- * the plant. `act` moves the thing the idle act is about; `asleep` turns the screen off.
+ * the plant. `act` moves the thing the idle act is about — always in a hand (TypingHands takes
+ * the hand off the keys for it); `asleep` turns the screen off. While an act has the hands, the
+ * keys stop lighting and the text on the screen stops where it was.
  */
 export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean }) {
+  const typing = act === null;
   return (
     <g>
       {/* the plant, far left, and the watering can of its act */}
@@ -127,13 +130,15 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
           <ellipse cx="-17" cy="35" rx="2.2" ry="6" fill="color-mix(in srgb, var(--ok) 62%, var(--bg))" />
         </g>
         {act === "plant" ? (
-          <g style={{ ...box("90% 40%", "smc-can 2.8s ease-in-out both"), opacity: 0 }}>
-            <path d="M-8 24 H1 V30.5 A2 2 0 0 1 -1 32.5 H-6 A2 2 0 0 1 -8 30.5 Z" fill="var(--accent-2)" />
-            <path d="M-8 26 L-14 22" stroke="var(--accent-2)" strokeWidth="1.6" strokeLinecap="round" />
-            <path d="M1 25.5 a2.6 2.6 0 0 1 0 5.2" fill="none" stroke="var(--accent-2)" strokeWidth="1.2" />
-            {[0, 0.25, 0.5].map((d, i) => (
-              <circle key={d} cx={-14.5 - i * 0.8} cy={24 + i} r="0.8" fill={WATER} style={{ animation: `smc-drop 0.7s ease-in ${1 + d}s 2`, opacity: 0 }} />
+          // the can comes in the left hand and tips about it, the spout over the leaves
+          <g style={{ transformOrigin: "0.4px 27px", animation: "smc-can 2.8s ease-in-out both", opacity: 0 }}>
+            <path d="M-11 24 H-2 V30.5 A2 2 0 0 1 -4 32.5 H-9 A2 2 0 0 1 -11 30.5 Z" fill="var(--accent-2)" />
+            <path d="M-11 26 L-17 22" stroke="var(--accent-2)" strokeWidth="1.6" strokeLinecap="round" />
+            <path d="M-2 25.5 a2.6 2.6 0 0 1 0 5.2" fill="none" stroke="var(--accent-2)" strokeWidth="1.2" />
+            {[0, 0.2, 0.4].map((d, i) => (
+              <circle key={d} cx={-17.5 - i * 0.8} cy={24 + i} r="0.8" fill={WATER} style={{ animation: `smc-drop 0.6s ease-in ${1 + d}s 2`, opacity: 0 }} />
             ))}
+            <Mitten cx={0.2} cy={28.1} rx={3.4} ry={2.8} />
           </g>
         ) : null}
       </g>
@@ -148,12 +153,16 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
         <rect x="4" y="44.2" width="11" height="3.5" rx="0.6" fill="var(--surface)" stroke={EDGE} strokeWidth="0.7" transform="rotate(3 9.5 46)" />
       </g>
 
-      {/* the mug on the left, steaming; its act lifts it to the mouth */}
-      <g style={box("50% 50%", act === "sip" ? "smc-sip 2.6s ease-in-out both" : "none")}>
+      {/* the mug on the left, steaming; its act lifts it to the mouth by the handle */}
+      <g style={{ transformOrigin: "-1.65px 45.5px", animation: act === "sip" ? "smc-sip 2.6s ease-in-out both" : "none" }}>
         <path d="M-7 41 H1.5 V47.4 A2.6 2.6 0 0 1 -1.1 50 H-4.4 A2.6 2.6 0 0 1 -7 47.4 Z" fill="var(--surface)" stroke={EDGE} strokeWidth="1.1" />
         <path d="M1.5 42.6 a2.2 2.2 0 0 1 0 4.4" fill="none" stroke={EDGE} strokeWidth="1.1" />
         <rect x="-5.8" y="43.4" width="6" height="2" rx="1" fill="var(--accent-2)" opacity="0.8" />
-        {act === "sip" ? null : <Steam x={-2.6} y={39.4} />}
+        {act === "sip" ? (
+          <Mitten cx={3.2} cy={45.2} rx={3.5} ry={2.6} style={{ animation: "smc-held-sip 2.6s linear both", opacity: 0 }} />
+        ) : (
+          <Steam x={-2.6} y={39.4} />
+        )}
       </g>
 
       {/* the monitor, right, facing us — the work types on it */}
@@ -162,13 +171,21 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
       {asleep ? (
         <circle cx="79" cy="42" r="0.8" fill="var(--warn)" style={{ animation: "smc-glow 3s ease-in-out infinite" }} />
       ) : (
-        <g>
+        // the text only runs while the hands type; the morning screen wakes up once somebody sits
+        <g style={{ animation: act === "arrive" ? "smc-screen-on 2.6s ease-out both" : "none" }}>
           {[
             { y: 28, w: 18, d: 0 },
             { y: 33, w: 13, d: 0.45 },
             { y: 38, w: 8, d: 0.9 },
           ].map((line) => (
-            <path key={line.y} d={`M58.5 ${line.y} h${line.w}`} stroke="var(--accent)" strokeWidth="1.7" strokeLinecap="round" style={box("0% 50%", `sec-line 2.8s ease-out ${line.d}s infinite`)} />
+            <path
+              key={line.y}
+              d={`M58.5 ${line.y} h${line.w}`}
+              stroke="var(--accent)"
+              strokeWidth="1.7"
+              strokeLinecap="round"
+              style={{ ...box("0% 50%", `sec-line 2.8s ease-out ${line.d}s infinite`), animationPlayState: typing ? "running" : "paused" }}
+            />
           ))}
           <rect x="68" y="36.4" width="1.7" height="3.4" rx="0.5" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
         </g>
@@ -179,21 +196,54 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
       {asleep
         ? null
         : [0, 1, 2, 3, 4].map((key) => (
-            <rect key={key} x={19.6 + key * 5.4} y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" style={{ animation: `sec-key 0.84s ease-in-out ${(key * 0.19).toFixed(2)}s infinite`, opacity: 0.3 }} />
+            <rect
+              key={key}
+              x={19.6 + key * 5.4}
+              y="47.4"
+              width="3.2"
+              height="1.5"
+              rx="0.4"
+              fill="var(--accent)"
+              style={{ animation: typing ? `sec-key 0.84s ease-in-out ${(key * 0.19).toFixed(2)}s infinite` : "none", opacity: 0.3 }}
+            />
           ))}
     </g>
   );
 }
 
-/** The hands on the keys — typing, or resting still while the secretary dozes. */
-export function TypingHands({ asleep }: { asleep: boolean }) {
+/**
+ * The two hands of the secretary at the desk, [left, right], while an act takes them off the
+ * keys: the left one sets the headset right, takes the mug, squares the papers, fetches the
+ * can; both go up for the stretch; neither is on the keys before the morning arrival is over.
+ * The thing in hand draws its own hand where the two meet (the mug, the can), so the hand the
+ * eye follows never doubles and never stays behind on the keys.
+ */
+const HANDS_IN_ACT: Record<string, [string, string]> = {
+  headset: ["smc-hand-ear 2.2s ease-in-out both", "none"],
+  sip: ["smc-hand-sip 2.6s ease-in-out both", "none"],
+  papers: ["smc-hand-papers 2s ease-in-out both", "none"],
+  plant: ["smc-hand-plant 2.8s ease-in-out both", "none"],
+  stretch: ["smc-hand-lift 2.4s ease-in-out both", "smc-hand-lift 2.4s ease-in-out both"],
+  arrive: ["smc-hand-arrive 2.6s ease-out both", "smc-hand-arrive 2.6s ease-out both"],
+};
+
+/** The hands on the keys — typing, still under any other act, resting while the secretary dozes. */
+export function TypingHands({ asleep, act = null }: { asleep: boolean; act?: string | null }) {
+  const busy = act ? HANDS_IN_ACT[act] : undefined;
   return (
     <g>
       {[
         { cx: 22, d: "0s" },
         { cx: 42, d: "0.21s" },
-      ].map((hand) => (
-        <Mitten key={hand.cx} cx={hand.cx} cy={47.2} rx={3.5} ry={2.6} style={{ animation: asleep ? "none" : `smc-tap 0.42s ease-in-out ${hand.d} infinite` }} />
+      ].map((hand, i) => (
+        <Mitten
+          key={hand.cx}
+          cx={hand.cx}
+          cy={47.2}
+          rx={3.5}
+          ry={2.6}
+          style={{ animation: busy ? busy[i] : asleep || act ? "none" : `smc-tap 0.42s ease-in-out ${hand.d} infinite` }}
+        />
       ))}
     </g>
   );
@@ -277,18 +327,29 @@ export function Pourer({ kind }: { kind: "teapot" | "carafe" }) {
   );
 }
 
-/** The «не беспокоить» sign held up on the right — a no-entry circle on a door hanger. */
+/** Where the hand holds the sign up: its bottom edge, clear of the headset cup. */
+export const SIGN_GRIP = { x: 67.5, y: 30.2 };
+
+/**
+ * The «не беспокоить» sign held up on the right — a no-entry circle on a door hanger. It sways
+ * about the hand that holds it (SignArm, drawn over it inside the body).
+ */
 export function Sign({ away = false }: { away?: boolean }) {
   return (
-    <g style={{ transformOrigin: "63px 31px", animation: away ? "smc-sign-away 1.2s ease-in both" : "smc-sign 2.8s ease-in-out infinite" }}>
+    <g style={{ transformOrigin: `${SIGN_GRIP.x}px ${SIGN_GRIP.y}px`, animation: away ? "smc-sign-away 1.2s ease-in both" : "smc-sign 2.8s ease-in-out infinite" }}>
       <g style={box("50% 100%", PROP_IN)}>
-        <rect x="54.5" y="3" width="18" height="26" rx="4" fill="var(--surface)" stroke="var(--danger)" strokeWidth="1.4" />
-        <circle cx="63.5" cy="8.2" r="2.3" fill="var(--bg)" />
-        <circle cx="63.5" cy="19.5" r="6" fill="var(--danger)" />
-        <rect x="59.4" y="18.4" width="8.2" height="2.2" rx="1.1" fill="#ffffff" />
+        <rect x="58.5" y="3" width="18" height="26" rx="4" fill="var(--surface)" stroke="var(--danger)" strokeWidth="1.4" />
+        <circle cx="67.5" cy="8.2" r="2.3" fill="var(--bg)" />
+        <circle cx="67.5" cy="19.5" r="6" fill="var(--danger)" />
+        <rect x="63.4" y="18.4" width="8.2" height="2.2" rx="1.1" fill="#ffffff" />
       </g>
     </g>
   );
+}
+
+/** The right arm up to the sign's bottom edge — the hand over the sign, the root under the body. */
+export function SignArm({ style }: { style?: CSSProperties }) {
+  return <Arm d={`M52 41 Q63 40 ${SIGN_GRIP.x - 0.5} ${SIGN_GRIP.y + 1}`} hand={{ cx: SIGN_GRIP.x, cy: SIGN_GRIP.y + 0.6, rx: 3.6, ry: 3 }} style={style} />;
 }
 
 /** The director's door behind the secretary, shut: the one being guarded (dnd). */
@@ -326,7 +387,7 @@ export function Hush() {
     <>
       <Mitten cx={33.5} cy={51.6} rx={4.4} ry={3.3} />
       <ellipse cx="33" cy="45.4" rx="1.9" ry="4.6" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
-      <text x="10" y="2" fontSize="6.4" fontWeight="700" fill="var(--text-muted)" style={{ animation: "smc-shh 2.8s ease-out infinite", opacity: 0 }}>
+      <text x="-9" y="30" fontSize="6.4" fontWeight="700" fill="var(--text-muted)" style={{ animation: "smc-shh 2.8s ease-out infinite", opacity: 0 }}>
         тсс
       </text>
     </>
@@ -354,26 +415,32 @@ export function GuestDoor({ closing = false }: { closing?: boolean }) {
   );
 }
 
-export function Notepad({ x, y, tilt }: { x: number; y: number; tilt: number }) {
+/** A notepad, its corner at (x, y); `grip` — a hand on its lower edge, the pad is held, not floating. */
+export function Notepad({ x, y, tilt, grip = false }: { x: number; y: number; tilt: number; grip?: boolean }) {
   return (
     <g transform={`translate(${x} ${y}) rotate(${tilt})`}>
       <g style={box("50% 100%", PROP_IN)}>
         <rect x="0" y="0" width="13" height="16" rx="1.6" fill="var(--surface)" stroke={EDGE} strokeWidth="1" />
         <rect x="3" y="-1.4" width="7" height="2.6" rx="1" fill={EDGE} />
         <path d="M2.6 5 h7.6 M2.6 8.4 h6 M2.6 11.8 h7" stroke="var(--text-muted)" strokeWidth="1" strokeLinecap="round" />
+        {grip ? <Mitten cx={3.4} cy={15.4} rx={3.2} ry={2.6} /> : null}
       </g>
     </g>
   );
 }
 
-/** other: a note in front, a pen going over it. */
+/**
+ * other: a note taken on the pad in front of the chest — the left hand holds the pad, the right
+ * one writes, both below the eyes and off the headset.
+ */
 export function Writing() {
   return (
     <>
-      <Notepad x={39} y={39} tilt={-8} />
+      <Notepad x={41} y={42} tilt={-8} />
+      <Mitten cx={42.2} cy={51.5} rx={2.6} ry={3.2} />
       <g style={{ animation: "smc-write 1.6s ease-in-out infinite" }}>
-        <path d="M45 42 L52 34" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
-        <Mitten cx={52.6} cy={33.8} rx={3} ry={2.6} />
+        <path d="M44.6 47.4 L50.6 41.4" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
+        <Mitten cx={49.6} cy={43} rx={3} ry={2.6} />
       </g>
     </>
   );
@@ -477,25 +544,25 @@ export function Carried({ scene }: { scene: DeskScene }) {
     case "courier":
       return (
         <g style={box("50% 100%", "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both")}>
-          <rect x="40" y="38" width="22" height="18" rx="1.6" fill={KRAFT} />
-          <rect x="49.4" y="38" width="3.2" height="18" fill="color-mix(in srgb, var(--gold) 40%, var(--surface))" opacity="0.8" />
-          <path d="M42.5 42 h4 M42.5 44.2 h3" stroke="var(--bg)" strokeOpacity="0.4" strokeWidth="0.7" />
-          <Mitten cx={38.6} cy={48} rx={2.6} ry={3.4} />
-          <Mitten cx={63.4} cy={48} rx={2.6} ry={3.4} />
+          <rect x="40" y="41" width="22" height="18" rx="1.6" fill={KRAFT} />
+          <rect x="49.4" y="41" width="3.2" height="18" fill="color-mix(in srgb, var(--gold) 40%, var(--surface))" opacity="0.8" />
+          <path d="M42.5 45 h4 M42.5 47.2 h3" stroke="var(--bg)" strokeOpacity="0.4" strokeWidth="0.7" />
+          <Mitten cx={38.6} cy={51} rx={2.6} ry={3.4} />
+          <Mitten cx={63.4} cy={51} rx={2.6} ry={3.4} />
         </g>
       );
     case "print":
       return (
         <g style={box("50% 100%", "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both")}>
-          <rect x="43" y="36" width="15" height="19" rx="0.8" fill="#ffffff" transform="rotate(6 50.5 45.5)" />
-          <path d="M45.6 40.6 h9 M45.4 43.4 h7 M45.2 46.2 h8.4 M45 49 h6" stroke="var(--text-muted)" strokeWidth="0.7" transform="rotate(6 50.5 45.5)" />
-          <Mitten cx={47} cy={55} rx={3} ry={2.4} />
+          <rect x="43" y="40" width="15" height="19" rx="0.8" fill="#ffffff" transform="rotate(6 50.5 49.5)" />
+          <path d="M45.6 44.6 h9 M45.4 47.4 h7 M45.2 50.2 h8.4 M45 53 h6" stroke="var(--text-muted)" strokeWidth="0.7" transform="rotate(6 50.5 49.5)" />
+          <Mitten cx={47} cy={59} rx={3} ry={2.4} />
         </g>
       );
     case "dnd":
       return <Sign />;
     default:
-      return <Notepad x={48} y={38} tilt={10} />;
+      return <Notepad x={48} y={40} tilt={10} grip />;
   }
 }
 

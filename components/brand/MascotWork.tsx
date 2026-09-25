@@ -175,10 +175,14 @@ export function Stack({ count, hot, body, shuffle }: { count: number; hot: boole
   );
 }
 
-/** `awaiting` (D-110): everything handed over — the sand runs, the glass turns over, again. */
+/**
+ * `awaiting` (D-110): everything handed over — the sand runs, the glass turns over, again. It stands
+ * on the ground at the right of the face (its foot on the shadow's line), in front of the body.
+ */
 export function Hourglass() {
   const tone = "var(--accent)";
   return (
+    <g transform="translate(4 1.4)">
     <g data-prop="hourglass" style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
       <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-hourglass 4.2s infinite" }}>
         <path
@@ -201,6 +205,7 @@ export function Hourglass() {
         <rect x="46.6" y="41.4" width="12.8" height="2.2" rx="1.1" fill={tone} />
         <rect x="46.6" y="57.4" width="12.8" height="2.2" rx="1.1" fill={tone} />
       </g>
+    </g>
     </g>
   );
 }
@@ -236,13 +241,19 @@ export const BRINGS_CARD: ReadonlySet<string> = new Set(["catch", "insist", "boo
 export const BRINGS_LETTER: ReadonlySet<string> = new Set(["letter", "read"]);
 
 /** A hand drawn in front of the body: the body's colour in shade, so it reads over the body. */
-const handFill = (body: string) => `color-mix(in srgb, ${body} 72%, #000000)`;
+export const handFill = (body: string) => `color-mix(in srgb, ${body} 72%, #000000)`;
+
+/**
+ * The face drawn the other way round (x → 64 − x): a gesture of the right hand played by the left
+ * one. Set as an SVG attribute on a wrapper, so the CSS motion inside is mirrored with it.
+ */
+export const MIRROR = "matrix(-1 0 0 1 64 0)";
 
 /**
  * Behind the body (drawn before it, inside the body's motion group — the body covers the root
  * of the arm, so the arm grows out of it, the way the D-82 wave does).
  */
-export function WorkActBehind({ act, body }: { act: string; body: string }) {
+export function WorkActBehind({ act, body, holding = false }: { act: string; body: string; holding?: boolean }) {
   if (act === "raise") {
     // the left hand: the card of a new order waits over the right shoulder
     return (
@@ -254,7 +265,8 @@ export function WorkActBehind({ act, body }: { act: string; body: string }) {
     );
   }
   if (act === "shrug" || act === "poof") {
-    // palms up on both sides; on «poof» they come after the card is gone
+    // palms up on both sides; on «poof» they come after the card is gone. The right hand keeps
+    // the stack if there is one — the shrug lifts it with the shoulders instead
     const timing = act === "poof" ? "1.2s ease-in-out 0.6s both" : "1.8s ease-in-out both";
     return (
       <>
@@ -262,10 +274,12 @@ export function WorkActBehind({ act, body }: { act: string; body: string }) {
           <path d="M12 44 Q5 44 2.4 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
           <ellipse cx="0.8" cy="38" rx="4.8" ry="2.6" transform="rotate(-22 0.8 38)" fill={body} />
         </g>
-        <g style={{ transformOrigin: "52px 44px", animation: `mascot-act-palm ${timing}` }}>
-          <path d="M52 44 Q59 44 61.6 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
-          <ellipse cx="63.2" cy="38" rx="4.8" ry="2.6" transform="rotate(22 63.2 38)" fill={body} />
-        </g>
+        {holding ? null : (
+          <g style={{ transformOrigin: "52px 44px", animation: `mascot-act-palm ${timing}` }}>
+            <path d="M52 44 Q59 44 61.6 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
+            <ellipse cx="63.2" cy="38" rx="4.8" ry="2.6" transform="rotate(22 63.2 38)" fill={body} />
+          </g>
+        )}
       </>
     );
   }
@@ -321,12 +335,15 @@ export function WorkActFront({ act, body }: { act: string; body: string }) {
     );
   }
   if (act === "wipe") {
-    // the forearm and the hand travel together along the brow, a shade darker than the body
+    // the forearm and the hand travel together along the brow, a shade darker than the body —
+    // the left hand, left to right: the right one holds the stack of a busy face
     return (
-      <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-wipe-hand 1.8s ease-in-out both", opacity: 0 }}>
-        <path d="M51.5 21.5 L60 31" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="6.2" strokeLinecap="round" />
-        <path d="M51.5 21.5 L60 31" fill="none" stroke={handFill(body)} strokeWidth="4.6" strokeLinecap="round" />
-        <ellipse cx="48" cy="19" rx="6" ry="3.4" transform="rotate(-8 48 19)" fill={handFill(body)} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+      <g transform={MIRROR}>
+        <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-wipe-hand 1.8s ease-in-out both", opacity: 0 }}>
+          <path d="M51.5 21.5 L60 31" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="6.2" strokeLinecap="round" />
+          <path d="M51.5 21.5 L60 31" fill="none" stroke={handFill(body)} strokeWidth="4.6" strokeLinecap="round" />
+          <ellipse cx="48" cy="19" rx="6" ry="3.4" transform="rotate(-8 48 19)" fill={handFill(body)} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+        </g>
       </g>
     );
   }
@@ -352,7 +369,7 @@ const POOF_BITS: { x: number; y: number }[] = [
 ];
 
 /** Over everything (after the face): what flies — the cards, the letter, the clock, the coin. */
-export function WorkActOver({ act }: { act: string }) {
+export function WorkActOver({ act, body }: { act: string; body: string }) {
   switch (act) {
     case "catch":
     case "insist":
@@ -422,6 +439,8 @@ export function WorkActOver({ act }: { act: string }) {
           <g transform="translate(42.5 11)">
             <CardShape badge="done" stroke="var(--ok)" />
           </g>
+          {/* the hand on its corner through the wind-up; it lets go at the release */}
+          <ellipse cx="35" cy="16.8" rx="3" ry="2.6" fill={handFill(body)} style={{ animation: "mascot-card-grip 1.2s linear both" }} />
         </g>
       );
     case "medal":
@@ -485,15 +504,17 @@ export function WorkActOver({ act }: { act: string }) {
         </g>
       );
     case "wipe":
-      // the drop the hand flicks off at the end of the brow
+      // the drop the hand flicks off at the end of the brow — mirrored with the hand (WorkActFront)
       return (
-        <path
-          d="M9 15 C12 19 12 22 9 22 C6 22 6 19 9 15 Z"
-          fill="var(--surface)"
-          stroke="var(--accent)"
-          strokeWidth="1.2"
-          style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-fling 1.8s both", opacity: 0 }}
-        />
+        <g transform={MIRROR}>
+          <path
+            d="M9 15 C12 19 12 22 9 22 C6 22 6 19 9 15 Z"
+            fill="var(--surface)"
+            stroke="var(--accent)"
+            strokeWidth="1.2"
+            style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-fling 1.8s both", opacity: 0 }}
+          />
+        </g>
       );
     case "coin":
       return (

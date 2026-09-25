@@ -79,7 +79,7 @@ const DESKS: {
   { caption: "Варит кофе — стоя у машины", scene: "coffee", phase: "doing" },
   { caption: "Заваривает чай", scene: "tea", phase: "doing" },
   { caption: "Приглашает гостя", scene: "guest", phase: "doing" },
-  { caption: "Печатает", scene: "print", phase: "doing" },
+  { caption: "Распечатывает", scene: "print", phase: "doing" },
   { caption: "Вызывает машину", scene: "taxi", phase: "doing" },
   { caption: "Не беспокоить", scene: "dnd", phase: "doing" },
   { caption: "Несёт чашку", scene: "coffee", phase: "done" },
