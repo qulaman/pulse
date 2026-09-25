@@ -1,4 +1,4 @@
--- D-128: «отправить сейчас» after the fact.
+-- D-129: «отправить сейчас» after the fact.
 --
 -- Outside the delivery window (D-38) a task waits as `scheduled` and every word to the team
 -- waits in the outbox with `deliver_after` = the window's opening (D-51 §2, D-114). The
@@ -33,7 +33,7 @@ begin
   end if;
 
   if old.status = 'scheduled' and new.status = 'sent' then
-    ok := uid is null or urole = 'director';               -- the tick, or «Отправить сейчас» (D-128)
+    ok := uid is null or urole = 'director';               -- the tick, or «Отправить сейчас» (D-129)
   elsif old.status = 'sent' and new.status = 'accepted' then
     ok := uid is null or uid = old.assignee_id;
   elsif old.status in ('sent','accepted') and new.status = 'declined' then

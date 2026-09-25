@@ -1,4 +1,4 @@
--- «Отправить сейчас» after the fact (D-128): the director sends a held task at once, and the
+-- «Отправить сейчас» after the fact (D-129): the director sends a held task at once, and the
 -- words a task queued for the morning leave with it; the director's own held pushes stay; a
 -- held announcement goes the same way. Only the director has the button.
 -- Fixtures — supabase/seed.sql: director …0001, …0007 (pinned an employee here — dev's may differ).
