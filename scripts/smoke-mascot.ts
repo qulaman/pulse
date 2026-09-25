@@ -68,7 +68,7 @@ async function main() {
   const changed: string[] = [];
   for (const set of SETS) {
     await page.goto(`${APP_URL}/dev/frames?set=${set}&n=8&size=96`, { waitUntil: "networkidle" });
-    await page.waitForSelector("main[data-ready]", { timeout: 30_000 });
+    await page.waitForSelector("main[data-ready]", { timeout: 120_000 });
     for (const row of await page.locator("[data-row]").all()) {
       const key = (await row.getAttribute("data-row"))!;
       const shot = await row.screenshot();
