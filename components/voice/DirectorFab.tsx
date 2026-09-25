@@ -33,6 +33,8 @@ export function DirectorFab() {
   const draft = stage === "confirm" && !onConfirm;
   const pointsEnabled = usePointsEnabled().data === true;
   const count = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;
+  // nothing parsed out of the words: the draft is a «не разобрал», not «0 сущностей»
+  const unparsed = entities.length === 0;
 
   return (
     <>
@@ -45,9 +47,10 @@ export function DirectorFab() {
             className="flex items-center gap-3 rounded-full border border-border bg-surface py-2 pl-2 pr-2"
             style={{ boxShadow: "var(--shadow-raised)" }}
           >
-            <Mascot state="thinking" size={32} />
+            {/* a «не разобрал» draft: the small face gives the same puzzled tilt as the big one */}
+            <Mascot state="thinking" act={unparsed ? "scratch" : null} size={32} />
             <Link href="/confirm" className="text-[14px] font-medium leading-[18px]">
-              Черновик: {count} {count === 1 ? "сущность" : count < 5 ? "сущности" : "сущностей"} · открыть
+              {unparsed ? "Не разобрал · открыть" : `Черновик: ${count} ${count === 1 ? "сущность" : count < 5 ? "сущности" : "сущностей"} · открыть`}
             </Link>
             <button
               type="button"
