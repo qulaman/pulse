@@ -11,13 +11,14 @@ import type { CSSProperties } from "react";
 /** Where the card over the head sits: the spot of the old «!» of `calling` (D-69). */
 export const CARD_AT = { x: 46, y: -5 };
 
-type Badge = "new" | "insist" | "back" | "done";
+type Badge = "new" | "insist" | "back" | "done" | "ask";
 
 const BADGE_FILL: Record<Badge, string> = {
   new: "var(--warn)",
   insist: "var(--danger)",
   back: "var(--warn)",
   done: "var(--ok)",
+  ask: "var(--warn)",
 };
 
 /**
@@ -55,6 +56,12 @@ function CardShape({ badge, stroke }: { badge: Badge | null; stroke: string }) {
             ) : null}
             {badge === "done" ? (
               <path d="M-2 0.2 l1.4 1.5 l2.8 -3" fill="none" stroke="var(--bg)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            ) : null}
+            {badge === "ask" ? (
+              // the employee's «Уточнить», on the card it came with
+              <text y="0.4" fontSize="6.6" fontWeight="800" textAnchor="middle" dominantBaseline="central" fill="var(--bg)" fontFamily="var(--font-display), system-ui, sans-serif">
+                ?
+              </text>
             ) : null}
           </g>
         </g>
@@ -544,6 +551,272 @@ export function WorkActUnder({ act, body }: { act: string; body: string }) {
       <ellipse cx="35.4" cy="5.2" rx="3" ry="2.6" fill={handFill(body)} />
     </g>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The director's side of the same card (tasks/020)                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the director's face plays when the board moves — the employee's steps and the director's
+ * own decisions, read off two consecutive boards (components/pulse/thoughtActs.ts). The face of
+ * the director has no feelings to show (D-70): every one of these is a gesture of an assistant
+ * with the card in its hands — a tick, a card taken, a fist under the chin, a stamp, a flick, a
+ * crumpled sheet, a push, the clock set forward, a note written back.
+ */
+export type BoardAct = "tick" | "receive" | "hmm" | "puzzle" | "stamp" | "flick" | "crumple" | "push" | "clock" | "reply";
+
+/**
+ * The board acts that take a hand. On «Задачи» (`checking`) the right hand holds the clipboard
+ * and the left one the pencil — the pencil goes down for them, so there are never three hands.
+ */
+export const TAKES_HAND: ReadonlySet<string> = new Set(["hmm", "stamp", "flick", "crumple", "push", "clock", "reply"]);
+
+/** Where a held card sits: in the right hand in front of the body, or on the clipboard of «Задачи». */
+const HELD_AT = { x: 52, y: 46 };
+const ON_BOARD = { x: 60, y: 45 };
+
+/** A thumb over the left edge of a card held in the right hand, as the employee's stack has it. */
+function HeldThumb({ body, animation }: { body: string; animation: string }) {
+  return (
+    <ellipse
+      cx={HELD_AT.x - 8}
+      cy={HELD_AT.y + 2.6}
+      rx="2.3"
+      ry="3.1"
+      transform={`rotate(-18 ${HELD_AT.x - 8} ${HELD_AT.y + 2.6})`}
+      fill={body}
+      style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation, opacity: 0 }}
+    />
+  );
+}
+
+/** A crumpled sheet: a lumpy ball with two creases. */
+function PaperBall() {
+  return (
+    <>
+      <path d="M-4.6 -1.2 L-3.2 -4 L-0.4 -4.8 L2.6 -3.8 L4.6 -1.4 L4.2 1.8 L2.2 4.2 L-1.2 4.6 L-3.8 2.8 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.2" strokeLinejoin="round" />
+      <path d="M-2.6 -2.2 L0.4 0.2 L2.8 -1.6 M0.4 0.2 L-0.6 3" fill="none" stroke="var(--text-muted)" strokeWidth="0.8" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  );
+}
+
+/** Behind the body: the arm that reaches up to the clock (the body covers its root). */
+export function BoardActBehind({ act, body }: { act: string; body: string }) {
+  if (act !== "clock") return null;
+  return (
+    <g style={{ transformOrigin: "12px 30px", animation: "mascot-act-clock-arm 1.8s ease-in-out both" }}>
+      <path d="M12 30 Q5 20 13.4 11" fill="none" stroke={body} strokeWidth="5.2" strokeLinecap="round" />
+      {/* the fingers on the crown of the clock, twisting it */}
+      <g style={{ transformOrigin: "13.4px 10px", animation: "mascot-act-clock-twist 1.8s ease-in-out both" }}>
+        <ellipse cx="14" cy="8.6" rx="3.6" ry="3" transform="rotate(-30 14 8.6)" fill={body} />
+      </g>
+    </g>
+  );
+}
+
+/**
+ * In front of the body, riding it: what the hands do with the card. `board` — the face holds the
+ * clipboard of «Задачи»: the card lies on it instead of in a hand, and a gesture of two hands is
+ * made with the free one.
+ */
+export function BoardActFront({ act, body, board }: { act: string; body: string; board: boolean }) {
+  const hand = handFill(body);
+  switch (act) {
+    case "receive": {
+      // the handed-in card comes up from below into the hand (onto the clipboard) and is read
+      const at = board ? ON_BOARD : HELD_AT;
+      return (
+        <>
+          <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-receive-card 1.6s both", opacity: 0 }}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(${board ? 3 : -4})`}>
+              <CardShape badge="done" stroke="var(--ok)" />
+            </g>
+          </g>
+          {board ? null : <HeldThumb body={body} animation="mascot-act-held-thumb 1.6s both" />}
+        </>
+      );
+    }
+    case "hmm":
+      // a fist under the chin; on «Задачи» it is the left hand — the right one holds the clipboard
+      return (
+        <g transform={board ? MIRROR : undefined}>
+          <g style={{ transformBox: "fill-box", transformOrigin: "80% 100%", animation: "mascot-act-hmm-hand 1.8s ease-in-out both", opacity: 0 }}>
+            <path d="M48 61 L39 53.4" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="6.2" strokeLinecap="round" />
+            <path d="M48 61 L39 53.4" fill="none" stroke={hand} strokeWidth="4.6" strokeLinecap="round" />
+            <ellipse cx="37.4" cy="51.2" rx="3.6" ry="3.1" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+          </g>
+        </g>
+      );
+    case "stamp": {
+      // the card in the left hand, the stamp comes down on it; on «Задачи» it comes down on the clipboard
+      const at = board ? ON_BOARD : { x: 17, y: 50 };
+      return (
+        <g transform={`translate(${at.x} ${at.y})`}>
+          {board ? null : (
+            <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-act-stamp-card 1.8s both", opacity: 0 }}>
+              <g transform="rotate(-5)">
+                <CardShape badge={null} stroke="var(--accent)" />
+              </g>
+              <ellipse cx="-8.6" cy="1.6" rx="2.3" ry="3.1" transform="rotate(18 -8.6 1.6)" fill={body} />
+            </g>
+          )}
+          {/* what the stamp leaves: a tick in a ring */}
+          <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-stamp-mark 1.8s both", opacity: 0 }}>
+            <circle r="4.4" fill="none" stroke="var(--ok)" strokeWidth="1.3" />
+            <path d="M-2.2 0.2 l1.6 1.7 l3 -3.3" fill="none" stroke="var(--ok)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+          <g style={{ animation: "mascot-act-stamp-tool 1.8s both", opacity: 0 }}>
+            <ellipse cx="0" cy="-11.4" rx="3.4" ry="2.8" fill="var(--gold)" />
+            <rect x="-1.5" y="-9.4" width="3" height="6.4" fill="color-mix(in srgb, var(--gold) 70%, var(--bg))" />
+            <rect x="-5.8" y="-3.6" width="11.6" height="3.6" rx="1" fill="var(--gold)" />
+            <rect x="-5.2" y="-0.9" width="10.4" height="0.9" fill="var(--ok)" />
+            {/* the fist on the neck */}
+            <ellipse cx="0" cy="-6.6" rx="3.4" ry="2.8" fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
+          </g>
+        </g>
+      );
+    }
+    case "flick": {
+      // the card sent back to redo leaves the hand with a flick of the wrist, down and away to the left
+      const at = board ? ON_BOARD : HELD_AT;
+      return (
+        <>
+          <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-flick-card 1.4s both", opacity: 0 }}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(4)`}>
+              <CardShape badge={null} stroke="var(--warn)" />
+              {/* the corner turned down in red: «не то» */}
+              <path d="M4.6 -6.5 H9 V-2.1 Z" fill="var(--danger)" />
+            </g>
+          </g>
+          {board ? (
+            // the left hand's fingertip snaps it off the clipboard
+            <ellipse
+              cx={at.x + 11}
+              cy={at.y + 1}
+              rx="2.6"
+              ry="2.2"
+              fill={hand}
+              style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-flick-finger 1.4s both", opacity: 0 }}
+            />
+          ) : (
+            <HeldThumb body={body} animation="mascot-act-flick-thumb 1.4s both" />
+          )}
+        </>
+      );
+    }
+    case "crumple": {
+      // the revoked card is crushed in the fist into a ball, and the ball goes over the edge
+      const at = board ? ON_BOARD : HELD_AT;
+      return (
+        <>
+          <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-crumple-card 1.7s both", opacity: 0 }}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(4)`}>
+              <CardShape badge={null} stroke="var(--text-muted)" />
+            </g>
+          </g>
+          {board ? null : <HeldThumb body={body} animation="mascot-act-crumple-thumb 1.7s both" />}
+          <g transform={`translate(${at.x} ${at.y})`}>
+            <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-crumple-ball 1.7s both", opacity: 0 }}>
+              <PaperBall />
+            </g>
+            <ellipse
+              cx="-1"
+              cy="2.6"
+              rx="4.4"
+              ry="3.6"
+              fill={hand}
+              stroke="var(--bg)"
+              strokeOpacity="0.3"
+              strokeWidth="0.8"
+              style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-crumple-fist 1.7s both", opacity: 0 }}
+            />
+          </g>
+        </>
+      );
+    }
+    case "push":
+      // «Настоять»: the card with «!!» is pushed forward with both hands and goes back out;
+      // on «Задачи» the right hand keeps the clipboard, so it is the left one alone
+      return (
+        <g transform="translate(30 52)">
+          <g style={{ transformOrigin: "0px 0px", animation: "mascot-act-push 1.6s both" }}>
+            <g style={{ animation: "mascot-act-push-card 1.6s both", opacity: 0 }}>
+              <CardShape badge="insist" stroke="var(--danger)" />
+            </g>
+            <g fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" style={{ animation: "mascot-act-push-fists 1.6s both", opacity: 0 }}>
+              <ellipse cx="-10.4" cy="1.4" rx="3.2" ry="3.6" />
+              {board ? null : <ellipse cx="10.4" cy="1.4" rx="3.2" ry="3.6" />}
+            </g>
+          </g>
+        </g>
+      );
+    case "reply": {
+      // the answer to a question: the hand writes a note and the note goes up to the person
+      const at = board ? { x: 58, y: 44 } : { x: 18, y: 49 };
+      return (
+        <g transform={`translate(${at.x} ${at.y})`}>
+          <g style={{ animation: "mascot-act-reply-note 2s both", opacity: 0 }}>
+            <g transform="rotate(-6)">
+              <rect x="-8" y="-6" width="16" height="12" rx="1.8" fill="var(--surface)" stroke="var(--accent)" strokeWidth="1.4" />
+              {[0, 1, 2].map((line) => (
+                <path
+                  key={line}
+                  d={`M-5 ${-2.6 + line * 2.9} h${line === 2 ? 6 : 10}`}
+                  stroke="var(--text-muted)"
+                  strokeWidth="1.2"
+                  strokeLinecap="round"
+                  style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `mascot-act-reply-line 1.2s ease-out ${(0.32 + line * 0.2).toFixed(2)}s both` }}
+                />
+              ))}
+            </g>
+            {board ? null : <ellipse cx="-8.6" cy="1.6" rx="2.3" ry="3.1" transform="rotate(18 -8.6 1.6)" fill={body} />}
+          </g>
+          {/* the pen, and the fist on it, going along the lines */}
+          <g style={{ animation: "mascot-act-reply-pen 2s both", opacity: 0 }}>
+            <path d="M0.6 0.4 L6.4 -3.4" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
+            <path d="M0.6 0.4 L1.9 -0.5" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
+            <ellipse cx="6.8" cy="-3.8" rx="2.8" ry="2.4" fill={hand} />
+          </g>
+        </g>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+/** Over everything: what flies in or hangs by the head — the tick, the card with «?», the clock. */
+export function BoardActOver({ act }: { act: string }) {
+  switch (act) {
+    case "tick":
+      return <Tick at={{ x: 57, y: 13 }} timing="1.2s" />;
+    case "puzzle":
+      // on the left, clear of the watchful ear on the crown (D-70)
+      return (
+        <g style={{ transformOrigin: "11px -1px", animation: "mascot-act-puzzle-card 1.6s both", opacity: 0 }}>
+          <g transform="translate(11 -1) rotate(-8)">
+            <CardShape badge="ask" stroke="var(--warn)" />
+          </g>
+        </g>
+      );
+    case "clock":
+      // a clock by the head; the minute hand is set forward — the deadline moved (or is gone)
+      return (
+        <g style={{ transformOrigin: "7px 1px", animation: "mascot-act-pop 1.8s ease-in-out both", opacity: 0 }}>
+          <rect x="10.4" y="3.2" width="3" height="2.2" rx="0.6" transform="rotate(45 11.9 4.3)" fill="var(--text-muted)" />
+          <circle cx="7" cy="1" r="6.6" fill="var(--surface)" stroke="var(--accent)" strokeWidth="1.4" />
+          <g stroke="var(--text-muted)" strokeWidth="0.9" strokeLinecap="round">
+            <path d="M7 -4.4 v1.2 M7 6.4 v-1.2 M1.6 1 h1.2 M12.4 1 h-1.2" />
+          </g>
+          <path d="M7 1 L9.2 2.2" stroke="var(--text)" strokeWidth="1.3" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-hour 1.8s both" }} />
+          <path d="M7 1 V-3.4" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-minute 1.8s both" }} />
+          <circle cx="7" cy="1" r="0.9" fill="var(--text)" />
+        </g>
+      );
+    default:
+      return null;
+  }
 }
 
 /** The tick of a thing done, the badge of `processing` in small (D-65). */

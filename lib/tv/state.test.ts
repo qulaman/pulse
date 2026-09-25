@@ -7,12 +7,17 @@ import {
   boardUntilFrom,
   burnInShift,
   calendarViewOf,
+  CAROUSEL_MS,
+  carouselNext,
+  carouselScene,
+  carouselScenes,
   clockStyleOf,
   effectiveMode,
   focusRemainingMs,
   guestEndsAt,
   guestOf,
   isNight,
+  ratingViewOf,
   sceneOf,
   shouldReload,
   SHIFT_STEP_MS,
@@ -32,9 +37,13 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest_until: null,
     clock_style: "digital",
     calendar_view: "week",
+    rating_view: "week",
+    carousel: false,
     board_id: null,
     board_until: null,
     board_guest: false,
+    board_point: null,
+    board_view: "list",
     awake_until: null,
     expires_at: null,
     version: 1,
@@ -58,9 +67,14 @@ describe("effectiveMode", () => {
     expect(effectiveMode(row, NOW)).toBe("ether");
   });
 
-  it("строки нет — эфир, и режим `task` пока тоже эфир", () => {
+  it("строки нет — эфир", () => {
     expect(effectiveMode(null, NOW)).toBe("ether");
-    expect(effectiveMode(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T09:05:00Z" }), NOW)).toBe("ether");
+  });
+
+  it("одно дело на стене живёт до `expires_at`, как человек (D-123)", () => {
+    expect(effectiveMode(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T09:05:00Z" }), NOW)).toBe("task");
+    expect(effectiveMode(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T08:55:00Z" }), NOW)).toBe("ether");
+    expect(effectiveMode(state({ mode: "task", task_id: null, expires_at: "2026-09-18T09:05:00Z" }), NOW)).toBe("ether");
   });
 });
 
@@ -222,5 +236,54 @@ describe("board on the wall (D-102)", () => {
     expect(boardUntilFrom(new Date("2026-09-18T18:00:00Z")).toISOString()).toBe("2026-09-18T20:00:00.000Z");
     // 00:30 Aqtobe (19:30 UTC the day before) is still before 21:00 of the new day
     expect(boardUntilFrom(new Date("2026-09-17T19:30:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
+  });
+});
+
+describe("заставка «Рейтинг» и круг заставок (D-123)", () => {
+  it("рейтинг — своя заставка; без очков — лицо", () => {
+    expect(sceneOf(state({ scene: "rating" }), NOW)).toBe("rating");
+    expect(sceneOf(state({ scene: "rating" }), NOW, false)).toBe("face");
+  });
+
+  it("период рейтинга: неделя по умолчанию, месяц — когда сказано", () => {
+    expect(ratingViewOf(null)).toBe("week");
+    expect(ratingViewOf(state({ rating_view: "month" }))).toBe("month");
+    expect(ratingViewOf(state({ rating_view: "year" }))).toBe("week");
+  });
+
+  it("круг: лицо, рейтинг, календарь, команда; без очков — без рейтинга", () => {
+    expect(carouselScenes(true)).toEqual(["face", "rating", "calendar", "team"]);
+    expect(carouselScenes(false)).toEqual(["face", "calendar", "team"]);
+  });
+
+  it("заставка круга — по часам, раз в три минуты, по кругу", () => {
+    const at = (step: number) => new Date(step * CAROUSEL_MS + 1000);
+    expect([0, 1, 2, 3, 4].map((step) => carouselScene(at(step), true))).toEqual(["face", "rating", "calendar", "team", "face"]);
+    expect([0, 1, 2, 3].map((step) => carouselScene(at(step), false))).toEqual(["face", "calendar", "team", "face"]);
+  });
+
+  it("включённый круг перебивает выбранную заставку и доску", () => {
+    const round = state({ carousel: true, scene: "clock" });
+    expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5))).toBe("rating");
+    expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5), false)).toBe("calendar");
+  });
+
+  it("гость в кабинете убирает рейтинг из круга", () => {
+    const round = state({ carousel: true });
+    expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5), true, true)).toBe("calendar");
+    // поставленный руками рейтинг остаётся: стена честно скажет «скрыт»
+    expect(sceneOf(state({ scene: "rating" }), NOW, true, true)).toBe("rating");
+  });
+
+  it("пульт знает, что дальше и когда", () => {
+    const next = carouselNext(new Date(2 * CAROUSEL_MS + 7_000), true);
+    expect(next.scene).toBe("team");
+    expect(next.at.getTime()).toBe(3 * CAROUSEL_MS);
+  });
+
+  it("одно дело на стене будит ночь", () => {
+    const night = new Date("2026-09-18T18:00:00Z"); // 23:00 в Актобе
+    expect(wallAsleep(state(), night)).toBe(true);
+    expect(wallAsleep(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T18:05:00Z" }), night)).toBe(false);
   });
 });

@@ -2,6 +2,7 @@
 
 import { HeadButton } from "@/components/ui/HeadButton";
 import { toast } from "@/components/ui/Toast";
+import { usePointsEnabled } from "@/lib/points/queries";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
 import { sceneOf } from "@/lib/tv/state";
@@ -14,7 +15,9 @@ import { sceneOf } from "@/lib/tv/state";
 export function CalendarOnWall() {
   const state = useTvState();
   const control = useTvControl();
-  const onWall = sceneOf(state.data ?? null) === "calendar";
+  // the round of scenes counts the rating only with points on (D-123): the same count as the wall
+  const points = usePointsEnabled().data ?? true;
+  const onWall = sceneOf(state.data ?? null, new Date(), points) === "calendar";
 
   // the round button of the screen head (D-109): the diode is lit while the calendar is on the wall
   return (

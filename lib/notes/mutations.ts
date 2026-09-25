@@ -38,6 +38,8 @@ type NewNote = {
   /** A point of a board (D-102). */
   board_id?: string | null;
   position?: number | null;
+  /** A sub-point of a board (D-121). */
+  parent_id?: string | null;
 };
 
 /**
@@ -131,6 +133,7 @@ export function useCreateNote(me: Me | undefined) {
         inboxId: null,
         boardId: row.board_id ?? null,
         position: row.position ?? null,
+        parentId: row.parent_id ?? null,
       });
       await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       upsertCached(queryClient, me.userId, {
@@ -142,6 +145,7 @@ export function useCreateNote(me: Me | undefined) {
         pinned: false,
         board_id: null,
         position: null,
+        parent_id: null,
         done_at: null,
         converted_task_id: null,
         converted_announcement_id: null,

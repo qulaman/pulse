@@ -286,7 +286,27 @@ export type SpeechTone = "danger" | "warn" | "ok" | "muted";
  * `message` marks a word in a task's thread, as opposed to a change of the task itself:
  * the employee's thought opens «Сообщения» for it, not «Дела» (D-110).
  */
-export type Phrase = { text: string; tone: SpeechTone; source?: "ether" | "calendar" | "errand"; message?: true };
+export type Phrase = { text: string; tone: SpeechTone; source?: "ether" | "calendar" | "errand"; message?: true; kind?: BoardEventKind };
+
+/**
+ * What happened to a task on the board, as the director's face plays it (tasks/020): the text
+ * says it in words, the kind picks the face's act. The director's own steps are here too — a tap
+ * on «Принять» lands in the board like a change from another phone.
+ */
+export type BoardEventKind =
+  | "new"
+  | "accepted"
+  | "handed"
+  | "declined"
+  | "done"
+  | "rework"
+  | "revoked"
+  | "resent"
+  | "question"
+  | "answered"
+  | "message"
+  | "moved"
+  | "passed";
 
 /** The assignee as the director calls them — first name, nominative, never declined. */
 export function whoOf(task: Pick<BoardTask, "assignee">): string {
@@ -314,7 +334,7 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
   if (!prev && !next) return null;
   if (!prev && next) {
     if (!isOnBoard(next.status)) return null;
-    return { text: `${whoOf(next)}: новая задача ${quoteTitle(next.title)}`, tone: "muted" };
+    return { text: `${whoOf(next)}: новая задача ${quoteTitle(next.title)}`, tone: "muted", kind: "new" };
   }
   if (prev && !next) return null; // pruned after its goodbye — the goodbye was said on the status change
   const before = prev!;
@@ -326,46 +346,46 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
     switch (after.status) {
       case "accepted":
       case "in_progress":
-        return { text: `${who}: задача ${title} принята в работу`, tone: "muted" };
+        return { text: `${who}: задача ${title} принята в работу`, tone: "muted", kind: "accepted" };
       case "pending_review":
-        return { text: `${who}: задача ${title} сдана, ждёт приёмки`, tone: "ok" };
+        return { text: `${who}: задача ${title} сдана, ждёт приёмки`, tone: "ok", kind: "handed" };
       case "declined": {
         const reason = after.decline_reason ? `: ${lowerFirst(after.decline_reason.trim())}` : "";
-        return { text: `${who} не может ${title}${reason}`, tone: "warn" };
+        return { text: `${who} не может ${title}${reason}`, tone: "warn", kind: "declined" };
       }
       case "done":
-        return { text: `Принято: ${title}`, tone: "ok" };
+        return { text: `Принято: ${title}`, tone: "ok", kind: "done" };
       case "rework":
-        return { text: `${who}: задача ${title} на доработке`, tone: "warn" };
+        return { text: `${who}: задача ${title} на доработке`, tone: "warn", kind: "rework" };
       case "revoked":
-        return { text: `Задача ${title} отозвана`, tone: "muted" };
+        return { text: `Задача ${title} отозвана`, tone: "muted", kind: "revoked" };
       case "sent":
         return before.status === "declined"
-          ? { text: `${who}: задача ${title} отправлена снова`, tone: "muted" }
-          : { text: `${who}: новая задача ${title}`, tone: "muted" };
+          ? { text: `${who}: задача ${title} отправлена снова`, tone: "muted", kind: "resent" }
+          : { text: `${who}: новая задача ${title}`, tone: "muted", kind: "new" };
       default:
         return null;
     }
   }
   if (after.status === "declined" && after.decline_reason && after.decline_reason !== before.decline_reason) {
-    return { text: `${who} не может ${title}: ${lowerFirst(after.decline_reason.trim())}`, tone: "warn" };
+    return { text: `${who} не может ${title}: ${lowerFirst(after.decline_reason.trim())}`, tone: "warn", kind: "declined" };
   }
   if (after.question && after.question_id !== before.question_id) {
-    return { text: `${who} спрашивает по ${title}: «${shortQuestion(after.question)}»`, tone: "warn" };
+    return { text: `${who} спрашивает по ${title}: «${shortQuestion(after.question)}»`, tone: "warn", kind: "question" };
   }
   if (!after.question && before.question) {
-    return { text: `${who}: вопрос по ${title} закрыт`, tone: "muted" };
+    return { text: `${who}: вопрос по ${title} закрыт`, tone: "muted", kind: "answered" };
   }
   if (hasUnread(after, meId) && after.last_message!.id !== before.last_message?.id && after.last_message!.id !== after.question_id) {
     const words = messageOf(after, meId) ?? "";
-    return { text: `${who} пишет по ${title}: «${shortQuestion(words)}»`, tone: "warn" };
+    return { text: `${who} пишет по ${title}: «${shortQuestion(words)}»`, tone: "warn", kind: "message" };
   }
   if (after.deadline !== before.deadline) {
     const when = after.deadline ? `до ${humanAqtobe(new Date(after.deadline), now)}` : "без срока";
-    return { text: `${who}: задача ${title} ${when}`, tone: "muted" };
+    return { text: `${who}: задача ${title} ${when}`, tone: "muted", kind: "moved" };
   }
   if (after.assignee_id !== before.assignee_id) {
-    return { text: `Задача ${title} передана: ${who}`, tone: "muted" };
+    return { text: `Задача ${title} передана: ${who}`, tone: "muted", kind: "passed" };
   }
   return null;
 }

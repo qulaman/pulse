@@ -16,9 +16,13 @@ function state(patch: Partial<TvState> = {}): TvState {
     guest_until: null,
     clock_style: "digital",
     calendar_view: "week",
+    rating_view: "week",
+    carousel: false,
     board_id: null,
     board_until: null,
     board_guest: false,
+    board_point: null,
+    board_view: "list",
     awake_until: null,
     expires_at: null,
     version: 1,
@@ -100,7 +104,7 @@ describe("wallNow", () => {
 
 describe("SCENE_LABEL", () => {
   it("даёт русское имя каждой сцене", () => {
-    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь", board: "Доска" });
+    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь", board: "Доска", rating: "Рейтинг" });
   });
 });
 
@@ -116,5 +120,25 @@ describe("keyLabels", () => {
     expect(labels.get("b")).toBe("Ерлан Д.");
     expect(labels.get("c")).toBe("Марат");
     expect(labels.get("d")).toBe("Айгуль");
+  });
+});
+
+describe("wallNow — стена v4 (D-123)", () => {
+  it("рейтинг недели и месяца", () => {
+    expect(wallNow(state({ scene: "rating" }), PEOPLE, NOW)).toBe("Эфир · рейтинг недели");
+    expect(wallNow(state({ scene: "rating", rating_view: "month" }), PEOPLE, NOW)).toBe("Эфир · рейтинг месяца");
+    // очки выключены — на стене лицо, и пульт говорит то же
+    expect(wallNow(state({ scene: "rating" }), PEOPLE, NOW, [], { points: false })).toBe("Эфир · лицо");
+  });
+
+  it("одно дело — название и сколько осталось", () => {
+    const row = state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T09:07:00Z" });
+    expect(wallNow(row, PEOPLE, NOW, [], { taskTitle: "Замер окон" })).toBe("Дело «Замер окон» · ещё 7 мин");
+    expect(wallNow(row, PEOPLE, NOW)).toBe("Одно дело · ещё 7 мин");
+  });
+
+  it("круг заставок — сцена и «по кругу»", () => {
+    const text = wallNow(state({ carousel: true }), PEOPLE, NOW);
+    expect(text).toMatch(/^Эфир · .+ · по кругу$/);
   });
 });

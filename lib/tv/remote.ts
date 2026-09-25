@@ -2,12 +2,15 @@ import { tvTime } from "./clock";
 import type { TvState } from "./queries";
 import {
   calendarViewOf,
+  carouselOn,
   effectiveMode,
   focusRemainingMs,
+  ratingViewOf,
   sceneOf,
   wallAsleep,
   type CalendarView,
   type ClockStyle,
+  type RatingView,
   type TvScene,
 } from "./state";
 
@@ -34,6 +37,7 @@ export const SCENE_LABEL: Record<TvScene, string> = {
   team: "Команда",
   calendar: "Календарь",
   board: "Доска",
+  rating: "Рейтинг",
 };
 
 /** Переключатель часов на пульте (D-96): как на стене, так и на клавише. */
@@ -48,12 +52,19 @@ export const CALENDAR_LABEL: Record<CalendarView, string> = {
   month: "Месяц",
 };
 
+/** Период рейтинга на стене (D-123) — те же слова, что у экрана «Рейтинг». */
+export const RATING_LABEL: Record<RatingView, string> = {
+  week: "Неделя",
+  month: "Месяц",
+};
+
 const SCENE_NOW: Record<TvScene, string> = {
   face: "Эфир · лицо",
   clock: "Эфир · часы",
   team: "Эфир · команда",
   calendar: "Эфир · календарь",
   board: "Эфир · доска",
+  rating: "Эфир · рейтинг недели",
 };
 
 export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
@@ -74,28 +85,37 @@ export function wallReceipt(state: TvState | null, now: Date): WallReceipt {
 
 /**
  * Что показывается прямо сейчас: «Эфир · часы», «Марат Ахметов · ещё 7 мин»,
- * «Доска «Планёрка» · до 21:00» (D-102) — названия досок пульт отдаёт списком — или
- * «Ночь · тусклые часы», пока стена спит (D-105): иначе пульт ночью обещал бы лицо.
+ * «Дело «Замер окон» · ещё 7 мин» (D-123), «Доска «Планёрка» · до 21:00» (D-102) —
+ * названия досок пульт отдаёт списком — или «Ночь · тусклые часы», пока стена спит (D-105):
+ * иначе пульт ночью обещал бы лицо. Круг заставок — «· по кругу» после сцены (D-123).
  */
 export function wallNow(
   state: TvState | null,
   people: { id: string; full_name: string }[],
   now: Date,
   boards: { id: string; title: string }[] = [],
+  extra: { points?: boolean; guest?: boolean; taskTitle?: string | null } = {},
 ): string {
-  if (effectiveMode(state, now) === "employee" && state?.employee_id) {
+  const mode = effectiveMode(state, now);
+  const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
+  if (mode === "employee" && state?.employee_id) {
     const person = people.find((p) => p.id === state.employee_id);
-    const minutes = Math.ceil(focusRemainingMs(state, now) / 60_000);
     return `${person?.full_name ?? "Сотрудник"} · ещё ${minutes} мин`;
   }
+  if (mode === "task") {
+    const title = extra.taskTitle?.trim();
+    return `${title ? `Дело «${title}»` : "Одно дело"} · ещё ${minutes} мин`;
+  }
   if (wallAsleep(state, now)) return "Ночь · тусклые часы";
-  const scene = sceneOf(state, now);
-  if (scene === "calendar" && calendarViewOf(state) === "month") return "Эфир · календарь · месяц";
+  const scene = sceneOf(state, now, extra.points ?? true, extra.guest ?? false);
+  const round = carouselOn(state) ? " · по кругу" : "";
+  if (scene === "calendar" && calendarViewOf(state) === "month") return `Эфир · календарь · месяц${round}`;
+  if (scene === "rating") return `${ratingViewOf(state) === "month" ? "Эфир · рейтинг месяца" : SCENE_NOW.rating}${round}`;
   if (scene === "board" && state?.board_until) {
     const title = boards.find((board) => board.id === state.board_id)?.title;
     return `${title ? `Доска «${title}»` : "Доска"} · до ${tvTime(new Date(state.board_until))}`;
   }
-  return SCENE_NOW[scene];
+  return `${SCENE_NOW[scene]}${round}`;
 }
 
 export { keyLabels } from "@/lib/people/labels";

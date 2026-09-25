@@ -1,5 +1,6 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -12,15 +13,20 @@ import { ANSWERS } from "@/components/visits/VisitAsk";
 import { boardOnWall, splitBoards } from "@/lib/mindboard/list";
 import { useBoards } from "@/lib/mindboard/queries";
 import { usePeople } from "@/lib/people/queries";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { createBrowserSupabase } from "@/lib/supabase/client";
 import { useMe } from "@/lib/tasks/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
-import { CALENDAR_LABEL, CLOCK_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
+import { CALENDAR_LABEL, CLOCK_LABEL, RATING_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
   awakeUntil,
   CALENDAR_VIEWS,
   calendarViewOf,
+  carouselNext,
+  carouselOn,
+  carouselScenes,
   CLOCK_STYLES,
   clockStyleOf,
   effectiveMode,
@@ -29,11 +35,14 @@ import {
   guestEndsAt,
   guestOf,
   isNight,
+  RATING_VIEWS,
+  ratingViewOf,
   sceneOf,
   TV_SCENES,
   WAKE_MS,
   type CalendarView,
   type ClockStyle,
+  type RatingView,
   type TvScene,
 } from "@/lib/tv/state";
 import { useAnswerVisit } from "@/lib/visits/mutations";
@@ -62,6 +71,11 @@ import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text
  *
  * С D-105: ночью, с 21:00 до 08:00, под дисплеем ползунок «Разбудить экран» — стена
  * возвращается из тусклых часов в эфир на два часа; тот же ползунок усыпляет её сразу.
+ *
+ * С D-123: заставка «Рейтинг» (только при включённых очках) и шов «Рейтинг на стене» с
+ * «Неделя / Месяц»; клавиша «По кругу» — стена сама меняет лицо, рейтинг, календарь и
+ * команду раз в три минуты, любая заставка руками круг останавливает; одно дело во весь
+ * экран ставится с экрана задачи, а дисплей пульта называет его.
  */
 
 /** Клавиш досок на пульте — три последние: мышечной памяти хватает, остальное — в «Заметках». */
@@ -73,7 +87,22 @@ const SCENE_HINT: Record<TvScene, string> = {
   team: "Кто чем занят",
   calendar: "Неделя вперёд: что запланировано",
   board: "Пункты директора — до 21:00",
+  rating: "Пятёрка лучших, рост и награды",
 };
+
+/** The order on the wall has a name on the remote's display (D-123); the director reads tasks. */
+function useTaskTitle(taskId: string | null) {
+  return useQuery({
+    queryKey: ["tv", "task-title", taskId],
+    enabled: Boolean(taskId),
+    staleTime: 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const supabase = createBrowserSupabase();
+      const { data } = await supabase.from("tasks").select("title").eq("id", taskId!).maybeSingle();
+      return data?.title ?? null;
+    },
+  });
+}
 
 const RECEIPT_COLOR = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
 
@@ -96,16 +125,26 @@ export default function ScreenPage() {
   const answer = useAnswerVisit();
   const me = useMe();
   const boards = useBoards(me.data?.userId);
+  const pointsEnabled = usePointsEnabled();
+  const taskTitle = useTaskTitle(state.data?.mode === "task" ? (state.data.task_id ?? null) : null);
 
   if (state.isLoading || people.isLoading) return <ScreenPageSkeleton />;
 
   const row = state.data ?? null;
   const mode = effectiveMode(row, now);
-  const scene = sceneOf(row, now);
+  // the rating needs points (D-48): the key and the round follow the company switch (D-123)
+  const points = pointsEnabled.data ?? true;
+  const guest = guestOf(row, false, now);
+  const scene = sceneOf(row, now, points, guest);
+  const round = carouselOn(row);
+  // a guest takes the rating out of the round (D-33): the remote counts the same round as the wall
+  const roundPoints = points && !guest;
+  const next = carouselNext(now, roundPoints);
+  const ratingView = ratingViewOf(row);
+  const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || pointsEnabled.data === true);
   const lastBoards = splitBoards(boards.data ?? [], now).live.slice(0, BOARD_KEYS);
   const clock = clockStyleOf(row);
   const calendarView = calendarViewOf(row);
-  const guest = guestOf(row, false, now);
   const guestEnds = guestEndsAt(row, now);
   const night = isNight(now);
   const awake = awakeUntil(row, now);
@@ -152,7 +191,7 @@ export default function ScreenPage() {
           ) : (
             <>
               <p className="mt-2 truncate font-display text-[21px] font-bold leading-7 tracking-[-0.02em]">
-                {wallNow(row, people.data ?? [], now, boards.data ?? [])}
+                {wallNow(row, people.data ?? [], now, boards.data ?? [], { points, guest, taskTitle: taskTitle.data })}
               </p>
               <p className="mt-1 text-[13px] leading-[18px]" style={{ color: RECEIPT_COLOR[receipt.tone] }}>
                 {receipt.text}
@@ -166,7 +205,7 @@ export default function ScreenPage() {
                   Поверх всего — сообщение секретаря
                 </p>
               ) : null}
-              {mode === "employee" ? (
+              {mode !== "ether" ? (
                 <div className="mt-3">
                   <Gauge ratio={remainingMs / FOCUS_MS} />
                 </div>
@@ -244,7 +283,7 @@ export default function ScreenPage() {
         <div className="mt-3 flex items-stretch gap-2">
           <Key
             icon={<EtherIcon />}
-            disabled={mode !== "employee"}
+            disabled={mode === "ether"}
             onClick={() => show({ mode: "ether" }, "Вернул эфир")}
           >
             Вернуть эфир
@@ -257,16 +296,18 @@ export default function ScreenPage() {
           />
         </div>
 
-        {/* four scenes, two by two; the lit dot under the one on the wall */}
-        <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2">
-          {TV_SCENES.map((value) => (
+        {/* the scenes three across, the round last; the lit dot under the one on the wall. While
+            the round turns, no scene key is lit — a tap on one pins it and stops the round (D-123) */}
+        <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-2" data-testid="remote-scenes">
+          {sceneKeys.map((value) => (
             <div key={value} className="flex flex-col items-stretch gap-1.5">
               <Key
                 tall
-                on={scene === value}
+                on={!round && scene === value}
                 icon={SCENE_ICON[value]}
+                data-testid={`remote-scene-${value}`}
                 onClick={() => {
-                  if (scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
+                  if (round || scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
                 }}
               >
                 {SCENE_LABEL[value]}
@@ -276,8 +317,64 @@ export default function ScreenPage() {
               </span>
             </div>
           ))}
+          <div className="flex flex-col items-stretch gap-1.5">
+            <Key
+              tall
+              on={round}
+              icon={<RoundIcon />}
+              aria-pressed={round}
+              data-testid="remote-carousel"
+              onClick={() =>
+                show(
+                  { carousel: !round },
+                  round ? "Заставки больше не меняются" : "Заставки меняются по кругу · раз в 3 мин",
+                )
+              }
+            >
+              По кругу
+            </Key>
+            <span className="flex justify-center">
+              <Dot on={round} />
+            </span>
+          </div>
         </div>
-        <p className="mt-1 px-1 text-center text-[13px] leading-[18px] text-muted">{SCENE_HINT[scene]}</p>
+        <p className="mt-1 px-1 text-center text-[13px] leading-[18px] text-muted">
+          {round
+            ? `${carouselScenes(roundPoints).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
+            : SCENE_HINT[scene]}
+        </p>
+
+        {/* the rating on the wall (D-123): the week or the month. Outside the round a tap puts the
+            rating up in that period; inside it only the period changes and the round goes on */}
+        {pointsEnabled.data === true ? (
+          <>
+            <Seam label="Рейтинг на стене" />
+            <div className="mt-2 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Рейтинг на стене">
+              {RATING_VIEWS.map((value: RatingView) => {
+                const lit = ratingView === value && (round || scene === "rating");
+                return (
+                  <Key
+                    key={value}
+                    on={lit}
+                    role="radio"
+                    aria-checked={lit}
+                    icon={value === "month" ? <MonthIcon /> : <WeekIcon />}
+                    onClick={() => {
+                      if (round) {
+                        if (ratingView !== value) show({ rating: value }, value === "month" ? "В круге — рейтинг месяца" : "В круге — рейтинг недели");
+                        return;
+                      }
+                      if (scene === "rating" && ratingView === value) return;
+                      show({ scene: "rating", rating: value }, value === "month" ? "На стене — рейтинг месяца" : "На стене — рейтинг недели");
+                    }}
+                  >
+                    {RATING_LABEL[value]}
+                  </Key>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
 
         {/* the calendar on the wall: today with the week, or the month (D-98). One tap puts the
             calendar up in that view — the key is also the way to the scene */}
@@ -479,8 +576,28 @@ const BoardIcon = () => (
   </svg>
 );
 
+/** A podium: the rating scene and its periods (D-123). */
+const PodiumIcon = () => (
+  <svg {...icon}>
+    <path d="M7.2 16.6V8.6h5.6v8" />
+    <path d="M2.8 16.6v-5h4.4M12.8 16.6v-3.6h4.4v3.6M2.4 16.6h15.2" />
+    <path d="M10 3.4l.8 1.6 1.7.2-1.2 1.2.3 1.7-1.6-.8-1.6.8.3-1.7-1.2-1.2 1.7-.2z" strokeWidth="1.3" />
+  </svg>
+);
+
+/** Two arrows chasing each other: the scenes change by themselves (D-123). */
+const RoundIcon = () => (
+  <svg {...icon}>
+    <path d="M15.6 8.2a6 6 0 0 0-10.8-1.6" />
+    <path d="M4.4 3.8v3.2h3.2" />
+    <path d="M4.4 11.8a6 6 0 0 0 10.8 1.6" />
+    <path d="M15.6 16.2V13h-3.2" />
+  </svg>
+);
+
 const SCENE_ICON: Record<TvScene, React.ReactNode> = {
   board: <BoardIcon />,
+  rating: <PodiumIcon />,
   face: (
     <svg {...icon}>
       <circle cx="10" cy="10" r="7" />

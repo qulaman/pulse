@@ -29,6 +29,8 @@ export type PendingCreate = {
   /** A point of a board (D-102): the board and the place on it. Absent in entries kept before boards. */
   boardId?: string | null;
   position?: number | null;
+  /** A sub-point (D-121): the point it hangs under; its position is among its siblings. */
+  parentId?: string | null;
 };
 
 /** A board born on the phone (D-102): it must reach the server before its points do. */
@@ -41,7 +43,15 @@ export type PendingBoard = {
   createdAt: string;
 };
 
-export type NoteFields = { text?: string; pinned?: boolean; remind_at?: string | null; done_at?: string | null; position?: number };
+export type NoteFields = {
+  text?: string;
+  pinned?: boolean;
+  remind_at?: string | null;
+  done_at?: string | null;
+  position?: number;
+  /** A point moved under another one, or back to the top of its board (D-121). */
+  parent_id?: string | null;
+};
 
 /** The fields of one note still owed to the server, merged — the latest value of each wins. */
 export type PendingEdit = { id: string; userId: string; fields: NoteFields; at: number };

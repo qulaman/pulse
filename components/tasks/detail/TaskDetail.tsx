@@ -59,6 +59,7 @@ export function TaskDetail({
   base,
   now,
   onBack,
+  wall,
 }: {
   task: TaskWithPeople;
   messages: TaskMessage[] | undefined;
@@ -67,6 +68,8 @@ export function TaskDetail({
   base: TaskActions;
   now: Date;
   onBack: () => void;
+  /** The director's «На экран» (D-123): the page passes it, the sandbox does not. */
+  wall?: ReactNode;
 }) {
   const isDirector = me.role === "director";
   const question = latestOpenQuestion(messages);
@@ -108,7 +111,14 @@ export function TaskDetail({
       <PageHead
         bare
         back={{ label: "Назад", onClick: onBack }}
-        actions={isDirector ? <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} /> : null}
+        actions={
+          isDirector ? (
+            <>
+              {wall}
+              <HeadButton label="Все действия" icon="more" testId="task-more" onClick={() => director.more(task)} />
+            </>
+          ) : null
+        }
       />
 
       {/* the status screen of this one task */}

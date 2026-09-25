@@ -377,6 +377,67 @@ export function storyBoard(focus: TvFocusEmployee, now: Date): StoryBoard {
   };
 }
 
+/* -------------------------------------------------------------------------- */
+/* Одно дело во весь экран (D-123)                                             */
+/* -------------------------------------------------------------------------- */
+
+export type TaskStepKey = "posted" | "accepted" | "review" | "done";
+
+export type TaskStep = {
+  key: TaskStepKey;
+  label: string;
+  /** Когда шаг пройден: «09:12», «ср 09:12», «12 сен»; не пройден — null. */
+  time: string | null;
+  state: "passed" | "now" | "next";
+};
+
+const STEP_LABEL: Record<TaskStepKey, string> = {
+  posted: "Поставлена",
+  accepted: "Принята в работу",
+  review: "Сдана на проверку",
+  done: "Принята директором",
+};
+
+/** Сколько шагов пройдено по статусу: новая — один, в работе — два, на проверке — три. */
+const REACHED: Record<string, number> = {
+  sent: 1,
+  accepted: 2,
+  in_progress: 2,
+  rework: 2,
+  pending_review: 3,
+  done: 4,
+};
+
+/**
+ * Четыре шага дела крупно — «Поставлена → Принята в работу → Сдана → Принята директором»:
+ * пройденные с временем, текущий подсвечен. Возврат на доработку откатывает «Сдана»: шаг
+ * снова впереди, без отдельного слова (D-45). Время сдачи — последней, а не первой.
+ */
+export function taskSteps(task: TvFocusTask, now: Date): TaskStep[] {
+  const story = [...(task.story ?? [])]
+    .filter((event) => !Number.isNaN(Date.parse(event.at)))
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  const first = (kind: TvStoryEvent["k"]) => story.find((event) => event.k === kind);
+  const last = (kind: TvStoryEvent["k"]) => [...story].reverse().find((event) => event.k === kind);
+  const reached = REACHED[task.status] ?? 2;
+  const at: Record<TaskStepKey, TvStoryEvent | undefined> = {
+    posted: first("posted"),
+    accepted: first("accepted"),
+    review: last("review"),
+    done: last("done"),
+  };
+  return (["posted", "accepted", "review", "done"] as const).map((key, index) => {
+    const passed = index < reached;
+    const event = passed ? at[key] : undefined;
+    return {
+      key,
+      label: STEP_LABEL[key],
+      time: event ? storyTime(event.at, now) : null,
+      state: passed ? "passed" : index === reached ? "now" : "next",
+    };
+  });
+}
+
 export type RatingBar = { value: number; current: boolean };
 
 export type RatingView = {

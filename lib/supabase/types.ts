@@ -616,6 +616,7 @@ export type Database = {
           done_at: string | null
           id: string
           inbox_item_id: string | null
+          parent_id: string | null
           pinned: boolean
           position: number | null
           raw_transcript: string | null
@@ -638,6 +639,7 @@ export type Database = {
           done_at?: string | null
           id?: string
           inbox_item_id?: string | null
+          parent_id?: string | null
           pinned?: boolean
           position?: number | null
           raw_transcript?: string | null
@@ -660,6 +662,7 @@ export type Database = {
           done_at?: string | null
           id?: string
           inbox_item_id?: string | null
+          parent_id?: string | null
           pinned?: boolean
           position?: number | null
           raw_transcript?: string | null
@@ -703,6 +706,13 @@ export type Database = {
             columns: ["inbox_item_id"]
             isOneToOne: false
             referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notes_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "notes"
             referencedColumns: ["id"]
           },
           {
@@ -1565,8 +1575,11 @@ export type Database = {
           awake_until: string | null
           board_guest: boolean
           board_id: string | null
+          board_point: string | null
           board_until: string | null
+          board_view: string
           calendar_view: string
+          carousel: boolean
           clock_style: string
           company_id: string
           employee_id: string | null
@@ -1574,6 +1587,7 @@ export type Database = {
           guest: boolean
           guest_until: string | null
           mode: string
+          rating_view: string
           reload_requested_at: string | null
           scene: string
           seen_at: string | null
@@ -1587,8 +1601,11 @@ export type Database = {
           awake_until?: string | null
           board_guest?: boolean
           board_id?: string | null
+          board_point?: string | null
           board_until?: string | null
+          board_view?: string
           calendar_view?: string
+          carousel?: boolean
           clock_style?: string
           company_id: string
           employee_id?: string | null
@@ -1596,6 +1613,7 @@ export type Database = {
           guest?: boolean
           guest_until?: string | null
           mode?: string
+          rating_view?: string
           reload_requested_at?: string | null
           scene?: string
           seen_at?: string | null
@@ -1609,8 +1627,11 @@ export type Database = {
           awake_until?: string | null
           board_guest?: boolean
           board_id?: string | null
+          board_point?: string | null
           board_until?: string | null
+          board_view?: string
           calendar_view?: string
+          carousel?: boolean
           clock_style?: string
           company_id?: string
           employee_id?: string | null
@@ -1618,6 +1639,7 @@ export type Database = {
           guest?: boolean
           guest_until?: string | null
           mode?: string
+          rating_view?: string
           reload_requested_at?: string | null
           scene?: string
           seen_at?: string | null
@@ -1632,6 +1654,13 @@ export type Database = {
             columns: ["board_id"]
             isOneToOne: false
             referencedRelation: "mind_boards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tv_state_board_point_fkey"
+            columns: ["board_point"]
+            isOneToOne: false
+            referencedRelation: "notes"
             referencedColumns: ["id"]
           },
           {
@@ -2110,6 +2139,39 @@ export type Database = {
         Returns: Json
       }
       tv_board: { Args: { p_guest?: boolean }; Returns: Json }
+      tv_board_control: {
+        Args: { p_clear_point?: boolean; p_point?: string; p_view?: string }
+        Returns: {
+          applied_version: number | null
+          awake_until: string | null
+          board_guest: boolean
+          board_id: string | null
+          board_point: string | null
+          board_until: string | null
+          board_view: string
+          calendar_view: string
+          clock_style: string
+          company_id: string
+          employee_id: string | null
+          expires_at: string | null
+          guest: boolean
+          guest_until: string | null
+          mode: string
+          reload_requested_at: string | null
+          scene: string
+          seen_at: string | null
+          task_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tv_state"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       tv_calendar: {
         Args: { p_days?: number; p_from?: string; p_guest?: boolean }
         Returns: Json
@@ -2119,10 +2181,12 @@ export type Database = {
           p_board?: string
           p_board_guest?: boolean
           p_calendar?: string
+          p_carousel?: boolean
           p_clock?: string
           p_employee_id?: string
           p_guest?: boolean
           p_mode?: string
+          p_rating?: string
           p_reload?: boolean
           p_scene?: string
           p_task_id?: string
@@ -2133,8 +2197,11 @@ export type Database = {
           awake_until: string | null
           board_guest: boolean
           board_id: string | null
+          board_point: string | null
           board_until: string | null
+          board_view: string
           calendar_view: string
+          carousel: boolean
           clock_style: string
           company_id: string
           employee_id: string | null
@@ -2142,6 +2209,7 @@ export type Database = {
           guest: boolean
           guest_until: string | null
           mode: string
+          rating_view: string
           reload_requested_at: string | null
           scene: string
           seen_at: string | null
@@ -2177,6 +2245,7 @@ export type Database = {
       }
       tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
       tv_overlay: { Args: never; Returns: Json }
+      tv_rating: { Args: { p_guest?: boolean; p_period?: string }; Returns: Json }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
       tv_task_story: { Args: { p_task: string }; Returns: Json }
       tv_touch: {

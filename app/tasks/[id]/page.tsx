@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { TaskDetail } from "@/components/tasks/detail/TaskDetail";
+import { TaskOnWall } from "@/components/tasks/TaskOnWall";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { PageHead } from "@/components/ui/PageHead";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
@@ -72,6 +73,7 @@ export default function TaskThreadPage() {
       base={actions}
       now={now}
       onBack={back}
+      wall={me.data.role === "director" ? <TaskOnWall taskId={task.data.id} status={task.data.status} title={task.data.title} /> : null}
     />
   );
 }
