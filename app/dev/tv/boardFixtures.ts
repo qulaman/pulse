@@ -140,6 +140,35 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
   return { hidden: false, board };
 }
 
+/**
+ * Демо песочницы (`&demo=focus|view|1`): ведущий сам ходит по пунктам раз в `DEMO_STEP_MS`,
+ * вид «Список / Карта» меняется каждый шаг (`view`) или каждый третий (`1` — и то и другое).
+ * Для замеров перфа и покадровой проверки «ничего не прыгает» без пульта и базы.
+ */
+export type BoardDemo = "focus" | "view" | "both";
+export const DEMO_STEP_MS = 2_000;
+
+export function demoOf(param: string | undefined): BoardDemo | null {
+  return param === "focus" || param === "view" ? param : param === "1" ? "both" : null;
+}
+
+const demos = new WeakMap<TvBoard, Map<string, TvBoard>>();
+
+/** Доска на шаге демо: те же пункты (тот же объект — раскладка не пересчитывается), другие подсветка и вид. */
+export function boardDemo(data: TvBoard, demo: BoardDemo, step: number): TvBoard {
+  const board = data.board;
+  if (!board || board.items.length === 0) return data;
+  const focus = demo === "view" ? board.focus : board.items[step % board.items.length].id;
+  const flip = demo === "view" ? step % 2 === 1 : demo === "both" ? Math.floor(step / 3) % 2 === 1 : false;
+  const view = flip ? (board.view === "map" ? "list" : "map") : board.view;
+  const key = `${focus}|${view}`;
+  let byKey = demos.get(data);
+  if (!byKey) demos.set(data, (byKey = new Map()));
+  let shown = byKey.get(key);
+  if (!shown) byKey.set(key, (shown = { ...data, board: { ...board, focus, view } }));
+  return shown;
+}
+
 const cache = new Map<string, TvBoard>();
 
 /** Доска случая v2, или undefined — случай не отсюда (его рисует WallSandbox сам). */
