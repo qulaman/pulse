@@ -3,10 +3,10 @@
 import { useMutation, useMutationState, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
-import { isNetworkError } from "@/lib/net";
+import { isNetworkError, NetworkError } from "@/lib/net";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-import { claim, dropCreate, keepCreate, keepEdit, release, settleEdit, type NoteFields } from "./pending";
+import { claim, dropCreate, hasCreate, keepCreate, keepEdit, release, settleEdit, type NoteFields } from "./pending";
 import { noteKeys, type Note } from "./queries";
 
 /**
@@ -64,6 +64,25 @@ export async function insertNote(me: Me, row: NewNote): Promise<Note> {
 
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
 const KEPT_OFFLINE = "Нет связи — сохранил на телефоне, отправлю сам";
+/** The server's branch rule said no (D-121): the move is undone on screen too. */
+const REFUSED_BRANCH = "Не получилось сложить ветку — вернул как было";
+
+/** The server refused a branch (`bad_parent`, D-121): not a point of this board, or one level too deep. */
+export function refusedBranch(error: unknown): boolean {
+  return error instanceof Error && /bad_parent/.test(error.message);
+}
+
+/**
+ * A sub-point whose point is still only on the phone (D-121): the server refuses it until the
+ * point lands. That is not a failure — it waits like a thought without network: retried on
+ * the network's beat, then left to the replay, which always sends the point first.
+ */
+export class WaitsForPoint extends NetworkError {
+  constructor() {
+    super("Подпункт ждёт свой пункт");
+    this.name = "WaitsForPoint";
+  }
+}
 
 /**
  * Creates and edits of notes run one after another (TanStack `scope`): an edit made
@@ -100,7 +119,7 @@ function rollback(queryClient: QueryClient, userId: string, snapshot: Note[] | u
 }
 
 function fail(error: unknown) {
-  toast(error instanceof Error ? error.message : GENERIC_ERROR);
+  toast(refusedBranch(error) ? REFUSED_BRANCH : error instanceof Error ? error.message : GENERIC_ERROR);
 }
 
 /**
@@ -114,7 +133,15 @@ export function useCreateNote(me: Me | undefined) {
   return useMutation({
     mutationKey: ["notes", "create"],
     scope: SERIAL,
-    mutationFn: (row: NewNote) => insertNote(me as Me, row),
+    mutationFn: async (row: NewNote) => {
+      try {
+        return await insertNote(me as Me, row);
+      } catch (error) {
+        // a sub-point typed under a point that has not left the phone yet (D-121)
+        if (row.parent_id && refusedBranch(error) && (await hasCreate(row.parent_id))) throw new WaitsForPoint();
+        throw error;
+      }
+    },
     onMutate: async (row) => {
       if (!me) return;
       const now = new Date().toISOString();
@@ -164,9 +191,9 @@ export function useCreateNote(me: Me | undefined) {
     },
     onError: (error, row) => {
       // a dead network after all retries: the note stays on screen and on the phone,
-      // the replay sends it when the network is back
+      // the replay sends it when the network is back (a sub-point — right after its point)
       if (isNetworkError(error)) {
-        toast(KEPT_OFFLINE);
+        if (!(error instanceof WaitsForPoint)) toast(KEPT_OFFLINE);
         return;
       }
       void dropCreate(row.id);
@@ -236,28 +263,47 @@ export function useNoteSaveState(id: string): SaveState {
   return mine.some((state) => state.paused) ? "offline" : "saving";
 }
 
+/** The toast of a delete: what happened, and the way back. */
+export type DeleteWords = { done: string; undo: string };
+
+const DELETE_WORDS: DeleteWords = { done: "Удалил · в корзине", undo: "Отменить" };
+
+const instant = (iso: string | null) => (iso ? Date.parse(iso) : Number.NaN);
+
 /**
  * Soft delete (D-75 §7): the row moves to the bin at once, «Отменить» in the toast
- * brings it back. The bin keeps it after the toast is gone (D-81).
+ * brings it back. The bin keeps it after the toast is gone (D-81). A point of a board takes
+ * its live sub-points along — one UPDATE, the server's trigger stamps the branch with the
+ * same time (D-121); the cache hides them at once instead of waiting for Realtime. `at` —
+ * the time to stamp, so the phone and the server agree on it to the millisecond; `words` —
+ * this delete's own toast («Пункт и 2 подпункта в корзине»).
  */
-export function useDeleteNote(me: { userId: string } | undefined) {
+export function useDeleteNote(me: { userId: string } | undefined, words: DeleteWords = DELETE_WORDS) {
   const queryClient = useQueryClient();
   const restore = useRestoreNote(me);
 
   return useMutation({
-    mutationFn: async ({ id }: { id: string }) => {
+    mutationFn: async ({ id, at }: { id: string; at?: string; words?: DeleteWords }) => {
       const supabase = createBrowserSupabase();
-      const { error } = await supabase.from("notes").update({ deleted_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase.from("notes").update({ deleted_at: at ?? new Date().toISOString() }).eq("id", id);
       if (error) throw new Error(error.message);
     },
-    onMutate: async ({ id }) => {
+    onMutate: async ({ id, at }) => {
       if (!me) return undefined;
-      await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
-      return { snapshot: patch(queryClient, me.userId, id, { deleted_at: new Date().toISOString() }) };
+      const key = keyOf(me.userId);
+      await queryClient.cancelQueries({ queryKey: key });
+      const snapshot = queryClient.getQueryData<Note[]>(key);
+      const stamp = at ?? new Date().toISOString();
+      queryClient.setQueryData<Note[]>(key, (rows) =>
+        (rows ?? []).map((note) =>
+          note.id === id || (note.parent_id === id && note.deleted_at === null) ? { ...note, deleted_at: stamp } : note,
+        ),
+      );
+      return { snapshot };
     },
-    onSuccess: (_data, { id }) => {
-      toast("Удалил · в корзине", {
-        action: { label: "Отменить", onClick: () => restore.mutate({ id }) },
+    onSuccess: (_data, { id, words: said = words }) => {
+      toast(said.done, {
+        action: { label: said.undo, onClick: () => restore.mutate({ id }) },
       });
     },
     onError: (error, _input, context) => {
@@ -267,7 +313,12 @@ export function useDeleteNote(me: { userId: string } | undefined) {
   });
 }
 
-/** «Вернуть» from the bin, and «Отменить» of a delete: the same row, audio included. */
+/**
+ * «Вернуть» from the bin, and «Отменить» of a delete: the same row, audio included. A point
+ * brings back exactly the sub-points that went with it (the same `deleted_at`); a sub-point
+ * back without its point comes back as a point where its point stood — the server's rules
+ * (D-121), drawn by the cache before Realtime confirms them.
+ */
 export function useRestoreNote(me: { userId: string } | undefined) {
   const queryClient = useQueryClient();
 
@@ -279,8 +330,22 @@ export function useRestoreNote(me: { userId: string } | undefined) {
     },
     onMutate: async ({ id }) => {
       if (!me) return undefined;
-      await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
-      return { snapshot: patch(queryClient, me.userId, id, { deleted_at: null }) };
+      const key = keyOf(me.userId);
+      await queryClient.cancelQueries({ queryKey: key });
+      const snapshot = queryClient.getQueryData<Note[]>(key);
+      const rows = snapshot ?? [];
+      const row = rows.find((note) => note.id === id);
+      const went = instant(row?.deleted_at ?? null);
+      const point = row?.parent_id ? rows.find((note) => note.id === row.parent_id) : undefined;
+      const alone = Boolean(row?.parent_id) && (!point || point.deleted_at !== null || point.parent_id !== null);
+      queryClient.setQueryData<Note[]>(key, (list) =>
+        (list ?? []).map((note) => {
+          if (note.id === id) return { ...note, deleted_at: null, ...(alone ? { parent_id: null, position: point?.position ?? note.position } : {}) };
+          if (note.parent_id === id && note.deleted_at !== null && instant(note.deleted_at) === went) return { ...note, deleted_at: null };
+          return note;
+        }),
+      );
+      return { snapshot };
     },
     onError: (error, _input, context) => {
       if (me && context) rollback(queryClient, me.userId, context.snapshot);
