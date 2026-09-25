@@ -50,6 +50,8 @@ desktop.ini
 *.swp
 
 # ВАЖНО: *.pdf НЕ игнорируем — презентация для инвестора должна быть в истории репозитория.
+# Исключение — локальная шпаргалка логинов и паролей dev-стенда, не коммитится никогда
+/LOGINS.pdf
 
 # STT gate: audio fixtures live in Storage (stt-fixtures bucket), run outputs are local
 tests/stt/fixtures/
