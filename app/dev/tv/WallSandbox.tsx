@@ -210,6 +210,7 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
     created_at: index === count - 1 ? new Date(base).toISOString() : at(base, -60 + index),
     assignee: guest ? null : index === 0 ? "Марат" : index === 3 ? "Асель" : null,
     handed_done: index === 3,
+    children: [],
   }));
   return {
     hidden: false,
@@ -219,6 +220,8 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
       total: items.length,
       done: items.filter((item) => item.done).length,
       updated_at: new Date(base).toISOString(),
+      view: "list",
+      focus: null,
       items,
     },
   };

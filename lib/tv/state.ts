@@ -14,6 +14,8 @@ export type TvScene = "face" | "clock" | "team" | "calendar" | "board";
 export type ClockStyle = "digital" | "analog";
 /** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
 export type CalendarView = "week" | "month";
+/** Доска на стене: крупный список для чтения издалека — или карта мыслей вокруг названия (D-121). */
+export type BoardView = "list" | "map";
 
 /** The four scene keys of the remote; the board comes on the wall only with a board (D-102). */
 export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar"];
@@ -21,6 +23,7 @@ export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar
 export const WALL_SCENES: readonly TvScene[] = [...TV_SCENES, "board"];
 export const CLOCK_STYLES: readonly ClockStyle[] = ["digital", "analog"];
 export const CALENDAR_VIEWS: readonly CalendarView[] = ["week", "month"];
+export const BOARD_VIEWS: readonly BoardView[] = ["list", "map"];
 
 /** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
 export const FOCUS_MS = 10 * 60_000;
@@ -97,6 +100,19 @@ export function clockStyleOf(state: TvState | null): ClockStyle {
 /** Вид календаря на стене. Незнакомое — неделя: она показывает и «Сегодня». */
 export function calendarViewOf(state: TvState | null): CalendarView {
   return state?.calendar_view === "month" ? "month" : "week";
+}
+
+/** Вид доски на стене. Незнакомое — список: он читается при любом числе пунктов (D-121). */
+export function boardViewOf(state: TvState | null): BoardView {
+  return state?.board_view === "map" ? "map" : "list";
+}
+
+/**
+ * Обсуждаемый пункт доски — только пока доска на стене жива (D-121). Что пункт ещё жив и с
+ * текстом, проверяет `tv_board()`; пульт сверяет с пунктами доски сам.
+ */
+export function boardPointOf(state: TvState | null, now: Date): string | null {
+  return boardLive(state, now) ? (state?.board_point ?? null) : null;
 }
 
 /**

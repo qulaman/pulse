@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { boardUntilFrom, FOCUS_MS, WAKE_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
+import { boardUntilFrom, FOCUS_MS, WAKE_MS, type BoardView, type CalendarView, type ClockStyle, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -63,12 +63,15 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.board_id = input.board;
     next.board_until = boardUntilFrom(now).toISOString();
     next.board_guest = false;
+    // another board ends the spotlight (the trigger on tv_state does the same, D-121)
+    if (old.board_id !== input.board) next.board_point = null;
   } else if (input.scene) {
     // another scene takes the board off the wall (same rule as tv_control)
     next.scene = input.scene;
     next.board_id = null;
     next.board_until = null;
     next.board_guest = false;
+    next.board_point = null;
   }
   if (input.guest !== undefined) {
     next.guest = input.guest;
@@ -128,6 +131,74 @@ export function useTvControl() {
     onError: (_error, _input, context) => {
       if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
       toast(OFFLINE);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: tvKeys.state });
+    },
+  });
+}
+
+/** Ведущий с пульта (D-121): подсветить пункт доски на стене, снять подсветку, сменить вид. */
+export type TvBoardControlInput = {
+  /** Подсветить этот пункт (верхнего уровня) доски, что сейчас на стене. */
+  point?: string;
+  /** Снять подсветку. */
+  clearPoint?: boolean;
+  /** «Список» или «Карта». */
+  view?: BoardView;
+};
+
+const BOARD_ERRORS: Record<string, string> = {
+  bad_point: "Этот пункт уже не на доске — обновил",
+  no_wall: "Экран ещё не подключался",
+  forbidden: "Доской на стене управляет только директор",
+};
+
+/**
+ * Команда ведущего — тем же путём, что `useTvControl`: без очереди, с потолком ожидания,
+ * строка стены двигается сразу и откатывается при ошибке. ◀ ▶ жмут подряд: ответы идут
+ * по порядку (`scope`), и последнее нажатие остаётся последним.
+ */
+export function useTvBoardControl() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: "always",
+    scope: { id: "tv-board-control" },
+    mutationFn: async (input: TvBoardControlInput): Promise<TvState> => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error(OFFLINE);
+
+      const supabase = createBrowserSupabase();
+      const call = supabase.rpc("tv_board_control", {
+        p_point: input.point,
+        p_clear_point: input.clearPoint ?? false,
+        p_view: input.view,
+      });
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS));
+      const { data, error } = await Promise.race([call, timeout]);
+      if (error) throw new Error(error.message);
+      return data as unknown as TvState;
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: tvKeys.state });
+      const snapshot = queryClient.getQueryData<TvState | null>(tvKeys.state);
+      queryClient.setQueryData<TvState | null>(tvKeys.state, (old) => {
+        if (!old) return old ?? null;
+        const next: TvState = { ...old };
+        if (input.clearPoint) next.board_point = null;
+        else if (input.point) next.board_point = input.point;
+        if (input.view) next.board_view = input.view;
+        return next;
+      });
+      return { snapshot };
+    },
+    onSuccess: (row) => {
+      queryClient.setQueryData<TvState | null>(tvKeys.state, row);
+    },
+    onError: (error, _input, context) => {
+      if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
+      const code = Object.keys(BOARD_ERRORS).find((key) => error.message.includes(key));
+      toast(code ? BOARD_ERRORS[code] : OFFLINE);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: tvKeys.state });

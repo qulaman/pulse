@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { boardCountLine, boardLayout, isFresh, pageAt, pageItems, PAGE_MS, tagOf, type TvBoardItem } from "./board";
 
 function item(n: number, patch: Partial<TvBoardItem> = {}): TvBoardItem {
-  return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, ...patch };
+  return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, children: [], ...patch };
 }
 
 describe("boardLayout", () => {
