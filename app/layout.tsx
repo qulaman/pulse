@@ -10,6 +10,7 @@ import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { loadBrand } from "@/lib/brand";
+import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -46,6 +47,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}
     >
       <body className="min-h-dvh bg-bg text-text antialiased">
+        {/* Chrome's install offer can come before hydration: kept for «Установить Pulse» (D-125) */}
+        <script dangerouslySetInnerHTML={{ __html: INSTALL_CATCHER }} />
         <QueryProvider>
           {children}
           <ToastHost />

@@ -116,6 +116,12 @@ const ACT_ON: Record<MascotAct, { on: MascotState; carry?: { count: number; hot?
   push: { on: "calm" },
   clock: { on: "calm" },
   reply: { on: "calm" },
+  // a phrase that did not make it (tasks/020, phase B)
+  ear: { on: "calm" },
+  scratch: { on: "calm" },
+  pinch: { on: "calm" },
+  nomic: { on: "calm" },
+  signal: { on: "calm" },
 };
 
 function dropStates(size: number): Row[] {
@@ -146,6 +152,28 @@ const HOLDING: [MascotAct, MascotState][] = [
   ["poof", "working"],
 ];
 
+/**
+ * The director's board acts over the faces they also meet (tasks/020): on «Задачи» the card lies on
+ * the clipboard and the pencil is put down; on the watchful face the props must clear its ear.
+ */
+const BOARD_ON: [MascotAct, MascotState][] = [
+  ["receive", "checking"],
+  ["hmm", "checking"],
+  ["stamp", "checking"],
+  ["flick", "checking"],
+  ["crumple", "checking"],
+  ["push", "checking"],
+  ["clock", "checking"],
+  ["reply", "checking"],
+  ["tick", "alert"],
+  ["puzzle", "alert"],
+  ["clock", "alert"],
+  // the failures of the pipeline on the watchful face: its ear on the crown meets the arms
+  ["ear", "alert"],
+  ["nomic", "alert"],
+  ["signal", "alert"],
+];
+
 function dropActs(size: number): Row[] {
   const holding = HOLDING.map(([act, on]) => ({
     key: `act-${act}-holding`,
@@ -155,6 +183,16 @@ function dropActs(size: number): Row[] {
     h: size * 1.7,
     draw: () => <Mascot state={on} size={size} act={act} carry={{ count: 2 }} />,
   }));
+  const board = BOARD_ON.map(([act, on]) => ({
+    key: `act-${act}-${on}`,
+    label: `${act} · ${on}`,
+    dur: ACT_MS[act],
+    w: size * 1.7,
+    h: size * 1.7,
+    draw: () => <Mascot state={on} size={size} act={act} />,
+  }));
+  // the director's rows go last: a row inserted above the others shifts them by a fraction of a
+  // pixel, and the smoke's pixel compare reads the new antialiasing as a change
   return [...holding, ...(Object.keys(ACT_ON) as MascotAct[]).map((act) => ({
     key: `act-${act}`,
     label: `${act} · ${ACT_ON[act].on}`,
@@ -162,7 +200,7 @@ function dropActs(size: number): Row[] {
     w: size * 1.7,
     h: size * 1.7,
     draw: () => <Mascot state={ACT_ON[act].on} size={size} act={act} carry={ACT_ON[act].carry ?? null} />,
-  }))];
+  })), ...board];
 }
 
 type SecCell = {

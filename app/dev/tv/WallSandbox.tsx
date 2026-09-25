@@ -21,6 +21,8 @@ import { carouselScene, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
+import { boardCase, type BoardCase } from "./boardFixtures";
+
 export type WallCase =
   | "face"
   | "clock"
@@ -32,6 +34,7 @@ export type WallCase =
   | "board-two"
   | "board-pages"
   | "board-hidden"
+  | BoardCase
   | "focus"
   | "focus-few"
   | "focus-many"
@@ -216,6 +219,8 @@ const BOARD_POINTS = [
 
 /** The board of D-102 on fixtures: five points (two ticked, one handed over, one just said), eleven, twenty. */
 function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | null {
+  const v2 = boardCase(wallCase, base, guest);
+  if (v2) return v2;
   if (wallCase === "board-hidden") return { board: null, hidden: true };
   const count = wallCase === "board-pages" ? 20 : wallCase === "board-two" ? 11 : wallCase === "board" ? 5 : 0;
   if (count === 0) return null;
@@ -226,6 +231,7 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
     created_at: index === count - 1 ? new Date(base).toISOString() : at(base, -60 + index),
     assignee: guest ? null : index === 0 ? "Марат" : index === 3 ? "Асель" : null,
     handed_done: index === 3,
+    children: [],
   }));
   return {
     hidden: false,
@@ -235,6 +241,8 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
       total: items.length,
       done: items.filter((item) => item.done).length,
       updated_at: new Date(base).toISOString(),
+      view: "list",
+      focus: null,
       items,
     },
   };

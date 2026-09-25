@@ -5,19 +5,9 @@ import Link from "next/link";
 import { NoteIcon } from "@/components/notes/icons";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
-import { boardExpiresAt, type BoardSummary } from "@/lib/mindboard/list";
+import { boardExpiresAt, summaryLine, type BoardSummary } from "@/lib/mindboard/list";
 import type { MindBoard } from "@/lib/mindboard/queries";
 import { whenRu } from "@/lib/notes/list";
-import { pluralRu } from "@/lib/tasks/status-text";
-
-/** «5 пунктов · 2 отмечено» — or «Пока пусто» for a board with nothing on it yet. */
-export function pointsLine(summary: BoardSummary | undefined): string {
-  const total = summary?.total ?? 0;
-  if (total === 0) return "Пока пусто";
-  const done = summary?.done ?? 0;
-  const head = `${total} ${pluralRu(total, ["пункт", "пункта", "пунктов"])}`;
-  return done > 0 ? `${head} · ${done} ${pluralRu(done, ["отмечен", "отмечено", "отмечено"])}` : head;
-}
 
 function BoardGlyph({ lit }: { lit: boolean }) {
   const color = lit ? "var(--accent)" : "var(--text-muted)";
@@ -48,7 +38,7 @@ export function BoardCard({ board, summary, onWall, now }: { board: MindBoard; s
       <span className="min-w-0 flex-1">
         <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{board.title}</span>
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-          <span className="min-w-0 truncate">{pointsLine(summary)}</span>
+          <span className="min-w-0 truncate" data-testid="board-card-summary">{summaryLine(summary)}</span>
           {onWall ? (
             <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-accent" data-testid="board-card-wall">
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" style={{ boxShadow: "0 0 8px var(--accent)" }} />
@@ -110,7 +100,7 @@ export function BoardTrashCard({
       <span className="min-w-0 flex-1">
         <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">Доска «{board.title}»</span>
         <span className="mt-1 block text-[12px] leading-4 text-muted">
-          {pointsLine(summary)} · удалена {whenRu(board.deleted_at ?? board.updated_at, now)}
+          {summaryLine(summary)} · удалена {whenRu(board.deleted_at ?? board.updated_at, now)}
         </span>
         <span className="nums mt-0.5 block text-[12px] leading-4" style={{ color: "var(--warn)" }}>
           исчезнет {humanAqtobe(boardExpiresAt(board), now)}

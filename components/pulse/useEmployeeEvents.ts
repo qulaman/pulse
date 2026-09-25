@@ -18,6 +18,8 @@ export const EVENT_ACT: Record<EmployeeEvent, MascotAct> = {
   approved: "medal",
   rework: "boomerang",
   revoked: "poof",
+  // deleted while still in the person's hands: the work is gone all the same (tasks/020)
+  gone: "poof",
   moved: "relief",
   message: "letter",
   read: "read",

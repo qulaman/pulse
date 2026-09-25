@@ -37,6 +37,12 @@ export type ChannelSpec = {
   table: string;
   /** PostgREST-style filter, e.g. `assignee_id=eq.<uuid>`. */
   filter?: string;
+  /**
+   * Which changes to take (default all). Realtime never delivers DELETE to a filtered channel —
+   * the old row carries its primary key alone, there is nothing to filter by — so a list that
+   * listens with a filter needs a second, unfiltered channel for DELETE only.
+   */
+  event?: "*" | "INSERT" | "UPDATE" | "DELETE";
 };
 
 type Listener<TRow extends Record<string, unknown>> = {
@@ -60,7 +66,7 @@ const registry = new Map<string, Entry>();
 
 function acquire<TRow extends Record<string, unknown>>(
   topic: string,
-  { table, filter }: ChannelSpec,
+  { table, filter, event = "*" }: ChannelSpec,
   listener: Listener<TRow>,
 ): () => void {
   let entry = registry.get(topic);
@@ -88,7 +94,8 @@ function acquire<TRow extends Record<string, unknown>>(
           .channel(topic)
           .on(
             "postgres_changes",
-            { event: "*", schema: "public", table, ...(filter ? { filter } : {}) },
+            // the overloads of `.on` want a literal event; the value is one of the four they take
+            { event: event as "*", schema: "public", table, ...(filter ? { filter } : {}) },
             (payload) => {
               for (const l of listeners) l.onEvent(payload as RealtimeEvent<Record<string, unknown>>);
             },
@@ -168,16 +175,16 @@ function useRealtimeChannel<TRow extends Record<string, unknown>>(
     onResyncRef.current = onResync;
   });
 
-  const { table, filter } = spec;
+  const { table, filter, event } = spec;
   useEffect(() => {
     if (!enabled) return;
-    const topic = `rtq:${table}:${filter ?? "all"}:${channelKey}`;
+    const topic = `rtq:${table}:${filter ?? "all"}:${event ?? "*"}:${channelKey}`;
     return acquire<TRow>(
       topic,
-      { table, filter },
+      { table, filter, event },
       { onEvent: (payload) => onEventRef.current(payload), onResync: () => onResyncRef.current() },
     );
-  }, [enabled, table, filter, channelKey]);
+  }, [enabled, table, filter, event, channelKey]);
 }
 
 export type UseRealtimeQueryOptions<TData, TRow extends Record<string, unknown>> = {

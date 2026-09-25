@@ -23,7 +23,14 @@ export type UploadUrlResponse = {
 };
 
 export type TranscribeResponse = {
-  transcript: string;
+  /**
+   * null when the guard threw the words away (silence the model filled in, noise): the route
+   * answers 200 with `code: "empty_transcript"`, so the audio is kept and nothing is parsed.
+   */
+  transcript: string | null;
+  code?: "empty_transcript";
+  /** which guard rule threw the words away (docs/AI.md §1) */
+  guard?: string;
   audio_path: string;
   stt_provider: string;
   latency_ms: number;

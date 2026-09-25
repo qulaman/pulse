@@ -435,14 +435,18 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           client_request_id: clientRequestId,
           ...(get().audio ? { duration_ms: get().audio!.durationMs } : {}),
         });
+        // Nothing heard: the guard threw the words away (silence the model filled in, noise) and
+        // the route said so with a 200 and no transcript. Reading `.trim()` off that null used to
+        // throw here, and the director got «Что-то пошло не так» for a plain «не расслышал».
+        const words = typeof res.transcript === "string" ? res.transcript : "";
         // the addressee the director picked before he spoke goes in front of what he said
         const address = get().address;
         set({
-          transcript: address && res.transcript.trim() ? `${address}${res.transcript}` : res.transcript,
+          transcript: address && words.trim() ? `${address}${words}` : words,
           inboxId: res.inbox_id ?? get().inboxId,
           suspicious: res.suspicious ?? false,
         });
-        if (!res.transcript.trim()) {
+        if (res.code === "empty_transcript" || !words.trim()) {
           set({ stage: "error", error: { code: "empty_transcript" }, retryFrom: null });
           return;
         }

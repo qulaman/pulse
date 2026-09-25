@@ -1,0 +1,100 @@
+/* «Как работает Pulse» (/lab/about): the few motions of the story that CSS plays better than
+   React. Transform and opacity only; under reduced motion everything stands still. */
+
+/* The hero's cardiomonitor line — the brand accent is a heartbeat (D-44). A window slides over
+   a dim trace and shows a bright copy under it; the copy counter-slides inside the window at
+   the same pace, so the trace stays put and only the light travels. Window: 35 % of the row,
+   from −35 % to +100 %; the copy is the row's width (285.71 % of the window) and moves the
+   other way by the same distance. */
+.ecg {
+  position: relative;
+  height: 56px;
+  overflow: hidden;
+}
+.ecgDim {
+  position: absolute;
+  inset: 0;
+  opacity: 0.22;
+}
+.ecgWindow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 35%;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 90%, transparent);
+  animation: ecg-window 3.4s linear infinite;
+  will-change: transform;
+}
+.ecgBright {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 285.7143%;
+  animation: ecg-bright 3.4s linear infinite;
+  will-change: transform;
+}
+@keyframes ecg-window {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(285.7143%); }
+}
+@keyframes ecg-bright {
+  from { transform: translateX(35%); }
+  to { transform: translateX(-100%); }
+}
+
+/* the hero face stands on a soft pool of the accent: a static gradient, never animated */
+.halo {
+  position: absolute;
+  inset: 8% 10%;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent);
+  pointer-events: none;
+}
+
+/* The office wall in miniature (D-76): a 16:9 panel, the gold ticker on top (the one place
+   the wall wears gold, DESIGN §1.3), the face in the middle, the mark and the clock below. */
+.tv {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(55% 70% at 50% 58%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 72%),
+    #070a0e;
+  box-shadow: var(--shadow-card), inset 0 0 0 5px #0d1218;
+}
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  border-bottom: 1px solid color-mix(in srgb, var(--gold) 18%, transparent);
+  background: color-mix(in srgb, var(--gold) 6%, transparent);
+}
+.tickerTrack {
+  display: inline-flex;
+  animation: ticker 22s linear infinite;
+  will-change: transform;
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* the step bar of the voice demo: each segment fills by scaleX, smoothed between ticks */
+.segFill {
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ecgWindow { display: none; }
+  .ecgDim { opacity: 0.75; }
+  .tickerTrack { animation: none; }
+  .segFill { transition: none; }
+}

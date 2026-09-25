@@ -51,7 +51,8 @@ export function usePushTest(userId?: string) {
             return;
           }
           if (Date.now() - started > GIVE_UP_MS) {
-            setVerdict({ done: true, tone: "warn", text: "Не пришло за 30 секунд — телефон выключен или без связи" });
+            // a sleeping Android with a battery saver holds pushes too, not only a dead phone (D-125)
+            setVerdict({ done: true, tone: "warn", text: "Не пришло за 30 секунд — телефон выключен, без связи или экономит батарею" });
             setBusy(false);
             return;
           }

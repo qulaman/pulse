@@ -1,4 +1,5 @@
 import type { Note } from "@/lib/notes/queries";
+import { pluralRu } from "@/lib/tasks/status-text";
 import type { TvState } from "@/lib/tv/queries";
 
 import type { MindBoard } from "./queries";
@@ -20,17 +21,45 @@ export function pointsOf(notes: readonly Note[], boardId: string): Note[] {
   return notes.filter((note) => note.board_id === boardId && note.deleted_at === null).sort(byPlace);
 }
 
-export type BoardSummary = { total: number; done: number; lastAt: string | null };
+/**
+ * What a board card and the status screen say (D-121): the points of the agenda, their
+ * sub-points apart, how many points are ticked — counted as the wall counts them, by the
+ * points — and the latest line said. A sub-point whose point is not among the rows is drawn
+ * as a point (`branchesOf`), so it is counted as one.
+ */
+export type BoardSummary = { total: number; subs: number; done: number; lastAt: string | null };
 
-/** What a board card and the status screen say: how many points, how many ticked, the latest. */
 export function boardSummary(points: readonly Note[]): BoardSummary {
+  const ids = new Set(points.map((point) => point.id));
+  let total = 0;
+  let subs = 0;
   let done = 0;
   let lastAt: string | null = null;
   for (const point of points) {
-    if (point.done_at) done += 1;
+    const sub = point.parent_id !== null && ids.has(point.parent_id);
+    if (sub) subs += 1;
+    else {
+      total += 1;
+      if (point.done_at) done += 1;
+    }
     if (!lastAt || point.created_at > lastAt) lastAt = point.created_at;
   }
-  return { total: points.length, done, lastAt };
+  return { total, subs, done, lastAt };
+}
+
+/** «5 пунктов · 3 подпункта · 2 отмечено» — or «Пока пусто» for a board with nothing on it yet. */
+export function summaryLine(summary: BoardSummary | undefined): string {
+  const total = summary?.total ?? 0;
+  if (total === 0) return "Пока пусто";
+  const subs = summary?.subs ?? 0;
+  const done = summary?.done ?? 0;
+  return [
+    `${total} ${pluralRu(total, ["пункт", "пункта", "пунктов"])}`,
+    subs > 0 ? `${subs} ${pluralRu(subs, ["подпункт", "подпункта", "подпунктов"])}` : "",
+    done > 0 ? `${done} ${pluralRu(done, ["отмечен", "отмечено", "отмечено"])}` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Summaries of every board at once, from the one notes cache. */

@@ -69,7 +69,8 @@ export default async function ProfilePage() {
           <VersionRow />
         </RowGroup>
 
-        <InstallHint />
+        {/* the way in stays here until installed, whatever was dismissed on Пульс (D-125) */}
+        <InstallHint sticky />
 
         <SignOutRow action={signOut} className="mt-6" />
 

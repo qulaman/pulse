@@ -12,3 +12,16 @@ export function pushBlocker(state: PushState, device: PushPlatform): string | nu
   }
   return null;
 }
+
+/**
+ * Said right after «Включить» (D-125). On Android the phone's own battery saver (Xiaomi,
+ * Samsung, Honor…) holds Chrome's pushes until the screen wakes — a push minutes late with no
+ * fault of ours; Chrome carries the pushes of the installed app too. Long enough to read.
+ */
+export function pushEnabledToast(device: PushPlatform, what = "Уведомления включены"): { text: string; lifetimeMs?: number } {
+  if (device.platform !== "android") return { text: what };
+  return {
+    text: `${what}. Чтобы не опаздывали: «Настройки» → «Приложения» → Chrome → «Батарея» → «Без ограничений»`,
+    lifetimeMs: 9000,
+  };
+}

@@ -29,7 +29,9 @@ export type NoteIconName =
   | "check"
   | "grip"
   | "plus"
-  | "wall";
+  | "wall"
+  | "indent"
+  | "outdent";
 
 const PATHS: Record<NoteIconName, ReactNode> = {
   mic: (
@@ -96,6 +98,10 @@ const PATHS: Record<NoteIconName, ReactNode> = {
   check: <path d="M5 12.5 10 17.5 19 7" />,
   grip: <path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01" strokeWidth={3} />,
   plus: <path d="M12 5v14M5 12h14" />,
+  // a point steps under the one above it (D-121): down, then in
+  indent: <path d="M5.5 4.5V11a3 3 0 0 0 3 3h10M15 10l4 4-4 4" />,
+  // a sub-point steps out to the points: down, then out
+  outdent: <path d="M18.5 4.5V11a3 3 0 0 1-3 3h-10M9 10l-4 4 4 4" />,
   // the screen on the office wall
   wall: (
     <>

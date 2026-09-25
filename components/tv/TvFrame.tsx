@@ -106,7 +106,11 @@ export function TvFrame(props: TvFrameProps) {
           : scene === "calendar"
         ? `calendar:${props.calendarView}`
         : scene === "board"
-          ? `board:${board?.board?.id ?? (board?.hidden ? "hidden" : "none")}`
+          ? // no board yet (loading) or no longer (expired): the face is drawn, so the key is the
+            // face's too — otherwise face → board replays the face's entrance (D-121)
+            board
+            ? `board:${board.board?.id ?? "hidden"}`
+            : "face"
           : scene;
 
   return (

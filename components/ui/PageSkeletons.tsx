@@ -455,9 +455,8 @@ export function BoardSkeleton() {
         {[0, 1, 2].map((i) => (
           <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
             <Bone h={22} w={22} round className="shrink-0" />
-            <div className="flex-1">
-              <Bone h={21} w={i === 1 ? "58%" : "76%"} />
-              <Bone h={12} w={60} className="mt-2" />
+            <div className="flex-1 py-[2px]">
+              <Bone h={17} w={i === 1 ? "58%" : "76%"} />
             </div>
           </div>
         ))}
