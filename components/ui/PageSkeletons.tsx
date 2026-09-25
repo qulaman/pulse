@@ -354,37 +354,42 @@ export function BoardSkeleton() {
       <PageHead
         back={{ href: "/notes?tab=boards", label: "Заметки" }}
         heading={
-          <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
+          // the large title's 40 px line (D-113), one line — a long title shrinks before it wraps
+          <SkeletonGroup className="mt-px min-w-0 flex-1 py-[5px]">
             <Bone h={30} w="62%" />
           </SkeletonGroup>
         }
         actions={<HeadButtonBone />}
       />
+      {/* the status screen of the board, box for box (NotesRecorder): eyebrow, 82 px body, input row, hint */}
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-3.5 pt-3.5">
-        <div className="flex items-center justify-between">
-          <Bone h={16} w={110} />
-          <Bone h={16} w={80} />
+        <div className="flex h-4 items-center justify-between">
+          <Bone h={12} w={110} />
+          <Bone h={12} w={80} />
         </div>
-        <div className="mt-2.5 flex min-h-[64px] items-center gap-3.5">
-          <Bone h={46} w={46} className="rounded-[14px]" />
+        <div className="mt-2.5 flex h-[82px] items-center gap-3.5">
+          <Bone h={48} w={40} className="rounded-[12px]" />
           <div className="flex-1">
-            <Bone h={20} w="40%" />
-            <Bone h={14} w="70%" className="mt-2" />
+            <Bone h={18} w="58%" />
+            <Bone h={13} w="72%" className="mt-2" />
+            <Bone h={13} w="64%" className="mt-[5px]" />
           </div>
         </div>
         <div className="mt-3 flex items-end gap-2.5 border-t border-border/60 pt-3">
           <Bone h={56} className="flex-1 rounded-[18px]" />
           <Bone h={56} w={56} round className="shrink-0" />
         </div>
-        <Bone h={14} w="70%" className="mx-auto mt-2" />
+        <div className="mt-2 flex h-4 items-center justify-center">
+          <Bone h={12} w="70%" />
+        </div>
       </SkeletonGroup>
+      {/* closed branches: the number and one line of words (sub-points arrive with the data) */}
       <SkeletonGroup className="mt-4 flex flex-col gap-2">
         {[0, 1, 2].map((i) => (
           <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
             <Bone h={22} w={22} round className="shrink-0" />
-            <div className="flex-1">
-              <Bone h={21} w={i === 1 ? "58%" : "76%"} />
-              <Bone h={12} w={60} className="mt-2" />
+            <div className="flex-1 py-[2px]">
+              <Bone h={17} w={i === 1 ? "58%" : "76%"} />
             </div>
           </div>
         ))}

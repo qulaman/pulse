@@ -25,7 +25,7 @@ import {
 import { useNoteSaveState } from "@/lib/notes/mutations";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { isOverdue, SHORT_STATUS } from "@/lib/tasks/status-text";
+import { isOverdue, pluralRu, SHORT_STATUS } from "@/lib/tasks/status-text";
 import { holdUpdate } from "@/lib/update/client";
 
 import { NoteIcon } from "./icons";
@@ -536,6 +536,7 @@ export function TrashCard({
   now,
   query,
   board,
+  riders = 0,
   onRestore,
   onPurge,
 }: {
@@ -544,6 +545,8 @@ export function TrashCard({
   query: string;
   /** The title of the board this point was deleted from. */
   board?: string;
+  /** Sub-points that went to the bin with this point and come back with it (D-121). */
+  riders?: number;
   onRestore: () => void;
   onPurge: () => void;
 }) {
@@ -559,10 +562,11 @@ export function TrashCard({
         <span className="mt-1 block text-[12px] leading-4 text-muted">
           Удалена {whenRu(note.deleted_at ?? note.updated_at, now)}
           {note.audio_path ? " · с голосом" : ""}
+          {riders > 0 ? <span data-testid="note-trashed-riders">{` · + ${riders} ${pluralRu(riders, ["подпункт", "подпункта", "подпунктов"])}`}</span> : null}
         </span>
         {board ? (
           <span className="mt-0.5 block truncate text-[12px] leading-4 text-muted" data-testid="note-trashed-board">
-            из доски «{board}»
+            {note.parent_id !== null && riders === 0 ? "подпункт " : ""}из доски «{board}»
           </span>
         ) : null}
         <span className="nums mt-0.5 block text-[12px] leading-4" style={{ color: "var(--warn)" }} data-testid="note-expires">
