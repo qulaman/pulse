@@ -364,6 +364,7 @@ next_delivery_slot(p_company uuid, p_now timestamptz default now()) returns time
 -- доставка (D-114); тики — только service_role, из минутного свипа
 publish_due_scheduled(p_now timestamptz default now()) returns int   -- scheduled → sent, tasks/017
 claim_deliveries(p_limit int default 50) returns setof notification_deliveries   -- воркер берёт строки
+push_when(p_at timestamptz, p_now timestamptz default now()) returns text   -- «сегодня 18:00» словами карточки — тексты пушей (D-125)
 set_notify_prefs(p_prefs jsonb) returns jsonb           -- только директор; перестраивает ждущую очередь
 push_health() returns table (user_id, devices, enabled_devices, last_ok_at, last_error, last_error_at,
                              last_seen_at, no_device_at)   -- директору и секретарю
