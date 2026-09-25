@@ -187,7 +187,7 @@ describe("describeChange", () => {
 
   it("a refusal carries its reason in running text, also when the reason lands later", () => {
     const declined = { ...sent, status: "declined" as const };
-    expect(describeChange(sent, declined, NOW, ME)).toEqual({ text: "Марат не может «КП по Казхрому»", tone: "warn" });
+    expect(describeChange(sent, declined, NOW, ME)).toEqual({ text: "Марат не может «КП по Казхрому»", tone: "warn", kind: "declined" });
     const reasoned = { ...declined, decline_reason: "Занят срочным" };
     expect(describeChange(declined, reasoned, NOW, ME)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
     expect(describeChange(sent, reasoned, NOW, ME)?.text).toBe("Марат не может «КП по Казхрому»: занят срочным");
@@ -201,7 +201,7 @@ describe("describeChange", () => {
 
   it("the director's own steps read as done deeds", () => {
     const review = { ...sent, status: "pending_review" as const };
-    expect(describeChange(review, { ...review, status: "done" }, NOW, ME)).toEqual({ text: "Принято: «КП по Казхрому»", tone: "ok" });
+    expect(describeChange(review, { ...review, status: "done" }, NOW, ME)).toEqual({ text: "Принято: «КП по Казхрому»", tone: "ok", kind: "done" });
     expect(describeChange(sent, { ...sent, status: "revoked" }, NOW, ME)?.text).toBe("Задача «КП по Казхрому» отозвана");
     expect(describeChange({ ...sent, status: "declined" }, sent, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» отправлена снова");
     expect(describeChange(sent, { ...sent, deadline: "2026-09-12T08:00:00Z" }, NOW, ME)?.text).toBe("Марат: задача «КП по Казхрому» до завтра 13:00");
@@ -212,6 +212,30 @@ describe("describeChange", () => {
     expect(describeChange(undefined, { ...sent, status: "done" }, NOW, ME)).toBeNull();
     expect(describeChange(sent, undefined, NOW, ME)).toBeNull();
     expect(describeChange(sent, { ...sent }, NOW, ME)).toBeNull();
+  });
+
+  it("every change says what kind it is — the director's face plays it (tasks/020)", () => {
+    const kind = (prev: BoardTask | undefined, next: BoardTask) => describeChange(prev, next, NOW, ME)?.kind;
+    const review = { ...sent, status: "pending_review" as const };
+    const declined = { ...sent, status: "declined" as const };
+    const asked = { ...sent, question: "Какой формат?", question_id: "m1", question_at: "x" };
+    const word = { id: "w1", content: "Готово", type: "text", sender_id: "u-Марат", seq: 3, created_at: "2026-09-11T04:03:00Z" } as NonNullable<BoardTask["last_message"]>;
+    expect(kind(undefined, sent)).toBe("new");
+    expect(kind(sent, { ...sent, status: "accepted" })).toBe("accepted");
+    expect(kind(sent, review)).toBe("handed");
+    expect(kind(sent, declined)).toBe("declined");
+    expect(kind(declined, { ...declined, decline_reason: "Занят срочным" })).toBe("declined");
+    expect(kind(review, { ...review, status: "done" })).toBe("done");
+    expect(kind(review, { ...review, status: "rework" })).toBe("rework");
+    expect(kind(sent, { ...sent, status: "revoked" })).toBe("revoked");
+    expect(kind(declined, sent)).toBe("resent");
+    expect(kind({ ...sent, status: "scheduled" }, sent)).toBe("new");
+    expect(kind(sent, asked)).toBe("question");
+    expect(kind(asked, sent)).toBe("answered");
+    expect(kind({ ...sent, seen_seq: 2 }, { ...sent, seen_seq: 2, last_message: word })).toBe("message");
+    expect(kind(sent, { ...sent, deadline: "2026-09-12T08:00:00Z" })).toBe("moved");
+    expect(kind({ ...sent, deadline: "2026-09-12T08:00:00Z" }, sent)).toBe("moved");
+    expect(kind(sent, { ...sent, assignee_id: "u-Ерлан", assignee: { full_name: "Ерлан Тестов" } })).toBe("passed");
   });
 
   it("describeChanges walks the whole board in order", () => {

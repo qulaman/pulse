@@ -83,6 +83,8 @@ const PANEL_FACE: Record<OrbitId, MascotState> = {
   ether: "tuned",
   calendar: "scheduling",
   secretary: "serving",
+  // the employee has no rating ball: their rating is a tab (D-59)
+  rating: "happy",
 };
 /** The medal has landed: then the face jumps with confetti this long (game feel, D-110). */
 const CHEER_AFTER_MS = 1_100;

@@ -105,6 +105,17 @@ const ACT_ON: Record<MascotAct, { on: MascotState; carry?: { count: number; hot?
   wipe: { on: "working", carry: { count: 2 } },
   shuffle: { on: "working", carry: { count: 3 } },
   coin: { on: "happy" },
+  // the director's face answers the board (tasks/020)
+  tick: { on: "calm" },
+  receive: { on: "calm" },
+  hmm: { on: "calm" },
+  puzzle: { on: "calm" },
+  stamp: { on: "calm" },
+  flick: { on: "calm" },
+  crumple: { on: "calm" },
+  push: { on: "calm" },
+  clock: { on: "calm" },
+  reply: { on: "calm" },
 };
 
 function dropStates(size: number): Row[] {

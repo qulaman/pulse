@@ -9,21 +9,27 @@ import type { TvState } from "./queries";
  * ответ — эфир и сцена «лицо» (D-76).
  */
 
-export type TvMode = "ether" | "employee";
-export type TvScene = "face" | "clock" | "team" | "calendar" | "board";
+export type TvMode = "ether" | "employee" | "task";
+export type TvScene = "face" | "clock" | "team" | "calendar" | "board" | "rating";
 export type ClockStyle = "digital" | "analog";
 /** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
 export type CalendarView = "week" | "month";
 /** Доска на стене: крупный список для чтения издалека — или карта мыслей вокруг названия (D-121). */
 export type BoardView = "list" | "map";
 
-/** The four scene keys of the remote; the board comes on the wall only with a board (D-102). */
-export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar"];
+/**
+ * The scene keys of the remote; the board comes on the wall only with a board (D-102), the
+ * rating only while points are on (D-48, D-123).
+ */
+export const TV_SCENES: readonly TvScene[] = ["face", "clock", "team", "calendar", "rating"];
 /** Every scene the wall can show. */
 export const WALL_SCENES: readonly TvScene[] = [...TV_SCENES, "board"];
 export const CLOCK_STYLES: readonly ClockStyle[] = ["digital", "analog"];
 export const CALENDAR_VIEWS: readonly CalendarView[] = ["week", "month"];
 export const BOARD_VIEWS: readonly BoardView[] = ["list", "map"];
+/** Заставка «Рейтинг»: последние 7 суток или последний месяц — как экран «Рейтинг» (D-123). */
+export type RatingView = "week" | "month";
+export const RATING_VIEWS: readonly RatingView[] = ["week", "month"];
 
 /** Фокус на сотруднике живёт 10 минут — то же число, что в `tv_control` (D-76 §5). */
 export const FOCUS_MS = 10 * 60_000;
@@ -33,16 +39,15 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 
 /**
- * Режим по часам киоска: фокус живёт до `expires_at` и гаснет сам, без cron и без
- * таймера на пульте (D-76 §5). Режим `task` схемой допущен заранее, но UI его пока
- * не строит — для стены это тот же эфир.
+ * Режим по часам киоска: фокус — человек (D-76) или одно дело (D-123) — живёт до
+ * `expires_at` и гаснет сам, без cron и без таймера на пульте (D-76 §5).
  */
 export function effectiveMode(state: TvState | null, now: Date): TvMode {
-  if (!state) return "ether";
-  if (state.mode !== "employee") return "ether";
-  if (!state.employee_id) return "ether";
-  if (!state.expires_at) return "ether";
-  return new Date(state.expires_at).getTime() > now.getTime() ? "employee" : "ether";
+  if (!state?.expires_at) return "ether";
+  if (new Date(state.expires_at).getTime() <= now.getTime()) return "ether";
+  if (state.mode === "employee" && state.employee_id) return "employee";
+  if (state.mode === "task" && state.task_id) return "task";
+  return "ether";
 }
 
 /**
@@ -63,13 +68,51 @@ export function guestEndsAt(state: TvState | null, now: Date): Date | null {
   return at.getTime() > now.getTime() ? at : null;
 }
 
+/** Заставки по кругу меняются раз в три минуты: успеть прочесть и не устать (D-123). */
+export const CAROUSEL_MS = 3 * 60_000;
+
+/**
+ * Круг заставок (D-123): лицо, рейтинг (только с очками), календарь, команда. Часы — тихий
+ * экран для совещаний, доска — выбор директора: в круг не входят.
+ */
+export function carouselScenes(points: boolean): TvScene[] {
+  return points ? ["face", "rating", "calendar", "team"] : ["face", "calendar", "team"];
+}
+
+/**
+ * Какая заставка сейчас в круге — по часам, без таймера и без обмена с пультом: киоск и
+ * пульт считают одно и то же число и сходятся. Граница — ровные три минуты от эпохи.
+ */
+export function carouselScene(now: Date, points: boolean): TvScene {
+  const list = carouselScenes(points);
+  return list[Math.floor(now.getTime() / CAROUSEL_MS) % list.length];
+}
+
+/** Когда круг сменит заставку и на какую — для пульта: «дальше — календарь в 14:03». */
+export function carouselNext(now: Date, points: boolean): { scene: TvScene; at: Date } {
+  const list = carouselScenes(points);
+  const step = Math.floor(now.getTime() / CAROUSEL_MS);
+  return { scene: list[(step + 1) % list.length], at: new Date((step + 1) * CAROUSEL_MS) };
+}
+
+/** Стена листает заставки сама (D-123). */
+export function carouselOn(state: TvState | null): boolean {
+  return state?.carousel === true;
+}
+
 /**
  * Заставка эфира. Незнакомая сцена — лицо: экран старше базы не должен чернеть. Доска —
- * только пока она жива: истёк её срок или её нет — лицо (D-102 §6).
+ * только пока она жива: истёк её срок или её нет — лицо (D-102 §6). Круг — по часам
+ * (D-123). Рейтинг без очков — лицо: `points` передаёт тот, кто знает флаг (`false` —
+ * очки выключены; не знает — считаем, что включены, и решает база). Гость в кабинете
+ * убирает рейтинг из круга — три минуты «Рейтинг скрыт» круг не крутит; поставленный
+ * руками рейтинг при госте честно говорит, что скрыт (D-33).
  */
-export function sceneOf(state: TvState | null, now: Date = new Date()): TvScene {
+export function sceneOf(state: TvState | null, now: Date = new Date(), points = true, guest = false): TvScene {
+  if (carouselOn(state)) return carouselScene(now, points && !guest);
   const scene = state?.scene;
   if (scene === "board") return boardLive(state, now) ? "board" : "face";
+  if (scene === "rating" && !points) return "face";
   return WALL_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
 }
 
@@ -113,6 +156,11 @@ export function boardViewOf(state: TvState | null): BoardView {
  */
 export function boardPointOf(state: TvState | null, now: Date): string | null {
   return boardLive(state, now) ? (state?.board_point ?? null) : null;
+}
+
+/** Период заставки «Рейтинг». Незнакомое — неделя (D-123). */
+export function ratingViewOf(state: TvState | null): RatingView {
+  return state?.rating_view === "month" ? "month" : "week";
 }
 
 /**
@@ -165,12 +213,12 @@ export function awakeUntil(state: TvState | null, now: Date): Date | null {
 
 /**
  * Стена сейчас спит — тусклые часы (D-96 §8): ночь, никто не будил, и на стене нет того,
- * что ночь перебивает, — фокуса на человеке и доски. Надпись о посетителе тоже будит
- * стену, но ненадолго; о ней пульт говорит отдельной строкой.
+ * что ночь перебивает, — фокуса на человеке или деле и доски. Надпись о посетителе тоже
+ * будит стену, но ненадолго; о ней пульт говорит отдельной строкой.
  */
 export function wallAsleep(state: TvState | null, now: Date): boolean {
   if (!isNight(now) || awakeUntil(state, now)) return false;
-  return effectiveMode(state, now) !== "employee" && sceneOf(state, now) !== "board";
+  return effectiveMode(state, now) === "ether" && sceneOf(state, now) !== "board";
 }
 
 /** Шаг сдвига против выгорания: раз в 10 минут. */

@@ -7,8 +7,17 @@ import { useClock } from "@/components/tv/useKiosk";
 import type { TvBoard, TvBoardItem } from "@/lib/tv/board";
 import { lineOf, type TvEvent } from "@/lib/tv/feed";
 import { overlayOf } from "@/lib/tv/overlay";
-import type { TvCalendar, TvFocusEmployee, TvFocusTask, TvOverlay, TvStoryEvent, TvSummary } from "@/lib/tv/queries";
-import type { ClockStyle, TvScene } from "@/lib/tv/state";
+import type {
+  TvCalendar,
+  TvFocusEmployee,
+  TvFocusTask,
+  TvOverlay,
+  TvRatingScene,
+  TvStoryEvent,
+  TvSummary,
+  TvTaskFocus,
+} from "@/lib/tv/queries";
+import { carouselScene, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
@@ -29,6 +38,13 @@ export type WallCase =
   | "focus-done"
   | "focus-nopoints"
   | "focus-empty"
+  | "rating"
+  | "rating-month"
+  | "rating-empty"
+  | "task"
+  | "task-review"
+  | "task-done"
+  | "carousel"
   | "visit"
   | "wait"
   | "message"
@@ -269,6 +285,74 @@ function focusFor(wallCase: WallCase, focus: TvFocusEmployee): TvFocusEmployee |
   }
 }
 
+/** The rating scene on fixtures (D-123): a week with five on the podium, a month, nobody yet; a guest hides it. */
+function ratingFor(wallCase: WallCase, base: number, guest: boolean): TvRatingScene {
+  if (guest) return { hidden: true, enabled: true, period: "week", top: [], riser: null, awards: [], team: { done: 0, on_time: 0, earned: 0, people: 0 } };
+  const month = wallCase === "rating-month";
+  const k = month ? 4 : 1;
+  const people: [string, string | null, number, number, number, number][] = [
+    ["Айгерим Сапарова", "Бухгалтер", 420, 60, 9, 9],
+    ["Марат Ахметов", "Прораб, участок «Север»", 340, 60, 9, 8],
+    ["Динара Касымова", "Снабжение", 260, -20, 6, 5],
+    ["Ерлан Беков", "Менеджер", 210, 90, 4, 4],
+    ["Тимур Жаксылыков", "Кладовщик", 180, 0, 3, 2],
+  ];
+  const top =
+    wallCase === "rating-empty"
+      ? []
+      : people.map(([name, position, points, delta, done, onTime], index) => ({
+          id: `r${index + 1}`,
+          name,
+          position,
+          avatar_url: null,
+          points: points * k,
+          rank: index + 1,
+          delta: delta * k,
+          done: done * k,
+          on_time: onTime * k,
+        }));
+  return {
+    hidden: false,
+    enabled: true,
+    period: month ? "month" : "week",
+    top,
+    riser: wallCase === "rating-empty" ? null : { id: "r4", name: "Ерлан Беков", avatar_url: null, delta: 90 * k, points: 210 * k },
+    awards:
+      wallCase === "rating-empty"
+        ? []
+        : [
+            { name: "Марат Ахметов", amount: 50, reason: "Сдал объект «Север» на день раньше", at: at(base, -35) },
+            { name: "Айгерим Сапарова", amount: 30, reason: "Закрыла сверку с поставщиками", at: todayAt(base, 11, 20, -1) },
+            { name: "Ерлан Беков", amount: 40, reason: "Новый клиент — договор на год", at: todayAt(base, 16, 5, -3) },
+          ],
+    team: { done: 48 * k, on_time: 41 * k, earned: 1240 * k, people: 9 },
+  };
+}
+
+/** One order on the whole wall (D-123): in work after a return, on review, accepted. */
+function taskFor(wallCase: WallCase, focus: TvFocusEmployee, guest: boolean): TvTaskFocus | null {
+  const source =
+    wallCase === "task"
+      ? focus.tasks.find((t) => t.id === "t4")
+      : wallCase === "task-review"
+        ? focus.tasks.find((t) => t.id === "t7")
+        : wallCase === "task-done"
+          ? focus.done_recent?.find((t) => t.id === "d1")
+          : undefined;
+  if (!source) return null;
+  return {
+    mode: "task",
+    guest,
+    expires_at: focus.expires_at,
+    employee: focus.employee,
+    task: {
+      ...source,
+      body: guest ? null : "Замерить все окна на третьем этаже корпуса «Север», размеры — в общую таблицу, фото каждого проёма.",
+      counts: { photos: 3, voices: 1, texts: 4, questions: 1 },
+    },
+  };
+}
+
 export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; clock: ClockStyle; guest: boolean }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
@@ -279,13 +363,17 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
   const data = fixtures(base, guest);
   const lines = data.events.map((event) => lineOf(event, guest));
   const scene: TvScene =
-    wallCase === "clock" || wallCase === "team"
-      ? wallCase
-      : wallCase === "calendar" || wallCase === "calendar-month" || wallCase === "calendar-empty"
-        ? "calendar"
-        : wallCase.startsWith("board")
-          ? "board"
-          : "face";
+    wallCase === "carousel"
+      ? carouselScene(now, true)
+      : wallCase === "clock" || wallCase === "team"
+        ? wallCase
+        : wallCase === "calendar" || wallCase === "calendar-month" || wallCase === "calendar-empty"
+          ? "calendar"
+          : wallCase.startsWith("board")
+            ? "board"
+            : wallCase.startsWith("rating")
+              ? "rating"
+              : "face";
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
   const summary = wallCase === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
 
@@ -304,7 +392,9 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
         speech={speechOf(lines, summary.today, now)}
         summary={summary}
         focus={focusFor(wallCase, data.focus)}
+        task={taskFor(wallCase, data.focus, guest)}
         focusRemainingMs={7 * MIN}
+        rating={ratingFor(wallCase, base, guest)}
         calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
         calendarView={wallCase === "calendar-month" ? "month" : "week"}
         board={boardFor(wallCase, base, guest)}
