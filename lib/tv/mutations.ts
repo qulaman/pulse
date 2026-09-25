@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { boardUntilFrom, FOCUS_MS, WAKE_MS, type CalendarView, type ClockStyle, type TvScene } from "./state";
+import { boardUntilFrom, FOCUS_MS, WAKE_MS, type CalendarView, type ClockStyle, type RatingView, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -27,8 +27,10 @@ const OFFLINE = "Нет связи с сервером, экран не пере
 const TIMEOUT_MS = 12_000;
 
 export type TvControlInput = {
-  mode?: "ether" | "employee";
+  mode?: "ether" | "employee" | "task";
   employeeId?: string;
+  /** Одно дело во весь экран (D-123). */
+  taskId?: string;
   scene?: TvScene;
   guest?: boolean;
   reload?: boolean;
@@ -42,6 +44,10 @@ export type TvControlInput = {
   boardGuest?: boolean;
   /** Разбудить стену ночью на два часа (`true`) или вернуть ночь (`false`) (D-105). */
   wake?: boolean;
+  /** Период заставки «Рейтинг»: неделя или месяц (D-123). */
+  rating?: RatingView;
+  /** Стена меняет заставки сама по кругу (D-123). */
+  carousel?: boolean;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -51,6 +57,11 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.mode = "employee";
     next.employee_id = input.employeeId;
     next.task_id = null;
+    next.expires_at = new Date(now.getTime() + FOCUS_MS).toISOString();
+  } else if (input.mode === "task" && input.taskId) {
+    next.mode = "task";
+    next.employee_id = null;
+    next.task_id = input.taskId;
     next.expires_at = new Date(now.getTime() + FOCUS_MS).toISOString();
   } else if (input.mode === "ether") {
     next.mode = "ether";
@@ -70,6 +81,19 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
     next.board_until = null;
     next.board_guest = false;
   }
+  // a scene or a board picked by hand stops the round; the switch owns it (same rule as tv_control)
+  if (input.carousel !== undefined) {
+    next.carousel = input.carousel;
+    if (input.carousel && next.scene === "board") {
+      next.scene = "face";
+      next.board_id = null;
+      next.board_until = null;
+      next.board_guest = false;
+    }
+  } else if (input.scene || input.board) {
+    next.carousel = false;
+  }
+  if (input.rating) next.rating_view = input.rating;
   if (input.guest !== undefined) {
     next.guest = input.guest;
     // a hand on the switch owns guest mode: no timer after it (same rule as tv_control)
@@ -99,6 +123,7 @@ export function useTvControl() {
       const call = supabase.rpc("tv_control", {
         p_mode: input.mode,
         p_employee_id: input.employeeId,
+        p_task_id: input.taskId,
         p_scene: input.scene,
         p_guest: input.guest,
         p_reload: input.reload ?? false,
@@ -107,6 +132,8 @@ export function useTvControl() {
         p_board: input.board,
         p_board_guest: input.boardGuest,
         p_wake: input.wake,
+        p_rating: input.rating,
+        p_carousel: input.carousel,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),
@@ -125,9 +152,10 @@ export function useTvControl() {
       // RPC вернул итоговую строку — берём её, а не гадаем и не перечитываем
       queryClient.setQueryData<TvState | null>(tvKeys.state, row);
     },
-    onError: (_error, _input, context) => {
+    onError: (error, _input, context) => {
       if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
-      toast(OFFLINE);
+      // a declined or revoked order never goes up (D-45, D-123): say so, not «no network»
+      toast(error instanceof Error && error.message.includes("bad_task") ? "Это дело на стену не встанет" : OFFLINE);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: tvKeys.state });

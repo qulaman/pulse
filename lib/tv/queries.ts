@@ -24,6 +24,7 @@ export const tvKeys = {
   calendar: (guest: boolean, from: string, days: number) => ["tv", "calendar", guest, from, days] as const,
   overlay: ["tv", "overlay"] as const,
   board: (guest: boolean) => ["tv", "board", guest] as const,
+  rating: (guest: boolean, period: string) => ["tv", "rating", guest, period] as const,
 };
 
 /**
@@ -235,7 +236,27 @@ export type TvFocusEmployee = {
   done_recent?: TvFocusTask[];
 };
 
-export type TvFocus = { mode: "ether" } | TvFocusEmployee;
+/** Сколько было сказано и показано по делу — числами, без слов (D-123). */
+export type TvTaskCounts = { photos: number; voices: number; texts: number; questions: number };
+
+/**
+ * Одно дело во весь экран (D-123): исполнитель, дело целиком и вся его история. Гостю —
+ * без названия и без слов директора (D-33); отказанное или отозванное дело база не отдаёт.
+ */
+export type TvTaskFocus = {
+  mode: "task";
+  guest: boolean;
+  expires_at: string;
+  employee: { id: string; name: string; position: string | null; avatar_url?: string | null } | null;
+  task: TvFocusTask & {
+    body?: string | null;
+    created_at?: string;
+    closed_at?: string | null;
+    counts?: TvTaskCounts;
+  };
+};
+
+export type TvFocus = { mode: "ether" } | TvFocusEmployee | TvTaskFocus;
 
 /** Страховка на случай, если realtime промолчал: фокус живёт всего 10 минут. */
 const FOCUS_REFRESH_MS = 30_000;
@@ -260,6 +281,71 @@ export function useTvFocus(enabled: boolean) {
   });
   useRealtimeInvalidate({ table: "tv_events" }, tvKeys.focus, enabled);
   useRealtimeInvalidate({ table: "tv_state" }, tvKeys.focus, enabled);
+  return query;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Заставка «Рейтинг» (D-123)                                                  */
+/* -------------------------------------------------------------------------- */
+
+export type TvLeader = {
+  id: string;
+  name: string;
+  position: string | null;
+  avatar_url: string | null;
+  points: number;
+  rank: number;
+  delta: number;
+  done: number;
+  on_time: number;
+};
+
+export type TvAward = { name: string; amount: number; reason: string; at: string };
+
+/**
+ * Первая пятёрка периода, кто вырос больше всех, последние награды и итог команды.
+ * `hidden` — гость в кабинете (D-33): больше ничего не приходит; `enabled: false` — очки
+ * выключены (D-48), заставки нет.
+ */
+export type TvRatingScene = {
+  hidden: boolean;
+  enabled: boolean;
+  period: "week" | "month";
+  top: TvLeader[];
+  riser: { id: string; name: string; avatar_url: string | null; delta: number; points: number } | null;
+  awards: TvAward[];
+  team: { done: number; on_time: number; earned: number; people: number };
+};
+
+/** Рейтинг меняется наградами: по событию стены — сразу, иначе — раз в минуту. */
+const RATING_REFRESH_MS = 60_000;
+
+export function useTvRating(guest: boolean, enabled: boolean, period: "week" | "month") {
+  const key = tvKeys.rating(guest, period);
+  const query = useQuery({
+    queryKey: key,
+    enabled,
+    refetchInterval: RATING_REFRESH_MS,
+    queryFn: async (): Promise<TvRatingScene> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.rpc("tv_rating", { p_guest: guest, p_period: period });
+      if (error) throw new Error(error.message);
+      const value = (data ?? {}) as Partial<TvRatingScene>;
+      return {
+        hidden: value.hidden ?? false,
+        enabled: value.enabled ?? false,
+        period: value.period === "month" ? "month" : "week",
+        top: value.top ?? [],
+        riser: value.riser ?? null,
+        awards: value.awards ?? [],
+        team: { done: 0, on_time: 0, earned: 0, people: 0, ...(value.team ?? {}) },
+      };
+    },
+  });
+  // a reward emits a wall event (`points`): the scene updates with it
+  useRealtimeInvalidate({ table: "tv_events" }, key, enabled);
+  // the guest switch and the period live in the wall row
+  useRealtimeInvalidate({ table: "tv_state" }, key, enabled);
   return query;
 }
 
