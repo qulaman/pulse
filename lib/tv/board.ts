@@ -85,6 +85,17 @@ export const PAGE_MS = 20_000;
 /** Только что сказанный пункт светится минуту. */
 export const FRESH_MS = 60_000;
 
+/**
+ * Карта мыслей читается со стены, пока ветвей не больше двенадцати (по шесть на сторону).
+ * Больше — стена рисует список, даже если пульт просил карту: мелкая карта хуже списка (D-121).
+ */
+export const MAP_MAX_POINTS = 12;
+
+/** Влезет ли доска картой — то же правило и на стене, и в подсказке пульта. */
+export function mapFits(points: number): boolean {
+  return points > 0 && points <= MAP_MAX_POINTS;
+}
+
 export type BoardLayout = { columns: 1 | 2; pages: number; perPage: number };
 
 export function boardLayout(count: number): BoardLayout {
