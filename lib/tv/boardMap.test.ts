@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvBoardItem, TvBoardLeaf } from "./board";
-import { boxOf, elbow, MAP_LEAVES_MAX, mapCollisions, mapLayout, rectsOverlap, ribbon, splitSides, type MapLayout } from "./boardMap";
+import { boxOf, elbow, MAP_LEAVES_MAX, MAP_TIERS, mapCollisions, mapLayout, mapStage, rectsOverlap, ribbon, splitSides, type MapLayout } from "./boardMap";
 
 // the map field on 16:9: 74 − 4.4 − 1.4 tall, 92% of 177.8 wide
 const FRAME = { width: 163.6, height: 68.2 };
@@ -43,14 +43,16 @@ function assertClean(layout: MapLayout, items: TvBoardItem[]) {
 }
 
 const SUBS = ["Сверить остатки", "Позвонить Марату", "Счёт от поставщика", "Проверить пропуска", "Фото с объекта", "Акт сверки"];
+/** Points of a word or two: nothing to squeeze, the step alone decides the size. */
+const SHORT = ["Отгрузка Казхром", "Смета склада", "Выставка", "Прайс на мерч", "Отпуск", "Аренда офиса", "Ноутбуки", "Тренинг", "Итоги квартала", "Визитки", "Банк", "Корпоратив"];
 
 describe("mapLayout", () => {
   it("пять ветвей: первые — справа сверху вниз, остальные — слева сверху вниз, ничего не пересекается и не обрезано", () => {
     const items = [point(1, SUBS.slice(0, 3)), point(2), point(3, SUBS.slice(0, 2)), point(4), point(5)];
     const layout = layoutOf(items);
     assertClean(layout, items);
-    // five short points with a few leaves: the biggest size, every leaf on the map
-    expect(layout.tier.key).toBe("a");
+    // five short points with a few leaves: the size of their step (5–8), every leaf on the map
+    expect(layout.tier.key).toBe("m");
     expect(layout.branches.flatMap((b) => b.leaves).every((l) => l.leaf !== null)).toBe(true);
     const right = layout.branches.filter((b) => b.side === "right");
     const left = layout.branches.filter((b) => b.side === "left");
@@ -129,6 +131,106 @@ describe("mapLayout", () => {
     const layout = mapLayout("Доска · 25 сент.", items, { width: 147, height: 68.2 });
     expect(layout).not.toBeNull();
     expect(mapCollisions(layout!)).toEqual([]);
+  });
+});
+
+describe("ступени масштаба", () => {
+  it("ступень по числу ветвей: 1–2, 3–4, 5–8, 9–12", () => {
+    expect([1, 2, 3, 4, 5, 8, 9, 12].map(mapStage)).toEqual(["xl", "xl", "l", "l", "m", "m", "s", "s"]);
+  });
+
+  it("короткие пункты встают на свою ступень, и чем ветвей меньше, тем крупнее узлы, центр и ленты", () => {
+    let prev: MapLayout | null = null;
+    for (let n = 12; n >= 1; n--) {
+      const items = Array.from({ length: n }, (_, i) => point(i + 1, [], SHORT[i]));
+      const layout = layoutOf(items);
+      assertClean(layout, items);
+      expect(layout.tier.key).toBe(mapStage(n));
+      if (prev) {
+        expect(layout.tier.size).toBeGreaterThanOrEqual(prev.tier.size);
+        expect(layout.center.size).toBeGreaterThanOrEqual(prev.center.size);
+        expect(layout.tier.link).toBeGreaterThanOrEqual(prev.tier.link);
+      }
+      prev = layout;
+    }
+  });
+
+  it("две ветви занимают стену: карта шире двух третей поля и крупнее карты из пяти", () => {
+    const two = layoutOf([point(1, [], "Отгрузка Казхром до пятницы"), point(2, SUBS.slice(0, 3), "Ремонт склада: смета к среде")]);
+    const five = layoutOf(Array.from({ length: 5 }, (_, i) => point(i + 1)));
+    const rects = [two.center.rect, ...two.branches.flatMap((b) => [b.rect, ...b.leaves.map((l) => l.rect)])];
+    const width = Math.max(...rects.map((r) => r.x + r.w)) - Math.min(...rects.map((r) => r.x));
+    expect(width).toBeGreaterThan(FRAME.width * 0.66);
+    expect(two.tier.size).toBeGreaterThan(five.tier.size);
+    expect(two.center.size).toBeGreaterThan(five.center.size);
+  });
+
+  it("тяжёлая доска опускается ниже своей ступени по весу, но всё равно чистая", () => {
+    // three points of 300 characters with four long leaves each: «3–4» does not hold it
+    const items = Array.from({ length: 3 }, (_, i) => point(i + 1, [LONG, LONG, LONG, LONG], LONG));
+    const layout = layoutOf(items);
+    expect(mapCollisions(layout)).toEqual([]);
+    expect(layout.tier.size).toBeLessThan(MAP_TIERS.l.size);
+  });
+
+  it("лента тянется, только пока стороне просторно, и не длиннее `linkMax`", () => {
+    for (const n of [1, 2, 3, 4, 6, 10]) {
+      const layout = layoutOf(Array.from({ length: n }, (_, i) => point(i + 1, [], SHORT[i])));
+      const c = layout.center.rect;
+      for (const b of layout.branches) {
+        const run = b.side === "right" ? b.rect.x - (c.x + c.w) : c.x - (b.rect.x + b.rect.w);
+        expect(run).toBeGreaterThanOrEqual(layout.tier.link - 0.05);
+        expect(run).toBeLessThanOrEqual(layout.tier.linkMax + 0.05);
+      }
+    }
+  });
+
+  it("многострочный узел не шире своих строк", () => {
+    const layout = layoutOf([point(1, [], "Новый прайс на мерч — согласовать с бухгалтерией и отделом продаж"), point(2)]);
+    const branch = layout.branches[0];
+    expect(branch.lines).toBeGreaterThan(1);
+    const half = (FRAME.width - layout.center.rect.w) / 2 - layout.tier.link;
+    expect(branch.rect.w).toBeLessThan(half);
+  });
+
+  // every step, every weight, every wall: nothing overlaps, nothing leaves the field, links run clear
+  const FRAMES = [
+    { name: "16:9", width: 160.4, height: 68.2 },
+    { name: "16:10", width: 144, height: 68.2 },
+    { name: "4:3", width: 119.5, height: 68.2 },
+  ];
+  const WEIGHTS: { name: string; leaves: (i: number) => string[]; text: (i: number) => string }[] = [
+    { name: "без листьев", leaves: () => [], text: (i) => SHORT[i] },
+    { name: "листья через одну", leaves: (i) => (i % 2 === 0 ? SUBS.slice(0, 1 + (i % 4)) : []), text: (i) => TEXTS[i] },
+    { name: "по четыре листа", leaves: () => SUBS.slice(0, 4), text: (i) => TEXTS[i] },
+    { name: "по шесть длинных листьев", leaves: () => Array.from({ length: 6 }, () => LONG.slice(0, 90)), text: (i) => TEXTS[i] },
+    { name: "длинные пункты", leaves: (i) => (i % 3 === 0 ? [LONG.slice(0, 120)] : []), text: () => LONG },
+    { name: "поручено", leaves: (i) => SUBS.slice(0, i % 3), text: (i) => TEXTS[i] },
+  ];
+  const seen = new Set<string>();
+  for (const frame of FRAMES) {
+    for (const weight of WEIGHTS) {
+      it(`${frame.name}, ${weight.name}: 1–12 ветвей — без пересечений на каждой ступени`, () => {
+        for (let n = 1; n <= 12; n++) {
+          const items = Array.from({ length: n }, (_, i) => {
+            const p = point(i + 1, weight.leaves(i), weight.text(i));
+            return weight.name === "поручено" ? { ...p, assignee: "Марат", children: p.children.map((c) => ({ ...c, assignee: "Асель" })) } : p;
+          });
+          const layout = mapLayout("Планёрка · понедельник", items, frame);
+          if (!layout) {
+            // only a 4:3 screen cannot hold eleven or twelve heavy branches: the wall draws the list
+            expect(frame.name, `${n} branches`).toBe("4:3");
+            expect(n).toBeGreaterThanOrEqual(9);
+            continue;
+          }
+          expect(mapCollisions(layout), `${n} branches on ${layout.tier.key}`).toEqual([]);
+          seen.add(layout.tier.key);
+        }
+      });
+    }
+  }
+  it("сетка выше прошла по всем ступеням и запасным кеглям", () => {
+    expect([...seen].sort()).toEqual(Object.keys(MAP_TIERS).sort());
   });
 });
 

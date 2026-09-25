@@ -2,7 +2,8 @@ import type { TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/bo
 
 /**
  * Доска v2 на фикстурах (D-121) — случаи песочницы `/dev/tv?case=…`: ветки, подсветка
- * ведущего, карта, двенадцать и тринадцать ветвей, длинные тексты, страницы, пусто.
+ * ведущего, карта (и с одной–четырьмя ветвями — крупные ступени), двенадцать и тринадцать
+ * ветвей, длинные тексты, страницы, пусто.
  * Фикстуры строятся один раз на случай и минуту: стена не перерисовывает доску каждую
  * секунду часов, как и на киоске, где запрос отдаёт те же объекты.
  */
@@ -12,6 +13,10 @@ export const BOARD_CASES = [
   "board-focus",
   "board-map",
   "board-map-focus",
+  "board-map-1",
+  "board-map-2",
+  "board-map-3",
+  "board-map-4",
   "board-map-12",
   "board-map-13",
   "board-long",
@@ -77,6 +82,14 @@ function seedsFor(wallCase: BoardCase): Seed[] {
     case "board-map":
     case "board-map-focus":
       return BRANCHES;
+    case "board-map-1":
+      return [BRANCHES[1]];
+    case "board-map-2":
+      return [BRANCHES[0], BRANCHES[1]];
+    case "board-map-3":
+      return [BRANCHES[0], BRANCHES[1], BRANCHES[3]];
+    case "board-map-4":
+      return BRANCHES.slice(0, 4);
     case "board-map-12":
     case "board-map-13":
       return [...BRANCHES, ...MORE.slice(0, wallCase === "board-map-12" ? 7 : 8).map((text, i) => ({ text, sub: i % 3 === 1 ? SUBS.slice(0, 2) : [] }))];

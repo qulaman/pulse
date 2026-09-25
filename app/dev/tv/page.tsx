@@ -35,7 +35,7 @@ const CASES: readonly WallCase[] = [
 ];
 
 /**
- * /dev/tv?case=face|clock|team|calendar|calendar-month|calendar-empty|board|board-two|board-pages|board-hidden|board-branches|board-focus|board-map|board-map-focus|board-map-12|board-map-13|board-long|board-pages-branches|board-empty|focus|focus-few|focus-many|focus-done|focus-nopoints|focus-empty|rating|rating-month|rating-empty|task|task-review|task-done|carousel|visit|wait|message|message-long|event|night[&clock=analog][&guest=1]
+ * /dev/tv?case=face|clock|team|calendar|calendar-month|calendar-empty|board|board-two|board-pages|board-hidden|board-branches|board-focus|board-map|board-map-focus|board-map-1…4|board-map-12|board-map-13|board-long|board-pages-branches|board-empty|focus|focus-few|focus-many|focus-done|focus-nopoints|focus-empty|rating|rating-month|rating-empty|task|task-review|task-done|carousel|visit|wait|message|message-long|event|night[&clock=analog][&guest=1]
  * — the office wall on fixtures (dev only): every scene and notice of D-96, the board of D-102 and the secretary's
  * message of D-116 without a kiosk,
  * a login or the shared database. Screenshots at 1920×1080 and 1280×720 come from here.

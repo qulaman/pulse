@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
 
-import { CENTER_PAD_X, type MapBranch, type MapLayout, type MapLeaf } from "@/lib/tv/boardMap";
+import type { MapBranch, MapLayout, MapLeaf } from "@/lib/tv/boardMap";
 
 import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
 
@@ -70,12 +70,12 @@ export const TvBoardMap = memo(function TvBoardMap({
                 {branch.leaves.map((leaf, index) => (
                   <g key={index}>
                     {/* opaque, not translucent: the stems of one branch share their spine and must not stack up brighter */}
-                    <path d={leaf.path} style={{ fill: "none", stroke: `color-mix(in srgb, ${tone} 55%, var(--bg))`, strokeWidth: 0.24, strokeLinecap: "round", strokeLinejoin: "round" }} />
+                    <path d={leaf.path} style={{ fill: "none", stroke: `color-mix(in srgb, ${tone} 55%, var(--bg))`, strokeWidth: layout.tier.stem, strokeLinecap: "round", strokeLinejoin: "round" }} />
                     <circle
                       cx={leaf.dotX}
                       cy={leaf.dotY}
                       r={layout.tier.dot}
-                      style={leaf.leaf ? { fill: leaf.leaf.done ? "var(--ok)" : tone } : { fill: "var(--bg)", stroke: tone, strokeWidth: 0.2 }}
+                      style={leaf.leaf ? { fill: leaf.leaf.done ? "var(--ok)" : tone } : { fill: "var(--bg)", stroke: tone, strokeWidth: layout.tier.stem * 0.8 }}
                     />
                   </g>
                 ))}
@@ -91,8 +91,8 @@ export const TvBoardMap = memo(function TvBoardMap({
         style={{
           width: vh(center.rect.w),
           height: vh(center.rect.h),
-          padding: `0 ${vh(CENTER_PAD_X)}`,
-          borderRadius: vh(2.6),
+          padding: `0 ${vh(center.padX)}`,
+          borderRadius: vh(layout.tier.centerRadius),
           background:
             "radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%), var(--surface-2)",
           boxShadow: "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 55%, transparent), 0 2vh 6vh rgba(0, 0, 0, 0.42)",
@@ -143,7 +143,7 @@ function Branch({ branch, layout, lit, dim, fresh, still }: { branch: MapBranch;
   const { tier } = layout;
   const { rect, item } = branch;
   const tone = toneOf(branch);
-  const radius = vh(1.8);
+  const radius = vh(tier.radius);
   const x = vh(rect.x);
   const y = vh(rect.y);
   return (
