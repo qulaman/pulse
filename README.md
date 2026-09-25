@@ -17,6 +17,7 @@
 | [`docs/AI.md`](docs/AI.md) · [`docs/STT_GATE.md`](docs/STT_GATE.md) | Голосовой конвейер: промпт парсера, схема сущностей, evals; протокол СТТ-гейта |
 | [`docs/DATABASE.md`](docs/DATABASE.md) · [`docs/BACKEND.md`](docs/BACKEND.md) · [`docs/FRONTEND.md`](docs/FRONTEND.md) | Контракты слоёв |
 | [`docs/SETUP.md`](docs/SETUP.md) · [`docs/TESTING.md`](docs/TESTING.md) | Среды/деплой/провижининг клиента; тесты и Definition of Done |
+| [`IDEAS.md`](IDEAS.md) | Идеи на будущее и бэклог: не решения, в работу — только через `DECISIONS.md` |
 | [`WORKLOG.md`](WORKLOG.md) | Журнал сессий (append-only) |
 | `/tasks` | Наряды агентам-разработчикам `NNN-*.md` (по порядку с 001) и шаблон `TEMPLATE.md` |
 | `/archive` | История подготовки: два раунда экспертных ревью, задания параллельным агентам, дизайн-пробы, законсервированный трекер, план сообщений. **При разработке не читать** |
