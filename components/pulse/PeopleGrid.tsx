@@ -58,10 +58,11 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
   const loads = useLoads();
 
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "tv" && p.role !== "director");
+  // where the grid will stand, under its own title; its length is the team's (`grow`, D-122)
   if (people.isLoading) {
     return (
-      <SkeletonGroup className="mt-7">
-        <h2 className="text-[19px] font-semibold leading-6">Люди</h2>
+      <SkeletonGroup grow className="mt-6">
+        <h2 className="text-[19px] font-semibold leading-6">{title}</h2>
         <div className="mt-3">
           <PeopleGridBone />
         </div>
@@ -71,7 +72,7 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
   if (team.length === 0) return null;
 
   return (
-    <section className="mt-6">
+    <section className="mt-6" data-grow="">
       <h2 className="flex items-center gap-2 text-[19px] font-semibold leading-6">
         {title}
         <span className="nums rounded-full bg-surface-2 px-2 text-[13px] leading-5 text-muted">{team.length}</span>

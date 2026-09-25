@@ -7,7 +7,7 @@ import { Suspense, useMemo, useState } from "react";
 import { ErrandCards } from "@/components/secretary/ErrandCards";
 import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
-import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { SecretarySkeleton } from "@/components/secretary/SecretarySkeleton";
 import { isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
 import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount } from "@/lib/errands/stats";
 import { useNow } from "@/lib/pulse/queries";
@@ -185,17 +185,5 @@ function ErrandLine({ errand, now, onOpen }: { errand: Errand; now: Date; onOpen
     </button>
   ) : (
     <div className={className}>{body}</div>
-  );
-}
-
-/** Заявки before the data: the head is the page's own (D-113), the list is bones. */
-function SecretarySkeleton() {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead title="Заявки" />
-      <SkeletonGroup className="mt-4">
-        <SectionBone fields={3} />
-      </SkeletonGroup>
-    </main>
   );
 }

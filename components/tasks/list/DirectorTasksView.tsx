@@ -279,7 +279,7 @@ function EmptyState({
 }) {
   if (nothingAtAll) {
     return (
-      <div className="mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
+      <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-10 text-center">
         <Mascot state="calm" size={64} />
         <p className="mt-4 font-display text-[17px] font-semibold">Пока ничего не отправлено</p>
         <p className="mt-1 text-[14px] leading-[19px] text-muted">Задача — голосом: зажмите маскота на Пульсе и скажите, что сделать</p>
@@ -288,14 +288,14 @@ function EmptyState({
   }
   if (query.trim()) {
     return (
-      <p className="mt-3 rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
+      <p className="rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
         Ничего не нашёл по «{query.trim()}»
       </p>
     );
   }
   if (tab === "yours") {
     return (
-      <div className="mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center">
+      <div className="flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center">
         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-ok/15 text-ok">
           <Icon name="check" size={24} />
         </span>
@@ -310,7 +310,7 @@ function EmptyState({
     );
   }
   return (
-    <p className="mt-3 rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
+    <p className="rounded-[20px] border border-border/70 px-6 py-8 text-center text-[15px] text-muted">
       {tab === "working" ? "У команды нет открытых задач" : "Закрытых пока нет"}
     </p>
   );

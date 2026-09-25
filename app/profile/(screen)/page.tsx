@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { InstallHint } from "@/components/InstallHint";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
+import { AfterPoints } from "@/components/profile/AfterPoints";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
@@ -46,39 +47,41 @@ export default async function ProfilePage() {
       </div>
       {director ? null : <PointsCard userId={profile.userId} enabled={pointsEnabled} />}
 
-      <h2 className="eyebrow mt-6 px-1">Личное</h2>
-      <RowGroup className="mt-2">
-        <PasswordRow />
-        <NotificationsRow director={director} />
-        <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
-      </RowGroup>
+      <AfterPoints userId={director ? null : profile.userId}>
+        <h2 className="eyebrow mt-6 px-1">Личное</h2>
+        <RowGroup className="mt-2">
+          <PasswordRow />
+          <NotificationsRow director={director} />
+          <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
+        </RowGroup>
 
-      {canManageTeam(profile.role) ? (
-        <>
-          <h2 className="eyebrow mt-6 px-1">Компания</h2>
-          <RowGroup className="mt-2">
-            <Row icon={<GearIcon />} title="Настройки" value={director ? "голос, разбор, очки" : "команда, роли, пароли"} href="/settings" />
-          </RowGroup>
-        </>
-      ) : null}
+        {canManageTeam(profile.role) ? (
+          <>
+            <h2 className="eyebrow mt-6 px-1">Компания</h2>
+            <RowGroup className="mt-2">
+              <Row icon={<GearIcon />} title="Настройки" value={director ? "голос, разбор, очки" : "команда, роли, пароли"} href="/settings" />
+            </RowGroup>
+          </>
+        ) : null}
 
-      <h2 className="eyebrow mt-6 px-1">Приложение</h2>
-      <RowGroup className="mt-2">
-        <VersionRow />
-      </RowGroup>
+        <h2 className="eyebrow mt-6 px-1">Приложение</h2>
+        <RowGroup className="mt-2">
+          <VersionRow />
+        </RowGroup>
 
-      <InstallHint />
+        <InstallHint />
 
-      <SignOutRow action={signOut} className="mt-6" />
+        <SignOutRow action={signOut} className="mt-6" />
 
-      <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
-        <PulseMark />
-        {/* the build this page came from — the same one the phone runs (D-115) */}
-        <p className="nums text-[12px] leading-4 text-muted">
-          версия {versionLabel(BUILD)}
-          {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
-        </p>
-      </footer>
+        <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
+          <PulseMark />
+          {/* the build this page came from — the same one the phone runs (D-115) */}
+          <p className="nums text-[12px] leading-4 text-muted">
+            версия {versionLabel(BUILD)}
+            {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
+          </p>
+        </footer>
+      </AfterPoints>
     </main>
   );
 }

@@ -6,7 +6,6 @@ import { TeamList } from "@/components/people/TeamList";
 import { PeopleGrid } from "@/components/pulse/PeopleGrid";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
-import { TeamListBone } from "@/components/ui/PageSkeletons";
 import { useTeamLoads } from "@/lib/people/loads";
 import { usePeople } from "@/lib/people/queries";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -58,24 +57,30 @@ export function TeamScreen() {
 
       <PeopleGrid title="Сейчас" />
 
-      <Link
-        href="/rating"
-        className="mt-6 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
-      >
-        Рейтинг
-        <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
-      </Link>
+      {/* under the grid only once the grid has its size: it grows with the team, and what
+          stood under it while it loaded jumped down when it arrived (D-122) */}
+      {people.isLoading ? null : (
+        <>
+          <Link
+            href="/rating"
+            className="mt-6 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
+          >
+            Рейтинг
+            <span className="text-[13px] leading-4 text-muted">очки и динамика ›</span>
+          </Link>
 
-      <Link
-        href="/shop"
-        className="mt-2 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
-      >
-        Магазин
-        <span className="text-[13px] leading-4 text-muted">награды и выдача ›</span>
-      </Link>
+          <Link
+            href="/shop"
+            className="mt-2 flex min-h-[48px] items-center justify-between card px-4 text-[16px] leading-[22px]"
+          >
+            Магазин
+            <span className="text-[13px] leading-4 text-muted">награды и выдача ›</span>
+          </Link>
 
-      <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
-      {people.isLoading ? <TeamListBone /> : <TeamList people={people.data ?? []} loads={loads.data} pointsOn={pointsOn} />}
+          <h2 className="mt-7 text-[19px] font-semibold leading-6">Все сотрудники</h2>
+          <TeamList people={people.data ?? []} loads={loads.data} pointsOn={pointsOn} />
+        </>
+      )}
     </main>
   );
 }
