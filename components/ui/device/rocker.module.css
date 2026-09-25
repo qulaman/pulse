@@ -1,0 +1,52 @@
+/*
+ * The rocker of the device kit: ◀ and ▶ are the two ends of one pill and the OK key sits
+ * between them in the same bezel — the D-pad of a TV remote laid flat. The keys are the
+ * kit's `Key` with a shape class, so they sink, tick and light like every other key
+ * (device.module.css: the face drops 3px, transform only; glows never animate).
+ */
+
+.bezel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(96px, 0.95fr) minmax(0, 1fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.035);
+}
+
+/* the ends of the pill and the OK between them; the doubled class outranks the kit's own
+   radius without !important, `> span` is the key's face */
+.back.back,
+.back.back > span {
+  border-radius: 999px 16px 16px 999px;
+}
+.next.next,
+.next.next > span {
+  border-radius: 16px 999px 999px 16px;
+}
+.ok.ok,
+.ok.ok > span {
+  border-radius: 20px;
+}
+.back.back,
+.next.next,
+.ok.ok {
+  min-height: 68px;
+}
+
+/* the arrow sits a little towards its own end, as it is moulded on a real rocker */
+.back.back > span {
+  padding-left: 6px;
+}
+.next.next > span {
+  padding-right: 6px;
+}
+
+/* the word under the glyph: smaller than a key's label, the glyph is what the thumb reads */
+.word {
+  font-size: 12px;
+  line-height: 14px;
+}
