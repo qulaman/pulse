@@ -4,6 +4,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
 import { messageFlags } from "@/components/tasks/TaskThread";
 import type { TaskMessage } from "@/lib/tasks/queries";
+import { TIME_ANSWER_WORD } from "@/lib/tasks/lifecycle";
 import { messageState } from "@/lib/tasks/thread";
 import { TEXT } from "@/lib/tasks/status-text";
 import { VoiceMessage } from "./VoiceMessage";
@@ -42,8 +43,14 @@ export function MessageRow({ message, mine, onRetry }: { message: TaskMessage; m
   const time = humanAqtobe(new Date(message.created_at));
 
   const label = flags.report
-    ? "Отчёт"
-    : flags.declineReason
+    ? flags.partial
+      ? "Отчёт · сделано не всё"
+      : "Отчёт"
+    : flags.timeRequest
+      ? `Просьба о сроке · ${flags.timeAnswer ? TIME_ANSWER_WORD[flags.timeAnswer] : "ждёт ответа"}`
+      : flags.handoffNote
+        ? "При передаче"
+        : flags.declineReason
       ? "Причина отказа"
       : flags.reworkComment
         ? "Комментарий к доработке"
@@ -55,9 +62,9 @@ export function MessageRow({ message, mine, onRetry }: { message: TaskMessage; m
 
   const tone = flags.declineReason
     ? "border-danger/40"
-    : flags.reworkComment
+    : flags.reworkComment || flags.partial
       ? "border-warn/40"
-      : flags.isQuestion && !flags.answered
+      : (flags.isQuestion && !flags.answered) || (flags.timeRequest && !flags.timeAnswer)
         ? "border-accent/40"
         : "border-border";
 

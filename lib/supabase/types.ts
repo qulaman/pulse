@@ -1420,6 +1420,7 @@ export type Database = {
           group_id: string | null
           id: string
           parent_task_id: string | null
+          passed_to: string | null
           priority: Database["public"]["Enums"]["task_priority"]
           recurrence_rule_id: string | null
           scheduled_send_at: string | null
@@ -1443,6 +1444,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           parent_task_id?: string | null
+          passed_to?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule_id?: string | null
           scheduled_send_at?: string | null
@@ -1466,6 +1468,7 @@ export type Database = {
           group_id?: string | null
           id?: string
           parent_task_id?: string | null
+          passed_to?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
           recurrence_rule_id?: string | null
           scheduled_send_at?: string | null
@@ -1503,6 +1506,13 @@ export type Database = {
             columns: ["parent_task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_passed_to_fkey"
+            columns: ["passed_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -1962,6 +1972,11 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      answer_deadline_request: {
+        Args: { approve: boolean; client_request_id?: string; task_id: string }
+        Returns: Json
+      }
+      deadline_reminders_due: { Args: { p_now?: string }; Returns: number }
       errand_answer: {
         Args: { client_request_id?: string; p_answer: string; p_id: string }
         Returns: Json
@@ -2048,6 +2063,10 @@ export type Database = {
       }
       notify_prefs_defaults: { Args: never; Returns: Json }
       notify_prefs_of: { Args: { p_user: string }; Returns: Json }
+      nudge_task: {
+        Args: { client_request_id?: string; task_id: string }
+        Returns: Json
+      }
       overdue_alerts_due: { Args: { p_now?: string }; Returns: number }
       publish_due_scheduled: { Args: { p_now?: string }; Returns: number }
       purge_closed_tasks: { Args: never; Returns: Json }
@@ -2066,9 +2085,21 @@ export type Database = {
       }
       reassign_task: {
         Args: {
+          change_deadline?: boolean
           client_request_id?: string
           new_assignee_id: string
+          new_deadline?: string
+          note?: string
           task_id: string
+        }
+        Returns: Json
+      }
+      request_deadline: {
+        Args: {
+          client_request_id?: string
+          proposed: string
+          task_id: string
+          words?: string
         }
         Returns: Json
       }

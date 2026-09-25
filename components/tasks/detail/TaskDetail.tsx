@@ -4,8 +4,8 @@ import type { CSSProperties, ReactNode } from "react";
 
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
-import { Icon, type IconName } from "@/components/tasks/desk/icons";
-import { ACTION_ICON, ACTION_LABEL, cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
+import { Icon } from "@/components/tasks/desk/icons";
+import { cardKeysFor, DirectorKeys, LifecycleNotes } from "@/components/tasks/list/DirectorTaskCard";
 import type { EmployeeAction } from "@/components/tasks/list/EmployeeTaskCard";
 import { statusToneOf, StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { Face, Note, Stepper } from "@/components/tasks/list/TaskList";
@@ -19,6 +19,15 @@ import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
 import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
+import {
+  handedInPartly,
+  isWorking,
+  lastNudgeAt,
+  latestSuggestion,
+  latestTimeRequest,
+  passedWord,
+  untilWords,
+} from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { closedAtOf, REASON_TONE, REASON_WORD, reasonFor, statusWord, stepsOf, timeLeft } from "@/lib/tasks/overview";
 import type { Me, TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
@@ -76,13 +85,20 @@ export function TaskDetail({
   const declineReason = latestDeclineReason(messages);
   const myQuestion = isDirector ? null : openQuestionOf(messages, me.userId);
   const overdue = isOverdue(task, now);
-  const reason = isDirector ? reasonFor(task, question, now) : null;
+  // D-128: a request for time, a suggested colleague, «не всё», the last reminder — from the thread
+  const request = isWorking(task.status) ? latestTimeRequest(messages) : null;
+  const suggestion = task.status === "declined" ? latestSuggestion(messages) : null;
+  const partial = handedInPartly(task, messages);
+  const nudgedAt = lastNudgeAt(messages);
+  const reason = isDirector ? reasonFor(task, question, now, Boolean(request)) : null;
 
   const director = useDirectorControls({
     base,
     companyId: me.companyId,
     tasks: [task],
     questionOf: () => question,
+    requestOf: () => request,
+    suggestionOf: () => suggestion,
     now,
     onThread: false,
     afterRemove: onBack,
@@ -99,8 +115,9 @@ export function TaskDetail({
   const left = timeLeft(task, now);
   const talk = (messages ?? []).filter((message) => message.type !== "status_change" && message.type !== "system").length;
 
-  const keys: DeskAction[] = isDirector ? cardKeysFor(task, Boolean(question), now) : [];
-  const primaryKey = (key: DeskAction) => key === "approve" || key === "insist" || (key === "extend" && reason === "overdue");
+  const keys: DeskAction[] = isDirector
+    ? cardKeysFor(task, { question: Boolean(question), request: Boolean(request), suggestion: Boolean(suggestion) }, now)
+    : [];
 
   const person = isDirector ? task.assignee?.full_name : task.author?.full_name;
 
@@ -205,9 +222,16 @@ export function TaskDetail({
             Вопрос директору: «{myQuestion}» · ждёт ответа
           </Note>
         ) : null}
+        {!isDirector && request ? (
+          <Note tone="warn" icon={<Icon name="clock" size={15} />}>
+            Просите срок {untilWords(request.proposed, now)} · ждёт ответа директора
+          </Note>
+        ) : null}
         {task.status === "declined" ? (
           <Note tone="danger" icon={<Icon name="hand" size={15} />}>
-            {isDirector ? `Отказ${declineReason ? `: ${declineReason}` : ""}` : "Отказ отправлен директору"}
+            {isDirector
+              ? `Отказ${declineReason ? `: ${declineReason}` : ""}`
+              : `Отказ отправлен директору${suggestion ? ` · вы предложили: ${suggestion.name.trim().split(/\s+/)[0]}` : ""}`}
           </Note>
         ) : null}
         {task.status === "rework" ? (
@@ -216,31 +240,23 @@ export function TaskDetail({
           </Note>
         ) : null}
         {task.status === "revoked" ? (
-          <Note tone="muted" icon={<Icon name="undo" size={15} />}>
-            {TEXT.revoked}
-          </Note>
+          task.passed_to ? (
+            <Note tone="muted" icon={<Icon name="swap" size={15} />}>
+              {passedWord(task.passed?.full_name)}
+            </Note>
+          ) : (
+            <Note tone="muted" icon={<Icon name="undo" size={15} />}>
+              {TEXT.revoked}
+            </Note>
+          )
+        ) : null}
+        {isDirector ? (
+          <LifecycleNotes task={task} request={request} suggestion={suggestion} partial={partial} nudgedAt={nudgedAt} now={now} />
         ) : null}
 
         {/* the buttons of this role — the same as on the card */}
-        {isDirector && keys.length > 0 ? (
-          <div className={`mt-4 grid gap-2 ${keys.length === 3 ? "grid-cols-3" : keys.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
-            {keys.map((key, index) => {
-              const danger = key === "remove" || key === "cancel";
-              const icon = ACTION_ICON[key];
-              return (
-                <Button
-                  key={key}
-                  data-testid={`task-action-${key}`}
-                  variant={index === 0 && primaryKey(key) ? "primary" : danger ? "ghost" : "secondary"}
-                  className={`!px-2 whitespace-nowrap !text-[14px] ${danger ? "!text-danger/85" : ""}`}
-                  icon={keys.length < 3 && icon ? <Icon name={icon as IconName} size={16} /> : undefined}
-                  onClick={() => director.press(key, task)}
-                >
-                  {key === "remove" ? BUTTON.remove : ACTION_LABEL[key]}
-                </Button>
-              );
-            })}
-          </div>
+        {isDirector ? (
+          <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => director.press(key, task)} />
         ) : null}
         {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}
         {!isDirector && task.assignee_id === me.userId ? (
@@ -339,12 +355,15 @@ function EmployeeButtons({ task, onAction, now }: { task: TaskWithPeople; onActi
   }
   if (task.status === "accepted" || task.status === "in_progress" || task.status === "rework") {
     return (
-      <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
-        <Button data-testid="task-action-complete" className="whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("complete")}>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <Button data-testid="task-action-complete" className="col-span-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("complete")}>
           {BUTTON.complete}
         </Button>
-        <Button variant="secondary" className="whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask")}>
+        <Button variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask")}>
           {BUTTON.ask}
+        </Button>
+        <Button data-testid="task-action-cant" variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="clock" />} onClick={() => onAction("decline")}>
+          {BUTTON.cant}
         </Button>
       </div>
     );

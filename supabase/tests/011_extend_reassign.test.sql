@@ -10,13 +10,13 @@ set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","r
 select is(
   (select extend_task_deadline(
      task_id := '20000000-0000-0000-0000-000000000003'::uuid,
-     new_deadline := '2026-09-12 08:00:00+00'::timestamptz)->>'task_id'),
+     new_deadline := '2030-09-12 08:00:00+00'::timestamptz)->>'task_id'),
   '20000000-0000-0000-0000-000000000003',
   'director extends the deadline of an accepted task'
 );
 select is(
   (select deadline from tasks where id = '20000000-0000-0000-0000-000000000003'),
-  '2026-09-12 08:00:00+00'::timestamptz,
+  '2030-09-12 08:00:00+00'::timestamptz,
   'the new deadline is stored'
 );
 select is(

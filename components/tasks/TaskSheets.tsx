@@ -1,14 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { DateField } from "@/components/ui/datetime/DateField";
+import { DateTimeField } from "@/components/ui/datetime/DateTimeField";
 import { Sheet } from "@/components/ui/Sheet";
-import { humanYmd, todayYmd } from "@/lib/datetime/calendar";
 import { uploadPhoto } from "@/lib/files/photo";
-import { BUTTON, DECLINE_REASONS, TEXT } from "@/lib/tasks/status-text";
+import { CANT_REASONS, NOT_MINE, requestButtonLabel, timeChoices } from "@/lib/tasks/lifecycle";
+import { BUTTON, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 
 const FIELD_CLASS =
   "w-full field px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
@@ -60,76 +60,176 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
 }
 
 /* -------------------------------------------------------------------------- */
-/* «Не могу» — chips first: nobody types on a site in the cold                 */
+/* «Не могу» — what stands in the way: time, the wrong person, or a real «нет»  */
 /* -------------------------------------------------------------------------- */
 
-export function DeclineSheet({
+type CantPick = { kind: "time"; iso: string } | { kind: "decline"; reason: string };
+
+/**
+ * One sheet behind «Не могу», on a new task and on work in hand (D-128): the employee says what
+ * stands in the way and the director gets a decision to make, not a bare refusal.
+ *  - «Нужно больше времени» — a deadline in one chip: the task stays in work (on a new one it
+ *    is «возьму, но к …»), the director grants it or keeps the old one;
+ *  - «Это не ко мне» — «Подсказать, кому…» opens the people picker, the task returns to the
+ *    director with the name; «Не знаю кому» returns it without one;
+ *  - «Не смогу сделать» — the refusal, with its reason chip, as before.
+ * The words in the field go with whichever path is taken. Two taps from the card, as before.
+ */
+export function CantSheet({
   open,
   onClose,
-  onSubmit,
-}: BaseProps & { onSubmit: (reason: string) => void }) {
-  const [chip, setChip] = useState<string | null>(null);
-  const [laterDate, setLaterDate] = useState("");
-  const [text, setText] = useState("");
+  status,
+  deadline,
+  onTime,
+  onDecline,
+  onPass,
+}: BaseProps & {
+  status: TaskStatus;
+  deadline: string | null;
+  onTime: (iso: string, words: string) => void;
+  /** the reason with the employee's words already joined */
+  onDecline: (reason: string) => void;
+  /** «Подсказать, кому…»: the caller opens the people picker and sends the refusal with the name */
+  onPass: (words: string) => void;
+}) {
+  return (
+    <Sheet open={open} onClose={onClose} title={TEXT.cantTitle}>
+      {/* born with every opening: the chips count from the clock and the deadline of this moment */}
+      <CantBody status={status} deadline={deadline} onTime={onTime} onDecline={onDecline} onPass={onPass} onClose={onClose} />
+    </Sheet>
+  );
+}
 
-  const needsDate = chip === "Буду позже";
+function CantBody({
+  status,
+  deadline,
+  onTime,
+  onDecline,
+  onPass,
+  onClose,
+}: {
+  status: TaskStatus;
+  deadline: string | null;
+  onTime: (iso: string, words: string) => void;
+  onDecline: (reason: string) => void;
+  onPass: (words: string) => void;
+  onClose: () => void;
+}) {
+  const [now] = useState(() => new Date());
+  const choices = useMemo(() => timeChoices(now, deadline), [now, deadline]);
+  const [pick, setPick] = useState<CantPick | null>(null);
+  const [custom, setCustom] = useState(false);
+  const [customIso, setCustomIso] = useState<string | null>(null);
+  const [words, setWords] = useState("");
 
-  const reset = () => {
-    setChip(null);
-    setLaterDate("");
-    setText("");
-  };
+  const customAhead = customIso !== null && new Date(customIso).getTime() > now.getTime();
+  const isTime = (iso: string) => !custom && pick?.kind === "time" && pick.iso === iso;
+  const isReason = (reason: string) => pick?.kind === "decline" && pick.reason === reason;
+
+  const label =
+    pick?.kind === "time"
+      ? requestButtonLabel(status, pick.iso, now)
+      : pick?.kind === "decline"
+        ? pick.reason === NOT_MINE
+          ? TEXT.cantReturn
+          : BUTTON.declineSend
+        : TEXT.cantPick;
 
   const submit = () => {
-    if (!chip) return;
-    const head = needsDate && laterDate ? `${chip}: ${humanYmd(laterDate)}` : chip;
-    const tail = text.trim();
-    onSubmit(tail ? `${head}. ${tail}` : head);
-    reset();
+    if (!pick) return;
+    const tail = words.trim();
+    if (pick.kind === "time") onTime(pick.iso, tail);
+    else onDecline(tail ? `${pick.reason}. ${tail}` : pick.reason);
     onClose();
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={TEXT.declineTitle}>
+    <div data-testid="cant-sheet">
+      <GroupLabel>{TEXT.cantTime}</GroupLabel>
       <div className="flex flex-wrap gap-2">
-        {DECLINE_REASONS.map((reason) => (
+        {choices.map((choice) => (
           <Chip
-            key={reason}
-            tone={chip === reason ? "accent" : "neutral"}
-            onClick={() => setChip(reason)}
+            key={choice.iso}
+            data-testid="cant-time"
+            tone={isTime(choice.iso) ? "accent" : "neutral"}
+            onClick={() => {
+              setCustom(false);
+              setPick({ kind: "time", iso: choice.iso });
+            }}
           >
+            {choice.label}
+          </Chip>
+        ))}
+        <Chip
+          tone={custom ? "accent" : "neutral"}
+          onClick={() => {
+            setCustom(true);
+            setPick(customAhead && customIso ? { kind: "time", iso: customIso } : null);
+          }}
+        >
+          {TEXT.cantOtherTime}
+        </Chip>
+      </div>
+      {custom ? (
+        <div className="mt-2">
+          <DateTimeField
+            value={customIso}
+            now={now}
+            onChange={(iso) => {
+              setCustomIso(iso);
+              setPick(iso && new Date(iso).getTime() > now.getTime() ? { kind: "time", iso } : null);
+            }}
+          />
+          {customIso && !customAhead ? <p className="mt-1 text-[13px] leading-4 text-danger">{TEXT.cantPast}</p> : null}
+        </div>
+      ) : null}
+
+      <GroupLabel>{TEXT.cantNotMine}</GroupLabel>
+      <div className="flex flex-wrap gap-2">
+        <Chip data-testid="cant-pass" onClick={() => onPass(words.trim())}>
+          {TEXT.cantSuggest}
+        </Chip>
+        <Chip tone={isReason(NOT_MINE) ? "accent" : "neutral"} onClick={() => setPick({ kind: "decline", reason: NOT_MINE })}>
+          {TEXT.cantNobody}
+        </Chip>
+      </div>
+
+      <GroupLabel>{TEXT.cantRefuse}</GroupLabel>
+      <div className="flex flex-wrap gap-2">
+        {CANT_REASONS.map((reason) => (
+          <Chip key={reason} data-testid="cant-reason" tone={isReason(reason) ? "accent" : "neutral"} onClick={() => setPick({ kind: "decline", reason })}>
             {reason}
           </Chip>
         ))}
       </div>
 
-      {needsDate ? (
-        <div className="mt-3">
-          <DateField
-            value={laterDate || null}
-            min={todayYmd()}
-            label="Когда смогу"
-            placeholder="Когда смогу"
-            onChange={setLaterDate}
-          />
-        </div>
-      ) : null}
-
       <textarea
-        className={`${FIELD_CLASS} mt-3`}
+        className={`${FIELD_CLASS} mt-4`}
         rows={2}
-        placeholder={TEXT.declinePlaceholder}
-        value={text}
-        onChange={(event) => setText(event.target.value)}
+        placeholder={TEXT.cantWords}
+        value={words}
+        onChange={(event) => setWords(event.target.value)}
       />
 
       <div className="mt-3">
         {/* the card button chose; this one sends — the same word on both read as a stuck tap */}
-        <Button block variant="danger" onClick={submit} disabled={!chip}>
-          {BUTTON.declineSend}
+        <Button
+          block
+          data-testid="cant-send"
+          variant={pick?.kind === "decline" && pick.reason !== NOT_MINE ? "danger" : "primary"}
+          onClick={submit}
+          disabled={!pick}
+        >
+          {label}
         </Button>
       </div>
-    </Sheet>
+    </div>
+  );
+}
+
+function GroupLabel({ children }: { children: ReactNode }) {
+  return (
+    <p className="mb-2 mt-4 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted first:mt-0">{children}</p>
   );
 }
 
@@ -137,12 +237,17 @@ export function DeclineSheet({
 /* «Выполнено» — the report; text is optional in this order, photo/voice next  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The handover: words, a photo and — when the work is not all done — «Сделано не всё» (D-128):
+ * the director sees «сдано частично» and decides with the usual buttons.
+ */
 export function ReportSheet({
   open,
   onClose,
   onSubmit,
-}: BaseProps & { onSubmit: (text: string, filePath: string | null) => void }) {
+}: BaseProps & { onSubmit: (text: string, filePath: string | null, partial: boolean) => void }) {
   const [text, setText] = useState("");
+  const [partial, setPartial] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -171,19 +276,25 @@ export function ReportSheet({
       }
       setUploading(false);
     }
-    onSubmit(text.trim(), filePath);
+    onSubmit(text.trim(), filePath, partial);
     setText("");
+    setPartial(false);
     pick(null);
     onClose();
   };
 
   return (
     <Sheet open={open} onClose={onClose} title={TEXT.reportTitle}>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <Chip data-testid="report-partial" tone={partial ? "accent" : "neutral"} aria-pressed={partial} onClick={() => setPartial((was) => !was)}>
+          {TEXT.reportPartial}
+        </Chip>
+      </div>
       <textarea
         className={FIELD_CLASS}
         rows={3}
         data-autofocus
-        placeholder={TEXT.reportPlaceholder}
+        placeholder={partial ? TEXT.reportPartialPlaceholder : TEXT.reportPlaceholder}
         value={text}
         onChange={(event) => setText(event.target.value)}
       />
@@ -227,7 +338,7 @@ export function ReportSheet({
 
       <div className="mt-3">
         <Button block onClick={submit} disabled={uploading}>
-          {uploading ? TEXT.photoUploading : BUTTON.complete}
+          {uploading ? TEXT.photoUploading : partial ? TEXT.reportPartialSend : BUTTON.complete}
         </Button>
       </div>
     </Sheet>

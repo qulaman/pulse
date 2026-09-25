@@ -80,7 +80,8 @@ export function DirectorTasksView({
   const reasons = useMemo(() => {
     const map = new Map<string, DeskReason>();
     for (const task of all) {
-      const reason = reasonFor(task, rows.get(task.id)?.question, now);
+      const row = rows.get(task.id);
+      const reason = reasonFor(task, row?.question, now, Boolean(row?.time_request));
       if (reason) map.set(task.id, reason);
     }
     return map;
@@ -126,6 +127,8 @@ export function DirectorTasksView({
     companyId,
     tasks: all,
     questionOf: (id) => rows.get(id)?.question ?? null,
+    requestOf: (id) => rows.get(id)?.time_request ?? null,
+    suggestionOf: (id) => rows.get(id)?.suggestion ?? null,
     now,
   });
   const { press, answer } = controls;

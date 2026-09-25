@@ -4,19 +4,31 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
 import { AnswerSheet } from "@/components/tasks/desk/AnswerSheet";
-import { DirectorSheets, type DirectorSheetName } from "@/components/tasks/desk/DirectorSheets";
+import { DirectorSheets, type DirectorSheetName, type PassTo } from "@/components/tasks/desk/DirectorSheets";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import type { DeskAction } from "@/lib/tasks/desk";
+import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import { ACTION_ICON, ACTION_LABEL, allActionsFor } from "./DirectorTaskCard";
 
-type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string } | null;
+type SheetState = { name: DirectorSheetName | "answer" | "more"; taskId: string; passTo?: PassTo } | null;
+
+/** «Все действия» says a little more than a key on a card has room for. */
+const MORE_LABEL: Partial<Record<DeskAction, string>> = {
+  reassign: "Переназначить",
+  extend: "Изменить срок",
+  grant: "Согласовать срок",
+  retime: "Назначить другой срок",
+  keep: "Оставить прежний срок",
+  handoff: "Передать предложенному",
+  nudge: "Напомнить",
+};
 
 function firstName(full: string | null | undefined): string {
   return full?.trim().split(/\s+/)[0] ?? "";
@@ -33,6 +45,8 @@ export function useDirectorControls({
   companyId,
   tasks,
   questionOf,
+  requestOf = () => null,
+  suggestionOf = () => null,
   now,
   onThread = true,
   afterRemove,
@@ -43,6 +57,10 @@ export function useDirectorControls({
   tasks: readonly TaskWithPeople[];
   /** the employee's open question of a task, for «Ответить словами» */
   questionOf: (taskId: string) => string | null;
+  /** the employee's request for time still waiting (D-128) */
+  requestOf?: (taskId: string) => TimeRequest | null;
+  /** the colleague suggested with a refusal (D-128) */
+  suggestionOf?: (taskId: string) => Suggestion | null;
   now: Date;
   /** «Открыть переписку» in «Все действия» — off on the task's own screen */
   onThread?: boolean;
@@ -91,6 +109,35 @@ export function useDirectorControls({
         haptic(15);
         actions.transition({ taskId: task.id, toStatus: "done" });
         return;
+      case "grant":
+      case "keep": {
+        const request = requestOf(task.id);
+        haptic(12);
+        actions.answerTime({ taskId: task.id, approve: action === "grant", proposedIso: request?.proposed ?? null });
+        toast(named(action === "grant" ? "Срок согласован" : "Срок прежний", task));
+        return;
+      }
+      case "retime":
+        setSheet({ name: "extend", taskId: task.id });
+        return;
+      case "nudge":
+        actions.nudge({ taskId: task.id, name: firstName(task.assignee?.full_name) });
+        return;
+      case "handoff": {
+        const suggestion = suggestionOf(task.id);
+        if (!suggestion) {
+          setSheet({ name: "reassign", taskId: task.id });
+          return;
+        }
+        const person = { id: suggestion.id, full_name: suggestion.name };
+        if (reassignNeedsDeadline(task.deadline, new Date())) {
+          setSheet({ name: "passDeadline", taskId: task.id, passTo: { person, note: "" } });
+          return;
+        }
+        haptic(12);
+        actions.reassign({ taskId: task.id, assigneeId: person.id, assigneeName: person.full_name });
+        return;
+      }
       case "insist":
         actions.transition({ taskId: task.id, toStatus: "sent" });
         return;
@@ -124,7 +171,10 @@ export function useDirectorControls({
 
   const sheetTask = sheet ? byId(sheet.taskId) : null;
   const question = sheetTask ? questionOf(sheetTask.id) : null;
-  const choices: DeskAction[] = sheetTask ? [...allActionsFor(sheetTask), ...(onThread ? (["open"] as const) : [])] : [];
+  const flags = sheetTask
+    ? { request: Boolean(requestOf(sheetTask.id)), suggestion: Boolean(sheetTask.status === "declined" && suggestionOf(sheetTask.id)) }
+    : {};
+  const choices: DeskAction[] = sheetTask ? [...allActionsFor(sheetTask, flags), ...(onThread ? (["open"] as const) : [])] : [];
 
   const sheets = sheetTask ? (
     <>
@@ -134,6 +184,14 @@ export function useDirectorControls({
         onClose={() => setSheet(null)}
         actions={actions}
         afterRemove={afterRemove}
+        suggestedId={sheetTask.status === "declined" ? (suggestionOf(sheetTask.id)?.id ?? null) : null}
+        passTo={sheet?.passTo ?? null}
+        onNeedsDeadline={(passTo) => {
+          const taskId = sheetTask.id;
+          // the picker leaves first, «Срок для …» slides in after it
+          setSheet(null);
+          setTimeout(() => setSheet({ name: "passDeadline", taskId, passTo }), 170);
+        }}
       />
       {question ? (
         <AnswerSheet
@@ -165,7 +223,8 @@ export function useDirectorControls({
                 onClick={() => {
                   setSheet(null);
                   // the next sheet slides in after this one has gone
-                  setTimeout(() => press(action, sheetTask), action === "approve" || action === "insist" || action === "open" ? 0 : 170);
+                  const instant = action === "approve" || action === "insist" || action === "open" || action === "grant" || action === "keep" || action === "nudge";
+                  setTimeout(() => press(action, sheetTask), instant ? 0 : 170);
                 }}
                 className={`flex min-h-[52px] items-center gap-3 rounded-[14px] px-3 text-left text-[16px] font-medium transition-colors duration-[120ms] active:bg-surface-2 ${
                   danger ? "text-danger" : "text-text"
@@ -177,7 +236,7 @@ export function useDirectorControls({
                 >
                   <Icon name={icon} size={18} />
                 </span>
-                <span className="flex-1">{action === "open" ? "Открыть переписку" : action === "reassign" ? "Переназначить" : ACTION_LABEL[action]}</span>
+                <span className="flex-1">{action === "open" ? "Открыть переписку" : (MORE_LABEL[action] ?? ACTION_LABEL[action])}</span>
                 <span className="text-muted">
                   <Icon name="open" size={14} />
                 </span>

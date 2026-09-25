@@ -36,6 +36,11 @@ const RULES: Record<string, Rule> = {
   message: { ttl: 24 * HOUR, urgency: "high" },
   done: { ttl: 24 * HOUR, urgency: "normal", silent: true },
   deadline_extended: { ttl: 24 * HOUR, urgency: "normal", silent: true },
+  // D-128: a closer deadline and «срок прежний» are news to act on; «скоро срок» is stale after the hour
+  deadline_moved: { ttl: 24 * HOUR, urgency: "high" },
+  deadline_kept: { ttl: 24 * HOUR, urgency: "high" },
+  task_nudge: { ttl: 12 * HOUR, urgency: "high" },
+  deadline_soon: { ttl: 1 * HOUR, urgency: "high" },
   // the director's side of a task
   pending_review: { ttl: 24 * HOUR, urgency: "high" },
   declined: { ttl: 24 * HOUR, urgency: "high" },
