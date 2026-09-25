@@ -20,8 +20,9 @@ export default function EtherPage() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Эфир" />
 
+      {/* the empty card starts where the list and its skeleton start: it takes their place */}
       {empty ? (
-        <div className="mt-6 flex flex-col items-center card px-6 py-10 text-center">
+        <div className="mt-5 flex flex-col items-center card px-6 py-10 text-center">
           <Mascot state="calm" size={72} />
           <p className="mt-4 text-[16px] leading-[22px]">Объявлений пока нет</p>
           <p className="mt-1 text-[13px] leading-4 text-muted">

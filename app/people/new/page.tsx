@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Credentials } from "@/components/people/Credentials";
 import { PersonForm, draftOf } from "@/components/people/PersonForm";
 import { PageHead } from "@/components/ui/PageHead";
-import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { NewPersonFormBone } from "@/components/ui/PageSkeletons";
 import { Sheet } from "@/components/ui/Sheet";
 import { assignableRoles } from "@/lib/people/access";
 import { useCreatePerson, usePeople } from "@/lib/people/queries";
@@ -40,10 +40,7 @@ export default function NewPersonPage() {
         {/* mounted only in the browser, once the roster is in: the ready password is random
             and must not be rendered twice (server and client), and the aliases need the roster */}
         {people.isLoading || !me.data ? (
-          <SkeletonGroup className="flex flex-col gap-4">
-            <SectionBone fields={2} />
-            <SectionBone fields={3} />
-          </SkeletonGroup>
+          <NewPersonFormBone />
         ) : (
           <PersonForm
             mode="create"

@@ -7,7 +7,7 @@ import { LoginCard } from "@/components/people/LoginCard";
 import { PersonPushCard } from "@/components/people/PersonPushCard";
 import { PersonForm, draftOf, patchOf } from "@/components/people/PersonForm";
 import { PageHead } from "@/components/ui/PageHead";
-import { Bone, SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { EditPersonSkeleton } from "@/components/ui/PageSkeletons";
 import { assignableRoles, canChangeAccess, canEditPerson, canResetLogin } from "@/lib/people/access";
 import { ROLE_LABEL, usePeople, usePerson, useUpdatePerson } from "@/lib/people/queries";
 import { useMe } from "@/lib/tasks/queries";
@@ -30,18 +30,12 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
   const loading = person.isLoading || me.isLoading || people.isLoading;
   const editor = me.data ? { id: me.data.userId, role: me.data.role } : null;
 
+  // the route's skeleton, to the pixel (D-122)
+  if (loading) return <EditPersonSkeleton back={back} />;
+
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
-      {loading ? (
-        <PageHead
-          back={back}
-          heading={
-            <SkeletonGroup className="min-w-0 flex-1 py-[3px]">
-              <Bone h={30} w="62%" />
-            </SkeletonGroup>
-          }
-        />
-      ) : !p || !editor ? (
+      {!p || !editor ? (
         <PageHead back={back} title="Сотрудник не найден" />
       ) : (
         // the head of the screen (D-113): the name and what the person is
@@ -57,13 +51,7 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
             .join(" · ")}
         />
       )}
-      {loading ? (
-        <SkeletonGroup className="mt-5 flex flex-col gap-4">
-          <SectionBone fields={3} />
-          <SectionBone fields={4} />
-          <SectionBone fields={2} />
-        </SkeletonGroup>
-      ) : !p || !editor ? null : !canEditPerson(editor, p) ? (
+      {!p || !editor ? null : !canEditPerson(editor, p) ? (
         <p className="mt-4 card px-4 py-6 text-center text-[16px] leading-[22px] text-muted">Карточку директора меняет только директор</p>
       ) : (
         <>

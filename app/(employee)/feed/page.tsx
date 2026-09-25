@@ -241,11 +241,6 @@ export default function FeedPage() {
   const acceptByFace = isSecretary && mode === "idle" && desk.phase === "asked" && desk.errand !== null;
 
   // a change from the director's side is a thought above the head; the face wakes up to it
-  // the board is one screen: the shell stops growing with its content while this page is open
-  useEffect(() => {
-    document.body.setAttribute("data-board", "");
-    return () => document.body.removeAttribute("data-board");
-  }, []);
 
   const [expiredThought, setExpiredThought] = useState<string | null>(null);
   // the secretary's face already shows a new request, and the line under it names it
@@ -425,9 +420,11 @@ export default function FeedPage() {
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, what it says grows upwards above it and the cards downwards under it.
     // The bands scroll inside themselves, so the page itself is always one screen (D-60).
+    // `data-board` stops the shell growing with its content (globals.css), as in the skeleton.
     <main
       className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
       style={{ overscrollBehaviorY: "contain" }}
+      data-board=""
       data-mode={mode}
     >
       {isSecretary && (guarded || showTally) ? (

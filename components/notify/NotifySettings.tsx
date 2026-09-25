@@ -402,13 +402,40 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
   );
 }
 
-function NotifyBones() {
+/** A value on the right of a row that has not loaded: the row keeps its height and its words. */
+function ValueBone() {
+  return <span aria-hidden className="skeleton inline-block h-4 w-12 rounded-[6px] bg-surface-2 align-middle" />;
+}
+
+/**
+ * The rules before they load — also the route's skeleton (D-122). «Что присылать» and «Когда»
+ * are the same rows for every director, so they stand as they will, only their values grey;
+ * below them — people, the lock screen and the devices, as long as the data makes them.
+ */
+export function NotifyBones() {
   return (
-    <div className="mt-6 flex flex-col gap-2" aria-busy>
-      {[0, 1, 2].map((i) => (
-        <div key={i} className="card h-[174px] animate-pulse opacity-60" />
-      ))}
-    </div>
+    <>
+      <h2 className="eyebrow mt-6 px-1">Что присылать</h2>
+      <RowGroup className="mt-2">
+        {NOTIFY_CATEGORIES.map((category) => (
+          <Row key={category} icon={<CategoryIcon category={category} />} title={CATEGORY_LABEL[category]} value={<ValueBone />} />
+        ))}
+        <Row icon={<AlarmIcon />} title="Мои напоминания" value="всегда" tone="muted" />
+        <Row icon={<AlarmIcon />} title="Тревога «Охрана»" value="всегда" tone="danger" />
+      </RowGroup>
+
+      <h2 className="eyebrow mt-6 px-1">Когда</h2>
+      <RowGroup className="mt-2">
+        <Row icon={<StackIcon />} title="Сводка" value={<ValueBone />} />
+        <Row icon={<SunIcon />} title="Итог дня" value={<ValueBone />} />
+        <Row icon={<MoonIcon />} title="Не беспокоить" value={<ValueBone />} />
+        <Row icon={<MeetingIcon />} title="Во время встреч" value={<ValueBone />} />
+      </RowGroup>
+
+      <div className="mt-6 flex flex-col gap-2" aria-busy data-grow="">
+        <div className="card h-[174px] animate-pulse opacity-60" />
+      </div>
+    </>
   );
 }
 

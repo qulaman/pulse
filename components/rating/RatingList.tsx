@@ -6,18 +6,12 @@ import { useState } from "react";
 import { Mascot } from "@/components/brand/Mascot";
 import { AwardSheet, type AwardTarget } from "@/components/rating/AwardSheet";
 import { Podium } from "@/components/rating/Podium";
+import { PeriodChips } from "@/components/rating/PeriodChips";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
 import { initialsOf } from "@/lib/people/queries";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
-
-const PERIODS: { key: RatingPeriod; label: string }[] = [
-  { key: "week", label: "Неделя" },
-  { key: "month", label: "Месяц" },
-  { key: "all", label: "Всё время" },
-];
 
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];
 
@@ -83,7 +77,16 @@ function Row({ row, canAward, onAward, onOpen }: { row: RatingRow; canAward: boo
  * person's own place with what it takes to climb, then every row — tap a row for
  * the story behind the points, «+» to award (director).
  */
-export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: boolean; pointsEnabled: boolean; isDirector: boolean }) {
+export function RatingList({
+  canAward,
+  pointsEnabled,
+  isDirector,
+}: {
+  canAward: boolean;
+  /** null while the switch is still loading: no «очки выключены» for a moment that is not true (D-122) */
+  pointsEnabled: boolean | null;
+  isDirector: boolean;
+}) {
   const [period, setPeriod] = useState<RatingPeriod>("week");
   const [target, setTarget] = useState<AwardTarget | null>(null);
   const [open, setOpen] = useState<RatingRow | null>(null);
@@ -105,15 +108,9 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
 
   return (
     <div className="mt-4">
-      <div className="flex gap-2">
-        {PERIODS.map((p) => (
-          <Chip key={p.key} tone={period === p.key ? "accent" : "neutral"} onClick={() => setPeriod(p.key)}>
-            {p.label}
-          </Chip>
-        ))}
-      </div>
+      <PeriodChips value={period} onChange={setPeriod} />
 
-      {!pointsEnabled ? (
+      {pointsEnabled === false ? (
         <p className="mt-4 rounded-[12px] border border-warn/40 bg-warn/10 px-3 py-2 text-[13px] leading-4 text-warn">
           {isDirector ? (
             <>
@@ -189,7 +186,7 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
           {rows.length > 0 ? (
             <ul className="mt-4 space-y-2">
               {rows.map((row) => (
-                <Row key={row.user_id} row={row} canAward={canAward && pointsEnabled} onAward={startAward} onOpen={setOpen} />
+                <Row key={row.user_id} row={row} canAward={canAward && pointsEnabled === true} onAward={startAward} onOpen={setOpen} />
               ))}
             </ul>
           ) : null}
@@ -199,7 +196,7 @@ export function RatingList({ canAward, pointsEnabled, isDirector }: { canAward: 
       <PointsSheet
         row={open}
         canRead={isDirector || open?.is_me === true}
-        canAward={canAward && pointsEnabled}
+        canAward={canAward && pointsEnabled === true}
         onClose={() => setOpen(null)}
         onAward={startAward}
       />

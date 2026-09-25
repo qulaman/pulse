@@ -32,6 +32,7 @@
     "smoke:pick": "tsx scripts/smoke-pick.ts",
     "smoke:team": "tsx scripts/smoke-team.ts",
     "smoke:mascot": "tsx scripts/smoke-mascot.ts",
+    "smoke:stages": "tsx scripts/smoke-stages.ts",
     "db:clean": "tsx scripts/db-clean.ts",
     "seed:client": "tsx scripts/seed-client.ts"
   },

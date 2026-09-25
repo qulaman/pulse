@@ -205,8 +205,9 @@ html {
 
 /* the board (Пульс, Лента) is exactly one screen: the shell stops growing with its content, so
    the face keeps the middle and no scrollbar blinks in and out as the modes change (D-60).
-   The bands inside the board scroll instead. */
-body[data-board] .app-shell {
+   The bands inside the board scroll instead. Said by the board's own <main> — the page and its
+   skeleton alike — so the shell has its final height in the first frame, not after an effect. */
+.app-shell:has(main[data-board]) {
   height: 100dvh;
 }
 
@@ -2450,11 +2451,6 @@ h1 { letter-spacing: -0.025em; }
   46% { opacity: 1; }
   100% { transform: translate(60%, -96px) rotate(14deg) scale(0.7); opacity: 0; }
 }
-/* opacity only: a translate on every navigation reads as the screen jumping */
-@keyframes page-enter {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 @keyframes sheet-up {
   from { transform: translateY(24px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
@@ -2485,9 +2481,9 @@ h1 { letter-spacing: -0.025em; }
   to { opacity: 1; }
 }
 
-/* Every screen fades in once; lists stagger their first six cards (opacity only — nothing moves). */
-/* backwards, not both: a retained transform would make <main> a stacking context and trap fixed sheets under the FAB */
-main { animation: page-enter var(--t-screen) var(--ease-out) backwards; }
+/* A screen does not fade in: the route skeleton, the page without its data and the page with
+   it are separate <main>s, and each one rising from 0 was a blink between two pictures of the
+   same screen (D-122). Lists stagger their first six cards (opacity only — nothing moves). */
 .card-in { animation: card-in 220ms var(--ease-out) both; }
 .card-in:nth-child(2) { animation-delay: 40ms; }
 .card-in:nth-child(3) { animation-delay: 80ms; }

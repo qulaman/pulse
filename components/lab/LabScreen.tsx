@@ -4,10 +4,13 @@ import { CostReport } from "@/components/lab/CostReport";
 import { LabPanel } from "@/components/lab/LabPanel";
 import { LabTabs } from "@/components/lab/LabTabs";
 import { PageHead } from "@/components/ui/PageHead";
-import { parseLabTab } from "@/lib/lab/tabs";
+import type { LabTab } from "@/lib/lab/tabs";
 
-export default async function LabPage({ searchParams }: { searchParams: Promise<{ tab?: string | string[] }> }) {
-  const tab = parseLabTab((await searchParams).tab);
+/**
+ * «Лаборатория» (D-63). The server adds nothing but the tab from the address, so the route's
+ * skeleton is this same screen on its first tab — every panel draws its own waiting (D-122).
+ */
+export function LabScreen({ tab }: { tab: LabTab }) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Лаборатория" />

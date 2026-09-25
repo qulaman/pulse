@@ -362,11 +362,6 @@ export default function PulsePage() {
   // A change on the board is a thought: it pops above the head, the face wakes up surprised
   // at it, and after a while the thought is gone and the face dozes off again. The opening
   // line (the summary on a tap) is speech, under the face. Both answer to the same line.
-  // the board is one screen: the shell stops growing with its content while this page is open
-  useEffect(() => {
-    document.body.setAttribute("data-board", "");
-    return () => document.body.removeAttribute("data-board");
-  }, []);
 
   const [expiredThought, setExpiredThought] = useState<string | null>(null);
   const thought = speech.line && !speech.line.opening && speech.line.id !== expiredThought ? speech.line : null;
@@ -545,11 +540,14 @@ export default function PulsePage() {
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, the assistant's words grow upwards above it and the cards downwards
     // under it. The bands scroll inside themselves, so the page itself is always one screen
-    // — no scrollbar appearing and disappearing on a tap (D-60).
+    // — no scrollbar appearing and disappearing on a tap (D-60). `data-board` stops the shell
+    // growing with its content (globals.css); PulseSkeleton draws the same bands, so the face
+    // stands where the skeleton had it.
     <main
       className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
+      data-board=""
     >
       <LayoutGroup>
         {/* above the head: what the assistant says */}

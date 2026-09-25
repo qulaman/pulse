@@ -6,11 +6,12 @@ import { Mascot } from "@/components/brand/Mascot";
 import { humanAqtobe } from "@/lib/ai/time";
 import { balanceOf, usePointHistory, useRating } from "@/lib/points/queries";
 
+/** The balance before it loads: inline, so the 44 px line of the number keeps its height (D-122). */
 function BalanceBone() {
   return (
     <span
       aria-hidden
-      className="skeleton mt-1.5 block rounded-[6px]"
+      className="skeleton inline-block rounded-[6px] align-middle"
       style={{ width: 62, height: 34, background: "var(--border)" }}
     />
   );
@@ -47,8 +48,9 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
 
   if (!enabled && rows.length === 0) return null;
 
+  // `data-grow`: the card is as tall as the last awards make it; the page waits for it (AfterPoints)
   return (
-    <section className="mt-3 card overflow-hidden">
+    <section className="mt-3 card overflow-hidden" data-grow="">
       <div className="flex items-center gap-4 px-4 pb-3 pt-4">
         <div className="min-w-0">
           <p className="eyebrow">Очки</p>
