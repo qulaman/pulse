@@ -3,13 +3,9 @@
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { useInstallOffer } from "@/lib/push/install";
 
 const DISMISS_KEY = "pulse.install.dismissed";
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
 
 type Platform = "android" | "ios" | "other";
 
@@ -24,13 +20,17 @@ function detect(): { standalone: boolean; platform: Platform } {
 /**
  * Onboarding step 2 of docs/FRONTEND.md: the app lives on the home screen — a standalone
  * window and, on iOS ≥ 16.4, the only way to get push. Hidden once installed or dismissed.
- * Android: the browser's own prompt behind a real button; iOS: the two taps in words.
- * `bubble` renders it as one of the assistant's lines on Пульс, otherwise as a card.
+ * Android: the browser's own prompt behind a real button — caught before hydration by the root
+ * layout (lib/push/install-catcher.ts, D-125), a listener mounted here used to miss it; iOS:
+ * the two taps in words. On Android the installed app's pushes carry its own name instead of
+ * «Chrome». `bubble` renders it as one of the assistant's lines on Пульс, otherwise as a card;
+ * `sticky` (the profile) stays until installed — a «Понятно» on Пульс does not hide the way in.
  */
-export function InstallHint({ bubble = false }: { bubble?: boolean }) {
+export function InstallHint({ bubble = false, sticky = false }: { bubble?: boolean; sticky?: boolean }) {
   const [state, setState] = useState<{ standalone: boolean; platform: Platform } | null>(null);
   const [dismissed, setDismissed] = useState(true);
-  const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  const [installed, setInstalled] = useState(false);
+  const offer = useInstallOffer();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -43,20 +43,12 @@ export function InstallHint({ bubble = false }: { bubble?: boolean }) {
       }
       setDismissed(hidden);
     }, 0);
-    const onPrompt = (event: Event) => {
-      event.preventDefault();
-      setInstallEvent(event as BeforeInstallPromptEvent);
-    };
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("beforeinstallprompt", onPrompt);
-    };
+    return () => clearTimeout(timer);
   }, []);
 
-  if (!state || state.standalone || dismissed) return null;
+  if (!state || state.standalone || installed || (dismissed && !sticky)) return null;
   // a desktop browser is not where the director lives; the landing already says «на телефоне»
-  if (state.platform === "other" && !installEvent) return null;
+  if (state.platform === "other" && !offer.canInstall) return null;
 
   const dismiss = () => {
     try {
@@ -68,30 +60,29 @@ export function InstallHint({ bubble = false }: { bubble?: boolean }) {
   };
 
   const install = async () => {
-    if (!installEvent) return;
-    await installEvent.prompt();
-    const choice = await installEvent.userChoice;
-    if (choice.outcome === "accepted") setDismissed(true);
-    setInstallEvent(null);
+    if (await offer.install()) setInstalled(true);
   };
 
   const text =
     state.platform === "ios"
       ? "Добавь Pulse на главный экран: внизу Safari нажми «Поделиться», затем «На экран «Домой»». Так придут уведомления и откроется без адресной строки."
-      : "Добавь Pulse на главный экран: откроется как приложение, без адресной строки, и уведомления придут даже когда браузер закрыт.";
+      : "Добавь Pulse на главный экран: откроется как приложение, без адресной строки, и уведомления будут приходить от имени Pulse, а не Chrome.";
 
-  const actions = (
-    <div className="mt-3 flex gap-2">
-      {installEvent ? (
-        <Button variant="primary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={() => void install()}>
-          Установить
-        </Button>
-      ) : null}
-      <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={dismiss}>
-        {installEvent ? "Не сейчас" : "Понятно"}
-      </Button>
-    </div>
-  );
+  const actions =
+    offer.canInstall || !sticky ? (
+      <div className="mt-3 flex gap-2">
+        {offer.canInstall ? (
+          <Button variant="primary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={() => void install()}>
+            Установить
+          </Button>
+        ) : null}
+        {sticky ? null : (
+          <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={dismiss}>
+            {offer.canInstall ? "Не сейчас" : "Понятно"}
+          </Button>
+        )}
+      </div>
+    ) : null;
 
   if (bubble) {
     return (

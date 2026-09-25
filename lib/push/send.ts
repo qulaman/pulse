@@ -3,12 +3,14 @@ import "server-only";
 import webpush from "web-push";
 
 import { getServerEnv } from "@/lib/env";
-import { lockScreenText, pushTag, transportFor } from "@/lib/push/policy";
+import { lockScreenText, pushTag, transportFor, ttlLeft } from "@/lib/push/policy";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Database } from "@/lib/supabase/types";
 
 const MAX_ATTEMPTS = 3;
 const BATCH = 50;
+/** A row this close to its end still goes: the push service keeps it at least this long. */
+const MIN_TTL = 30;
 /** Pushes in flight at once: an announcement to 500 people goes in one tick, not ten. */
 const CONCURRENCY = 8;
 
@@ -39,6 +41,10 @@ export function pushPayload(row: Row): string {
     tag: pushTag(meta, row.task_id),
     kind: row.event_kind,
     delivery_id: row.id,
+    // «Принял» from the shade (D-125) needs the task; the url already carries the same id
+    task_id: row.task_id,
+    // the shade shows when it happened, not when a late worker got to it
+    at: row.created_at,
     silent: transport.silent,
   });
 }
@@ -103,12 +109,25 @@ export async function sweepDeliveries({ budgetMs = 8_000 }: { budgetMs?: number 
 async function deliver(service: Service, row: Row, targets: Sub[], okSubs: Set<string>, result: Result): Promise<void> {
   if (targets.length === 0) {
     // nobody to send to: failed with a readable reason — the director reads it as
-    // «уведомления не включены», tier 2 (Telegram) picks it up later
+    // «уведомления не включены», tier 2 (Telegram) picks it up later. Checked before the
+    // age: a missing channel is the truer reason, and the signals count it
     await service
       .from("notification_deliveries")
       .update({ status: "failed", attempts: MAX_ATTEMPTS, last_error: "no_subscription", claimed_at: null })
       .eq("id", row.id);
     result.failed += 1;
+    return;
+  }
+
+  const left = ttlLeft(row);
+  if (left <= 0) {
+    // its moment is gone (D-125): not a dead channel — `expired` never counts as
+    // «уведомления не доходят» (team_channel_alerts_due reads only no_subscription / push …)
+    await service
+      .from("notification_deliveries")
+      .update({ status: "failed", attempts: MAX_ATTEMPTS, last_error: "expired", claimed_at: null })
+      .eq("id", row.id);
+    result.skipped += 1;
     return;
   }
 
@@ -121,7 +140,8 @@ async function deliver(service: Service, row: Row, targets: Sub[], okSubs: Set<s
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
         payload,
-        { TTL: transport.ttl, urgency: transport.urgency },
+        // a row that waited keeps only what is left of its life at the push service too
+        { TTL: Math.max(MIN_TTL, Math.min(transport.ttl, left)), urgency: transport.urgency },
       );
       delivered = true;
       okSubs.add(sub.id);
@@ -156,7 +176,16 @@ async function deliver(service: Service, row: Row, targets: Sub[], okSubs: Set<s
   }
 }
 
-/** Fire-and-forget kick after a mutation; the sweep is the safety net, so errors only log. */
-export function kickDeliveries(): void {
-  void sweepDeliveries().catch((err) => console.error("push kick failed:", err instanceof Error ? err.message : err));
+/**
+ * The kick after a mutation; the sweep is the safety net, so errors only log. It RETURNS the
+ * work (D-125): `after(() => kickDeliveries())` hands the promise to the platform, which keeps
+ * the function alive until the pushes are out. A `void` here let Vercel freeze the function
+ * right after the response — rows stayed claimed and half-sent until the next request thawed
+ * it, minutes or a night later. A caller inside `after(async () => …)` must `await` it.
+ */
+export function kickDeliveries(): Promise<void> {
+  return sweepDeliveries().then(
+    () => undefined,
+    (err) => console.error("push kick failed:", err instanceof Error ? err.message : err),
+  );
 }
