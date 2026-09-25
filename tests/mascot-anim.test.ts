@@ -93,7 +93,8 @@ describe("acts end within their length", () => {
   it("«Капля» and the employee's face", () => {
     const late: string[] = [];
     for (const act of Object.keys(ACT_MS) as MascotAct[]) {
-      for (const state of ["calm", "sleeping", "working", "calling", "happy", "awaiting", "alert", "nervous", "tuned"] as MascotState[]) {
+      // `checking` — the director's board acts on «Задачи», with the card on the clipboard (tasks/020)
+      for (const state of ["calm", "sleeping", "working", "calling", "happy", "awaiting", "alert", "nervous", "tuned", "checking"] as MascotState[]) {
         late.push(...overruns(drop(state), drop(state, act), ACT_MS[act]).map((line) => `${act} on ${state}: ${line}`));
       }
     }

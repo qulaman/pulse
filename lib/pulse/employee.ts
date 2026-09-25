@@ -183,6 +183,7 @@ export type EmployeeEvent =
   | "approved"
   | "rework"
   | "revoked"
+  | "gone"
   | "insisted"
   | "arrived"
   | "handed"
@@ -200,6 +201,7 @@ export const EVENT_WEIGHT: readonly EmployeeEvent[] = [
   "approved",
   "rework",
   "revoked",
+  "gone",
   "insisted",
   "arrived",
   "handed",
@@ -254,10 +256,17 @@ function taskEvent(prev: BoardTask | undefined, next: BoardTask, meId: string): 
 
 export function employeeEvents(prev: readonly BoardTask[], next: readonly BoardTask[], meId: string): EmployeeEvent[] {
   const before = new Map(prev.map((task) => [task.id, task]));
+  const after = new Set(next.map((task) => task.id));
   const events: EmployeeEvent[] = [];
   for (const task of next) {
     const event = taskEvent(before.get(task.id), task, meId);
     if (event) events.push(event);
+  }
+  // An order still in the person's hands that is simply no longer there was deleted («⋯ →
+  // Удалить», tasks/020): to the person it is the same as a revoke — the work is gone. A closed
+  // row leaving the list is the board pruning its goodbye, not news.
+  for (const task of prev) {
+    if (!after.has(task.id) && isOpenFor(task)) events.push("gone");
   }
   return events;
 }
