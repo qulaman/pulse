@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+import { FADE_OUT, Linger } from "@/components/brand/Linger";
+import { SeasonWear } from "@/components/brand/MascotSeason";
+import type { MascotSeason } from "@/lib/mascot/season";
 import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
 
 import {
@@ -41,14 +44,29 @@ export { SECRETARY_TONE } from "./secretaryRoom";
  * The one-shots of the secretary's face (D-97): «есть!» on «Принял», the small things done at
  * the desk while nobody asks, the morning arrival, the director's «спасибо».
  */
-export type SecretaryAct = "accept" | "sip" | "headset" | "stretch" | "clock" | "papers" | "plant" | "arrive" | "thanks";
+export type SecretaryAct =
+  | "accept"
+  | "sip"
+  | "headset"
+  | "headsetRight"
+  | "stretch"
+  | "stretchSide"
+  | "clock"
+  | "papers"
+  | "plant"
+  | "arrive"
+  | "thanks";
 
 /** How long each act takes: the screen clears it after this, the keyframes are cut to it. */
 export const SEC_ACT_MS: Record<SecretaryAct, number> = {
   accept: 900,
   sip: 2600,
   headset: 2200,
+  // the same small things another way: the other hand, a stretch to the side — so a day at the
+  // desk does not repeat one take
+  headsetRight: 2200,
   stretch: 2400,
+  stretchSide: 2400,
   clock: 2200,
   papers: 2000,
   plant: 2800,
@@ -64,6 +82,8 @@ const EYE_RY = 7;
 const LOOK_EASE = "transform 420ms cubic-bezier(0.34, 1.45, 0.64, 1)";
 const SHAPE_EASE = "transform 160ms var(--ease-out)";
 const IDLE = "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite";
+/** A piece of the job's room that is no longer needed steps back the way it came (PROP_IN). */
+const SMC_OUT = "smc-env-out 0.26s ease-in both";
 
 type Look = { x: number; y: number; loop?: string };
 
@@ -114,8 +134,16 @@ const ACT_BODY: Partial<Record<SecretaryAct, string>> = {
   arrive: "smc-arrive 2.6s cubic-bezier(0.3, 0.7, 0.3, 1) both",
   // the head leans into the hand that sets the headset right
   headset: "smc-tilt-ear 2.2s ease-in-out both",
+  headsetRight: "smc-tilt-ear-r 2.2s ease-in-out both",
+  stretchSide: "smc-stretch-side 2.4s ease-in-out both",
 };
+/** The eyes go first: to the mug, to the ear, up — and only then the hand. */
 const ACT_EYES: Partial<Record<SecretaryAct, string>> = {
+  sip: "smc-look-mug 2.6s ease-in-out both",
+  headset: "smc-look-ear 2.2s ease-in-out both",
+  headsetRight: "smc-look-ear-r 2.2s ease-in-out both",
+  stretch: "smc-look-stretch 2.4s ease-in-out both",
+  stretchSide: "smc-look-stretch 2.4s ease-in-out both",
   clock: "smc-look-clock 2.2s ease-in-out both",
   papers: "smc-look-papers 2s ease-in-out both",
   plant: "smc-look-plant 2.8s ease-in-out both",
@@ -123,6 +151,7 @@ const ACT_EYES: Partial<Record<SecretaryAct, string>> = {
 const ACT_LIDS: Partial<Record<SecretaryAct, string>> = {
   sip: "smc-lids-shut 2.6s ease-in-out both",
   stretch: "smc-lids-shut 2.4s ease-in-out both",
+  stretchSide: "smc-lids-shut 2.4s ease-in-out both",
 };
 
 /**
@@ -158,6 +187,8 @@ export function SecretaryMascot({
   daypart = "day",
   look = null,
   cheer = false,
+  still = false,
+  season = null,
   room: roomOn,
 }: {
   scene: DeskScene | null;
@@ -175,6 +206,14 @@ export function SecretaryMascot({
   /** a quick job was just closed — confetti (the caller asks only after the D-40 gate) */
   cheer?: boolean;
   /**
+   * The deep rest of a screen nobody has touched for minutes (D-119): at the desk the secretary
+   * stops typing and reads — the body sits still, the eyes stay on the monitor, the room's clouds,
+   * stars, steam and plant stop; the clock ticks on. Anything asked of the secretary ends it.
+   */
+  still?: boolean;
+  /** a holiday of the company's calendar to dress for (D-119) — over the headset band */
+  season?: MascotSeason | null;
+  /**
    * The room of the job even in `mini` (D-103): the small secretary at the director's desk
    * stands up to the coffee machine, the teapot, the door — the director sees the job itself.
    */
@@ -185,6 +224,11 @@ export function SecretaryMascot({
   const room = detailed && !bare && (roomOn ?? !mini);
   const rest = !bare && phase === "rest";
   const asleep = rest && daypart === "night";
+  // reading at the desk: an untouched screen, at rest, between the small acts
+  const reading = rest && still && !asleep && !act;
+  const stretching = act === "stretch" || act === "stretchSide";
+  // eyes that turn to somebody new blink on the way (the key remounts the lid group per target)
+  const lookKey = look ? `${Math.round(look.x * 3)}:${Math.round(look.y * 3)}` : "own";
   const job: DeskScene | null = !bare && phase === "doing" ? scene : null;
   const asked = !bare && phase === "asked";
   const done = !bare && phase === "done";
@@ -236,7 +280,9 @@ export function SecretaryMascot({
             : rest
               ? act === "arrive"
                 ? "smc-walk 0.52s ease-in-out 3"
-                : "smc-type 0.84s ease-in-out infinite"
+                : reading
+                  ? "none"
+                  : "smc-type 0.84s ease-in-out infinite"
               : IDLE;
   // the outer motion: an act moves the whole body; the finish carries the job out and back
   // (the director's desk walks its small secretary over to the big face instead — SecretaryDesk)
@@ -269,19 +315,39 @@ export function SecretaryMascot({
       {room ? null : <ellipse cx="32" cy="61" rx="16" ry="2.5" fill="var(--bg)" opacity="0.5" />}
 
       {/* ---- the room behind the body ---- */}
-      {room && rest ? <RoomBack daypart={daypart} clockAct={act === "clock"} /> : null}
-      {inRoom("coffee") ? <CoffeeMachine /> : null}
-      {inRoom("guest") ? <GuestDoor /> : null}
+      <Linger show={room && rest} out={FADE_OUT}>
+        {room && rest ? <RoomBack daypart={daypart} clockAct={act === "clock"} still={reading} /> : null}
+      </Linger>
+      <Linger show={inRoom("coffee")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("coffee") ? <CoffeeMachine /> : null}
+      </Linger>
+      <Linger show={inRoom("guest")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("guest") ? <GuestDoor /> : null}
+      </Linger>
       {room && finish === "guest" ? <GuestDoor closing /> : null}
-      {inRoom("tea") ? <PourCup liquid={TEA} tag /> : null}
-      {inRoom("water") ? <PourCup liquid={WATER} tag={false} /> : null}
-      {inRoom("dnd") || (room && finish === "dnd") ? <ShutDoor /> : null}
-      {show("dnd") ? <Sign /> : null}
+      <Linger show={inRoom("tea")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("tea") ? <PourCup liquid={TEA} tag /> : null}
+      </Linger>
+      <Linger show={inRoom("water")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("water") ? <PourCup liquid={WATER} tag={false} /> : null}
+      </Linger>
+      <Linger show={inRoom("dnd") || (room && finish === "dnd")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("dnd") || (room && finish === "dnd") ? <ShutDoor /> : null}
+      </Linger>
+      <Linger show={show("dnd")}>
+        {show("dnd") ? <Sign /> : null}
+      </Linger>
       {detailed && finish === "dnd" ? <Sign away /> : null}
-      {inRoom("taxi") ? <Car /> : null}
+      <Linger show={inRoom("taxi")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("taxi") ? <Car /> : null}
+      </Linger>
       {room && finish === "taxi" ? <Car motion="leave" /> : null}
-      {inRoom("print") ? <Printer /> : null}
-      {inRoom("meeting") ? <MeetingTable /> : null}
+      <Linger show={inRoom("print")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("print") ? <Printer /> : null}
+      </Linger>
+      <Linger show={inRoom("meeting")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("meeting") ? <MeetingTable /> : null}
+      </Linger>
 
       {/* asked: the headset rings — arcs go out of the left ear, faster the longer it waits */}
       {asked && detailed ? (
@@ -329,7 +395,7 @@ export function SecretaryMascot({
             {show("meeting") && room ? <Arm d="M10 40 Q2 38 -6 37.5" style={{ animation: "smc-place-arm 2.6s ease-in-out infinite" }} /> : null}
             {/* the stretch: the hands leave the keys (TypingHands) and the arms go up over the head,
                 out of the shoulders behind it */}
-            {act === "stretch" && detailed ? (
+            {stretching && detailed ? (
               <>
                 <g style={{ transformOrigin: "10px 40px", animation: "smc-arm-up 2.4s ease-in-out both" }}>
                   <Arm d="M10 40 Q-2 22 7 0" hand={{ cx: 7.4, cy: -2.6, rx: 3.8, ry: 4.2 }} />
@@ -364,8 +430,10 @@ export function SecretaryMascot({
             <rect x="53.4" y="24.5" width="8" height="13" rx="3.4" fill={GEAR} stroke={EDGE} strokeWidth="0.7" />
             <path d="M6.6 36.5 C7.6 45.5 13 49.6 21.5 49.2" fill="none" stroke={GEAR} strokeWidth="1.7" strokeLinecap="round" />
             <ellipse cx="23.2" cy="49.1" rx="2.6" ry="2" fill={GEAR} />
-            <circle cx="6.6" cy="29" r="1.25" fill={lightTone} style={{ animation: asleep ? "none" : lightLoop }} />
+            <circle cx="6.6" cy="29" r="1.25" fill={lightTone} style={{ animation: asleep || reading ? "none" : lightLoop }} />
             {alarm && detailed ? <Siren /> : null}
+            {/* a holiday on the crown; the siren takes the crown while it is on */}
+            {season && detailed && !alarm ? <SeasonWear season={season} /> : null}
 
             {glad ? (
               <g fill="#ffffff" opacity="0.22">
@@ -379,7 +447,8 @@ export function SecretaryMascot({
               <g style={{ transformOrigin: "32px 33px", animation: eyeLoop }}>
                 <g fill="var(--bg)">
                   {[24, 40].map((cx) => (
-                    <g key={cx} style={{ transformOrigin: `${cx}px 33px`, animation: blink }}>
+                    <g key={`${cx}-${lookKey}`} style={{ transformOrigin: `${cx}px 33px`, animation: look ? "mascot-blink-once 0.24s ease-in-out both" : "none" }}>
+                    <g style={{ transformOrigin: `${cx}px 33px`, animation: blink }}>
                       <g style={{ transformOrigin: `${cx}px 33px`, animation: lids ?? "none" }}>
                         <g style={{ transformOrigin: `${cx}px 33px`, transform: eye, transition: SHAPE_EASE }}>
                           <ellipse cx={cx} cy="33" rx={EYE_RX} ry={EYE_RY} />
@@ -389,12 +458,13 @@ export function SecretaryMascot({
                         </g>
                       </g>
                     </g>
+                    </g>
                   ))}
                 </g>
               </g>
             </g>
 
-            <Mouth talking={talking || job === "doctor" || job === "taxi" || job === "security"} asked={asked} alarm={alarm} glad={glad} job={job} rest={rest && !asleep} />
+            <Mouth talking={talking || job === "doctor" || job === "taxi" || job === "security"} asked={asked} alarm={alarm} glad={glad} job={job} rest={rest && !asleep} yawn={stretching} />
 
             {/* ---- what is held in front of the body ---- */}
             {show("dnd") ? <Hush /> : null}
@@ -415,17 +485,23 @@ export function SecretaryMascot({
       </g>
 
       {/* rest: the desk in front, the hands on the keys */}
-      {room && rest ? (
-        <>
-          <RoomFront act={act} asleep={asleep} />
-          <TypingHands asleep={asleep} act={act} />
-        </>
-      ) : null}
+      <Linger show={room && rest} out={FADE_OUT}>
+        {room && rest ? (
+          <>
+            <RoomFront act={act} asleep={asleep} still={reading} />
+            <TypingHands asleep={asleep} act={act} still={reading} />
+          </>
+        ) : null}
+      </Linger>
       {asleep && detailed ? <Zzz /> : null}
 
       {/* the pourer rides outside the body's sway: the pour needs a steady hand */}
-      {inRoom("tea") ? <Pourer kind="teapot" /> : null}
-      {inRoom("water") ? <Pourer kind="carafe" /> : null}
+      <Linger show={inRoom("tea")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("tea") ? <Pourer kind="teapot" /> : null}
+      </Linger>
+      <Linger show={inRoom("water")} out={SMC_OUT} origin="100% 100%">
+        {inRoom("water") ? <Pourer kind="carafe" /> : null}
+      </Linger>
 
       {/* doctor and taxi: the call goes out of the microphone, its subject over the head */}
       {show("doctor") || show("taxi") || show("security") ? (
@@ -446,11 +522,13 @@ export function SecretaryMascot({
 
       {/* asked: the request over the head, as a picture, «+N» for the ones behind it */}
       {/* (the director's desk shows the picture on its monitor instead) */}
-      {asked && detailed && !mini ? (
-        <Bubble tone={ringTone} motion={bubbleMotion} queue={queue}>
-          <Glyph scene={scene ?? "other"} />
-        </Bubble>
-      ) : null}
+      <Linger show={asked && detailed && !mini} origin="30% 100%">
+        {asked && detailed && !mini ? (
+          <Bubble tone={ringTone} motion={bubbleMotion} queue={queue}>
+            <Glyph scene={scene ?? "other"} />
+          </Bubble>
+        ) : null}
+      </Linger>
 
       {/* accept: «есть!» — a tick pops by the headset */}
       {act === "accept" && detailed ? (
@@ -462,7 +540,7 @@ export function SecretaryMascot({
 
       {/* done: a tick over the head, and two sparks */}
       {done && detailed ? (
-        <Delayed ms={finish && CARRY_OUT.has(finish) ? 1500 : 300}>
+        <Delayed ms={finish && CARRY_OUT.has(finish) ? 1850 : 300}>
           <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "smc-pop 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
             <circle cx="54" cy="6" r="7" fill="var(--ok)" />
             <path d="M50.6 6.2 l2.4 2.4 L57.6 3.6" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -482,7 +560,7 @@ function Delayed({ ms, children }: { ms: number; children: ReactNode }) {
   return <g style={{ animation: `smc-fade-in 0.01s linear ${ms}ms both` }}>{children}</g>;
 }
 
-function Mouth({ talking, asked, alarm, glad, job, rest }: { talking: boolean; asked: boolean; alarm: boolean; glad: boolean; job: DeskScene | null; rest: boolean }) {
+function Mouth({ talking, asked, alarm, glad, job, rest, yawn }: { talking: boolean; asked: boolean; alarm: boolean; glad: boolean; job: DeskScene | null; rest: boolean; yawn: boolean }) {
   if (talking) {
     return <ellipse cx="32" cy="45" rx="3.8" ry="2.8" fill="var(--bg)" style={{ transformOrigin: "32px 45px", animation: "mascot-mouth 0.9s ease-in-out infinite" }} />;
   }
@@ -491,8 +569,11 @@ function Mouth({ talking, asked, alarm, glad, job, rest }: { talking: boolean; a
   // an eager open smile — «да-да, слушаю»
   if (asked) return <path d="M27.6 43.6 Q32 44.6 36.4 43.6 Q35.6 49 32 49 Q28.4 49 27.6 43.6 Z" fill="var(--bg)" />;
   if (glad) return <path d="M26 43 Q32 48.6 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />;
-  // the finger covers the lips; walking is a set mouth; any other job is a small smile
-  if (job === "dnd") return null;
+  // the stretch comes with a yawn
+  if (yawn) return <ellipse cx="32" cy="45.8" rx="2.8" ry="3.4" fill="var(--bg)" style={{ transformOrigin: "32px 45px", animation: "smc-yawn-mouth 2.4s ease-in-out both" }} />;
+  // the finger is across the lips — they show on either side of it; walking is a set mouth; any
+  // other job is a small smile
+  if (job === "dnd") return <path d="M28.4 45.2 H36.4" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;
   if (job === "come" || job === "lunch" || job === "courier") return <path d="M29 45 H35" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;
   if (job) return <path d="M27.5 43.8 Q32 47.2 36.5 43.8" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" />;
   if (rest) return <path d="M28.6 43.2 Q32 45.4 35.4 43.2" fill="none" stroke="var(--bg)" strokeWidth="1.8" strokeLinecap="round" />;

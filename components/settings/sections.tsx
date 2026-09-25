@@ -463,6 +463,34 @@ export function PointsSection() {
   );
 }
 
+/** The faces (D-119): whether they dress for the holidays of the company's calendar. */
+export function MascotSection() {
+  const { draft, server, update, dirty, save, saving } = useDraft();
+  return (
+    <Disclosure
+      icon={<StarIcon />}
+      title="Маскот"
+      dirty={dirty.mascot}
+      summary={draft.mascot_seasons ? "наряжается к праздникам" : "без праздничных нарядов"}
+      hint="Новый год — колпак с 20 декабря по 7 января, Наурыз — тюльпан 20–23 марта"
+    >
+      <Toggle
+        label="Праздничные наряды"
+        hint="Лица директора, сотрудников, секретаря и экрана в кабинете"
+        checked={draft.mascot_seasons}
+        onChange={(v) => update({ mascot_seasons: v })}
+      />
+      {dirty.mascot ? (
+        <SectionActions
+          pending={saving("mascot_seasons")}
+          onSave={() => save({ mascot_seasons: draft.mascot_seasons })}
+          onReset={() => update({ mascot_seasons: server.mascot_seasons })}
+        />
+      ) : null}
+    </Disclosure>
+  );
+}
+
 export function WindowSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
   return (

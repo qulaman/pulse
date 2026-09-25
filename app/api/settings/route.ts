@@ -31,6 +31,7 @@ export const PATCH = withAuth<SettingsPatch>(
     if (body.secretary) patch.secretary = { ...current.secretary, ...body.secretary };
     if (body.points_enabled !== undefined) patch.points_enabled = body.points_enabled;
     if (body.rating_mode) patch.rating_mode = body.rating_mode;
+    if (body.mascot_seasons !== undefined) patch.mascot_seasons = body.mascot_seasons;
 
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("update_company_settings", { patch: patch as Json });

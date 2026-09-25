@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 
 import { SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
+import { useMascotSeason } from "@/lib/mascot/useSeason";
 
 /** Drawn at this size and scaled to what the screen asks for — the same trick as MascotLever. */
 const BASE = 128;
@@ -27,6 +28,7 @@ export function SecretaryFace({
   queue,
   daypart,
   cheer,
+  still = false,
   onTap,
 }: {
   scene: DeskScene | null;
@@ -43,8 +45,11 @@ export function SecretaryFace({
   queue: number;
   daypart: Daypart;
   cheer: boolean;
+  /** the deep rest of an untouched screen: the secretary stops typing and reads (D-119) */
+  still?: boolean;
   onTap: () => void;
 }) {
+  const season = useMascotSeason();
   return (
     <motion.div layout className="relative flex items-center justify-center" style={{ width: BASE + 24, height: BASE + 24 }} transition={SPRING}>
       <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} className="flex items-center justify-center">
@@ -76,6 +81,8 @@ export function SecretaryFace({
               queue={queue}
               daypart={daypart}
               cheer={cheer}
+              still={still}
+              season={season}
             />
           </span>
         </button>

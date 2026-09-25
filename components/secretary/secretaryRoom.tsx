@@ -56,8 +56,11 @@ export function Steam({ x, y }: { x: number; y: number }) {
 
 // ---- the desk (rest) -------------------------------------------------------------------
 
-/** Behind the body: the window with the time of day, the clock on the wall. */
-export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: boolean }) {
+/**
+ * Behind the body: the window with the time of day, the clock on the wall. `still` — the deep rest
+ * of a screen nobody touches: the clouds and the stars stop, the clock goes on ticking.
+ */
+export function RoomBack({ daypart, clockAct, still = false }: { daypart: Daypart; clockAct: boolean; still?: boolean }) {
   const sky =
     daypart === "night"
       ? "color-mix(in srgb, var(--accent-2) 10%, var(--bg))"
@@ -77,7 +80,7 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
             { x: 71, y: 12, d: 0.9 },
             { x: 82, y: 12.5, d: 1.7 },
           ].map((star) => (
-            <circle key={star.x} cx={star.x} cy={star.y} r="0.8" fill="#ffffff" style={{ animation: `smc-twinkle 2.6s ease-in-out ${star.d}s infinite` }} />
+            <circle key={star.x} cx={star.x} cy={star.y} r="0.8" fill="#ffffff" style={{ animation: still ? "none" : `smc-twinkle 2.6s ease-in-out ${star.d}s infinite` }} />
           ))}
         </g>
       ) : daypart === "evening" ? (
@@ -88,7 +91,7 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
       ) : (
         <g>
           <circle cx={daypart === "morning" ? 68 : 79} cy={daypart === "morning" ? 13 : 3.5} r="3.6" fill="var(--gold)" />
-          <g style={{ animation: "smc-cloud 9s ease-in-out infinite" }}>
+          <g style={{ animation: still ? "none" : "smc-cloud 9s ease-in-out infinite" }}>
             <ellipse cx="71" cy="7" rx="4" ry="1.8" fill="#ffffff" opacity="0.55" />
             <ellipse cx="73.5" cy="5.8" rx="2.6" ry="1.8" fill="#ffffff" opacity="0.55" />
           </g>
@@ -96,7 +99,8 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
       )}
       <path d="M74 -4 V18 M62 7 H86" stroke={EDGE} strokeWidth="0.8" />
 
-      {/* the clock on the wall, top left: the minute hand sweeps a minute a turn */}
+      {/* the clock on the wall, top left: the hand ticks round once a minute — a tick a second, so
+          the wall repaints once a second instead of every frame */}
       <circle cx="-7" cy="5" r="6.2" fill="var(--surface)" stroke={EDGE} strokeWidth="1.1" />
       <path d="M-7 5 L-7 1.6" stroke="var(--text)" strokeWidth="1.1" strokeLinecap="round" style={{ transformOrigin: "-7px 5px", transform: "rotate(-60deg)" }} />
       <path
@@ -104,7 +108,7 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
         stroke="var(--text-muted)"
         strokeWidth="0.8"
         strokeLinecap="round"
-        style={{ transformOrigin: "-7px 5px", animation: clockAct ? "smc-spin 1.1s cubic-bezier(0.4, 0, 0.2, 1) 0.4s 2" : "smc-spin 60s linear infinite" }}
+        style={{ transformOrigin: "-7px 5px", animation: clockAct ? "smc-spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s 2" : "smc-spin 60s steps(60) infinite" }}
       />
       <circle cx="-7" cy="5" r="0.8" fill="var(--text)" />
     </g>
@@ -117,14 +121,16 @@ export function RoomBack({ daypart, clockAct }: { daypart: Daypart; clockAct: bo
  * the hand off the keys for it); `asleep` turns the screen off. While an act has the hands, the
  * keys stop lighting and the text on the screen stops where it was.
  */
-export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean }) {
-  const typing = act === null;
+export function RoomFront({ act, asleep, still = false }: { act: string | null; asleep: boolean; still?: boolean }) {
+  // the keys light and the text runs only while the hands type — not under an act, not while the
+  // secretary reads (the deep rest of an untouched screen)
+  const typing = act === null && !still;
   return (
     <g>
       {/* the plant, far left, and the watering can of its act */}
       <g>
         <path d="M-22 43 H-12 L-13.2 50 H-20.8 Z" fill={KRAFT} />
-        <g style={{ transformOrigin: "-17px 43px", animation: act === "plant" ? "smc-leaves 2.8s ease-in-out both" : "smc-sway 5s ease-in-out infinite" }}>
+        <g style={{ transformOrigin: "-17px 43px", animation: act === "plant" ? "smc-leaves 2.8s ease-in-out both" : still ? "none" : "smc-sway 5s ease-in-out infinite" }}>
           <ellipse cx="-20" cy="37.5" rx="2.4" ry="5.4" transform="rotate(-28 -20 37.5)" fill="color-mix(in srgb, var(--ok) 70%, var(--bg))" />
           <ellipse cx="-14.2" cy="37" rx="2.4" ry="5.6" transform="rotate(26 -14.2 37)" fill="color-mix(in srgb, var(--ok) 80%, var(--bg))" />
           <ellipse cx="-17" cy="35" rx="2.2" ry="6" fill="color-mix(in srgb, var(--ok) 62%, var(--bg))" />
@@ -160,7 +166,7 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
         <rect x="-5.8" y="43.4" width="6" height="2" rx="1" fill="var(--accent-2)" opacity="0.8" />
         {act === "sip" ? (
           <Mitten cx={3.2} cy={45.2} rx={3.5} ry={2.6} style={{ animation: "smc-held-sip 2.6s linear both", opacity: 0 }} />
-        ) : (
+        ) : still ? null : (
           <Steam x={-2.6} y={39.4} />
         )}
       </g>
@@ -193,20 +199,16 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
 
       {/* the keyboard in front of the body, its keys lighting as they are pressed */}
       <rect x="17" y="46.4" width="30" height="3.6" rx="1.2" fill="color-mix(in srgb, var(--surface-2) 70%, white 10%)" stroke={EDGE} strokeWidth="0.7" />
-      {asleep
-        ? null
-        : [0, 1, 2, 3, 4].map((key) => (
-            <rect
-              key={key}
-              x={19.6 + key * 5.4}
-              y="47.4"
-              width="3.2"
-              height="1.5"
-              rx="0.4"
-              fill="var(--accent)"
-              style={{ animation: typing ? `sec-key 0.84s ease-in-out ${(key * 0.19).toFixed(2)}s infinite` : "none", opacity: 0.3 }}
-            />
+      {asleep ? null : (
+        <>
+          {[0, 1, 2, 3, 4].map((key) => (
+            <rect key={key} x={19.6 + key * 5.4} y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" opacity="0.3" />
           ))}
+          {/* the key being pressed: one light hopping from key to key (steps, so it repaints once a
+              hop), not five pulsing — the pulses were a third of the whole desk's cost */}
+          {typing ? <rect x="19.6" y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" style={{ animation: "sec-key-hop 0.84s steps(1) infinite" }} /> : null}
+        </>
+      )}
     </g>
   );
 }
@@ -220,15 +222,20 @@ export function RoomFront({ act, asleep }: { act: string | null; asleep: boolean
  */
 const HANDS_IN_ACT: Record<string, [string, string]> = {
   headset: ["smc-hand-ear 2.2s ease-in-out both", "none"],
+  headsetRight: ["none", "smc-hand-ear-r 2.2s ease-in-out both"],
   sip: ["smc-hand-sip 2.6s ease-in-out both", "none"],
   papers: ["smc-hand-papers 2s ease-in-out both", "none"],
   plant: ["smc-hand-plant 2.8s ease-in-out both", "none"],
   stretch: ["smc-hand-lift 2.4s ease-in-out both", "smc-hand-lift 2.4s ease-in-out both"],
+  stretchSide: ["smc-hand-lift 2.4s ease-in-out both", "smc-hand-lift 2.4s ease-in-out both"],
   arrive: ["smc-hand-arrive 2.6s ease-out both", "smc-hand-arrive 2.6s ease-out both"],
 };
 
-/** The hands on the keys — typing, still under any other act, resting while the secretary dozes. */
-export function TypingHands({ asleep, act = null }: { asleep: boolean; act?: string | null }) {
+/**
+ * The hands on the keys — typing, still under any other act, resting while the secretary dozes or
+ * reads (`still`, the deep rest of an untouched screen).
+ */
+export function TypingHands({ asleep, act = null, still = false }: { asleep: boolean; act?: string | null; still?: boolean }) {
   const busy = act ? HANDS_IN_ACT[act] : undefined;
   return (
     <g>
@@ -242,7 +249,7 @@ export function TypingHands({ asleep, act = null }: { asleep: boolean; act?: str
           cy={47.2}
           rx={3.5}
           ry={2.6}
-          style={{ animation: busy ? busy[i] : asleep || act ? "none" : `smc-tap 0.42s ease-in-out ${hand.d} infinite` }}
+          style={{ animation: busy ? busy[i] : asleep || still || act ? "none" : `smc-tap 0.42s ease-in-out ${hand.d} infinite` }}
         />
       ))}
     </g>
@@ -381,12 +388,17 @@ export function Siren() {
   );
 }
 
-/** A finger on the lips and «тсс» floating off them. */
+/**
+ * A finger on the lips and «тсс» floating off them: the forearm comes up from below the chin, the
+ * fist under the lips, one finger up across them (the lips show on either side of it — Mouth).
+ */
 export function Hush() {
   return (
     <>
-      <Mitten cx={33.5} cy={51.6} rx={4.4} ry={3.3} />
-      <ellipse cx="33" cy="45.4" rx="1.9" ry="4.6" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
+      <path d="M36.2 52.4 L42.4 61" stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="6.2" strokeLinecap="round" />
+      <path d="M36.2 52.4 L42.4 61" stroke={HAND} strokeWidth="4.8" strokeLinecap="round" />
+      <Mitten cx={34.4} cy={51.4} rx={4} ry={3.2} />
+      <ellipse cx="33.2" cy="45" rx="1.7" ry="4.4" fill={HAND} stroke="var(--bg)" strokeOpacity="0.35" strokeWidth="0.8" />
       <text x="-9" y="30" fontSize="6.4" fontWeight="700" fill="var(--text-muted)" style={{ animation: "smc-shh 2.8s ease-out infinite", opacity: 0 }}>
         тсс
       </text>
@@ -736,7 +748,7 @@ export function Hearts() {
         <path
           key={heart.x}
           d={`M${heart.x} 4 c-1.6 -2.6 -5.4 -1.2 -4.2 1.6 c0.8 1.8 4.2 4.2 4.2 4.2 c0 0 3.4 -2.4 4.2 -4.2 c1.2 -2.8 -2.6 -4.2 -4.2 -1.6 Z`}
-          style={{ ...box("50% 100%", `smc-heart 2.4s ease-out ${heart.d}s both`), opacity: 0, scale: String(heart.s) }}
+          style={{ ...box("50% 100%", `smc-heart 1.8s ease-out ${heart.d}s both`), opacity: 0, scale: String(heart.s) }}
         />
       ))}
     </g>

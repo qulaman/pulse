@@ -2,7 +2,9 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 
-import { Mascot, type MascotState } from "@/components/brand/Mascot";
+import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
+import { useMascotActs } from "@/components/pulse/useMascotActs";
+import { useMascotSeason } from "@/lib/mascot/useSeason";
 import type { TvSpeech } from "@/lib/tv/voice";
 
 import { useVhPx } from "./useKiosk";
@@ -22,6 +24,13 @@ import { useVhPx } from "./useKiosk";
 
 const FACE_VH = 34;
 
+/**
+ * The face on the wall does the small things a face at rest does (D-82, D-119): asleep it snores
+ * and rolls over, awake it waves, winks, whistles — never the look after the balls: the wall has
+ * none. Only the calm and glad acts: the wall shows nothing that could sting (D-45).
+ */
+const TV_SKIP: readonly MascotAct[] = ["orbit"];
+
 const STATE: Record<TvSpeech["mood"], MascotState> = {
   calm: "calm",
   speaking: "speaking",
@@ -31,6 +40,8 @@ const STATE: Record<TvSpeech["mood"], MascotState> = {
 
 export function TvMascot({ speech }: { speech: TvSpeech }) {
   const size = useVhPx(FACE_VH);
+  const acts = useMascotActs(STATE[speech.mood], true, TV_SKIP);
+  const season = useMascotSeason();
 
   return (
     <div className="flex flex-col items-center">
@@ -44,7 +55,7 @@ export function TvMascot({ speech }: { speech: TvSpeech }) {
             transition: "background 800ms var(--ease-out)",
           }}
         />
-        {size > 0 ? <Mascot state={STATE[speech.mood]} size={size} /> : null}
+        {size > 0 ? <Mascot state={STATE[speech.mood]} size={size} act={acts.act} season={season} /> : null}
       </span>
 
       <div className="mt-[3vh] h-[6vh] text-center">

@@ -49,7 +49,12 @@ function pick(pool: readonly MascotAct[], last: MascotAct | null): MascotAct {
  * Nothing runs per frame: one timer between acts, one to clear the act, and the act itself is
  * CSS. Under prefers-reduced-motion there are no acts at all — they carry no information.
  */
-export function useMascotActs(state: MascotState, enabled: boolean): { act: MascotAct | null; play: (act: MascotAct) => void } {
+export function useMascotActs(
+  state: MascotState,
+  enabled: boolean,
+  /** acts that make no sense on this screen — the wall has no balls to follow */
+  skip: readonly MascotAct[] = [],
+): { act: MascotAct | null; play: (act: MascotAct) => void } {
   const reduced = useReducedMotion() === true;
   const [shown, setShown] = useState<{ act: MascotAct; called: boolean } | null>(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,7 +80,7 @@ export function useMascotActs(state: MascotState, enabled: boolean): { act: Masc
     [],
   );
 
-  const pool = enabled && !reduced ? POOLS[state] : undefined;
+  const pool = enabled && !reduced ? POOLS[state]?.filter((act) => !skip.includes(act)) : undefined;
   // calm and happy share one pool: going from one to the other does not restart the wait
   const poolKey = pool?.join(",") ?? "";
 

@@ -1,6 +1,9 @@
 import type { CSSProperties } from "react";
 
-import { BRINGS_CARD, BRINGS_LETTER, CallCard, handFill, Hourglass, Letter, MIRROR, Stack, WorkActBehind, WorkActFront, WorkActOver, type WorkAct } from "@/components/brand/MascotWork";
+import { FADE_OUT, Linger } from "@/components/brand/Linger";
+import { SeasonWear } from "@/components/brand/MascotSeason";
+import type { MascotSeason } from "@/lib/mascot/season";
+import { BRINGS_CARD, BRINGS_LETTER, CallCard, handFill, Hourglass, Letter, MIRROR, Stack, WorkActBehind, WorkActFront, WorkActOver, WorkActUnder, type WorkAct } from "@/components/brand/MascotWork";
 
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
@@ -145,6 +148,18 @@ export const ACT_MS: Record<MascotAct, number> = {
   orbit: 3600,
   peek: 2800,
   tiptoe: 2200,
+};
+
+/**
+ * The moment an act lands, for a phone that can answer it in the hand (Android; iOS has no
+ * vibration API): the card caught, the harder «!!», the medal on the chest, the card back on the
+ * crown — [ms into the act, vibration pattern]. The screen that plays the act schedules it.
+ */
+export const ACT_TOUCH: Partial<Record<MascotAct, [number, number | number[]]>> = {
+  catch: [570, 18],
+  insist: [570, [18, 60, 24]],
+  medal: [720, [14, 50, 22]],
+  boomerang: [700, 22],
 };
 
 /**
@@ -500,6 +515,7 @@ export function Mascot({
   act = null,
   gaze = null,
   carry = null,
+  season = null,
 }: {
   state?: MascotState;
   size?: number;
@@ -511,6 +527,8 @@ export function Mascot({
    * of them is due within the hour. null or zero — empty hands.
    */
   carry?: { count: number; hot?: boolean } | null;
+  /** a holiday of the company's calendar to dress for (D-119, lib/mascot/useSeason.ts) */
+  season?: MascotSeason | null;
   /**
    * Where the face is looking, as a direction from its middle (−1..1 on each axis): the eyes
    * go there and hold, the head leans a little the same way (D-84 — the person the director
@@ -551,6 +569,9 @@ export function Mascot({
   const gazeShift = `translate(${(gx * 4.8).toFixed(2)}px, ${(gy * 3.8).toFixed(2)}px)`;
   const lean = `translateX(${(gx * 2).toFixed(2)}px) rotate(${(gx * 9).toFixed(2)}deg)`;
   const LOOK_EASE = "transform 420ms cubic-bezier(0.34, 1.45, 0.64, 1)";
+  // eyes that jump to somebody new blink on the way — the key remounts the lid group per target
+  const gazeKey = gaze ? `${Math.round(gx * 3)}:${Math.round(gy * 3)}` : "own";
+  const gazeBlink = gaze ? "mascot-blink-once 0.24s ease-in-out both" : "none";
   // one cycle now holds a flick, its echo and a later single blink, so the rhythm is not a tick
   const blink = squint || lidded || asleep ? "none" : "mascot-blink 9.2s infinite";
   // at avatar sizes the gleam and the ground shadow are sub-pixel decoration: draw them, do not animate
@@ -632,48 +653,50 @@ export function Mascot({
 
       {/* chatting: somebody's bubble comes in on the left with the typing dots, then the answer
           goes out on the right — a conversation, told in two bubbles */}
-      {state === "chatting" && detailed ? (
-        <>
-          <g style={{ transformBox: "fill-box", transformOrigin: "90% 100%", animation: "mascot-bubble-left 3.2s ease-in-out infinite", opacity: 0 }}>
-            <path
-              d="M-8.5 -6 H0.5 A7.5 7.5 0 0 1 3.07 8.55 L6.5 13.5 L-0.5 9 H-8.5 A7.5 7.5 0 0 1 -8.5 -6 Z"
-              fill="var(--surface)"
-              stroke={TONE.messages}
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            {[0, 1, 2].map((dot) => (
-              <circle
-                key={dot}
-                cx={-9 + dot * 5}
-                cy="1.5"
-                r="1.7"
-                fill={TONE.messages}
-                style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: `mascot-typing 0.9s ease-in-out ${(dot * 0.15).toFixed(2)}s infinite` }}
-              />
-            ))}
-          </g>
-          <g style={{ transformBox: "fill-box", transformOrigin: "0% 100%", animation: "mascot-bubble-right 3.2s ease-in-out infinite", opacity: 0 }}>
-            <path
-              d="M53.5 -10 H62.5 A7.5 7.5 0 0 1 62.5 5 H55 L48.5 9.5 L49.75 4 A7.5 7.5 0 0 1 53.5 -10 Z"
-              fill="color-mix(in srgb, var(--accent) 22%, var(--surface))"
-              stroke="var(--accent)"
-              strokeWidth="1.5"
-              strokeLinejoin="round"
-            />
-            {[0, 1].map((line) => (
+      <Linger show={state === "chatting" && detailed} out={FADE_OUT}>
+        {state === "chatting" && detailed ? (
+          <>
+            <g style={{ transformBox: "fill-box", transformOrigin: "90% 100%", animation: "mascot-bubble-left 3.2s ease-in-out infinite", opacity: 0 }}>
               <path
-                key={line}
-                d={line === 0 ? "M52 -4.6 h12.5" : "M52 -0.6 h8"}
-                stroke="var(--accent)"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-                style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `mascot-reply-line 3.2s ease-out ${(line * 0.18).toFixed(2)}s infinite` }}
+                d="M-8.5 -6 H0.5 A7.5 7.5 0 0 1 3.07 8.55 L6.5 13.5 L-0.5 9 H-8.5 A7.5 7.5 0 0 1 -8.5 -6 Z"
+                fill="var(--surface)"
+                stroke={TONE.messages}
+                strokeWidth="1.5"
+                strokeLinejoin="round"
               />
-            ))}
-          </g>
-        </>
-      ) : null}
+              {[0, 1, 2].map((dot) => (
+                <circle
+                  key={dot}
+                  cx={-9 + dot * 5}
+                  cy="1.5"
+                  r="1.7"
+                  fill={TONE.messages}
+                  style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: `mascot-typing 0.9s ease-in-out ${(dot * 0.15).toFixed(2)}s infinite` }}
+                />
+              ))}
+            </g>
+            <g style={{ transformBox: "fill-box", transformOrigin: "0% 100%", animation: "mascot-bubble-right 3.2s ease-in-out infinite", opacity: 0 }}>
+              <path
+                d="M53.5 -10 H62.5 A7.5 7.5 0 0 1 62.5 5 H55 L48.5 9.5 L49.75 4 A7.5 7.5 0 0 1 53.5 -10 Z"
+                fill="color-mix(in srgb, var(--accent) 22%, var(--surface))"
+                stroke="var(--accent)"
+                strokeWidth="1.5"
+                strokeLinejoin="round"
+              />
+              {[0, 1].map((line) => (
+                <path
+                  key={line}
+                  d={line === 0 ? "M52 -4.6 h12.5" : "M52 -0.6 h8"}
+                  stroke="var(--accent)"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `mascot-reply-line 3.2s ease-out ${(line * 0.18).toFixed(2)}s infinite` }}
+                />
+              ))}
+            </g>
+          </>
+        ) : null}
+      </Linger>
 
       {/* announcing: the words leave the bell of the megaphone in arcs, on the shout */}
       {state === "announcing" && detailed ? (
@@ -816,32 +839,31 @@ export function Mascot({
 
       {/* offering: the parsed cards wait in hand — a ring ripples out of the blob and the
           stack lifts every time it pops back, so the face itself says «tap me» */}
-      {state === "offering" ? (
-        <>
-          <g fill="none" stroke={COLOR.offering} strokeWidth="1.6">
-            {[0, 1].map((ring) => (
-              <circle
-                key={ring}
-                cx="32"
-                cy="32"
-                r="27"
-                style={{ transformOrigin: "32px 32px", animation: `mascot-tap-ring 1.6s ease-out ${(0.3 + ring * 0.8).toFixed(2)}s infinite`, opacity: 0 }}
-              />
-            ))}
-          </g>
-          {detailed ? (
-            <g style={{ transformOrigin: "32px -3px", animation: "mascot-offer-card 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}>
-              <rect x="20" y="-11" width="15" height="11" rx="2.5" fill="var(--surface)" stroke={COLOR.offering} strokeWidth="1.4" opacity="0.7" transform="rotate(-6 27.5 -5.5)" />
-              <rect x="25" y="-9" width="15" height="11" rx="2.5" fill="var(--surface)" stroke={COLOR.offering} strokeWidth="1.4" />
-              <path d="M28 -5h9M28 -1.5h5" stroke={COLOR.offering} strokeWidth="1.1" strokeLinecap="round" />
+      <Linger show={state === "offering"} out={FADE_OUT}>
+        {state === "offering" ? (
+          <>
+            <g fill="none" stroke={COLOR.offering} strokeWidth="1.6">
+              {[0, 1].map((ring) => (
+                <circle
+                  key={ring}
+                  cx="32"
+                  cy="32"
+                  r="27"
+                  style={{ transformOrigin: "32px 32px", animation: `mascot-tap-ring 1.6s ease-out ${(0.3 + ring * 0.8).toFixed(2)}s infinite`, opacity: 0 }}
+                />
+              ))}
             </g>
-          ) : null}
-        </>
-      ) : null}
+            {detailed ? (
+              <g style={{ transformOrigin: "32px -3px", animation: "mascot-offer-card 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite" }}>
+                <rect x="20" y="-11" width="15" height="11" rx="2.5" fill="var(--surface)" stroke={COLOR.offering} strokeWidth="1.4" opacity="0.7" transform="rotate(-6 27.5 -5.5)" />
+                <rect x="25" y="-9" width="15" height="11" rx="2.5" fill="var(--surface)" stroke={COLOR.offering} strokeWidth="1.4" />
+                <path d="M28 -5h9M28 -1.5h5" stroke={COLOR.offering} strokeWidth="1.1" strokeLinecap="round" />
+              </g>
+            ) : null}
+          </>
+        ) : null}
+      </Linger>
 
-      {/* calling: the new order over the head, popping in time with the hops — a card with a
-          «!» badge (D-110), the bare «!» at avatar size. A card flying in brings it itself. */}
-      {state === "calling" && !(acting && BRINGS_CARD.has(acting)) ? <CallCard color={COLOR.calling} detailed={detailed} /> : null}
 
       {/* sleeping: two small z-s drift up from the head, one after the other */}
       {asleep ? (
@@ -891,6 +913,17 @@ export function Mascot({
         </g>
       ) : null}
 
+      {/* the wind-up of a throw: the card in the hand behind the head, only its top over the crown
+          — `sending`, and the employee's «Сдал» (under the body, so the head hides the rest) */}
+      {state === "sending" && detailed ? (
+        <g data-still="hide" style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear infinite", opacity: 0 }}>
+          <rect x="34" y="5" width="17" height="12" rx="3" fill="var(--surface)" stroke={COLOR.sending} strokeWidth="1.5" />
+          <path d="M37.5 9.5h10M37.5 13h6" stroke={COLOR.sending} strokeWidth="1.2" strokeLinecap="round" />
+          <ellipse cx="36" cy="5.6" rx="3" ry="2.6" fill={handFill(COLOR.sending)} />
+        </g>
+      ) : null}
+      {acting ? <WorkActUnder act={acting} body={COLOR[state]} /> : null}
+
       {/* voice: swell and dip follow the microphone (one transform, no re-layout) */}
       <g
         data-face
@@ -910,27 +943,35 @@ export function Mascot({
           <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
             {/* loop: the body's own motion */}
             <g style={{ transformOrigin: "32px 44px", animation: BODY[state] }}>
+              {/* calling: the new order over the head — a card with a «!» badge (D-110), the bare «!»
+                  at avatar size. It rides the body, so it goes up with every hop instead of hanging
+                  where the head was; it pops in time with them. A card flying in brings it itself. */}
+              <Linger show={state === "calling" && !(acting && BRINGS_CARD.has(acting))}>
+                {state === "calling" && !(acting && BRINGS_CARD.has(acting)) ? <CallCard color={COLOR.calling} detailed={detailed} /> : null}
+              </Linger>
               {/* scheduling: a tear-off calendar held up over the left shoulder by the left hand —
                   the arm comes out behind the body, so the calendar leans with it; the top page
                   lifts, turns and falls away, the next day is already under it, and today's cell
                   keeps pulsing */}
-              {state === "scheduling" && detailed ? (
-                <g style={{ transformOrigin: "12px 30px", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
-                  <CalendarPage />
-                  <g style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "mascot-page-flip 3s ease-in infinite" }}>
+              <Linger show={state === "scheduling" && detailed} origin="100% 100%">
+                {state === "scheduling" && detailed ? (
+                  <g style={{ transformOrigin: "12px 30px", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
                     <CalendarPage />
+                    <g style={{ transformBox: "fill-box", transformOrigin: "50% 0%", animation: "mascot-page-flip 3s ease-in infinite" }}>
+                      <CalendarPage />
+                    </g>
+                    {/* the header and its rings stay put: only the page under them turns */}
+                    <path d="M-18 -3 V-3.5 A3 3 0 0 1 -15 -6.5 H-1 A3 3 0 0 1 2 -3.5 V-0.5 H-18 Z" fill={TONE.calendar} />
+                    <g fill="var(--text-muted)">
+                      <rect x="-13.5" y="-9" width="1.8" height="4.6" rx="0.9" />
+                      <rect x="-4.3" y="-9" width="1.8" height="4.6" rx="0.9" />
+                    </g>
+                    {/* the arm under it and the hand on its lower edge */}
+                    <path d="M12 30 Q2 27 -5.5 17.5" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
+                    <ellipse cx="-6.2" cy="15.4" rx="4.2" ry="3.2" transform="rotate(-24 -6.2 15.4)" fill={COLOR[state]} />
                   </g>
-                  {/* the header and its rings stay put: only the page under them turns */}
-                  <path d="M-18 -3 V-3.5 A3 3 0 0 1 -15 -6.5 H-1 A3 3 0 0 1 2 -3.5 V-0.5 H-18 Z" fill={TONE.calendar} />
-                  <g fill="var(--text-muted)">
-                    <rect x="-13.5" y="-9" width="1.8" height="4.6" rx="0.9" />
-                    <rect x="-4.3" y="-9" width="1.8" height="4.6" rx="0.9" />
-                  </g>
-                  {/* the arm under it and the hand on its lower edge */}
-                  <path d="M12 30 Q2 27 -5.5 17.5" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
-                  <ellipse cx="-6.2" cy="15.4" rx="4.2" ry="3.2" transform="rotate(-24 -6.2 15.4)" fill={COLOR[state]} />
-                </g>
-              ) : null}
+                ) : null}
+              </Linger>
               {/* wave: a small hand comes out from behind the body and waves — drawn first, so
                   the body covers its root and it reads as growing out of it. The right hand holds
                   the employee's stack, so then the left one waves (D-110) */}
@@ -939,9 +980,12 @@ export function Mascot({
                   <g style={{ transformOrigin: "53px 30px", animation: "mascot-act-hand 1.8s ease-in-out both" }}>
                     {/* an arm raised out of the side, a mitten with its thumb out at the end of it */}
                     <path d="M50 32 Q60 27 64 14" fill="none" stroke={COLOR[state]} strokeWidth="5.4" strokeLinecap="round" />
-                    <ellipse cx="65" cy="9.5" rx="4.8" ry="5.8" transform="rotate(18 65 9.5)" fill={COLOR[state]} />
-                    <ellipse cx="60.4" cy="12" rx="1.9" ry="2.9" transform="rotate(-38 60.4 12)" fill={COLOR[state]} />
-                    <ellipse cx="64" cy="7.4" rx="2" ry="1.2" transform="rotate(18 64 7.4)" fill="#ffffff" opacity="0.2" />
+                    {/* the hand overshoots every swing and catches up: follow-through at the wrist */}
+                    <g style={{ transformOrigin: "64px 14px", animation: "mascot-act-wrist 1.8s ease-in-out both" }}>
+                      <ellipse cx="65" cy="9.5" rx="4.8" ry="5.8" transform="rotate(18 65 9.5)" fill={COLOR[state]} />
+                      <ellipse cx="60.4" cy="12" rx="1.9" ry="2.9" transform="rotate(-38 60.4 12)" fill={COLOR[state]} />
+                      <ellipse cx="64" cy="7.4" rx="2" ry="1.2" transform="rotate(18 64 7.4)" fill="#ffffff" opacity="0.2" />
+                    </g>
                   </g>
                 </g>
               ) : null}
@@ -966,26 +1010,33 @@ export function Mascot({
 
               {/* listening: the ear pricks up on the right and twitches now and then; tuned — the
                   same ear, turned to the word to everyone (D-110) */}
-              {state === "listening" || state === "tuned" ? (
-                <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both" }}>
-                  <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-twitch 3.2s ease-in-out 1s infinite" }}>
-                    {/* a proper ear: a rounded lobe standing out of the head, with a darker hollow */}
-                    <path d="M52 16 C58 8 69 12 68 22 C67.5 29 61 33 55 31 C53 30 51.5 28 52 26 Z" fill={COLOR.listening} />
-                    <path d="M56 19 C60 15.5 65.5 18.5 64.5 24 C64 27.5 60 29.5 57.5 27.5 C56 26.5 55.5 24.5 56.5 23 Z" fill="var(--bg)" opacity="0.26" />
+              <Linger show={state === "listening" || state === "tuned"} origin="0% 80%">
+                {state === "listening" || state === "tuned" ? (
+                  <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.2s both" }}>
+                    <g style={{ transformOrigin: "53px 26px", animation: "mascot-ear-twitch 3.2s ease-in-out 1s infinite" }}>
+                      {/* a proper ear: a rounded lobe standing out of the head, with a darker hollow */}
+                      <path d="M52 16 C58 8 69 12 68 22 C67.5 29 61 33 55 31 C53 30 51.5 28 52 26 Z" fill={COLOR.listening} />
+                      <path d="M56 19 C60 15.5 65.5 18.5 64.5 24 C64 27.5 60 29.5 57.5 27.5 C56 26.5 55.5 24.5 56.5 23 Z" fill="var(--bg)" opacity="0.26" />
+                    </g>
                   </g>
-                </g>
-              ) : null}
+                ) : null}
+              </Linger>
 
               {/* alert: one small ear up on the crown — the animal sign of «насторожился»,
                   without a single angry line on the face (D-70) */}
-              {state === "alert" ? (
-                <g style={{ transformOrigin: "44px 12px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both" }}>
-                  <g style={{ transformOrigin: "44px 12px", animation: "mascot-alert-ear 4.6s ease-in-out infinite" }}>
-                    <path d="M41 12 C42 2 50 -1 52 5 C53.5 10 50 15 46 15 C43.5 15 41.5 14 41 12 Z" fill={COLOR.alert} />
-                    <path d="M43.5 11 C44 5.5 48 3.5 49.5 7 C50.5 10 48.5 12.5 46 12.5 C44.5 12.5 43.6 12 43.5 11 Z" fill="var(--bg)" opacity="0.26" />
+              <Linger show={state === "alert"} origin="20% 100%">
+                {state === "alert" ? (
+                  <g style={{ transformOrigin: "44px 12px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both" }}>
+                    <g style={{ transformOrigin: "44px 12px", animation: "mascot-alert-ear 4.6s ease-in-out infinite" }}>
+                      <path d="M41 12 C42 2 50 -1 52 5 C53.5 10 50 15 46 15 C43.5 15 41.5 14 41 12 Z" fill={COLOR.alert} />
+                      <path d="M43.5 11 C44 5.5 48 3.5 49.5 7 C50.5 10 48.5 12.5 46 12.5 C44.5 12.5 43.6 12 43.5 11 Z" fill="var(--bg)" opacity="0.26" />
+                    </g>
                   </g>
-                </g>
-              ) : null}
+                ) : null}
+              </Linger>
+
+              {/* a holiday on the crown, riding the body (D-119) */}
+              {season && detailed ? <SeasonWear season={season} /> : null}
 
               {/* happy, celebrating and serving: a soft blush under the eyes */}
               {cheeks ? (
@@ -1004,66 +1055,75 @@ export function Mascot({
 
               {/* checking: the clipboard of «Задачи», held in front of the body; a tick lands in
                   each row in turn, the way a list is gone through */}
-              {state === "checking" && detailed ? (
-                <g style={{ transformBox: "fill-box", transformOrigin: "30% 100%", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
-                  <rect x="48" y="32.5" width="24" height="30" rx="3.5" fill="var(--surface)" stroke={TONE.tasks} strokeWidth="1.5" />
-                  <rect x="54" y="29.9" width="12" height="5.2" rx="2" fill={TONE.tasks} />
-                  {CHECK_ROWS.map((y, row) => (
-                    <g key={y}>
-                      <rect x="51.5" y={y - 3} width="6" height="6" rx="1.4" fill="none" stroke="var(--text-muted)" strokeWidth="1.2" />
-                      <path d={`M61 ${y} h${row === 1 ? 6.5 : 8}`} stroke="var(--text-muted)" strokeWidth="1.6" strokeLinecap="round" />
-                      <path
-                        d={`M52.6 ${y - 0.1} l1.9 1.9 l3.6 -3.8`}
-                        fill="none"
-                        stroke="var(--ok)"
-                        strokeWidth="1.9"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        style={{ transformBox: "fill-box", transformOrigin: "35% 70%", animation: `mascot-tick-${row + 1} 3.6s ease-out infinite`, opacity: 0 }}
-                      />
+              <Linger show={state === "checking" && detailed} origin="30% 100%">
+                {state === "checking" && detailed ? (
+                  <g style={{ transformBox: "fill-box", transformOrigin: "30% 100%", animation: "mascot-prop-in 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
+                    <rect x="48" y="32.5" width="24" height="30" rx="3.5" fill="var(--surface)" stroke={TONE.tasks} strokeWidth="1.5" />
+                    <rect x="54" y="29.9" width="12" height="5.2" rx="2" fill={TONE.tasks} />
+                    {CHECK_ROWS.map((y, row) => (
+                      <g key={y}>
+                        <rect x="51.5" y={y - 3} width="6" height="6" rx="1.4" fill="none" stroke="var(--text-muted)" strokeWidth="1.2" />
+                        <path d={`M61 ${y} h${row === 1 ? 6.5 : 8}`} stroke="var(--text-muted)" strokeWidth="1.6" strokeLinecap="round" />
+                        <path
+                          d={`M52.6 ${y - 0.1} l1.9 1.9 l3.6 -3.8`}
+                          fill="none"
+                          stroke="var(--ok)"
+                          strokeWidth="1.9"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          data-still="show"
+                          style={{ transformBox: "fill-box", transformOrigin: "35% 70%", animation: `mascot-tick-${row + 1} 3.6s ease-out infinite`, opacity: 0 }}
+                        />
+                      </g>
+                    ))}
+                    {/* the thumb over the bottom edge: the board is held, not floating */}
+                    <ellipse cx="59.5" cy="62.4" rx="3" ry="2.3" fill={COLOR[state]} />
+                    {/* the other hand ticks the rows off with a pencil, in step with the ticks */}
+                    <g style={{ animation: "mascot-check-pen 3.6s ease-in-out infinite" }}>
+                      <path d="M54.6 41.4 L48 44.6" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
+                      <path d="M54.6 41.4 L53.2 42.1" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
+                      <ellipse cx="47.8" cy="45" rx="2.8" ry="2.4" fill={handFill(COLOR[state])} />
                     </g>
-                  ))}
-                  {/* the thumb over the bottom edge: the board is held, not floating */}
-                  <ellipse cx="59.5" cy="62.4" rx="3" ry="2.3" fill={COLOR[state]} />
-                  {/* the other hand ticks the rows off with a pencil, in step with the ticks */}
-                  <g style={{ animation: "mascot-check-pen 3.6s ease-in-out infinite" }}>
-                    <path d="M54.6 41.4 L48 44.6" stroke="var(--gold)" strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M54.6 41.4 L53.2 42.1" stroke="var(--text)" strokeWidth="1.8" strokeLinecap="round" />
-                    <ellipse cx="47.8" cy="45" rx="2.8" ry="2.4" fill={handFill(COLOR[state])} />
                   </g>
-                </g>
-              ) : null}
+                ) : null}
+              </Linger>
 
               {/* announcing: the megaphone at the mouth, pointing up and out at the whole company */}
-              {state === "announcing" && detailed ? (
-                <g transform={MEGAPHONE_AT}>
-                  <g style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
-                    <rect x="-3" y="-2.4" width="4" height="4.8" rx="1.2" fill={`color-mix(in srgb, ${TONE.ether} 70%, var(--bg))`} />
-                    <path d="M0.5 -3.2 L5 -3.2 L17 -9.6 L17 9.6 L5 3.2 L0.5 3.2 Z" fill={TONE.ether} />
-                    <path d="M6 3.4 L7.6 8.6" stroke={`color-mix(in srgb, ${TONE.ether} 70%, var(--bg))`} strokeWidth="2.6" strokeLinecap="round" />
-                    <ellipse cx="17" cy="0" rx="2.3" ry="9.6" fill={`color-mix(in srgb, ${TONE.ether} 62%, var(--bg))`} />
-                    <path d="M6 -2.6 L15.6 -7.6" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.1" strokeLinecap="round" />
-                    {/* the fist on the grip */}
-                    <ellipse cx="7.2" cy="7.6" rx="2.6" ry="3.2" transform="rotate(-16 7.2 7.6)" fill={handFill(COLOR[state])} />
+              <Linger show={state === "announcing" && detailed} origin="0% 60%">
+                {state === "announcing" && detailed ? (
+                  <g transform={MEGAPHONE_AT}>
+                    <g style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both" }}>
+                      <rect x="-3" y="-2.4" width="4" height="4.8" rx="1.2" fill={`color-mix(in srgb, ${TONE.ether} 70%, var(--bg))`} />
+                      <path d="M0.5 -3.2 L5 -3.2 L17 -9.6 L17 9.6 L5 3.2 L0.5 3.2 Z" fill={TONE.ether} />
+                      <path d="M6 3.4 L7.6 8.6" stroke={`color-mix(in srgb, ${TONE.ether} 70%, var(--bg))`} strokeWidth="2.6" strokeLinecap="round" />
+                      <ellipse cx="17" cy="0" rx="2.3" ry="9.6" fill={`color-mix(in srgb, ${TONE.ether} 62%, var(--bg))`} />
+                      <path d="M6 -2.6 L15.6 -7.6" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="1.1" strokeLinecap="round" />
+                      {/* the fist on the grip */}
+                      <ellipse cx="7.2" cy="7.6" rx="2.6" ry="3.2" transform="rotate(-16 7.2 7.6)" fill={handFill(COLOR[state])} />
+                    </g>
                   </g>
-                </g>
-              ) : null}
+                ) : null}
+              </Linger>
 
               {/* serving: the cup of «Секретарь» on its saucer, carried with care */}
-              {state === "serving" && detailed ? (
-                <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-prop-in 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s both" }}>
-                  <ellipse cx="52.5" cy="59.2" rx="11.5" ry="2.6" fill="var(--surface)" stroke={TONE.secretary} strokeWidth="1.3" />
-                  <path d="M60.6 48.6 a3.4 3.4 0 0 1 0 6.8" fill="none" stroke={TONE.secretary} strokeWidth="1.8" />
-                  <path d="M44.4 47 H60.6 V52 A6 6 0 0 1 54.6 58 H50.4 A6 6 0 0 1 44.4 52 Z" fill="var(--surface)" stroke={TONE.secretary} strokeWidth="1.5" strokeLinejoin="round" />
-                  <ellipse cx="52.5" cy="47.4" rx="7.4" ry="1.5" fill={`color-mix(in srgb, ${TONE.secretary} 55%, var(--bg))`} />
-                  {/* both hands under the saucer: a cup is carried with care */}
-                  <ellipse cx="41.6" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
-                  <ellipse cx="63.4" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
-                </g>
-              ) : null}
+              <Linger show={state === "serving" && detailed}>
+                {state === "serving" && detailed ? (
+                  <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-prop-in 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s both" }}>
+                    <ellipse cx="52.5" cy="59.2" rx="11.5" ry="2.6" fill="var(--surface)" stroke={TONE.secretary} strokeWidth="1.3" />
+                    <path d="M60.6 48.6 a3.4 3.4 0 0 1 0 6.8" fill="none" stroke={TONE.secretary} strokeWidth="1.8" />
+                    <path d="M44.4 47 H60.6 V52 A6 6 0 0 1 54.6 58 H50.4 A6 6 0 0 1 44.4 52 Z" fill="var(--surface)" stroke={TONE.secretary} strokeWidth="1.5" strokeLinejoin="round" />
+                    <ellipse cx="52.5" cy="47.4" rx="7.4" ry="1.5" fill={`color-mix(in srgb, ${TONE.secretary} 55%, var(--bg))`} />
+                    {/* both hands under the saucer: a cup is carried with care */}
+                    <ellipse cx="41.6" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
+                    <ellipse cx="63.4" cy="58.8" rx="2.8" ry="2.2" fill={handFill(COLOR[state])} />
+                  </g>
+                ) : null}
+              </Linger>
 
               {/* the employee's orders in work, a stack of cards in the hands (D-110) */}
-              {holding ? <Stack count={carry!.count} hot={carry!.hot === true} body={COLOR[state]} shuffle={acting === "shuffle"} /> : null}
+              <Linger show={holding} origin="30% 100%">
+                {holding ? <Stack count={carry!.count} hot={carry!.hot === true} body={COLOR[state]} shuffle={acting === "shuffle"} /> : null}
+              </Linger>
               {/* what the work puts in front of the body for a moment: the medal, the hand at the brow, the ear */}
               {acting ? <WorkActFront act={acting} body={COLOR[state]} /> : null}
 
@@ -1074,6 +1134,7 @@ export function Mascot({
                   <g style={{ transformOrigin: "32px 33px", animation: act ? (ACT_GAZE[act] ?? "none") : "none" }}>
                     {/* The eye keeps one geometry and changes shape by transform: animating rx/ry
                         would re-run layout and paint of the SVG on every frame of the change. */}
+                    <g key={`l-${gazeKey}`} style={{ transformOrigin: "24px 33px", animation: gazeBlink }}>
                     <g style={{ transformOrigin: "24px 33px", animation: blink }}>
                       <g style={{ transformOrigin: "24px 33px", animation: lids?.[0] ?? "none" }}>
                         <g style={{ transformOrigin: "24px 33px", transform: eyeShape, transition: "transform 120ms var(--ease-out)" }}>
@@ -1081,13 +1142,16 @@ export function Mascot({
                         </g>
                       </g>
                     </g>
+                    </g>
                     {/* both lids on one animation, no offset: a face blinks with both eyes at once */}
+                    <g key={`r-${gazeKey}`} style={{ transformOrigin: "40px 33px", animation: gazeBlink }}>
                     <g style={{ transformOrigin: "40px 33px", animation: blink }}>
                       <g style={{ transformOrigin: "40px 33px", animation: lids?.[1] ?? "none" }}>
                         <g style={{ transformOrigin: "40px 33px", transform: eyeShape, transition: "transform 120ms var(--ease-out)" }}>
                           <ellipse cx="40" cy="33" rx={EYE_RX} ry={EYE_RY} style={{ animation: reading ? "mascot-eye-return 1.9s both" : undefined }} />
                         </g>
                       </g>
+                    </g>
                     </g>
                     {reading ? (
                       // the eyes run glyphs: each holds its quarter of the roll and cuts to the next,
@@ -1196,12 +1260,16 @@ export function Mascot({
 
       {/* everything handed over: the hourglass stands on the ground by the face and runs until the
           director answers — it is not held, so it does not breathe with the body */}
-      {state === "awaiting" && detailed ? <Hourglass /> : null}
+      <Linger show={state === "awaiting" && detailed}>
+        {state === "awaiting" && detailed ? <Hourglass /> : null}
+      </Linger>
       {/* nervous: the unread word itself, by the head (D-110) — unless it is flying in or being opened */}
-      {state === "nervous" && detailed && !(acting && BRINGS_LETTER.has(acting)) ? <Letter /> : null}
+      <Linger show={state === "nervous" && detailed && !(acting && BRINGS_LETTER.has(acting))} origin="50% 50%">
+        {state === "nervous" && detailed && !(acting && BRINGS_LETTER.has(acting)) ? <Letter /> : null}
+      </Linger>
       {/* what flies in the work's acts: the card caught, stashed, put aside, thrown up, back to
           redo; the «?», the letter, the clock, the coin (D-110) */}
-      {acting ? <WorkActOver act={acting} body={COLOR[state]} /> : null}
+      {acting ? <WorkActOver act={acting} /> : null}
 
       {/* processing: the new status itself — the tick lands with the top of the hop, and it
           is drawn last so the badge sits on the face instead of under it */}
@@ -1211,14 +1279,13 @@ export function Mascot({
           <path d="M51.4 9.4 l2.5 2.5 L58.8 6.4" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </g>
       ) : null}
-      {/* sending: the card in the hand leaves at the throw (timed to mascot-throw) and flies
-          up and away — the message the director just gave, going to its addressee */}
+      {/* sending: the card leaves the hand at the throw (timed to mascot-throw) and flies up and
+          away — the message the director just gave, going to its addressee. Through the wind-up it
+          was behind the head (the copy drawn under the body); here it comes over the crown */}
       {state === "sending" && detailed ? (
-        <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) infinite", opacity: 0 }}>
+        <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s linear infinite", opacity: 0 }}>
           <rect x="34" y="5" width="17" height="12" rx="3" fill="var(--surface)" stroke={COLOR.sending} strokeWidth="1.5" />
           <path d="M37.5 9.5h10M37.5 13h6" stroke={COLOR.sending} strokeWidth="1.2" strokeLinecap="round" />
-          {/* the hand on its corner through the wind-up; it lets go at the release */}
-          <ellipse cx="35.4" cy="16.4" rx="3" ry="2.6" fill={handFill(COLOR.sending)} style={{ animation: "mascot-card-grip 1.2s linear infinite" }} />
         </g>
       ) : null}
 

@@ -26,6 +26,7 @@ import {
 import {
   ConventionsSection,
   DictionarySection,
+  MascotSection,
   ParserSection,
   PointsSection,
   SecretarySection,
@@ -111,7 +112,7 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
   const sections = useDirtySections();
   const dirty: Record<SettingsTab, boolean> = {
     company: companyDirty || !!sections.window,
-    app: !!sections.secretary,
+    app: !!(sections.secretary || sections.mascot),
     team: !!sections.points,
     ai: !!(sections.stt || sections.parser || sections.conventions),
   };
@@ -300,6 +301,11 @@ function AppPanel({ director }: { director: boolean }) {
       <div className="mt-2">
         <SettingsReady bones={1}>
           <SecretarySection />
+        </SettingsReady>
+      </div>
+      <div className="mt-2">
+        <SettingsReady bones={1}>
+          <MascotSection />
         </SettingsReady>
       </div>
 

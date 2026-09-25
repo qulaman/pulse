@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { Glyph, Mitten, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
 import { untilLine, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
+import { useMascotSeason } from "@/lib/mascot/useSeason";
+import { useDeepRest } from "@/lib/useDeepRest";
 
 /** The desk is drawn in this box; the screen places the box, not its parts. */
 export const DESK_W = 100;
@@ -143,6 +145,12 @@ export function SecretaryDesk({
   // the hands are on the keys only while the secretary sits at them: not at a job, not carrying
   // the cup over, not on the way out or in (a character has two hands — they go where it goes)
   const typing = !working && !handing && !standing && !move && !gone;
+  // deep rest (nobody has touched the screen for minutes): a desk with nothing to show stops where
+  // it is — it is the costliest thing on the waiting screen after the dream (D-119); anything the
+  // director should see (a request, a job, a walk) keeps moving
+  const deep = useDeepRest();
+  const season = useMascotSeason();
+  const frozen = deep && phase === "rest" && !attending && !move && !nodding;
   return (
     <button
       type="button"
@@ -169,7 +177,7 @@ export function SecretaryDesk({
       aria-pressed={attending}
       data-testid="secretary-desk"
       data-attending={attending ? "1" : "0"}
-      className="relative block transition-transform duration-[120ms] active:scale-[0.96]"
+      className={`relative block transition-transform duration-[120ms] active:scale-[0.96] ${frozen ? "sec-paused" : ""}`}
       data-away={away ? "1" : "0"}
       style={{
         width: DESK_W,
@@ -335,6 +343,7 @@ export function SecretaryDesk({
           >
             <SecretaryMascot
               mini
+              season={season}
               room={standing && !move}
               size={40}
               // walking out of the frame or back in: steps, eyes on the way
@@ -377,17 +386,11 @@ export function SecretaryDesk({
       >
         <rect x="36" y="48" width="24" height="5" rx="1.6" fill="color-mix(in srgb, var(--surface-2) 70%, white 10%)" stroke={EDGE} strokeWidth="0.8" />
         {[0, 1, 2, 3].map((key) => (
-          <rect
-            key={key}
-            x={39 + key * 5}
-            y="49.6"
-            width="3"
-            height="1.8"
-            rx="0.5"
-            fill="var(--accent)"
-            style={{ animation: typing ? `sec-key 0.95s ease-in-out ${(key * 0.23).toFixed(2)}s infinite` : "none", opacity: 0.3 }}
-          />
+          <rect key={key} x={39 + key * 5} y="49.6" width="3" height="1.8" rx="0.5" fill="var(--accent)" opacity="0.3" />
         ))}
+        {/* the key being pressed: one light hopping over the keys, not four pulsing ones — the same
+            typing for a quarter of the frames it cost */}
+        {typing ? <rect x="39" y="49.6" width="3" height="1.8" rx="0.5" fill="var(--accent)" style={{ animation: "sec-key-hop-desk 0.95s steps(1) infinite" }} /> : null}
         {/* the small secretary's hands on the keys, tapping in turn */}
         <g style={{ opacity: typing ? 1 : 0, transition: FADE }} data-testid="desk-hands">
           {[

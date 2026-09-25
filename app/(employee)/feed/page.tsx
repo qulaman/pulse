@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
 import { EtherSection } from "@/components/ether/EtherSection";
-import { ACT_MS, type MascotAct, type MascotState } from "@/components/brand/Mascot";
+import { ACT_MS, ACT_TOUCH, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { IdleScene } from "@/components/pulse/IdleScene";
 import { MascotLever } from "@/components/pulse/MascotLever";
@@ -30,6 +30,7 @@ import { ErrandCards, ResultCard } from "@/components/secretary/ErrandCards";
 import { Sheet } from "@/components/ui/Sheet";
 import { DndLamp } from "@/components/secretary/DndLamp";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
+import { useDeepRest } from "@/lib/useDeepRest";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
@@ -301,6 +302,9 @@ export default function FeedPage() {
       actsEnd.current = at + wait + ACT_MS[act];
       if (wait === 0) play(act);
       else actTimers.current.push(setTimeout(() => play(act), wait));
+      // the phone answers the moment the act lands — the card caught, the medal on the chest
+      const touch = ACT_TOUCH[act];
+      if (touch) actTimers.current.push(setTimeout(() => haptic(touch[1]), wait + touch[0]));
     },
     [play],
   );
@@ -399,9 +403,12 @@ export default function FeedPage() {
   const thoughtPanel: OrbitId = thought?.source === "ether" ? "ether" : thought?.source === "calendar" ? "calendar" : thought?.source === "errand" ? "secretary" : thought?.message ? "messages" : "tasks";
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
+  // a screen nobody has touched for minutes: the secretary stops typing and reads, and the small
+  // things at the desk wait for the next touch (D-119)
+  const deepRest = useDeepRest();
   // the small things at the desk play only at rest, on the waiting screen (D-97)
   const secretaryAct = useSecretaryActs({
-    idle: isSecretary && mode === "idle" && desk.phase === "rest" && !thought && !loading,
+    idle: isSecretary && mode === "idle" && desk.phase === "rest" && !thought && !loading && !deepRest,
     daypart,
     acceptKey: desk.acceptKey,
     thanksKey: desk.thanksKey,
@@ -471,6 +478,7 @@ export default function FeedPage() {
                 queue={desk.queue}
                 daypart={daypart}
                 cheer={pointsEnabled && desk.phase === "done" && desk.quick}
+                still={deepRest && mode === "idle"}
                 onTap={onFaceTap}
               />
             ) : (

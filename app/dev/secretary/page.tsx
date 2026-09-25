@@ -31,8 +31,20 @@ const SECTIONS: { title: string; cells: Cell[] }[] = [
   },
   {
     title: "Сценки в покое",
-    cells: (["sip", "headset", "stretch", "clock", "papers", "plant", "arrive", "thanks"] as SecretaryAct[]).map((act) => ({
-      caption: { sip: "Глоток", headset: "Гарнитура", stretch: "Потянуться", clock: "Часы", papers: "Бумаги", plant: "Цветок", arrive: "Пришла утром", thanks: "Спасибо ♥", accept: "" }[act]!,
+    cells: (["sip", "headset", "headsetRight", "stretch", "stretchSide", "clock", "papers", "plant", "arrive", "thanks"] as SecretaryAct[]).map((act) => ({
+      caption: {
+        sip: "Глоток",
+        headset: "Гарнитура",
+        headsetRight: "Гарнитура правой",
+        stretch: "Потянуться",
+        stretchSide: "Потянуться вбок",
+        clock: "Часы",
+        papers: "Бумаги",
+        plant: "Цветок",
+        arrive: "Пришла утром",
+        thanks: "Спасибо ♥",
+        accept: "",
+      }[act]!,
       phase: "rest" as const,
       act,
     })),

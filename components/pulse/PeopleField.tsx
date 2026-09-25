@@ -11,14 +11,13 @@ import type { Chase } from "@/lib/idle/flight";
 import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
 import { addressOf, firstNameOf, initialsOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
+import { useDeepRest } from "@/lib/useDeepRest";
 
 /** The trip up is three acts (D-74) and needs room to read; the way back is a calm float. */
 const LAUNCH_MS = 1_700;
 const RETURN_MS = 2_400;
 /** How long the ring stays closed in gold after the director accepts the last task. */
 const DONE_MS = 1_400;
-/** Nobody has touched the screen this long: the rings stop where they are, until a touch. */
-const SLEEP_MS = 180_000;
 /** The mouth is on the rim of the 128 px face, where things can still be seen (D-74 §4). */
 const RIM = 90;
 /** The rings of the swallow live just outside the face. */
@@ -203,21 +202,9 @@ export function PeopleField({
     };
   }, []);
 
-  // ---- deep sleep: a board left open does not spin its rings forever ------------------------
-  const [asleep, setAsleep] = useState(false);
-  useEffect(() => {
-    let timer = setTimeout(() => setAsleep(true), SLEEP_MS);
-    const poke = () => {
-      setAsleep(false);
-      clearTimeout(timer);
-      timer = setTimeout(() => setAsleep(true), SLEEP_MS);
-    };
-    window.addEventListener("pointerdown", poke, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("pointerdown", poke);
-    };
-  }, []);
+  // ---- deep sleep: a board left open does not spin its rings forever (the rings stop where they
+  // are, until a touch; lib/useDeepRest.ts) --------------------------------------------------------
+  const asleep = useDeepRest();
 
   // ---- the card of a lit one -----------------------------------------------------------------
   const [opened, setOpened] = useState<string | null>(null);

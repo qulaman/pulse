@@ -21,7 +21,7 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary";
+export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary" | "mascot";
 
 type Draft = {
   server: CompanySettings;
@@ -55,6 +55,8 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(settingsKey, settings);
       // the rating, the team list and the award buttons read the switch on their own
       if (patch.points_enabled !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_enabled"] });
+      // the home faces read the holiday switch on their own (D-119)
+      if (patch.mascot_seasons !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "mascot_seasons"] });
       // the secretary's buttons and their scenes are read by Пульс and the secretary's screen (D-97)
       if (patch.secretary !== undefined) void queryClient.invalidateQueries({ queryKey: ["company"] });
       toast("Сохранил настройки");
@@ -80,6 +82,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         points: draft.points_enabled !== server.points_enabled || draft.rating_mode !== server.rating_mode,
         window: !same(draft.delivery_window, server.delivery_window),
         secretary: !same(draft.secretary, server.secretary),
+        mascot: draft.mascot_seasons !== server.mascot_seasons,
       },
       save: (patch) => save.mutate(patch),
       saving: (key) => save.isPending && save.variables?.[key] !== undefined,

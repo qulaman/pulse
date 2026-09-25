@@ -10,6 +10,7 @@ import { PeopleField } from "@/components/pulse/PeopleField";
 import type { Member, Pick } from "@/lib/idle/people";
 import { looseSeed } from "@/lib/idle/random";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
+import { useDeepRest } from "@/lib/useDeepRest";
 
 /** One dream: out of the head, across the screen for this long, and gone. */
 const FLIGHT_MS = 14_000;
@@ -99,8 +100,11 @@ export function IdleScene({
   onLook?: (pick: Pick | null) => void;
 }) {
   const reduced = useReducedMotion() ?? false;
+  // a screen nobody has touched for minutes sleeps without dreams: the flight is the costliest thing
+  // on it, and nobody is watching (D-119)
+  const deep = useDeepRest();
   const playing = active && !reduced;
-  const dreaming = playing && quiet;
+  const dreaming = playing && quiet && !deep;
   const anchor = useRef<HTMLDivElement>(null);
   const area = useArea(anchor);
   const [dream, setDream] = useState<{ id: DreamId; key: number; seed: number } | null>(null);

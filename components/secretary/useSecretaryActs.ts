@@ -7,8 +7,8 @@ import { SEC_ACT_MS, type SecretaryAct } from "@/components/secretary/SecretaryM
 import { aqtobeDay, type Daypart } from "@/lib/errands/scene";
 
 /** What the secretary does at the desk while nobody asks (D-97); the evening is a tired one. */
-const DAY: readonly SecretaryAct[] = ["sip", "headset", "stretch", "clock", "papers", "plant"];
-const EVENING: readonly SecretaryAct[] = ["stretch", "sip", "clock", "stretch", "headset"];
+const DAY: readonly SecretaryAct[] = ["sip", "headset", "headsetRight", "stretch", "stretchSide", "clock", "papers", "plant"];
+const EVENING: readonly SecretaryAct[] = ["stretch", "sip", "clock", "stretchSide", "headset", "headsetRight"];
 
 /** The first act a few seconds after the desk settles; then one every 20–40 s. */
 const FIRST_MS: [number, number] = [4_000, 8_000];

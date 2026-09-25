@@ -160,6 +160,8 @@ export const CompanySettingsSchema = z.object({
   /** Points off during the pilot (D-40(в)); the director switches them on (D-48). */
   points_enabled: z.boolean().default(false),
   rating_mode: z.enum(["top5", "full"]).default("top5"),
+  /** The faces dress for the holidays of the company's calendar (D-119, lib/mascot/season.ts). */
+  mascot_seasons: z.boolean().default(true),
   delivery_window: DeliveryWindowSchema.prefault({}),
   /** The secretary's buttons and the repeat-push timeout (D-79). */
   secretary: SecretarySettingsSchema.prefault({}),
@@ -228,6 +230,7 @@ export const SettingsPatchSchema = z
     matching: MatchingSettingsSchema,
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
+    mascot_seasons: z.boolean(),
     delivery_window: DeliveryWindowSchema.partial(),
     secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,

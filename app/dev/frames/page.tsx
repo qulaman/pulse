@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { FINISH_MS, SEC_ACT_MS, SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import { DESK_SCENES, type Daypart, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
+import type { MascotSeason } from "@/lib/mascot/season";
 
 /**
  * /dev/frames — contact sheets of the mascots (dev only). Every row is one motion drawn as a
@@ -14,11 +15,16 @@ import { DESK_SCENES, type Daypart, type DeskPhase, type DeskScene, type Urgency
  * on its own clock, so a screenshot of a row is the whole motion at a glance — a hand that stays
  * on the desk while the arms go up shows in one picture.
  *
- *   ?set=drop-states | drop-acts | sec | desk   which rows
+ *   ?set=drop-states | drop-acts | sec | desk | transitions   which rows (transitions: the face
+ *                                               mounts in one state and turns to the next at once —
+ *                                               the columns are the moments after the turn)
  *   ?only=<row key>[,<row key>…]                just these rows
  *   ?n=8                                        frames per row
  *   ?size=96                                    the face's size; the cells grow with it
  *   ?live                                       let everything play instead
+ * Once every column is held, `main[data-ready]` is set — `pnpm smoke:mascot` waits for it. The
+ * static frames of «уменьшить движение» are the same page under an emulated
+ * `prefers-reduced-motion: reduce` (DevTools → Rendering, or `REDUCED=1 pnpm smoke:mascot`).
  */
 
 type Row = { key: string; label: string; dur: number; draw: () => ReactNode; w: number; h: number };
@@ -102,14 +108,24 @@ const ACT_ON: Record<MascotAct, { on: MascotState; carry?: { count: number; hot?
 };
 
 function dropStates(size: number): Row[] {
-  return (Object.keys(LOOP_MS) as MascotState[]).map((state) => ({
+  const seasons = (["new_year", "nauryz"] as const).flatMap((season) =>
+    (["calm", "sleeping", "working"] as MascotState[]).map((state) => ({
+      key: `season-${season}-${state}`,
+      label: `${state} · ${season}`,
+      dur: LOOP_MS[state],
+      w: size * 1.7,
+      h: size * 1.7,
+      draw: () => <Mascot state={state} size={size} carry={CARRY[state] ?? null} season={season} />,
+    })),
+  );
+  return [...seasons, ...(Object.keys(LOOP_MS) as MascotState[]).map((state) => ({
     key: `state-${state}`,
     label: state,
     dur: LOOP_MS[state],
     w: size * 1.7,
     h: size * 1.7,
     draw: () => <Mascot state={state} size={size} carry={CARRY[state] ?? null} />,
-  }));
+  }))];
 }
 
 /** Acts whose hands meet the employee's stack: the free hand must be the one that moves. */
@@ -138,7 +154,19 @@ function dropActs(size: number): Row[] {
   }))];
 }
 
-type SecCell = { scene?: DeskScene | null; phase: DeskPhase; act?: SecretaryAct; urgency?: Urgency; daypart?: Daypart; talking?: boolean; bare?: boolean; mini?: boolean; room?: boolean };
+type SecCell = {
+  scene?: DeskScene | null;
+  phase: DeskPhase;
+  act?: SecretaryAct;
+  urgency?: Urgency;
+  daypart?: Daypart;
+  talking?: boolean;
+  bare?: boolean;
+  mini?: boolean;
+  room?: boolean;
+  still?: boolean;
+  season?: MascotSeason;
+};
 
 function secRow(size: number, key: string, label: string, dur: number, cell: SecCell): Row {
   return {
@@ -158,6 +186,8 @@ function secRow(size: number, key: string, label: string, dur: number, cell: Sec
         bare={cell.bare ?? false}
         mini={cell.mini ?? false}
         room={cell.room}
+        still={cell.still ?? false}
+        season={cell.season ?? null}
         size={size}
       />
     ),
@@ -173,7 +203,12 @@ function secretary(size: number): Row[] {
   const done = DESK_SCENES.map((scene) => secRow(size, `sec-done-${scene}`, `done ${scene}`, FINISH_MS, { scene, phase: "done" }));
   const mini = DESK_SCENES.map((scene) => secRow(size, `sec-mini-${scene}`, `mini ${scene}`, 3200, { scene, phase: "doing", mini: true }));
   const talking = secRow(size, "sec-talking", "bare talking", 1100, { phase: "rest", bare: true, talking: true });
-  return [...dayparts, ...acts, ...asked, alarm, ...doing, ...done, ...mini, talking];
+  const reading = secRow(size, "sec-rest-still", "rest, deep rest: reads", 3400, { phase: "rest", still: true });
+  const seasons = [
+    secRow(size, "sec-season-new_year", "rest · new_year", 3400, { phase: "rest", season: "new_year" }),
+    secRow(size, "sec-season-nauryz", "asked · nauryz", 1900, { scene: "tea", phase: "asked", season: "nauryz" }),
+  ];
+  return [...dayparts, reading, ...seasons, ...acts, ...asked, alarm, ...doing, ...done, ...mini, talking];
 }
 
 type DeskCell = { scene?: DeskScene | null; phase?: DeskPhase; attending?: boolean; urgency?: Urgency };
@@ -198,31 +233,97 @@ function desk(): Row[] {
   }));
 }
 
-const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk };
+/** One face that mounts showing `from` and turns into `to` on the next frame. */
+function Turn({ from, to }: { from: ReactNode; to: ReactNode }) {
+  const [on, setOn] = useState(false);
+  useLayoutEffect(() => {
+    const frame = requestAnimationFrame(() => setOn(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return <>{on ? to : from}</>;
+}
+
+/**
+ * What goes when a face changes its mind: the ball closes, the stack becomes the hourglass, the
+ * request is taken, the job is done. Every prop has to leave, not blink out.
+ */
+function transitions(size: number): Row[] {
+  const drop = (key: string, from: [MascotState, { count: number }?], to: [MascotState, { count: number }?]): Row => ({
+    key: `turn-${key}`,
+    label: `${from[0]} → ${to[0]}`,
+    dur: 600,
+    w: size * 1.7,
+    h: size * 1.7,
+    draw: () => <Turn from={<Mascot state={from[0]} size={size} carry={from[1] ?? null} />} to={<Mascot state={to[0]} size={size} carry={to[1] ?? null} />} />,
+  });
+  const sec = (key: string, from: SecCell, to: SecCell): Row => ({
+    key: `turn-${key}`,
+    label: `sec ${from.phase} ${from.scene ?? ""} → ${to.phase} ${to.scene ?? ""}`,
+    dur: 600,
+    w: size * 2.3,
+    h: size * 1.75,
+    draw: () => (
+      <Turn
+        from={<SecretaryMascot scene={from.scene ?? null} phase={from.phase} size={size} />}
+        to={<SecretaryMascot scene={to.scene ?? null} phase={to.phase} size={size} />}
+      />
+    ),
+  });
+  return [
+    drop("checking-calm", ["checking"], ["calm"]),
+    drop("serving-calm", ["serving"], ["calm"]),
+    drop("announcing-calm", ["announcing"], ["calm"]),
+    drop("scheduling-calm", ["scheduling"], ["calm"]),
+    drop("chatting-calm", ["chatting"], ["calm"]),
+    drop("listening-saving", ["listening"], ["saving"]),
+    drop("offering-sending", ["offering"], ["sending"]),
+    drop("calling-working", ["calling", { count: 1 }], ["working", { count: 2 }]),
+    drop("working-awaiting", ["working", { count: 1 }], ["awaiting"]),
+    drop("awaiting-happy", ["awaiting"], ["happy"]),
+    drop("nervous-working", ["nervous", { count: 1 }], ["working", { count: 1 }]),
+    drop("alert-calm", ["alert"], ["calm"]),
+    sec("rest-asked", { phase: "rest" }, { scene: "coffee", phase: "asked" }),
+    sec("asked-doing", { scene: "coffee", phase: "asked" }, { scene: "coffee", phase: "doing" }),
+    sec("doing-done", { scene: "coffee", phase: "doing" }, { scene: "coffee", phase: "done" }),
+    sec("doing-done-tea", { scene: "tea", phase: "doing" }, { scene: "tea", phase: "done" }),
+    sec("doing-done-print", { scene: "print", phase: "doing" }, { scene: "print", phase: "done" }),
+    sec("doing-rest-dnd", { scene: "dnd", phase: "doing" }, { phase: "rest" }),
+  ];
+}
+
+const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk, transitions };
 
 /** The query string after hydration — a string snapshot, so the store stays stable. */
-function useQuery(): URLSearchParams | null {
-  const search = useSyncExternalStore(
+function useSearch(): string | null {
+  return useSyncExternalStore(
     () => () => {},
     () => window.location.search,
     () => null,
   );
-  return search === null ? null : new URLSearchParams(search);
 }
 
 export default function FramesPage() {
-  const query = useQuery();
-  if (!query) return null;
-  const set = SETS[query.get("set") ?? "drop-states"] ?? dropStates;
-  const only = query.get("only");
-  const n = Math.max(2, Number(query.get("n") ?? "8") || 8);
-  const size = Number(query.get("size") ?? "96") || 96;
-  const rows = set(size).filter((row) => !only || row.key === only || only.split(",").includes(row.key));
-  return <Sheet rows={rows} n={n} live={query.has("live")} />;
+  const search = useSearch();
+  // the rows are built once per query: the sheet seeks them once, not on every render
+  const sheet = useMemo(() => {
+    if (search === null) return null;
+    const query = new URLSearchParams(search);
+    const set = SETS[query.get("set") ?? "drop-states"] ?? dropStates;
+    const only = query.get("only");
+    const size = Number(query.get("size") ?? "96") || 96;
+    return {
+      rows: set(size).filter((row) => !only || only.split(",").includes(row.key)),
+      n: Math.max(2, Number(query.get("n") ?? "8") || 8),
+      live: query.has("live"),
+    };
+  }, [search]);
+  if (!sheet) return null;
+  return <Sheet rows={sheet.rows} n={sheet.n} live={sheet.live} />;
 }
 
 function Sheet({ rows, n, live }: { rows: Row[]; n: number; live: boolean }) {
   const root = useRef<HTMLElement>(null);
+  const [ready, setReady] = useState(false);
   // hold every column at its own moment of the row's timeline (the Web Animations API seeks CSS
   // animations too; their delays stay authored, so staggered props keep their stagger)
   useEffect(() => {
@@ -237,13 +338,21 @@ function Sheet({ rows, n, live }: { rows: Row[]; n: number; live: boolean }) {
         }
       }
     };
-    // a prop mounted a frame later (the sign of a job, the tick of a finish) is caught by the second pass
-    seek();
-    const again = requestAnimationFrame(seek);
-    return () => cancelAnimationFrame(again);
+    // a prop mounted a few frames later (the sign of a job, the tick of a finish, the face that has
+    // just turned) is caught by the next passes; after the last, «held» for a waiting script
+    let frame = 0;
+    let passes = 0;
+    const pass = () => {
+      seek();
+      passes += 1;
+      if (passes < 4) frame = requestAnimationFrame(pass);
+      else setReady(true);
+    };
+    pass();
+    return () => cancelAnimationFrame(frame);
   }, [rows, live]);
   return (
-    <main ref={root} className="p-3" data-frames>
+    <main ref={root} className="p-3" data-frames data-ready={ready || live ? "" : undefined}>
       {rows.map((row) => (
         <section key={row.key} data-row={row.key} data-dur={row.dur} className="mb-1 flex items-center gap-1 border-b border-border">
           <p className="w-[110px] shrink-0 text-[11px] leading-3 text-muted">

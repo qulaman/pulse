@@ -80,7 +80,7 @@ const CARD_ORIGIN = `${CARD_AT.x}px ${CARD_AT.y}px`;
  */
 export function CallCard({ color, detailed }: { color: string; detailed: boolean }) {
   return (
-    <g data-prop="call-card" style={{ transformOrigin: "46px 2px", animation: "mascot-call-mark 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite", opacity: 0 }}>
+    <g data-prop="call-card" data-still="show" style={{ transformOrigin: "46px 2px", animation: "mascot-call-mark 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite", opacity: 0 }}>
       {detailed ? (
         <CardOverHead badge="new" stroke={color} />
       ) : (
@@ -369,7 +369,7 @@ const POOF_BITS: { x: number; y: number }[] = [
 ];
 
 /** Over everything (after the face): what flies — the cards, the letter, the clock, the coin. */
-export function WorkActOver({ act, body }: { act: string; body: string }) {
+export function WorkActOver({ act }: { act: string }) {
   switch (act) {
     case "catch":
     case "insist":
@@ -433,14 +433,13 @@ export function WorkActOver({ act, body }: { act: string; body: string }) {
         </>
       );
     case "handover":
-      // the throw of «Отправляю», from this side: the card leaves the hand for the director
+      // the throw of «Отправляю», from this side: the card leaves the hand for the director (the
+      // wind-up behind the head is WorkActUnder's)
       return (
-        <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s cubic-bezier(0.2, 0.7, 0.3, 1) both", opacity: 0 }}>
+        <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s linear both", opacity: 0 }}>
           <g transform="translate(42.5 11)">
             <CardShape badge="done" stroke="var(--ok)" />
           </g>
-          {/* the hand on its corner through the wind-up; it lets go at the release */}
-          <ellipse cx="35" cy="16.8" rx="3" ry="2.6" fill={handFill(body)} style={{ animation: "mascot-card-grip 1.2s linear both" }} />
         </g>
       );
     case "medal":
@@ -452,7 +451,7 @@ export function WorkActOver({ act, body }: { act: string; body: string }) {
           />
           <path
             d="M57 4 L58.2 7.2 L61.4 8.4 L58.2 9.6 L57 12.8 L55.8 9.6 L52.6 8.4 L55.8 7.2 Z"
-            style={{ transformOrigin: "57px 8.4px", animation: "mascot-act-spark 2.4s 0.18s both", opacity: 0 }}
+            style={{ transformOrigin: "57px 8.4px", animation: "mascot-act-spark 2.22s 0.18s both", opacity: 0 }}
           />
         </g>
       );
@@ -498,7 +497,7 @@ export function WorkActOver({ act, body }: { act: string; body: string }) {
             <path
               key={wave}
               d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
-              style={{ transformOrigin: "62px 25px", animation: `mascot-wave-in 0.8s ease-out ${(0.25 + wave * 0.22).toFixed(2)}s 2 both`, opacity: 0 }}
+              style={{ transformOrigin: "62px 25px", animation: `mascot-wave-in 0.7s ease-out ${(0.2 + wave * 0.15).toFixed(2)}s 2 both`, opacity: 0 }}
             />
           ))}
         </g>
@@ -529,6 +528,22 @@ export function WorkActOver({ act, body }: { act: string; body: string }) {
     default:
       return null;
   }
+}
+
+/**
+ * Under the body (drawn before it, outside its motion): the wind-up of «Сдал» — the card in the hand
+ * behind the head, only its top over the crown; WorkActOver's copy takes over at the release.
+ */
+export function WorkActUnder({ act, body }: { act: string; body: string }) {
+  if (act !== "handover") return null;
+  return (
+    <g data-still="hide" style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear both", opacity: 0 }}>
+      <g transform="translate(42.5 11)">
+        <CardShape badge="done" stroke="var(--ok)" />
+      </g>
+      <ellipse cx="35.4" cy="5.2" rx="3" ry="2.6" fill={handFill(body)} />
+    </g>
+  );
 }
 
 /** The tick of a thing done, the badge of `processing` in small (D-65). */
