@@ -33,6 +33,7 @@ function point(overrides: Partial<Note> = {}): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    parent_id: null,
     board_id: "b-1",
     position: 1,
     done_at: null,

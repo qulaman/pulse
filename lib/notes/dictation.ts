@@ -48,7 +48,12 @@ const KEPT_ON_PHONE: Receipt = { tone: "warn", eyebrow: "Нет связи", hea
  * Where the capture goes: a loose thought by default, or the next point of a board (D-102).
  * The place is taken when the recording ends, so two points said in a row keep their order.
  */
-export type DictationTarget = { boardId: string; nextPosition: () => number };
+export type DictationTarget = {
+  boardId: string;
+  nextPosition: () => number;
+  /** A sub-point (D-121): the point the words hang under. Read when the recording ends, before the place. */
+  parentId?: () => string | null;
+};
 
 type Job = {
   /** The capture as the phone keeps it: id, idempotency key, the recording, upload progress. */
@@ -205,6 +210,7 @@ export function useDictation(
       audioPath: null,
       inboxId: null,
       boardId: place?.boardId ?? null,
+      parentId: place?.parentId?.() ?? null,
       position: place ? place.nextPosition() : null,
     };
     // this capture is the dictaphone's until it lands or is handed over to the replay

@@ -23,6 +23,7 @@ export function phoneRow(entry: PendingCreate): Note {
     reminded_at: null,
     board_id: entry.boardId ?? null,
     position: entry.position ?? null,
+    parent_id: entry.parentId ?? null,
     done_at: null,
     client_request_id: entry.crid,
     created_at: entry.createdAt,

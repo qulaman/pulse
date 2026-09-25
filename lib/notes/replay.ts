@@ -72,6 +72,7 @@ export async function deliverCreate(me: Me, entry: PendingCreate): Promise<Note>
     inbox_item_id: inboxId,
     board_id: entry.boardId ?? null,
     position: entry.position ?? null,
+    parent_id: entry.parentId ?? null,
   });
   await dropCreate(entry.id);
   return note;

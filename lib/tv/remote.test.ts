@@ -19,6 +19,8 @@ function state(patch: Partial<TvState> = {}): TvState {
     board_id: null,
     board_until: null,
     board_guest: false,
+    board_point: null,
+    board_view: "list",
     awake_until: null,
     expires_at: null,
     version: 1,
