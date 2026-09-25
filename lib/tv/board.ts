@@ -3,10 +3,10 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import type { BoardView } from "./state";
 
 /**
- * Доска на стене (D-102 §8) — чистыми функциями: как разложить пункты по колонкам и
- * страницам, какая страница сейчас, какой пункт только что сказан, что написать рядом с
- * поручённым. Стена ни с чем не взаимодействует, поэтому всё решают число пунктов и часы
- * киоска.
+ * Доска на стене (D-102 §8, D-121) — чистыми функциями: ответ базы в надёжной форме, какой
+ * вид рисовать, поле сцены, какая страница сейчас, какой пункт только что сказан, что
+ * написать рядом с поручённым. Раскладка списка — `boardList.ts`, карты — `boardMap.ts`.
+ * Стена ни с чем не взаимодействует: всё решают данные, пульт и часы киоска.
  */
 
 /** Подпункт на стене (D-121) — те же поля, что у пункта, без своих веток. */
@@ -77,9 +77,6 @@ export function boardFrom(data: unknown): TvBoard {
   };
 }
 
-/** До шести пунктов — одна колонка крупно, до 14 — две, дальше — страницы по 14. */
-export const ONE_COLUMN_MAX = 6;
-export const PAGE_SIZE = 14;
 /** Страница стоит на стене 20 секунд. */
 export const PAGE_MS = 20_000;
 /** Только что сказанный пункт светится минуту. */
@@ -96,23 +93,35 @@ export function mapFits(points: number): boolean {
   return points > 0 && points <= MAP_MAX_POINTS;
 }
 
-export type BoardLayout = { columns: 1 | 2; pages: number; perPage: number };
-
-export function boardLayout(count: number): BoardLayout {
-  if (count <= ONE_COLUMN_MAX) return { columns: 1, pages: 1, perPage: Math.max(count, 1) };
-  return { columns: 2, pages: Math.ceil(count / PAGE_SIZE), perPage: PAGE_SIZE };
+/** Что стена рисует на самом деле: карту — только если она влезает (`mapFits`), иначе список. */
+export function wallView(board: Pick<TvBoardData, "view" | "items">): BoardView {
+  return board.view === "map" && mapFits(board.items.length) ? "map" : "list";
 }
 
-/** Какая страница на стене сейчас — по часам киоска, без таймеров и без состояния. */
-export function pageAt(now: Date, pages: number): number {
+/**
+ * Поле доски на стене, vh. Сцена высотой 74 vh садится между бегущей строкой и подписью
+ * (там ~80 vh) с воздухом; сверху строка «ДОСКА · 5 пунктов», под ней — список или карта.
+ * Ширина — по пропорции экрана: 16:9 даёт 164 vh, ноутбук 16:10 — уже.
+ */
+export const BOARD_HEIGHT = 74;
+export const BOARD_TOP_ROW = 4.4;
+export const BOARD_TOP_GAP = 1.4;
+/** Между названием и пунктами в списке. */
+export const BOARD_TITLE_GAP = 2.6;
+
+export function boardFrame(aspect: number): { width: number; height: number } {
+  const width = Math.min(Math.max(aspect, 1) * 100 * 0.92, 164);
+  return { width: Math.round(width * 10) / 10, height: BOARD_HEIGHT - BOARD_TOP_ROW - BOARD_TOP_GAP };
+}
+
+/**
+ * Какая страница на стене сейчас — по часам киоска, без таймеров и без состояния. Ведущий
+ * подсветил пункт — стена стоит на его странице, пока подсветка не снята (D-121).
+ */
+export function pageAt(now: Date, pages: number, focusPage: number | null = null): number {
   if (pages <= 1) return 0;
+  if (focusPage !== null && focusPage >= 0 && focusPage < pages) return focusPage;
   return Math.floor(now.getTime() / PAGE_MS) % pages;
-}
-
-/** Пункты одной страницы вместе с их номерами на доске — нумерация сквозная. */
-export function pageItems(items: readonly TvBoardItem[], layout: BoardLayout, page: number): { item: TvBoardItem; n: number }[] {
-  const from = page * layout.perPage;
-  return items.slice(from, from + layout.perPage).map((item, index) => ({ item, n: from + index + 1 }));
 }
 
 /**
@@ -123,6 +132,19 @@ export function pageItems(items: readonly TvBoardItem[], layout: BoardLayout, pa
 export function isFresh(item: Pick<TvBoardItem, "created_at">, now: Date): boolean {
   const age = now.getTime() - new Date(item.created_at).getTime();
   return age > -FRESH_MS && age < FRESH_MS;
+}
+
+/**
+ * Свежие пункты и подпункты одной строкой id — ключ для мемо: список и карта не
+ * перерисовываются каждую секунду часов, только когда свечение у кого-то началось или кончилось.
+ */
+export function freshKey(items: readonly TvBoardItem[], now: Date): string {
+  const ids: string[] = [];
+  for (const item of items) {
+    if (isFresh(item, now)) ids.push(item.id);
+    for (const leaf of item.children) if (isFresh(leaf, now)) ids.push(leaf.id);
+  }
+  return ids.join(",");
 }
 
 /** Нейтральная пометка у пункта: «→ Марат», «→ Марат · сдано» — ни отказов, ни просрочек (D-45). */

@@ -12,6 +12,8 @@ import type { ClockStyle, TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
+import { boardCase, type BoardCase } from "./boardFixtures";
+
 export type WallCase =
   | "face"
   | "clock"
@@ -23,6 +25,7 @@ export type WallCase =
   | "board-two"
   | "board-pages"
   | "board-hidden"
+  | BoardCase
   | "focus"
   | "focus-few"
   | "focus-many"
@@ -200,6 +203,8 @@ const BOARD_POINTS = [
 
 /** The board of D-102 on fixtures: five points (two ticked, one handed over, one just said), eleven, twenty. */
 function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | null {
+  const v2 = boardCase(wallCase, base, guest);
+  if (v2) return v2;
   if (wallCase === "board-hidden") return { board: null, hidden: true };
   const count = wallCase === "board-pages" ? 20 : wallCase === "board-two" ? 11 : wallCase === "board" ? 5 : 0;
   if (count === 0) return null;

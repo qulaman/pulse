@@ -1,129 +1,180 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { useMemo, useSyncExternalStore } from "react";
 
-import { boardCountLine, boardLayout, isFresh, pageAt, pageItems, tagOf, type TvBoard as TvBoardData } from "@/lib/tv/board";
+import {
+  BOARD_HEIGHT,
+  BOARD_TITLE_GAP,
+  BOARD_TOP_GAP,
+  BOARD_TOP_ROW,
+  boardCountLine,
+  boardFrame,
+  freshKey,
+  pageAt,
+  wallView,
+  type TvBoard as TvBoardData,
+  type TvBoardData as Board,
+} from "@/lib/tv/board";
+import { listLayout, pageOfPoint, titleFit } from "@/lib/tv/boardList";
+import { mapLayout } from "@/lib/tv/boardMap";
 import { tvTime } from "@/lib/tv/clock";
 
+import { TvBoardList } from "./TvBoardList";
+import { TvBoardMap } from "./TvBoardMap";
+import { EASE, vh } from "./TvBoardParts";
+
+const MAP_MARGIN = 1.6;
+
 /**
- * Заставка «Доска» (D-102 §8): пункты директора на стене кабинета. Название крупно, пункты
- * с номерами: до шести — одна колонка крупно, до четырнадцати — две, дальше страницы, они
- * листаются сами раз в 20 секунд по часам киоска. Отмеченный пункт гаснет с галочкой и
- * остаётся на своём месте; только что сказанный минуту мягко светится. Рядом с поручённым —
- * только нейтральное «→ Марат» (D-45). При госте в кабинете доски нет — часы и «скрыта»
- * (D-33). Движение — только opacity и transform.
+ * Заставка «Доска» (D-102 §8, D-121): мысли директора на стене кабинета, два вида.
+ *  - «Список» — крупно, для чтения издалека: пункты с номерами, подпункты точками под ними;
+ *    колонки, кегль и страницы — по весу веток (`listLayout`); страницы листаются сами раз в
+ *    20 с по часам киоска.
+ *  - «Карта» — название в центре, пункты ветвями вокруг, подпункты листьями (`mapLayout`).
+ *    Больше двенадцати ветвей — всё равно список (`mapFits`).
+ * Ведущий с пульта подсвечивает пункт: он на подложке, остальные гаснут, стена стоит на его
+ * странице, сверху — «3 / 7» и шкала пунктов. Отмеченный гаснет с галочкой на своём месте;
+ * только что сказанный минуту мягко светится. Рядом с поручённым — нейтральное «→ Марат»
+ * (D-45). При госте доски нет — часы и «скрыта» (D-33). Движение — только opacity и transform.
  */
-
-const EASE = [0.2, 0, 0, 1] as const;
-
 export function TvBoard({ data, now }: { data: TvBoardData | null; now: Date }) {
+  const aspect = useSyncExternalStore(subscribeResize, clientAspect, serverAspect);
+  const still = useReducedMotion() ?? false;
+  const frame = useMemo(() => boardFrame(aspect), [aspect]);
+  const board = data?.hidden ? null : (data?.board ?? null);
+  const items = board?.items;
+  const title = board?.title ?? "";
+  const wantMap = board ? wallView(board) === "map" : false;
+
+  // the map keeps a margin on both sides: the spotlit branch grows a little and must stay on the board
+  const map = useMemo(
+    () => (wantMap && items ? mapLayout(title, items, { width: frame.width - MAP_MARGIN * 2, height: frame.height }) : null),
+    [wantMap, items, title, frame],
+  );
+  const heading = useMemo(() => titleFit(title, frame.width), [title, frame]);
+  const list = useMemo(
+    () => (!map && items ? listLayout(items, { width: frame.width, height: frame.height - heading.lines * heading.lh - BOARD_TITLE_GAP }) : null),
+    [map, items, frame, heading],
+  );
+
   if (data?.hidden) return <Hidden now={now} />;
-  const board = data?.board ?? null;
   if (!board) return null;
 
-  const layout = boardLayout(board.items.length);
-  const page = pageAt(now, layout.pages);
-  const rows = pageItems(board.items, layout, page);
-  const big = layout.columns === 1;
+  const focus = board.focus;
+  const pages = list?.pages.length ?? 1;
+  const page = pageAt(now, pages, list ? pageOfPoint(list, focus) : null);
+  const fresh = freshKey(board.items, now);
+  const view = map ? "map" : "list";
 
   return (
-    <div className="flex w-full max-w-[92vw] flex-col" data-testid="tv-board" data-columns={layout.columns}>
-      <header className="flex items-end justify-between gap-[4vh]">
-        <div className="min-w-0">
-          <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--accent)" }}>
-            Доска
-          </p>
-          <h2 className="mt-[0.6vh] line-clamp-1 text-[7vh] font-bold leading-[8vh] tracking-[-0.03em]" data-testid="tv-board-title">
-            {board.title}
-          </h2>
-        </div>
-        <span className="shrink-0 pb-[1vh] text-[3vh] font-semibold leading-[4vh] text-muted">{boardCountLine(board)}</span>
-      </header>
-
-      {board.items.length === 0 ? (
-        <p className="mt-[6vh] text-[4vh] leading-[5vh] text-muted">Пункты появятся здесь, как только их скажут</p>
-      ) : (
-        // pages keep the height of a full one: the title must not jump when a short page comes
-        <div style={layout.pages > 1 ? { minHeight: "54vh" } : undefined}>
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.ol
-              key={page}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.3 } }}
-              transition={{ duration: 0.5, ease: EASE }}
-              className={`mt-[3.6vh] ${big ? "flex flex-col gap-[1.6vh]" : "grid grid-flow-col gap-x-[4vh] gap-y-[1.2vh]"}`}
-              style={big ? undefined : { gridTemplateRows: `repeat(${Math.ceil(rows.length / 2)}, auto)`, gridTemplateColumns: "1fr 1fr" }}
-            >
-              {rows.map(({ item, n }) => (
-                <Point key={item.id} n={n} text={item.text} done={item.done} tag={tagOf(item)} fresh={isFresh(item, now)} big={big} />
-              ))}
-            </motion.ol>
-          </AnimatePresence>
-        </div>
-      )}
-
-      {layout.pages > 1 ? (
-        <p className="nums mt-[2.4vh] text-center text-[2.4vh] leading-[3vh] text-muted" data-testid="tv-board-page">
-          {page + 1} / {layout.pages}
-        </p>
-      ) : null}
+    <div
+      className="flex flex-col"
+      style={{ width: vh(frame.width), height: vh(BOARD_HEIGHT) }}
+      data-testid="tv-board"
+      data-view={view}
+      data-focus={focus ?? undefined}
+    >
+      <TopRow board={board} page={page} pages={pages} />
+      <div className="relative" style={{ marginTop: vh(BOARD_TOP_GAP), height: vh(frame.height) }}>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={view}
+            className="absolute inset-0"
+            initial={{ opacity: 0, scale: still ? 1 : 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: still ? 1 : 0.99, transition: { duration: still ? 0 : 0.28 } }}
+            transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+          >
+            {map ? (
+              <TvBoardMap layout={map} title={board.title} focus={focus} fresh={fresh} still={still} />
+            ) : list ? (
+              <TvBoardList layout={list} title={board.title} heading={heading} page={page} focus={focus} fresh={fresh} still={still} />
+            ) : null}
+          </motion.div>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
 
-function Point({ n, text, done, tag, fresh, big }: { n: number; text: string; done: boolean; tag: string | null; fresh: boolean; big: boolean }) {
-  const still = useReducedMotion();
+/**
+ * Строка над доской: «ДОСКА» слева; справа — счёт пунктов, а пока ведущий ведёт совещание —
+ * «3 / 7» и шкала пунктов с отметкой текущего. Обе надписи стоят в одной клетке и
+ * сменяются прозрачностью — строка не прыгает.
+ */
+function TopRow({ board, page, pages }: { board: Board; page: number; pages: number }) {
+  const at = board.focus ? board.items.findIndex((item) => item.id === board.focus) : -1;
+  const walking = at >= 0;
   return (
-    <motion.li
-      layout="position"
-      initial={{ opacity: 0, y: 16 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: EASE }}
-      className={`relative flex items-start rounded-[2vh] ${big ? "gap-[2.6vh] px-[2.4vh] py-[1.4vh]" : "gap-[2vh] px-[2vh] py-[1vh]"}`}
-      data-done={done || undefined}
-      data-fresh={fresh || undefined}
-    >
-      {fresh ? (
-        <motion.span
-          aria-hidden
-          className="pointer-events-none absolute inset-0 rounded-[2vh]"
-          style={{ background: "color-mix(in srgb, var(--accent) 14%, transparent)", boxShadow: "inset 0 0 0 0.2vh color-mix(in srgb, var(--accent) 45%, transparent)" }}
-          initial={{ opacity: 0 }}
-          animate={still ? { opacity: 0.8 } : { opacity: [0.35, 0.95, 0.35] }}
-          transition={still ? { duration: 0.3 } : { duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
-        />
-      ) : null}
-      <span
-        aria-hidden
-        className={`nums relative flex shrink-0 items-center justify-center rounded-full font-bold ${big ? "h-[6.4vh] w-[6.4vh] text-[3.4vh]" : "h-[4.6vh] w-[4.6vh] text-[2.5vh]"}`}
-        style={{
-          color: done ? "var(--ok)" : "var(--accent)",
-          background: `color-mix(in srgb, ${done ? "var(--ok)" : "var(--accent)"} 16%, transparent)`,
-        }}
-      >
-        {done ? (
-          <svg viewBox="0 0 24 24" width="55%" height="55%" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12.5 10 17.5 19 7" />
-          </svg>
-        ) : (
-          n
-        )}
-      </span>
-      <span className="relative min-w-0 flex-1">
-        <span
-          className={`line-clamp-2 font-semibold tracking-[-0.015em] ${big ? "text-[4.4vh] leading-[5.6vh]" : "text-[3.1vh] leading-[4.1vh]"}`}
-          style={{ opacity: done ? 0.42 : 1 }}
-        >
-          {text}
-        </span>
-        {tag ? (
-          <span className={`mt-[0.4vh] block font-semibold ${big ? "text-[2.6vh] leading-[3.2vh]" : "text-[2.1vh] leading-[2.6vh]"}`} style={{ color: "var(--accent)" }}>
-            {tag}
+    <div className="flex shrink-0 items-center justify-between gap-[4vh]" style={{ height: vh(BOARD_TOP_ROW) }}>
+      <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--accent)" }}>
+        Доска
+      </p>
+      <div className="flex items-center gap-[3vh]">
+        <div className="grid justify-items-end [grid-template-areas:'cell'] *:[grid-area:cell]">
+          <span
+            className="nums self-center text-[3vh] font-semibold leading-[4vh] text-muted"
+            style={{ opacity: walking ? 0 : 1, transition: "opacity 450ms var(--ease-in-out)" }}
+            aria-hidden={walking}
+          >
+            {boardCountLine(board)}
           </span>
-        ) : null}
+          <Progress board={board} at={at} on={walking} />
+        </div>
+        {pages > 1 ? <PageDots page={page} pages={pages} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** «3 / 7» и шкала: по сегменту на пункт, текущий — акцентом и шире, отмеченные — тише. */
+function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) {
+  const count = board.items.length;
+  // the scale never gets wider than a fifth of the row, whatever the number of points
+  const segment = Math.min(3.2, Math.max(0.9, (34 - 0.5 * (count - 1)) / Math.max(count, 1)));
+  return (
+    <div
+      className="flex items-center gap-[2vh] self-center"
+      style={{ opacity: on ? 1 : 0, transition: "opacity 450ms var(--ease-in-out)" }}
+      aria-hidden={!on}
+      data-testid="tv-board-progress"
+    >
+      <span className="flex items-center gap-[0.5vh]">
+        {board.items.map((item, index) => (
+          <span
+            key={item.id}
+            className="block rounded-full"
+            style={{
+              width: vh(index === at ? segment * 1.6 : segment),
+              height: vh(index === at ? 0.9 : 0.6),
+              background:
+                index === at ? "var(--accent)" : item.done ? "color-mix(in srgb, var(--ok) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
+              transition: "background-color 450ms var(--ease-in-out)",
+            }}
+          />
+        ))}
       </span>
-    </motion.li>
+      <span className="nums text-[3.4vh] font-bold leading-[4vh] tabular-nums">
+        {on ? at + 1 : 1}
+        <span className="text-muted"> / {count}</span>
+      </span>
+    </div>
+  );
+}
+
+/** Точки страниц — как у карточки сотрудника: текущая светлая, меняется только цвет. */
+function PageDots({ page, pages }: { page: number; pages: number }) {
+  return (
+    <span className="flex items-center gap-[1vh]" aria-label={`Страница ${page + 1} из ${pages}`} data-testid="tv-board-page">
+      {Array.from({ length: pages }, (_, index) => (
+        <span
+          key={index}
+          className="h-[1.2vh] w-[1.2vh] rounded-full"
+          style={{ background: index === page ? "var(--text)" : "var(--border)", transition: "background-color 400ms var(--ease-in-out)" }}
+        />
+      ))}
+    </span>
   );
 }
 
@@ -136,3 +187,13 @@ function Hidden({ now }: { now: Date }) {
     </div>
   );
 }
+
+/* The wall's proportions: 16:9 on a TV, anything on a laptop peeking at /tv. Rounded, so a
+   1080p screen matches the server's 16:9 and hydration draws the same board. */
+function subscribeResize(onChange: () => void) {
+  window.addEventListener("resize", onChange);
+  return () => window.removeEventListener("resize", onChange);
+}
+const round = (value: number) => Math.round(value * 100) / 100;
+const clientAspect = () => round(window.innerWidth / Math.max(window.innerHeight, 1));
+const serverAspect = () => round(16 / 9);
