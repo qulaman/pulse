@@ -36,7 +36,7 @@ export function BoardCard({ board, summary, onWall, now }: { board: MindBoard; s
     >
       <BoardGlyph lit={onWall} />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{board.title}</span>
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{board.title}</span>
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
           <span className="min-w-0 truncate" data-testid="board-card-summary">{summaryLine(summary)}</span>
           {onWall ? (
@@ -98,7 +98,7 @@ export function BoardTrashCard({
         <NoteIcon name="board" size={13} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">Доска «{board.title}»</span>
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">Доска «{board.title}»</span>
         <span className="mt-1 block text-[12px] leading-4 text-muted">
           {summaryLine(summary)} · удалена {whenRu(board.deleted_at ?? board.updated_at, now)}
         </span>
