@@ -14,7 +14,7 @@ export default async function DirectorLayout({ children }: { children: React.Rea
   if (profile.role !== "director") redirect(homeForRole(profile.role));
 
   return (
-    <DirectorShell fullName={profile.fullName} companyId={profile.companyId}>
+    <DirectorShell me={profile}>
       {children}
     </DirectorShell>
   );
