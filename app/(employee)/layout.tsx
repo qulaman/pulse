@@ -28,7 +28,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   return (
     <div className="app-shell flex min-h-dvh flex-col">
       <AppHeader fullName={profile.fullName} companyId={profile.companyId} pointsFor={pointsEnabled ? profile.userId : undefined} />
-      <RoleScope role={tabBarRole(profile.role)}>{children}</RoleScope>
+      <RoleScope role={tabBarRole(profile.role)} me={profile}>{children}</RoleScope>
       <TabBar role={tabBarRole(profile.role)} />
     </div>
   );

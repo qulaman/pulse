@@ -24,7 +24,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
 
   if (profile.role === "director") {
     return (
-      <DirectorShell fullName={profile.fullName} companyId={profile.companyId}>
+      <DirectorShell me={profile}>
         {children}
       </DirectorShell>
     );
@@ -32,7 +32,7 @@ export async function AdminShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="app-shell flex min-h-dvh flex-col">
-      <RoleScope role="secretary">{children}</RoleScope>
+      <RoleScope role="secretary" me={profile}>{children}</RoleScope>
       <TabBar role="secretary" />
     </div>
   );

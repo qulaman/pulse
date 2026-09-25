@@ -76,10 +76,11 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         <DeadlinePill task={task} now={now} />
       </div>
 
-      {/* row 2: title */}
+      {/* row 2: title; per-card links do not prefetch — forty cards were forty background
+          renders of the task's layout, each with its own session check (D-126) */}
       <div className="relative mt-2">
         {href ? (
-          <Link href={href} className="block">
+          <Link href={href} prefetch={false} className="block">
             {title}
           </Link>
         ) : (

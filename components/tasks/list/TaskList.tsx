@@ -515,6 +515,7 @@ export function CardFoot({ href, extra }: { href: string; extra?: ReactNode }) {
     <div className="-mx-1.5 mt-2 flex items-center justify-between">
       <Link
         href={href}
+        prefetch={false}
         data-testid="task-thread"
         className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
       >
