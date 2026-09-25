@@ -409,7 +409,9 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
 /**
  * The title of the board as the screen's heading: a tap turns it into a field, Enter or a tap
  * elsewhere keeps the new name, an empty field gives the old one back. A long title shrinks
- * (34 → 26 px) before it wraps, and wraps to three lines at most — up to 120 characters.
+ * (34 → 26 px) and then ends in «…» on its one line, as a large title does on iOS (D-113): the
+ * head keeps the height of its skeleton whatever the name (D-122), and the whole name is one
+ * tap away — in the field, and on the wall.
  */
 function BoardTitle({ title, onRename }: { title: string; onRename: (title: string) => void }) {
   const [editing, setEditing] = useState(false);
@@ -424,16 +426,13 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
     if (!node || !room) return;
     const fit = () => {
       node.style.fontSize = "";
-      node.style.lineHeight = "";
       node.style.whiteSpace = "nowrap";
       // scrollWidth is rounded: a line that measures «376 of 376» may need 376.4 px and wrap
       const natural = node.scrollWidth + 1;
       const width = node.clientWidth;
       node.style.whiteSpace = "";
       if (natural <= width) return;
-      const px = Math.max(26, Math.floor((34 * width) / natural));
-      node.style.fontSize = `${px}px`;
-      if ((natural * px) / 34 > width) node.style.lineHeight = "32px";
+      node.style.fontSize = `${Math.max(26, Math.floor((34 * width) / natural))}px`;
     };
     fit();
     const resize = new ResizeObserver(fit);
@@ -500,7 +499,7 @@ function BoardTitle({ title, onRename }: { title: string; onRename: (title: stri
         onClick={() => setEditing(true)}
         data-testid="board-title"
         aria-label={`${title} — переименовать`}
-        className="line-clamp-3 w-full text-left"
+        className="line-clamp-1 w-full text-left"
       >
         {title}
       </button>

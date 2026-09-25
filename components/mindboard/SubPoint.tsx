@@ -243,7 +243,8 @@ export function SubPointRow(props: RowProps) {
       ) : (
         <>
           <NoteEditor
-            key={sub.id}
+            // born again when STT brings the words (raw_transcript), never while the director types
+            key={`${sub.id}:${sub.raw_transcript ?? ""}`}
             text={sub.text}
             label="Текст подпункта"
             onDirty={setDirty}

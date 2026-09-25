@@ -194,7 +194,7 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
     <div
       className={`relative ${
         lit
-          ? "[&>article]:!border-accent/70 [&>article]:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent),0_10px_28px_color-mix(in_srgb,var(--accent)_12%,transparent)]"
+          ? "[&>article]:!scroll-mb-[180px] [&>article]:!border-accent/70 [&>article]:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent),0_10px_28px_color-mix(in_srgb,var(--accent)_12%,transparent)]"
           : ""
       }`}
       data-point-id={point.id}
@@ -245,7 +245,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
 
             <div className="mt-2">
               <NoteEditor
-                key={point.id}
+                // born again when STT brings the words (raw_transcript), never while the director types
+                key={`${point.id}:${point.raw_transcript ?? ""}`}
                 text={point.text}
                 label="Текст пункта"
                 onDirty={setDirty}
