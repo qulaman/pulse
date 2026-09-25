@@ -67,6 +67,7 @@ export type DeskAction =
   | "cancel"
   | "extend"
   | "revoke"
+  | "sendNow"
   | "open"
   | "remove";
 
@@ -80,6 +81,7 @@ export const KEY_LABEL: Record<DeskAction, string> = {
   cancel: "Отменить",
   extend: "Продлить",
   revoke: "Отозвать",
+  sendNow: "Отправить сейчас",
   open: "Открыть",
   remove: "Удалить",
 };
@@ -98,7 +100,8 @@ export function keysFor(
   if (task.status === "declined") return ["insist", "reassign", "cancel"];
   if (working && overdue) return ["extend", "reassign", "open"];
   if (working) return ["extend", "reassign", "revoke"];
-  if (task.status === "scheduled") return ["extend", "revoke", "open"];
+  // held for the morning (D-38): «Отправить сейчас» brings it forward (D-128)
+  if (task.status === "scheduled") return ["sendNow", "extend", "revoke"];
   return ["open", "remove"];
 }
 

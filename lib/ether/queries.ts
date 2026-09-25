@@ -4,9 +4,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { peopleKeys, type Person } from "@/lib/people/queries";
+import { kickPush } from "@/lib/push/client";
 import { useRealtimeListener, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
+import { heldKeys } from "@/lib/tasks/held";
 
 type AnnouncementRow = Database["public"]["Tables"]["announcements"]["Row"];
 type AckRow = Database["public"]["Tables"]["announcement_acks"]["Row"];
@@ -129,5 +131,72 @@ export function useDeleteAnnouncement() {
       toast("Не получилось удалить. Попробуй ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }),
+  });
+}
+
+/** Announcement id → the moment its pushes go, for the ones still waiting for the window. */
+export type HeldAnnouncements = Record<string, string>;
+
+/**
+ * The director's Эфир at night (D-128): which announcements still wait for the delivery
+ * window (D-38, D-51 §2), and from when. Only the director asks — RLS gives the director the
+ * company's outbox; an employee would read their own row and have nothing to send.
+ */
+export function useHeldAnnouncements(enabled: boolean) {
+  return useRealtimeQuery<HeldAnnouncements>({
+    queryKey: heldKeys.announcements,
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("notification_deliveries")
+        .select("deliver_after, announcement_id:meta->>announcement_id")
+        .eq("event_kind", "announcement")
+        .eq("status", "queued")
+        .gt("deliver_after", new Date().toISOString());
+      if (error) throw new Error(error.message);
+      const held: HeldAnnouncements = {};
+      for (const row of (data ?? []) as { deliver_after: string; announcement_id: string | null }[]) {
+        if (!row.announcement_id) continue;
+        const first = held[row.announcement_id];
+        if (!first || new Date(row.deliver_after) < new Date(first)) held[row.announcement_id] = row.deliver_after;
+      }
+      return held;
+    },
+    channel: { table: "notification_deliveries", filter: "event_kind=eq.announcement" },
+    enabled,
+  });
+}
+
+/** «Отправить сейчас» on an announcement held for the morning (D-128): the team hears it now. */
+export function useSendAnnouncementNow() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (announcementId: string) => {
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase.rpc("send_announcements_now", {
+        announcement_ids: [announcementId],
+        client_request_id: crypto.randomUUID(),
+      });
+      if (error) throw new Error(error.message);
+      // the rows are due now: the pushes go at once, not on the minute sweep
+      kickPush();
+    },
+    onMutate: async (announcementId) => {
+      await queryClient.cancelQueries({ queryKey: heldKeys.announcements });
+      const previous = queryClient.getQueryData<HeldAnnouncements>(heldKeys.announcements);
+      if (previous) {
+        queryClient.setQueryData<HeldAnnouncements>(
+          heldKeys.announcements,
+          Object.fromEntries(Object.entries(previous).filter(([id]) => id !== announcementId)),
+        );
+      }
+      toast("Объявление ушло");
+      return { previous };
+    },
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(heldKeys.announcements, context.previous);
+      toast("Не получилось отправить. Попробуй ещё раз");
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: heldKeys.announcements }),
   });
 }

@@ -22,6 +22,7 @@ const LABEL: Record<DeskAction, string> = {
   cancel: "Отменить",
   extend: "Продлить",
   revoke: "Отозвать",
+  sendNow: "Отправить",
   open: "Открыть",
   remove: "Удалить",
 };
@@ -33,6 +34,7 @@ const ICON: Partial<Record<DeskAction, IconName>> = {
   reassign: "swap",
   extend: "clock",
   revoke: "undo",
+  sendNow: "send",
   cancel: "x",
   remove: "x",
 };
@@ -53,7 +55,7 @@ export function allActionsFor(task: { status: TaskWithPeople["status"] }): DeskA
     case "rework":
       return ["extend", "reassign", "revoke", "remove"];
     case "scheduled":
-      return ["extend", "revoke", "remove"];
+      return ["sendNow", "extend", "revoke", "remove"];
     default:
       return ["remove"];
   }
@@ -73,9 +75,12 @@ export function cardKeysFor(task: TaskWithPeople, question: boolean, now: Date):
   return keys;
 }
 
-/** The loud button: only a move that closes the director's turn — accept, insist, or a late task's new date. */
-function isPrimary(key: DeskAction, reason: DeskReason | null): boolean {
-  return key === "approve" || key === "insist" || (key === "extend" && reason === "overdue");
+/**
+ * The loud button: only a move that closes the director's turn — accept, insist, send a held
+ * task now, or a late task's new date.
+ */
+export function isPrimary(key: DeskAction, reason: DeskReason | null): boolean {
+  return key === "approve" || key === "insist" || key === "sendNow" || (key === "extend" && reason === "overdue");
 }
 
 /**
@@ -198,7 +203,7 @@ export function DirectorTaskCard({
       {/* D-32: until it is accepted, the push receipt in words — «не открывал с 9:14» */}
       {task.status === "sent" ? (
         <div className="-mt-0.5 flex justify-center">
-          <DeliveryStatus taskId={task.id} status={task.status} />
+          <DeliveryStatus taskId={task.id} status={task.status} assigneeId={task.assignee_id} onSendNow={() => onAction("sendNow", task)} />
         </div>
       ) : null}
 

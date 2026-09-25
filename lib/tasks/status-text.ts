@@ -49,6 +49,8 @@ export const BUTTON = {
   reassign: "Переназначить",
   remove: "Удалить",
   send: "Отправить",
+  /** a task held for the morning goes now (D-128) */
+  sendNow: "Отправить сейчас",
 } as const;
 
 export const TEXT = {

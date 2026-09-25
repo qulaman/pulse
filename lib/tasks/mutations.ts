@@ -16,6 +16,8 @@ import {
   type TaskRow,
   type TaskWithPeople,
 } from "./queries";
+import { heldKeys } from "./held";
+import { receiptKeys } from "./receipts";
 import type { TaskStatus } from "./status-text";
 import { markFailed } from "./thread";
 
@@ -163,6 +165,62 @@ export function useRevoke() {
       toast(error instanceof Error ? error.message : GENERIC_ERROR);
     },
     onSettled: (_data, _error, { taskId }) => invalidateTasks(queryClient, taskId),
+  });
+}
+
+/** Only a held task changes its status; a task already out only lets its held words go. */
+function releaseCached(old: unknown, taskId: string, at: string): unknown {
+  const release = (task: TaskWithPeople): TaskWithPeople =>
+    task.id === taskId && task.status === "scheduled" ? { ...task, status: "sent", scheduled_send_at: at } : task;
+  if (Array.isArray(old)) return (old as TaskWithPeople[]).map(release);
+  if (old && typeof old === "object" && typeof (old as { id?: unknown }).id === "string") return release(old as TaskWithPeople);
+  return old;
+}
+
+/** The first name of the task's assignee, from whatever list holds the task — for the toast. */
+function assigneeOf(snapshot: ReturnType<typeof snapshotTasks>, taskId: string): string {
+  for (const [, data] of snapshot) {
+    const list = Array.isArray(data) ? (data as TaskWithPeople[]) : data && typeof data === "object" ? [data as TaskWithPeople] : [];
+    const task = list.find((item) => item?.id === taskId);
+    const name = task?.assignee?.full_name?.trim().split(/\s+/)[0];
+    if (name) return name;
+  }
+  return "";
+}
+
+/**
+ * «Отправить сейчас» after the fact (D-128): a task held for the morning goes out now, and
+ * what it queued for the morning to the team (a message, «Доработать», «Настоять») with it.
+ */
+export function useSendNow() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ taskId, requestId }: { taskId: string; requestId: string }) => {
+      await postJson(`/api/tasks/${taskId}/send-now`, {
+        client_request_id: requestId,
+      });
+    },
+    onMutate: async ({ taskId }) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.root });
+      const snapshot = snapshotTasks(queryClient);
+      const at = new Date().toISOString();
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) => releaseCached(old, taskId, at));
+      // the receipt in words at the tap, as every move of the director has (useDirectorControls)
+      const who = assigneeOf(snapshot, taskId);
+      toast(who ? `Отправлено · ${who}` : "Отправлено");
+      return { snapshot };
+    },
+    onError: (error, _input, context) => {
+      if (context) restoreTasks(queryClient, context.snapshot);
+      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: (_data, _error, { taskId }) => {
+      invalidateTasks(queryClient, taskId);
+      // the receipts that said «отправлю утром»
+      void queryClient.invalidateQueries({ queryKey: heldKeys.task(taskId) });
+      void queryClient.invalidateQueries({ queryKey: receiptKeys(taskId) });
+    },
   });
 }
 
@@ -410,6 +468,8 @@ export type TaskActions = {
   /** rework → accepted → pending_review: two calls, two client_request_id. */
   complete: (input: { taskId: string; fromStatus: TaskStatus; report?: { text?: string; file_path?: string } }) => void;
   revoke: (taskId: string) => void;
+  /** «Отправить сейчас»: what this task holds for the morning goes out now (D-128). */
+  sendNow: (taskId: string) => void;
   /** «Продлить»: a new deadline (null — «без срока») on an open task. */
   extend: (input: Omit<ExtendInput, "requestId">) => void;
   /** «Переназначить»: the same order to another person; the old task is revoked. */
@@ -425,6 +485,7 @@ export type TaskActions = {
 export function useTaskActions(me: Me | undefined): TaskActions {
   const transition = useTransition();
   const revoke = useRevoke();
+  const sendNow = useSendNow();
   const extend = useExtendDeadline();
   const reassign = useReassign();
   const sendMessage = useSendMessage(me);
@@ -450,10 +511,11 @@ export function useTaskActions(me: Me | undefined): TaskActions {
       transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report });
     },
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
+    sendNow: (taskId) => sendNow.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: input.id ?? crypto.randomUUID() }),
     remove: (taskId) => remove.mutate({ taskId }),
     markRead: (input) => markRead.mutate(input),
     // sending a message is not «busy»: the composer stays live, the row carries its own clock
-    busy: transition.isPending || revoke.isPending || extend.isPending || reassign.isPending,
+    busy: transition.isPending || revoke.isPending || sendNow.isPending || extend.isPending || reassign.isPending,
   };
 }

@@ -132,6 +132,21 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
                   {line && lastMine?.id === message.id && messageState(message) === "sent" ? (
                     <p className="mt-1 pr-1 text-right text-[12px] leading-4" style={{ color: RECEIPT_TONE[line.tone] }} data-testid="thread-receipt">
                       {line.text}
+                      {/* at night the words wait for the morning — unless the director says «now» (D-128) */}
+                      {line.held ? (
+                        <>
+                          {" · "}
+                          <button
+                            type="button"
+                            className="underline underline-offset-2"
+                            style={{ color: "var(--accent)" }}
+                            onClick={() => actions.sendNow(taskId)}
+                            data-testid="thread-send-now"
+                          >
+                            отправить сейчас
+                          </button>
+                        </>
+                      ) : null}
                     </p>
                   ) : null}
                 </div>

@@ -46,6 +46,7 @@ function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
       }),
     complete: () => patch({ status: "pending_review", completed_at: stamp }),
     revoke: () => patch({ status: "revoked", closed_at: stamp }),
+    sendNow: () => patch({ status: "sent", scheduled_send_at: stamp }),
     extend: ({ deadlineIso }) => patch({ deadline: deadlineIso }),
     reassign: ({ assigneeName }) => patch({ assignee: { full_name: assigneeName } }),
     sendMessage: () => {},

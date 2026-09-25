@@ -86,7 +86,7 @@ describe("keysFor", () => {
     ["accepted", [{ status: "accepted" }], ["extend", "reassign", "revoke"]],
     ["in_progress", [{ status: "in_progress" }], ["extend", "reassign", "revoke"]],
     ["rework", [{ status: "rework" }], ["extend", "reassign", "revoke"]],
-    ["scheduled", [{ status: "scheduled" }], ["extend", "revoke", "open"]],
+    ["scheduled", [{ status: "scheduled" }], ["sendNow", "extend", "revoke"]],
     ["done", [{ status: "done" }], ["open", "remove"]],
     ["revoked", [{ status: "revoked" }], ["open", "remove"]],
   ];

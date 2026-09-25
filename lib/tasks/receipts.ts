@@ -1,6 +1,7 @@
 "use client";
 
 import { humanAqtobe } from "@/lib/ai/time";
+import { whenHeld } from "@/lib/tasks/held";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
@@ -14,9 +15,10 @@ import type { Database } from "@/lib/supabase/types";
 export type DeliveryRow = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 export type ReceiptTone = "ok" | "muted" | "warn";
-export type Receipt = { text: string; tone: ReceiptTone };
+/** `held` — the words wait for the morning, and the director may send them now (D-128). */
+export type Receipt = { text: string; tone: ReceiptTone; held?: true };
 
-const receiptKeys = (taskId: string) => ["thread-receipt", taskId] as const;
+export const receiptKeys = (taskId: string) => ["thread-receipt", taskId] as const;
 
 /** «сегодня 09:14» reads as «не открывал с 09:14» once today is dropped. */
 function at(iso: string, now: Date): string {
@@ -39,10 +41,9 @@ export function receiptLine(delivery: DeliveryRow | null | undefined, now: Date 
     return { text: "уведомления не включены", tone: "warn" };
   }
   if (delivery.status === "queued" && delivery.deliver_after && new Date(delivery.deliver_after) > now) {
-    // quiet hours (D-38): the words wait for the morning, and the director is told so
-    const when = at(delivery.deliver_after, now);
+    // quiet hours (D-38): the words wait for the morning, and the director is told so —
     // «отправлю в 08:00» today, «отправлю завтра 08:00» when a day word comes with it
-    return { text: /^\d/.test(when) ? `отправлю в ${when}` : `отправлю ${when}`, tone: "muted" };
+    return { text: `отправлю ${whenHeld(delivery.deliver_after, now)}`, tone: "muted", held: true };
   }
   return null;
 }

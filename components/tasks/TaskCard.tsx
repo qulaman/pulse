@@ -100,7 +100,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
       {variant === "director" && task.status !== "scheduled" && task.status !== "revoked" ? (
         <div className="relative">
-          <DeliveryStatus taskId={task.id} status={task.status} />
+          <DeliveryStatus taskId={task.id} status={task.status} assigneeId={task.assignee_id} onSendNow={() => actions.sendNow(task.id)} />
         </div>
       ) : null}
 
@@ -321,6 +321,19 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
             {BUTTON.cancel}
           </Button>
         </>
+      ) : null}
+
+      {/* held for the morning (D-38): it can go now (D-128) */}
+      {task.status === "scheduled" ? (
+        <Button
+          icon={<Icon name="send" />}
+          onClick={() => {
+            haptic(10);
+            actions.sendNow(task.id);
+          }}
+        >
+          {BUTTON.sendNow}
+        </Button>
       ) : null}
 
       {!terminal ? (

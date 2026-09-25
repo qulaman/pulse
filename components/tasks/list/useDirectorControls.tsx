@@ -94,6 +94,11 @@ export function useDirectorControls({
       case "insist":
         actions.transition({ taskId: task.id, toStatus: "sent" });
         return;
+      case "sendNow":
+        // held for the morning: it goes now (D-128); the toast comes with the mutation
+        haptic(10);
+        actions.sendNow(task.id);
+        return;
       case "open":
         router.push(`/tasks/${task.id}`);
         return;
@@ -165,7 +170,7 @@ export function useDirectorControls({
                 onClick={() => {
                   setSheet(null);
                   // the next sheet slides in after this one has gone
-                  setTimeout(() => press(action, sheetTask), action === "approve" || action === "insist" || action === "open" ? 0 : 170);
+                  setTimeout(() => press(action, sheetTask), action === "approve" || action === "insist" || action === "sendNow" || action === "open" ? 0 : 170);
                 }}
                 className={`flex min-h-[52px] items-center gap-3 rounded-[14px] px-3 text-left text-[16px] font-medium transition-colors duration-[120ms] active:bg-surface-2 ${
                   danger ? "text-danger" : "text-text"

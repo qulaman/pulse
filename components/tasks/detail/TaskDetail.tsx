@@ -5,7 +5,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { Icon, type IconName } from "@/components/tasks/desk/icons";
-import { ACTION_ICON, ACTION_LABEL, cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
+import { ACTION_ICON, ACTION_LABEL, cardKeysFor, isPrimary } from "@/components/tasks/list/DirectorTaskCard";
 import type { EmployeeAction } from "@/components/tasks/list/EmployeeTaskCard";
 import { statusToneOf, StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { Face, Note, Stepper } from "@/components/tasks/list/TaskList";
@@ -100,7 +100,6 @@ export function TaskDetail({
   const talk = (messages ?? []).filter((message) => message.type !== "status_change" && message.type !== "system").length;
 
   const keys: DeskAction[] = isDirector ? cardKeysFor(task, Boolean(question), now) : [];
-  const primaryKey = (key: DeskAction) => key === "approve" || key === "insist" || (key === "extend" && reason === "overdue");
 
   const person = isDirector ? task.assignee?.full_name : task.author?.full_name;
 
@@ -231,7 +230,7 @@ export function TaskDetail({
                 <Button
                   key={key}
                   data-testid={`task-action-${key}`}
-                  variant={index === 0 && primaryKey(key) ? "primary" : danger ? "ghost" : "secondary"}
+                  variant={index === 0 && isPrimary(key, reason) ? "primary" : danger ? "ghost" : "secondary"}
                   className={`!px-2 whitespace-nowrap !text-[14px] ${danger ? "!text-danger/85" : ""}`}
                   icon={keys.length < 3 && icon ? <Icon name={icon as IconName} size={16} /> : undefined}
                   onClick={() => director.press(key, task)}
@@ -260,7 +259,7 @@ export function TaskDetail({
               />
             </span>
           ) : null}
-          {isDirector && task.status !== "scheduled" && task.status !== "revoked" ? <DeliveryStatus taskId={task.id} status={task.status} /> : null}
+          {isDirector && task.status !== "scheduled" && task.status !== "revoked" ? <DeliveryStatus taskId={task.id} status={task.status} assigneeId={task.assignee_id} onSendNow={() => director.press("sendNow", task)} /> : null}
         </div>
       </article>
 

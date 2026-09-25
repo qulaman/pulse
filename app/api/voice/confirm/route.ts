@@ -72,6 +72,14 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
+    // «отправить сейчас» is the whole batch (D-128): the outbox holds an announcement for the
+    // window like every word to the team, so its pushes are released here, after the batch
+    const announcementIds = Array.isArray(result.announcement_ids) ? (result.announcement_ids as string[]) : [];
+    if (body.force_now && announcementIds.length > 0) {
+      const released = await supabase.rpc("send_announcements_now", { announcement_ids: announcementIds });
+      // the batch is saved either way; the announcement then simply waits for the morning
+      if (released.error) console.error("send_announcements_now failed:", released.error.message);
+    }
     // the triggers queued the pushes; send them once the response is on its way
     after(() => kickDeliveries());
     return apiOk({ result, duplicate });
