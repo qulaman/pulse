@@ -2082,6 +2082,7 @@ export type Database = {
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }
+      team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
       team_role: {
         Args: { r: Database["public"]["Enums"]["user_role"] }
         Returns: boolean
@@ -2177,11 +2178,11 @@ export type Database = {
       tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
       tv_overlay: { Args: never; Returns: Json }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
+      tv_task_story: { Args: { p_task: string }; Returns: Json }
       tv_touch: {
         Args: { p_company: string; p_guest_minutes?: number }
         Returns: number
       }
-      team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
       unseen_task_alerts_due: { Args: { p_now?: string }; Returns: number }
       update_company_profile: { Args: { p_name: string }; Returns: Json }
       update_company_settings: { Args: { patch: Json }; Returns: Json }
