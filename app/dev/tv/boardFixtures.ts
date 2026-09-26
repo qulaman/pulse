@@ -2,7 +2,8 @@ import type { TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/bo
 
 /**
  * Доска v2 на фикстурах (D-121) — случаи песочницы `/dev/tv?case=…`: ветки, подсветка
- * ведущего, карта, двенадцать и тринадцать ветвей, длинные тексты, страницы, пусто.
+ * ведущего, карта (и с одной–четырьмя ветвями — крупные ступени), двенадцать и тринадцать
+ * ветвей, длинные тексты, страницы, пусто.
  * Фикстуры строятся один раз на случай и минуту: стена не перерисовывает доску каждую
  * секунду часов, как и на киоске, где запрос отдаёт те же объекты.
  */
@@ -12,6 +13,10 @@ export const BOARD_CASES = [
   "board-focus",
   "board-map",
   "board-map-focus",
+  "board-map-1",
+  "board-map-2",
+  "board-map-3",
+  "board-map-4",
   "board-map-12",
   "board-map-13",
   "board-long",
@@ -77,6 +82,14 @@ function seedsFor(wallCase: BoardCase): Seed[] {
     case "board-map":
     case "board-map-focus":
       return BRANCHES;
+    case "board-map-1":
+      return [BRANCHES[1]];
+    case "board-map-2":
+      return [BRANCHES[0], BRANCHES[1]];
+    case "board-map-3":
+      return [BRANCHES[0], BRANCHES[1], BRANCHES[3]];
+    case "board-map-4":
+      return BRANCHES.slice(0, 4);
     case "board-map-12":
     case "board-map-13":
       return [...BRANCHES, ...MORE.slice(0, wallCase === "board-map-12" ? 7 : 8).map((text, i) => ({ text, sub: i % 3 === 1 ? SUBS.slice(0, 2) : [] }))];
@@ -125,6 +138,35 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
     items,
   };
   return { hidden: false, board };
+}
+
+/**
+ * Демо песочницы (`&demo=focus|view|1`): ведущий сам ходит по пунктам раз в `DEMO_STEP_MS`,
+ * вид «Список / Карта» меняется каждый шаг (`view`) или каждый третий (`1` — и то и другое).
+ * Для замеров перфа и покадровой проверки «ничего не прыгает» без пульта и базы.
+ */
+export type BoardDemo = "focus" | "view" | "both";
+export const DEMO_STEP_MS = 2_000;
+
+export function demoOf(param: string | undefined): BoardDemo | null {
+  return param === "focus" || param === "view" ? param : param === "1" ? "both" : null;
+}
+
+const demos = new WeakMap<TvBoard, Map<string, TvBoard>>();
+
+/** Доска на шаге демо: те же пункты (тот же объект — раскладка не пересчитывается), другие подсветка и вид. */
+export function boardDemo(data: TvBoard, demo: BoardDemo, step: number): TvBoard {
+  const board = data.board;
+  if (!board || board.items.length === 0) return data;
+  const focus = demo === "view" ? board.focus : board.items[step % board.items.length].id;
+  const flip = demo === "view" ? step % 2 === 1 : demo === "both" ? Math.floor(step / 3) % 2 === 1 : false;
+  const view = flip ? (board.view === "map" ? "list" : "map") : board.view;
+  const key = `${focus}|${view}`;
+  let byKey = demos.get(data);
+  if (!byKey) demos.set(data, (byKey = new Map()));
+  let shown = byKey.get(key);
+  if (!shown) byKey.set(key, (shown = { ...data, board: { ...board, focus, view } }));
+  return shown;
 }
 
 const cache = new Map<string, TvBoard>();

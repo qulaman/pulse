@@ -12,15 +12,18 @@ import { extForMime } from "@/lib/voice/recorder";
 
 import { parentsFirst } from "@/lib/mindboard/branch";
 import { insertBoard, upsertBoardCached } from "@/lib/mindboard/mutations";
+import { withoutBranch } from "@/lib/mindboard/offline";
 
-import { insertNote, upsertCached } from "./mutations";
+import { insertNote, refusedBranch, REFUSED_LATER, upsertCached } from "./mutations";
 import {
   claim,
   dropBoard,
   dropCreate,
+  editHeld,
   listBoards,
   listCreates,
   listEdits,
+  onReplayRequest,
   patchCreate,
   release,
   settleEdit,
@@ -134,55 +137,105 @@ export function useReplayHearing(): ReadonlySet<string> {
   );
 }
 
+/**
+ * One round: the boards, then the notes, oldest first (a sub-point right after its point),
+ * then the edits. The first dead network ends the round — the rest waits for the next one.
+ */
+async function sendRound(me: Me, queryClient: QueryClient): Promise<number> {
+  let sent = 0;
+  // boards first: a point cannot land on a board the server has not seen (D-102)
+  for (const board of await listBoards(me.userId)) {
+    try {
+      const row = await insertBoard(me, { id: board.id, title: board.title, client_request_id: board.crid });
+      upsertBoardCached(queryClient, me.userId, row);
+      await dropBoard(board.id);
+    } catch (error) {
+      if (isTransient(error)) return sent;
+      // refused for good: its points would be refused too, the board stays on the phone
+    }
+  }
+  // a sub-point goes after its point, whatever the clocks said (D-121)
+  const creates = parentsFirst(await listCreates(me.userId));
+  const behind = new Set<string>();
+  for (const entry of creates) {
+    // its point did not land in this round (sent by someone else right now, or refused):
+    // the server would refuse the sub-point too — it waits for the next round
+    if (entry.parentId && behind.has(entry.parentId)) {
+      behind.add(entry.id);
+      continue;
+    }
+    // the dictaphone or a create mutation is sending this one right now
+    if (!claim(entry.id)) {
+      behind.add(entry.id);
+      continue;
+    }
+    try {
+      const note = await deliverCreate(me, entry);
+      upsertCached(queryClient, me.userId, note);
+      sent += 1;
+      if (entry.audio && note.text.trim() === "") {
+        markHearing(note.id, true);
+        const words = await fetchWords(note, entry.audio.durationMs);
+        markHearing(note.id, false);
+        if (words) applyWords(queryClient, me.userId, note.id, words);
+      }
+    } catch (error) {
+      if (isTransient(error)) return sent;
+      // the server refused this one for good: it stays on the phone until «Удалить»
+      behind.add(entry.id);
+    } finally {
+      release(entry.id);
+    }
+  }
+  const supabase = createBrowserSupabase();
+  let refused = false;
+  for (const edit of await listEdits(me.userId)) {
+    // this tab's own mutation is writing these fields right now: it answers for them
+    if (editHeld(edit.id)) continue;
+    const { error } = await supabase.from("notes").update(edit.fields).eq("id", edit.id);
+    if (error && isNetworkError(error)) return sent;
+    if (error && refusedBranch(error)) {
+      // a move made without network met a board that changed meanwhile (D-121): the move is
+      // refused, the text and the tick owed with it still go
+      refused = true;
+      const rest = withoutBranch(edit.fields);
+      if (rest) {
+        const again = await supabase.from("notes").update(rest).eq("id", edit.id);
+        if (again.error && isNetworkError(again.error)) return sent;
+      }
+    }
+    // written, or refused for good (the note is gone): either way nothing is owed any more
+    await settleEdit(edit.id, edit.fields);
+  }
+  if (refused) {
+    // the screen drew the move at the tap: the board as the server has it, and a word why
+    void queryClient.invalidateQueries({ queryKey: noteKeys.mine(me.userId) });
+    toast(REFUSED_LATER);
+  }
+  return sent;
+}
+
 let running: Promise<number> | null = null;
+/** Somebody asked for a round while one was running: what they kept may be past its reading. */
+let again = false;
 
 /**
- * Send what the phone kept: the notes first, oldest first, then the edits. The first
- * dead network ends the round — the rest waits for the next one. One round per tab.
+ * Send what the phone kept (`sendRound`). One round per tab at a time; a call during a round
+ * gets that round's promise and one more round right after it — a sub-point kept a moment
+ * after the round read the phone must not wait for the next beat.
  */
 export function flushPendingNotes(me: Me, queryClient: QueryClient): Promise<number> {
-  running ??= (async () => {
+  if (running) {
+    again = true;
+    return running;
+  }
+  running = (async () => {
     let sent = 0;
     try {
-      // boards first: a point cannot land on a board the server has not seen (D-102)
-      for (const board of await listBoards(me.userId)) {
-        try {
-          const row = await insertBoard(me, { id: board.id, title: board.title, client_request_id: board.crid });
-          upsertBoardCached(queryClient, me.userId, row);
-          await dropBoard(board.id);
-        } catch (error) {
-          if (isTransient(error)) return sent;
-          // refused for good: its points would be refused too, the board stays on the phone
-        }
-      }
-      // a sub-point goes after its point, whatever the clocks said (D-121)
-      for (const entry of parentsFirst(await listCreates(me.userId))) {
-        // the dictaphone or a create mutation is sending this one right now
-        if (!claim(entry.id)) continue;
-        try {
-          const note = await deliverCreate(me, entry);
-          upsertCached(queryClient, me.userId, note);
-          sent += 1;
-          if (entry.audio && note.text.trim() === "") {
-            markHearing(note.id, true);
-            const words = await fetchWords(note, entry.audio.durationMs);
-            markHearing(note.id, false);
-            if (words) applyWords(queryClient, me.userId, note.id, words);
-          }
-        } catch (error) {
-          if (isTransient(error)) return sent;
-          // the server refused this one for good: it stays on the phone until «Удалить»
-        } finally {
-          release(entry.id);
-        }
-      }
-      const supabase = createBrowserSupabase();
-      for (const edit of await listEdits(me.userId)) {
-        const { error } = await supabase.from("notes").update(edit.fields).eq("id", edit.id);
-        if (error && isNetworkError(error)) return sent;
-        // written, or refused for good (the note is gone): either way nothing is owed any more
-        await settleEdit(edit.id, edit.fields);
-      }
+      do {
+        again = false;
+        sent += await sendRound(me, queryClient);
+      } while (again && onlineManager.isOnline());
       return sent;
     } finally {
       running = null;
@@ -223,9 +276,12 @@ export function useNotesReplay(me: Me | undefined) {
     };
     document.addEventListener("visibilitychange", onVisible);
     const beat = setInterval(() => void round(), RETRY_MS);
+    // a sub-point waits for its point with the network up (D-121): both go now
+    const offAsk = onReplayRequest(() => void round());
     return () => {
       alive = false;
       offOnline();
+      offAsk();
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(beat);
     };

@@ -85,8 +85,8 @@ describe("isFresh", () => {
 describe("tagOf и boardCountLine", () => {
   it("пишет нейтрально: кому поручено и сдано ли", () => {
     expect(tagOf(item(1))).toBeNull();
-    expect(tagOf(item(1, { assignee: "Марат" }))).toBe("→ Марат");
-    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→ Марат · сдано");
+    expect(tagOf(item(1, { assignee: "Марат" }))).toBe("→\u00a0Марат");
+    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · сдано");
   });
 
   it("считает пункты и отмеченные", () => {
