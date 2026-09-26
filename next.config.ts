@@ -32,6 +32,12 @@ const nextConfig: NextConfig = {
     PULSE_BUILD_SHA: sha.slice(0, 7),
     PULSE_BUILD_AT: git("log -1 --format=%cI"),
   },
+  experimental: {
+    // a tab visited in the last 30 s opens from the router cache, not from the server (D-126):
+    // the screens are client pages fed by TanStack Query and Realtime, the server part is the
+    // shell and the session — nothing there goes stale in half a minute
+    staleTimes: { dynamic: 30 },
+  },
 };
 
 export default nextConfig;

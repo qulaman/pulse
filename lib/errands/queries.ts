@@ -153,8 +153,9 @@ export function ballTone(rows: readonly Errand[] | undefined): string {
 
 /**
  * Квитанция заявки (принцип 8, D-32): строка outbox, которую триггер поставил в
- * очередь секретарю. Фильтр по jsonb — только в запросе; сокет слушает таблицу целиком
- * (одна тема на приложение, фильтра по meta у Realtime нет).
+ * очередь секретарю. Фильтр по jsonb — только в запросе (фильтра по meta у Realtime нет);
+ * сокет слушает только строки заявок, а не каждую доставку компании (D-126), и он один
+ * на все открытые квитанции.
  */
 export function useErrandReceipt(errandId: string | null, enabled = true) {
   return useRealtimeQuery<DeliveryRow | null, DeliveryRow>({
@@ -171,7 +172,7 @@ export function useErrandReceipt(errandId: string | null, enabled = true) {
       if (error) throw new Error(error.message);
       return (data?.[0] ?? null) as DeliveryRow | null;
     },
-    channel: { table: "notification_deliveries" },
+    channel: { table: "notification_deliveries", filter: "event_kind=eq.errand_sent" },
     enabled: enabled && Boolean(errandId),
   });
 }

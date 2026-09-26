@@ -70,7 +70,7 @@ export function CrewCard({
         <ul className="mt-1.5 flex flex-col">
           {shown.map((task) => (
             <li key={task.id}>
-              <Link href={task.href} className="flex items-start gap-2.5 rounded-[14px] px-1 py-2 active:bg-surface-2" data-testid="crew-task">
+              <Link href={task.href} prefetch={false} className="flex items-start gap-2.5 rounded-[14px] px-1 py-2 active:bg-surface-2" data-testid="crew-task">
                 <span className="pt-px">
                   <StatusGlyph status={task.status} overdue={isLate(task)} size={20} />
                 </span>

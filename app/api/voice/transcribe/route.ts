@@ -65,7 +65,12 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       client_request_id: body.client_request_id,
     };
 
-    const file = await supabase.storage.from("voice").download(body.audio_path);
+    // three independent reads side by side — the director is waiting on this route (D-126)
+    const [file, roster, rawSettings] = await Promise.all([
+      supabase.storage.from("voice").download(body.audio_path),
+      loadRoster(profile.companyId),
+      loadCompanySettings(profile.companyId),
+    ]);
     if (file.error || !file.data) {
       console.error("voice download failed:", file.error?.message);
       return apiError(502, "stt_failed", "Не расслышал, попробуй ещё раз", {
@@ -77,8 +82,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const ext = body.audio_path.split(".").pop()?.toLowerCase() ?? "";
     const mime = MIME_BY_EXT[ext] ?? "audio/webm";
 
-    const roster = await loadRoster(profile.companyId);
-    const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
+    const settings = parseCompanySettings(rawSettings);
     // Only a large roster needs the task history to decide whom the prompt names (D-55).
     const counts = roster.length > HINT_MAX_PEOPLE ? await loadAssigneeCounts(profile.companyId) : undefined;
     const vocabularyHints = vocabularyHintsFor(roster, settings, counts);
