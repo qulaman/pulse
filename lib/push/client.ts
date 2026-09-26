@@ -1,6 +1,7 @@
 "use client";
 
 import { getPublicEnv } from "@/lib/env.public";
+import { registerServiceWorker } from "@/lib/offline/worker";
 import { base64UrlToBytes, madeWithKey } from "@/lib/push/keys";
 
 export type PushState = "unsupported" | "no_keys" | "denied" | "granted" | "default";
@@ -27,11 +28,7 @@ export function pushPlatform(): PushPlatform {
 /** Register the worker (idempotent) so a push arrives even before the person ever tapped «Включить». */
 export async function registerWorker(): Promise<ServiceWorkerRegistration | null> {
   if (pushState() === "unsupported") return null;
-  try {
-    return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
-  } catch {
-    return null;
-  }
+  return registerServiceWorker();
 }
 
 /** `fresh`: made just now — the server has never heard of it. */
