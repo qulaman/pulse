@@ -1786,7 +1786,22 @@ export type Database = {
           spent: number | null
           user_id: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "point_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -1814,6 +1829,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      answer_deadline_request: {
+        Args: { approve: boolean; client_request_id?: string; task_id: string }
+        Returns: Json
       }
       answer_visit: {
         Args: { p_answer: string; p_id: string }
@@ -1923,6 +1942,7 @@ export type Database = {
         Args: { client_request_id?: string; p_item_id: string }
         Returns: Json
       }
+      deadline_reminders_due: { Args: { p_now?: string }; Returns: number }
       delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
       delivery_category: {
@@ -1981,11 +2001,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      answer_deadline_request: {
-        Args: { approve: boolean; client_request_id?: string; task_id: string }
-        Returns: Json
-      }
-      deadline_reminders_due: { Args: { p_now?: string }; Returns: number }
       errand_answer: {
         Args: { client_request_id?: string; p_answer: string; p_id: string }
         Returns: Json
