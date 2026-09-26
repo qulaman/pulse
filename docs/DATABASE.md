@@ -371,6 +371,8 @@ next_delivery_slot(p_company uuid, p_now timestamptz default now()) returns time
 
 -- доставка (D-114); тики — только service_role, из минутного свипа
 publish_due_scheduled(p_now timestamptz default now()) returns int   -- scheduled → sent, tasks/017
+send_task_now(task_id uuid, client_request_id uuid default null) returns jsonb   -- D-129: отложенное задачи — сейчас
+send_announcements_now(announcement_ids uuid[], client_request_id uuid default null) returns jsonb   -- D-129
 deadline_reminders_due(p_now timestamptz default now()) returns int  -- «Скоро срок» исполнителю за час (D-128)
 claim_deliveries(p_limit int default 50) returns setof notification_deliveries   -- воркер берёт строки
 push_when(p_at timestamptz, p_now timestamptz default now()) returns text   -- «сегодня 18:00» словами карточки — тексты пушей (D-125)
