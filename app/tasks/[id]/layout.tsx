@@ -23,7 +23,7 @@ export default async function TaskThreadLayout({ children }: { children: React.R
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <RoleScope role={tabBarRole(profile.role)}>{children}</RoleScope>
+      <RoleScope role={tabBarRole(profile.role)} me={profile}>{children}</RoleScope>
       <TabBar role={tabBarRole(profile.role)} />
     </div>
   );

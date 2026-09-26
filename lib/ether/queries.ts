@@ -3,11 +3,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
-import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
+import { peopleKeys, type Person } from "@/lib/people/queries";
+import { useRealtimeListener, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
 type AnnouncementRow = Database["public"]["Tables"]["announcements"]["Row"];
+type AckRow = Database["public"]["Tables"]["announcement_acks"]["Row"];
 
 export type Announcement = AnnouncementRow & {
   author: { full_name: string } | null;
@@ -37,8 +39,37 @@ export function useEther() {
     queryFn: fetchFeed,
     channel: { table: "announcements" },
   });
-  // an ack is a row of another table — invalidate the feed when one lands
-  useRealtimeInvalidate({ table: "announcement_acks" }, etherKeys.feed);
+  // An ack is a row of another table. It is written into the feed from the event itself: a
+  // refetch per ack was the whole feed with every ack and name, on every open phone, times
+  // the people acknowledging (D-126). The name comes from the people list when it is loaded.
+  const queryClient = useQueryClient();
+  useRealtimeListener<AckRow>(
+    { table: "announcement_acks", event: "INSERT" },
+    (payload) => {
+      const ack = payload.new as Partial<AckRow>;
+      if (!ack.announcement_id || !ack.user_id) return;
+      const person = queryClient.getQueryData<Person[]>(peopleKeys.all)?.find((p) => p.id === ack.user_id);
+      queryClient.setQueryData<Announcement[]>(etherKeys.feed, (feed) =>
+        feed?.map((a) =>
+          a.id === ack.announcement_id && !a.acks.some((known) => known.user_id === ack.user_id)
+            ? {
+                ...a,
+                acks: [
+                  ...a.acks,
+                  {
+                    user_id: ack.user_id as string,
+                    created_at: ack.created_at ?? new Date().toISOString(),
+                    user: person ? { full_name: person.full_name } : null,
+                  },
+                ],
+              }
+            : a,
+        ),
+      );
+    },
+    () => void queryClient.invalidateQueries({ queryKey: etherKeys.feed }, { cancelRefetch: false }),
+    "ether-acks",
+  );
   return query;
 }
 

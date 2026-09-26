@@ -1,6 +1,7 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { cache } from "react";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 import { getPublicEnv } from "@/lib/env.public";
 import { homeForRole, type Role } from "@/lib/routes";
@@ -71,20 +72,31 @@ function createTokenSupabase(token: string) {
  */
 export async function getSessionProfile(req?: Request): Promise<SessionProfile> {
   const token = req ? bearerToken(req) : undefined;
-  const supabase = token ? createTokenSupabase(token) : await createServerSupabase();
+  return token ? loadProfile(createTokenSupabase(token), token) : cookieProfile();
+}
 
-  const { data: userData, error: userError } = token
-    ? await supabase.auth.getUser(token)
-    : await supabase.auth.getUser();
+/**
+ * The cookie session once per server render: a layout and its page render side by side and
+ * both ask (D-126). React's cache lives for one request only, so nobody else's session is ever
+ * reused; a route handler calls it once anyway.
+ */
+const cookieProfile = cache(async (): Promise<SessionProfile> => loadProfile(await createServerSupabase()));
 
-  if (userError || !userData.user) {
+async function loadProfile(supabase: SupabaseClient<Database>, token?: string): Promise<SessionProfile> {
+  // getClaims verifies the JWT signature on this server once the project signs with an asymmetric
+  // key (the JWKS is cached per instance) — no Auth round trip per render. Under the legacy
+  // symmetric secret it asks the Auth server itself, exactly as getUser did (D-126).
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+  const userId = claimsData?.claims.sub;
+
+  if (claimsError || !userId) {
     throw new AuthError(401, "unauthorized");
   }
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("id, company_id, role, is_active, full_name")
-    .eq("id", userData.user.id)
+    .eq("id", userId)
     .maybeSingle();
 
   if (profileError || !profile) {

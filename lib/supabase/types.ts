@@ -2098,6 +2098,14 @@ export type Database = {
         Args: { p_few: string; p_many: string; p_n: number; p_one: string }
         Returns: string
       }
+      send_announcements_now: {
+        Args: { announcement_ids: string[]; client_request_id?: string }
+        Returns: Json
+      }
+      send_task_now: {
+        Args: { client_request_id?: string; task_id: string }
+        Returns: Json
+      }
       set_event_participants: {
         Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
         Returns: undefined
