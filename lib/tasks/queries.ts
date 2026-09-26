@@ -121,10 +121,42 @@ async function fetchMyTasks(userId: string): Promise<TaskWithPeople[]> {
 }
 
 /**
+ * A deleted task leaves every cached list at once, the way «Удалить» on the author's own phone
+ * does it. Realtime delivers no DELETE to a filtered channel, and the employee's lists listen on
+ * `assignee_id=eq.<me>` — so an order deleted on the director's phone used to stay in Лента and
+ * «Мои дела» until the next snapshot (a return to the tab), and the face never played its
+ * «рассыпалась» (tasks/020). This channel has no filter and takes DELETE only: the event carries
+ * the id and nothing else, RLS has no row to check, and an id that is in no list changes nothing.
+ * Every hook that mounts it shares one socket join (the registry keys the topic).
+ */
+function useTaskDeletes(enabled: boolean) {
+  const queryClient = useQueryClient();
+  useRealtimeListener<TaskRow>(
+    { table: "tasks", event: "DELETE" },
+    (payload) => {
+      const id = (payload.old as Partial<TaskRow> | undefined)?.id;
+      if (!id) return;
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
+        Array.isArray(old) && old.some((row) => (row as { id?: string } | null)?.id === id)
+          ? old.filter((row) => (row as { id?: string } | null)?.id !== id)
+          : old,
+      );
+    },
+    // nothing to catch up on: a delete missed while the socket was down is dropped by the
+    // snapshot every list takes on resubscribe
+    () => {},
+    "task-deletes",
+    enabled,
+  );
+}
+
+/**
  * The employee's own tasks. The Realtime filter narrows the socket to this user;
- * RLS narrows it again on the server, so the two never disagree.
+ * RLS narrows it again on the server, so the two never disagree. Deletes come on their own
+ * unfiltered channel (`useTaskDeletes`).
  */
 export function useMyTasks(userId: string | undefined) {
+  useTaskDeletes(Boolean(userId));
   return useRealtimeQuery<TaskWithPeople[], TaskRow>({
     queryKey: taskKeys.mine(userId ?? ""),
     queryFn: () => fetchMyTasks(userId as string),
@@ -380,6 +412,9 @@ export function usePulseBoard(me: Me | undefined, enabled = true) {
   // subordinates' tasks — a secretary's task then played on the manager's mascot as theirs.
   const assigneeId = me && me.role !== "director" ? meId : undefined;
   const live = enabled && Boolean(me);
+  // the filtered socket of Лента never hears a DELETE: deletes come on their own channel; the
+  // director's socket has no filter and takes them below
+  useTaskDeletes(live && Boolean(assigneeId));
 
   const query = useRealtimeQuery<BoardTask[], TaskRow>({
     queryKey,

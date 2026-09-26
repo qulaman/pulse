@@ -1,6 +1,21 @@
 import { describe, expect, it } from "vitest";
 
-import { pushBlocker } from "./words";
+import { pushBlocker, pushEnabledToast } from "./words";
+
+describe("pushEnabledToast (D-125)", () => {
+  it("tells an Android phone where Chrome's battery saver is, and stays long enough to read", () => {
+    const toast = pushEnabledToast({ platform: "android", standalone: true });
+    expect(toast.text).toMatch(/^Уведомления включены\. .*Chrome → «Батарея» → «Без ограничений»/);
+    expect(toast.lifetimeMs).toBeGreaterThan(5000);
+  });
+
+  it("says just that it is on everywhere else", () => {
+    expect(pushEnabledToast({ platform: "ios", standalone: true })).toEqual({ text: "Уведомления включены" });
+    expect(pushEnabledToast({ platform: "other", standalone: false }, "Включены на этом устройстве")).toEqual({
+      text: "Включены на этом устройстве",
+    });
+  });
+});
 
 describe("pushBlocker", () => {
   it("sends an iPhone in Safari to the home screen first", () => {

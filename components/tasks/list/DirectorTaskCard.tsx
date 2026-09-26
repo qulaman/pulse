@@ -138,7 +138,7 @@ export function DirectorKeys({
         data-testid={`task-action-${key}`}
         variant={primary ? "primary" : danger ? "ghost" : "secondary"}
         className={`!px-2 whitespace-nowrap !text-[14px] ${danger ? "!text-danger/85" : ""}`}
-        icon={cols < 3 && ICON[key] ? <Icon name={ICON[key] as IconName} size={16} /> : undefined}
+        icon={cols < 3 && (cols === 1 || label.length <= 12) && ICON[key] ? <Icon name={ICON[key] as IconName} size={16} /> : undefined}
         onClick={() => onPress(key)}
       >
         {label}

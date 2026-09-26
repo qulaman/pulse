@@ -89,7 +89,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
           .eq("event_kind", "task_sent")
           .is("acted_at", null);
       }
-      kickDeliveries();
+      // awaited: the platform keeps the function alive only for work it is handed (D-125)
+      await kickDeliveries();
     });
     return apiOk({ result, duplicate });
   },

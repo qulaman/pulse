@@ -3,59 +3,14 @@
 import Link from "next/link";
 
 import { PeopleGridBone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { LOAD_COLOR, loadColor, useTeamLoads } from "@/lib/people/loads";
 import { initialsOf, usePeople } from "@/lib/people/queries";
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
-import { createBrowserSupabase } from "@/lib/supabase/client";
-
-type Load = { active: number; overdue: number; nearest: string | null };
-type LoadColor = "gray" | "green" | "yellow" | "red";
-
-const COLOR: Record<LoadColor, string> = {
-  gray: "var(--text-muted)",
-  green: "var(--ok)",
-  yellow: "var(--warn)",
-  red: "var(--danger)",
-};
-
-/** docs/DATABASE.md v_employee_load rules, computed on the client until the view lands. */
-function colorOf(load: Load | undefined, available: boolean): LoadColor {
-  if (!available || !load || load.active === 0) return "gray";
-  if (load.overdue > 0) return "red";
-  if (load.nearest && new Date(load.nearest).getTime() < Date.now() + 24 * 3_600_000) return "yellow";
-  return "green";
-}
-
-function useLoads() {
-  return useRealtimeQuery<Record<string, Load>>({
-    queryKey: ["tasks", "loads"],
-    queryFn: async () => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("assignee_id, deadline, status")
-        .in("status", ["sent", "accepted", "in_progress", "rework", "pending_review"]);
-      if (error) throw new Error(error.message);
-      const now = Date.now();
-      const loads: Record<string, Load> = {};
-      for (const task of data ?? []) {
-        const load = (loads[task.assignee_id] ??= { active: 0, overdue: 0, nearest: null });
-        load.active += 1;
-        const openForOverdue = task.status !== "pending_review";
-        if (task.deadline) {
-          if (openForOverdue && new Date(task.deadline).getTime() < now) load.overdue += 1;
-          if (!load.nearest || task.deadline < load.nearest) load.nearest = task.deadline;
-        }
-      }
-      return loads;
-    },
-    channel: { table: "tasks" },
-  });
-}
 
 /** «Команда»: the team at a glance — one dot per person, tap opens the card. */
 export function PeopleGrid({ title = "Люди" }: { title?: string }) {
   const people = usePeople();
-  const loads = useLoads();
+  // the same cache and socket as the list above it on «Команда» (D-126: it was a second copy)
+  const loads = useTeamLoads();
 
   const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "tv" && p.role !== "director");
   // where the grid will stand, under its own title; its length is the team's (`grow`, D-122)
@@ -80,12 +35,13 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
       <ul className="mt-3 grid grid-cols-4 gap-2">
         {team.map((person) => {
           const load = loads.data?.[person.id];
-          const color = colorOf(load, person.availability === "active");
+          const color = loadColor(load, person.availability === "active");
           const first = person.full_name.split(/\s+/)[0] ?? person.full_name;
           return (
             <li key={person.id} className="card-in">
               <Link
                 href={`/people/${person.id}`}
+                prefetch={false}
                 className="flex flex-col items-center card px-1 py-3 text-center transition-transform duration-[120ms] active:scale-[0.97]"
               >
                 <span className="relative">
@@ -98,7 +54,7 @@ export function PeopleGrid({ title = "Люди" }: { title?: string }) {
                   <span
                     aria-hidden
                     className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-surface"
-                    style={{ background: COLOR[color] }}
+                    style={{ background: LOAD_COLOR[color] }}
                   />
                   {load && load.active > 0 ? (
                     <span className="nums absolute -top-1 -left-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-surface-2 px-1 text-[11px] font-semibold">

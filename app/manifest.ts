@@ -7,6 +7,10 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "Pulse",
     description: "Голосовое управление компанией",
     lang: "ru",
+    // the app's identity (D-125): equal to the old implicit one (start_url), so an installed
+    // copy stays the same app; the scope keeps every route inside its window
+    id: "/",
+    scope: "/",
     start_url: "/",
     display: "standalone",
     orientation: "portrait",

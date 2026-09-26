@@ -212,7 +212,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
                     Ответить ›
                   </button>
                 ) : (
-                  <Link href={`/tasks/${task.id}`} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
+                  <Link href={`/tasks/${task.id}`} prefetch={false} className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text">
                     Ответить ›
                   </Link>
                 )}

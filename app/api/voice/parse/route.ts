@@ -58,15 +58,22 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       transcript: body.transcript,
     };
 
-    // Idempotency (AI.md §10): a double FAB tap must not buy tokens twice.
-    const previous = await supabase
-      .from("ai_logs")
-      .select("parsed_entities, model")
-      .eq("company_id", profile.companyId)
-      .eq("client_request_id", body.client_request_id)
-      .eq("kind", "parse")
-      .eq("status", "ok")
-      .maybeSingle();
+    // Idempotency (AI.md §10): a double FAB tap must not buy tokens twice. What the parse needs
+    // is read alongside that check — a retry wastes three cheap reads, a first try saves the
+    // director three round trips (D-126).
+    const [previous, roster, rawSettings, secretaryOnDuty] = await Promise.all([
+      supabase
+        .from("ai_logs")
+        .select("parsed_entities, model")
+        .eq("company_id", profile.companyId)
+        .eq("client_request_id", body.client_request_id)
+        .eq("kind", "parse")
+        .eq("status", "ok")
+        .maybeSingle(),
+      loadRoster(profile.companyId),
+      loadCompanySettings(profile.companyId),
+      hasActiveSecretary(profile.companyId),
+    ]);
 
     if (previous.data?.parsed_entities) {
       return apiOk({
@@ -77,17 +84,11 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       });
     }
 
-    const roster = await loadRoster(profile.companyId);
-    const settings = parseCompanySettings(await loadCompanySettings(profile.companyId));
+    const settings = parseCompanySettings(rawSettings);
 
     // «Кофе» до модели (D-79): короткая фраза без имени из ростера, совпавшая с кнопкой
     // каталога, — это заявка, а не поручение. Ни токена, ни экрана подтверждения.
-    const errand = matchErrand(
-      body.transcript,
-      settings.secretary.actions,
-      roster,
-      await hasActiveSecretary(profile.companyId),
-    );
+    const errand = matchErrand(body.transcript, settings.secretary.actions, roster, secretaryOnDuty);
     if (errand) {
       return apiOk({ entities: [], errand, model: "matcher", escalated: false, latency_ms: 0 });
     }

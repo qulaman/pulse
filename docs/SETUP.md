@@ -63,7 +63,7 @@
 4. **Демо-состояние:** `pnpm db:clean` — стирает задачи/сообщения/очки/логи/черновики и smoke-логины dev-проекта, людей и настройки оставляет (для показа); `pnpm db:reset` возвращает полный seed для pgTAP. **Seed:** прогнать `supabase/seed.sql` в dev (демо-компания, «два Ерлана», задачи во всех статусах — контракт сида в DATABASE.md). **В prod seed не катится никогда** — прод наполняется анкетой клиента (§5).
 5. **VAPID:** `npx web-push generate-vapid-keys` — дважды (dev-пара и prod-пара). Разложить по скоупам Vercel.
 6. **Vercel:** `vercel link` → env-переменные из таблицы §2 по скоупам (Preview → dev-значения, Production → prod-значения) → `git push` ветки = preview-деплой на dev-данных → merge в `main` = production.
-7. **Минутный тик:** `vercel.json` объявляет один cron — `/api/push/sweep` каждую минуту (**сейчас — раз в сутки**, `0 3 * * *` = 08:00 Asia/Aqtobe: проект `pulse` в Vercel на Hobby, домен `pulse-blond-one.vercel.app`, Production и Preview смотрят в dev-Supabase — WORKLOG 2026-09-25; на Pro вернуть `* * * * *`); он же гонит `events_due_reminders` и `errands_due_escalation` (BACKEND.md). Задать `CRON_SECRET` в env Vercel — роут сверяет `Authorization: Bearer <CRON_SECRET>`. Роут принимает и `GET` (так зовёт cron Vercel), и `POST`; тот же тик выпускает отложенные задачи и считает сигналы директора (D-114). Cron раз в минуту — тариф Vercel Pro (на Hobby — раз в сутки). Локально cron нет: рядом с `pnpm dev` запускать `pnpm dev:tick`. **Порядок выкатки D-114: миграции — до кода**: воркер без `claim_deliveries` не отправит ни одного пуша.
+7. **Минутный тик:** `vercel.json` объявляет один cron — `/api/push/sweep` каждую минуту (**сейчас — раз в сутки**, `0 3 * * *` = 08:00 Asia/Aqtobe: проект `pulse` в Vercel на Hobby, домен `pulse-blond-one.vercel.app`, Production и Preview смотрят в dev-Supabase — WORKLOG 2026-09-25; на Pro вернуть `* * * * *`); он же гонит `events_due_reminders` и `errands_due_escalation` (BACKEND.md). Задать `CRON_SECRET` в env Vercel — роут сверяет `Authorization: Bearer <CRON_SECRET>`. Роут принимает и `GET` (так зовёт cron Vercel), и `POST`; тот же тик выпускает отложенные задачи и считает сигналы директора (D-114). Cron раз в минуту — тариф Vercel Pro (на Hobby — раз в сутки); минутный тик без Pro — В-8 (D-125). Локально cron нет: рядом с `pnpm dev` запускать `pnpm dev:tick`. **Порядок выкатки D-114: миграции — до кода**: воркер без `claim_deliveries` не отправит ни одного пуша.
 8. **Telegram-боты, вебхук, секреты Edge Functions** — `[не построено]` (D-21, G.20c): `supabase/functions` нет. План: у @BotFather **два** бота — `pulse_dev_bot` и рабочий (имя по D-20), один бот на две среды запрещён (вебхук у бота один, dev-эксперименты будут воровать апдейты у прода); после деплоя функции `tg-webhook` — `setWebhook` на её URL с `secret_token=$TELEGRAM_WEBHOOK_SECRET`; `supabase secrets set` в обоих проектах: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `INTERNAL_FN_SECRET`.
 9. **Смоук-чек-лист после первого деплоя** (на реальном телефоне, не эмуляторе):
     - [ ] логин сид-пользователем (director), Пульс открывается;
@@ -89,12 +89,14 @@
   провижининг добавит: region, domain
 Шаги (идемпотентно, с чекпоинтами — повторный запуск продолжает):
   1. supabase projects create pulse-<slug> --region <region>   # юрисдикция клиента — аргумент продажи
+     + асимметричный ключ подписи JWT (Authentication → JWT Keys, ECC): getClaims проверяет сессию без похода в Auth (D-126)
   2. supabase migration up --db-url <new-project>              # ВСЕ миграции с нуля
   3. [есть] seed компании — `pnpm seed:client <анкета.json>` (цель — проект из .env.local;
      `--dry-run` показывает план, `--undo` откатывает ровно анкету; идемпотентен; алиасы подсказываются по D-54;
      пароли без значения в анкете генерируются и печатаются один раз): insert company (settings из анкеты), профили из employees[],
      служебный tv-пользователь; демо-данные НЕ сеются
-  4. vercel project create pulse-<slug> + домен/поддомен клиента
+  4. vercel project create pulse-<slug> + домен/поддомен клиента; регион функций = регион базы клиента
+     (`vercel.json` "regions", dev — fra1): иначе каждый запрос к базе идёт через океан (D-126)
   5. env: генерация VAPID-пары и CRON_SECRET (плюс TELEGRAM_WEBHOOK_SECRET, INTERNAL_FN_SECRET — когда появятся Telegram и Edge Functions);
      прокладка всех переменных §2 (Vercel env + supabase secrets)
   6. Telegram-бот клиента у BotFather (ручной шаг — API нет; скрипт ждёт токен),

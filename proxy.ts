@@ -49,15 +49,17 @@ export async function proxy(request: NextRequest) {
     },
   );
 
-  // Do not run code between createServerClient and getUser: it would break
+  // Do not run code between createServerClient and getClaims: it would break
   // session refresh and log users out at random (@supabase/ssr contract).
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims refreshes an expiring session like getUser did, then verifies the JWT here once
+  // the project signs with an asymmetric key — every navigation and every tab-bar prefetch used
+  // to pay an Auth round trip for it (D-126).
+  const { data } = await supabase.auth.getClaims();
+  const userId = data?.claims.sub;
 
   const { pathname } = request.nextUrl;
 
-  if (!user) {
+  if (!userId) {
     if (isPublicPath(pathname)) return response;
     return redirectTo(request, response, "/login");
   }
@@ -66,7 +68,7 @@ export async function proxy(request: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
-      .eq("id", user.id)
+      .eq("id", userId)
       .maybeSingle();
     // An auth user without a profile (not onboarded yet) stays on /login instead of
     // bouncing between /login -> home -> layout guard -> /login forever.
