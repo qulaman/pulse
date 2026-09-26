@@ -20,6 +20,15 @@ export function LabScreen({ tab }: { tab: LabTab }) {
         panels={{
           models: (
             <>
+              <Link href="/lab/about" className="card mb-3 flex min-h-[44px] items-center justify-between gap-3 p-4">
+                <span>
+                  <span className="block text-[16px] font-semibold leading-[22px]">Как работает Pulse</span>
+                  <span className="block text-[13px] leading-4 text-muted">Продукт за пять минут: как устроен, в чём секрет, что даёт</span>
+                </span>
+                <span aria-hidden className="text-[18px] text-muted">
+                  ›
+                </span>
+              </Link>
               <Link href="/lab/mascot" className="card flex min-h-[44px] items-center justify-between gap-3 p-4">
                 <span>
                   <span className="block text-[16px] font-semibold leading-[22px]">Анимации маскота</span>

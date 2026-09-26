@@ -2073,6 +2073,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      push_when: { Args: { p_at: string; p_now?: string }; Returns: string }
       reassign_task: {
         Args: {
           client_request_id?: string
@@ -2105,6 +2106,14 @@ export type Database = {
       ru_plural: {
         Args: { p_few: string; p_many: string; p_n: number; p_one: string }
         Returns: string
+      }
+      send_announcements_now: {
+        Args: { announcement_ids: string[]; client_request_id?: string }
+        Returns: Json
+      }
+      send_task_now: {
+        Args: { client_request_id?: string; task_id: string }
+        Returns: Json
       }
       set_event_participants: {
         Args: { p_add?: string[]; p_event: string; p_remove?: string[] }
@@ -2159,6 +2168,7 @@ export type Database = {
           board_until: string | null
           board_view: string
           calendar_view: string
+          carousel: boolean
           clock_style: string
           company_id: string
           employee_id: string | null
@@ -2166,6 +2176,7 @@ export type Database = {
           guest: boolean
           guest_until: string | null
           mode: string
+          rating_view: string
           reload_requested_at: string | null
           scene: string
           seen_at: string | null
@@ -2254,7 +2265,10 @@ export type Database = {
       }
       tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
       tv_overlay: { Args: never; Returns: Json }
-      tv_rating: { Args: { p_guest?: boolean; p_period?: string }; Returns: Json }
+      tv_rating: {
+        Args: { p_guest?: boolean; p_period?: string }
+        Returns: Json
+      }
       tv_summary: { Args: { p_guest?: boolean }; Returns: Json }
       tv_task_story: { Args: { p_task: string }; Returns: Json }
       tv_touch: {

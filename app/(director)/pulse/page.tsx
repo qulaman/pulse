@@ -26,6 +26,7 @@ import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { Button } from "@/components/ui/Button";
+import { useComposeStore } from "@/lib/store/compose";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
@@ -139,6 +140,11 @@ export default function PulsePage() {
   const entities = useIngestStore((state) => state.entities);
   const question = useIngestStore((state) => state.question);
   const requestId = useIngestStore((state) => state.clientRequestId);
+  const heard = useIngestStore((state) => state.transcript);
+  // Nothing parsed out of a real phrase — the parser found nothing, or would not take it: the
+  // state /confirm draws as «Не разобрал». On Пульс it used to be silent (no cards, so nothing
+  // «in hand») and the face just fell asleep while the words sat in a draft
+  const unparsed = stage === "confirm" && entities.length === 0 && heard.trim() !== "";
   const resetIngest = useIngestStore((state) => state.reset);
   const startManual = useIngestStore((state) => state.startManual);
   const startVoice = useIngestStore((state) => state.startVoice);
@@ -440,7 +446,12 @@ export default function PulsePage() {
   const mascot: MascotState =
     // the cup brought over outranks the news of it: the face takes it, the thought says it
     confirmFace ??
-    (handoff ? "serving" : (oopsFace ?? (thought ? thoughtFace : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake))));
+    (handoff
+      ? "serving"
+      : (oopsFace ??
+        // «не разобрал» waits for the director: the face stays awake and puzzled until the words
+        // are fixed, made a task or closed
+        (unparsed ? "thinking" : thought ? thoughtFace : mode === "idle" ? (asking ? "serving" : attending || reading ? "calm" : restFace) : (panelFace ?? awake))));
   // where the face looks: the middle of the picked circle, the person whose card is open, or the small face at the desk
   const gaze = attending && picked ? lookAt(picked.x, picked.y) : reading && looking ? lookAt(looking.x, looking.y) : asking || handoff ? lookAt(DESK_AT.x + DESK_FACE.x, DESK_AT.y + DESK_FACE.y) : null;
   // the small things a face at rest does on its own — asleep, waiting on the ring, or
@@ -472,6 +483,14 @@ export default function PulsePage() {
     },
     [],
   );
+  // «не разобрал» plays the moment the parse comes back empty — the hand to the crown — once per
+  // phrase: corrected words are a new request, and a second miss scratches again
+  const playedUnparsed = useRef<string | null>(null);
+  useEffect(() => {
+    if (!unparsed || !requestId || playedUnparsed.current === requestId) return;
+    playedUnparsed.current = requestId;
+    playAct("scratch");
+  }, [unparsed, requestId, playAct]);
 
   const onFaceTap = () => {
     // the errand card is out: a tap on the face puts it away, it does not wake the balls
@@ -595,8 +614,24 @@ export default function PulsePage() {
         {/* above the head: what the assistant says */}
         <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
           <div className="mt-auto pb-3 pt-2">
-            <Assistant said={exchange?.said ?? null} lines={phraseInHand ? confirmLines : loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines}>
-              {exchange ? <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} /> : null}
+            <Assistant
+              // «не разобрал»: what was heard, in the director's bubble, and the assistant's answer under it
+              said={exchange?.said ?? (unparsed ? heard : null)}
+              lines={
+                phraseInHand
+                  ? confirmLines
+                  : unparsed
+                    ? [{ id: `unparsed:${requestId ?? ""}`, text: "Не разобрал: не нашёл здесь ни задачи, ни объявления.", tone: "warn" }]
+                    : loading && mode !== "idle" && lines.length === 0
+                      ? [{ id: "loading", text: "Смотрю, что нового…" }]
+                      : lines
+              }
+            >
+              {exchange ? (
+                <ExchangeButtons exchange={exchange} onManual={startManual} onClose={closeExchange} />
+              ) : unparsed ? (
+                <UnparsedButtons onFix={() => useComposeStore.getState().request(heard)} onManual={startManual} onClose={resetIngest} />
+              ) : null}
             </Assistant>
           </div>
         </div>
@@ -859,6 +894,26 @@ export default function PulsePage() {
         isDirector
       />
     </main>
+  );
+}
+
+/**
+ * The ways out of «не разобрал», right under the words (the same three as /confirm): fix the
+ * words in the typed input and parse again, make them a task by hand, or drop them.
+ */
+function UnparsedButtons({ onFix, onManual, onClose }: { onFix: () => void; onManual: () => void; onClose: () => void }) {
+  return (
+    <div className="card-in flex flex-wrap justify-center gap-2 pt-1" data-testid="unparsed-actions">
+      <Button className="!min-h-[40px] !px-4 !text-[14px]" onClick={onFix}>
+        Исправить текст
+      </Button>
+      <Button variant="secondary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={onManual}>
+        Сделать задачей
+      </Button>
+      <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={onClose}>
+        Закрыть
+      </Button>
+    </div>
   );
 }
 

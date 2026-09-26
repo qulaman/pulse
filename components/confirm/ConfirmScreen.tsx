@@ -40,7 +40,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   if (entities.length === 0 && transcript.trim() && stage !== "parsing") {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
-        <PageHead title="Не разобрал" actions={<Mascot state="thinking" size={40} />} />
+        <PageHead title="Не разобрал" actions={<Mascot state="thinking" act="scratch" size={40} />} />
         <p className="mt-4 text-[13px] leading-4 text-muted">Услышал так:</p>
         <p className="mt-1 rounded-[12px] bg-surface-2 px-3 py-2 text-[16px] leading-[22px]">«{transcript}»</p>
         <p className="mt-4 text-[16px] leading-[22px] text-muted">
