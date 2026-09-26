@@ -12,6 +12,10 @@ type Props = {
   onClose: () => void;
   currentIso: string | null;
   onPick: (iso: string | null) => void;
+  /** «Срок для Ерлана» when a reassign asks for one (D-128); «Срок» otherwise */
+  title?: string;
+  /** a line above the presets: why the sheet asks */
+  hint?: string | null;
 };
 
 /** Presets from docs/FRONTEND.md; everything else через календарь. */
@@ -22,14 +26,15 @@ const PRESETS: { label: string; iso: () => string | null }[] = [
   { label: "Без срока", iso: () => null },
 ];
 
-export function DeadlineSheet({ open, onClose, currentIso, onPick }: Props) {
+export function DeadlineSheet({ open, onClose, currentIso, onPick, title = "Срок", hint }: Props) {
   const choose = (iso: string | null) => {
     onPick(iso);
     onClose();
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Срок">
+    <Sheet open={open} onClose={onClose} title={title}>
+      {hint ? <p className="-mt-1 mb-3 text-[14px] leading-[19px] text-muted">{hint}</p> : null}
       {/* the body lives inside the sheet so it is born with it: the picker then starts
           from the deadline this task has right now, not from the one it had at boot */}
       <DeadlineBody currentIso={currentIso} onChoose={choose} />

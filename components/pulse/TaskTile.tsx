@@ -14,6 +14,7 @@ import { haptic } from "@/lib/haptics";
 import { Composer } from "@/components/tasks/thread/Composer";
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
+import { untilWords } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
 
@@ -170,7 +171,33 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
           )}
 
           {/* the director's quick actions: the ones a tile can carry without a sheet */}
-          {interactive && lane === "question" && !task.question ? (
+          {interactive && lane === "question" && !task.question && task.time_request && task.time_request.senderId !== meId ? (
+            // a request for time (D-128): answered right here; another date — the open card
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip
+                tone="accent"
+                onClick={() => {
+                  haptic(12);
+                  actions.answerTime({ taskId: task.id, approve: true, proposedIso: task.time_request?.proposed ?? null });
+                  toast("Срок согласован");
+                }}
+              >
+                Согласовать · {untilWords(task.time_request.proposed, now)}
+              </Chip>
+              <Chip
+                onClick={() => {
+                  actions.answerTime({ taskId: task.id, approve: false, proposedIso: null });
+                  toast("Срок прежний");
+                }}
+              >
+                Оставить прежний
+              </Chip>
+              <Chip tone="muted" onClick={onToggle}>
+                Другой срок ›
+              </Chip>
+            </div>
+          ) : null}
+          {interactive && lane === "question" && !task.question && !(task.time_request && task.time_request.senderId !== meId) ? (
             // a plain message: seen, or the thread to answer in
             <>
               {showReply ? <ThreadTail taskId={task.id} meId={meId} enabled={showReply} /> : null}

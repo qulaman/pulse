@@ -29,6 +29,9 @@ const actions: TaskActions = {
   sendMessage: (input) => console.log("sendMessage", input),
   remove: (taskId) => console.log("remove", taskId),
   markRead: (input) => console.log("markRead", input),
+  requestTime: (input) => console.log("requestTime", input),
+  answerTime: (input) => console.log("answerTime", input),
+  nudge: (input) => console.log("nudge", input),
   busy: false,
 };
 
@@ -42,6 +45,7 @@ function fixture(status: TaskStatus, index: number): TaskWithPeople {
     author_id: "director",
     assignee_id: "employee",
     parent_task_id: null,
+    passed_to: null,
     group_id: null,
     title: "Подготовить КП для Казхрома",
     body: index % 2 === 0 ? "Смета и сроки, копия — в почту снабжения" : null,

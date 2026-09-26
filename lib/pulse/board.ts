@@ -1,5 +1,21 @@
 import { humanAqtobe } from "@/lib/ai/time";
 import type { Json } from "@/lib/supabase/types";
+import {
+  handedInPartly,
+  isNudge,
+  isOpenTimeRequest,
+  isPartialReport,
+  isWorking,
+  lastNudgeAt,
+  latestSuggestion,
+  latestTimeRequest,
+  metaOf as lifecycleMeta,
+  suggestionOf,
+  timeRequestOf,
+  untilWords,
+  type Suggestion,
+  type TimeRequest,
+} from "@/lib/tasks/lifecycle";
 import type { TaskMessageRow, TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, pluralRu, verdict, type TaskStatus } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
@@ -20,6 +36,14 @@ export type BoardTask = TaskWithPeople & {
   question_at: string | null;
   /** The reason behind «Не могу», when the employee gave one. */
   decline_reason: string | null;
+  /** «Нужно больше времени» still waiting for the director (D-128). */
+  time_request?: TimeRequest | null;
+  /** The colleague the employee suggested with the refusal (D-128). */
+  suggestion?: Suggestion | null;
+  /** When the director last reminded (D-128) — «напомнили в 11:20». */
+  nudged_at?: string | null;
+  /** The work was handed in as «сделано не всё» (D-128). */
+  partial?: boolean;
   /** The newest message of the thread that is not a status line — who wrote it and what. */
   last_message: BoardMessage | null;
   /** The reader's own read cursor on the thread (D-61): messages above it are unread. */
@@ -27,7 +51,7 @@ export type BoardTask = TaskWithPeople & {
 };
 
 /** One row of the embedded message list the board query fetches next to each task. */
-export type BoardNote = { id: string; content: string | null; meta: Json; created_at: string };
+export type BoardNote = { id: string; content: string | null; meta: Json; created_at: string; sender_id?: string | null };
 
 /** The last real message of a thread, as the board keeps it. */
 export type BoardMessage = { id: string; content: string | null; type: string; sender_id: string; seq: number; created_at: string };
@@ -57,9 +81,7 @@ export function isOnBoard(status: TaskStatus): boolean {
   return BOARD_STATUSES.includes(status);
 }
 
-function metaOf(meta: Json): Record<string, unknown> {
-  return meta && typeof meta === "object" && !Array.isArray(meta) ? (meta as Record<string, unknown>) : {};
-}
+const metaOf = (meta: Json): Record<string, unknown> => lifecycleMeta(meta);
 
 function isOpenQuestion(meta: Json): boolean {
   const record = metaOf(meta);
@@ -88,6 +110,10 @@ export function toBoardTask(task: TaskWithPeople, notes: BoardNote[], last: Boar
     question_id: question?.id ?? null,
     question_at: question?.created_at ?? null,
     decline_reason: reason?.content ?? null,
+    time_request: isWorking(task.status) ? latestTimeRequest(notes) : null,
+    suggestion: task.status === "declined" ? latestSuggestion(notes) : null,
+    nudged_at: lastNudgeAt(notes),
+    partial: handedInPartly(task, notes),
     last_message: last,
     seen_seq: seenSeq,
   };
@@ -104,14 +130,18 @@ export function hasUnread(task: Pick<BoardTask, "last_message" | "seen_seq">, me
   return Boolean(last && CHAT_TYPES.includes(last.type) && last.sender_id !== meId && last.seq > task.seen_seq);
 }
 
-/** The task carries a message for the reader: an open question, or an unread one. */
+/**
+ * The task carries a message for the reader: an open question, a request for time (the
+ * director's to answer, D-128), or an unread word.
+ */
 export function hasMessage(task: BoardTask, meId: string): boolean {
-  return Boolean(task.question) || hasUnread(task, meId);
+  return Boolean(task.question) || Boolean(task.time_request && task.time_request.senderId !== meId) || hasUnread(task, meId);
 }
 
-/** What the card shows as the message: the open question first, else the unread words. */
-export function messageOf(task: BoardTask, meId: string): string | null {
+/** What the card shows as the message: the open question first, a request for time, else the unread words. */
+export function messageOf(task: BoardTask, meId: string, now: Date = new Date()): string | null {
   if (task.question) return task.question;
+  if (task.time_request && task.time_request.senderId !== meId) return `просит срок ${untilWords(task.time_request.proposed, now)}`;
   if (!hasUnread(task, meId)) return null;
   const last = task.last_message!;
   if (last.type === "photo") return last.content ? `фото: ${last.content}` : "фото";
@@ -208,7 +238,13 @@ export function applyTaskChange(board: readonly BoardTask[], row: Partial<TaskRo
     changed = true;
   }
   // a declined task that is sent again («Настоять») starts clean
-  if (changed && next.status !== "declined" && current.status === "declined") next.decline_reason = null;
+  if (changed && next.status !== "declined" && current.status === "declined") {
+    next.decline_reason = null;
+    next.suggestion = null;
+  }
+  // a request for time lives while the work is in hand; «не всё» — while it waits for приёмка
+  if (changed && !isWorking(next.status)) next.time_request = null;
+  if (changed && next.status !== "pending_review") next.partial = false;
   if (!changed) return null;
   const copy = [...board];
   copy[index] = next;
@@ -262,7 +298,21 @@ export function applyMessage(
       next = { ...base, question: null, question_id: null, question_at: null };
     }
   } else if (isDeclineNote(message.meta) && message.content && message.content !== current.decline_reason) {
-    next = { ...base, decline_reason: message.content };
+    next = { ...base, decline_reason: message.content, suggestion: suggestionOf(message.meta) };
+  } else if (metaOf(message.meta).time_request === true) {
+    // a request opens (insert) or is answered (its update); the newest open one wins
+    if (isOpenTimeRequest(message.meta)) {
+      const request = timeRequestOf({ ...message, sender_id: message.sender_id ?? null });
+      if (request && (!current.time_request || current.time_request.at <= request.at) && current.time_request?.id !== request.id) {
+        next = { ...base, time_request: request };
+      }
+    } else if (current.time_request?.id === message.id) {
+      next = { ...base, time_request: null };
+    }
+  } else if (isNudge(message.meta) && message.created_at !== current.nudged_at) {
+    next = { ...base, nudged_at: message.created_at };
+  } else if (isPartialReport(message.meta) && !current.partial) {
+    next = { ...base, partial: true };
   }
 
   if (!next) return null;
@@ -351,7 +401,8 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
         return { text: `${who}: задача ${title} сдана, ждёт приёмки`, tone: "ok", kind: "handed" };
       case "declined": {
         const reason = after.decline_reason ? `: ${lowerFirst(after.decline_reason.trim())}` : "";
-        return { text: `${who} не может ${title}${reason}`, tone: "warn", kind: "declined" };
+        const suggested = after.suggestion ? ` · предлагает: ${firstNameOf(after.suggestion.name)}` : "";
+        return { text: `${who} не может ${title}${reason}${suggested}`, tone: "warn", kind: "declined" };
       }
       case "done":
         return { text: `Принято: ${title}`, tone: "ok", kind: "done" };
@@ -368,7 +419,11 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
     }
   }
   if (after.status === "declined" && after.decline_reason && after.decline_reason !== before.decline_reason) {
-    return { text: `${who} не может ${title}: ${lowerFirst(after.decline_reason.trim())}`, tone: "warn", kind: "declined" };
+    const suggested = after.suggestion ? ` · предлагает: ${firstNameOf(after.suggestion.name)}` : "";
+    return { text: `${who} не может ${title}: ${lowerFirst(after.decline_reason.trim())}${suggested}`, tone: "warn", kind: "declined" };
+  }
+  if (after.time_request && after.time_request.id !== before.time_request?.id && after.time_request.senderId !== meId) {
+    return { text: `${who} просит срок по ${title}: ${untilWords(after.time_request.proposed, now)}`, tone: "warn", kind: "question" };
   }
   if (after.question && after.question_id !== before.question_id) {
     return { text: `${who} спрашивает по ${title}: «${shortQuestion(after.question)}»`, tone: "warn", kind: "question" };

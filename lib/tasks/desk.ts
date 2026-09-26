@@ -14,11 +14,11 @@ import { isOverdue, type TaskStatus } from "./status-text";
  * TaskCard.tsx), folded to three per state: принцип 2 holds for the director's hand too.
  */
 
-/** Why a task waits for the director: «ваш ход». */
-export type DeskReason = "review" | "question" | "declined" | "overdue";
+/** Why a task waits for the director: «ваш ход». `time` — the employee asks for another deadline (D-128). */
+export type DeskReason = "review" | "time" | "question" | "declined" | "overdue";
 
 /** The order of the queue: what only the director can move first. */
-export const REASON_ORDER: readonly DeskReason[] = ["review", "question", "declined", "overdue"];
+export const REASON_ORDER: readonly DeskReason[] = ["review", "time", "question", "declined", "overdue"];
 
 export type DeskItem = { task: BoardTask; reason: DeskReason };
 
@@ -26,15 +26,17 @@ export type DeskItem = { task: BoardTask; reason: DeskReason };
 const WORKING: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
 
 /**
- * The first reason that applies, in the card's priority: приёмка beats a question, a
- * question beats a missed deadline. A question on a closed or declined task is not the
- * director's move on the question — the task itself is.
+ * The first reason that applies, in the card's priority: приёмка beats a request for time,
+ * a request beats a question, a question beats a missed deadline — a late task whose holder
+ * asked for time waits for the answer, not for a scolding. A question on a closed or
+ * declined task is not the director's move on the question — the task itself is.
  */
 export function reasonOf(
-  task: { status: TaskStatus; deadline: string | null; question?: string | null },
+  task: { status: TaskStatus; deadline: string | null; question?: string | null; request?: boolean },
   now: Date = new Date(),
 ): DeskReason | null {
   if (task.status === "pending_review") return "review";
+  if (task.request && WORKING.includes(task.status)) return "time";
   if (task.question && WORKING.includes(task.status)) return "question";
   if (task.status === "declined") return "declined";
   if (isOverdue(task, now)) return "overdue";
@@ -47,7 +49,7 @@ export function queueOf(tasks: readonly BoardTask[], now: Date = new Date()): De
   const items: DeskItem[] = [];
   for (const task of tasks) {
     if (seen.has(task.id)) continue;
-    const reason = reasonOf(task, now);
+    const reason = reasonOf({ ...task, request: Boolean(task.time_request) }, now);
     if (!reason) continue;
     seen.add(task.id);
     items.push({ task, reason });
@@ -68,7 +70,13 @@ export type DeskAction =
   | "extend"
   | "revoke"
   | "open"
-  | "remove";
+  | "remove"
+  // D-128: the employee's request for time, their suggested colleague, a reminder
+  | "grant"
+  | "retime"
+  | "keep"
+  | "handoff"
+  | "nudge";
 
 /** A key is a command, so a verb — `BUTTON` in status-text.ts keeps the card's own words. */
 export const KEY_LABEL: Record<DeskAction, string> = {
@@ -78,25 +86,57 @@ export const KEY_LABEL: Record<DeskAction, string> = {
   insist: "Настоять",
   reassign: "Переназначить",
   cancel: "Отменить",
-  extend: "Продлить",
+  extend: "Срок",
   revoke: "Отозвать",
   open: "Открыть",
   remove: "Удалить",
+  grant: "Согласовать",
+  retime: "Другой срок",
+  keep: "Оставить прежний",
+  handoff: "Передать",
+  nudge: "Напомнить",
 };
+
+/** What the director's keys need to know besides the status (D-128). */
+export type KeyFlags = {
+  question?: boolean;
+  overdue?: boolean;
+  /** the employee asks for another deadline */
+  request?: boolean;
+  /** the refusal names a colleague */
+  suggestion?: boolean;
+  /** a new task nobody has taken for a while — «Напомнить» comes forward */
+  waiting?: boolean;
+};
+
+/** A new task untouched this long earns «Напомнить» on its card. */
+export const WAITING_AFTER_MS = 15 * 60_000;
+
+/** A new task, not taken, handed out longer than WAITING_AFTER_MS ago. */
+export function isWaiting(task: { status: TaskStatus; created_at: string; scheduled_send_at?: string | null }, now: Date = new Date()): boolean {
+  if (task.status !== "sent") return false;
+  const since = new Date(task.scheduled_send_at ?? task.created_at).getTime();
+  return now.getTime() - since >= WAITING_AFTER_MS;
+}
 
 /**
  * The buttons of one task's open card, at most three. Rows of D-80 top to bottom —
- * the first that matches wins. «Продлить» and «Переназначить» on any open task (D-51 п.3).
+ * the first that matches wins. «Срок» and «Переназначить» on any open task (D-51 п.3);
+ * a request for time is answered in one tap, a suggested colleague takes it in one tap,
+ * a late or untaken task offers «Напомнить» (D-128).
  */
 export function keysFor(
   task: { status: TaskStatus },
-  { question = false, overdue = false }: { question?: boolean; overdue?: boolean } = {},
+  { question = false, overdue = false, request = false, suggestion = false, waiting = false }: KeyFlags = {},
 ): DeskAction[] {
   const working = WORKING.includes(task.status);
   if (task.status === "pending_review") return ["approve", "rework", "open"];
+  if (working && request) return ["grant", "retime", "keep"];
   if (working && question) return ["answer", "extend", "open"];
+  if (task.status === "declined" && suggestion) return ["handoff", "insist", "cancel"];
   if (task.status === "declined") return ["insist", "reassign", "cancel"];
-  if (working && overdue) return ["extend", "reassign", "open"];
+  if (working && overdue) return ["extend", "nudge", "reassign"];
+  if (working && waiting) return ["nudge", "extend", "reassign"];
   if (working) return ["extend", "reassign", "revoke"];
   if (task.status === "scheduled") return ["extend", "revoke", "open"];
   return ["open", "remove"];

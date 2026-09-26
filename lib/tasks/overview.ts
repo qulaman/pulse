@@ -23,6 +23,8 @@ export type ListTask = Groupable & {
   closed_at: string | null;
   updated_at: string;
   scheduled_send_at: string | null;
+  /** D-128: a reassigned task knows who took over; its end is «передана», not «отозвана» */
+  passed_to?: string | null;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -54,13 +56,14 @@ export function employeeTabOf(task: { status: TaskStatus }): EmployeeTab {
   return "working";
 }
 
-/** The director's reason for one task: the question lives on the board row, not the task. */
+/** The director's reason for one task: the question and a request for time live on the board row, not the task. */
 export function reasonFor(
   task: { status: TaskStatus; deadline: string | null },
   question: string | null | undefined,
   now: Date = new Date(),
+  request = false,
 ): DeskReason | null {
-  return reasonOf({ ...task, question: question ?? null }, now);
+  return reasonOf({ ...task, question: question ?? null, request }, now);
 }
 
 /** Title, description or the person's name contain the needle — case-insensitive. */
@@ -82,6 +85,7 @@ export type Section<T> = { key: string; title: string; tone: Tone; tasks: T[] };
 
 export const REASON_TITLE: Record<DeskReason, string> = {
   review: "На приёмке",
+  time: "Просят срок",
   question: "Вопросы",
   declined: "Отказы",
   overdue: "Просрочено",
@@ -89,6 +93,7 @@ export const REASON_TITLE: Record<DeskReason, string> = {
 
 export const REASON_TONE: Record<DeskReason, Tone> = {
   review: "warn",
+  time: "warn",
   question: "warn",
   declined: "danger",
   overdue: "danger",
@@ -218,7 +223,7 @@ export function directorScreen<T extends ListTask>(
   let unseen = 0;
   let working = 0;
   let scheduled = 0;
-  const byReason: Record<DeskReason, number> = { review: 0, question: 0, declined: 0, overdue: 0 };
+  const byReason: Record<DeskReason, number> = { review: 0, time: 0, question: 0, declined: 0, overdue: 0 };
   for (const task of tasks) {
     const reason = reasons.get(task.id) ?? null;
     if (reason) byReason[reason] += 1;
@@ -244,6 +249,7 @@ export function directorScreen<T extends ListTask>(
   if (yours > 0) {
     const parts: string[] = [];
     if (byReason.review) parts.push(`${byReason.review} на приёмке`);
+    if (byReason.time) parts.push(plural(byReason.time, ["просьба о сроке", "просьбы о сроке", "просьб о сроке"]));
     if (byReason.question) parts.push(plural(byReason.question, ["вопрос", "вопроса", "вопросов"]));
     if (byReason.declined) parts.push(plural(byReason.declined, ["отказ", "отказа", "отказов"]));
     if (byReason.overdue) parts.push(plural(byReason.overdue, ["просрочка", "просрочки", "просрочек"]));
@@ -445,7 +451,8 @@ export function stepsOf(task: ListTask, now: Date = new Date()): Step[] {
         handed,
         step("work", "В работе", task.accepted_at, task.accepted_at ? "done" : "todo"),
         step("handed_in", "Сдана", task.completed_at, task.completed_at ? "done" : "todo"),
-        step("closed", "Отозвана", closedAtOf(task), "bad"),
+        // a handover is not a failure: the work went on with another person (D-128)
+        task.passed_to ? step("closed", "Передана", closedAtOf(task), "done") : step("closed", "Отозвана", closedAtOf(task), "bad"),
       ];
     default:
       return [handed];
@@ -459,6 +466,7 @@ function step(key: string, label: string, at: string | null, state: StepState): 
 /** The reason as the state word of a director's card: one task, so the singular. */
 export const REASON_WORD: Record<DeskReason, string> = {
   review: "на приёмке",
+  time: "просит срок",
   question: "вопрос",
   declined: "отказ",
   overdue: "просрочена",
@@ -470,11 +478,12 @@ export const REASON_WORD: Record<DeskReason, string> = {
  * handed-in work is «на проверке», a new task asks for the tap. Overdue beats the stage.
  */
 export function statusWord(
-  task: { status: TaskStatus; deadline: string | null; scheduled_send_at?: string | null },
+  task: { status: TaskStatus; deadline: string | null; scheduled_send_at?: string | null; passed_to?: string | null },
   role: "director" | "employee",
   now: Date = new Date(),
 ): string {
   if (isOverdue(task, now) && !(role === "employee" && task.status === "sent")) return "просрочена";
+  if (task.status === "revoked" && task.passed_to) return "передана";
   if (role === "director") {
     if (task.status === "sent") return "не принята";
     if (task.status === "scheduled" && task.scheduled_send_at) return `уйдёт ${humanAqtobe(new Date(task.scheduled_send_at), now)}`;

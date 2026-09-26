@@ -1,36 +1,41 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, Reorder } from "framer-motion";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
 import { Dot, NoteEditor, Original, SaveReceipt } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
-import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";
+import { CardShell } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { glimpse, lineState, type LineState } from "@/lib/mindboard/branch";
 import { handedLabel } from "@/lib/mindboard/handed";
+import type { Wait } from "@/lib/mindboard/offline";
 import type { Branch } from "@/lib/mindboard/tree";
 import type { Dictation } from "@/lib/notes/dictation";
 import { firstLine, restLines, whenRu } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
+import { DragRow, useReorder } from "./DragRow";
 import { SubComposer } from "./SubComposer";
-import { STATE_WORDS, SubLine, SubPointRow } from "./SubPoint";
+import { STATE_WORDS, SubLine, SubPointRow, WaitMark } from "./SubPoint";
 
-/** How the screen sees each row: still only on the phone, stuck without network, being heard, what it became. */
+/**
+ * How the screen sees each row: still only on the phone, what it waits for (the network, or
+ * its own point — D-121), being heard, what it became.
+ */
 export type RowLook = {
   phone: (id: string) => boolean;
-  waiting: (id: string) => boolean;
+  wait: (row: Note) => Wait | null;
   hearing: (id: string) => boolean;
   task: (row: Note) => TaskWithPeople | undefined;
 };
 
 export function stateOf(row: Note, look: RowLook): LineState {
-  return lineState(row, { phone: look.phone(row.id), waiting: look.waiting(row.id), hearing: look.hearing(row.id) });
+  return lineState(row, { phone: look.phone(row.id), wait: look.wait(row), hearing: look.hearing(row.id) });
 }
 
 /** The number of a point as the wall has it, its tick once done, or its voice while it has no words yet. */
@@ -75,6 +80,8 @@ export type PointHandlers = {
   retranscribe: (row: Note) => void;
   /** A sub-point typed under this point. */
   write: (text: string) => void;
+  /** A sub-point dropped between its siblings (D-121): one row written, its new place. */
+  place: (sub: Note, position: number) => void;
   /** The screen's microphone is about to open for a sub-point of this point. */
   aim: () => void;
   /** «Сделать подпунктом» — offered only where the server will take it. */
@@ -116,8 +123,15 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
   const phone = look.phone(point.id);
-  const offline = look.waiting(point.id);
+  const wait = look.wait(point);
   const state = stateOf(point, look);
+  // the sub-points move by their handles inside the open card, never out of their branch
+  const subIds = children.map((sub) => sub.id);
+  const subById = new Map(children.map((sub) => [sub.id, sub]));
+  const subOrder = useReorder(subIds, (id) => subById.get(id)?.position ?? 0, (id, position) => {
+    const sub = subById.get(id);
+    if (sub) on.place(sub, position);
+  });
   const task = look.task(point);
   const done = point.done_at !== null;
   const handed = point.converted_task_id !== null;
@@ -130,10 +144,10 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
   const heading =
     state === "words" ? (
       <>
-        <span className={`${open ? "" : "line-clamp-2"} block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${done ? "text-text/55" : ""}`}>
+        <span className={`line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${done ? "text-text/55" : ""}`}>
           {head || "Без текста"}
         </span>
-        {rest && !open ? <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
+        {rest && !open ? <span className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
       </>
     ) : state === "deaf" ? (
       <span className="block">
@@ -171,7 +185,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
       </span>,
     );
   }
-  if (offline) meta.push(<span key="offline" style={{ color: "var(--warn)" }}>ждёт связи</span>);
+  // a point without words already says what it waits for in its own words («Голос на телефоне»)
+  if (wait && state === "words") meta.push(<WaitMark key="wait" wait={wait} />);
 
   const { shown, more } = glimpse(children);
 
@@ -179,7 +194,7 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
     <div
       className={`relative ${
         lit
-          ? "[&>article]:!border-accent/70 [&>article]:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent),0_10px_28px_color-mix(in_srgb,var(--accent)_12%,transparent)]"
+          ? "[&>article]:!scroll-mb-[180px] [&>article]:!border-accent/70 [&>article]:shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_14%,transparent),0_10px_28px_color-mix(in_srgb,var(--accent)_12%,transparent)]"
           : ""
       }`}
       data-point-id={point.id}
@@ -215,8 +230,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
         }
       >
         {phone ? (
-          <p className="text-[14px] leading-[19px]" style={{ color: "var(--warn)" }}>
-            Пункт ещё на телефоне — отправлю сам, как появится связь. Подпункты можно добавлять уже сейчас.
+          <p className={`text-[14px] leading-[19px] ${wait ? "text-warn" : "text-muted"}`} data-testid="point-phone">
+            {wait ? "Пункт ещё на телефоне — отправлю сам, как появится связь." : "Пункт ещё на телефоне — отправляю."} Подпункты можно добавлять уже сейчас.
           </p>
         ) : (
           <>
@@ -230,7 +245,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
 
             <div className="mt-2">
               <NoteEditor
-                key={point.id}
+                // born again when STT brings the words (raw_transcript), never while the director types
+                key={`${point.id}:${point.raw_transcript ?? ""}`}
                 text={point.text}
                 label="Текст пункта"
                 onDirty={setDirty}
@@ -267,37 +283,48 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
             </h3>
           ) : null}
           {children.length > 0 ? (
-            <div className="flex flex-col">
+            <Reorder.Group as="div" axis="y" values={subOrder.order} onReorder={subOrder.onReorder} className="flex flex-col" data-testid="point-subs">
               <AnimatePresence initial={false} mode="popLayout">
-                {children.map((sub) => (
-                  <motion.div
-                    key={sub.id}
-                    layout="position"
-                    transition={CARD_SPRING}
-                    initial={{ opacity: 0, scale: 0.97 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
-                  >
-                    <SubPointRow
-                      sub={sub}
-                      now={now}
-                      open={openSub === sub.id}
-                      state={stateOf(sub, look)}
-                      offline={look.waiting(sub.id)}
-                      phone={look.phone(sub.id)}
-                      task={look.task(sub)}
-                      onToggle={() => on.toggleSub(sub.id)}
-                      onChangeText={(text) => on.text(sub, text)}
-                      onDone={() => on.done(sub)}
-                      onAssign={() => on.assign(sub)}
-                      onPromote={on.promote(sub)}
-                      onDelete={() => on.remove(sub)}
-                      onRetranscribe={() => on.retranscribe(sub)}
-                    />
-                  </motion.div>
-                ))}
+                {subOrder.order.map((subId, index) => {
+                  const sub = subById.get(subId);
+                  if (!sub) return null;
+                  const subOpen = openSub === sub.id;
+                  return (
+                    <DragRow
+                      key={sub.id}
+                      id={sub.id}
+                      // a sub-point that is still only on the phone has no row to move yet
+                      movable={children.length > 1 && !subOpen && !look.phone(sub.id)}
+                      label={`Перетащить подпункт ${index + 1}`}
+                      testId="sub-grip"
+                      layout="position"
+                      onStart={subOrder.start}
+                      onEnd={() => subOrder.drop(sub.id)}
+                    >
+                      {(subGrip) => (
+                        <SubPointRow
+                          sub={sub}
+                          now={now}
+                          open={subOpen}
+                          state={stateOf(sub, look)}
+                          wait={look.wait(sub)}
+                          phone={look.phone(sub.id)}
+                          task={look.task(sub)}
+                          grip={subGrip}
+                          onToggle={() => on.toggleSub(sub.id)}
+                          onChangeText={(text) => on.text(sub, text)}
+                          onDone={() => on.done(sub)}
+                          onAssign={() => on.assign(sub)}
+                          onPromote={on.promote(sub)}
+                          onDelete={() => on.remove(sub)}
+                          onRetranscribe={() => on.retranscribe(sub)}
+                        />
+                      )}
+                    </DragRow>
+                  );
+                })}
               </AnimatePresence>
-            </div>
+            </Reorder.Group>
           ) : null}
 
           <SubComposer pointId={point.id} dictation={dictation} aimed={aimed} onAim={on.aim} onWrite={on.write} first={children.length === 0} />
