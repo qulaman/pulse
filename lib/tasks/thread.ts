@@ -70,6 +70,29 @@ export function markFailed(messages: TaskMessage[] | undefined, id: string): Tas
 }
 
 /* -------------------------------------------------------------------------- */
+/* A reassigned task says «передана», not «отозвано» (D-128)                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * reassign_task closes the old task with a status line «revoked» and, in the same moment, a
+ * line «Передана: Ерлан». The thread keeps the one that tells the truth: the status line of
+ * that moment goes. A revoke on its own (no handover beside it) stays as it is.
+ */
+export function withoutPassedRevoke(messages: TaskMessage[]): TaskMessage[] {
+  const handovers = messages.filter((message) => message.type === "system" && typeof metaOf(message).reassigned_to === "string");
+  if (handovers.length === 0) return messages;
+  const moments = new Set(handovers.map((message) => Math.floor(new Date(message.created_at).getTime() / 1000)));
+  return messages.filter(
+    (message) =>
+      !(
+        message.type === "status_change" &&
+        metaOf(message).new_status === "revoked" &&
+        moments.has(Math.floor(new Date(message.created_at).getTime() / 1000))
+      ),
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Days                                                                        */
 /* -------------------------------------------------------------------------- */
 

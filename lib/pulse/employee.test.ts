@@ -36,6 +36,7 @@ function row(status: TaskStatus, extra: Partial<BoardTask> = {}): BoardTask {
     deadline: null,
     group_id: null,
     parent_task_id: null,
+    passed_to: null,
     priority: "normal",
     recurrence_rule_id: null,
     scheduled_send_at: null,

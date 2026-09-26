@@ -25,8 +25,12 @@ const BodySchema = z.strictObject({
   to_status: z.enum(STATUSES),
   reason: z.string().optional(), // «Не могу» — becomes a visible message
   comment: z.string().optional(), // rework note from the director
+  /** «Это к другому» (D-128): the colleague the employee suggests with the refusal. */
+  suggest_assignee_id: z.guid().optional(),
   /** «Выполнено»: the words and the photo travel with the handover, in one transaction (D-64 §3). */
-  report: z.strictObject({ text: z.string().optional(), file_path: z.string().optional() }).optional(),
+  report: z
+    .strictObject({ text: z.string().optional(), file_path: z.string().optional(), partial: z.boolean().optional() })
+    .optional(),
   client_request_id: z.uuid(),
 });
 
@@ -46,7 +50,12 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const { data, error } = await supabase.rpc("transition_task", {
       task_id: taskId,
       to_status: body.to_status,
-      payload: { reason: body.reason ?? null, comment: body.comment ?? null, report: body.report ?? null },
+      payload: {
+        reason: body.reason ?? null,
+        comment: body.comment ?? null,
+        report: body.report ?? null,
+        suggest_assignee_id: body.suggest_assignee_id ?? null,
+      },
       client_request_id: body.client_request_id,
     });
 
@@ -60,6 +69,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       if (error.message.includes("forbidden")) {
         return apiError(403, "forbidden", "Нет доступа");
       }
+      if (error.message.includes("assignee_not_found")) return apiError(404, "assignee_not_found", "Такого сотрудника нет");
+      if (error.message.includes("same_assignee")) return apiError(409, "same_assignee", "Себя предложить нельзя");
       throw new Error(`transition_task failed: ${error.message}`);
     }
 

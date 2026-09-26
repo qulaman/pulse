@@ -8,22 +8,27 @@ import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskRail } from "
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { toast } from "@/components/ui/Toast";
-import { haptic } from "@/lib/haptics";
-import { QUICK_ANSWERS } from "@/lib/tasks/desk";
+import type { BoardTask } from "@/lib/pulse/board";
+import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
+import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
 import { toneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
-import { directorSheetOf, DirectorSheets } from "./desk/DirectorSheets";
-import { Icon } from "./desk/icons";
-import { AskSheet, DeclineSheet, ReportSheet } from "./TaskSheets";
+import { Icon, type IconName } from "./desk/icons";
+import { ACTION_ICON, ACTION_LABEL, allActionsFor, isPrimaryKey, LifecycleNotes, wideLabelOf } from "./list/DirectorTaskCard";
+import { useDirectorControls } from "./list/useDirectorControls";
+import { useEmployeeControls } from "./list/useEmployeeControls";
 
 export type TaskCardVariant = "employee" | "director";
 
+/** A board row carries what the task row does not — a request for time, a suggestion (D-128). */
+type CardTask = TaskWithPeople & Partial<Pick<BoardTask, "time_request" | "suggestion" | "nudged_at" | "partial">>;
+
 export type TaskCardProps = {
-  task: TaskWithPeople;
+  task: CardTask;
   variant: TaskCardVariant;
   actions: TaskActions;
   companyId: string;
@@ -35,13 +40,15 @@ export type TaskCardProps = {
   href?: string;
 };
 
-type OpenSheet = "none" | "ask" | "decline" | "report" | "rework" | "revoke" | "extend" | "reassign" | "delete";
-
 /* -------------------------------------------------------------------------- */
 
+/**
+ * The full card of a task where a list is not the point — Пульс, Лента, a person's card.
+ * Its buttons are the hooks of «Задачи» (D-83, D-128), so a button means the same thing on
+ * every screen: the employee's «Не могу» asks for time or names a colleague here too, the
+ * director answers a request for time and hands a task to the suggested person in one tap.
+ */
 export function TaskCard({ task, variant, actions, companyId, declineReason, question, href }: TaskCardProps) {
-  const [sheet, setSheet] = useState<OpenSheet>("none");
-  const close = () => setSheet("none");
   const router = useRouter();
 
   // the clock is read once per mount: the pill needs no live tick on a card
@@ -49,6 +56,21 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
   const deadline = deadlineLabel(task, now);
   const tone = toneOf(task.status, deadline.overdue);
   const dimmed = task.status === "revoked" || task.status === "done";
+  const request = task.time_request && isWorking(task.status) ? task.time_request : null;
+  const suggestion = task.status === "declined" ? (task.suggestion ?? null) : null;
+
+  const director = useDirectorControls({
+    base: actions,
+    companyId,
+    tasks: [task],
+    questionOf: () => question ?? null,
+    requestOf: () => request,
+    suggestionOf: () => suggestion,
+    now,
+    // on the task's own page there is nothing left to look at
+    afterRemove: href ? undefined : () => router.back(),
+  });
+  const employee = useEmployeeControls({ actions, companyId, tasks: [task] });
 
   const urgent = (
     <span className="inline-flex items-center gap-1 rounded-full bg-warn/12 px-2 py-0.5 text-[12px] font-semibold leading-4 text-warn">
@@ -58,6 +80,9 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
   );
 
   const title = <h2 className="text-[19px] font-semibold leading-6 text-text">{task.title}</h2>;
+  const threeKeys = variant === "employee" && task.status === "sent";
+  // in work «Выполнено» leads on its own row, «Уточнить» and «Не могу» under it
+  const workKeys = variant === "employee" && isWorking(task.status) && task.status !== "sent";
 
   return (
     <article
@@ -125,6 +150,17 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
       <StatusBanner task={task} declineReason={declineReason} />
 
+      {variant === "employee" && request ? (
+        <Banner tone="warn" icon={<Icon name="clock" size={15} />}>
+          Просите срок {untilWords(request.proposed, now)} · ждёт ответа директора
+        </Banner>
+      ) : null}
+      {variant === "director" ? (
+        <div className="relative">
+          <LifecycleNotes task={task} request={request} suggestion={suggestion} partial={Boolean(task.partial)} nudgedAt={task.nudged_at ?? null} now={now} />
+        </div>
+      ) : null}
+
       {variant === "director" && question ? (
         <QuestionBanner
           question={question}
@@ -135,48 +171,19 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         />
       ) : null}
 
-      <div className={`relative mt-4 gap-2 ${variant === "employee" && task.status === "sent" ? "grid grid-cols-3" : "flex flex-wrap"}`}>
+      <div className={`relative mt-4 gap-2 ${threeKeys ? "grid grid-cols-3" : workKeys ? "grid grid-cols-2" : "flex flex-wrap"}`}>
         {variant === "employee" ? (
-          <EmployeeActions task={task} onOpen={setSheet} actions={actions} />
+          <EmployeeButtons task={task} onPress={(action) => employee.press(action, task)} />
         ) : (
-          <DirectorActions task={task} onOpen={setSheet} actions={actions} />
+          <DirectorButtons
+            actions={allActionsFor(task, { request: Boolean(request), suggestion: Boolean(suggestion) })}
+            label={(key) => wideLabelOf(key, request, suggestion, now) ?? (key === "reassign" ? BUTTON.reassign : ACTION_LABEL[key])}
+            onPress={(key) => director.press(key, task)}
+          />
         )}
       </div>
 
-      <AskSheet
-        open={sheet === "ask"}
-        onClose={close}
-        onSubmit={(text) => {
-          actions.sendMessage({ taskId: task.id, companyId, text, meta: { is_question: true } });
-          toast(TEXT.askedToast);
-        }}
-      />
-
-      <DeclineSheet open={sheet === "decline"} onClose={close} onSubmit={(reason) => actions.transition({ taskId: task.id, toStatus: "declined", reason })} />
-
-      <ReportSheet
-        open={sheet === "report"}
-        onClose={close}
-        onSubmit={(text, filePath) => {
-          // one call: the words, the photo and the handover are one transaction (D-64 §3)
-          actions.complete({
-            taskId: task.id,
-            fromStatus: task.status,
-            report: text || filePath ? { text: text || undefined, file_path: filePath ?? undefined } : undefined,
-          });
-        }}
-      />
-
-      {variant === "director" ? (
-        <DirectorSheets
-          task={task}
-          open={directorSheetOf(sheet)}
-          onClose={close}
-          actions={actions}
-          // on the task's own page there is nothing left to look at
-          afterRemove={href ? undefined : () => router.back()}
-        />
-      ) : null}
+      {variant === "employee" ? employee.sheets : director.sheets}
     </article>
   );
 }
@@ -232,7 +239,11 @@ function StatusBanner({ task, declineReason }: { task: TaskWithPeople; declineRe
     );
   }
   if (task.status === "revoked") {
-    return (
+    return task.passed_to ? (
+      <Banner tone="muted" icon={<Icon name="swap" size={15} />}>
+        {passedWord(task.passed?.full_name)}
+      </Banner>
+    ) : (
       <Banner tone="muted" icon={<Icon name="undo" size={15} />}>
         {TEXT.revoked}
       </Banner>
@@ -252,25 +263,17 @@ function StatusBanner({ task, declineReason }: { task: TaskWithPeople; declineRe
  * Exactly the table of docs/FRONTEND.md «Состояние задачи → набор кнопок».
  * Three buttons at most — принцип 2, not to be widened.
  */
-function EmployeeActions({ task, onOpen, actions }: { task: TaskWithPeople; onOpen: (sheet: OpenSheet) => void; actions: TaskActions }) {
+function EmployeeButtons({ task, onPress }: { task: TaskWithPeople; onPress: (action: "accept" | "ask" | "decline" | "complete") => void }) {
   if (task.status === "sent") {
     return (
       <>
-        <Button
-          block
-          className="!px-2 whitespace-nowrap"
-          icon={<Icon name="check" />}
-          onClick={() => {
-            haptic(15);
-            actions.transition({ taskId: task.id, toStatus: "accepted" });
-          }}
-        >
+        <Button block className="!px-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onPress("accept")}>
           {BUTTON.accept}
         </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onOpen("ask")}>
+        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
           {BUTTON.ask}
         </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="danger" icon={<Icon name="x" />} onClick={() => onOpen("decline")}>
+        <Button block className="!px-2 whitespace-nowrap" variant="danger" icon={<Icon name="x" />} onClick={() => onPress("decline")}>
           {BUTTON.cant}
         </Button>
       </>
@@ -278,86 +281,45 @@ function EmployeeActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
   }
 
   // rework needs no second «Принял» — the tap sends accepted, then pending_review.
-  if (task.status === "accepted" || task.status === "rework") {
+  if (isWorking(task.status)) {
     return (
-      <Button icon={<Icon name="check" />} onClick={() => onOpen("report")}>
-        {BUTTON.complete}
-      </Button>
+      <>
+        <Button block className="col-span-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onPress("complete")}>
+          {BUTTON.complete}
+        </Button>
+        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
+          {BUTTON.ask}
+        </Button>
+        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="clock" />} onClick={() => onPress("decline")}>
+          {BUTTON.cant}
+        </Button>
+      </>
     );
   }
 
   return null;
 }
 
-function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOpen: (sheet: OpenSheet) => void; actions: TaskActions }) {
-  const terminal = task.status === "done" || task.status === "revoked" || task.status === "declined";
-
+/** Every move the task allows, in the order of «Все действия»; the first is loud when it closes the director's turn. */
+function DirectorButtons({ actions, label, onPress }: { actions: DeskAction[]; label: (key: DeskAction) => string; onPress: (key: DeskAction) => void }) {
   return (
     <>
-      {task.status === "pending_review" ? (
-        <>
+      {actions.map((key, index) => {
+        const quiet = key === "remove" || key === "cancel" || key === "revoke" || key === "keep";
+        const icon = ACTION_ICON[key];
+        return (
           <Button
-            icon={<Icon name="check" />}
-            onClick={() => {
-              haptic(15);
-              actions.transition({ taskId: task.id, toStatus: "done" });
-            }}
+            key={key}
+            data-testid={`task-action-${key}`}
+            variant={index === 0 && isPrimaryKey(key, null) ? "primary" : quiet ? "ghost" : "secondary"}
+            className={key === "remove" ? "!text-danger/80" : ""}
+            icon={icon ? <Icon name={icon as IconName} /> : undefined}
+            onClick={() => onPress(key)}
           >
-            {BUTTON.approve}
+            {key === "remove" ? BUTTON.remove : label(key)}
           </Button>
-          <Button variant="secondary" icon={<Icon name="rotate" />} onClick={() => onOpen("rework")}>
-            {BUTTON.rework}
-          </Button>
-        </>
-      ) : null}
-
-      {task.status === "declined" ? (
-        <>
-          <Button onClick={() => actions.transition({ taskId: task.id, toStatus: "sent" })}>{BUTTON.insist}</Button>
-          <Button variant="secondary" onClick={() => onOpen("reassign")}>
-            {BUTTON.reassign}
-          </Button>
-          <Button variant="ghost" onClick={() => onOpen("revoke")}>
-            {BUTTON.cancel}
-          </Button>
-        </>
-      ) : null}
-
-      {/* held for the morning (D-38): it can go now (D-129) */}
-      {task.status === "scheduled" ? (
-        <Button
-          icon={<Icon name="send" />}
-          onClick={() => {
-            haptic(10);
-            actions.sendNow(task.id);
-          }}
-        >
-          {BUTTON.sendNow}
-        </Button>
-      ) : null}
-
-      {!terminal ? (
-        <>
-          {task.status !== "pending_review" ? (
-            <Button variant="secondary" onClick={() => onOpen("extend")}>
-              {BUTTON.extend}
-            </Button>
-          ) : null}
-          {["sent", "accepted", "in_progress", "rework"].includes(task.status) ? (
-            <Button variant="ghost" onClick={() => onOpen("reassign")}>
-              {BUTTON.reassign}
-            </Button>
-          ) : null}
-          <Button variant="ghost" icon={<Icon name="undo" />} onClick={() => onOpen("revoke")}>
-            {BUTTON.revoke}
-          </Button>
-        </>
-      ) : null}
-
-      {/* cleanup, not a status: a wrong or test order disappears without a trace */}
-      <Button variant="ghost" className="!text-danger/80" icon={<Icon name="x" />} onClick={() => onOpen("delete")}>
-        {BUTTON.remove}
-      </Button>
+        );
+      })}
     </>
   );
 }

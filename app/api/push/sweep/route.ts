@@ -17,6 +17,7 @@ type Tick =
   | "visits_due_expiry"
   | "unseen_task_alerts_due"
   | "overdue_alerts_due"
+  | "deadline_reminders_due"
   | "director_day_summaries_due"
   | "director_digests_due"
   | "team_channel_alerts_due"
@@ -56,6 +57,7 @@ export async function POST(req: Request) {
     // доходят», «итог дня» — and last, the digests, so a signal held for one goes into it
     const unseen = await tick(service, "unseen_task_alerts_due");
     const overdue = await tick(service, "overdue_alerts_due");
+    const deadlineSoon = await tick(service, "deadline_reminders_due"); // «Скоро срок» to the employee, D-128
     const team = await tick(service, "team_channel_alerts_due"); // «уведомления не доходят»
     const summaries = await tick(service, "director_day_summaries_due");
     const digests = await tick(service, "director_digests_due");
@@ -73,6 +75,7 @@ export async function POST(req: Request) {
       visits_expired: visitsExpired,
       unseen,
       overdue,
+      deadline_soon: deadlineSoon,
       team,
       summaries,
       digests,

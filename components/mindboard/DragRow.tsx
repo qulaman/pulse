@@ -58,6 +58,7 @@ export function DragRow({
   onEnd,
   className,
   testId = "point-grip",
+  layout = true,
   children,
 }: {
   id: string;
@@ -68,6 +69,8 @@ export function DragRow({
   onEnd: () => void;
   className?: string;
   testId?: string;
+  /** "position" — a row that grows in place (a sub-point opening) moves, never stretches its text. */
+  layout?: true | "position";
   children: (grip: ReactNode) => ReactNode;
 }) {
   const controls = useDragControls();
@@ -93,6 +96,7 @@ export function DragRow({
       value={id}
       dragListener={false}
       dragControls={controls}
+      layout={layout}
       onDragStart={onStart}
       onDragEnd={onEnd}
       whileDrag={{ scale: 1.02, zIndex: 5 }}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { TvFrame } from "@/components/tv/TvFrame";
 import { useClock } from "@/components/tv/useKiosk";
@@ -21,7 +21,7 @@ import { carouselScene, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
-import { boardCase, type BoardCase } from "./boardFixtures";
+import { boardCase, boardDemo, DEMO_STEP_MS, type BoardCase, type BoardDemo } from "./boardFixtures";
 
 export type WallCase =
   | "face"
@@ -358,11 +358,24 @@ function taskFor(wallCase: WallCase, focus: TvFocusEmployee, guest: boolean): Tv
   };
 }
 
-export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; clock: ClockStyle; guest: boolean }) {
+/** The sandbox demo's step: a tick every `DEMO_STEP_MS` while `&demo=` is on. */
+function useDemoStep(demo: BoardDemo | null): number {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!demo) return;
+    const timer = setInterval(() => setStep((s) => s + 1), DEMO_STEP_MS);
+    return () => clearInterval(timer);
+  }, [demo]);
+  return step;
+}
+
+export function WallSandbox({ wallCase, clock, guest, demo = null }: { wallCase: WallCase; clock: ClockStyle; guest: boolean; demo?: BoardDemo | null }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
   const [base] = useState(() => Date.now() - (Date.now() % 60_000));
   const live = useClock();
+  const step = useDemoStep(demo);
+  const board = boardFor(wallCase, base, guest);
   // the night case pins the clock to 23:10 in Aqtobe; every other case runs on the real one
   const now = wallCase === "night" ? new Date(todayAt(base, 23, 10)) : live;
   const data = fixtures(base, guest);
@@ -383,7 +396,7 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
   const summary = wallCase === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
 
   return (
-    <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }}>
+    <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : undefined}>
       <TvFrame
         company="Компания"
         logoUrl={null}
@@ -402,7 +415,7 @@ export function WallSandbox({ wallCase, clock, guest }: { wallCase: WallCase; cl
         rating={ratingFor(wallCase, base, guest)}
         calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
         calendarView={wallCase === "calendar-month" ? "month" : "week"}
-        board={boardFor(wallCase, base, guest)}
+        board={board && demo ? boardDemo(board, demo, step) : board}
         overlay={overlayOf(overlayFor(wallCase, base, guest), summary.events, new Date(base))}
         sound={false}
       />

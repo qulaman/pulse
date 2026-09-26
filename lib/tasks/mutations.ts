@@ -3,8 +3,10 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { dequeue, enqueue } from "@/lib/outbox";
+import type { BoardTask } from "@/lib/pulse/board";
 import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
@@ -17,6 +19,7 @@ import {
   type TaskWithPeople,
 } from "./queries";
 import { heldKeys } from "./held";
+import { NUDGE_EVERY_MS } from "./lifecycle";
 import { receiptKeys } from "./receipts";
 import type { TaskStatus } from "./status-text";
 import { markFailed } from "./thread";
@@ -25,7 +28,8 @@ const GENERIC_ERROR = "Не получилось. Попробую ещё раз
 
 type ApiErrorBody = { error?: { code?: string; message_ru?: string } };
 
-async function postJson(path: string, payload: unknown): Promise<void> {
+/** The answer's JSON body on success (null when there is none); a failure throws. */
+async function postJson(path: string, payload: unknown): Promise<unknown> {
   // the idempotency key doubles as the outbox key: a replay after a reload is the same call
   const key = (payload as { client_request_id?: string } | null)?.client_request_id ?? `${path}:${Date.now()}`;
   let res: Response;
@@ -44,7 +48,13 @@ async function postJson(path: string, payload: unknown): Promise<void> {
   }
   dequeue(key);
 
-  if (res.ok) return;
+  if (res.ok) {
+    try {
+      return await res.json();
+    } catch {
+      return null;
+    }
+  }
   if (res.status === 401 && typeof window !== "undefined") {
     // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- full reload on purpose: drop every client cache of the dead session
     window.location.assign(`${window.location.origin}/login`);
@@ -92,6 +102,13 @@ function restoreTasks(queryClient: QueryClient, snapshot: ReturnType<typeof snap
   for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
 }
 
+/** The board row carries what the task row does not — a request for time, a reminder (D-128). */
+function patchBoard(queryClient: QueryClient, taskId: string, patch: Partial<BoardTask>) {
+  queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) =>
+    old ? old.map((row) => (row.id === taskId ? { ...row, ...patch } : row)) : old,
+  );
+}
+
 function invalidateTasks(queryClient: QueryClient, taskId: string) {
   void queryClient.invalidateQueries({ queryKey: taskKeys.root });
   void queryClient.invalidateQueries({ queryKey: taskKeys.thread(taskId) });
@@ -108,11 +125,16 @@ export type TransitionInput = {
   requestId: string;
   /** «Не могу»: chip + free text, becomes a visible message. */
   reason?: string;
+  /** «Это к другому» (D-128): the colleague suggested with the refusal. */
+  suggestAssigneeId?: string;
   /** Rework note from the director, likewise a visible message. */
   comment?: string;
   /** «Выполнено»: the report rides inside the transition — one call, one transaction (D-64 §3). */
-  report?: { text?: string; file_path?: string };
+  report?: Report;
 };
+
+/** The words and the photo of a handover; `partial` — «сделано не всё» (D-128). */
+export type Report = { text?: string; file_path?: string; partial?: boolean };
 
 export function useTransition() {
   const queryClient = useQueryClient();
@@ -123,6 +145,7 @@ export function useTransition() {
         to_status: input.toStatus,
         reason: input.reason,
         comment: input.comment,
+        suggest_assignee_id: input.suggestAssigneeId,
         report: input.report,
         client_request_id: input.requestId,
       });
@@ -262,7 +285,17 @@ export function useExtendDeadline() {
   });
 }
 
-export type ReassignInput = { taskId: string; assigneeId: string; assigneeName: string; requestId: string };
+export type ReassignInput = {
+  taskId: string;
+  assigneeId: string;
+  assigneeName: string;
+  requestId: string;
+  /** D-128: a new deadline for the new person — only when `changeDeadline` (null: «без срока») */
+  deadlineIso?: string | null;
+  changeDeadline?: boolean;
+  /** D-128: the director's word to the new person */
+  note?: string;
+};
 
 export function useReassign() {
   const queryClient = useQueryClient();
@@ -272,10 +305,135 @@ export function useReassign() {
       await postJson(`/api/tasks/${input.taskId}/reassign`, {
         assignee_id: input.assigneeId,
         client_request_id: input.requestId,
+        ...(input.changeDeadline ? { change_deadline: true, deadline_iso: input.deadlineIso ?? null } : {}),
+        ...(input.note?.trim() ? { note: input.note.trim() } : {}),
       });
     },
     // no optimistic clone: the new task's id comes from the server, the lists refetch at once
     onSuccess: (_data, input) => toast(`Передал: ${input.assigneeName}`),
+    onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
+    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
+/* D-128: «Нужно больше времени», its answer, «Напомнить»                      */
+/* -------------------------------------------------------------------------- */
+
+export type RequestTimeInput = {
+  taskId: string;
+  /** a new task is taken by the request — «возьму, но к …» */
+  fromStatus: TaskStatus;
+  proposedIso: string;
+  words?: string;
+  requestId: string;
+};
+
+/** The employee asks for another deadline; the card shows «ждёт ответа» at once. */
+export function useRequestDeadline(me: Me | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: RequestTimeInput) => {
+      await postJson(`/api/tasks/${input.taskId}/deadline-request`, {
+        proposed_iso: input.proposedIso,
+        words: input.words?.trim() || undefined,
+        client_request_id: input.requestId,
+      });
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.root });
+      const snapshot = snapshotTasks(queryClient);
+      if (input.fromStatus === "sent") {
+        queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
+          patchCached(old, input.taskId, { status: "accepted" }),
+        );
+      }
+      patchBoard(queryClient, input.taskId, {
+        time_request: {
+          id: `pending:${input.requestId}`,
+          proposed: input.proposedIso,
+          words: input.words?.trim() || null,
+          at: new Date().toISOString(),
+          senderId: me?.userId ?? null,
+        },
+      });
+      return { snapshot };
+    },
+    onError: (error, _input, context) => {
+      if (context) restoreTasks(queryClient, context.snapshot);
+      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+  });
+}
+
+export type AnswerTimeInput = { taskId: string; approve: boolean; proposedIso: string | null; requestId: string };
+
+/** «Согласовать» / «Оставить прежний»: the request leaves the card at once, the deadline follows. */
+export function useAnswerDeadline() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: AnswerTimeInput) => {
+      await postJson(`/api/tasks/${input.taskId}/deadline-answer`, {
+        approve: input.approve,
+        client_request_id: input.requestId,
+      });
+    },
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: taskKeys.root });
+      const snapshot = snapshotTasks(queryClient);
+      if (input.approve && input.proposedIso) {
+        queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
+          patchCached(old, input.taskId, { deadline: input.proposedIso }),
+        );
+      }
+      patchBoard(queryClient, input.taskId, { time_request: null });
+      return { snapshot };
+    },
+    onError: (error, _input, context) => {
+      if (context) restoreTasks(queryClient, context.snapshot);
+      toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+  });
+}
+
+export type NudgeInput = { taskId: string; name: string; requestId: string };
+
+type NudgeResult = { too_soon?: boolean; last_at?: string; deliver_after?: string | null };
+
+/**
+ * «Напомнить»: the server says whether the push went now, waits for the window, or was not
+ * sent because the last one is less than half an hour old — the toast says which.
+ */
+export function useNudge() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: NudgeInput): Promise<NudgeResult> => {
+      const body = (await postJson(`/api/tasks/${input.taskId}/nudge`, { client_request_id: input.requestId })) as {
+        result?: NudgeResult;
+      } | null;
+      return body?.result ?? {};
+    },
+    onSuccess: (result, input) => {
+      const now = new Date();
+      if (result.too_soon && result.last_at) {
+        const left = Math.max(1, Math.ceil((new Date(result.last_at).getTime() + NUDGE_EVERY_MS - now.getTime()) / 60_000));
+        toast(`Уже напомнили ${humanAqtobe(new Date(result.last_at), now)} · снова можно через ${left} мин`);
+        return;
+      }
+      if (result.last_at) patchBoard(queryClient, input.taskId, { nudged_at: result.last_at });
+      toast(
+        result.deliver_after
+          ? `Напомню ${humanAqtobe(new Date(result.deliver_after), now)} — сейчас тихие часы`
+          : input.name
+            ? `Напомнил · ${input.name}`
+            : "Напомнил",
+      );
+    },
     onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
@@ -472,7 +630,7 @@ export function useSendMessage(me: Me | undefined) {
 export type TaskActions = {
   transition: (input: Omit<TransitionInput, "requestId">) => void;
   /** rework → accepted → pending_review: two calls, two client_request_id. */
-  complete: (input: { taskId: string; fromStatus: TaskStatus; report?: { text?: string; file_path?: string } }) => void;
+  complete: (input: { taskId: string; fromStatus: TaskStatus; report?: Report }) => void;
   revoke: (taskId: string) => void;
   /** «Отправить сейчас»: what this task holds for the morning goes out now (D-129). */
   sendNow: (taskId: string) => void;
@@ -480,6 +638,12 @@ export type TaskActions = {
   extend: (input: Omit<ExtendInput, "requestId">) => void;
   /** «Переназначить»: the same order to another person; the old task is revoked. */
   reassign: (input: Omit<ReassignInput, "requestId">) => void;
+  /** «Нужно больше времени» / «Возьму, но к …» (D-128). */
+  requestTime: (input: Omit<RequestTimeInput, "requestId">) => void;
+  /** «Согласовать» / «Оставить прежний» (D-128). */
+  answerTime: (input: Omit<AnswerTimeInput, "requestId">) => void;
+  /** «Напомнить» (D-128). */
+  nudge: (input: Omit<NudgeInput, "requestId">) => void;
   sendMessage: (input: SendMessageInput) => void;
   /** «Удалить»: hard delete, no trace — cleanup of wrong and test orders. */
   remove: (taskId: string) => void;
@@ -494,6 +658,9 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const sendNow = useSendNow();
   const extend = useExtendDeadline();
   const reassign = useReassign();
+  const requestTime = useRequestDeadline(me);
+  const answerTime = useAnswerDeadline();
+  const nudge = useNudge();
   const sendMessage = useSendMessage(me);
   const remove = useDeleteTask();
   const markRead = useMarkRead(me);
@@ -502,6 +669,9 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
     extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
     reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
+    requestTime: (input) => requestTime.mutate({ ...input, requestId: crypto.randomUUID() }),
+    answerTime: (input) => answerTime.mutate({ ...input, requestId: crypto.randomUUID() }),
+    nudge: (input) => nudge.mutate({ ...input, requestId: crypto.randomUUID() }),
     complete: ({ taskId, fromStatus, report }) => {
       if (fromStatus === "rework") {
         // The employee taps once; the matrix still demands rework → accepted first.
@@ -522,6 +692,14 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     remove: (taskId) => remove.mutate({ taskId }),
     markRead: (input) => markRead.mutate(input),
     // sending a message is not «busy»: the composer stays live, the row carries its own clock
-    busy: transition.isPending || revoke.isPending || sendNow.isPending || extend.isPending || reassign.isPending,
+    busy:
+      transition.isPending ||
+      revoke.isPending ||
+      sendNow.isPending ||
+      extend.isPending ||
+      reassign.isPending ||
+      requestTime.isPending ||
+      answerTime.isPending ||
+      nudge.isPending,
   };
 }

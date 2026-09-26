@@ -1,5 +1,36 @@
 import { describe, expect, it } from "vitest";
 
+import { statusWord as wordOf, stepsOf as stepsFor } from "./overview";
+
+describe("a handed-over task (D-128)", () => {
+  const base = {
+    id: "t-passed",
+    status: "revoked" as const,
+    deadline: null,
+    priority: "normal" as const,
+    created_at: "2026-09-20T04:00:00Z",
+    title: "Датчики",
+    body: null,
+    assignee_id: "u",
+    assignee: null,
+    accepted_at: null,
+    completed_at: null,
+    closed_at: "2026-09-21T04:00:00Z",
+    updated_at: "2026-09-21T04:00:00Z",
+    scheduled_send_at: null,
+  };
+
+  it("says «передана» and ends calm", () => {
+    expect(wordOf({ ...base, passed_to: "p" }, "employee")).toBe("передана");
+    expect(stepsFor({ ...base, passed_to: "p" }).at(-1)).toMatchObject({ label: "Передана", state: "done" });
+  });
+
+  it("a plain revoke stays «отозвана»", () => {
+    expect(wordOf(base, "director")).toBe("отозвана");
+    expect(stepsFor(base).at(-1)).toMatchObject({ label: "Отозвана", state: "bad" });
+  });
+});
+
 import type { DeskReason } from "./desk";
 import {
   closedSections,

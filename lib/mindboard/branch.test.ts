@@ -128,15 +128,17 @@ describe("parentsFirst", () => {
 });
 
 describe("lineState", () => {
-  const none = { phone: false, waiting: false, hearing: false };
+  const none = { phone: false, wait: null, hearing: false };
 
   it("is words once there are words, whatever else is going on", () => {
-    expect(lineState({ text: "План", audio_path: "a.webm" }, { phone: true, waiting: true, hearing: true })).toBe("words");
+    expect(lineState({ text: "План", audio_path: "a.webm" }, { phone: true, wait: "network", hearing: true })).toBe("words");
   });
 
   it("follows the voice: kept now, waiting on the phone, heard, not heard", () => {
     expect(lineState({ text: "", audio_path: null }, { ...none, phone: true })).toBe("saving");
-    expect(lineState({ text: "", audio_path: null }, { ...none, phone: true, waiting: true })).toBe("phone");
+    expect(lineState({ text: "", audio_path: null }, { ...none, phone: true, wait: "network" })).toBe("phone");
+    // a sub-point whose point is still on the phone: it waits for the point, not for the network
+    expect(lineState({ text: "", audio_path: null }, { ...none, phone: true, wait: "point" })).toBe("point");
     expect(lineState({ text: " ", audio_path: "a.webm" }, { ...none, hearing: true })).toBe("hearing");
     expect(lineState({ text: "", audio_path: "a.webm" }, none)).toBe("deaf");
   });

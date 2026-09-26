@@ -1,19 +1,20 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 
-import { CENTER_PAD_X, type MapBranch, type MapLayout, type MapLeaf } from "@/lib/tv/boardMap";
+import type { MapBranch, MapLayout, MapLeaf } from "@/lib/tv/boardMap";
 
 import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
 
 /**
  * «Карта» доски на стене (D-121): название — узел в центре, пункты — ветви справа и слева
  * на плавных лентах, подпункты — листья у своей ветви. Где что стоит, считает `mapLayout`
- * (всё в vh внутри поля); здесь узлы стоят на своих местах через transform, а связи —
- * один слой SVG под ними. Новая ветвь вырастает (opacity + scale), соседи переезжают
- * transform'ом; слой связей при перестройке сменяется прозрачностью. Ведущий подсветил
- * ветвь — она на подложке и чуть крупнее, остальные с их связями и листьями гаснут.
+ * (всё в vh внутри поля); здесь узлы стоят на своих местах через transform, а связи каждой
+ * ветви — своим слоем SVG под ними, размером со свой охват. Новая ветвь вырастает
+ * (opacity + scale), соседи переезжают transform'ом; слой связей при перестройке сменяется
+ * прозрачностью. Ведущий подсветил ветвь — она на подложке и чуть крупнее, остальные с их
+ * связями и листьями гаснут; гаснут слои целиком (композитор), SVG на кадрах не перерисовывается.
  */
 
 /**
@@ -42,48 +43,15 @@ export const TvBoardMap = memo(function TvBoardMap({
   fresh: string;
   still: boolean;
 }) {
-  const freshIds = new Set(fresh ? fresh.split(",") : []);
-  // the links are redrawn only when the geometry changes: then the old layer fades out under the new one
-  const geometry = layout.branches.map((branch) => branch.path + branch.leaves.map((leaf) => leaf.path).join("")).join("|");
+  const freshIds = useMemo(() => new Set(fresh ? fresh.split(",") : []), [fresh]);
   const glide = { duration: still ? 0 : 0.6, ease: EASE };
   const { center } = layout;
 
   return (
     <div className="relative mx-auto" style={{ width: vh(layout.width), height: vh(layout.height) }} data-testid="tv-board-map" data-tier={layout.tier.key}>
-      <AnimatePresence initial={false}>
-        <motion.svg
-          key={geometry}
-          aria-hidden
-          className="pointer-events-none absolute inset-0 h-full w-full"
-          viewBox={`0 0 ${layout.width} ${layout.height}`}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: still ? 0 : 0.5, ease: EASE }}
-        >
-          {layout.branches.map((branch) => {
-            const tone = toneOf(branch);
-            const dim = focus !== null && focus !== branch.item.id;
-            return (
-              <g key={branch.item.id} style={{ opacity: dim ? DIM * 0.8 : branch.item.done ? 0.55 : 1, transition: "opacity 500ms var(--ease-in-out)" }}>
-                <path d={branch.path} style={{ fill: tone, fillOpacity: 0.78 }} />
-                {branch.leaves.map((leaf, index) => (
-                  <g key={index}>
-                    {/* opaque, not translucent: the stems of one branch share their spine and must not stack up brighter */}
-                    <path d={leaf.path} style={{ fill: "none", stroke: `color-mix(in srgb, ${tone} 55%, var(--bg))`, strokeWidth: 0.24, strokeLinecap: "round", strokeLinejoin: "round" }} />
-                    <circle
-                      cx={leaf.dotX}
-                      cy={leaf.dotY}
-                      r={layout.tier.dot}
-                      style={leaf.leaf ? { fill: leaf.leaf.done ? "var(--ok)" : tone } : { fill: "var(--bg)", stroke: tone, strokeWidth: 0.2 }}
-                    />
-                  </g>
-                ))}
-              </g>
-            );
-          })}
-        </motion.svg>
-      </AnimatePresence>
+      {layout.branches.map((branch) => (
+        <Links key={branch.item.id} branch={branch} layout={layout} dim={focus !== null && focus !== branch.item.id} still={still} />
+      ))}
 
       {/* the title in the middle */}
       <motion.div
@@ -91,8 +59,8 @@ export const TvBoardMap = memo(function TvBoardMap({
         style={{
           width: vh(center.rect.w),
           height: vh(center.rect.h),
-          padding: `0 ${vh(CENTER_PAD_X)}`,
-          borderRadius: vh(2.6),
+          padding: `0 ${vh(center.padX)}`,
+          borderRadius: vh(layout.tier.centerRadius),
           background:
             "radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 60%), var(--surface-2)",
           boxShadow: "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 55%, transparent), 0 2vh 6vh rgba(0, 0, 0, 0.42)",
@@ -139,11 +107,55 @@ export const TvBoardMap = memo(function TvBoardMap({
   );
 });
 
-function Branch({ branch, layout, lit, dim, fresh, still }: { branch: MapBranch; layout: MapLayout; lit: boolean; dim: boolean; fresh: boolean; still: boolean }) {
+/**
+ * Связи одной ветви — лента от названия, стебли, точки листьев — отдельным слоем размером с
+ * их охват (`branch.links`, в тех же vh). Ведущий гасит ветвь прозрачностью этого слоя: это
+ * анимация композитора, а общий SVG на всю карту перерисовывался бы каждый кадр полсекунды.
+ * Геометрия изменилась (новая ветвь, лист) — старый слой тает под новым.
+ */
+const Links = memo(function Links({ branch, layout, dim, still }: { branch: MapBranch; layout: MapLayout; dim: boolean; still: boolean }) {
+  const { tier } = layout;
+  const tone = toneOf(branch);
+  const box = branch.links;
+  const geometry = branch.path + branch.leaves.map((leaf) => leaf.path).join("");
+  return (
+    <AnimatePresence initial={false}>
+      <motion.div
+        key={geometry}
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{ left: vh(box.x), top: vh(box.y), width: vh(box.w), height: vh(box.h) }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: dim ? DIM * 0.8 : branch.item.done ? 0.55 : 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: still ? 0 : 0.5, ease: EASE }}
+      >
+        <svg className="block h-full w-full overflow-visible" viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`}>
+          <path d={branch.path} style={{ fill: tone, fillOpacity: 0.78 }} />
+          {branch.leaves.map((leaf, index) => (
+            <g key={index}>
+              {/* opaque, not translucent: the stems of one branch share their spine and must not stack up brighter */}
+              <path d={leaf.path} style={{ fill: "none", stroke: `color-mix(in srgb, ${tone} 55%, var(--bg))`, strokeWidth: tier.stem, strokeLinecap: "round", strokeLinejoin: "round" }} />
+              <circle
+                cx={leaf.dotX}
+                cy={leaf.dotY}
+                r={tier.dot}
+                style={leaf.leaf ? { fill: leaf.leaf.done ? "var(--ok)" : tone } : { fill: "var(--bg)", stroke: tone, strokeWidth: tier.stem * 0.8 }}
+              />
+            </g>
+          ))}
+        </svg>
+      </motion.div>
+    </AnimatePresence>
+  );
+});
+
+// memo: the spotlight moves from branch to branch and redraws those two, not the whole map
+const Branch = memo(function Branch({ branch, layout, lit, dim, fresh, still }: { branch: MapBranch; layout: MapLayout; lit: boolean; dim: boolean; fresh: boolean; still: boolean }) {
   const { tier } = layout;
   const { rect, item } = branch;
   const tone = toneOf(branch);
-  const radius = vh(1.8);
+  const radius = vh(tier.radius);
   const x = vh(rect.x);
   const y = vh(rect.y);
   return (
@@ -188,9 +200,9 @@ function Branch({ branch, layout, lit, dim, fresh, still }: { branch: MapBranch;
       </div>
     </motion.div>
   );
-}
+});
 
-function Leaf({
+const Leaf = memo(function Leaf({
   leaf,
   branch,
   layout,
@@ -247,4 +259,4 @@ function Leaf({
       </p>
     </motion.div>
   );
-}
+});

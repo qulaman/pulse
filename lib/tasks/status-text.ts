@@ -45,7 +45,7 @@ export const BUTTON = {
   insist: "Настоять",
   cancel: "Отменить",
   revoke: "Отозвать",
-  extend: "Продлить",
+  extend: "Срок",
   reassign: "Переназначить",
   remove: "Удалить",
   send: "Отправить",
@@ -72,8 +72,23 @@ export const TEXT = {
   photoRemove: "Убрать фото",
   photoUploading: "Отправляю фото…",
   photoFailed: "Фото не отправилось. Проверь связь и попробуй ещё раз",
-  declineTitle: "Почему не получится?",
-  declinePlaceholder: "Добавить словами (необязательно)",
+  // «Не могу» (D-128): three ways out, each a decision for the director
+  cantTitle: "Что мешает?",
+  cantTime: "Нужно больше времени",
+  cantOtherTime: "Другое время",
+  cantPast: "Это время уже прошло",
+  cantNotMine: "Это не ко мне",
+  cantSuggest: "Подсказать, кому…",
+  cantNobody: "Не знаю кому",
+  cantRefuse: "Не смогу сделать",
+  cantWords: "Пару слов директору — по желанию",
+  cantPick: "Выберите, что мешает",
+  cantReturn: "Вернуть директору",
+  passTitle: "Кому лучше передать?",
+  passHint: "Задача вернётся директору с вашей подсказкой — решит он",
+  reportPartial: "Сделано не всё",
+  reportPartialPlaceholder: "Что осталось и почему?",
+  reportPartialSend: "Сдать как есть",
   reworkTitle: "Что доработать?",
   reworkPlaceholder: "Комментарий обязателен — сотрудник увидит его в треде",
   revokeConfirm: "Отозвать задачу? Сотрудник увидит пометку «отозвано директором»",
@@ -83,9 +98,6 @@ export const TEXT = {
   question: "вопрос",
   audioFailed: "Не смог открыть аудио, попробуй ещё раз",
 } as const;
-
-/** «Не могу» is chips first — nobody types on a building site in the cold. */
-export const DECLINE_REASONS = ["Это не ко мне", "Занят срочным", "Буду позже"] as const;
 
 export type DeadlineLabel = { text: string; overdue: boolean; none: boolean };
 

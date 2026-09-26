@@ -79,7 +79,8 @@ export function TvBoard({ data, now }: { data: TvBoardData | null; now: Date }) 
       <div className="relative" style={{ marginTop: vh(BOARD_TOP_GAP), height: vh(frame.height) }}>
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
-            key={view}
+            // another view, or the map on another step of its scale, crossfades as a whole: type never resizes in view
+            key={map ? `map-${map.tier.key}` : "list"}
             className="absolute inset-0"
             initial={{ opacity: 0, scale: still ? 1 : 0.98 }}
             animate={{ opacity: 1, scale: 1 }}

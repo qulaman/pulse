@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TaskMessage } from "./queries";
-import { applyMessageUpdate, dayLabel, markFailed, messageState, startsNewDay } from "./thread";
+import { applyMessageUpdate, dayLabel, markFailed, messageState, startsNewDay, withoutPassedRevoke } from "./thread";
 
 function said(id: string, content: string, meta: TaskMessage["meta"] = {}): TaskMessage {
   return {
@@ -78,5 +78,20 @@ describe("days of a thread", () => {
     expect(startsNewDay(undefined, a)).toBe(true);
     expect(startsNewDay(a, b)).toBe(true);
     expect(startsNewDay(b, c)).toBe(false);
+  });
+});
+
+describe("a handed-over task (D-128)", () => {
+  const at = "2026-09-17T04:00:00.500Z";
+  const revoked: TaskMessage = { ...said("s1", ""), type: "status_change", meta: { new_status: "revoked" }, created_at: at };
+  const passed: TaskMessage = { ...said("s2", "Передана: Ерлан"), type: "system", meta: { reassigned_to: "t2" }, created_at: at };
+
+  it("says «передана» once, without «отозвано» beside it", () => {
+    expect(withoutPassedRevoke([revoked, passed]).map((m) => m.id)).toEqual(["s2"]);
+  });
+
+  it("a plain revoke stays", () => {
+    const thread = [revoked];
+    expect(withoutPassedRevoke(thread)).toBe(thread);
   });
 });
