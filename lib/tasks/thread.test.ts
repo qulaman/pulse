@@ -81,7 +81,7 @@ describe("days of a thread", () => {
   });
 });
 
-describe("a handed-over task (D-128)", () => {
+describe("a handed-over task (D-129)", () => {
   const at = "2026-09-17T04:00:00.500Z";
   const revoked: TaskMessage = { ...said("s1", ""), type: "status_change", meta: { new_status: "revoked" }, created_at: at };
   const passed: TaskMessage = { ...said("s2", "Передана: Ерлан"), type: "system", meta: { reassigned_to: "t2" }, created_at: at };

@@ -18,7 +18,7 @@ export type DirectorSheetName = "rework" | "extend" | "reassign" | "revoke" | "d
 
 const NAMES: readonly string[] = ["rework", "extend", "reassign", "revoke", "delete", "passDeadline"];
 
-/** A reassign waiting for its new deadline (D-128): who takes the task and the director's word. */
+/** A reassign waiting for its new deadline (D-129): who takes the task and the director's word. */
 export type PassTo = { person: PickedPerson; note: string };
 
 /** Narrows a card's open-sheet state to the director's sheets. */
@@ -47,9 +47,9 @@ export function DirectorSheets({
   actions: TaskActions;
   /** On the task's own page there is nothing left to look at after «Удалить». */
   afterRemove?: () => void;
-  /** The colleague the employee suggested — on top of «Кому передать?» (D-128). */
+  /** The colleague the employee suggested — on top of «Кому передать?» (D-129). */
   suggestedId?: string | null;
-  /** The reassign that asks for a new deadline before it goes (D-128). */
+  /** The reassign that asks for a new deadline before it goes (D-129). */
   passTo?: PassTo | null;
   /** The old deadline is behind or within the hour: the caller opens «Срок для …». */
   onNeedsDeadline?: (pass: PassTo) => void;

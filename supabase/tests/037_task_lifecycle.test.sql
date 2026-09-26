@@ -1,4 +1,4 @@
--- D-128: the task's life between the director and the employee — «Не могу» from rework with
+-- D-129: the task's life between the director and the employee — «Не могу» from rework with
 -- a suggested colleague, «Нужно больше времени» and its answers, honest «Срок», «Напомнить»,
 -- a reassign with a new deadline and a word, «Скоро срок», no «Просрочено» while a request waits.
 -- Counts are scoped to this file's rows: dev holds other people's tasks and queues.

@@ -20,7 +20,7 @@ const firstName = (full: string | null | undefined) => full?.trim().split(/\s+/)
 /**
  * What the employee's three buttons do, wherever a task shows them — a card of «Мои дела»
  * or the task's own screen (D-83, D-87): «Принял» at once with a receipt, «Уточнить»,
- * «Не могу» and «Выполнено» through their sheets. «Не могу» is the sheet of D-128: more time
+ * «Не могу» and «Выполнено» through their sheets. «Не могу» is the sheet of D-129: more time
  * (the task stays in work), «это не ко мне» with a colleague's name, or a real refusal.
  * One hook, one meaning per button.
  */

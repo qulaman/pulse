@@ -13,7 +13,7 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * «Нужно больше времени» (D-128): the assignee asks for another deadline. On a new task it is
+ * «Нужно больше времени» (D-129): the assignee asks for another deadline. On a new task it is
  * «возьму, но к …» — the RPC takes the task and leaves the time to the director. One RPC: the
  * request as a message with a flag, the director's push («Просит срок»), the receipt.
  */

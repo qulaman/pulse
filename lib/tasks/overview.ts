@@ -23,7 +23,7 @@ export type ListTask = Groupable & {
   closed_at: string | null;
   updated_at: string;
   scheduled_send_at: string | null;
-  /** D-128: a reassigned task knows who took over; its end is «передана», not «отозвана» */
+  /** D-129: a reassigned task knows who took over; its end is «передана», not «отозвана» */
   passed_to?: string | null;
 };
 
@@ -451,7 +451,7 @@ export function stepsOf(task: ListTask, now: Date = new Date()): Step[] {
         handed,
         step("work", "В работе", task.accepted_at, task.accepted_at ? "done" : "todo"),
         step("handed_in", "Сдана", task.completed_at, task.completed_at ? "done" : "todo"),
-        // a handover is not a failure: the work went on with another person (D-128)
+        // a handover is not a failure: the work went on with another person (D-129)
         task.passed_to ? step("closed", "Передана", closedAtOf(task), "done") : step("closed", "Отозвана", closedAtOf(task), "bad"),
       ];
     default:

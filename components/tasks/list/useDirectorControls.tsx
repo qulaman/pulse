@@ -57,9 +57,9 @@ export function useDirectorControls({
   tasks: readonly TaskWithPeople[];
   /** the employee's open question of a task, for «Ответить словами» */
   questionOf: (taskId: string) => string | null;
-  /** the employee's request for time still waiting (D-128) */
+  /** the employee's request for time still waiting (D-129) */
   requestOf?: (taskId: string) => TimeRequest | null;
-  /** the colleague suggested with a refusal (D-128) */
+  /** the colleague suggested with a refusal (D-129) */
   suggestionOf?: (taskId: string) => Suggestion | null;
   now: Date;
   /** «Открыть переписку» in «Все действия» — off on the task's own screen */

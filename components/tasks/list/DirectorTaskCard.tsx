@@ -49,7 +49,7 @@ const ICON: Partial<Record<DeskAction, IconName>> = {
   nudge: "bell",
 };
 
-/** What the keys need from the board row besides the status (D-128). */
+/** What the keys need from the board row besides the status (D-129). */
 export type CardFlags = { question?: boolean; request?: boolean; suggestion?: boolean };
 
 /**
@@ -66,7 +66,7 @@ export function allActionsFor(task: { status: TaskWithPeople["status"] }, { requ
     case "accepted":
     case "in_progress":
     case "rework":
-      // a request for time is answered, not reminded about (D-128)
+      // a request for time is answered, not reminded about (D-129)
       return request ? ["grant", "retime", "keep", "reassign", "revoke", "remove"] : ["extend", "nudge", "reassign", "revoke", "remove"];
     case "scheduled":
       return ["extend", "revoke", "remove"];
@@ -101,7 +101,7 @@ export function isPrimaryKey(key: DeskAction, reason: DeskReason | null): boolea
 }
 
 /**
- * The first key that carries its own words (D-128) — «Согласовать · до завтра 10:00»,
+ * The first key that carries its own words (D-129) — «Согласовать · до завтра 10:00»,
  * «Передать · Ерлан» — takes a row of its own; the rest share the row below.
  */
 export function wideLabelOf(key: DeskAction, request: TimeRequest | null, suggestion: Suggestion | null, now: Date): string | null {
@@ -158,7 +158,7 @@ export function DirectorKeys({
   );
 }
 
-/** The director's notes of D-128 on a task: a request for time, «не всё», who took over, a reminder. */
+/** The director's notes of D-129 on a task: a request for time, «не всё», who took over, a reminder. */
 export function LifecycleNotes({
   task,
   request,

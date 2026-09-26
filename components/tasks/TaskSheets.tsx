@@ -66,7 +66,7 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
 type CantPick = { kind: "time"; iso: string } | { kind: "decline"; reason: string };
 
 /**
- * One sheet behind «Не могу», on a new task and on work in hand (D-128): the employee says what
+ * One sheet behind «Не могу», on a new task and on work in hand (D-129): the employee says what
  * stands in the way and the director gets a decision to make, not a bare refusal.
  *  - «Нужно больше времени» — a deadline in one chip: the task stays in work (on a new one it
  *    is «возьму, но к …»), the director grants it or keeps the old one;
@@ -238,7 +238,7 @@ function GroupLabel({ children }: { children: ReactNode }) {
 /* -------------------------------------------------------------------------- */
 
 /**
- * The handover: words, a photo and — when the work is not all done — «Сделано не всё» (D-128):
+ * The handover: words, a photo and — when the work is not all done — «Сделано не всё» (D-129):
  * the director sees «сдано частично» and decides with the usual buttons.
  */
 export function ReportSheet({

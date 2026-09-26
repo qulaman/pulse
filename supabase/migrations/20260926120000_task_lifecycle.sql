@@ -1,4 +1,4 @@
--- D-128: the life of a task between the director and the employee — the places that had no
+-- D-129: the life of a task between the director and the employee — the places that had no
 -- path. After «Принял» the employee could only hand in; «Буду позже» and «Это не ко мне» were
 -- refusals; a reassigned task told the old holder «Отозвано директором» and gave the new one
 -- no context and a deadline already behind; nobody reminded anybody of anything. The rule of
@@ -6,9 +6,8 @@
 -- statuses — a proposal is a message with a flag, the way «Уточнить» is (D-03).
 --
 --   1. tasks.passed_to        — who took over a reassigned task (the old holder's card says so)
---   2. task_status_guard      — «Не могу» also from rework (sent/accepted already allowed it)
---   3. transition_task        — a refusal may suggest a colleague; a report may say «не всё»;
---                               the director's push carries the reason
+--   3. transition_task        — «Не могу» also from rework; a refusal may suggest a colleague;
+--                               a report may say «не всё»; the director's push carries the reason
 --   4. request_deadline       — the employee asks for another deadline; on a new task it is
 --                               «возьму, но к …»: accepted at once, the request waits
 --   5. answer_deadline_request — «Согласовать» / «Оставить прежний»
@@ -21,8 +20,9 @@
 --  10. overdue_alerts_due     — no «Просрочено» while the employee's request waits
 --  11. deadline_reminders_due — «Скоро срок» to the employee an hour before (minute sweep)
 --
--- Nothing here touches notify_outbox_task: the words of the task pushes belong to D-125
--- (a parallel migration); the producers below adjust the rows they cause instead.
+-- Nothing here touches notify_outbox_task (its words belong to D-125) or task_status_guard (D-128
+-- «отправить сейчас» rewrites it): the producers below adjust the rows they cause, and «Не могу»
+-- from rework walks the guard's own edges — rework → accepted → declined — inside transition_task.
 
 -- ---------------------------------------------------------------------------
 -- 1. Who took over
@@ -30,7 +30,7 @@
 alter table tasks add column if not exists passed_to uuid references profiles(id);
 
 comment on column tasks.passed_to is
-  'D-128: set by reassign_task on the revoked original — the person the work went to.';
+  'D-129: set by reassign_task on the revoked original — the person the work went to.';
 
 create or replace function tasks_field_guard() returns trigger
 language plpgsql security definer set search_path = public
@@ -73,64 +73,6 @@ begin
   return new;
 end;
 $$;
-
--- ---------------------------------------------------------------------------
--- 2. «Не могу» from any work in hand, rework included
--- ---------------------------------------------------------------------------
-create or replace function task_status_guard() returns trigger
-language plpgsql security definer set search_path = public
-as $fn$
-declare
-  uid   uuid    := auth.uid();
-  urole text    := auth_role();
-  ok    boolean := false;
-begin
-  if new.status = old.status then
-    return new;
-  end if;
-
-  if old.status = 'scheduled' and new.status = 'sent' then
-    ok := uid is null;                                     -- cron scheduled-send only
-  elsif old.status = 'sent' and new.status = 'accepted' then
-    ok := uid is null or uid = old.assignee_id;
-  elsif old.status in ('sent','accepted','in_progress','rework') and new.status = 'declined' then
-    ok := uid is null or uid = old.assignee_id;            -- D-128: rework too
-  elsif old.status = 'accepted' and new.status = 'pending_review' then
-    ok := uid is null or uid = old.assignee_id;
-  elsif old.status = 'pending_review' and new.status in ('done','rework') then
-    ok := uid is null or urole = 'director';
-  elsif old.status = 'rework' and new.status = 'accepted' then
-    ok := uid is null or uid = old.assignee_id;
-  elsif old.status = 'declined' and new.status = 'sent' then
-    ok := uid is null or urole = 'director';               -- "Настоять" (G.20)
-  elsif new.status = 'revoked' and old.status not in ('done','revoked') then
-    ok := uid is null or urole = 'director';               -- incl. declined: "Отменить"
-  end if;
-
-  if not ok then
-    raise exception 'invalid_transition' using errcode = 'P0001';
-  end if;
-
-  new.accepted_at  := old.accepted_at;
-  new.completed_at := old.completed_at;
-  new.closed_at    := old.closed_at;
-
-  if new.status = 'accepted' and old.status = 'sent' then
-    new.accepted_at := now();
-  end if;
-  if new.status = 'pending_review' then
-    new.completed_at := now();
-  end if;
-  if new.status in ('done','declined','revoked') then
-    new.closed_at := now();
-  end if;
-  if old.status = 'declined' and new.status = 'sent' then
-    new.closed_at := null;                                 -- the task is open again
-  end if;
-
-  return new;
-end;
-$fn$;
 
 -- ---------------------------------------------------------------------------
 -- 3. transition_task: a suggestion with the refusal, «не всё» with the report
@@ -188,6 +130,13 @@ begin
     v_meta := v_meta || jsonb_build_object('suggest_assignee_id', v_suggest, 'suggest_name', v_suggest_name);
     -- the suggestion travels on the reason's row: a refusal without words still carries one
     v_reason := coalesce(v_reason, 'Это не ко мне');
+  end if;
+
+  -- «Не могу» on a rework: the guard knows accepted → declined, and rework → accepted is the
+  -- assignee's own step — the same hand, one transaction, the guard's rules untouched
+  if to_status = 'declined' then
+    update tasks t set status = 'accepted'
+     where t.id = v_task and t.company_id = v_company and t.status = 'rework';
   end if;
 
   update tasks t set status = to_status

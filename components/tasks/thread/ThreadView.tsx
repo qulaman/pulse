@@ -43,7 +43,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   const receipt = useThreadReceipt(taskId, isDirector, userId);
   const line = isDirector ? receiptLine(receipt.data) : null;
 
-  // a handed-over task tells «передана» once, not «отозвано» beside it (D-128)
+  // a handed-over task tells «передана» once, not «отозвано» beside it (D-129)
   const rows = useMemo(() => withoutPassedRevoke(messages ?? []), [messages]);
   // one receipt, under the last word that is mine — a tick per bubble would be noise
   const lastMine = [...rows].reverse().find((message) => message.sender_id === userId && !isPendingMessage(message));

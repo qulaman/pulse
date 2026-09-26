@@ -12,7 +12,7 @@ describe("transportFor — the fixed policy (D-114)", () => {
   it("carries good news quietly", () => {
     expect(transportFor({ event_kind: "done", meta: {} })).toMatchObject({ urgency: "normal", silent: true });
     expect(transportFor({ event_kind: "deadline_extended", meta: {} })).toMatchObject({ silent: true });
-    // D-128: what the employee has to act on rings; «скоро срок» is worthless after its hour
+    // D-129: what the employee has to act on rings; «скоро срок» is worthless after its hour
     expect(transportFor({ event_kind: "deadline_moved", meta: {} })).toMatchObject({ silent: false, urgency: "high" });
     expect(transportFor({ event_kind: "deadline_kept", meta: {} })).toMatchObject({ silent: false, urgency: "high" });
     expect(transportFor({ event_kind: "task_nudge", meta: {} })).toMatchObject({ silent: false, urgency: "high" });

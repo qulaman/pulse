@@ -12,7 +12,7 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * The director's answer to «Нужно больше времени» (D-128): one RPC — the deadline (if granted),
+ * The director's answer to «Нужно больше времени» (D-129): one RPC — the deadline (if granted),
  * the request closed, a line in the thread, the employee's push.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(

@@ -100,7 +100,7 @@ function restoreTasks(queryClient: QueryClient, snapshot: ReturnType<typeof snap
   for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
 }
 
-/** The board row carries what the task row does not — a request for time, a reminder (D-128). */
+/** The board row carries what the task row does not — a request for time, a reminder (D-129). */
 function patchBoard(queryClient: QueryClient, taskId: string, patch: Partial<BoardTask>) {
   queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) =>
     old ? old.map((row) => (row.id === taskId ? { ...row, ...patch } : row)) : old,
@@ -123,7 +123,7 @@ export type TransitionInput = {
   requestId: string;
   /** «Не могу»: chip + free text, becomes a visible message. */
   reason?: string;
-  /** «Это к другому» (D-128): the colleague suggested with the refusal. */
+  /** «Это к другому» (D-129): the colleague suggested with the refusal. */
   suggestAssigneeId?: string;
   /** Rework note from the director, likewise a visible message. */
   comment?: string;
@@ -131,7 +131,7 @@ export type TransitionInput = {
   report?: Report;
 };
 
-/** The words and the photo of a handover; `partial` — «сделано не всё» (D-128). */
+/** The words and the photo of a handover; `partial` — «сделано не всё» (D-129). */
 export type Report = { text?: string; file_path?: string; partial?: boolean };
 
 export function useTransition() {
@@ -226,10 +226,10 @@ export type ReassignInput = {
   assigneeId: string;
   assigneeName: string;
   requestId: string;
-  /** D-128: a new deadline for the new person — only when `changeDeadline` (null: «без срока») */
+  /** D-129: a new deadline for the new person — only when `changeDeadline` (null: «без срока») */
   deadlineIso?: string | null;
   changeDeadline?: boolean;
-  /** D-128: the director's word to the new person */
+  /** D-129: the director's word to the new person */
   note?: string;
 };
 
@@ -253,7 +253,7 @@ export function useReassign() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* D-128: «Нужно больше времени», its answer, «Напомнить»                      */
+/* D-129: «Нужно больше времени», its answer, «Напомнить»                      */
 /* -------------------------------------------------------------------------- */
 
 export type RequestTimeInput = {
@@ -572,11 +572,11 @@ export type TaskActions = {
   extend: (input: Omit<ExtendInput, "requestId">) => void;
   /** «Переназначить»: the same order to another person; the old task is revoked. */
   reassign: (input: Omit<ReassignInput, "requestId">) => void;
-  /** «Нужно больше времени» / «Возьму, но к …» (D-128). */
+  /** «Нужно больше времени» / «Возьму, но к …» (D-129). */
   requestTime: (input: Omit<RequestTimeInput, "requestId">) => void;
-  /** «Согласовать» / «Оставить прежний» (D-128). */
+  /** «Согласовать» / «Оставить прежний» (D-129). */
   answerTime: (input: Omit<AnswerTimeInput, "requestId">) => void;
-  /** «Напомнить» (D-128). */
+  /** «Напомнить» (D-129). */
   nudge: (input: Omit<NudgeInput, "requestId">) => void;
   sendMessage: (input: SendMessageInput) => void;
   /** «Удалить»: hard delete, no trace — cleanup of wrong and test orders. */
