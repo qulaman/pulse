@@ -172,7 +172,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
 
           {/* the director's quick actions: the ones a tile can carry without a sheet */}
           {interactive && lane === "question" && !task.question && task.time_request && task.time_request.senderId !== meId ? (
-            // a request for time (D-129): answered right here; another date — the open card
+            // a request for time (D-128): answered right here; another date — the open card
             <div className="mt-3 flex flex-wrap gap-2">
               <Chip
                 tone="accent"

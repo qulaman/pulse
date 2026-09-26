@@ -12,7 +12,7 @@ type Props = {
   onClose: () => void;
   currentIso: string | null;
   onPick: (iso: string | null) => void;
-  /** «Срок для Ерлана» when a reassign asks for one (D-129); «Срок» otherwise */
+  /** «Срок для Ерлана» when a reassign asks for one (D-128); «Срок» otherwise */
   title?: string;
   /** a line above the presets: why the sheet asks */
   hint?: string | null;

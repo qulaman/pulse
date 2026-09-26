@@ -7,10 +7,10 @@ import { kickDeliveries } from "@/lib/push/send";
 
 const BodySchema = z.strictObject({
   assignee_id: z.guid(),
-  /** D-129: a new deadline for the new person (null — «без срока»); only with change_deadline */
+  /** D-128: a new deadline for the new person (null — «без срока»); only with change_deadline */
   deadline_iso: z.string().datetime({ offset: true }).nullable().optional(),
   change_deadline: z.boolean().optional(),
-  /** D-129: the director's word to the new person, rides in their push */
+  /** D-128: the director's word to the new person, rides in their push */
   note: z.string().max(500).optional(),
   client_request_id: z.uuid(),
 });
@@ -18,7 +18,7 @@ const BodySchema = z.strictObject({
 /**
  * «Переназначить»: the same order goes to another person as a fresh task, the old one is
  * revoked with a pointer (D-01). One RPC does both; the outbox trigger notifies the new person.
- * The new person may get a new deadline and a word; the old holder hears «передана» (D-129).
+ * The new person may get a new deadline and a word; the old holder hears «передана» (D-128).
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director"],

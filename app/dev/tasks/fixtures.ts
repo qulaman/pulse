@@ -31,15 +31,15 @@ type Fixture = {
   closed?: number;
   scheduled?: number;
   audio?: boolean;
-  /** D-129: the employee asks for a deadline `hours` from now, with their words */
+  /** D-128: the employee asks for a deadline `hours` from now, with their words */
   timeRequest?: { hours: number; words?: string };
-  /** D-129: the refusal names this colleague */
+  /** D-128: the refusal names this colleague */
   suggest?: Who;
-  /** D-129: handed in as «сделано не всё» */
+  /** D-128: handed in as «сделано не всё» */
   partial?: boolean;
-  /** D-129: the director reminded, hours ago (negative) */
+  /** D-128: the director reminded, hours ago (negative) */
   nudged?: number;
-  /** D-129: reassigned to this person */
+  /** D-128: reassigned to this person */
   passedTo?: Who;
 };
 
@@ -96,7 +96,7 @@ const FIXTURES: Fixture[] = [
   { title: "Оплатить счёт за электроэнергию", who: "aigul", status: "done", created: -28, accepted: -27, completed: -5, closed: -2 },
   { title: "Разместить вакансию прораба на hh.kz", who: "dana", status: "done", created: -60, accepted: -58, completed: -30, closed: -26 },
   { title: "В субботу сходить на страйкбол", who: "marat", status: "revoked", created: -50, closed: -24 },
-  // D-129: the life between «Принял» and «Принято»
+  // D-128: the life between «Принял» and «Принято»
   {
     title: "Смонтировать вентиляцию во втором цехе",
     who: "marat",

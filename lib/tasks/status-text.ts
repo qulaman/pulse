@@ -70,7 +70,7 @@ export const TEXT = {
   photoRemove: "Убрать фото",
   photoUploading: "Отправляю фото…",
   photoFailed: "Фото не отправилось. Проверь связь и попробуй ещё раз",
-  // «Не могу» (D-129): three ways out, each a decision for the director
+  // «Не могу» (D-128): three ways out, each a decision for the director
   cantTitle: "Что мешает?",
   cantTime: "Нужно больше времени",
   cantOtherTime: "Другое время",

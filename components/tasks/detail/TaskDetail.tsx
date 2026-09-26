@@ -85,7 +85,7 @@ export function TaskDetail({
   const declineReason = latestDeclineReason(messages);
   const myQuestion = isDirector ? null : openQuestionOf(messages, me.userId);
   const overdue = isOverdue(task, now);
-  // D-129: a request for time, a suggested colleague, «не всё», the last reminder — from the thread
+  // D-128: a request for time, a suggested colleague, «не всё», the last reminder — from the thread
   const request = isWorking(task.status) ? latestTimeRequest(messages) : null;
   const suggestion = task.status === "declined" ? latestSuggestion(messages) : null;
   const partial = handedInPartly(task, messages);

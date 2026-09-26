@@ -4,7 +4,7 @@ import type { Json } from "@/lib/supabase/types";
 import type { TaskStatus } from "./status-text";
 
 /**
- * The life of a task between the director and the employee (D-129): the employee proposes in
+ * The life of a task between the director and the employee (D-128): the employee proposes in
  * one tap, the director decides in one tap, and no new status is born for it. A proposal is a
  * message with a flag, as «Уточнить» is (D-03): `time_request` asks for another deadline, a
  * refusal may carry `suggest_assignee_id`, a reminder is a `nudge` line, a report may be

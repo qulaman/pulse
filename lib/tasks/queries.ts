@@ -34,7 +34,7 @@ export type Role = Database["public"]["Enums"]["user_role"];
 
 type Person = { full_name: string } | null;
 
-/** `passed` — who took over a reassigned task (D-129); absent on rows fetched without the join. */
+/** `passed` — who took over a reassigned task (D-128); absent on rows fetched without the join. */
 export type TaskWithPeople = TaskRow & { assignee: Person; author: Person; passed?: Person };
 export type TaskMessage = TaskMessageRow & { sender: Person };
 
@@ -339,7 +339,7 @@ async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
     .in("status", [...BOARD_STATUSES]);
   if (assigneeId) request = request.eq("assignee_id", assigneeId);
   const { data, error } = await request
-    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-129)
+    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128)
     .or(
       "meta->>is_question.eq.true,meta->>decline_reason.eq.true,meta->>time_request.eq.true,meta->>nudge.eq.true,meta->>partial.eq.true",
       { referencedTable: "notes" },
@@ -441,7 +441,7 @@ export function inboxOf(rows: readonly BoardTask[], now: Date, meId: string): Di
     overdue: lanes.overdue,
     declined: lanes.declined,
     // every open question, whichever lane the task sits in — «Задачи» marks them all; a request
-    // for time is a question to the director too (D-129)
+    // for time is a question to the director too (D-128)
     questions: rows.filter(
       (task) => (task.question || (task.time_request && task.time_request.senderId !== meId)) && isOnBoard(task.status),
     ),

@@ -50,7 +50,7 @@ describe("reasonOf / queueOf", () => {
     expect(reasonOf(task({ status: "accepted" }), NOW)).toBeNull();
   });
 
-  it("a request for time is its own move, before a question and a missed deadline (D-129)", () => {
+  it("a request for time is its own move, before a question and a missed deadline (D-128)", () => {
     expect(reasonOf({ ...task({ deadline: at("16"), question: "Где?" }), request: true }, NOW)).toBe("time");
     expect(reasonOf({ ...task({ status: "pending_review" }), request: true }, NOW)).toBe("review");
     expect(reasonOf({ ...task({ status: "declined" }), request: true }, NOW)).toBe("declined");
@@ -88,7 +88,7 @@ describe("keysFor", () => {
     ["open with a question", [{ status: "accepted" }, { question: true }], ["answer", "extend", "open"]],
     ["declined", [{ status: "declined" }], ["insist", "reassign", "cancel"]],
     ["open and overdue", [{ status: "sent" }, { overdue: true }], ["extend", "nudge", "reassign"]],
-    // D-129
+    // D-128
     ["a request for time", [{ status: "accepted" }, { request: true }], ["grant", "retime", "keep"]],
     ["declined with a suggested colleague", [{ status: "declined" }, { suggestion: true }], ["handoff", "insist", "cancel"]],
     ["a new task nobody took", [{ status: "sent" }, { waiting: true }], ["nudge", "extend", "reassign"]],
@@ -130,7 +130,7 @@ describe("keysFor", () => {
     }
   });
 
-  it("a request for time beats a question and a missed deadline; приёмка beats it (D-129)", () => {
+  it("a request for time beats a question and a missed deadline; приёмка beats it (D-128)", () => {
     expect(keysFor({ status: "accepted" }, { request: true, question: true, overdue: true })).toEqual(["grant", "retime", "keep"]);
     expect(keysFor({ status: "pending_review" }, { request: true })).toEqual(["approve", "rework", "open"]);
     // a request on a closed task is history

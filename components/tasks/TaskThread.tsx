@@ -18,12 +18,12 @@ type MessageFlags = {
   reworkComment: boolean;
   /** The words of a handover: they arrive inside transition_task (D-64 §3). */
   report: boolean;
-  /** D-129: the handover was «сделано не всё» */
+  /** D-128: the handover was «сделано не всё» */
   partial: boolean;
-  /** D-129: «Прошу срок до …» and how it was answered (null while it waits) */
+  /** D-128: «Прошу срок до …» and how it was answered (null while it waits) */
   timeRequest: boolean;
   timeAnswer: TimeAnswer | null;
-  /** D-129: the director's word to the new person of a reassigned task */
+  /** D-128: the director's word to the new person of a reassigned task */
   handoffNote: boolean;
   newStatus: string | null;
 };

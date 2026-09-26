@@ -1,4 +1,4 @@
--- D-129: the life of a task between the director and the employee — the places that had no
+-- D-128: the life of a task between the director and the employee — the places that had no
 -- path. After «Принял» the employee could only hand in; «Буду позже» and «Это не ко мне» were
 -- refusals; a reassigned task told the old holder «Отозвано директором» and gave the new one
 -- no context and a deadline already behind; nobody reminded anybody of anything. The rule of
@@ -20,7 +20,7 @@
 --  10. overdue_alerts_due     — no «Просрочено» while the employee's request waits
 --  11. deadline_reminders_due — «Скоро срок» to the employee an hour before (minute sweep)
 --
--- Nothing here touches notify_outbox_task (its words belong to D-125) or task_status_guard (D-128
+-- Nothing here touches notify_outbox_task (its words belong to D-125) or task_status_guard (D-129
 -- «отправить сейчас» rewrites it): the producers below adjust the rows they cause, and «Не могу»
 -- from rework walks the guard's own edges — rework → accepted → declined — inside transition_task.
 
@@ -30,7 +30,7 @@
 alter table tasks add column if not exists passed_to uuid references profiles(id);
 
 comment on column tasks.passed_to is
-  'D-129: set by reassign_task on the revoked original — the person the work went to.';
+  'D-128: set by reassign_task on the revoked original — the person the work went to.';
 
 create or replace function tasks_field_guard() returns trigger
 language plpgsql security definer set search_path = public

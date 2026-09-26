@@ -10,7 +10,7 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * «Напомнить» (D-129): one push to the assignee and a line in the thread, not more often than
+ * «Напомнить» (D-128): one push to the assignee and a line in the thread, not more often than
  * every half hour — a second tap answers with the time of the first (`too_soon`), not a buzz.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(

@@ -70,7 +70,7 @@ export function markFailed(messages: TaskMessage[] | undefined, id: string): Tas
 }
 
 /* -------------------------------------------------------------------------- */
-/* A reassigned task says «передана», not «отозвано» (D-129)                   */
+/* A reassigned task says «передана», not «отозвано» (D-128)                   */
 /* -------------------------------------------------------------------------- */
 
 /**

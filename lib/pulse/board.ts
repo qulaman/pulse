@@ -36,13 +36,13 @@ export type BoardTask = TaskWithPeople & {
   question_at: string | null;
   /** The reason behind «Не могу», when the employee gave one. */
   decline_reason: string | null;
-  /** «Нужно больше времени» still waiting for the director (D-129). */
+  /** «Нужно больше времени» still waiting for the director (D-128). */
   time_request?: TimeRequest | null;
-  /** The colleague the employee suggested with the refusal (D-129). */
+  /** The colleague the employee suggested with the refusal (D-128). */
   suggestion?: Suggestion | null;
-  /** When the director last reminded (D-129) — «напомнили в 11:20». */
+  /** When the director last reminded (D-128) — «напомнили в 11:20». */
   nudged_at?: string | null;
-  /** The work was handed in as «сделано не всё» (D-129). */
+  /** The work was handed in as «сделано не всё» (D-128). */
   partial?: boolean;
   /** The newest message of the thread that is not a status line — who wrote it and what. */
   last_message: BoardMessage | null;
@@ -132,7 +132,7 @@ export function hasUnread(task: Pick<BoardTask, "last_message" | "seen_seq">, me
 
 /**
  * The task carries a message for the reader: an open question, a request for time (the
- * director's to answer, D-129), or an unread word.
+ * director's to answer, D-128), or an unread word.
  */
 export function hasMessage(task: BoardTask, meId: string): boolean {
   return Boolean(task.question) || Boolean(task.time_request && task.time_request.senderId !== meId) || hasUnread(task, meId);

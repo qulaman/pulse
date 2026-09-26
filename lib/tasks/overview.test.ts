@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { statusWord as wordOf, stepsOf as stepsFor } from "./overview";
 
-describe("a handed-over task (D-129)", () => {
+describe("a handed-over task (D-128)", () => {
   const base = {
     id: "t-passed",
     status: "revoked" as const,

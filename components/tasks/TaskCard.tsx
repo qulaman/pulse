@@ -24,7 +24,7 @@ import { useEmployeeControls } from "./list/useEmployeeControls";
 
 export type TaskCardVariant = "employee" | "director";
 
-/** A board row carries what the task row does not — a request for time, a suggestion (D-129). */
+/** A board row carries what the task row does not — a request for time, a suggestion (D-128). */
 type CardTask = TaskWithPeople & Partial<Pick<BoardTask, "time_request" | "suggestion" | "nudged_at" | "partial">>;
 
 export type TaskCardProps = {
@@ -44,7 +44,7 @@ export type TaskCardProps = {
 
 /**
  * The full card of a task where a list is not the point — Пульс, Лента, a person's card.
- * Its buttons are the hooks of «Задачи» (D-83, D-129), so a button means the same thing on
+ * Its buttons are the hooks of «Задачи» (D-83, D-128), so a button means the same thing on
  * every screen: the employee's «Не могу» asks for time or names a colleague here too, the
  * director answers a request for time and hands a task to the suggested person in one tap.
  */

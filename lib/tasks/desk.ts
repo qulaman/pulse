@@ -14,7 +14,7 @@ import { isOverdue, type TaskStatus } from "./status-text";
  * TaskCard.tsx), folded to three per state: принцип 2 holds for the director's hand too.
  */
 
-/** Why a task waits for the director: «ваш ход». `time` — the employee asks for another deadline (D-129). */
+/** Why a task waits for the director: «ваш ход». `time` — the employee asks for another deadline (D-128). */
 export type DeskReason = "review" | "time" | "question" | "declined" | "overdue";
 
 /** The order of the queue: what only the director can move first. */
@@ -71,7 +71,7 @@ export type DeskAction =
   | "revoke"
   | "open"
   | "remove"
-  // D-129: the employee's request for time, their suggested colleague, a reminder
+  // D-128: the employee's request for time, their suggested colleague, a reminder
   | "grant"
   | "retime"
   | "keep"
@@ -97,7 +97,7 @@ export const KEY_LABEL: Record<DeskAction, string> = {
   nudge: "Напомнить",
 };
 
-/** What the director's keys need to know besides the status (D-129). */
+/** What the director's keys need to know besides the status (D-128). */
 export type KeyFlags = {
   question?: boolean;
   overdue?: boolean;
@@ -123,7 +123,7 @@ export function isWaiting(task: { status: TaskStatus; created_at: string; schedu
  * The buttons of one task's open card, at most three. Rows of D-80 top to bottom —
  * the first that matches wins. «Срок» and «Переназначить» on any open task (D-51 п.3);
  * a request for time is answered in one tap, a suggested colleague takes it in one tap,
- * a late or untaken task offers «Напомнить» (D-129).
+ * a late or untaken task offers «Напомнить» (D-128).
  */
 export function keysFor(
   task: { status: TaskStatus },

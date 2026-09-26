@@ -20,7 +20,7 @@ export type EmployeeAction = "accept" | "ask" | "decline" | "complete";
  * director's last word, the four steps and the buttons of FRONTEND «Состояние задачи →
  * набор кнопок» — Принял / Уточнить / Не могу on a new task (принцип 2), Выполнено /
  * Уточнить / Не могу on work in hand: «Не могу» after «Принял» asks for time, names the
- * right colleague or refuses (D-129). A request still waiting is said on the card.
+ * right colleague or refuses (D-128). A request still waiting is said on the card.
  */
 export function EmployeeTaskCard({
   task,
@@ -51,7 +51,7 @@ export function EmployeeTaskCard({
     : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.author?.full_name ?? "Директор")) : "";
   const author = task.author?.full_name?.trim().split(/\s+/)[0];
-  // my own request for time, still waiting for the director (D-129)
+  // my own request for time, still waiting for the director (D-128)
   const request = row?.time_request && (task.status === "accepted" || task.status === "in_progress" || task.status === "rework") ? row.time_request : null;
   const suggested = task.status === "declined" ? row?.suggestion?.name.trim().split(/\s+/)[0] : undefined;
 

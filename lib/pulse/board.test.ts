@@ -154,7 +154,7 @@ describe("applyTaskChange", () => {
 describe("applyMessage", () => {
   const board = [row("a", "КП", "Марат", "accepted")];
 
-  it("a request for time opens, puts the task in the director's lane and closes on its answer (D-129)", () => {
+  it("a request for time opens, puts the task in the director's lane and closes on its answer (D-128)", () => {
     const meta = { time_request: true, proposed_deadline: "2026-09-12T05:00:00Z", words: "жду поставку" };
     const opened = applyMessage(board, { id: "t1", task_id: "a", content: "Прошу срок до 12.09 10:00", meta, created_at: "2026-09-11T04:00:00Z", sender_id: "u-Марат" }, ME) as BoardTask[];
     expect(opened[0]!.time_request).toMatchObject({ id: "t1", proposed: "2026-09-12T05:00:00Z", words: "жду поставку", senderId: "u-Марат" });
@@ -163,19 +163,19 @@ describe("applyMessage", () => {
     expect(answered[0]!.time_request).toBeNull();
   });
 
-  it("the employee's own request is not a message to them (D-129)", () => {
+  it("the employee's own request is not a message to them (D-128)", () => {
     const mine = [row("a", "КП", "Марат", "accepted", { time_request: { id: "t1", proposed: "2026-09-12T05:00:00Z", words: null, at: "x", senderId: "u-Марат" } })];
     expect(hasMessage(mine[0]!, "u-Марат")).toBe(false);
     expect(hasMessage(mine[0]!, ME)).toBe(true);
   });
 
-  it("a request leaves the row when the work leaves the hands (D-129)", () => {
+  it("a request leaves the row when the work leaves the hands (D-128)", () => {
     const asked = [row("a", "КП", "Марат", "accepted", { time_request: { id: "t1", proposed: "2026-09-12T05:00:00Z", words: null, at: "x", senderId: "u-Марат" } })];
     const handed = applyTaskChange(asked, { id: "a", status: "pending_review" }) as BoardTask[];
     expect(handed[0]!.time_request).toBeNull();
   });
 
-  it("a refusal lands its suggested colleague, a reminder its time (D-129)", () => {
+  it("a refusal lands its suggested colleague, a reminder its time (D-128)", () => {
     const declined = [row("a", "КП", "Марат", "declined")];
     const withName = applyMessage(
       declined,
