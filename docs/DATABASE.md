@@ -11,6 +11,7 @@
 - Везде `id uuid primary key default gen_random_uuid()`, `company_id uuid not null references companies`, `created_at timestamptz not null default now()` — ниже не повторяются; исключения оговорены у таблиц (`task_reads`, `announcement_acks`, `event_participants`, `tv_state`, `recurrence_rules`).
 - Все времена — `timestamptz` (UTC); отображение — Asia/Aqtobe (UTC+5).
 - Enum через `create type`. RLS — в той же миграции, где создаётся таблица; deny by default.
+- В политиках `auth_company_id()`, `auth_role()`, `auth.uid()` — только обёрнутыми: `(select auth_company_id())`. Голый вызов выполняется на каждую строку (и сам — чтение `profiles`), обёрнутый — один раз на запрос и годится в условие индекса; старые политики переписаны миграцией `20260926210000_rls_initplan_fk_indexes` (D-126: чтение директора на 20 000 задач 72 → 8 мс). Внешний ключ, по которому удаляют родителя, — с индексом (там же пять таких индексов).
 - Баланс очков = `SUM(point_transactions.amount)`, никогда не поле. Append-only.
 - Просрочка — **вычислимое свойство**, НЕ колонка: `deadline < now() and status in ('sent','accepted','in_progress','rework')`. Колонку `is_overdue` не добавлять.
 - Materialized views **не используем**; допустимы только обычные view `with (security_invoker = on)`. Сейчас view в БД нет ни одного: Пульс читает задачи одним запросом с вложенными сообщениями (D-57 §3).

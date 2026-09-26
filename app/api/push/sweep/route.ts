@@ -21,7 +21,8 @@ type Tick =
   | "director_day_summaries_due"
   | "director_digests_due"
   | "team_channel_alerts_due"
-  | "notification_deliveries_purge";
+  | "notification_deliveries_purge"
+  | "tv_events_prune";
 
 /** Each tick on its own: a failing one is logged and the rest — and the queue — still go. */
 async function tick(service: Service, name: Tick): Promise<number> {
@@ -63,6 +64,9 @@ export async function POST(req: Request) {
     const digests = await tick(service, "director_digests_due");
     // the outbox cleans itself: 30 days for what went, 7 for what never did, a batch a minute
     const purged = await tick(service, "notification_deliveries_purge");
+    // the wall's feed lives on its last month (tv_events_prune, 30 days by default); the
+    // function existed since D-76 but nothing called it, so the table only grew (D-126)
+    const tvPruned = await tick(service, "tv_events_prune");
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
@@ -78,6 +82,7 @@ export async function POST(req: Request) {
       deadline_soon: deadlineSoon,
       team,
       summaries,
+      tv_pruned: tvPruned,
       digests,
       purged,
     });
