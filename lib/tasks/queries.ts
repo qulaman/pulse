@@ -34,7 +34,8 @@ export type Role = Database["public"]["Enums"]["user_role"];
 
 type Person = { full_name: string } | null;
 
-export type TaskWithPeople = TaskRow & { assignee: Person; author: Person };
+/** `passed` — who took over a reassigned task (D-128); absent on rows fetched without the join. */
+export type TaskWithPeople = TaskRow & { assignee: Person; author: Person; passed?: Person };
 export type TaskMessage = TaskMessageRow & { sender: Person };
 
 export type Me = {
@@ -46,7 +47,7 @@ export type Me = {
 };
 
 const TASK_SELECT =
-  "*, assignee:profiles!tasks_assignee_id_fkey(full_name), author:profiles!tasks_author_id_fkey(full_name)";
+  "*, assignee:profiles!tasks_assignee_id_fkey(full_name), author:profiles!tasks_author_id_fkey(full_name), passed:profiles!tasks_passed_to_fkey(full_name)";
 const MESSAGE_SELECT = "*, sender:profiles!task_messages_sender_id_fkey(full_name)";
 
 /** Statuses an employee still has to act on — «Мои дела». */
@@ -351,7 +352,7 @@ export const EMPTY_INBOX: DirectorInbox = { overdue: [], declined: [], questions
  * Tasks with their question and decline notes (a short list), the newest real message
  * of the thread (one row) and the caller's read cursor (their own row, by RLS).
  */
-const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at), last:task_messages(id, content, type, sender_id, seq, created_at), reads:task_reads(last_seq)`;
+const BOARD_SELECT = `${TASK_SELECT}, notes:task_messages(id, content, meta, created_at, sender_id), last:task_messages(id, content, type, sender_id, seq, created_at), reads:task_reads(last_seq)`;
 
 type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage[] | null; reads: { last_seq: number }[] | null };
 
@@ -370,7 +371,11 @@ async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
     .in("status", [...BOARD_STATUSES]);
   if (assigneeId) request = request.eq("assignee_id", assigneeId);
   const { data, error } = await request
-    .or("meta->>is_question.eq.true,meta->>decline_reason.eq.true", { referencedTable: "notes" })
+    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128)
+    .or(
+      "meta->>is_question.eq.true,meta->>decline_reason.eq.true,meta->>time_request.eq.true,meta->>nudge.eq.true,meta->>partial.eq.true",
+      { referencedTable: "notes" },
+    )
     .order("created_at", { referencedTable: "notes", ascending: false })
     .in("last.type", [...CHAT_TYPES])
     .order("seq", { referencedTable: "last", ascending: false })
@@ -470,8 +475,11 @@ export function inboxOf(rows: readonly BoardTask[], now: Date, meId: string): Di
   return {
     overdue: lanes.overdue,
     declined: lanes.declined,
-    // every open question, whichever lane the task sits in — «Задачи» marks them all
-    questions: rows.filter((task) => task.question && isOnBoard(task.status)),
+    // every open question, whichever lane the task sits in — «Задачи» marks them all; a request
+    // for time is a question to the director too (D-128)
+    questions: rows.filter(
+      (task) => (task.question || (task.time_request && task.time_request.senderId !== meId)) && isOnBoard(task.status),
+    ),
     review: lanes.review,
   };
 }

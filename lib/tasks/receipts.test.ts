@@ -54,10 +54,11 @@ describe("receiptLine (принцип 8, D-32)", () => {
     expect(receiptLine(delivery({ status: "failed", last_error: "push 500" }), NOW)).toBeNull();
   });
 
-  it("quiet hours promise a time; a row about to go says nothing", () => {
+  it("quiet hours promise a time and offer «отправить сейчас»; a row about to go says nothing", () => {
     expect(receiptLine(delivery({ deliver_after: "2026-09-18T03:00:00Z" }), NOW)).toEqual({
       text: "отправлю завтра 08:00",
       tone: "muted",
+      held: true,
     });
     expect(receiptLine(delivery({ deliver_after: "2026-09-17T11:00:00Z" }), NOW)?.text).toBe("отправлю в 16:00");
     expect(receiptLine(delivery(), NOW)).toBeNull();

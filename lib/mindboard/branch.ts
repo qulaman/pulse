@@ -1,6 +1,7 @@
 import type { Note } from "@/lib/notes/queries";
 
 import { positionBetween } from "./list";
+import type { Wait } from "./offline";
 import { branchesOf, nextPlaceIn, type Branch } from "./tree";
 
 /**
@@ -127,18 +128,19 @@ export function parentsFirst<T extends { id: string; parentId?: string | null }>
 }
 
 /** How a line of the board is doing on its way to words (принцип 5: the voice comes first). */
-export type LineState = "words" | "saving" | "phone" | "hearing" | "deaf";
+export type LineState = "words" | "saving" | "phone" | "point" | "hearing" | "deaf";
 
 /**
  * The state of a line: its words — or where its voice is: being kept right now, waiting on
- * the phone for the network, being heard, or not heard (the recording is kept, «Распознать»).
+ * the phone for the network, waiting on the phone for its own point to land first (D-121),
+ * being heard, or not heard (the recording is kept, «Распознать»).
  */
 export function lineState(
   row: Pick<Note, "text" | "audio_path">,
-  look: { phone: boolean; waiting: boolean; hearing: boolean },
+  look: { phone: boolean; wait: Wait | null; hearing: boolean },
 ): LineState {
   if (row.text.trim()) return "words";
-  if (look.phone) return look.waiting ? "phone" : "saving";
+  if (look.phone) return look.wait === "point" ? "point" : look.wait === "network" ? "phone" : "saving";
   if (look.hearing) return "hearing";
   return row.audio_path ? "deaf" : "words";
 }

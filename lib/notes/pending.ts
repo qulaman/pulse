@@ -219,3 +219,45 @@ export function claim(id: string): boolean {
 export function release(id: string): void {
   claimed.delete(id);
 }
+
+/**
+ * Edits of a note this tab's own mutation is writing right now (even paused without
+ * network): the replay leaves them to it — the same fields must not be sent twice, and a
+ * refusal must be answered once, by the one who knows what the screen showed before.
+ */
+const writing = new Map<string, number>();
+
+export function holdEdit(id: string): void {
+  writing.set(id, (writing.get(id) ?? 0) + 1);
+}
+
+export function releaseEdit(id: string): void {
+  const left = (writing.get(id) ?? 1) - 1;
+  if (left > 0) writing.set(id, left);
+  else writing.delete(id);
+}
+
+export function editHeld(id: string): boolean {
+  return writing.has(id);
+}
+
+/* ----------------------------------------------------------------- replay */
+
+const replayAsks = new Set<() => void>();
+
+/** The replay of the app (lib/notes/replay.ts) listens: something on the phone can go right now. */
+export function onReplayRequest(listener: () => void): () => void {
+  replayAsks.add(listener);
+  return () => {
+    replayAsks.delete(listener);
+  };
+}
+
+/**
+ * «Send what waits, now» — a sub-point said under a point that is still on the phone, with
+ * the network up (D-121): the replay sends the point and the sub-point right after it,
+ * instead of leaving both to the next beat.
+ */
+export function requestReplay(): void {
+  for (const listener of replayAsks) listener();
+}

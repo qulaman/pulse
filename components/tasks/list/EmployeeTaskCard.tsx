@@ -4,6 +4,7 @@ import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
+import { passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import { statusWord, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
@@ -17,9 +18,9 @@ export type EmployeeAction = "accept" | "ask" | "decline" | "complete";
  * A card of «Мои дела». Closed: the state mark, the title, «when», the state. Open: what
  * the director wrote and said (the recording and the words), a return for rework, the
  * director's last word, the four steps and the buttons of FRONTEND «Состояние задачи →
- * набор кнопок» — Принял / Уточнить / Не могу on a new task (принцип 2), «Выполнено» on
- * work in hand. «Уточнить» stays next to «Выполнено»: a question mid-work is the same
- * message with `is_question`, not a new action.
+ * набор кнопок» — Принял / Уточнить / Не могу on a new task (принцип 2), Выполнено /
+ * Уточнить / Не могу on work in hand: «Не могу» after «Принял» asks for time, names the
+ * right colleague or refuses (D-128). A request still waiting is said on the card.
  */
 export function EmployeeTaskCard({
   task,
@@ -50,6 +51,9 @@ export function EmployeeTaskCard({
     : "";
   const lastName = last ? (last.sender_id === meId ? "Вы" : (task.author?.full_name ?? "Директор")) : "";
   const author = task.author?.full_name?.trim().split(/\s+/)[0];
+  // my own request for time, still waiting for the director (D-128)
+  const request = row?.time_request && (task.status === "accepted" || task.status === "in_progress" || task.status === "rework") ? row.time_request : null;
+  const suggested = task.status === "declined" ? row?.suggestion?.name.trim().split(/\s+/)[0] : undefined;
 
   return (
     <CardShell
@@ -83,14 +87,25 @@ export function EmployeeTaskCard({
             {TEXT.reworkBanner}
           </Note>
         ) : null}
-        {task.status === "revoked" ? (
-          <Note tone="muted" icon={<Icon name="undo" size={15} />}>
-            {TEXT.revoked}
+        {request ? (
+          <Note tone="warn" icon={<Icon name="clock" size={15} />}>
+            Просите срок {untilWords(request.proposed, now)} · ждёт ответа директора
           </Note>
+        ) : null}
+        {task.status === "revoked" ? (
+          task.passed_to ? (
+            <Note tone="muted" icon={<Icon name="swap" size={15} />}>
+              {passedWord(task.passed?.full_name)}
+            </Note>
+          ) : (
+            <Note tone="muted" icon={<Icon name="undo" size={15} />}>
+              {TEXT.revoked}
+            </Note>
+          )
         ) : null}
         {task.status === "declined" ? (
           <Note tone="danger" icon={<Icon name="hand" size={15} />}>
-            Отказ отправлен директору
+            Отказ отправлен директору{suggested ? ` · вы предложили: ${suggested}` : ""}
           </Note>
         ) : null}
 
@@ -134,12 +149,16 @@ export function EmployeeTaskCard({
           </Button>
         </div>
       ) : task.status === "accepted" || task.status === "in_progress" || task.status === "rework" ? (
-        <div className="mt-4 grid grid-cols-[1.4fr_1fr] gap-2">
-          <Button data-testid="task-action-complete" className="whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("complete", task)}>
+        // «Выполнено» leads on its own row: three keys of a third each clip it on an iPhone SE
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button data-testid="task-action-complete" className="col-span-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("complete", task)}>
             {BUTTON.complete}
           </Button>
-          <Button variant="secondary" className="whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
+          <Button variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
             {BUTTON.ask}
+          </Button>
+          <Button data-testid="task-action-cant" variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="clock" />} onClick={() => onAction("decline", task)}>
+            {BUTTON.cant}
           </Button>
         </div>
       ) : task.status === "pending_review" ? (

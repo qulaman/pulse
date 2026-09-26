@@ -11,8 +11,8 @@ import { TONE_VAR, toneOf } from "@/lib/tasks/tone";
  *   ring     whether the work is moving: an arc going round while it is being done, a whole
  *            ring that breathes while it waits to be taken up, closed and still when handed in,
  *            snapped on a refusal, closed in gold the moment the director accepts it;
- *   badge    whether there is something to read or to settle: a refusal, a question, an unread
- *            word in the thread — one at a time, the most pressing.
+ *   badge    whether there is something to read or to settle: a refusal, a question or a request
+ *            for time (D-128), an unread word in the thread — one at a time, the most pressing.
  */
 
 export type CrewTask = {
@@ -22,6 +22,8 @@ export type CrewTask = {
   overdue: boolean;
   /** the employee's open question («Уточнить»), when there is one */
   question: string | null;
+  /** the deadline the employee asks for (D-128), while the director has not answered */
+  request?: string | null;
   /** an unread word in the thread */
   unread: boolean;
   /** why «Не могу» */
@@ -93,7 +95,7 @@ export function lookOf(tasks: CrewTask[]): Look {
   const moving = open.filter((t) => MOVING.includes(t.status)).length;
   const badge: Badge = open.some((t) => t.status === "declined")
     ? "declined"
-    : open.some((t) => t.question)
+    : open.some((t) => t.question || t.request)
       ? "question"
       : open.some((t) => t.unread)
         ? "message"

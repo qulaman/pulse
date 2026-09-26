@@ -19,6 +19,7 @@ export type IconName =
   | "reply"
   | "send"
   | "swap"
+  | "bell"
   | "open"
   | "left"
   | "right";
@@ -38,6 +39,12 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   x: <path d="M6 6l12 12M18 6L6 18" />,
+  bell: (
+    <>
+      <path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 1.5h-14z" />
+      <path d="M10 20.5a2 2 0 0 0 4 0" />
+    </>
+  ),
   rotate: <path d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />,
   undo: <path d="M9 14 4 9l5-5M4 9h9a6 6 0 0 1 0 12h-3" />,
   flame: <path d="M12 3s5 4.5 5 9.5a5 5 0 0 1-10 0c0-2 1-3.5 2-4.5 0 1.5.8 2.5 2 3 0-3 1-5.5 1-8z" />,

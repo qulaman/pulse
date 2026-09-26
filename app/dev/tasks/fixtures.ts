@@ -31,6 +31,16 @@ type Fixture = {
   closed?: number;
   scheduled?: number;
   audio?: boolean;
+  /** D-128: the employee asks for a deadline `hours` from now, with their words */
+  timeRequest?: { hours: number; words?: string };
+  /** D-128: the refusal names this colleague */
+  suggest?: Who;
+  /** D-128: handed in as «сделано не всё» */
+  partial?: boolean;
+  /** D-128: the director reminded, hours ago (negative) */
+  nudged?: number;
+  /** D-128: reassigned to this person */
+  passedTo?: Who;
 };
 
 /** Now-relative, so the sandbox always has something overdue, due today and due tomorrow. */
@@ -59,7 +69,7 @@ const FIXTURES: Fixture[] = [
   },
   { title: "Съездить в акимат за разрешением на земляные работы", who: "askhat", status: "declined", deadline: 30, declineReason: "Занят срочным", created: -8, closed: -2 },
   { title: "Отчёт по дебиторке за август", who: "dana", status: "accepted", deadline: -19, created: -72, accepted: -70 },
-  { title: "Позвонить в «КазМунайГаз» по тендеру", who: "marat", status: "sent", deadline: -2, created: -6 },
+  { title: "Позвонить в «КазМунайГаз» по тендеру", who: "marat", status: "sent", deadline: -2, created: -6, nudged: -0.2 },
   { title: "Заказать пропуска на объект для новой бригады", who: "askhat", status: "sent", deadline: 24, created: -0.5 },
   {
     title: "Проверить бетон на объекте «Нурсая» — лабораторные образцы",
@@ -86,6 +96,28 @@ const FIXTURES: Fixture[] = [
   { title: "Оплатить счёт за электроэнергию", who: "aigul", status: "done", created: -28, accepted: -27, completed: -5, closed: -2 },
   { title: "Разместить вакансию прораба на hh.kz", who: "dana", status: "done", created: -60, accepted: -58, completed: -30, closed: -26 },
   { title: "В субботу сходить на страйкбол", who: "marat", status: "revoked", created: -50, closed: -24 },
+  // D-128: the life between «Принял» and «Принято»
+  {
+    title: "Смонтировать вентиляцию во втором цехе",
+    who: "marat",
+    status: "accepted",
+    deadline: 3,
+    created: -30,
+    accepted: -29,
+    timeRequest: { hours: 27, words: "жду поставку вентиляторов" },
+  },
+  {
+    title: "Сверить остатки цемента на складе",
+    who: "askhat",
+    status: "declined",
+    deadline: 20,
+    declineReason: "Это не ко мне. Цемент ведёт Ерлан",
+    suggest: "erlan",
+    created: -6,
+    closed: -1,
+  },
+  { title: "Вывезти строительный мусор с объекта", who: "aigul", status: "pending_review", deadline: 10, created: -26, accepted: -25, completed: -2, partial: true },
+  { title: "Проверить пожарные датчики в офисе", who: "marat", status: "revoked", created: -30, closed: -3, passedTo: "erlan" },
   { title: "Согласовать график отпусков на октябрь", who: "askhat", status: "done", created: -300, accepted: -290, completed: -250, closed: -240 },
 ];
 
@@ -103,6 +135,8 @@ export function build(): { tasks: TaskWithPeople[]; board: BoardTask[] } {
       author_id: DIRECTOR.id,
       assignee_id: `u-${f.who}`,
       parent_task_id: null,
+      passed_to: f.passedTo ? `u-${f.passedTo}` : null,
+      passed: f.passedTo ? { full_name: PEOPLE[f.passedTo] } : null,
       group_id: null,
       title: f.title,
       body: f.body ?? null,
@@ -131,6 +165,12 @@ export function build(): { tasks: TaskWithPeople[]; board: BoardTask[] } {
         question_id: f.question ? `${id}-q` : null,
         question_at: f.question ? at(-0.3) : null,
         decline_reason: f.declineReason ?? null,
+        time_request: f.timeRequest
+          ? { id: `${id}-t`, proposed: at(f.timeRequest.hours) as string, words: f.timeRequest.words ?? null, at: at(-0.5) as string, senderId: task.assignee_id }
+          : null,
+        suggestion: f.suggest ? { id: `u-${f.suggest}`, name: PEOPLE[f.suggest] } : null,
+        nudged_at: at(f.nudged),
+        partial: Boolean(f.partial),
         last_message: f.last
           ? {
               id: `${id}-m`,
@@ -175,9 +215,26 @@ export function messagesFor(task: TaskWithPeople, board: BoardTask | undefined):
   }
   if (board?.question) push("text", board.question, task.assignee_id, board.question_at ?? task.created_at, { is_question: true });
   if (task.completed_at) {
-    push("text", "Сделал, всё в файле. Проверьте, пожалуйста", task.assignee_id, task.completed_at, { report: true });
+    const partial = board?.partial ? { partial: true } : {};
+    push("text", board?.partial ? "Вывез две машины из трёх — третью закажу на понедельник" : "Сделал, всё в файле. Проверьте, пожалуйста", task.assignee_id, task.completed_at, { report: true, ...partial });
     push("status_change", null, task.assignee_id, task.completed_at, { new_status: "pending_review" });
   }
-  if (board?.decline_reason) push("text", board.decline_reason, task.assignee_id, task.closed_at ?? task.created_at, { decline_reason: true });
+  if (board?.decline_reason) {
+    const suggestion = board.suggestion ? { suggest_assignee_id: board.suggestion.id, suggest_name: board.suggestion.name } : {};
+    push("text", board.decline_reason, task.assignee_id, task.closed_at ?? task.created_at, { decline_reason: true, ...suggestion });
+  }
+  if (board?.time_request) {
+    const request = board.time_request;
+    push("text", `Прошу срок до ${request.proposed.slice(8, 10)}.${request.proposed.slice(5, 7)}${request.words ? ` · ${request.words}` : ""}`, task.assignee_id, request.at, {
+      time_request: true,
+      proposed_deadline: request.proposed,
+      words: request.words,
+    });
+  }
+  if (board?.nudged_at) push("system", "Директор напомнил", DIRECTOR.id, board.nudged_at, { nudge: true });
+  if (task.passed_to) {
+    push("status_change", null, DIRECTOR.id, task.closed_at ?? task.created_at, { new_status: "revoked" });
+    push("system", `Передана: ${task.passed?.full_name ?? ""}`, DIRECTOR.id, task.closed_at ?? task.created_at, { reassigned_to: "fx-new", assignee_id: task.passed_to });
+  }
   return rows.sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map((row, index) => ({ ...row, seq: index + 1 }));
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { PulseMark } from "@/components/brand/PulseMark";
+import { wipeOffline } from "@/lib/offline/persist";
 import { forgetVisit } from "@/lib/pulse/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
@@ -22,6 +23,12 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+
+  // what the phone kept for offline was the previous person's (D-127): the sign-in screen —
+  // where every sign-out lands — forgets it
+  useEffect(() => {
+    void wipeOffline();
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +49,7 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
     // A sign-out is a client-side navigation: nothing of the previous person may survive
     // in this tab — cached lists, the assistant's conversation, the visit stamp.
     queryClient.clear();
+    void wipeOffline();
     forgetVisit();
     // The proxy sends the session to the right screen for the role.
     router.replace("/");

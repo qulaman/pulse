@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { humanAqtobe } from "@/lib/ai/time";
 import type { Announcement } from "@/lib/ether/queries";
+import { whenHeld } from "@/lib/tasks/held";
 
 const ICON = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -23,6 +24,8 @@ export function AnnouncementCard({
   onAck,
   acking,
   onDelete,
+  heldUntil,
+  onSendNow,
 }: {
   item: Announcement;
   userId: string | undefined;
@@ -32,6 +35,10 @@ export function AnnouncementCard({
   acking: boolean;
   /** The director's «Удалить» — the announcement is gone for everybody. */
   onDelete?: (id: string) => void;
+  /** Held for the delivery window (D-38): when the team's pushes go. */
+  heldUntil?: string | null;
+  /** The director's «отправить сейчас» on a held announcement (D-129). */
+  onSendNow?: (id: string) => void;
 }) {
   const [who, setWho] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -53,6 +60,21 @@ export function AnnouncementCard({
           <p className="nums mt-1 text-[13px] leading-4 text-muted">
             {item.author?.full_name ?? "Директор"} · {humanAqtobe(new Date(item.created_at))}
           </p>
+          {/* dictated at night, it waits for the morning like every word to the team — unless «now» */}
+          {isDirector && onSendNow && heldUntil && new Date(heldUntil) > new Date() ? (
+            <p className="nums mt-1 text-[13px] leading-4 text-muted" data-testid="ether-held">
+              {`Отправлю ${whenHeld(heldUntil)} · `}
+              <button
+                type="button"
+                className="underline underline-offset-2"
+                style={{ color: "var(--accent)" }}
+                onClick={() => onSendNow(item.id)}
+                data-testid="ether-send-now"
+              >
+                отправить сейчас
+              </button>
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 
 import { TaskDetail } from "@/components/tasks/detail/TaskDetail";
+import type { BoardTask } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
 
@@ -27,7 +28,7 @@ export function TaskSandbox({ role, id }: { role: "director" | "employee"; id: s
 function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
   const fixtures = useMemo(() => build(), []);
   const [task, setTask] = useState<TaskWithPeople | null>(() => fixtures.tasks.find((t) => t.id === id) ?? null);
-  const board = fixtures.board.find((row) => row.id === id);
+  const [board, setBoard] = useState<BoardTask | undefined>(() => fixtures.board.find((row) => row.id === id));
   const messages = useMemo(() => (task ? messagesFor(task, board) : []), [task, board]);
   const now = useMemo(() => new Date(), []);
 
@@ -46,11 +47,21 @@ function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
       }),
     complete: () => patch({ status: "pending_review", completed_at: stamp }),
     revoke: () => patch({ status: "revoked", closed_at: stamp }),
+    sendNow: () => patch({ status: "sent", scheduled_send_at: stamp }),
     extend: ({ deadlineIso }) => patch({ deadline: deadlineIso }),
     reassign: ({ assigneeName }) => patch({ assignee: { full_name: assigneeName } }),
     sendMessage: () => {},
     remove: () => setTask(null),
     markRead: () => {},
+    requestTime: ({ fromStatus, proposedIso, words }) => {
+      if (fromStatus === "sent") patch({ status: "accepted", accepted_at: stamp });
+      setBoard((row) => (row ? { ...row, time_request: { id: `${id}-t`, proposed: proposedIso, words: words ?? null, at: stamp, senderId: row.assignee_id } } : row));
+    },
+    answerTime: ({ approve, proposedIso }) => {
+      if (approve && proposedIso) patch({ deadline: proposedIso });
+      setBoard((row) => (row ? { ...row, time_request: null } : row));
+    },
+    nudge: () => setBoard((row) => (row ? { ...row, nudged_at: stamp } : row)),
     busy: false,
   };
 

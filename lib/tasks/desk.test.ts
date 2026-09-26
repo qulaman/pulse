@@ -50,6 +50,12 @@ describe("reasonOf / queueOf", () => {
     expect(reasonOf(task({ status: "accepted" }), NOW)).toBeNull();
   });
 
+  it("a request for time is its own move, before a question and a missed deadline (D-128)", () => {
+    expect(reasonOf({ ...task({ deadline: at("16"), question: "Где?" }), request: true }, NOW)).toBe("time");
+    expect(reasonOf({ ...task({ status: "pending_review" }), request: true }, NOW)).toBe("review");
+    expect(reasonOf({ ...task({ status: "declined" }), request: true }, NOW)).toBe("declined");
+  });
+
   it("приёмка beats a question, a question beats a missed deadline", () => {
     expect(reasonOf(task({ status: "pending_review", question: "Так?" }), NOW)).toBe("review");
     expect(reasonOf(task({ question: "Какой адрес?", deadline: at("16") }), NOW)).toBe("question");
@@ -81,12 +87,16 @@ describe("keysFor", () => {
     ["pending_review", [{ status: "pending_review" }], ["approve", "rework", "open"]],
     ["open with a question", [{ status: "accepted" }, { question: true }], ["answer", "extend", "open"]],
     ["declined", [{ status: "declined" }], ["insist", "reassign", "cancel"]],
-    ["open and overdue", [{ status: "sent" }, { overdue: true }], ["extend", "reassign", "open"]],
+    ["open and overdue", [{ status: "sent" }, { overdue: true }], ["extend", "nudge", "reassign"]],
+    // D-128
+    ["a request for time", [{ status: "accepted" }, { request: true }], ["grant", "retime", "keep"]],
+    ["declined with a suggested colleague", [{ status: "declined" }, { suggestion: true }], ["handoff", "insist", "cancel"]],
+    ["a new task nobody took", [{ status: "sent" }, { waiting: true }], ["nudge", "extend", "reassign"]],
     ["sent", [{ status: "sent" }], ["extend", "reassign", "revoke"]],
     ["accepted", [{ status: "accepted" }], ["extend", "reassign", "revoke"]],
     ["in_progress", [{ status: "in_progress" }], ["extend", "reassign", "revoke"]],
     ["rework", [{ status: "rework" }], ["extend", "reassign", "revoke"]],
-    ["scheduled", [{ status: "scheduled" }], ["extend", "revoke", "open"]],
+    ["scheduled", [{ status: "scheduled" }], ["sendNow", "extend", "revoke"]],
     ["done", [{ status: "done" }], ["open", "remove"]],
     ["revoked", [{ status: "revoked" }], ["open", "remove"]],
   ];
@@ -109,9 +119,22 @@ describe("keysFor", () => {
     const statuses: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "pending_review", "done", "rework", "declined", "revoked"];
     for (const status of statuses) {
       for (const question of [false, true]) {
-        for (const overdue of [false, true]) expect(keysFor({ status }, { question, overdue }).length).toBeLessThanOrEqual(3);
+        for (const overdue of [false, true]) {
+          for (const request of [false, true]) {
+            for (const suggestion of [false, true]) {
+              expect(keysFor({ status }, { question, overdue, request, suggestion, waiting: true }).length).toBeLessThanOrEqual(3);
+            }
+          }
+        }
       }
     }
+  });
+
+  it("a request for time beats a question and a missed deadline; приёмка beats it (D-128)", () => {
+    expect(keysFor({ status: "accepted" }, { request: true, question: true, overdue: true })).toEqual(["grant", "retime", "keep"]);
+    expect(keysFor({ status: "pending_review" }, { request: true })).toEqual(["approve", "rework", "open"]);
+    // a request on a closed task is history
+    expect(keysFor({ status: "done" }, { request: true })).toEqual(["open", "remove"]);
   });
 });
 

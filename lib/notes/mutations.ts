@@ -1,12 +1,25 @@
 "use client";
 
-import { useMutation, useMutationState, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { onlineManager, useMutation, useMutationState, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { revertEdit, valuesBefore } from "@/lib/mindboard/offline";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-import { claim, dropCreate, hasCreate, keepCreate, keepEdit, release, settleEdit, type NoteFields } from "./pending";
+import {
+  claim,
+  dropCreate,
+  hasCreate,
+  holdEdit,
+  keepCreate,
+  keepEdit,
+  release,
+  releaseEdit,
+  requestReplay,
+  settleEdit,
+  type NoteFields,
+} from "./pending";
 import { noteKeys, type Note } from "./queries";
 
 /**
@@ -66,10 +79,27 @@ const GENERIC_ERROR = "Не получилось. Попробую ещё раз
 const KEPT_OFFLINE = "Нет связи — сохранил на телефоне, отправлю сам";
 /** The server's branch rule said no (D-121): the move is undone on screen too. */
 const REFUSED_BRANCH = "Не получилось сложить ветку — вернул как было";
+/**
+ * The same, for a move made without network and refused when it finally went (D-121): the
+ * point above was deleted, became a sub-point or got sub-points meanwhile. The screen takes
+ * the move back and reads the board again.
+ */
+export const REFUSED_LATER = "Доска изменилась, пока не было связи — вернул пункт на место";
+/** A move that waited this long (or began without network) is answered with `REFUSED_LATER`. */
+const WAITED_MS = 10_000;
 
-/** The server refused a branch (`bad_parent`, D-121): not a point of this board, or one level too deep. */
+/**
+ * The server refused a branch (`bad_parent`, D-121): not a point of this board, or one level
+ * too deep. An `Error`, or the plain error object supabase-js hands back.
+ */
 export function refusedBranch(error: unknown): boolean {
-  return error instanceof Error && /bad_parent/.test(error.message);
+  const message =
+    error instanceof Error
+      ? error.message
+      : error && typeof error === "object" && "message" in error
+        ? String((error as { message: unknown }).message)
+        : "";
+  return /bad_parent/.test(message);
 }
 
 /**
@@ -104,14 +134,14 @@ export function upsertCached(queryClient: QueryClient, userId: string, row: Note
   });
 }
 
-/** Optimistic edit of one row; the snapshot is the way back on an error. */
-function patch(queryClient: QueryClient, userId: string, id: string, fields: Partial<Note>): Note[] | undefined {
+/** Optimistic edit of one row; what the row held before is the way back on a refusal. */
+function patch(queryClient: QueryClient, userId: string, id: string, fields: Partial<Note>): Partial<Note> {
   const key = keyOf(userId);
-  const before = queryClient.getQueryData<Note[]>(key);
+  const was = valuesBefore(queryClient.getQueryData<Note[]>(key)?.find((note) => note.id === id), fields);
   queryClient.setQueryData<Note[]>(key, (rows) =>
     (rows ?? []).map((note) => (note.id === id ? { ...note, ...fields } : note)),
   );
-  return before;
+  return was;
 }
 
 function rollback(queryClient: QueryClient, userId: string, snapshot: Note[] | undefined) {
@@ -137,8 +167,12 @@ export function useCreateNote(me: Me | undefined) {
       try {
         return await insertNote(me as Me, row);
       } catch (error) {
-        // a sub-point typed under a point that has not left the phone yet (D-121)
-        if (row.parent_id && refusedBranch(error) && (await hasCreate(row.parent_id))) throw new WaitsForPoint();
+        // a sub-point typed under a point that has not left the phone yet (D-121): with the
+        // network up the replay sends the point now, and the next retry lands this one
+        if (row.parent_id && refusedBranch(error) && (await hasCreate(row.parent_id))) {
+          if (onlineManager.isOnline()) requestReplay();
+          throw new WaitsForPoint();
+        }
         throw error;
       }
     },
@@ -209,8 +243,11 @@ export function useCreateNote(me: Me | undefined) {
 const UPDATE_KEY = ["notes", "update"] as const;
 
 /**
- * Text (autosave), «Закрепить» and «Напомнить» — the last writer wins, as on any note
- * app. The fields are kept on the phone until the server has them (D-95).
+ * Text (autosave), «Закрепить» and «Напомнить», a tick, a place, a branch — the last writer
+ * wins, as on any note app. The fields are kept on the phone until the server has them
+ * (D-95). A refusal takes back this edit only — the fields of this row that still show it —
+ * and reads the notes again: a move made without network may meet a board that changed
+ * meanwhile (D-121), and the screen must show the board as it is, not as it was at the tap.
  */
 export function useUpdateNote(me: { userId: string } | undefined) {
   const queryClient = useQueryClient();
@@ -224,12 +261,14 @@ export function useUpdateNote(me: { userId: string } | undefined) {
       if (error) throw new Error(error.message);
     },
     onMutate: async ({ id, ...fields }) => {
+      // this mutation answers for these fields until it settles: the replay leaves them alone
+      holdEdit(id);
       if (!me) return undefined;
       void keepEdit(me.userId, id, fields);
       await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       // a new time rings again: the cache says so before the trigger does
       const shown: Partial<Note> = "remind_at" in fields ? { ...fields, reminded_at: null } : fields;
-      return { snapshot: patch(queryClient, me.userId, id, shown) };
+      return { shown, was: patch(queryClient, me.userId, id, shown), at: Date.now(), offline: !onlineManager.isOnline() };
     },
     onSuccess: (_data, { id, ...fields }) => {
       void settleEdit(id, fields);
@@ -241,8 +280,16 @@ export function useUpdateNote(me: { userId: string } | undefined) {
         return;
       }
       void settleEdit(id, fields);
-      if (me && context) rollback(queryClient, me.userId, context.snapshot);
-      fail(error);
+      if (me && context) {
+        queryClient.setQueryData<Note[]>(keyOf(me.userId), (rows) => (rows ? revertEdit(rows, id, context.shown, context.was) : rows));
+        void queryClient.invalidateQueries({ queryKey: keyOf(me.userId) });
+      }
+      const waited = context !== undefined && (context.offline || Date.now() - context.at > WAITED_MS);
+      if (refusedBranch(error) && waited) toast(REFUSED_LATER);
+      else fail(error);
+    },
+    onSettled: (_data, _error, { id }) => {
+      releaseEdit(id);
     },
   });
 }

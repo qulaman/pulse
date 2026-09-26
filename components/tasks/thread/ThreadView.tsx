@@ -1,12 +1,12 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { receiptLine, useThreadReceipt } from "@/lib/tasks/receipts";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { fetchEarlierMessages, isPendingMessage, prependMessages, THREAD_PAGE, type TaskMessage } from "@/lib/tasks/queries";
-import { dayLabel, messageState, startsNewDay } from "@/lib/tasks/thread";
+import { dayLabel, messageState, startsNewDay, withoutPassedRevoke } from "@/lib/tasks/thread";
 import { useVisualViewport } from "@/lib/ui/useVisualViewport";
 import { Composer } from "./Composer";
 import { DaySeparator } from "./DaySeparator";
@@ -43,7 +43,8 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   const receipt = useThreadReceipt(taskId, isDirector, userId);
   const line = isDirector ? receiptLine(receipt.data) : null;
 
-  const rows = messages ?? [];
+  // a handed-over task tells «передана» once, not «отозвано» beside it (D-128)
+  const rows = useMemo(() => withoutPassedRevoke(messages ?? []), [messages]);
   // one receipt, under the last word that is mine — a tick per bubble would be noise
   const lastMine = [...rows].reverse().find((message) => message.sender_id === userId && !isPendingMessage(message));
 
@@ -132,6 +133,21 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
                   {line && lastMine?.id === message.id && messageState(message) === "sent" ? (
                     <p className="mt-1 pr-1 text-right text-[12px] leading-4" style={{ color: RECEIPT_TONE[line.tone] }} data-testid="thread-receipt">
                       {line.text}
+                      {/* at night the words wait for the morning — unless the director says «now» (D-129) */}
+                      {line.held ? (
+                        <>
+                          {" · "}
+                          <button
+                            type="button"
+                            className="underline underline-offset-2"
+                            style={{ color: "var(--accent)" }}
+                            onClick={() => actions.sendNow(taskId)}
+                            data-testid="thread-send-now"
+                          >
+                            отправить сейчас
+                          </button>
+                        </>
+                      ) : null}
                     </p>
                   ) : null}
                 </div>

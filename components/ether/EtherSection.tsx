@@ -6,7 +6,14 @@ import { useState } from "react";
 
 import { AnnouncementCard } from "@/components/ether/AnnouncementCard";
 import { EtherListBone } from "@/components/ui/PageSkeletons";
-import { useAcknowledge, useDeleteAnnouncement, useEther, type Announcement } from "@/lib/ether/queries";
+import {
+  useAcknowledge,
+  useDeleteAnnouncement,
+  useEther,
+  useHeldAnnouncements,
+  useSendAnnouncementNow,
+  type Announcement,
+} from "@/lib/ether/queries";
 import { TEAM_ROLES } from "@/lib/routes";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -49,6 +56,9 @@ export function EtherSection({ variant }: Props) {
   const ack = useAcknowledge(me.data?.userId);
   const remove = useDeleteAnnouncement();
   const isDirector = me.data?.role === "director";
+  // at night an announcement waits for the window; the director may send it now (D-129)
+  const held = useHeldAnnouncements(isDirector);
+  const sendNow = useSendAnnouncementNow();
   const userId = me.data?.userId;
 
   const [open, setOpen] = useState<boolean>(() => {
@@ -86,6 +96,8 @@ export function EtherSection({ variant }: Props) {
       onAck={(id) => ack.mutate(id)}
       acking={ack.isPending}
       onDelete={isDirector ? (id) => remove.mutate(id) : undefined}
+      heldUntil={isDirector ? held.data?.[item.id] : null}
+      onSendNow={isDirector ? (id) => sendNow.mutate(id) : undefined}
     />
   );
 

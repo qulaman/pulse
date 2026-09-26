@@ -147,10 +147,13 @@ export function freshKey(items: readonly TvBoardItem[], now: Date): string {
   return ids.join(",");
 }
 
-/** Нейтральная пометка у пункта: «→ Марат», «→ Марат · сдано» — ни отказов, ни просрочек (D-45). */
+/**
+ * Нейтральная пометка у пункта: «→ Марат», «→ Марат · сдано» — ни отказов, ни просрочек (D-45).
+ * Стрелка и имя — через неразрывный пробел: строка не рвётся на «→» и «Марат».
+ */
 export function tagOf(item: Pick<TvBoardItem, "assignee" | "handed_done">): string | null {
   if (!item.assignee) return null;
-  return item.handed_done ? `→ ${item.assignee} · сдано` : `→ ${item.assignee}`;
+  return item.handed_done ? `→\u00a0${item.assignee} · сдано` : `→\u00a0${item.assignee}`;
 }
 
 /** Подпись под названием: «5 пунктов · 2 отмечено». */

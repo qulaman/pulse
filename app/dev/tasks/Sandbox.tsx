@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 
 import { DirectorTasksView } from "@/components/tasks/list/DirectorTasksView";
 import { EmployeeTasksView } from "@/components/tasks/list/EmployeeTasksView";
+import { toast } from "@/components/ui/Toast";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -42,6 +43,7 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
     },
     complete: ({ taskId }) => patch(taskId, { status: "pending_review", completed_at: stamp }),
     revoke: (taskId) => patch(taskId, { status: "revoked", closed_at: stamp }),
+    sendNow: (taskId) => patch(taskId, { status: "sent", scheduled_send_at: stamp }),
     extend: ({ taskId, deadlineIso }) => patch(taskId, { deadline: deadlineIso }),
     reassign: ({ taskId, assigneeName }) => patch(taskId, { assignee: { full_name: assigneeName } }),
     sendMessage: ({ taskId }) => setBoard((list) => list.map((row) => (row.id === taskId ? { ...row, question: null } : row))),
@@ -50,6 +52,24 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
       setBoard((list) => list.filter((row) => row.id !== taskId));
     },
     markRead: () => {},
+    requestTime: ({ taskId, fromStatus, proposedIso, words }) => {
+      if (fromStatus === "sent") patch(taskId, { status: "accepted", accepted_at: stamp });
+      setBoard((list) =>
+        list.map((row) =>
+          row.id === taskId
+            ? { ...row, time_request: { id: `${taskId}-t`, proposed: proposedIso, words: words ?? null, at: stamp, senderId: row.assignee_id } }
+            : row,
+        ),
+      );
+    },
+    answerTime: ({ taskId, approve, proposedIso }) => {
+      if (approve && proposedIso) patch(taskId, { deadline: proposedIso });
+      setBoard((list) => list.map((row) => (row.id === taskId ? { ...row, time_request: null } : row)));
+    },
+    nudge: ({ taskId, name }) => {
+      setBoard((list) => list.map((row) => (row.id === taskId ? { ...row, nudged_at: stamp } : row)));
+      toast(name ? `Напомнил · ${name}` : "Напомнил");
+    },
     busy: false,
   };
 
