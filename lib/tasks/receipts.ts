@@ -15,7 +15,7 @@ import type { Database } from "@/lib/supabase/types";
 export type DeliveryRow = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 export type ReceiptTone = "ok" | "muted" | "warn";
-/** `held` — the words wait for the morning, and the director may send them now (D-128). */
+/** `held` — the words wait for the morning, and the director may send them now (D-129). */
 export type Receipt = { text: string; tone: ReceiptTone; held?: true };
 
 export const receiptKeys = (taskId: string) => ["thread-receipt", taskId] as const;

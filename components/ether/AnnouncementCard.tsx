@@ -37,7 +37,7 @@ export function AnnouncementCard({
   onDelete?: (id: string) => void;
   /** Held for the delivery window (D-38): when the team's pushes go. */
   heldUntil?: string | null;
-  /** The director's «отправить сейчас» on a held announcement (D-128). */
+  /** The director's «отправить сейчас» on a held announcement (D-129). */
   onSendNow?: (id: string) => void;
 }) {
   const [who, setWho] = useState(false);

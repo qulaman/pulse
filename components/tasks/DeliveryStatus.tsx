@@ -12,7 +12,7 @@ type TaskDelivery = { receipt: Delivery | null; held: HeldRow[] };
 
 /**
  * The newest «task_sent» delivery of a task and what the task still holds for the morning
- * to its assignee (D-128), live; idle while no task is given. One query, one channel.
+ * to its assignee (D-129), live; idle while no task is given. One query, one channel.
  */
 export function useTaskDelivery(taskId: string | null, assigneeId: string | null = null) {
   return useRealtimeQuery<TaskDelivery, Delivery>({
@@ -59,7 +59,7 @@ export const RECEIPT_COLOR: Record<ReceiptTone, string> = {
  * «не открывал с HH:MM», never «не получил». The words live in `receiptText`.
  *
  * At night the line says what waits for the morning instead — «отправлю завтра 08:00» —
- * with «отправить сейчас» next to it when the screen passes `onSendNow` (D-128).
+ * with «отправить сейчас» next to it when the screen passes `onSendNow` (D-129).
  */
 export function DeliveryStatus({
   taskId,

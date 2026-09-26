@@ -189,7 +189,7 @@ function assigneeOf(snapshot: ReturnType<typeof snapshotTasks>, taskId: string):
 }
 
 /**
- * «Отправить сейчас» after the fact (D-128): a task held for the morning goes out now, and
+ * «Отправить сейчас» after the fact (D-129): a task held for the morning goes out now, and
  * what it queued for the morning to the team (a message, «Доработать», «Настоять») with it.
  */
 export function useSendNow() {
@@ -468,7 +468,7 @@ export type TaskActions = {
   /** rework → accepted → pending_review: two calls, two client_request_id. */
   complete: (input: { taskId: string; fromStatus: TaskStatus; report?: { text?: string; file_path?: string } }) => void;
   revoke: (taskId: string) => void;
-  /** «Отправить сейчас»: what this task holds for the morning goes out now (D-128). */
+  /** «Отправить сейчас»: what this task holds for the morning goes out now (D-129). */
   sendNow: (taskId: string) => void;
   /** «Продлить»: a new deadline (null — «без срока») on an open task. */
   extend: (input: Omit<ExtendInput, "requestId">) => void;

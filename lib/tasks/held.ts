@@ -1,7 +1,7 @@
 import { humanAqtobe } from "@/lib/ai/time";
 
 /**
- * What a task holds for the morning (D-128): outbox rows to the assignee that wait for the
+ * What a task holds for the morning (D-129): outbox rows to the assignee that wait for the
  * delivery window (D-38, D-51 §2). The director reads «отправлю в 08:00» and one tap sends
  * them now (`send_task_now`). Pure — the clock comes in, so the wording is unit-tested.
  */

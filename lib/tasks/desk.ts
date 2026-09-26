@@ -100,7 +100,7 @@ export function keysFor(
   if (task.status === "declined") return ["insist", "reassign", "cancel"];
   if (working && overdue) return ["extend", "reassign", "open"];
   if (working) return ["extend", "reassign", "revoke"];
-  // held for the morning (D-38): «Отправить сейчас» brings it forward (D-128)
+  // held for the morning (D-38): «Отправить сейчас» brings it forward (D-129)
   if (task.status === "scheduled") return ["sendNow", "extend", "revoke"];
   return ["open", "remove"];
 }

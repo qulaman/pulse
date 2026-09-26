@@ -56,7 +56,7 @@ export function EtherSection({ variant }: Props) {
   const ack = useAcknowledge(me.data?.userId);
   const remove = useDeleteAnnouncement();
   const isDirector = me.data?.role === "director";
-  // at night an announcement waits for the window; the director may send it now (D-128)
+  // at night an announcement waits for the window; the director may send it now (D-129)
   const held = useHeldAnnouncements(isDirector);
   const sendNow = useSendAnnouncementNow();
   const userId = me.data?.userId;

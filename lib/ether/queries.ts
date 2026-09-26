@@ -138,7 +138,7 @@ export function useDeleteAnnouncement() {
 export type HeldAnnouncements = Record<string, string>;
 
 /**
- * The director's Эфир at night (D-128): which announcements still wait for the delivery
+ * The director's Эфир at night (D-129): which announcements still wait for the delivery
  * window (D-38, D-51 §2), and from when. Only the director asks — RLS gives the director the
  * company's outbox; an employee would read their own row and have nothing to send.
  */
@@ -167,7 +167,7 @@ export function useHeldAnnouncements(enabled: boolean) {
   });
 }
 
-/** «Отправить сейчас» on an announcement held for the morning (D-128): the team hears it now. */
+/** «Отправить сейчас» on an announcement held for the morning (D-129): the team hears it now. */
 export function useSendAnnouncementNow() {
   const queryClient = useQueryClient();
   return useMutation({

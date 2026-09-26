@@ -323,7 +323,7 @@ function DirectorActions({ task, onOpen, actions }: { task: TaskWithPeople; onOp
         </>
       ) : null}
 
-      {/* held for the morning (D-38): it can go now (D-128) */}
+      {/* held for the morning (D-38): it can go now (D-129) */}
       {task.status === "scheduled" ? (
         <Button
           icon={<Icon name="send" />}

@@ -10,7 +10,7 @@ const BodySchema = z.strictObject({
 });
 
 /**
- * «Отправить сейчас» after the fact (D-128): a task held for the morning goes out now, and
+ * «Отправить сейчас» after the fact (D-129): a task held for the morning goes out now, and
  * whatever it queued for the morning to the team leaves with it. The RPC checks the role.
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(

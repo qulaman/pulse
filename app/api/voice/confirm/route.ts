@@ -72,7 +72,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const { duplicate = false, ...result } = (data ?? {}) as Record<string, unknown>;
-    // «отправить сейчас» is the whole batch (D-128): the outbox holds an announcement for the
+    // «отправить сейчас» is the whole batch (D-129): the outbox holds an announcement for the
     // window like every word to the team, so its pushes are released here, after the batch
     const announcementIds = Array.isArray(result.announcement_ids) ? (result.announcement_ids as string[]) : [];
     if (body.force_now && announcementIds.length > 0) {
