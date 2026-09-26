@@ -36,6 +36,8 @@ export type BoardRow = {
   title: string;
   /** the employee's unanswered question, when there is one */
   question?: string | null;
+  /** the deadline the employee asks for, while unanswered (D-128) */
+  request?: string | null;
   decline_reason?: string | null;
   /** an unread word in the thread (lib/pulse/board.ts `hasUnread`) */
   unread?: boolean;
@@ -58,6 +60,7 @@ export function tasksOf(rows: BoardRow[], now: number): Record<string, CrewTask[
       status: row.status,
       overdue: isOverdue(row, at),
       question: row.question ?? null,
+      request: row.request ?? null,
       unread: Boolean(row.unread),
       reason: row.decline_reason ?? null,
       href: `/tasks/${row.id}`,

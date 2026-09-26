@@ -6,6 +6,7 @@ import type { Ref } from "react";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { isLate, wordOf } from "@/lib/idle/look";
 import type { Member, Seat } from "@/lib/idle/people";
+import { untilWords } from "@/lib/tasks/lifecycle";
 
 /**
  * The card of a person at work (D-118, replaces the read-only star card of D-73 §3): who he is
@@ -81,6 +82,8 @@ export function CrewCard({
                   </span>
                   {task.question ? (
                     <span className="mt-0.5 block truncate text-[12px] leading-4 text-warn">вопрос: «{task.question}»</span>
+                  ) : task.request ? (
+                    <span className="mt-0.5 block truncate text-[12px] leading-4 text-warn">просит срок {untilWords(task.request)}</span>
                   ) : task.unread ? (
                     <span className="mt-0.5 block text-[12px] leading-4 text-accent">новое сообщение</span>
                   ) : null}

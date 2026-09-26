@@ -547,6 +547,7 @@ export default function PulsePage() {
         deadline: t.deadline,
         title: t.title,
         question: t.question,
+        request: t.time_request && t.time_request.senderId !== meId ? t.time_request.proposed : null,
         decline_reason: t.decline_reason,
         unread: hasUnread(t, meId),
       })),

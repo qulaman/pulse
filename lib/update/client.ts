@@ -109,9 +109,9 @@ function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
 let applying = false;
 
 /**
- * Bring this page to the server's build. Today there is no offline cache, so a reload is
- * enough; the worker is still asked first, so that once it caches (serwist) a waiting worker
- * takes over before the reload instead of serving the old files again.
+ * Bring this page to the server's build. The worker keeps screens network-first and the build's
+ * files under their own names (D-127), so a reload brings the new build; the worker is still
+ * asked first, so that a waiting one takes over before the reload instead of serving old files.
  */
 export async function applyUpdate(): Promise<void> {
   if (applying) return;

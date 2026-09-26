@@ -59,6 +59,10 @@ describe("team look", () => {
     expect(lookOf([task({ id: "a" }), task({ id: "b" }), task({ id: "c" }), task({ id: "d" })]).arcs).toBe(3);
   });
 
+  it("a request for time is a question to the director (D-128)", () => {
+    expect(lookOf([task({ unread: true }), task({ request: "2026-09-27T05:00:00Z" })]).badge).toBe("question");
+  });
+
   it("puts one badge on, the most pressing: a refusal, then a question, then an unread word", () => {
     expect(lookOf([task({ unread: true }), task({ question: "Какой адрес?" })]).badge).toBe("question");
     expect(lookOf([task({ unread: true }), task({ status: "declined" })]).badge).toBe("declined");

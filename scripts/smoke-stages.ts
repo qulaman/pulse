@@ -41,7 +41,9 @@ const TOLERANCE = 2;
 
 mkdirSync(SHOTS, { recursive: true });
 
-const PHONE = { viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU" };
+// the service worker answers the build's files and the screens itself (D-127): it would slip
+// past the requests this smoke holds — the stages are measured without it
+const PHONE = { viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU", serviceWorkers: "block" as const };
 
 type Account = { role: string; email: string; password: string; routes: (ids: Ids) => string[] };
 type Ids = { task: string | null; person: string | null; board: string | null };
@@ -82,7 +84,8 @@ async function idsFor(account: Account): Promise<Ids> {
   const mine = account.role === "director" ? "author_id" : "assignee_id";
   const task = await supabase.from("tasks").select("id").eq(mine, me).neq("status", "scheduled").order("created_at", { ascending: false }).limit(1).maybeSingle();
   const person = await supabase.from("profiles").select("id").neq("id", me).eq("is_active", true).in("role", ["employee", "manager"]).limit(1).maybeSingle();
-  const board = await supabase.from("mind_boards").select("id").limit(1).maybeSingle();
+  // a board in the bin opens «Доски нет» — not the screen being measured
+  const board = await supabase.from("mind_boards").select("id").is("deleted_at", null).limit(1).maybeSingle();
   return { task: task.data?.id ?? null, person: person.data?.id ?? null, board: board.data?.id ?? null };
 }
 
