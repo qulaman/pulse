@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
 import type { TabBarRole } from "@/lib/routes";
-import { inboxCounts, useDirectorInbox, useMe, useMyTasks } from "@/lib/tasks/queries";
+import { inboxCounts, useDirectorInbox, useFreshTaskCount, useMe } from "@/lib/tasks/queries";
 import { useVisualViewport } from "@/lib/ui/useVisualViewport";
 
 import styles from "./TabBar.module.css";
@@ -180,11 +180,11 @@ export function backTarget(role: TabRole, pathname: string): string | null {
  */
 function useTabBadges(role: TabRole): Record<string, number> {
   const me = useMe();
-  const mine = useMyTasks(role !== "director" ? me.data?.userId : undefined);
+  const fresh = useFreshTaskCount(role !== "director" ? me.data?.userId : undefined);
   const inbox = useDirectorInbox(me.data, role === "director");
   if (role !== "director") {
-    const fresh = (mine.data ?? []).filter((task) => task.status === "sent").length;
-    return fresh > 0 ? { "/tasks": fresh } : {};
+    const count = fresh.data ?? 0;
+    return count > 0 ? { "/tasks": count } : {};
   }
   const total = inboxCounts(inbox.data).total;
   return total > 0 ? { "/pulse": total } : {};

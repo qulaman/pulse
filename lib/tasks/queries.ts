@@ -20,6 +20,7 @@ import {
 import {
   lastSeqOf,
   mergeBySeq,
+  useRealtimeInvalidate,
   useRealtimeListener,
   useRealtimeQuery,
 } from "@/lib/realtime/useRealtimeQuery";
@@ -67,6 +68,7 @@ export const taskKeys = {
   detail: (taskId: string) => ["tasks", "detail", taskId] as const,
   thread: (taskId: string) => ["task-thread", taskId] as const,
   me: () => ["me"] as const,
+  fresh: (userId: string) => ["tasks", "fresh", userId] as const,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -115,7 +117,13 @@ async function fetchMyTasks(userId: string): Promise<TaskWithPeople[]> {
   const supabase = createBrowserSupabase();
   // No status filter: RLS already hides `scheduled` from everyone but its author.
   // assignee filter: a manager also sees subordinates' tasks under RLS — not in «Лента».
-  const { data, error } = await supabase.from("tasks").select(TASK_SELECT).eq("assignee_id", userId);
+  // newest first: past max_rows (1000) PostgREST cuts the read, and an unordered cut was any
+  // thousand of the person's tasks — ordered, it is the recent ones (D-126)
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_SELECT)
+    .eq("assignee_id", userId)
+    .order("created_at", { ascending: false });
   if (error) throw new Error(error.message);
   return sortByUrgency((data ?? []) as unknown as TaskWithPeople[]);
 }
@@ -160,6 +168,32 @@ export function useMyTasks(userId: string | undefined) {
   return useRealtimeQuery<TaskWithPeople[], TaskRow>({
     queryKey: taskKeys.mine(userId ?? ""),
     queryFn: () => fetchMyTasks(userId as string),
+    channel: { table: "tasks", filter: userId ? `assignee_id=eq.${userId}` : undefined },
+    enabled: Boolean(userId),
+  });
+}
+
+/**
+ * How many of the employee's tasks wait for «Принял» — the badge on «Дела». A count, not the
+ * list: the badge is on every screen, and the list is the person's whole history with its
+ * people (D-126). It listens on the list's own socket (and the shared DELETE one), so the
+ * number moves on the same events as the list behind it.
+ */
+export function useFreshTaskCount(userId: string | undefined) {
+  const key = taskKeys.fresh(userId ?? "");
+  useRealtimeInvalidate({ table: "tasks", event: "DELETE" }, key, Boolean(userId));
+  return useRealtimeQuery<number, TaskRow>({
+    queryKey: key,
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { count, error } = await supabase
+        .from("tasks")
+        .select("id", { count: "exact", head: true })
+        .eq("assignee_id", userId as string)
+        .eq("status", "sent");
+      if (error) throw new Error(error.message);
+      return count ?? 0;
+    },
     channel: { table: "tasks", filter: userId ? `assignee_id=eq.${userId}` : undefined },
     enabled: Boolean(userId),
   });

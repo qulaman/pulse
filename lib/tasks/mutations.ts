@@ -109,8 +109,15 @@ function patchBoard(queryClient: QueryClient, taskId: string, patch: Partial<Boa
   );
 }
 
+/**
+ * After a change to one task: the task and its thread read anew at once; the lists are only
+ * marked stale. The Realtime echo of this very change patches or refetches the lists on screen,
+ * and a list opened later reads anew — refetching them all here (the board, «Отправленные» with
+ * 200 rows, «Мои дела», the loads) was eight requests per tap (D-126).
+ */
 function invalidateTasks(queryClient: QueryClient, taskId: string) {
-  void queryClient.invalidateQueries({ queryKey: taskKeys.root });
+  void queryClient.invalidateQueries({ queryKey: taskKeys.root, refetchType: "none" });
+  void queryClient.invalidateQueries({ queryKey: taskKeys.detail(taskId) });
   void queryClient.invalidateQueries({ queryKey: taskKeys.thread(taskId) });
 }
 
