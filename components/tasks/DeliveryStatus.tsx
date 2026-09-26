@@ -79,8 +79,9 @@ export function DeliveryStatus({
   if (waiting) {
     const color = RECEIPT_COLOR.muted;
     return (
-      <p className="mt-2 flex items-center gap-1.5 text-[13px] leading-4" style={{ color }} data-testid="delivery-held">
-        <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: color }} />
+      <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-4" style={{ color }} data-testid="delivery-held">
+        {/* the line may wrap on a narrow phone: the dot stays with its first row */}
+        <span aria-hidden className="mt-[5px] inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
         <span>
           {`${waiting} · `}
           <button type="button" className="underline underline-offset-2" style={{ color: "var(--accent)" }} onClick={onSendNow} data-testid="send-now">

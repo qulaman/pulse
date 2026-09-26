@@ -170,11 +170,17 @@ export function useRevoke() {
 
 /** Only a held task changes its status; a task already out only lets its held words go. */
 function releaseCached(old: unknown, taskId: string, at: string): unknown {
-  const release = (task: TaskWithPeople): TaskWithPeople =>
-    task.id === taskId && task.status === "scheduled" ? { ...task, status: "sent", scheduled_send_at: at } : task;
+  const held = (task: unknown) => (task as TaskWithPeople | null)?.id === taskId && (task as TaskWithPeople).status === "scheduled";
+  const release = (task: TaskWithPeople): TaskWithPeople => (held(task) ? { ...task, status: "sent", scheduled_send_at: at } : task);
   if (Array.isArray(old)) return (old as TaskWithPeople[]).map(release);
-  if (old && typeof old === "object" && typeof (old as { id?: unknown }).id === "string") return release(old as TaskWithPeople);
-  return old;
+  if (!old || typeof old !== "object") return old;
+  if (typeof (old as { id?: unknown }).id === "string") return release(old as TaskWithPeople);
+  // the board keeps its lanes as arrays inside one object — the task's screen shows it from
+  // there (placeholderData) until its own fetch lands, so it must move there too
+  const entries = Object.entries(old as Record<string, unknown>);
+  const holds = (value: unknown) => Array.isArray(value) && value.some(held);
+  if (!entries.some(([, value]) => holds(value))) return old;
+  return Object.fromEntries(entries.map(([key, value]) => [key, holds(value) ? (value as TaskWithPeople[]).map(release) : value]));
 }
 
 /** The first name of the task's assignee, from whatever list holds the task — for the toast. */
