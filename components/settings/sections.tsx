@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { usePeople } from "@/lib/people/queries";
+import type { CompanySettings } from "@/lib/settings";
+// labels and helpers only — lib/settings.ts itself would bring zod into this page (D-126)
 import {
   PARSER_MODEL_LABEL,
   PARSER_MODEL_SHORT,
@@ -17,8 +19,7 @@ import {
   STT_PROVIDER_SHORT,
   STT_PROVIDERS,
   withSecretaryCodes,
-  type CompanySettings,
-} from "@/lib/settings";
+} from "@/lib/settings-plain";
 
 const FIELD =
   "min-h-[44px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";

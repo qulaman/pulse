@@ -1,15 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
 import { applyUpdate } from "@/lib/update/client";
 import { useServerVersion, versionKey } from "@/lib/update/queries";
 import { useHydrated } from "@/lib/useHydrated";
 import { BUILD, looksLikeStaleBuild, versionStatus } from "@/lib/version";
+
+// The face loads when an error actually shows: this boundary wraps every route, and a static
+// import put the whole mascot into the bundle of screens that never draw it (D-126). The
+// placeholder keeps its 88 px, so the words do not move when it arrives.
+const Mascot = dynamic(() => import("@/components/brand/Mascot").then((m) => m.Mascot), {
+  loading: () => <span aria-hidden className="block" style={{ width: 88, height: 88 }} />,
+});
 
 /** Route-level error boundary: the assistant owns the failure, the director keeps the phone. */
 export default function RouteError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {

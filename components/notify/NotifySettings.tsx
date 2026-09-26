@@ -25,8 +25,8 @@ import {
   quietValue,
   UNSEEN_AFTER,
   type NotifyCategory,
-  type NotifyPrefs,
-} from "@/lib/push/prefs";
+} from "@/lib/push/prefs-plain";
+import type { NotifyPrefs } from "@/lib/push/prefs";
 
 export const notifyPrefsKey = ["notify-prefs"] as const;
 

@@ -3,7 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
-import { parseCompanySettings, type SecretaryAction } from "@/lib/settings";
+import type { CompanySettings, SecretaryAction } from "@/lib/settings";
+import { fetchSettings, settingsKey } from "@/lib/settings-query";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
@@ -71,21 +72,23 @@ export function useErrandHistory(days = 30, enabled = true) {
 }
 
 /**
- * Каталог кнопок компании. Читается из `companies.settings` напрямую: RLS отдаёт
- * настройки любому своему, а /api/settings — только директору (V-02: конфигурация,
- * а не код).
+ * Каталог кнопок компании (V-02: конфигурация, а не код). Спрашивают его только директор и
+ * секретарь — им /api/settings отдаёт настройки уже разобранными.
  */
+type SecretarySetup = { escalateAfterMin: number; window: { from: string; to: string }; securityPhone: string };
+
+// One read of the company settings for the whole app, parsed on the server (/api/settings, the
+// director and the secretary — the only ones who ask). Parsing here needed the zod schema, and
+// zod reached the browser with all of its locales: ~84 KB gz on every director's Пульс (D-126).
+const actionsOf = (settings: CompanySettings): SecretaryAction[] => settings.secretary.actions;
+const setupOf = (settings: CompanySettings): SecretarySetup => ({
+  escalateAfterMin: settings.secretary.escalate_after_min,
+  window: settings.delivery_window,
+  securityPhone: settings.secretary.security_phone,
+});
+
 export function useSecretaryActions(enabled = true) {
-  return useQuery({
-    queryKey: ["company", "secretary"],
-    enabled,
-    queryFn: async (): Promise<SecretaryAction[]> => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
-      if (error) throw new Error(error.message);
-      return parseCompanySettings(data?.settings).secretary.actions;
-    },
-  });
+  return useQuery({ queryKey: settingsKey, queryFn: fetchSettings, enabled, select: actionsOf });
 }
 
 /**
@@ -93,22 +96,7 @@ export function useSecretaryActions(enabled = true) {
  * момента лицо бежит на месте, — и окно доставки компании: вне его за столом ночь.
  */
 export function useSecretarySetup(enabled = true) {
-  return useQuery({
-    queryKey: ["company", "secretary-setup"],
-    enabled,
-    staleTime: 5 * 60_000,
-    queryFn: async (): Promise<{ escalateAfterMin: number; window: { from: string; to: string }; securityPhone: string }> => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("companies").select("settings").limit(1).maybeSingle();
-      if (error) throw new Error(error.message);
-      const settings = parseCompanySettings(data?.settings);
-      return {
-        escalateAfterMin: settings.secretary.escalate_after_min,
-        window: settings.delivery_window,
-        securityPhone: settings.secretary.security_phone,
-      };
-    },
-  });
+  return useQuery({ queryKey: settingsKey, queryFn: fetchSettings, enabled, staleTime: 5 * 60_000, select: setupOf });
 }
 
 export type SecretaryPerson = { id: string; full_name: string; away_until: string | null };

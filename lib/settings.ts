@@ -3,17 +3,28 @@ import { z } from "zod";
 import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
 import { DEFAULT_WORD_KINDS, KIND_LABEL_MAX, WORD_KINDS_MAX } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
+import { STT_PROVIDERS } from "@/lib/settings-plain";
+
+// Plain values and helpers without zod live in settings-plain.ts — the pages that only need a
+// label or a code helper import them there and stay free of zod (D-126). Re-exported here, so
+// server code keeps importing everything from one place.
+export {
+  PARSER_MODEL_LABEL,
+  PARSER_MODEL_SHORT,
+  PARSER_MODELS,
+  secretaryActionCode,
+  STT_PROVIDER_LABEL,
+  STT_PROVIDER_SHORT,
+  STT_PROVIDERS,
+  withSecretaryCodes,
+  type SttProviderKey,
+} from "@/lib/settings-plain";
 
 /**
  * company.settings — everything client-specific lives here, never in code (V-02).
  * Unknown keys are kept (other subsystems own theirs); known keys get defaults.
  */
 
-export const STT_PROVIDERS = ["openai", "whisper1", "deepgram", "elevenlabs"] as const;
-export type SttProviderKey = (typeof STT_PROVIDERS)[number];
-
-/** DeepSeek ids are the lab's A/B against Haiku (D-63); the default stays Claude. */
-export const PARSER_MODELS = ["claude-haiku-4-5", "claude-sonnet-5", "deepseek-chat", "deepseek-reasoner"] as const;
 
 export const SttSettingsSchema = z.object({
   provider: z.enum(STT_PROVIDERS).default("openai"),
@@ -171,48 +182,6 @@ export const CompanySettingsSchema = z.object({
 
 export type CompanySettings = z.infer<typeof CompanySettingsSchema>;
 
-const TRANSLIT: Record<string, string> = {
-  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
-  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
-  х: "h", ц: "c", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
-  ә: "a", ғ: "g", қ: "k", ң: "n", ө: "o", ұ: "u", ү: "u", һ: "h", і: "i",
-};
-
-/**
- * The code of a catalogue button is the director's label in latin letters — it never
- * changes afterwards, because an errand keeps it forever while the label may be
- * renamed (D-79 §4). A label with nothing to transliterate falls back to action_N.
- */
-export function secretaryActionCode(label: string, taken: readonly string[] = []): string {
-  const base =
-    label
-      .toLowerCase()
-      .split("")
-      .map((ch) => TRANSLIT[ch] ?? (/[a-z0-9]/.test(ch) ? ch : " "))
-      .join("")
-      .trim()
-      .replace(/\s+/g, "_")
-      .slice(0, 32) || `action_${taken.length + 1}`;
-  let code = base;
-  for (let n = 2; taken.includes(code); n += 1) code = `${base}_${n}`.slice(0, 32);
-  return code;
-}
-
-/**
- * What the form sends: empty rows are the editor's scratch space, and a row the
- * director just added gets its code here, once.
- */
-export function withSecretaryCodes(actions: readonly SecretaryAction[]): SecretaryAction[] {
-  const result: SecretaryAction[] = [];
-  for (const action of actions) {
-    const label = action.label.trim();
-    if (!label) continue;
-    const code = action.code.trim() || secretaryActionCode(label, result.map((a) => a.code));
-    result.push({ ...action, label, code });
-  }
-  return result;
-}
-
 /** Defaults applied on top of whatever the row holds; malformed sections fall back to defaults. */
 export function parseCompanySettings(raw: unknown): CompanySettings {
   const result = CompanySettingsSchema.safeParse(raw ?? {});
@@ -239,32 +208,3 @@ export const SettingsPatchSchema = z
   .strict();
 
 export type SettingsPatch = z.infer<typeof SettingsPatchSchema>;
-
-export const STT_PROVIDER_LABEL: Record<SttProviderKey, string> = {
-  openai: "OpenAI gpt-4o-transcribe (основной по гейту)",
-  whisper1: "OpenAI whisper-1 (контроль)",
-  deepgram: "Deepgram nova-3",
-  elevenlabs: "ElevenLabs Scribe v2 — запасной (D-53)",
-};
-
-/** One-line names for summaries and chips — the long labels above belong in a <select>. */
-export const STT_PROVIDER_SHORT: Record<SttProviderKey, string> = {
-  openai: "gpt-4o-transcribe",
-  whisper1: "whisper-1",
-  deepgram: "Deepgram nova-3",
-  elevenlabs: "ElevenLabs Scribe v2",
-};
-
-export const PARSER_MODEL_SHORT: Record<string, string> = {
-  "claude-haiku-4-5": "Claude Haiku 4.5",
-  "claude-sonnet-5": "Claude Sonnet 5",
-  "deepseek-chat": "DeepSeek V3",
-  "deepseek-reasoner": "DeepSeek R1",
-};
-
-export const PARSER_MODEL_LABEL: Record<string, string> = {
-  "claude-haiku-4-5": "Claude Haiku 4.5 — быстрый, ~2.8 с",
-  "claude-sonnet-5": "Claude Sonnet 5 — точнее, ~6 с",
-  "deepseek-chat": "DeepSeek V3 (chat) — без рассуждений, лаборатория",
-  "deepseek-reasoner": "DeepSeek R1 (reasoner) — с рассуждениями, медленно, лаборатория",
-};

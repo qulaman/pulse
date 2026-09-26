@@ -7,13 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import type { LabCall, LabResponse, LabRow } from "@/lib/lab/rows";
-import {
-  PARSER_MODEL_LABEL,
-  PARSER_MODELS,
-  STT_PROVIDER_LABEL,
-  STT_PROVIDERS,
-  type CompanySettings,
-} from "@/lib/settings";
+import type { CompanySettings } from "@/lib/settings";
+// labels only — lib/settings.ts itself would bring zod into this page (D-126)
+import { PARSER_MODEL_LABEL, PARSER_MODELS, STT_PROVIDER_LABEL, STT_PROVIDERS } from "@/lib/settings-plain";
 
 type LabSettings = LabResponse["settings"];
 
