@@ -636,7 +636,7 @@ export function useSendMessage(me: Me | undefined) {
 
 export type TaskActions = {
   transition: (input: Omit<TransitionInput, "requestId">) => void;
-  /** rework → accepted → pending_review: two calls, two client_request_id. */
+  /** «Выполнено» — from a rework too: the RPC walks rework → accepted itself, one call (D-130). */
   complete: (input: { taskId: string; fromStatus: TaskStatus; report?: Report }) => void;
   revoke: (taskId: string) => void;
   /** «Отправить сейчас»: what this task holds for the morning goes out now (D-129). */
@@ -679,20 +679,10 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     requestTime: (input) => requestTime.mutate({ ...input, requestId: crypto.randomUUID() }),
     answerTime: (input) => answerTime.mutate({ ...input, requestId: crypto.randomUUID() }),
     nudge: (input) => nudge.mutate({ ...input, requestId: crypto.randomUUID() }),
-    complete: ({ taskId, fromStatus, report }) => {
-      if (fromStatus === "rework") {
-        // The employee taps once; the matrix still demands rework → accepted first.
-        // The report goes with the second call — the one that is the handover.
-        transition.mutate(
-          { taskId, toStatus: "accepted", requestId: crypto.randomUUID() },
-          {
-            onSuccess: () => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report }),
-          },
-        );
-        return;
-      }
-      transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report });
-    },
+    // One tap, one call, the report inside it: from a rework the RPC walks rework → accepted
+    // itself, in the same transaction (D-130). It used to be two calls, and a tab closed between
+    // them left the task «в работе» with the report gone.
+    complete: ({ taskId, report }) => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report }),
     revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendNow: (taskId) => sendNow.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: input.id ?? crypto.randomUUID() }),

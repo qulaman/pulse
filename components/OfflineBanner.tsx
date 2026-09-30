@@ -1,11 +1,13 @@
 "use client";
 
 import { onlineManager, useMutationState, useQueryClient } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError } from "@/lib/net";
 import { latestFetch } from "@/lib/offline/persist";
+import { outboxSize, subscribeOutbox } from "@/lib/outbox";
+import { countOnTheirWay, subscribeKept } from "@/lib/voice/kept";
 
 // the same switch that pauses and resumes mutations — the line never disagrees with the queue
 const subscribe = (onChange: () => void) => onlineManager.subscribe(onChange);
@@ -26,14 +28,41 @@ function useLatestFetch(): number | null {
   );
 }
 
+/**
+ * What waits for the network outside the mutation cache (D-130): the outbox a closed session
+ * left, and the director's phrases the phone keeps.
+ */
+function useWaitingOnPhone(): { outbox: number; phrases: number } {
+  const [counts, setCounts] = useState({ outbox: 0, phrases: 0 });
+  useEffect(() => {
+    let alive = true;
+    const read = async () => {
+      const phrases = await countOnTheirWay();
+      if (alive) setCounts({ outbox: outboxSize(), phrases });
+    };
+    void read();
+    const offOutbox = subscribeOutbox(() => void read());
+    const offKept = subscribeKept(() => void read());
+    return () => {
+      alive = false;
+      offOutbox();
+      offKept();
+    };
+  }, []);
+  return counts;
+}
+
 /** The network and the taps waiting for it; while `shown`, the top line belongs to this banner. */
 export function useSendQueue(): { isOnline: boolean; paused: number; shown: boolean } {
   const isOnline = useOnline();
   // taps made without network wait in the mutation cache (QueryProvider, networkMode offlineFirst)
-  const paused = useMutationState({
+  const inMemory = useMutationState({
     filters: { status: "pending" },
     select: (m) => m.state.isPaused || (m.state.failureCount > 0 && isNetworkError(m.state.failureReason)),
   }).filter(Boolean).length;
+  // a paused tap is in the outbox too: the larger of the two, not their sum
+  const onPhone = useWaitingOnPhone();
+  const paused = Math.max(inMemory, onPhone.outbox) + onPhone.phrases;
   return { isOnline, paused, shown: !isOnline || paused > 0 };
 }
 

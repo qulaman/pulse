@@ -77,6 +77,8 @@ export type ConfirmRequest = {
 export type ConfirmResponse = {
   result: Record<string, unknown>;
   duplicate: boolean;
+  /** No network at the tap: the batch waits on the phone and goes by itself (D-130). */
+  queued?: boolean;
 };
 
 export class VoiceApiError extends Error {

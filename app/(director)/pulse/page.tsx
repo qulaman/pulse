@@ -25,6 +25,7 @@ import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
+import { useKeptPill } from "@/components/voice/KeptPhrases";
 import { Button } from "@/components/ui/Button";
 import { useComposeStore } from "@/lib/store/compose";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
@@ -280,6 +281,8 @@ export default function PulsePage() {
   const eventSoon = startsSoon(nextMeeting, now);
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
   const showHint = useLeverHint();
+  // the pill of a phrase the phone keeps stands where the hint would (D-130)
+  const keptPill = useKeptPill((state) => state.shown);
 
   // ---- the balls and the panels ------------------------------------------------------------
   const [mode, setMode] = useState<Mode>("idle");
@@ -477,6 +480,19 @@ export default function PulsePage() {
     if (oopsTimer.current) clearTimeout(oopsTimer.current);
     oopsTimer.current = setTimeout(() => setOops(null), ACT_MS[act]);
   }, [stage, ingestError, playAct]);
+  // no network: the phrase stays on the phone and goes by itself (D-130) — the same phone held
+  // up for signal as a failed upload, but the face is not sorry, it has kept the words
+  useEffect(
+    () =>
+      useIngestStore.subscribe((current, previous) => {
+        if (current.stage !== "kept" || previous.stage === "kept") return;
+        playAct("signal");
+        setOops("signal");
+        if (oopsTimer.current) clearTimeout(oopsTimer.current);
+        oopsTimer.current = setTimeout(() => setOops(null), ACT_MS.signal);
+      }),
+    [playAct],
+  );
   useEffect(
     () => () => {
       if (oopsTimer.current) clearTimeout(oopsTimer.current);
@@ -872,7 +888,7 @@ export default function PulsePage() {
 
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}
-      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting ? (
+      {showHint && mode === "idle" && stage === "idle" && !picked && !asking && !visitorsWaiting && !messagesWaiting && !keptPill ? (
         <p
           className="pointer-events-none fixed inset-x-0 z-20 px-4 text-center text-[12px] leading-4 text-muted"
           style={{ bottom: "calc(var(--tabbar-space) + 2px)" }}

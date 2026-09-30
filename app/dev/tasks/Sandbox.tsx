@@ -22,6 +22,25 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
   const [tasks, setTasks] = useState<TaskWithPeople[]>(initial.tasks);
   const [board, setBoard] = useState<BoardTask[]>(initial.board);
   const now = useMemo(() => new Date(), []);
+  // the server holds more closed tasks than the first page (D-130): «Показать ещё» brings
+  // copies of the closed fixtures, a month older
+  const [olderLeft, setOlderLeft] = useState(empty ? 0 : 24);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const closedNow = tasks.filter((task) => ["done", "revoked", "declined"].includes(task.status));
+  const loadOlder = () => {
+    setLoadingOlder(true);
+    setTimeout(() => {
+      const month = 30 * 86_400_000;
+      const older = Array.from({ length: olderLeft }, (_, i) => {
+        const base = closedNow[i % Math.max(1, closedNow.length)];
+        const at = new Date(now.getTime() - month - i * 86_400_000).toISOString();
+        return { ...base, id: `older-${i}`, title: `${base.title} (архив ${i + 1})`, closed_at: at, created_at: at, updated_at: at };
+      });
+      setTasks((list) => [...list, ...older]);
+      setOlderLeft(0);
+      setLoadingOlder(false);
+    }, 600);
+  };
 
   const patch = (taskId: string, change: Partial<TaskWithPeople>) => {
     setTasks((list) => list.map((task) => (task.id === taskId ? { ...task, ...change, updated_at: new Date().toISOString() } : task)));
@@ -101,8 +120,10 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
           now={now}
           onPurge={(done) => {
             setTasks((list) => list.filter((task) => !["done", "revoked", "declined"].includes(task.status)));
+            setOlderLeft(0);
             done();
           }}
+          closedPages={{ total: closedNow.length + olderLeft, loading: loadingOlder, onMore: loadOlder }}
         />
       ) : (
         <EmployeeTasksView

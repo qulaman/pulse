@@ -59,6 +59,12 @@ export function useSendBatch(onDone?: () => void) {
 
       const result = await send(forceNow, pointsEnabled);
       if (!result) return; // the overlay owns the failure and the retry
+      // no network: the batch waits on the phone and the face said so (D-130); a question
+      // asked about data the phone cannot reach now is asked again later
+      if (result.queued) {
+        onDone?.();
+        return;
+      }
 
       const parts = [...names];
       if (hasAnnouncement) parts.push("объявление в Эфир");

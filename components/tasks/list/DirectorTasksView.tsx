@@ -52,6 +52,7 @@ export function DirectorTasksView({
   now,
   onPurge,
   purging: purgePending = false,
+  closedPages,
 }: {
   meId: string;
   companyId: string;
@@ -63,6 +64,11 @@ export function DirectorTasksView({
   now: Date;
   onPurge: (done: () => void) => void;
   purging?: boolean;
+  /**
+   * The closed tasks come a page at a time (D-130): how many there are on the server, and the
+   * next page. Absent — the list holds all of them (the /dev sandbox).
+   */
+  closedPages?: { total: number | undefined; loading: boolean; onMore: () => void };
 }) {
   const [personId, setPersonId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -144,7 +150,10 @@ export function DirectorTasksView({
   };
 
   const person = personId ? people.find((p) => p.id === personId) : undefined;
-  const closedCount = all.filter((task) => task.status === "done" || task.status === "revoked" || task.status === "declined").length;
+  const closedLoaded = all.filter((task) => task.status === "done" || task.status === "revoked" || task.status === "declined").length;
+  // the server's count: the list holds the latest pages only, the purge takes all of them
+  const closedCount = Math.max(closedLoaded, closedPages?.total ?? 0);
+  const moreClosed = closedPages !== undefined && closedCount > closedLoaded;
 
   const empty = (
     <EmptyState
@@ -189,7 +198,8 @@ export function DirectorTasksView({
         items={[
           { key: "yours", label: "Ждут вас", count: piles.yours.length, alert: screen.tone === "danger" ? "danger" : "warn" },
           { key: "working", label: "В работе", count: piles.working.length },
-          { key: "closed", label: "Закрытые", count: piles.closed.length },
+          // a person or a search narrows what is loaded; the plain tab counts what the server has
+          { key: "closed", label: "Закрытые", count: personId || query.trim() ? piles.closed.length : closedCount },
         ]}
       >
         {searchOpen ? (
@@ -237,6 +247,14 @@ export function DirectorTasksView({
           )}
         />
       </div>
+
+      {current === "closed" && moreClosed ? (
+        <div className="mt-4 flex justify-center">
+          <Button variant="secondary" size="sm" loading={closedPages.loading} onClick={closedPages.onMore}>
+            Показать ещё · {closedCount - closedLoaded}
+          </Button>
+        </div>
+      ) : null}
 
       {/* cleanup of history: wrong and test orders go for good, company-wide — so not under a person */}
       {current === "closed" && !personId && closedCount > 0 ? (

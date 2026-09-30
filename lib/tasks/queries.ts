@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { create } from "zustand";
 
 import {
   applyMessage,
@@ -199,16 +200,54 @@ export function useFreshTaskCount(userId: string | undefined) {
   });
 }
 
+/** Closed tasks come a page at a time (D-130); the open ones always all of them. */
+export const CLOSED_PAGE = 100;
+/** A guard, not a page: no director holds this many open orders — the list stays whole. */
+const OPEN_CAP = 2000;
+const CLOSED_STATUSES = ["done", "declined", "revoked"] as const;
+
+/**
+ * How many closed tasks «Задачи» holds for a director right now and how many there are. Kept
+ * outside the query key on purpose: every optimistic patch finds the list under the same key,
+ * and a Realtime refetch keeps the pages the director has already opened.
+ */
+export const useSentPages = create<{ limit: Record<string, number>; total: Record<string, number> }>(() => ({
+  limit: {},
+  total: {},
+}));
+
+const newestFirst = (a: TaskRow, b: TaskRow) => (a.created_at > b.created_at ? -1 : a.created_at < b.created_at ? 1 : 0);
+
+/**
+ * Every open task of this director — an order from three weeks ago still in work must never
+ * fall off the list (the old single «last 200» cut it off in about a week of a live pilot) —
+ * and the closed ones, most recently closed first, a page at a time.
+ */
 async function fetchSentTasks(userId: string): Promise<TaskWithPeople[]> {
   const supabase = createBrowserSupabase();
-  const { data, error } = await supabase
-    .from("tasks")
-    .select(TASK_SELECT)
-    .eq("author_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(200);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as TaskWithPeople[];
+  const limit = useSentPages.getState().limit[userId] ?? CLOSED_PAGE;
+  const [open, closed] = await Promise.all([
+    supabase
+      .from("tasks")
+      .select(TASK_SELECT)
+      .eq("author_id", userId)
+      .not("status", "in", `(${CLOSED_STATUSES.join(",")})`)
+      .order("created_at", { ascending: false })
+      .limit(OPEN_CAP),
+    supabase
+      .from("tasks")
+      .select(TASK_SELECT, { count: "exact" })
+      .eq("author_id", userId)
+      .in("status", [...CLOSED_STATUSES])
+      .order("closed_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(limit),
+  ]);
+  if (open.error) throw new Error(open.error.message);
+  if (closed.error) throw new Error(closed.error.message);
+  useSentPages.setState((state) => ({ total: { ...state.total, [userId]: closed.count ?? 0 } }));
+  const rows = [...(open.data ?? []), ...(closed.data ?? [])] as unknown as TaskWithPeople[];
+  return rows.sort(newestFirst);
 }
 
 /** Everything the director sent, newest first — «Отправленные». Scheduled ones included (author sees them). */
@@ -219,6 +258,22 @@ export function useSentTasks(userId: string | undefined) {
     channel: { table: "tasks", filter: userId ? `author_id=eq.${userId}` : undefined },
     enabled: Boolean(userId),
   });
+}
+
+/**
+ * The closed tasks of «Задачи»: how many there are on the server, how many are loaded, and
+ * «Показать ещё» — the next page, fetched under the same key (D-130).
+ */
+export function useClosedPages(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  const total = useSentPages((state) => (userId ? state.total[userId] : undefined));
+  const limit = useSentPages((state) => (userId ? (state.limit[userId] ?? CLOSED_PAGE) : CLOSED_PAGE));
+  const more = () => {
+    if (!userId) return Promise.resolve();
+    useSentPages.setState((state) => ({ limit: { ...state.limit, [userId]: limit + CLOSED_PAGE } }));
+    return queryClient.refetchQueries({ queryKey: taskKeys.sent(userId), exact: true });
+  };
+  return { total, limit, more };
 }
 
 export function activeOnly(tasks: TaskWithPeople[] | undefined): TaskWithPeople[] {

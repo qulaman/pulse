@@ -19,7 +19,26 @@ import type {
 } from "../ai/schema";
 import type { AssigneeMatch } from "../matchName";
 import { holdUpdate } from "../update/client";
-import { VoiceApiError, voiceApi, type ConfirmResponse, type IngestSource } from "../voice/api";
+import {
+  VoiceApiError,
+  voiceApi,
+  type ConfirmRequest,
+  type ConfirmResponse,
+  type IngestSource,
+  type ParseResponse,
+} from "../voice/api";
+import {
+  claimPhrase,
+  dropPhrase,
+  forgetParked,
+  isReady,
+  keepPhrase,
+  markParked,
+  patchPhrase,
+  releasePhrase,
+  type KeptPhrase,
+  type KeptStage,
+} from "../voice/kept";
 import {
   createRecorder,
   extForMime,
@@ -30,8 +49,10 @@ import {
 
 /**
  * The director's ingest pipeline as one state machine (docs/FRONTEND.md "FAB",
- * docs/AI.md §11). Zustand holds it because it is ephemeral UI state: nothing here
- * outlives the trip to /confirm, and server state stays with TanStack Query.
+ * docs/AI.md §11). Zustand holds it because it is ephemeral UI state, and server state
+ * stays with TanStack Query. What must outlive the page — the phrase itself, from the
+ * release to the batch on the server — is mirrored on the phone step by step
+ * (lib/voice/kept.ts, D-130).
  */
 
 export type IngestStage =
@@ -45,6 +66,11 @@ export type IngestStage =
   | "question"
   | "sending"
   | "done"
+  /**
+   * No network: the phrase stays on the phone and goes by itself once there is one (D-130).
+   * A beat long — the face shows it, then the pipeline is free for the next phrase.
+   */
+  | "kept"
   | "error";
 
 export type IngestErrorCode =
@@ -88,6 +114,9 @@ export type EntityPatch = Partial<
 /** Anything shorter is a slip of the finger, not speech (docs/AI.md §11). */
 export const MIN_RECORDING_MS = 1000;
 
+/** How long the face says «сохранил, отправлю сам» before it is free again (D-130). */
+export const KEPT_MS = 1500;
+
 const KNOWN_CODES = new Set<string>([
   "record_too_short",
   "mic_denied",
@@ -109,6 +138,8 @@ type IngestState = {
   retryFrom: RetryFrom | null;
   /** Idempotency key of the whole ingest, from the first keystroke to `done` (principle 7). */
   clientRequestId: string | null;
+  /** The phone's copy of this phrase (lib/voice/kept.ts); null — not kept (no owner, no IndexedDB). */
+  keptId: string | null;
   recordingStartedAt: number | null;
   audio: RecordedAudio | null;
   audioPath: string | null;
@@ -167,6 +198,11 @@ type IngestActions = {
   editEntity: (index: number, patch: EntityPatch) => void;
   removeEntity: (index: number) => void;
   send: (forceNow?: boolean, pointsEnabled?: boolean) => Promise<ConfirmResponse | null>;
+  /**
+   * A phrase the phone kept comes back to the face (D-130): its cards to confirm, or the step
+   * the server refused. False — the face is busy with another phrase, or the replay holds it.
+   */
+  restore: (phrase: KeptPhrase) => boolean;
   reset: () => void;
 };
 
@@ -175,6 +211,7 @@ const initialState: IngestState = {
   error: null,
   retryFrom: null,
   clientRequestId: null,
+  keptId: null,
   recordingStartedAt: null,
   audio: null,
   audioPath: null,
@@ -195,6 +232,16 @@ const initialState: IngestState = {
 let activeRecorder: Recorder | null = null;
 const levelListeners = new Set<(level: number) => void>();
 
+/**
+ * Whose phone keeps the phrase (D-130): the director's shell binds it once `me` is known. Not
+ * state — nothing renders from it — and a phrase begun before it is known is simply not kept.
+ */
+let owner: string | null = null;
+
+export function bindIngestOwner(userId: string | null): void {
+  owner = userId;
+}
+
 /** Microphone loudness, 0..1, straight to the caller — no re-render per frame. */
 export function subscribeIngestLevel(cb: (level: number) => void): () => void {
   levelListeners.add(cb);
@@ -212,6 +259,11 @@ function classify(cause: unknown): IngestErrorCode {
     return cause.code as IngestErrorCode;
   }
   return "unknown";
+}
+
+/** A dead network, not a server that said no: the phrase can wait on the phone for the next one. */
+function offline(cause: unknown): boolean {
+  return cause instanceof VoiceApiError && cause.code === "network";
 }
 
 function retryTargetFor(code: IngestErrorCode, from: RetryFrom): RetryFrom | null {
@@ -292,6 +344,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     const count = get().entities.length;
     const res = await get().send(false, false);
     if (!res) return; // send() already left the overlay on «повторить»
+    if (res.queued) return; // no network: the phone keeps them and said so (D-130)
     const ids = noteIdsOf(res.result);
     toast(
       count === 1 ? "Записал" : `Записал ${count} ${pluralRu(count, ["заметку", "заметки", "заметок"])}`,
@@ -315,14 +368,171 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     set(patch);
   }
 
+  /* ------------------------------------------------ the phone's copy (D-130) */
+
+  /**
+   * The phrase goes on the phone before anything else happens to it (principle 5): the
+   * recording before the first byte leaves, typed words before the parser sees them.
+   */
+  async function keepFresh(stage: KeptStage, audio: RecordedAudio | null): Promise<void> {
+    const s = get();
+    const id = s.clientRequestId;
+    if (!owner || !id || s.keptId) return;
+    // claimed before it is written: the write wakes the replay, which must find it taken
+    claimPhrase(id);
+    const kept = await keepPhrase({
+      id,
+      userId: owner,
+      createdAt: new Date().toISOString(),
+      updatedAt: Date.now(),
+      crid: id,
+      source: s.source,
+      audio: audio ? { blob: audio.blob, mime: audio.mime, durationMs: audio.durationMs } : null,
+      audioPath: s.audioPath,
+      inboxId: s.inboxId,
+      transcript: s.transcript,
+      address: s.address,
+      pinned: s.pinned,
+      toSecretary: s.toSecretary,
+      suspicious: s.suspicious,
+      stage,
+      entities: [],
+      parsedEntities: [],
+      errand: null,
+      confirm: null,
+      failure: null,
+      attempts: 0,
+    });
+    if (!kept) {
+      releasePhrase(id);
+      return;
+    }
+    // the phrase moved on while the phone wrote (a reset, another phrase): the copy is nobody's
+    if (get().clientRequestId !== id) {
+      releasePhrase(id);
+      void dropPhrase(id);
+      return;
+    }
+    set({ keptId: id });
+  }
+
+  /** Every step is written down: a dead app leaves the phrase where it got to. */
+  function mirror(patch: Parameters<typeof patchPhrase>[1]): Promise<unknown> {
+    const id = get().keptId;
+    return id ? patchPhrase(id, patch) : Promise.resolve(null);
+  }
+
+  /** The phrase is over — on the server, or let go by the director: the phone forgets it. */
+  function forget(): void {
+    const id = get().keptId;
+    if (!id) return;
+    releasePhrase(id);
+    forgetParked(id);
+    void dropPhrase(id);
+    set({ keptId: null });
+  }
+
+  /** Another phrase takes the face: the one it held is not dropped — the replay carries it on. */
+  function abandon(): void {
+    const id = get().keptId;
+    if (id) releasePhrase(id);
+  }
+
+  /**
+   * No network (D-130): the phrase stays on the phone — kept at the release, every step since
+   * written down — and the replay carries it on once there is one. The face says so for a beat,
+   * then is free for the next phrase. False — nothing was kept (no IndexedDB here): the old
+   * «нет связи, повторить?» stays the way out.
+   */
+  function park(line: string): boolean {
+    const id = get().keptId;
+    if (!id) return false;
+    releasePhrase(id);
+    markParked(id);
+    set({ ...initialState, stage: "kept" });
+    toast(line);
+    setTimeout(() => {
+      if (get().stage === "kept") set({ ...initialState });
+    }, KEPT_MS);
+    return true;
+  }
+
+  const hearLater = () =>
+    get().source === "voice"
+      ? "Нет связи. Запись сохранил — разберу, как появится сеть"
+      : "Нет связи. Текст сохранил — разберу, как появится сеть";
+
+  /** Said into the secretary's desk (D-99): the director's own words are the request. */
+  function toDesk(): void {
+    const { transcript, clientRequestId, audioPath, inboxId } = get();
+    const words = transcript.trim();
+    askSecretary(
+      { code: "free", label: words.split(/\s+/).slice(0, 5).join(" ").slice(0, 40), icon: "" },
+      words,
+      () => undefined,
+      { id: clientRequestId as string, audioPath, transcript: words, inboxId },
+    );
+    get().reset();
+  }
+
+  /**
+   * What a parse means for the phrase — the live one right after the parser, and one the
+   * replay parsed while nobody watched (D-130): a request to the secretary, «не разобрал»,
+   * a question, thoughts only, or cards to confirm.
+   */
+  async function settle(
+    entities: PostprocessedEntity[],
+    parsed: PostprocessedEntity[],
+    errand: ParseResponse["errand"] | null,
+  ): Promise<void> {
+    const { transcript, clientRequestId, audioPath } = get();
+
+    // «Кофе» — заявка секретарю, а не сущность: ни /confirm, ни модели (D-79).
+    // Пять секунд тост держит «Отменить», запись уже лежит в Storage (принцип 5).
+    if (errand) {
+      askSecretary(
+        { code: errand.code, label: errand.label, icon: "" },
+        errand.note,
+        () => undefined,
+        { id: clientRequestId as string, audioPath, transcript, inboxId: get().inboxId },
+      );
+      get().reset();
+      return;
+    }
+
+    // nothing found: /confirm shows the raw words with a way out (fix the text, make a task, close)
+    if (entities.length === 0 && parsed.length === 0) {
+      set({ entities: [], parsedEntities: [], stage: "confirm", error: null, retryFrom: "parse" });
+      void mirror({ stage: "parsed", entities: [], parsedEntities: [] });
+      return;
+    }
+    // only questions: nothing to confirm — the assistant answers on Пульс
+    if (parsed.length > 0 && parsed.every((entity) => entity.kind === "query")) {
+      const question = parsed.map((entity) => (entity.kind === "query" ? entity.question : "")).join(" ").trim();
+      forget();
+      set({ entities: [], parsedEntities: parsed, question: question || transcript, stage: "question", error: null, retryFrom: null });
+      return;
+    }
+    // only thoughts: nothing to confirm — they are already saved, «Отменить» undoes it
+    if (isNotesOnly(entities)) {
+      set({ entities, parsedEntities: parsed, error: null, retryFrom: null });
+      void mirror({ stage: "parsed", entities, parsedEntities: parsed });
+      await captureNotes();
+      return;
+    }
+    set({ entities, parsedEntities: parsed, stage: "confirm", error: null, retryFrom: null });
+    void mirror({ stage: "parsed", entities, parsedEntities: parsed });
+  }
+
   return {
     ...initialState,
 
     async startVoice(address, pin, target) {
       const stage = get().stage;
       // «question» is a finished exchange on Пульс, not a busy pipeline — a new phrase may start
-      if (stage !== "idle" && stage !== "error" && stage !== "question") return;
+      if (stage !== "idle" && stage !== "error" && stage !== "question" && stage !== "kept") return;
 
+      abandon();
       const recorder = createRecorder();
       activeRecorder = recorder;
       recorder.onLevel(emitLevel);
@@ -379,12 +589,14 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
     cancelVoice() {
       activeRecorder?.cancel();
       activeRecorder = null;
+      forget();
       set({ ...initialState });
     },
 
     async submitText(text, pin) {
       const transcript = text.trim();
       if (!transcript) return;
+      abandon();
       set({
         ...initialState,
         clientRequestId: crypto.randomUUID(),
@@ -392,6 +604,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         transcript,
         pinned: pin ?? null,
       });
+      await keepFresh("heard", null);
       await get().runParse();
     },
 
@@ -404,6 +617,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         retryFrom: null,
         clientRequestId: get().clientRequestId ?? crypto.randomUUID(),
       });
+      // on the phone before the first byte leaves it (principle 5, D-130); a retry is kept already
+      await keepFresh("recorded", audio);
       try {
         const slot = await voiceApi.uploadUrl({
           ext: extForMime(audio.mime),
@@ -416,7 +631,9 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           mime: audio.mime,
         });
         set({ audioPath: slot.audio_path, inboxId: slot.inbox_id ?? get().inboxId });
+        void mirror({ audioPath: slot.audio_path, inboxId: get().inboxId });
       } catch (cause) {
+        if (offline(cause) && park(hearLater())) return;
         fail(cause, "upload");
         return;
       }
@@ -441,16 +658,21 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         const words = typeof res.transcript === "string" ? res.transcript : "";
         // the addressee the director picked before he spoke goes in front of what he said
         const address = get().address;
+        const transcript = address && words.trim() ? `${address}${words}` : words;
         set({
-          transcript: address && words.trim() ? `${address}${words}` : words,
+          transcript,
           inboxId: res.inbox_id ?? get().inboxId,
           suspicious: res.suspicious ?? false,
         });
         if (res.code === "empty_transcript" || !words.trim()) {
+          // nothing was said: the audio stays in Storage, the phone has nothing left to carry
+          forget();
           set({ stage: "error", error: { code: "empty_transcript" }, retryFrom: null });
           return;
         }
+        void mirror({ transcript, inboxId: get().inboxId, suspicious: get().suspicious, stage: "heard" });
       } catch (cause) {
+        if (offline(cause) && park(hearLater())) return;
         fail(cause, "transcribe");
         return;
       }
@@ -463,14 +685,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
 
       // said into the secretary's desk: the director's own words are the request (D-99)
       if (get().toSecretary) {
-        const words = transcript.trim();
-        askSecretary(
-          { code: "free", label: words.split(/\s+/).slice(0, 5).join(" ").slice(0, 40), icon: "" },
-          words,
-          () => undefined,
-          { id: clientRequestId, audioPath, transcript: words, inboxId: get().inboxId },
-        );
-        get().reset();
+        toDesk();
         return;
       }
       set({ stage: "parsing", error: null, retryFrom: null });
@@ -487,48 +702,14 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         const entities = res.entities ?? [];
         if (res.inbox_id) set({ inboxId: res.inbox_id });
         if (res.suspicious !== undefined) set({ suspicious: res.suspicious });
-
-        // «Кофе» — заявка секретарю, а не сущность: ни /confirm, ни модели (D-79).
-        // Пять секунд тост держит «Отменить», запись уже лежит в Storage (принцип 5).
-        if (res.errand) {
-          askSecretary(
-            { code: res.errand.code, label: res.errand.label, icon: "" },
-            res.errand.note,
-            () => undefined,
-            {
-              id: clientRequestId,
-              audioPath,
-              transcript,
-              inboxId: get().inboxId,
-            },
-          );
-          get().reset();
-          return;
-        }
-
-        // nothing found: /confirm shows the raw words with a way out (fix the text, make a task, close)
-        if (entities.length === 0) {
-          set({ entities: [], parsedEntities: [], stage: "confirm", error: null, retryFrom: "parse" });
-          return;
-        }
-        // only questions: nothing to confirm — the assistant answers on Пульс
-        if (entities.every((entity) => entity.kind === "query")) {
-          const question = entities.map((entity) => (entity.kind === "query" ? entity.question : "")).join(" ").trim();
-          set({ entities: [], parsedEntities: entities, question: question || transcript, stage: "question", error: null, retryFrom: null });
-          return;
-        }
-        // only thoughts: nothing to confirm — they are already saved, «Отменить» undoes it
-        if (isNotesOnly(entities)) {
-          set({ entities, parsedEntities: entities, error: null, retryFrom: null });
-          await captureNotes();
-          return;
-        }
-        set({ entities, parsedEntities: entities, stage: "confirm", error: null, retryFrom: null });
+        await settle(entities, entities, res.errand ?? null);
       } catch (cause) {
+        if (offline(cause) && park(hearLater())) return;
         fail(cause, "parse");
         // «не берусь разобрать» is not a failure to retry — it is the same «nothing found» screen
         if (get().error?.code === "parse_refused") {
           set({ entities: [], parsedEntities: [], stage: "confirm", error: null, retryFrom: "parse" });
+          void mirror({ stage: "parsed", entities: [], parsedEntities: [] });
         }
       }
     },
@@ -537,13 +718,18 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       const transcript = text.trim();
       if (!transcript) return;
       // corrected words are a new request: the old key would replay the empty result (principle 7)
-      set({ transcript, entities: [], parsedEntities: [], question: null, clientRequestId: crypto.randomUUID() });
+      const clientRequestId = crypto.randomUUID();
+      set({ transcript, entities: [], parsedEntities: [], question: null, clientRequestId });
+      // the corrected words are the phrase now; one that was never kept (a note's) is kept from here
+      if (get().keptId) void mirror({ crid: clientRequestId, transcript, stage: "heard", entities: [], parsedEntities: [], failure: null });
+      else await keepFresh("heard", null);
       await get().runParse();
     },
 
     ask(question) {
       const text = question.trim();
       if (!text) return;
+      abandon();
       set({
         ...initialState,
         clientRequestId: get().clientRequestId ?? crypto.randomUUID(),
@@ -579,12 +765,14 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           : { assignee: { status: "unmatched" as const, user_id: null, candidates: [], flag: "check" as const }, blocked: "assignee_unmatched" as const }),
       };
       set({ entities: [manual], parsedEntities: [], stage: "confirm", error: null, retryFrom: null });
+      void mirror({ stage: "parsed", entities: [manual], parsedEntities: [], failure: null });
     },
 
     /**
      * «Поручить» / «Объявить» on a note. The parser is not called: the text is already
      * combed, and a second parse would only invent a deadline. The entity is built by
      * hand and confirmed on the usual screen, where the director picks the assignee.
+     * Not kept on the phone: the note itself is the copy.
      */
     startFromNote(note, as) {
       const text = note.text.trim();
@@ -612,6 +800,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
               blocked: "assignee_unmatched",
             }
           : { kind: "announcement", text, source_span: text };
+      abandon();
       set({
         ...initialState,
         clientRequestId: crypto.randomUUID(),
@@ -655,10 +844,12 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
           i === index ? ({ ...entity, ...patch } as PostprocessedEntity) : entity,
         ),
       }));
+      void mirror({ entities: get().entities });
     },
 
     removeEntity(index) {
       set((state) => ({ entities: state.entities.filter((_, i) => i !== index) }));
+      void mirror({ entities: get().entities });
     },
 
     async send(forceNow = false, pointsEnabled = false) {
@@ -666,41 +857,97 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       const confirmed = entities.filter((entity) => isSendable(entity, pointsEnabled)).map(toConfirmed);
       if (!clientRequestId || confirmed.length === 0) return null;
 
+      const request: ConfirmRequest = {
+        client_request_id: clientRequestId,
+        source,
+        audio_path: audioPath,
+        transcript,
+        parsed_entities: parsedEntities.map(strip),
+        confirmed_entities: confirmed,
+        ...(forceNow ? { force_now: true } : {}),
+        ...(inboxId ? { inbox_id: inboxId } : {}),
+        ...(noteId ? { note_id: noteId } : {}),
+      };
       set({ stage: "sending", error: null, retryFrom: null });
       try {
-        const res = await voiceApi.confirm({
-          client_request_id: clientRequestId,
-          source,
-          audio_path: audioPath,
-          transcript,
-          parsed_entities: parsedEntities.map(strip),
-          confirmed_entities: confirmed,
-          ...(forceNow ? { force_now: true } : {}),
-          ...(inboxId ? { inbox_id: inboxId } : {}),
-          ...(noteId ? { note_id: noteId } : {}),
-        });
+        const res = await voiceApi.confirm(request);
+        // on the server now: the phone's copy has done its job, even if the app dies this instant
+        forget();
         set({ stage: "done" });
         return res;
       } catch (cause) {
+        if (offline(cause) && get().keptId) {
+          // the batch waits on the phone exactly as it was thrown, under the same key: one that did
+          // land and lost only its answer is a harmless duplicate on the replay (principle 7)
+          await mirror({ stage: "sending", confirm: request, entities });
+          if (park("Нет связи. Отправлю, как появится")) return { result: {}, duplicate: false, queued: true };
+        }
         fail(cause, "send");
         return null;
       }
     },
 
+    restore(phrase) {
+      const stage = get().stage;
+      if (stage !== "idle" && stage !== "error" && stage !== "question" && stage !== "kept") return false;
+      if (!isReady(phrase) || !claimPhrase(phrase.id)) return false;
+      abandon();
+      forgetParked(phrase.id);
+      set({
+        ...initialState,
+        keptId: phrase.id,
+        clientRequestId: phrase.crid,
+        source: phrase.source,
+        audio: phrase.audio,
+        audioPath: phrase.audioPath,
+        inboxId: phrase.inboxId,
+        transcript: phrase.transcript,
+        address: phrase.address,
+        pinned: phrase.pinned,
+        toSecretary: phrase.toSecretary,
+        suspicious: phrase.suspicious,
+        entities: phrase.entities,
+        parsedEntities: phrase.parsedEntities,
+      });
+
+      if (phrase.failure) {
+        if (phrase.stage === "sending" || phrase.stage === "parsed") {
+          // the batch the server refused: the cards come back to be fixed and thrown again
+          set({ stage: "confirm" });
+          void mirror({ stage: "parsed", confirm: null, failure: null });
+          toast(phrase.failure.message ?? "Не отправилось — проверь и отправь ещё раз");
+          return true;
+        }
+        const code: IngestErrorCode = KNOWN_CODES.has(phrase.failure.code) ? (phrase.failure.code as IngestErrorCode) : "unknown";
+        const from: RetryFrom = phrase.stage === "heard" ? "parse" : phrase.audioPath ? "transcribe" : "upload";
+        set({ stage: "error", error: { code, message: phrase.failure.message }, retryFrom: retryTargetFor(code, from) });
+        void mirror({ failure: null, attempts: 0 });
+        return true;
+      }
+      if (phrase.toSecretary) {
+        toDesk();
+        return true;
+      }
+      void settle(phrase.entities, phrase.parsedEntities, phrase.errand);
+      return true;
+    },
+
     reset() {
       activeRecorder?.cancel();
       activeRecorder = null;
+      forget();
       set({ ...initialState });
     },
   };
 });
 
 // A phrase on its way — being recorded, uploaded, heard, parsed, or waiting on the board —
-// lives only in this page's memory: an app update waits until it is sent or dropped (D-115).
-// «question» is a finished exchange (see startVoice), not work in progress.
+// is carried by this page: an app update waits until it is sent or dropped (D-115). The phone
+// keeps a copy (D-130), but a reload in the middle would still cost the director the moment.
+// «question» is a finished exchange (see startVoice), not work in progress; «kept» is on the phone.
 let releaseUpdateHold: (() => void) | null = null;
 useIngestStore.subscribe(({ stage }) => {
-  const busy = stage !== "idle" && stage !== "done" && stage !== "question";
+  const busy = stage !== "idle" && stage !== "done" && stage !== "question" && stage !== "kept";
   if (busy && !releaseUpdateHold) releaseUpdateHold = holdUpdate();
   if (!busy && releaseUpdateHold) {
     releaseUpdateHold();
