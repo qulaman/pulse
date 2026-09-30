@@ -1,6 +1,7 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
+import type { ReactNode } from "react";
 
 import { tvTime } from "@/lib/tv/clock";
 import { leadersView, type LeaderCard } from "@/lib/tv/leaders";
@@ -69,8 +70,9 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
           </div>
         ) : (
           <section className="flex min-h-0 items-end justify-center gap-[2.4vh]" aria-label="Первая тройка">
+            {/* keyed by place: an award that reorders the five changes who stands on a step, the steps stay */}
             {view.podium.map((card, index) => (
-              <PodiumColumn key={card.id} card={card} order={index} />
+              <PodiumColumn key={card.rank} card={card} order={index} />
             ))}
           </section>
         )}
@@ -80,7 +82,7 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
             <ol className="flex flex-col gap-[1.2vh]">
               {view.rest.map((card, index) => (
                 <motion.li
-                  key={card.id}
+                  key={card.rank}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.45, delay: 0.5 + index * 0.08, ease: EASE }}
@@ -88,11 +90,15 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
                   style={{ background: "color-mix(in srgb, var(--surface) 88%, transparent)" }}
                 >
                   <span className="w-[3.4vh] shrink-0 text-center text-[3vh] font-bold tabular-nums text-muted">{card.rank}</span>
-                  <TvAvatar name={card.name} src={card.avatar} size={6} />
-                  <span className="min-w-0 flex-1 truncate text-[3vh] font-semibold leading-[3.8vh]">{card.name}</span>
-                  <span className="shrink-0 text-[3.4vh] font-bold tabular-nums" style={{ color: "var(--gold)" }}>
-                    {card.points}
-                  </span>
+                  <Holder id={card.id} className="min-w-0 flex-1">
+                    <div className="flex items-center gap-[1.8vh]">
+                      <TvAvatar name={card.name} src={card.avatar} size={6} />
+                      <span className="min-w-0 flex-1 truncate text-[3vh] font-semibold leading-[3.8vh]">{card.name}</span>
+                      <span className="shrink-0 text-[3.4vh] font-bold tabular-nums" style={{ color: "var(--gold)" }}>
+                        {card.points}
+                      </span>
+                    </div>
+                  </Holder>
                 </motion.li>
               ))}
             </ol>
@@ -121,9 +127,16 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
 
           {awards.length > 0 ? (
             <section className="flex min-h-0 flex-col gap-[1.2vh]">
-              <p className="text-[2.2vh] font-semibold leading-[2.8vh]" style={{ color: "var(--gold)" }}>
+              {/* the label comes with its first line, not before it */}
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.45, delay: 0.85, ease: EASE }}
+                className="text-[2.2vh] font-semibold leading-[2.8vh]"
+                style={{ color: "var(--gold)" }}
+              >
                 Награды
-              </p>
+              </motion.p>
               <ul className="flex flex-col gap-[1vh]">
                 {awards.map((award, index) => (
                   <motion.li
@@ -167,24 +180,28 @@ function PodiumColumn({ card, order }: { card: LeaderCard; order: number }) {
       style={{ maxWidth: first ? "38%" : "31%" }}
       data-rank={card.rank}
     >
-      <TvAvatar name={card.name} src={card.avatar} size={first ? 16 : 12} ring={medal} />
-      <p
-        className={`mt-[1.8vh] line-clamp-2 text-center font-bold leading-[1.15] tracking-[-0.01em] [overflow-wrap:anywhere] ${
-          first ? "text-[4vh]" : "text-[3.2vh]"
-        }`}
-      >
-        {card.name}
-      </p>
-      <p className="mt-[0.6vh] flex items-baseline gap-[0.8vh]">
-        <span className={`font-bold tabular-nums ${first ? "text-[7vh] leading-[7.4vh]" : "text-[5vh] leading-[5.6vh]"}`} style={{ color: "var(--gold)" }}>
-          {card.points}
-        </span>
-        <span className="text-[2.2vh] text-muted">{card.pointsWord}</span>
-      </p>
-      <p className="h-[3vh] text-[2.2vh] font-semibold leading-[3vh] tabular-nums" style={{ color: "var(--ok)" }}>
-        {card.delta !== null ? `▲ +${card.delta}` : ""}
-      </p>
-      {card.done ? <p className="text-[2.2vh] leading-[2.8vh] text-muted">{card.done}</p> : <p className="h-[2.8vh]" />}
+      <Holder id={card.id} className="w-full">
+        <div className="flex flex-col items-center">
+          <TvAvatar name={card.name} src={card.avatar} size={first ? 16 : 12} ring={medal} />
+          <p
+            className={`mt-[1.8vh] line-clamp-2 text-center font-bold leading-[1.15] tracking-[-0.01em] [overflow-wrap:anywhere] ${
+              first ? "text-[4vh]" : "text-[3.2vh]"
+            }`}
+          >
+            {card.name}
+          </p>
+          <p className="mt-[0.6vh] flex items-baseline gap-[0.8vh]">
+            <span className={`font-bold tabular-nums ${first ? "text-[7vh] leading-[7.4vh]" : "text-[5vh] leading-[5.6vh]"}`} style={{ color: "var(--gold)" }}>
+              {card.points}
+            </span>
+            <span className="text-[2.2vh] text-muted">{card.pointsWord}</span>
+          </p>
+          <p className="h-[3vh] text-[2.2vh] font-semibold leading-[3vh] tabular-nums" style={{ color: "var(--ok)" }}>
+            {card.delta !== null ? `▲ +${card.delta}` : ""}
+          </p>
+          {card.done ? <p className="text-[2.2vh] leading-[2.8vh] text-muted">{card.done}</p> : <p className="h-[2.8vh]" />}
+        </div>
+      </Holder>
       {/* the step: its height says the place before the number does */}
       <div
         className="mt-[1.4vh] flex w-full items-start justify-center rounded-t-[1.6vh] pt-[1.2vh]"
@@ -199,5 +216,28 @@ function PodiumColumn({ card, order }: { card: LeaderCard; order: number }) {
         </span>
       </div>
     </motion.div>
+  );
+}
+
+/**
+ * Who holds a place. An award that reorders the five changes the holder in place: the one leaving fades out,
+ * the new one fades in over the same spot — the place never jumps, never stands empty. Both share one grid
+ * cell while they cross; the first render just shows the holder (the scene's own entrance brings it).
+ */
+function Holder({ id, className = "", children }: { id: string; className?: string; children: ReactNode }) {
+  return (
+    <div className={`grid [grid-template-areas:'who'] *:[grid-area:who] ${className}`}>
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={id}
+          className="min-w-0"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1, transition: { duration: 0.5, delay: 0.1, ease: EASE } }}
+          exit={{ opacity: 0, transition: { duration: 0.25, ease: EASE } }}
+        >
+          {children}
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 }

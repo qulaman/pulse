@@ -114,6 +114,24 @@ export function boardFrame(aspect: number): { width: number; height: number } {
   return { width: Math.round(width * 10) / 10, height: BOARD_HEIGHT - BOARD_TOP_ROW - BOARD_TOP_GAP };
 }
 
+/** Шкала ведущего над доской: сегмент на пункт, промежуток, высота сегмента и капсулы текущего, vh. */
+export const PROGRESS_GAP = 0.5;
+export const PROGRESS_H = 0.6;
+export const PROGRESS_THUMB_H = 0.9;
+
+/**
+ * Шкала пунктов ведущего (D-121): ширина сегмента — шкала не шире пятой части строки при
+ * любом числе пунктов; капсула текущего — в 1,6 сегмента, по центру своего сегмента, и её
+ * сдвиг от начала шкалы. Капсула едет transform'ом, сегменты под ней не двигаются (D-45).
+ */
+export function progressScale(count: number, at: number): { segment: number; thumb: number; shift: number } {
+  const segment = Math.min(3.2, Math.max(0.9, (34 - PROGRESS_GAP * (count - 1)) / Math.max(count, 1)));
+  const thumb = segment * 1.6;
+  const index = Math.min(Math.max(at, 0), Math.max(count - 1, 0));
+  const shift = index * (segment + PROGRESS_GAP) + (segment - thumb) / 2;
+  return { segment, thumb, shift: Math.round(shift * 1000) / 1000 };
+}
+
 /**
  * Какая страница на стене сейчас — по часам киоска, без таймеров и без состояния. Ведущий
  * подсветил пункт — стена стоит на его странице, пока подсветка не снята (D-121).

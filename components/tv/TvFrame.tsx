@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 import { PulseMark } from "@/components/brand/PulseMark";
 import type { TvBoard as TvBoardData } from "@/lib/tv/board";
@@ -86,14 +87,27 @@ export type TvFrameProps = {
  * Размеры в `vh`: экран одинаково садится и на 1080p, и на 4K, и на телевизор 55".
  */
 export function TvFrame(props: TvFrameProps) {
-  const { company, logoUrl, now, guest, scene, clock, night, offline, items, speech, summary, focus, calendar, overlay, sound } =
-    props;
+  const { company, logoUrl, now, guest, clock, night, offline, items, speech, summary, focus, overlay, sound } = props;
   const shift = burnInShift(now);
-  // a board to show: its points, or the honest «скрыта» for a guest (D-102)
-  const board = scene === "board" && (props.board?.board || props.board?.hidden) ? props.board : null;
   const task = props.task ?? null;
+  // the scene changes once, when the next one has its data (a calendar without its events would
+  // say «Свободный день», a board without its points would show the face in between)
+  const stage = useStage(
+    { scene: props.scene, calendar: props.calendar, calendarView: props.calendarView, rating: props.rating ?? null, board: props.board ?? null },
+    !focus && !task,
+  );
+  const { scene, calendar } = stage;
+  // a board to show: its points, or the honest «скрыта» for a guest (D-102)
+  const board = scene === "board" && (stage.board?.board || stage.board?.hidden) ? stage.board : null;
   // a person, an order, a board or a notice on the wall wakes the night up: somebody is in the office
   const dim = night && !focus && !task && !overlay.banner && !board;
+  // the ticker, the footer and the day curve leave and come back with the night softly, in place
+  const awake = { opacity: dim ? 0 : 1, transition: "opacity var(--t-tv) var(--ease-in-out)" };
+  // an opaque notice over the wall: the scene under it stays mounted but is not drawn (no mascot
+  // frames for the minutes a visitor waits); it is drawn again the moment the notice starts to leave
+  const [coverShown, setCoverShown] = useState(false);
+  if (coverShown && !overlay.banner) setCoverShown(false);
+  const covered = coverShown && overlay.banner !== null;
   // the scene key: changing it plays the transition, everything else updates in place
   const sceneKey = dim
     ? "night"
@@ -102,9 +116,9 @@ export function TvFrame(props: TvFrameProps) {
       : task
         ? `task:${task.task.id}`
         : scene === "rating"
-          ? `rating:${props.rating?.period ?? "week"}`
+          ? `rating:${stage.rating?.period ?? "week"}`
           : scene === "calendar"
-        ? `calendar:${props.calendarView}`
+        ? `calendar:${stage.calendarView}`
         : scene === "board"
           ? // no board yet (loading) or no longer (expired): the face is drawn, so the key is the
             // face's too — otherwise face → board replays the face's entrance (D-121)
@@ -120,22 +134,24 @@ export function TvFrame(props: TvFrameProps) {
         style={{ transform: `translate(${shift.x}px, ${shift.y}px)`, transition: "transform 2s var(--ease-in-out)" }}
       >
         {/* far layer: the company's day by the hour, at the very bottom */}
-        {!dim ? (
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26vh]">
-            <DayPulse pulse={summary?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
-          </div>
-        ) : null}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26vh]" style={awake} aria-hidden>
+          <DayPulse pulse={summary?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
+        </div>
 
-        <header className="shrink-0 pt-[2.4vh]" style={{ visibility: dim ? "hidden" : undefined }}>
-          <TvTicker items={dim ? [] : items} />
+        <header className="shrink-0 pt-[2.4vh]" style={awake} aria-hidden={dim || undefined}>
+          {/* the row keeps the ticker's height at night and on a day without news: the middle never moves */}
+          <div className="h-[6.2vh]">
+            <TvTicker items={items} paused={dim} />
+          </div>
         </header>
 
-        <main className="flex min-h-0 flex-1 items-center justify-center">
+        <main className="flex min-h-0 flex-1 items-center justify-center" style={covered ? { contentVisibility: "hidden" } : undefined}>
           <AnimatePresence mode="wait">
             <motion.div
               key={sceneKey}
-              initial={{ opacity: 0, y: 24 }}
-              animate={{ opacity: 1, y: 0 }}
+              // the rise is a share of the wall, the same on 720p and 4K
+              initial={{ opacity: 0, y: "2.2vh" }}
+              animate={{ opacity: 1, y: "0vh" }}
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}
               // transform + opacity и ничего больше — перф-контракт стены (D-45)
@@ -148,13 +164,13 @@ export function TvFrame(props: TvFrameProps) {
               ) : task ? (
                 <TvTaskFocus focus={task} remainingMs={props.focusRemainingMs} now={now} />
               ) : scene === "rating" ? (
-                <TvLeaders data={props.rating ?? null} now={now} />
+                <TvLeaders data={stage.rating} now={now} />
               ) : scene === "clock" ? (
                 <TvClock company={company} logoUrl={logoUrl} now={now} next={summary?.events[0] ?? null} clock={clock} />
               ) : scene === "team" ? (
                 <TvTeam summary={summary ?? EMPTY_SUMMARY} guest={guest} />
               ) : scene === "calendar" ? (
-                <TvCalendar calendar={calendar} now={now} view={props.calendarView} />
+                <TvCalendar calendar={calendar} now={now} view={stage.calendarView} />
               ) : board ? (
                 <TvBoard data={board} now={now} />
               ) : (
@@ -166,7 +182,8 @@ export function TvFrame(props: TvFrameProps) {
 
         <footer
           className="relative z-10 flex shrink-0 items-center justify-between gap-[3vh] px-[4vh] pb-[3.4vh]"
-          style={{ visibility: dim ? "hidden" : undefined }}
+          style={awake}
+          aria-hidden={dim || undefined}
         >
           <div className="flex items-baseline gap-[2vh]">
             <PulseMark size="tv" />
@@ -187,10 +204,48 @@ export function TvFrame(props: TvFrameProps) {
           </div>
         </footer>
 
-        <TvOverlay view={overlay} sound={sound} />
+        <TvOverlay view={overlay} sound={sound} onCovered={() => setCoverShown(true)} />
       </div>
     </div>
   );
+}
+
+/** How long the wall keeps its scene while the next one's data is on its way: a query that never answers must not pin it. */
+const HOLD_MS = 4_000;
+
+/** The middle of the wall and the data it is drawn from — they change together. */
+type Stage = {
+  scene: TvScene;
+  calendar: TvCalendarData | null;
+  calendarView: CalendarView;
+  rating: TvRatingScene | null;
+  board: TvBoardData | null;
+};
+
+/**
+ * The kiosk fetches a scene's data after `tv_state` names the scene (the queries run only for what is on the wall):
+ * until the data is there, the stage on the wall stays as it was, so the wall plays one transition into the whole
+ * picture — not into «Свободный день» or an empty grid that fill in a moment later, not through the face (D-121).
+ * `open`: nobody's orders cover the middle, the scene is what shows.
+ */
+function useStage(next: Stage, open: boolean): Stage {
+  const waiting =
+    open && ((next.scene === "calendar" && !next.calendar) || (next.scene === "rating" && !next.rating) || (next.scene === "board" && !next.board));
+  const [held, setHeld] = useState(next);
+  if (!waiting && !sameStage(held, next)) setHeld(next);
+  const waitingFor = waiting ? `${next.scene}:${next.calendarView}` : null;
+  const [gaveUp, setGaveUp] = useState<string | null>(null);
+  if (!waiting && gaveUp !== null) setGaveUp(null);
+  useEffect(() => {
+    if (!waitingFor) return;
+    const timer = setTimeout(() => setGaveUp(waitingFor), HOLD_MS);
+    return () => clearTimeout(timer);
+  }, [waitingFor]);
+  return waiting && gaveUp !== waitingFor ? held : next;
+}
+
+function sameStage(a: Stage, b: Stage): boolean {
+  return a.scene === b.scene && a.calendar === b.calendar && a.calendarView === b.calendarView && a.rating === b.rating && a.board === b.board;
 }
 
 /**

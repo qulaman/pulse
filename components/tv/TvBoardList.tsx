@@ -128,7 +128,14 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
             {row.children.length > 0 || row.more > 0 ? (
               <ul className="flex flex-col" style={{ marginTop: vh(tier.subTop), gap: vh(tier.subGap), opacity: item.done ? 0.6 : 1 }}>
                 {row.children.map(({ leaf, lines, tag }) => (
-                  <li key={leaf.id} className="relative flex items-start" style={{ gap: vh(tier.dotGap) }} data-leaf={leaf.id} data-done={leaf.done || undefined}>
+                  <li
+                    key={leaf.id}
+                    // as wide as its words: the glow of a sub-point just said hugs it instead of running to the column's edge
+                    className="relative flex max-w-full items-start self-start"
+                    style={{ gap: vh(tier.dotGap) }}
+                    data-leaf={leaf.id}
+                    data-done={leaf.done || undefined}
+                  >
                     <AnimatePresence>
                       {freshIds.has(leaf.id) ? <FreshGlow key="glow" radius={vh(1)} still={still} inset={`${vh(-0.3)} ${vh(-1)}`} /> : null}
                     </AnimatePresence>

@@ -13,26 +13,37 @@ export function RemoteSkeleton() {
   return (
     <SkeletonGroup className={`${s.body} mx-auto mt-4 w-full max-w-[380px]`}>
       <Bone h={14} w={64} className="mx-auto rounded-full" />
+      {/* the display line for line: the eyebrow, what is on the wall, the receipt, the gauge's row */}
       <div className={`${s.lcd} mt-3`}>
-        <div className="flex items-center justify-between">
+        <div className="flex h-4 items-center justify-between">
           <Bone h={12} w={96} />
           <Bone h={12} w={40} />
         </div>
-        <Bone h={24} w={200} className="mt-3" />
-        <Bone h={14} w={120} className="mt-2" />
+        <div className="mt-2 flex h-7 items-center">
+          <Bone h={22} w={200} />
+        </div>
+        <div className="mt-1 flex h-[18px] items-center">
+          <Bone h={13} w={120} />
+        </div>
+        <div className="mt-3 h-[3px]" />
       </div>
       <div className="mt-3 flex gap-2">
         <Bone h={60} className="rounded-[18px]" />
         <Bone h={60} w={60} className="shrink-0 rounded-full" />
       </div>
-      {/* four scenes two by two, each with its dot (D-96) */}
-      <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-[17px]">
-        <Bone h={66} className="rounded-[18px]" />
-        <Bone h={66} className="rounded-[18px]" />
-        <Bone h={66} className="rounded-[18px]" />
-        <Bone h={66} className="rounded-[18px]" />
+      {/* the scenes three across, each with its dot, the round last (D-123) — two rows with or without the rating */}
+      <div className="mt-3 grid grid-cols-3 gap-x-2 gap-y-2">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="flex flex-col items-stretch gap-1.5">
+            <Bone h={66} className="rounded-[18px]" />
+            <span className="h-[5px]" />
+          </div>
+        ))}
       </div>
-      <Bone h={16} w={180} className="mx-auto mt-3" />
+      {/* the hint under them always holds two lines */}
+      <div className="mt-1 flex min-h-[36px] justify-center pt-[2px]">
+        <Bone h={13} w={180} />
+      </div>
       {/* the calendar view keys (D-98) */}
       <div className={`${s.seam}`} />
       <Bone h={16} w={140} className="mt-3 ml-1" />

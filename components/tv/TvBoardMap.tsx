@@ -78,31 +78,34 @@ export const TvBoardMap = memo(function TvBoardMap({
         </h2>
       </motion.div>
 
-      {layout.branches.map((branch) => (
-        <Branch
-          key={branch.item.id}
-          branch={branch}
-          layout={layout}
-          lit={focus === branch.item.id}
-          dim={focus !== null && focus !== branch.item.id}
-          fresh={freshIds.has(branch.item.id)}
-          still={still}
-        />
-      ))}
-      {layout.branches.flatMap((branch) =>
-        branch.leaves.map((leaf, index) => (
-          <Leaf
-            key={leaf.leaf?.id ?? `${branch.item.id}-more`}
-            leaf={leaf}
+      {/* the map comes in as a whole (the view's crossfade); only a branch or a leaf said later grows out of its link */}
+      <AnimatePresence initial={false}>
+        {layout.branches.map((branch) => (
+          <Branch
+            key={branch.item.id}
             branch={branch}
             layout={layout}
-            index={index}
+            lit={focus === branch.item.id}
             dim={focus !== null && focus !== branch.item.id}
-            fresh={leaf.leaf !== null && freshIds.has(leaf.leaf.id)}
+            fresh={freshIds.has(branch.item.id)}
             still={still}
           />
-        )),
-      )}
+        ))}
+        {layout.branches.flatMap((branch) =>
+          branch.leaves.map((leaf, index) => (
+            <Leaf
+              key={leaf.leaf?.id ?? `${branch.item.id}-more`}
+              leaf={leaf}
+              branch={branch}
+              layout={layout}
+              index={index}
+              dim={focus !== null && focus !== branch.item.id}
+              fresh={leaf.leaf !== null && freshIds.has(leaf.leaf.id)}
+              still={still}
+            />
+          )),
+        )}
+      </AnimatePresence>
     </div>
   );
 });

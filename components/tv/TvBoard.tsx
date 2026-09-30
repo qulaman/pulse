@@ -12,6 +12,10 @@ import {
   boardFrame,
   freshKey,
   pageAt,
+  PROGRESS_GAP,
+  PROGRESS_H,
+  PROGRESS_THUMB_H,
+  progressScale,
   wallView,
   type TvBoard as TvBoardData,
   type TvBoardData as Board,
@@ -129,11 +133,14 @@ function TopRow({ board, page, pages }: { board: Board; page: number; pages: num
   );
 }
 
-/** «3 / 7» и шкала: по сегменту на пункт, текущий — акцентом и шире, отмеченные — тише. */
+/**
+ * «3 / 7» и шкала: по сегменту на пункт, отмеченные — тише; текущий — акцентная капсула
+ * поверх шкалы, она переезжает к следующему пункту (transform), шкала под ней не меняется.
+ * Число — в клетке на все разряды: «9 → 10» не сдвигает шкалу.
+ */
 function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) {
   const count = board.items.length;
-  // the scale never gets wider than a fifth of the row, whatever the number of points
-  const segment = Math.min(3.2, Math.max(0.9, (34 - 0.5 * (count - 1)) / Math.max(count, 1)));
+  const scale = progressScale(count, at);
   return (
     <div
       className="flex items-center gap-[2vh] self-center"
@@ -141,40 +148,55 @@ function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) 
       aria-hidden={!on}
       data-testid="tv-board-progress"
     >
-      <span className="flex items-center gap-[0.5vh]">
-        {board.items.map((item, index) => (
+      <span className="relative flex items-center" style={{ gap: vh(PROGRESS_GAP), height: vh(PROGRESS_THUMB_H) }}>
+        {board.items.map((item) => (
           <span
             key={item.id}
             className="block rounded-full"
             style={{
-              width: vh(index === at ? segment * 1.6 : segment),
-              height: vh(index === at ? 0.9 : 0.6),
-              background:
-                index === at ? "var(--accent)" : item.done ? "color-mix(in srgb, var(--ok) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
-              transition: "background-color 450ms var(--ease-in-out)",
+              width: vh(scale.segment),
+              height: vh(PROGRESS_H),
+              background: item.done ? "color-mix(in srgb, var(--ok) 55%, transparent)" : "color-mix(in srgb, var(--text-muted) 38%, transparent)",
             }}
           />
         ))}
+        <span
+          aria-hidden
+          className="absolute left-0 top-0 block rounded-full"
+          style={{
+            width: vh(scale.thumb),
+            height: vh(PROGRESS_THUMB_H),
+            background: "var(--accent)",
+            // a ring of the wall's own colour: the capsule sits on the scale, not in a gap of it
+            boxShadow: "0 0 0 0.3vh var(--bg)",
+            transform: `translateX(${vh(scale.shift)})`,
+            transition: "transform 450ms var(--ease-in-out)",
+          }}
+          data-testid="tv-board-progress-thumb"
+        />
       </span>
       <span className="nums text-[3.4vh] font-bold leading-[4vh] tabular-nums">
-        {on ? at + 1 : 1}
+        <span className="inline-block text-right" style={{ minWidth: `${String(count).length}ch` }}>
+          {on ? at + 1 : 1}
+        </span>
         <span className="text-muted"> / {count}</span>
       </span>
     </div>
   );
 }
 
-/** Точки страниц — как у карточки сотрудника: текущая светлая, меняется только цвет. */
+/** Точки страниц — как у карточки сотрудника: светлая точка переезжает к текущей странице (transform). */
 function PageDots({ page, pages }: { page: number; pages: number }) {
   return (
-    <span className="flex items-center gap-[1vh]" aria-label={`Страница ${page + 1} из ${pages}`} data-testid="tv-board-page">
+    <span className="relative flex items-center gap-[1vh]" aria-label={`Страница ${page + 1} из ${pages}`} data-testid="tv-board-page">
       {Array.from({ length: pages }, (_, index) => (
-        <span
-          key={index}
-          className="h-[1.2vh] w-[1.2vh] rounded-full"
-          style={{ background: index === page ? "var(--text)" : "var(--border)", transition: "background-color 400ms var(--ease-in-out)" }}
-        />
+        <span key={index} className="h-[1.2vh] w-[1.2vh] rounded-full" style={{ background: "var(--border)" }} />
       ))}
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 h-[1.2vh] w-[1.2vh] rounded-full"
+        style={{ background: "var(--text)", transform: `translateX(${vh(page * 2.2)})`, transition: "transform 400ms var(--ease-in-out)" }}
+      />
     </span>
   );
 }

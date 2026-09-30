@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { TvFrame } from "@/components/tv/TvFrame";
 import { useClock } from "@/components/tv/useKiosk";
@@ -291,22 +291,27 @@ function focusFor(wallCase: WallCase, focus: TvFocusEmployee): TvFocusEmployee |
 }
 
 /** The rating scene on fixtures (D-123): a week with five on the podium, a month, nobody yet; a guest hides it. */
-function ratingFor(wallCase: WallCase, base: number, guest: boolean): TvRatingScene {
+function ratingFor(wallCase: WallCase, base: number, guest: boolean, reorder = false): TvRatingScene {
   if (guest) return { hidden: true, enabled: true, period: "week", top: [], riser: null, awards: [], team: { done: 0, on_time: 0, earned: 0, people: 0 } };
   const month = wallCase === "rating-month";
   const k = month ? 4 : 1;
-  const people: [string, string | null, number, number, number, number][] = [
-    ["Айгерим Сапарова", "Бухгалтер", 420, 60, 9, 9],
-    ["Марат Ахметов", "Прораб, участок «Север»", 340, 60, 9, 8],
-    ["Динара Касымова", "Снабжение", 260, -20, 6, 5],
-    ["Ерлан Беков", "Менеджер", 210, 90, 4, 4],
-    ["Тимур Жаксылыков", "Кладовщик", 180, 0, 3, 2],
+  const people: [string, string | null, number, number, number, number, string][] = [
+    ["Айгерим Сапарова", "Бухгалтер", 420, 60, 9, 9, "r1"],
+    ["Марат Ахметов", "Прораб, участок «Север»", 340, 60, 9, 8, "r2"],
+    ["Динара Касымова", "Снабжение", 260, -20, 6, 5, "r3"],
+    ["Ерлан Беков", "Менеджер", 210, 90, 4, 4, "r4"],
+    ["Тимур Жаксылыков", "Кладовщик", 180, 0, 3, 2, "r5"],
   ];
+  // the walk's `rating-reorder`: an award lifts Ерлан from fourth to second, the places shuffle
+  if (reorder) {
+    people[3] = ["Ерлан Беков", "Менеджер", 350, 230, 5, 5, "r4"];
+    people.sort((a, b) => b[2] - a[2]);
+  }
   const top =
     wallCase === "rating-empty"
       ? []
-      : people.map(([name, position, points, delta, done, onTime], index) => ({
-          id: `r${index + 1}`,
+      : people.map(([name, position, points, delta, done, onTime, id], index) => ({
+          id,
           name,
           position,
           avatar_url: null,
@@ -358,45 +363,139 @@ function taskFor(wallCase: WallCase, focus: TvFocusEmployee, guest: boolean): Tv
   };
 }
 
-/** The sandbox demo's step: a tick every `DEMO_STEP_MS` while `&demo=` is on. */
-function useDemoStep(demo: BoardDemo | null): number {
+/** The sandbox demo's step: a tick every `every` ms while a demo is on. */
+function useDemoStep(on: boolean, every = DEMO_STEP_MS): number {
   const [step, setStep] = useState(0);
   useEffect(() => {
-    if (!demo) return;
-    const timer = setInterval(() => setStep((s) => s + 1), DEMO_STEP_MS);
+    if (!on) return;
+    const timer = setInterval(() => setStep((s) => s + 1), every);
     return () => clearInterval(timer);
-  }, [demo]);
+  }, [on, every]);
   return step;
 }
 
-export function WallSandbox({ wallCase, clock, guest, demo = null }: { wallCase: WallCase; clock: ClockStyle; guest: boolean; demo?: BoardDemo | null }) {
+/**
+ * `&walk=…`: the wall walks through its states by itself, one step every `&every=` ms (4 s) — for
+ * filming scene changes, notices coming and going, the night waking up. `&lag=` ms keeps the new
+ * step's scene data away for a while, the way the kiosk fetches it after `tv_state` flips.
+ */
+export const WALKS = {
+  scenes: ["face", "clock", "team", "calendar", "calendar-month", "rating", "rating-month", "focus", "task", "board-branches", "face"],
+  overlay: ["face", "visit", "face", "message", "wait", "message-long", "event", "focus", "visit", "focus"],
+  night: ["night", "face", "night", "focus", "night"],
+  focus: ["focus", "focus-few", "focus", "focus-done", "task", "task-review", "task-done"],
+  rating: ["rating", "rating-reorder", "rating", "rating-month"],
+  team: ["team", "team-reorder", "team"],
+} as const satisfies Record<string, readonly (WallCase | "rating-reorder" | "team-reorder")[]>;
+export type WallWalk = keyof typeof WALKS;
+type WalkCase = WallCase | "rating-reorder" | "team-reorder";
+
+/** True `lag` ms after `key` last changed: the new step's data «arrives». */
+function useArrived(key: string, lag: number): boolean {
+  const [arrived, setArrived] = useState({ key, at: lag <= 0 });
+  if (arrived.key !== key) setArrived({ key, at: lag <= 0 });
+  useEffect(() => {
+    if (lag <= 0) return;
+    const timer = setTimeout(() => setArrived({ key, at: true }), lag);
+    return () => clearTimeout(timer);
+  }, [key, lag]);
+  return arrived.key === key && arrived.at;
+}
+
+/** `&tick=1`: news every 3 s — the ticker takes new words on the move (D-121, wave 3). */
+const TICK_MS = 3_000;
+function newsOf(base: number, count: number): TvEvent[] {
+  return Array.from({ length: count }, (_, i) => ({
+    id: `news${count - i}`,
+    kind: "task_done" as const,
+    created_at: at(base, 0),
+    payload: { name: "Асель Муратова", title: `Новое дело №${count - i}`, amount: null },
+    payload_guest: { name: "Асель", title: null, amount: null },
+  }));
+}
+
+export function WallSandbox({
+  wallCase,
+  clock,
+  guest,
+  demo = null,
+  tick = false,
+  walk = null,
+  every = 4_000,
+  lag = 0,
+}: {
+  wallCase: WallCase;
+  clock: ClockStyle;
+  guest: boolean;
+  demo?: BoardDemo | null;
+  tick?: boolean;
+  walk?: string | null;
+  every?: number;
+  lag?: number;
+}) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
   const [base] = useState(() => Date.now() - (Date.now() % 60_000));
   const live = useClock();
-  const step = useDemoStep(demo);
-  const board = boardFor(wallCase, base, guest);
+  const step = useDemoStep(demo !== null);
+  const news = useDemoStep(tick, TICK_MS);
+  const route: readonly WalkCase[] | null = walk && walk in WALKS ? WALKS[walk as WallWalk] : null;
+  const walkStep = useDemoStep(route !== null, every);
+  const walked: WalkCase = route ? route[walkStep % route.length] : wallCase;
+  const reorder = walked === "rating-reorder";
+  // the walk's `team-reorder`: Динара takes six orders, Тимур hands four in — the tiles re-sort by load
+  const busier = walked === "team-reorder";
+  const current: WallCase = reorder ? "rating" : busier ? "team" : walked;
+  const arrived = useArrived(`${walkStep}`, route ? lag : 0);
   // the night case pins the clock to 23:10 in Aqtobe; every other case runs on the real one
-  const now = wallCase === "night" ? new Date(todayAt(base, 23, 10)) : live;
-  const data = fixtures(base, guest);
-  const lines = data.events.map((event) => lineOf(event, guest));
+  const now = current === "night" || walk === "night" ? new Date(todayAt(base, 23, 10)) : live;
+  // the scene data keeps its identity between renders, as query results do on the kiosk (TvFrame holds a scene by it)
+  const data = useMemo(() => fixtures(base, guest), [base, guest]);
+  const lines = [...newsOf(base, news), ...data.events].map((event) => lineOf(event, guest));
+  // a person or an order still on its way: the kiosk keeps the ether scene it had (its row names the mode,
+  // the middle waits for `tv_focus()`), so the walk keeps the previous step's scene
+  const before = route ? route[(walkStep + route.length - 1) % route.length] : wallCase;
+  const sceneCase: WallCase =
+    !arrived && (current.startsWith("focus") || current.startsWith("task")) ? (before === "rating-reorder" ? "rating" : before === "team-reorder" ? "team" : before) : current;
   const scene: TvScene =
-    wallCase === "carousel"
+    sceneCase === "carousel"
       ? carouselScene(now, true)
-      : wallCase === "clock" || wallCase === "team"
-        ? wallCase
-        : wallCase === "calendar" || wallCase === "calendar-month" || wallCase === "calendar-empty"
+      : sceneCase === "clock" || sceneCase === "team"
+        ? sceneCase
+        : sceneCase === "calendar" || sceneCase === "calendar-month" || sceneCase === "calendar-empty"
           ? "calendar"
-          : wallCase.startsWith("board")
+          : sceneCase.startsWith("board")
             ? "board"
-            : wallCase.startsWith("rating")
+            : sceneCase.startsWith("rating")
               ? "rating"
               : "face";
+  // the scene under a pending person keeps its data; a new scene waits for its own
+  const hasData = arrived || sceneCase !== current;
+  const boardData = useMemo(() => (hasData ? boardFor(sceneCase, base, guest) : null), [hasData, sceneCase, base, guest]);
+  const board = useMemo(() => (boardData && demo ? boardDemo(boardData, demo, step) : boardData), [boardData, demo, step]);
+  const rating = useMemo(
+    () => (hasData && scene === "rating" ? ratingFor(sceneCase, base, guest, reorder) : null),
+    [hasData, scene, sceneCase, base, guest, reorder],
+  );
+  const calendar = useMemo(
+    () =>
+      !hasData ? null : sceneCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar,
+    [hasData, sceneCase, data],
+  );
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
-  const summary = wallCase === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
+  const shown = current === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
+  const counted = news > 0 ? { ...shown, today: { ...shown.today, sent: shown.today.sent + news, done: shown.today.done + news } } : shown;
+  const summary = busier
+    ? {
+        ...counted,
+        load: counted.load.map((row) =>
+          row.name.startsWith("Динара") ? { ...row, active: 6 } : row.name.startsWith("Тимур") ? { ...row, active: 1 } : row,
+        ),
+      }
+    : counted;
 
   return (
-    <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : undefined}>
+    <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : route ? walkStep : undefined}>
       <TvFrame
         company="Компания"
         logoUrl={null}
@@ -404,19 +503,19 @@ export function WallSandbox({ wallCase, clock, guest, demo = null }: { wallCase:
         guest={guest}
         scene={scene}
         clock={clock}
-        night={wallCase === "night"}
+        night={current === "night"}
         offline={false}
         items={tickerItems(lines, summary)}
         speech={speechOf(lines, summary.today, now)}
         summary={summary}
-        focus={focusFor(wallCase, data.focus)}
-        task={taskFor(wallCase, data.focus, guest)}
+        focus={arrived ? focusFor(current, data.focus) : null}
+        task={arrived ? taskFor(current, data.focus, guest) : null}
         focusRemainingMs={7 * MIN}
-        rating={ratingFor(wallCase, base, guest)}
-        calendar={wallCase === "calendar-empty" ? { ...data.calendar, events: data.calendar.events.filter((e) => e.id === "c4") } : data.calendar}
-        calendarView={wallCase === "calendar-month" ? "month" : "week"}
-        board={board && demo ? boardDemo(board, demo, step) : board}
-        overlay={overlayOf(overlayFor(wallCase, base, guest), summary.events, new Date(base))}
+        rating={rating}
+        calendar={calendar}
+        calendarView={sceneCase === "calendar-month" ? "month" : "week"}
+        board={board}
+        overlay={overlayOf(overlayFor(current, base, guest), summary.events, new Date(base))}
         sound={false}
       />
     </div>

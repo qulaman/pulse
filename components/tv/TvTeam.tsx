@@ -1,5 +1,7 @@
 "use client";
 
+import { motion, MotionConfig } from "framer-motion";
+
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { TvSummary } from "@/lib/tv/queries";
 
@@ -14,6 +16,8 @@ import type { TvSummary } from "@/lib/tv/queries";
 
 /** Шесть в ряд, четыре ряда: на 24 плитках имя ещё читается с двух метров. */
 const TILES = 24;
+/** Плитка переезжает на новое место за время стены (`--t-tv`, 500 мс ease-in-out) — только transform. */
+const MOVE = { layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } } as const;
 const MEDALS = ["1", "2", "3"] as const;
 
 export function TvTeam({ summary, guest }: { summary: TvSummary; guest: boolean }) {
@@ -29,37 +33,44 @@ export function TvTeam({ summary, guest }: { summary: TvSummary; guest: boolean 
     }
   }
 
+  // the order is what moves a tile: the clock's re-renders and the scene's entrance never start a slide
+  const order = rows.map((row) => row.name).join("\u0001");
+
   if (rows.length === 0) {
     return <p className="text-[4vh] leading-[5.4vh] text-muted">Команда ещё не заведена</p>;
   }
 
   return (
-    <div className="grid w-full max-w-[92vw] grid-cols-6 gap-x-[2vh] gap-y-[3.4vh]">
-      {rows.map((row) => (
-        <div key={row.name} className="flex min-w-0 items-start gap-[1.2vh]">
-          <span
-            aria-hidden
-            className="mt-[1.4vh] h-[1.2vh] w-[1.2vh] shrink-0 rounded-full"
-            style={{ background: row.active > 0 ? "var(--ok)" : "var(--text-muted)" }}
-          />
-          <div className="min-w-0">
-            {/* имя переносится, а не режется: «Марат Оспа…» на стене читается как ошибка */}
-            <p className="text-[3vh] leading-[4vh] [overflow-wrap:anywhere]">
-              {row.name}
-              {medals.has(row.name) ? (
-                <span className="ml-[0.8vh] text-[2vh] font-semibold" style={{ color: "var(--gold)" }}>
-                  {medals.get(row.name)}
-                </span>
-              ) : null}
-            </p>
-            <p className="truncate text-[2.2vh] leading-[3vh] text-muted">
-              {row.active > 0
-                ? `${row.active} ${pluralRu(row.active, ["дело", "дела", "дел"])}`
-                : "дел нет"}
-            </p>
-          </div>
-        </div>
-      ))}
-    </div>
+    // «reduce motion»: the tiles take their new cells at once
+    <MotionConfig reducedMotion="user">
+      <div className="grid w-full max-w-[92vw] grid-cols-6 gap-x-[2vh] gap-y-[3.4vh]">
+        {/* a count changed and the tiles re-sort by load: each slides to its new cell instead of jumping (FLIP) */}
+        {rows.map((row) => (
+          <motion.div key={row.name} layout="position" layoutDependency={order} transition={MOVE} className="flex min-w-0 items-start gap-[1.2vh]">
+            <span
+              aria-hidden
+              className="mt-[1.4vh] h-[1.2vh] w-[1.2vh] shrink-0 rounded-full"
+              style={{ background: row.active > 0 ? "var(--ok)" : "var(--text-muted)" }}
+            />
+            <div className="min-w-0">
+              {/* имя переносится, а не режется: «Марат Оспа…» на стене читается как ошибка */}
+              <p className="text-[3vh] leading-[4vh] [overflow-wrap:anywhere]">
+                {row.name}
+                {medals.has(row.name) ? (
+                  <span className="ml-[0.8vh] text-[2vh] font-semibold" style={{ color: "var(--gold)" }}>
+                    {medals.get(row.name)}
+                  </span>
+                ) : null}
+              </p>
+              <p className="truncate text-[2.2vh] leading-[3vh] text-muted">
+                {row.active > 0
+                  ? `${row.active} ${pluralRu(row.active, ["дело", "дела", "дел"])}`
+                  : "дел нет"}
+              </p>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </MotionConfig>
   );
 }

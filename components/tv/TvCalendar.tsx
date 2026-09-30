@@ -208,7 +208,7 @@ function TodayTile({ card, index }: { card: TodayCard; index: number }) {
         </span>
         {card.note ? (
           <span
-            className="shrink-0 truncate rounded-full px-[1.2vh] py-[0.3vh] text-[2vh] font-semibold leading-[2.6vh]"
+            className="shrink-0 truncate rounded-full px-[1.2vh] py-[0.3vh] text-[2vh] font-semibold leading-[2.6vh] tabular-nums"
             style={{
               color: lit ? "var(--bg)" : "var(--text-muted)",
               background: lit ? "var(--accent)" : "color-mix(in srgb, var(--border) 70%, transparent)",

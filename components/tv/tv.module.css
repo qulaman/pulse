@@ -61,3 +61,30 @@
   transform-origin: left center;
   transition: transform 10s linear;
 }
+
+/* The ticker's tape rides on the compositor: the track slides left by one run and starts over,
+   where the next copy stands in for the first. One run's width and the time of a lap arrive as
+   custom properties from the measured tape (TvTicker) — no React, no main thread on the frames.
+   Until they arrive the tape stands still. */
+.tape {
+  --tape-shift: 0px;
+  --tape-time: 60s;
+  animation: tv-tape var(--tape-time) linear infinite;
+  will-change: transform;
+}
+
+@keyframes tv-tape {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(var(--tape-shift), 0, 0);
+  }
+}
+
+/* The still wall: the tape stands at its start, the way it always did */
+@media (prefers-reduced-motion: reduce) {
+  .tape {
+    animation: none;
+  }
+}

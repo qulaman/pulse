@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { boardCountLine, boardFrame, boardFrom, freshKey, isFresh, mapFits, pageAt, PAGE_MS, tagOf, wallView, type TvBoardItem } from "./board";
+import { boardCountLine, boardFrame, boardFrom, freshKey, isFresh, mapFits, pageAt, PAGE_MS, PROGRESS_GAP, progressScale, tagOf, wallView, type TvBoardItem } from "./board";
 
 function item(n: number, patch: Partial<TvBoardItem> = {}): TvBoardItem {
   return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, children: [], ...patch };
@@ -94,5 +94,30 @@ describe("tagOf и boardCountLine", () => {
     expect(boardCountLine({ total: 5, done: 0 })).toBe("5 пунктов");
     expect(boardCountLine({ total: 3, done: 2 })).toBe("3 пункта · 2 отмечено");
     expect(boardCountLine({ total: 1, done: 1 })).toBe("1 пункт · 1 отмечен");
+  });
+});
+
+describe("progressScale", () => {
+  it("шкала не шире пятой части строки, сегмент — от 0,9 до 3,2 vh", () => {
+    for (const count of [1, 3, 7, 12, 30]) {
+      const { segment } = progressScale(count, 0);
+      expect(segment).toBeGreaterThanOrEqual(0.9);
+      expect(segment).toBeLessThanOrEqual(3.2);
+      if (count <= 20) expect(count * segment + (count - 1) * PROGRESS_GAP).toBeLessThanOrEqual(34.01);
+    }
+  });
+
+  it("капсула — по центру своего сегмента и на шаг сегмента дальше с каждым пунктом", () => {
+    const first = progressScale(7, 0);
+    const third = progressScale(7, 2);
+    expect(first.thumb).toBeCloseTo(first.segment * 1.6);
+    // centred: the capsule's middle is the segment's middle
+    expect(first.shift + first.thumb / 2).toBeCloseTo(first.segment / 2);
+    expect(third.shift - first.shift).toBeCloseTo(2 * (first.segment + PROGRESS_GAP));
+  });
+
+  it("пункт не найден — капсула у первого; за краем — у последнего", () => {
+    expect(progressScale(5, -1).shift).toBe(progressScale(5, 0).shift);
+    expect(progressScale(5, 9).shift).toBe(progressScale(5, 4).shift);
   });
 });

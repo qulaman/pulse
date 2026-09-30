@@ -46,15 +46,10 @@ export function TvMascot({ speech }: { speech: TvSpeech }) {
   return (
     <div className="flex flex-col items-center">
       <span className="relative" style={{ width: size, height: size }}>
-        {/* тёплое свечение под лицом: статичное, не анимируется (перф-контракт D-45) */}
-        <span
-          aria-hidden
-          className="absolute -inset-[12%] rounded-full"
-          style={{
-            background: `radial-gradient(circle, color-mix(in srgb, ${speech.mood === "happy" ? "var(--gold)" : "var(--accent)"} ${speech.mood === "sleeping" ? 7 : 18}%, transparent), transparent 68%)`,
-            transition: "background 800ms var(--ease-out)",
-          }}
-        />
+        {/* тёплое свечение под лицом: два статичных слоя, бирюзовый и золотой, — лицо обрадовалось, и
+            золото проступает прозрачностью (градиент сам не перетекает, он сменился бы одним кадром) */}
+        <Glow tone="var(--accent)" opacity={speech.mood === "happy" ? 0 : speech.mood === "sleeping" ? 7 / 18 : 1} />
+        <Glow tone="var(--gold)" opacity={speech.mood === "happy" ? 1 : 0} />
         {size > 0 ? <Mascot state={STATE[speech.mood]} size={size} act={acts.act} season={season} /> : null}
       </span>
 
@@ -75,5 +70,20 @@ export function TvMascot({ speech }: { speech: TvSpeech }) {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+/** One glow under the face at 18 % of its tone; the mood picks the layer by opacity (D-45: opacity only). */
+function Glow({ tone, opacity }: { tone: string; opacity: number }) {
+  return (
+    <span
+      aria-hidden
+      className="absolute -inset-[12%] rounded-full"
+      style={{
+        background: `radial-gradient(circle, color-mix(in srgb, ${tone} 18%, transparent), transparent 68%)`,
+        opacity,
+        transition: "opacity 800ms var(--ease-out)",
+      }}
+    />
   );
 }

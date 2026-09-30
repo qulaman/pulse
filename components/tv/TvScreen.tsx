@@ -85,8 +85,11 @@ export function TvScreen({
   // лицо говорит о том же, что едет в строке, и пересчитывается с часами: новость
   // «стареет» сама, без отдельного таймера
   const speech = speechOf(lines, data?.today ?? { sent: 0, done: 0, in_work: 0 }, now);
-  const focused = mode === "employee" && focus.data?.mode === "employee" ? focus.data : null;
-  const task = mode === "task" && focus.data?.mode === "task" ? focus.data : null;
+  // a person after an order or an order after a person: the one on the wall stays until the next one's data
+  // is there — one transition, not two through the ether scene underneath
+  const switching = mode !== "ether" && focus.data != null && focus.data.mode !== mode && focus.isFetching;
+  const focused = focus.data?.mode === "employee" && (mode === "employee" || switching) ? focus.data : null;
+  const task = focus.data?.mode === "task" && (mode === "task" || switching) ? focus.data : null;
 
   return (
     <div className="h-dvh w-full">

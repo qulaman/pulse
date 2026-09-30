@@ -26,7 +26,7 @@ const EASE = [0.2, 0, 0, 1] as const;
 /** A short message is read from across the room; a long one still fits in four lines. */
 const SHORT_MESSAGE = 40;
 
-export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }) {
+export function TvOverlay({ view, sound, onCovered }: { view: OverlayView; sound: boolean; onCovered?: () => void }) {
   const shown = view.banner;
 
   // one ring per visitor or message, and not again after the kiosk restarts
@@ -41,80 +41,90 @@ export function TvOverlay({ view, sound }: { view: OverlayView; sound: boolean }
     <>
       <AnimatePresence>
         {shown ? (
+          // one backdrop while any notice is up: a visitor after a message, the next message after
+          // «Понятно» change the words on it, and the scene underneath never shows through
           <motion.div
-            key={`${shown.kind}:${shown.id}`}
+            key="banner"
             className="absolute inset-0 z-30 flex items-center justify-center px-[6vh]"
             style={{ background: "var(--bg)" }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.35 } }}
             transition={{ duration: 0.5, ease: EASE }}
+            // fully opaque: the wall under it need not be drawn (TvFrame)
+            onAnimationComplete={(target) => {
+              if (typeof target === "object" && target !== null && "opacity" in target && target.opacity === 1) onCovered?.();
+            }}
             data-testid="tv-overlay"
             data-kind={shown.kind}
           >
-            <motion.div
-              initial={{ scale: 0.94, y: 18 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ duration: 0.55, ease: EASE }}
-              className="flex max-w-[84vw] flex-col items-center text-center"
-            >
-              {shown.kind === "visit" ? (
-                <>
-                  <DoorMark tone="var(--accent)" />
-                  <p className="mt-[4vh] text-[11vh] font-bold leading-[12vh] tracking-[-0.03em]">{shown.title}</p>
-                  {shown.note ? (
-                    <p className="mt-[2vh] line-clamp-2 text-[5.4vh] font-semibold leading-[6.6vh] [overflow-wrap:anywhere]">
-                      {shown.note}
-                    </p>
-                  ) : null}
-                  <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">
-                    {shown.since}
-                    {shown.more > 0 ? ` · ждут ещё ${shown.more}` : ""}
-                  </p>
-                </>
-              ) : shown.kind === "message" ? (
-                shown.text ? (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={`${shown.kind}:${shown.id}`}
+                initial={{ opacity: 0, scale: 0.94, y: 18 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.25 } }}
+                transition={{ duration: 0.55, ease: EASE }}
+                className="flex max-w-[84vw] flex-col items-center text-center"
+              >
+                {shown.kind === "visit" ? (
                   <>
-                    <BubbleMark />
-                    <p
-                      className="mt-[3.4vh] text-[3.6vh] font-semibold uppercase leading-[4.4vh] tracking-[0.08em]"
-                      style={{ color: "var(--accent)" }}
-                    >
-                      {shown.title}
-                    </p>
-                    <p
-                      className={`mt-[2vh] line-clamp-4 font-bold tracking-[-0.02em] [overflow-wrap:anywhere] ${
-                        shown.text.length <= SHORT_MESSAGE ? "text-[9vh] leading-[10.4vh]" : "text-[6.4vh] leading-[7.8vh]"
-                      }`}
-                      data-testid="tv-message-text"
-                    >
-                      {shown.text}
-                    </p>
+                    <DoorMark tone="var(--accent)" />
+                    <p className="mt-[4vh] text-[11vh] font-bold leading-[12vh] tracking-[-0.03em]">{shown.title}</p>
+                    {shown.note ? (
+                      <p className="mt-[2vh] line-clamp-2 text-[5.4vh] font-semibold leading-[6.6vh] [overflow-wrap:anywhere]">
+                        {shown.note}
+                      </p>
+                    ) : null}
                     <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">
                       {shown.since}
-                      {shown.more > 0 ? ` · ещё ${shown.more}` : ""}
+                      {shown.more > 0 ? ` · ждут ещё ${shown.more}` : ""}
                     </p>
                   </>
+                ) : shown.kind === "message" ? (
+                  shown.text ? (
+                    <>
+                      <BubbleMark />
+                      <p
+                        className="mt-[3.4vh] text-[3.6vh] font-semibold uppercase leading-[4.4vh] tracking-[0.08em]"
+                        style={{ color: "var(--accent)" }}
+                      >
+                        {shown.title}
+                      </p>
+                      <p
+                        className={`mt-[2vh] line-clamp-4 font-bold tracking-[-0.02em] [overflow-wrap:anywhere] ${
+                          shown.text.length <= SHORT_MESSAGE ? "text-[9vh] leading-[10.4vh]" : "text-[6.4vh] leading-[7.8vh]"
+                        }`}
+                        data-testid="tv-message-text"
+                      >
+                        {shown.text}
+                      </p>
+                      <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">
+                        {shown.since}
+                        {shown.more > 0 ? ` · ещё ${shown.more}` : ""}
+                      </p>
+                    </>
+                  ) : (
+                    // a guest in the office (D-33): the notice without the words
+                    <>
+                      <BubbleMark />
+                      <p className="mt-[4vh] text-[9vh] font-bold leading-[10vh] tracking-[-0.03em]">{shown.title}</p>
+                      <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">Текст — в вашем телефоне</p>
+                    </>
+                  )
                 ) : (
-                  // a guest in the office (D-33): the notice without the words
                   <>
-                    <BubbleMark />
-                    <p className="mt-[4vh] text-[9vh] font-bold leading-[10vh] tracking-[-0.03em]">{shown.title}</p>
-                    <p className="mt-[2.4vh] text-[3.4vh] leading-[4.4vh] text-muted">Текст — в вашем телефоне</p>
+                    <CalendarMark />
+                    <p className="mt-[3.4vh] text-[9vh] font-bold leading-[10vh] tracking-[-0.03em]" style={{ color: "var(--accent)" }}>
+                      {shown.title}
+                    </p>
+                    <p className="mt-[2vh] line-clamp-2 text-[5vh] font-semibold leading-[6.2vh] [overflow-wrap:anywhere]">
+                      {shown.detail}
+                    </p>
                   </>
-                )
-              ) : (
-                <>
-                  <CalendarMark />
-                  <p className="mt-[3.4vh] text-[9vh] font-bold leading-[10vh] tracking-[-0.03em]" style={{ color: "var(--accent)" }}>
-                    {shown.title}
-                  </p>
-                  <p className="mt-[2vh] line-clamp-2 text-[5vh] font-semibold leading-[6.2vh] [overflow-wrap:anywhere]">
-                    {shown.detail}
-                  </p>
-                </>
-              )}
-            </motion.div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </motion.div>
         ) : null}
       </AnimatePresence>

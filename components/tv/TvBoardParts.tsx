@@ -21,28 +21,33 @@ export function clampStyle(lines: number): CSSProperties {
   return { display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: lines, overflow: "hidden" };
 }
 
-/** Кружок с номером пункта; отмеченный — галочка; обсуждаемый — залит акцентом. */
+/**
+ * Кружок с номером пункта; отмеченный — галочка; обсуждаемый — залит акцентом. Заливка —
+ * свой слой с номером цвета стены поверх кружка, он проявляется прозрачностью (D-45):
+ * переход подсветки не перерисовывает кружок полсекунды.
+ */
 export function Badge({ n, done, size, lit, tone = "var(--accent)" }: { n: number; done: boolean; size: number; lit: boolean; tone?: string }) {
   const color = done ? "var(--ok)" : tone;
   return (
     <span
       aria-hidden
       className="nums relative flex shrink-0 items-center justify-center rounded-full font-bold leading-none"
-      style={{
-        width: vh(size),
-        height: vh(size),
-        fontSize: vh(size * 0.5),
-        color: lit && !done ? "var(--bg)" : color,
-        background: lit && !done ? color : `color-mix(in srgb, ${color} 17%, transparent)`,
-        transition: "background-color 450ms var(--ease-in-out), color 450ms var(--ease-in-out)",
-      }}
+      style={{ width: vh(size), height: vh(size), fontSize: vh(size * 0.5), color, background: `color-mix(in srgb, ${color} 17%, transparent)` }}
     >
       {done ? (
         <svg viewBox="0 0 24 24" width="56%" height="56%" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M5 12.5 10 17.5 19 7" />
         </svg>
       ) : (
-        n
+        <>
+          {n}
+          <span
+            className="absolute inset-0 flex items-center justify-center rounded-full"
+            style={{ background: color, color: "var(--bg)", opacity: lit ? 1 : 0, transition: "opacity 450ms var(--ease-in-out)" }}
+          >
+            {n}
+          </span>
+        </>
       )}
     </span>
   );
