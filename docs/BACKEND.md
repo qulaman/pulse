@@ -286,6 +286,7 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 | `sent/accepted → declined` | исполнитель; причина — `payload.reason`, сервер её не требует; подсказка коллеги — `payload.suggest_assignee_id` (D-128) |
 | `rework → declined` | исполнитель через `transition_task` — шагами `rework → accepted → declined` в одной транзакции (D-128; самого ребра в страже нет) |
 | `accepted → pending_review` | исполнитель (отчёт — в той же транзакции, D-64 §3) |
+| `rework → pending_review` | исполнитель через `transition_task` — шагами `rework → accepted → pending_review` в одной транзакции, отчёт внутри (D-130; самого ребра в страже нет, `rework → accepted` пуша не ставит) |
 | `pending_review → done \| rework` | только director |
 | `rework → accepted` | исполнитель |
 | `declined → sent` | director («Настоять», G.20; `closed_at` обнуляется) |

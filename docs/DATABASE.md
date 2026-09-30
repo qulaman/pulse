@@ -358,6 +358,7 @@ create policy tasks_insert on tasks for insert with check (
 -- задачи и сообщения
 confirm_voice_batch(payload jsonb, client_request_id uuid, p_now timestamptz default now()) returns jsonb
 transition_task(task_id uuid, to_status task_status, payload jsonb default '{}', client_request_id uuid default null) returns jsonb
+                                                              -- из rework в declined / pending_review — сам через accepted (D-128, D-130)
 revoke_task(task_id uuid, client_request_id uuid default null) returns jsonb
 extend_task_deadline(task_id uuid, new_deadline timestamptz, client_request_id uuid default null) returns jsonb
 reassign_task(task_id uuid, new_assignee_id uuid, client_request_id uuid default null,
