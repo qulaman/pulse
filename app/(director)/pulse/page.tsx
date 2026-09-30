@@ -847,7 +847,7 @@ export default function PulsePage() {
             </div>
           ) : null}
           {/* the band's top moves with the mode, as the words' bottom does: the cards glide with it */}
-          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
             {confirming ? <ConfirmInline ref={confirmRef} /> : null}
             {!phraseInHand && visitorsWaiting ? <VisitAsk
@@ -863,6 +863,10 @@ export default function PulsePage() {
             {/* a panel folding away or giving way to another fades out where it stood (popLayout: the
                 rest does not wait for it); position only — a layout animation of its size squashed the
                 deck inside whenever a card of another height came to the top */}
+            {/* the leaving panel is popped out absolutely, so it needs a positioned parent — this box,
+                not the band: a positioned band comes after the face and covers the team's circles
+                that reach down into it (they stopped taking taps). Empty, it is not there at all. */}
+            <div className="relative empty:hidden">
             <AnimatePresence mode="popLayout">
             {mode === "panel" && !phraseInHand ? (
               <motion.div
@@ -909,6 +913,7 @@ export default function PulsePage() {
               </motion.div>
             ) : null}
             </AnimatePresence>
+            </div>
           </motion.div>
         </div>
       </LayoutGroup>

@@ -614,7 +614,7 @@ export default function FeedPage() {
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
             </div>
           ) : null}
-          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
             {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
             {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
@@ -642,6 +642,10 @@ export default function FeedPage() {
               </>
             ) : null}
             {/* a panel folding away fades out where it stood; position only (a size animation squashed its cards) */}
+            {/* the leaving panel is popped out absolutely, so it needs a positioned parent — this box,
+                not the band: a positioned band comes after the face and covers the team's circles
+                that reach down into it (they stopped taking taps). Empty, it is not there at all. */}
+            <div className="relative empty:hidden">
             <AnimatePresence mode="popLayout">
             {mode === "panel" ? (
               <motion.div
@@ -717,6 +721,7 @@ export default function FeedPage() {
               </motion.div>
             ) : null}
             </AnimatePresence>
+            </div>
           </motion.div>
         </div>
       </LayoutGroup>
