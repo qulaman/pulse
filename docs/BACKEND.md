@@ -40,7 +40,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 
 | Эндпоинт | Метод | Роль | Что |
 |---|---|---|---|
-| `/api/voice/upload-url` | POST | любая | `{ext: webm\|m4a\|mp4, context: director_input\|task_message, client_request_id}` → signed upload URL в бакет `voice`; для `director_input` — строка `inbox_items` (§2) |
+| `/api/voice/upload-url` | POST | любая | `{ext: webm\|m4a\|mp4, context: director_input\|task_message, client_request_id, recorded_at?}` → signed upload URL в бакет `voice`; для `director_input` — строка `inbox_items` с `recorded_at` (§2, D-130) |
 | `/api/voice/transcribe` | POST | director | §2 |
 | `/api/voice/parse` | POST | director | §2 |
 | `/api/voice/confirm` | POST | director | §2 |
@@ -70,7 +70,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/push/seen` | POST | любая | «увидел» (D-32): `{delivery_id}` из SW при показе уведомления; без `delivery_id` (открытие приложения) — все незакрытые строки человека |
 | `/api/push/acted` | POST | любая | «Прочитал» из шторки (D-64): `{delivery_id}` своей доставки → `mark_thread_read` до `meta.last_seq` под токеном пользователя |
 | `/api/push/sweep` | GET, POST | — (`Authorization: Bearer <CRON_SECRET>`) | минутный тик §10 (Vercel cron шлёт GET) |
-| `/api/files/upload-url` | POST | любая | `{ext: jpg\|png\|webp, client_request_id}` → signed upload URL в бакет `photos`, путь `{company}/{user}/{client_request_id}.{ext}` (G.20b) |
+| `/api/files/upload-url` | POST | любая | `{ext: jpg\|png\|webp, client_request_id}` → signed upload URL в бакет `photos`, путь `{company}/{user}/{client_request_id}.{ext}` (G.20b); объект этого ключа уже есть — `{signed_url: "", stored: true}`, повтор идёт дальше (D-130) |
 | `/api/files/url` | GET | любая | `?message_id=` → signed URL файла сообщения на 10 мин; доступ решает RLS `task_messages`, бакет по типу: `photo` → `photos`, `voice` → `voice`; путь в Storage клиент не называет |
 | `/api/people` | POST | director | создаёт auth-пользователя через admin API service role + профиль (роли — весь enum, в т.ч. `secretary`, `tv`); при провале профиля auth-пользователь удаляется; `409 email_exists` |
 | `/api/people/:id/password` | POST | director | `{password}` (6–72) через service role; только своя компания, пароль другого директора — `403` (G.20b) |
