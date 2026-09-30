@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DateTimeField } from "@/components/ui/datetime/DateTimeField";
 import { Sheet } from "@/components/ui/Sheet";
-import { uploadPhoto } from "@/lib/files/photo";
+import { PHOTO_MIME, shrinkPhoto, uploadPhotoBlob } from "@/lib/files/photo";
+import { claimMedia, dropMedia, handOverMedia, keepMedia, releaseMedia } from "@/lib/media/pending";
 import { CANT_REASONS, NOT_MINE, requestButtonLabel, timeChoices } from "@/lib/tasks/lifecycle";
 import { BUTTON, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 
@@ -245,7 +246,16 @@ export function ReportSheet({
   open,
   onClose,
   onSubmit,
-}: BaseProps & { onSubmit: (text: string, filePath: string | null, partial: boolean) => void }) {
+  keep,
+}: BaseProps & {
+  onSubmit: (text: string, filePath: string | null, partial: boolean) => void;
+  /**
+   * The handover with a photo is kept on the phone before the upload (D-130): no network at
+   * the site and the report still goes — the replay uploads the photo and hands the task in
+   * under the same key. `onKept` — it went to the phone, not to the server.
+   */
+  keep?: { taskId: string; companyId: string; userId: string; onKept: (partial: boolean) => void };
+}) {
   const [text, setText] = useState("");
   const [partial, setPartial] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
@@ -261,26 +271,64 @@ export function ReportSheet({
     setError(null);
   };
 
+  const done = () => {
+    setText("");
+    setPartial(false);
+    pick(null);
+    onClose();
+  };
+
   const submit = async () => {
     let filePath: string | null = null;
     if (photo) {
       // the photo lands in Storage first; the status changes only when it is there (принцип 5)
       setUploading(true);
       setError(null);
+      const { blob, ext } = await shrinkPhoto(photo);
+      const id = crypto.randomUUID();
+      const crid = crypto.randomUUID();
+      // on the phone before the upload: a report made at a site without signal is not lost (D-130)
+      const kept = keep
+        ? await keepMedia({
+            id,
+            kind: "report",
+            userId: keep.userId,
+            companyId: keep.companyId,
+            taskId: keep.taskId,
+            crid,
+            blob,
+            mime: PHOTO_MIME[ext],
+            ext,
+            durationMs: null,
+            text: text.trim(),
+            partial,
+            filePath: null,
+            createdAt: new Date().toISOString(),
+            attempts: 0,
+          })
+        : false;
+      if (kept) claimMedia(id);
       try {
-        filePath = await uploadPhoto(photo);
+        filePath = await uploadPhotoBlob(blob, ext, crid);
+        if (kept) {
+          releaseMedia(id);
+          void dropMedia(id);
+        }
       } catch {
         setUploading(false);
+        if (kept && keep) {
+          handOverMedia(id);
+          keep.onKept(partial);
+          done();
+          return;
+        }
         setError(TEXT.photoFailed);
         return;
       }
       setUploading(false);
     }
     onSubmit(text.trim(), filePath, partial);
-    setText("");
-    setPartial(false);
-    pick(null);
-    onClose();
+    done();
   };
 
   return (

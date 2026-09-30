@@ -8,6 +8,8 @@ const BodySchema = z.strictObject({
   ext: z.enum(["webm", "m4a", "mp4"]),
   context: z.enum(["director_input", "task_message"]),
   client_request_id: z.uuid(),
+  /** When the finger left the face, by the phone's clock — a kept phrase arrives late (D-130). */
+  recorded_at: z.iso.datetime({ offset: true }).optional(),
 });
 
 /**
@@ -50,6 +52,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         status: "recorded",
         audio_path: path,
         client_request_id: body.client_request_id,
+        ...(body.recorded_at ? { recorded_at: body.recorded_at } : {}),
       })
       .select("id")
       .single();

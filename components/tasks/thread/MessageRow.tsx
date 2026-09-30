@@ -15,6 +15,17 @@ function durationOf(message: TaskMessage): number | null {
   return typeof value === "number" && value > 0 ? value : null;
 }
 
+/** A voice message or a photo kept on the phone for want of network (D-130): no file on the server yet. */
+function keptOnPhone(message: TaskMessage): boolean {
+  return (message.meta as { kept?: unknown } | null)?.kept === true && !message.file_path;
+}
+
+/** «0:07» */
+function seconds(ms: number | null): string {
+  const total = Math.max(1, Math.round((ms ?? 0) / 1000));
+  return `0:${String(total).padStart(2, "0")}`;
+}
+
 /** A clock while the row is on its way, a tick once the thread holds it. */
 function StateMark({ state }: { state: "pending" | "sent" }) {
   if (state === "pending") {
@@ -90,6 +101,11 @@ export function MessageRow({ message, mine, onRetry }: { message: TaskMessage; m
 
         {message.content ? <p className="mt-1 text-[16px] leading-[22px]">{message.content}</p> : null}
 
+        {keptOnPhone(message) ? (
+          <p className="mt-1 text-[14px] leading-[18px] text-muted" data-testid="message-kept">
+            {message.type === "voice" ? `Голосовое ${seconds(durationOf(message))}` : "Фото"} · ждёт связи
+          </p>
+        ) : null}
         {message.type === "photo" && message.file_path && state === "sent" ? <PhotoMessage messageId={message.id} /> : null}
         {message.type === "voice" && state === "sent" ? (
           <VoiceMessage messageId={message.id} durationMs={durationOf(message)} />

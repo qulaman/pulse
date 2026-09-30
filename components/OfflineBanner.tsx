@@ -7,6 +7,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError } from "@/lib/net";
 import { latestFetch } from "@/lib/offline/persist";
 import { outboxSize, subscribeOutbox } from "@/lib/outbox";
+import { countMedia, subscribeMedia } from "@/lib/media/pending";
 import { countOnTheirWay, subscribeKept } from "@/lib/voice/kept";
 
 // the same switch that pauses and resumes mutations — the line never disagrees with the queue
@@ -30,23 +31,26 @@ function useLatestFetch(): number | null {
 
 /**
  * What waits for the network outside the mutation cache (D-130): the outbox a closed session
- * left, and the director's phrases the phone keeps.
+ * left, the director's phrases the phone keeps, and the files of threads.
  */
 function useWaitingOnPhone(): { outbox: number; phrases: number } {
   const [counts, setCounts] = useState({ outbox: 0, phrases: 0 });
   useEffect(() => {
     let alive = true;
     const read = async () => {
-      const phrases = await countOnTheirWay();
-      if (alive) setCounts({ outbox: outboxSize(), phrases });
+      // the director's phrases and the files of threads (voice, photos, a report with a photo)
+      const [phrases, media] = await Promise.all([countOnTheirWay(), countMedia()]);
+      if (alive) setCounts({ outbox: outboxSize(), phrases: phrases + media });
     };
     void read();
     const offOutbox = subscribeOutbox(() => void read());
     const offKept = subscribeKept(() => void read());
+    const offMedia = subscribeMedia(() => void read());
     return () => {
       alive = false;
       offOutbox();
       offKept();
+      offMedia();
     };
   }, []);
   return counts;

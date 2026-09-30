@@ -630,6 +630,15 @@ export function useSendMessage(me: Me | undefined) {
   });
 }
 
+/**
+ * A handover kept on the phone — a report with a photo made without network (D-130): every
+ * list shows the task handed in at once, as a paused transition would; the replay
+ * (components/MediaReplay.tsx) makes it true on the server and the next snapshot agrees.
+ */
+export function showHandedIn(queryClient: QueryClient, taskId: string): void {
+  queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) => patchCached(old, taskId, { status: "pending_review" }));
+}
+
 /* -------------------------------------------------------------------------- */
 /* The action surface the card talks to                                        */
 /* -------------------------------------------------------------------------- */

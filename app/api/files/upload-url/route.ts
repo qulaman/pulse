@@ -18,6 +18,11 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
   async ({ profile, body }) => {
     const path = `${profile.companyId}/${profile.userId}/${body.client_request_id}.${body.ext}`;
     const { data, error } = await createServiceSupabase().storage.from("photos").createSignedUploadUrl(path);
+    // the object of this key is there already: an earlier upload of the same photo landed and
+    // its answer was lost — the replay of a kept photo goes on to the message (D-130)
+    if (error && /already exists/i.test(error.message)) {
+      return apiOk({ path, signed_url: "", token: "", stored: true });
+    }
     if (error || !data) {
       console.error("photo upload url failed:", error?.message);
       return apiError(502, "upload_url_failed", "Не удалось начать загрузку, попробуй ещё раз");

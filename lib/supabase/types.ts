@@ -466,6 +466,7 @@ export type Database = {
           created_at: string
           entities: Json | null
           id: string
+          recorded_at: string | null
           status: Database["public"]["Enums"]["inbox_status"]
           transcript: string | null
           updated_at: string
@@ -478,6 +479,7 @@ export type Database = {
           created_at?: string
           entities?: Json | null
           id?: string
+          recorded_at?: string | null
           status?: Database["public"]["Enums"]["inbox_status"]
           transcript?: string | null
           updated_at?: string
@@ -490,6 +492,7 @@ export type Database = {
           created_at?: string
           entities?: Json | null
           id?: string
+          recorded_at?: string | null
           status?: Database["public"]["Enums"]["inbox_status"]
           transcript?: string | null
           updated_at?: string

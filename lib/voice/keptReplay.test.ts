@@ -97,7 +97,9 @@ describe("advance", () => {
     const outcome = await advance(phrase(), d);
 
     expect(outcome).toBe("ready");
-    expect(d.api.uploadUrl).toHaveBeenCalledWith(expect.objectContaining({ client_request_id: "p-1", context: "director_input", ext: "webm" }));
+    expect(d.api.uploadUrl).toHaveBeenCalledWith(
+      expect.objectContaining({ client_request_id: "p-1", context: "director_input", ext: "webm", recorded_at: "2026-09-30T09:05:00.000Z" }),
+    );
     expect(d.api.transcribe).toHaveBeenCalledWith(expect.objectContaining({ audio_path: "c/u/a.webm", client_request_id: "p-1", duration_ms: 4200 }));
     expect(d.api.parse).toHaveBeenCalledWith(expect.objectContaining({ transcript: "отчёт по продажам к пятнице", client_request_id: "p-1" }));
     expect(phone.rows.get("p-1")).toMatchObject({ stage: "parsed", audioPath: "c/u/a.webm", inboxId: "in-1" });

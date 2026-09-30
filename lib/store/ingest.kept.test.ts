@@ -133,6 +133,8 @@ describe("the phrase kept on the phone (D-130)", () => {
     expect(kept.userId).toBe("u-dir");
     expect(kept.stage).toBe("recorded");
     expect(kept.audio?.blob).toBe(audio.blob);
+    // the release goes with the upload: the server counts how long the phrase waited
+    expect(api.uploadUrl).toHaveBeenCalledWith(expect.objectContaining({ recorded_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) }));
   });
 
   it("follows every step: the words, then the cards as the director edits them", async () => {
@@ -287,6 +289,8 @@ describe("a kept phrase comes back to the face (D-130)", () => {
     expect(state.clientRequestId).toBe("p-1");
     expect(state.entities).toHaveLength(1);
     expect(phone.claimed.has("p-1")).toBe(true);
+    // a retry of the upload still reports the first release, not the moment of the tap
+    expect(state.recordedAt).toBe("2026-09-30T09:05:00.000Z");
   });
 
   it("a batch the server refused comes back as cards to fix, not as a dead end", () => {

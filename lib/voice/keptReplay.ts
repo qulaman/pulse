@@ -59,7 +59,8 @@ export async function advance(start: KeptPhrase, deps: ReplayDeps): Promise<Outc
         await step({ failure: { code: "upload_failed" } });
         return "ready";
       }
-      const slot = await deps.api.uploadUrl({ ext: extForMime(phrase.audio.mime), context: "director_input", client_request_id: phrase.crid });
+      // the release by the phone's clock: the server counts how long the phrase waited (D-130)
+      const slot = await deps.api.uploadUrl({ ext: extForMime(phrase.audio.mime), context: "director_input", client_request_id: phrase.crid, recorded_at: phrase.createdAt });
       try {
         await deps.api.uploadAudio({ signed_url: slot.signed_url, blob: phrase.audio.blob, mime: phrase.audio.mime });
       } catch (error) {

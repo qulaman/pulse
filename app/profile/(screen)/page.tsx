@@ -72,7 +72,7 @@ export default async function ProfilePage() {
         {/* the way in stays here until installed, whatever was dismissed on Пульс (D-125) */}
         <InstallHint sticky />
 
-        <SignOutRow action={signOut} className="mt-6" />
+        <SignOutRow action={signOut} userId={profile.userId} className="mt-6" />
 
         <footer className="mt-8 flex flex-col items-center gap-1.5 opacity-45">
           <PulseMark />

@@ -141,6 +141,8 @@ type IngestState = {
   /** The phone's copy of this phrase (lib/voice/kept.ts); null — not kept (no owner, no IndexedDB). */
   keptId: string | null;
   recordingStartedAt: number | null;
+  /** When the finger left the face (ISO) — sent with the upload, the wait is counted from it (D-130). */
+  recordedAt: string | null;
   audio: RecordedAudio | null;
   audioPath: string | null;
   inboxId: string | null;
@@ -213,6 +215,7 @@ const initialState: IngestState = {
   clientRequestId: null,
   keptId: null,
   recordingStartedAt: null,
+  recordedAt: null,
   audio: null,
   audioPath: null,
   inboxId: null,
@@ -619,11 +622,15 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
       });
       // on the phone before the first byte leaves it (principle 5, D-130); a retry is kept already
       await keepFresh("recorded", audio);
+      // the release, as the server will count the wait from it: a retry keeps the first one
+      const releasedAt = get().recordedAt ?? new Date().toISOString();
+      if (!get().recordedAt) set({ recordedAt: releasedAt });
       try {
         const slot = await voiceApi.uploadUrl({
           ext: extForMime(audio.mime),
           context: "director_input",
           client_request_id: get().clientRequestId as string,
+          recorded_at: releasedAt,
         });
         await voiceApi.uploadAudio({
           signed_url: slot.signed_url,
@@ -897,6 +904,7 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         ...initialState,
         keptId: phrase.id,
         clientRequestId: phrase.crid,
+        recordedAt: phrase.createdAt,
         source: phrase.source,
         audio: phrase.audio,
         audioPath: phrase.audioPath,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
@@ -7,7 +8,7 @@ import { AskSheet, CantSheet, ReportSheet } from "@/components/tasks/TaskSheets"
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import { NOT_MINE, requestToast } from "@/lib/tasks/lifecycle";
-import type { TaskActions } from "@/lib/tasks/mutations";
+import { showHandedIn, type TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
 
@@ -33,6 +34,7 @@ export function useEmployeeControls({
   companyId: string;
   tasks: readonly TaskWithPeople[];
 }): { press: (action: EmployeeAction, task: TaskWithPeople) => void; sheets: ReactNode } {
+  const queryClient = useQueryClient();
   const [sheet, setSheet] = useState<SheetState>(null);
   // the task the sheets were last opened for: they stay mounted while they slide away
   const [heldId, setHeldId] = useState<string | null>(null);
@@ -110,6 +112,20 @@ export function useEmployeeControls({
       <ReportSheet
         open={sheet?.name === "report"}
         onClose={() => setSheet(null)}
+        keep={
+          sheetTask?.assignee_id
+            ? {
+                taskId: sheetTask.id,
+                companyId,
+                userId: sheetTask.assignee_id,
+                onKept: (partial) => {
+                  showHandedIn(queryClient, sheetTask.id);
+                  haptic(15);
+                  toast(partial ? "Нет связи. Сдам с фото, как появится · не всё" : "Нет связи. Сдам с фото, как появится");
+                },
+              }
+            : undefined
+        }
         onSubmit={(text, filePath, partial) => {
           if (!sheetTask) return;
           // one call: the words, the photo and the handover are one transaction (D-64 §3)

@@ -1,11 +1,15 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { toast } from "@/components/ui/Toast";
-import { uploadPhoto } from "@/lib/files/photo";
+import { PHOTO_MIME, shrinkPhoto, uploadPhotoBlob } from "@/lib/files/photo";
 import { haptic } from "@/lib/haptics";
+import { claimMedia, dropMedia, handOverMedia, keepMedia, releaseMedia, type PendingMedia } from "@/lib/media/pending";
+import { showKeptMedia } from "@/lib/media/show";
 import type { TaskActions } from "@/lib/tasks/mutations";
+import { useMe } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
 import { holdUpdate, useUpdateHold } from "@/lib/update/client";
 import { voiceApi } from "@/lib/voice/api";
@@ -59,8 +63,48 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   // the timer fires outside React's render, so the slide-to-cancel state it reads
   // has to be a ref — a stale closure would send a recording meant to be forgotten
   const cancelling = useRef(false);
-  // a voice reply or a photo lives only in memory until it is uploaded: an app update waits (D-115)
+  // a voice reply or a photo is carried by this page until it is uploaded: an app update waits (D-115)
   useUpdateHold(recording || uploading);
+  const me = useMe().data;
+  const queryClient = useQueryClient();
+
+  /**
+   * A file of the thread goes on the phone before it goes anywhere else (principle 5, D-130):
+   * sent now if the network is there; otherwise it stands in the thread «ждёт связи» and the
+   * replay (components/MediaReplay.tsx) sends it later under the same id. «failed» — nothing
+   * could keep it (no IndexedDB here): the old «не отправилось» is the way out.
+   */
+  const sendFile = async (item: PendingMedia, upload: () => Promise<string>, send: (filePath: string) => void): Promise<"sent" | "kept" | "failed"> => {
+    const kept = me ? await keepMedia(item) : false;
+    if (kept) claimMedia(item.id);
+    try {
+      const filePath = await upload();
+      send(filePath);
+      if (kept) {
+        releaseMedia(item.id);
+        void dropMedia(item.id);
+      }
+      return "sent";
+    } catch {
+      if (!kept || !me) return "failed";
+      showKeptMedia(queryClient, item, me);
+      handOverMedia(item.id);
+      return "kept";
+    }
+  };
+
+  const mediaOf = (fields: Pick<PendingMedia, "kind" | "blob" | "mime" | "ext" | "durationMs" | "text">): PendingMedia => ({
+    ...fields,
+    id: crypto.randomUUID(),
+    userId: me?.userId ?? "",
+    companyId,
+    taskId,
+    crid: crypto.randomUUID(),
+    partial: false,
+    filePath: null,
+    createdAt: new Date().toISOString(),
+    attempts: 0,
+  });
 
   const stopTicking = () => {
     if (ticker.current) clearInterval(ticker.current);
@@ -91,14 +135,23 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
     if (!file) return;
     setUploading(true);
     try {
+      const { blob, ext } = await shrinkPhoto(file);
+      const text = draft.trim();
+      const item = mediaOf({ kind: "photo", blob, mime: PHOTO_MIME[ext], ext, durationMs: null, text });
       // the photo is in Storage before the message exists — a caption without a picture
       // would be the one thing the thread could not repair
-      const filePath = await uploadPhoto(file);
-      actions.sendMessage({ taskId, companyId, text: draft.trim(), filePath, type: "photo" });
+      const result = await sendFile(
+        item,
+        () => uploadPhotoBlob(blob, ext, item.crid),
+        (filePath) => actions.sendMessage({ id: item.id, taskId, companyId, text, filePath, type: "photo" }),
+      );
+      if (result === "failed") {
+        toast(TEXT.photoFailed);
+        return;
+      }
+      if (result === "kept") toast("Нет связи. Фото отправлю, как появится");
       setDraft("");
       onSent?.();
-    } catch {
-      toast(TEXT.photoFailed);
     } finally {
       setUploading(false);
       if (fileInput.current) fileInput.current.value = "";
@@ -137,28 +190,27 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
     }
     if (audio.durationMs < MIN_RECORDING_MS) return;
 
-    try {
-      const ext = extForMime(audio.mime);
-      const upload = await voiceApi.uploadUrl({
-        ext,
-        context: "task_message",
-        client_request_id: crypto.randomUUID(),
-      });
-      await voiceApi.uploadAudio({ signed_url: upload.signed_url, blob: audio.blob, mime: audio.mime });
-      // the length travels with the message so the player can draw a wave and count the
-      // seconds down without downloading anything (MediaRecorder files lie about duration)
-      actions.sendMessage({
-        taskId,
-        companyId,
-        text: "",
-        filePath: upload.audio_path,
-        type: "voice",
-        meta: { duration_ms: Math.min(audio.durationMs, MAX_RECORDING_MS) },
-      });
-      onSent?.();
-    } catch {
+    const ext = extForMime(audio.mime);
+    // the length travels with the message so the player can draw a wave and count the
+    // seconds down without downloading anything (MediaRecorder files lie about duration)
+    const durationMs = Math.min(audio.durationMs, MAX_RECORDING_MS);
+    const item = mediaOf({ kind: "voice", blob: audio.blob, mime: audio.mime, ext, durationMs, text: "" });
+    const result = await sendFile(
+      item,
+      async () => {
+        const upload = await voiceApi.uploadUrl({ ext, context: "task_message", client_request_id: item.crid });
+        await voiceApi.uploadAudio({ signed_url: upload.signed_url, blob: audio.blob, mime: audio.mime });
+        return upload.audio_path;
+      },
+      (filePath) =>
+        actions.sendMessage({ id: item.id, taskId, companyId, text: "", filePath, type: "voice", meta: { duration_ms: durationMs } }),
+    );
+    if (result === "failed") {
       toast("Голосовое не отправилось");
+      return;
     }
+    if (result === "kept") toast("Нет связи. Голосовое отправлю, как появится");
+    onSent?.();
   };
 
   const onPointerDown = async (event: ReactPointerEvent<HTMLButtonElement>) => {

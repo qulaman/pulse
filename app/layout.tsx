@@ -5,6 +5,7 @@ import { AppUpdate } from "@/components/AppUpdate";
 import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
+import { MediaReplay } from "@/components/MediaReplay";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
@@ -56,6 +57,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* the phone knows whether it runs the server's build, and updates with one tap (D-115) */}
           <AppUpdate />
           <OutboxReplay />
+          {/* a voice message, a photo or a report with a photo kept without network goes by itself (D-130) */}
+          <MediaReplay />
           <MascotPower />
           {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}
           <SecretaryAlarmGate />

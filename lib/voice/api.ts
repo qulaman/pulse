@@ -136,6 +136,8 @@ export interface VoiceApi {
     ext: AudioExt;
     context: UploadContext;
     client_request_id: string;
+    /** The director's release, by the phone's clock (D-130): how long a kept phrase waited. */
+    recorded_at?: string;
   }): Promise<UploadUrlResponse>;
   uploadAudio(input: { signed_url: string; blob: Blob; mime: string }): Promise<void>;
   transcribe(input: TranscribeRequest): Promise<TranscribeResponse>;

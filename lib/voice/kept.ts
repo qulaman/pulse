@@ -55,6 +55,25 @@ export type KeptPhrase = {
   attempts: number;
 };
 
+/**
+ * How a phrase lies in IndexedDB: the recording as bytes, not a Blob. WebKit refuses a Blob in
+ * IndexedDB in an ephemeral session (Safari's private mode; measured with Playwright WebKit,
+ * 2026-09-30) and older iOS lost them — an ArrayBuffer goes everywhere.
+ */
+type StoredPhrase = Omit<KeptPhrase, "audio"> & { audio: { bytes: ArrayBuffer; mime: string; durationMs: number } | null };
+
+async function toStored(entry: KeptPhrase): Promise<StoredPhrase> {
+  if (!entry.audio) return { ...entry, audio: null };
+  const { blob, mime, durationMs } = entry.audio;
+  return { ...entry, audio: { bytes: await blob.arrayBuffer(), mime, durationMs } };
+}
+
+function fromStored(entry: StoredPhrase): KeptPhrase {
+  if (!entry.audio) return { ...entry, audio: null };
+  const { bytes, mime, durationMs } = entry.audio;
+  return { ...entry, audio: { blob: new Blob([bytes], { type: mime }), mime, durationMs } };
+}
+
 const DB_NAME = "pulse-voice";
 const DB_VERSION = 1;
 const PHRASES = "phrases";
@@ -124,23 +143,29 @@ function changed() {
 }
 
 /** Keep a new phrase on the phone. False — nothing was kept (no IndexedDB here). */
-export function keepPhrase(entry: KeptPhrase): Promise<boolean> {
+export async function keepPhrase(entry: KeptPhrase): Promise<boolean> {
+  let stored: StoredPhrase;
+  try {
+    stored = await toStored(entry);
+  } catch {
+    return false;
+  }
   return queued(async () => {
-    const { ok } = await run("readwrite", (store) => store.put(entry));
+    const { ok } = await run("readwrite", (store) => store.put(stored));
     if (ok) changed();
     return ok;
   });
 }
 
 /** One more step of the phrase; the phrase as it is now, or null when the phone has none. */
-export function patchPhrase(id: string, patch: Partial<Omit<KeptPhrase, "id" | "userId">>): Promise<KeptPhrase | null> {
+export function patchPhrase(id: string, patch: Partial<Omit<KeptPhrase, "id" | "userId" | "audio">>): Promise<KeptPhrase | null> {
   return queued(async () => {
-    const current = await run<KeptPhrase | undefined>("readonly", (store) => store.get(id));
+    const current = await run<StoredPhrase | undefined>("readonly", (store) => store.get(id));
     if (!current.value) return null;
-    const next: KeptPhrase = { ...current.value, ...patch, updatedAt: Date.now() };
+    const next: StoredPhrase = { ...current.value, ...patch, updatedAt: Date.now() };
     const { ok } = await run("readwrite", (store) => store.put(next));
     if (ok) changed();
-    return ok ? next : null;
+    return ok ? fromStored(next) : null;
   });
 }
 
@@ -155,8 +180,11 @@ export function dropPhrase(id: string): Promise<void> {
 /** What this director's phone still holds, oldest first. */
 export function listPhrases(userId: string): Promise<KeptPhrase[]> {
   return queued(async () => {
-    const { value } = await run<KeptPhrase[]>("readonly", (store) => store.getAll());
-    return (value ?? []).filter((entry) => entry.userId === userId).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    const { value } = await run<StoredPhrase[]>("readonly", (store) => store.getAll());
+    return (value ?? [])
+      .filter((entry) => entry.userId === userId)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+      .map(fromStored);
   });
 }
 
@@ -166,8 +194,8 @@ export function listPhrases(userId: string): Promise<KeptPhrase[]> {
  */
 export function countOnTheirWay(): Promise<number> {
   return queued(async () => {
-    const { value } = await run<KeptPhrase[]>("readonly", (store) => store.getAll());
-    return (value ?? []).filter((entry) => !isReady(entry) && !claimed.has(entry.id)).length;
+    const { value } = await run<StoredPhrase[]>("readonly", (store) => store.getAll());
+    return (value ?? []).filter((entry) => !isReady(fromStored(entry)) && !claimed.has(entry.id)).length;
   });
 }
 
