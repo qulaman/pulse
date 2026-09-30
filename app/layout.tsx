@@ -11,6 +11,7 @@ import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { loadBrand } from "@/lib/brand";
+import { QUIET_LOOPS } from "@/lib/design/quiet-loops";
 import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
@@ -47,6 +48,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       className={`${display.variable} ${body.variable}`}
       style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}
     >
+      <head>
+        {/* before React registers its listeners: nobody listens for loop boundaries, so the
+            compositor keeps every infinite animation off the main thread (lib/design/quiet-loops.ts) */}
+        <script dangerouslySetInnerHTML={{ __html: QUIET_LOOPS }} />
+      </head>
       <body className="min-h-dvh bg-bg text-text antialiased">
         {/* Chrome's install offer can come before hydration: kept for «Установить Pulse» (D-125) */}
         <script dangerouslySetInnerHTML={{ __html: INSTALL_CATCHER }} />
