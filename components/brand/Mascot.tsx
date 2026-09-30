@@ -1,5 +1,6 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
+import { Blend, EYE_BLEND, SETTLE_LEAD } from "@/components/brand/Blend";
 import { FADE_OUT, Linger } from "@/components/brand/Linger";
 import { SeasonWear } from "@/components/brand/MascotSeason";
 import type { MascotSeason } from "@/lib/mascot/season";
@@ -322,7 +323,7 @@ const BODY: Record<MascotState, string> = {
   angry: "mascot-angry 0.82s ease-in-out infinite",
   nervous: "mascot-nervous 1.35s ease-in-out infinite",
   bored: "mascot-bored 4.4s ease-in-out infinite",
-  panicking: "mascot-panic 0.48s ease-in-out infinite",
+  panicking: "mascot-panic 1.92s ease-in-out infinite",
   swearing: "mascot-swear 0.72s ease-in-out infinite",
   checking: "mascot-check 3.6s ease-in-out infinite",
   chatting: "mascot-chat 3.2s ease-in-out infinite",
@@ -374,7 +375,7 @@ const EYES: Record<MascotState, string> = {
   angry: "mascot-angry-look 0.82s ease-in-out infinite",
   nervous: "mascot-nervous-look 1.35s ease-in-out infinite",
   bored: "mascot-bored-look 4.4s ease-in-out infinite",
-  panicking: "mascot-panic-look 0.48s ease-in-out infinite",
+  panicking: "mascot-panic-look 1.92s ease-in-out infinite",
   swearing: "mascot-swear-look 0.72s ease-in-out infinite",
   checking: "mascot-check-look 3.6s infinite",
   chatting: "mascot-chat-look 3.2s infinite",
@@ -593,6 +594,21 @@ function CalendarPage() {
   );
 }
 
+/**
+ * A motion group of a face big enough to be watched carries its pose across a change (Blend): a state
+ * turned, an act started or cut, a look taken. An avatar has no mid-pose worth carrying and pays for
+ * no wrappers.
+ */
+function Carry({ on, k, origin, eyes = false, children }: { on: boolean; k: string; origin: string; eyes?: boolean; children: ReactNode }) {
+  return on ? (
+    <Blend k={k} origin={origin} timing={eyes ? EYE_BLEND : undefined} lead={k === SETTLE ? SETTLE_LEAD : undefined}>
+      {children}
+    </Blend>
+  ) : (
+    <>{children}</>
+  );
+}
+
 export function Mascot({
   state = "calm",
   size = 64,
@@ -680,6 +696,8 @@ export function Mascot({
   const onBoard = state === "checking";
   const penDown = onBoard && acting !== null && TAKES_HAND.has(acting);
   const actGaze = act ? ((onBoard ? ACT_GAZE_ON_BOARD[act] : undefined) ?? ACT_GAZE[act] ?? "none") : "none";
+  const actBody = act ? ACT_BODY[act] : "none";
+  const eyeLoop = gaze ? "none" : EYES[state];
   const actSmile = act === "smile" ? "mascot-act-smile 3.2s ease-in-out both" : act ? ACT_SMILE[act] : undefined;
   // the jumps of an act leave the ground too, and while they do the ground answers them
   // instead of the state's breath
@@ -792,72 +810,80 @@ export function Mascot({
       </Linger>
 
       {/* announcing: the words leave the bell of the megaphone in arcs, on the shout */}
-      {state === "announcing" && detailed ? (
-        <g transform={MEGAPHONE_AT} fill="none" stroke={TONE.ether} strokeWidth="1.7" strokeLinecap="round">
-          {[0, 1, 2].map((wave) => {
-            const h = 6 + wave * 2.6;
-            return (
-              <path
-                key={wave}
-                d={`M${20.5 + wave * 4.4} ${-h} a${h + 1} ${h + 1} 0 0 1 0 ${2 * h}`}
-                style={{
-                  transformBox: "fill-box",
-                  transformOrigin: "0% 50%",
-                  animation: `mascot-shout-wave 1.4s ease-out ${(0.46 + wave * 0.14).toFixed(2)}s infinite`,
-                  opacity: 0,
-                }}
-              />
-            );
-          })}
-        </g>
-      ) : null}
+      <Linger show={state === "announcing" && detailed} out={FADE_OUT}>
+        {state === "announcing" && detailed ? (
+          <g transform={MEGAPHONE_AT} fill="none" stroke={TONE.ether} strokeWidth="1.7" strokeLinecap="round">
+            {[0, 1, 2].map((wave) => {
+              const h = 6 + wave * 2.6;
+              return (
+                <path
+                  key={wave}
+                  d={`M${20.5 + wave * 4.4} ${-h} a${h + 1} ${h + 1} 0 0 1 0 ${2 * h}`}
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: "0% 50%",
+                    animation: `mascot-shout-wave 1.4s ease-out ${(0.46 + wave * 0.14).toFixed(2)}s infinite`,
+                    opacity: 0,
+                  }}
+                />
+              );
+            })}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* listening: sound waves come in from the right and land on the ear; tuned — the gold of
           Эфир, the word to everyone, coming in at an even pace (D-110) */}
-      {state === "listening" || state === "tuned" ? (
-        <g fill="none" stroke={state === "tuned" ? TONE.ether : COLOR.listening} strokeWidth="1.7" strokeLinecap="round">
-          {[0, 1, 2].map((wave) => (
-            <path
-              key={wave}
-              d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
-              style={{
-                transformOrigin: "62px 25px",
-                // an even pace: a duration that followed the voice restarted the waves
-                // mid-flight twenty times a second — they jittered instead of travelling (D-126)
-                animation: `mascot-wave-in ${state === "tuned" ? "1.6s" : "1.3s"} ease-out ${wave * 0.28}s infinite`,
-                opacity: 0,
-              }}
-            />
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "listening" || state === "tuned"} out={FADE_OUT}>
+        {state === "listening" || state === "tuned" ? (
+          <g fill="none" stroke={state === "tuned" ? TONE.ether : COLOR.listening} strokeWidth="1.7" strokeLinecap="round">
+            {[0, 1, 2].map((wave) => (
+              <path
+                key={wave}
+                d={`M${66 + wave * 5} ${17 - wave * 2.5} a${8 + wave * 4} ${8 + wave * 4} 0 0 1 0 ${16 + wave * 5}`}
+                style={{
+                  transformOrigin: "62px 25px",
+                  // an even pace: a duration that followed the voice restarted the waves
+                  // mid-flight twenty times a second — they jittered instead of travelling (D-126)
+                  animation: `mascot-wave-in ${state === "tuned" ? "1.6s" : "1.3s"} ease-out ${wave * 0.28}s infinite`,
+                  opacity: 0,
+                }}
+              />
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* thinking: three dots come and go above the head, like a message being typed */}
-      {state === "thinking" ? (
-        <g fill={COLOR.thinking}>
-          {[0, 1, 2].map((dot) => (
-            <circle
-              key={dot}
-              cx={44 + dot * 6}
-              cy={8 - dot * 2}
-              r={2 + dot * 0.4}
-              style={{
-                transformOrigin: `${44 + dot * 6}px ${8 - dot * 2}px`,
-                animation: `mascot-dot 2.6s ${dot * 0.22}s infinite`,
-                opacity: 0,
-              }}
-            />
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "thinking"} out={FADE_OUT}>
+        {state === "thinking" ? (
+          <g fill={COLOR.thinking}>
+            {[0, 1, 2].map((dot) => (
+              <circle
+                key={dot}
+                cx={44 + dot * 6}
+                cy={8 - dot * 2}
+                r={2 + dot * 0.4}
+                style={{
+                  transformOrigin: `${44 + dot * 6}px ${8 - dot * 2}px`,
+                  animation: `mascot-dot 2.6s ${dot * 0.22}s infinite`,
+                  opacity: 0,
+                }}
+              />
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* nervous and panicking: sweat flicks away from the head at different tempos */}
-      {anxious ? (
-        <g fill="var(--surface)" stroke={COLOR[state]} strokeWidth="1.25">
-          <path d="M54 17 C57 21 57 24 54 24 C51 24 51 21 54 17 Z" style={{ transformOrigin: "54px 21px", animation: `mascot-sweat ${state === "panicking" ? "0.48s" : "1.35s"} ease-out infinite` }} />
-          {state === "panicking" ? <path d="M9 25 C12 29 12 32 9 32 C6 32 6 29 9 25 Z" style={{ transformOrigin: "9px 29px", animation: "mascot-sweat 0.48s ease-out 0.18s infinite" }} /> : null}
-        </g>
-      ) : null}
+      <Linger show={anxious} out={FADE_OUT}>
+        {anxious ? (
+          <g fill="var(--surface)" stroke={COLOR[state]} strokeWidth="1.25">
+            <path d="M54 17 C57 21 57 24 54 24 C51 24 51 21 54 17 Z" style={{ transformOrigin: "54px 21px", animation: `mascot-sweat ${state === "panicking" ? "1.92s" : "5.4s"} ease-out infinite` }} />
+            {state === "panicking" ? <path d="M9 25 C12 29 12 32 9 32 C6 32 6 29 9 25 Z" style={{ transformOrigin: "9px 29px", animation: "mascot-sweat 1.92s ease-out 0.18s infinite" }} /> : null}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* swearing: the cloud keeps the reaction expressive without putting words in the UI */}
       {state === "swearing" ? (
@@ -869,68 +895,74 @@ export function Mascot({
       ) : null}
 
       {/* saving: a note sinks into the head and is gone — tucked away safely */}
-      {state === "saving" ? (
-        <g style={{ transformOrigin: "32px -2px", animation: "mascot-tuck-note 1.4s ease-in-out infinite", opacity: 0 }}>
-          <rect x="24" y="-9" width="16" height="12" rx="2.5" fill="var(--surface)" stroke={COLOR.saving} strokeWidth="1.5" />
-          <path d="M27 -4.5h10M27 -1.5h6" stroke={COLOR.saving} strokeWidth="1.3" strokeLinecap="round" />
-        </g>
-      ) : null}
+      <Linger show={state === "saving"} out={FADE_OUT}>
+        {state === "saving" ? (
+          <g style={{ transformOrigin: "32px -2px", animation: "mascot-tuck-note 1.4s ease-in-out infinite", opacity: 0 }}>
+            <rect x="24" y="-9" width="16" height="12" rx="2.5" fill="var(--surface)" stroke={COLOR.saving} strokeWidth="1.5" />
+            <path d="M27 -4.5h10M27 -1.5h6" stroke={COLOR.saving} strokeWidth="1.3" strokeLinecap="round" />
+          </g>
+        ) : null}
+      </Linger>
 
       {/* transcribing: bars of sound turn, one after another, into lines of text */}
-      {state === "transcribing" ? (
-        <g fill={COLOR.transcribing}>
-          {/* the voice: four bars that breathe, then go quiet */}
-          {[0, 1, 2, 3].map((bar) => (
-            <rect
-              key={`bar-${bar}`}
-              x={-9 + bar * 4}
-              y={22 - [4, 7, 5, 3][bar]!}
-              width="2.2"
-              height={[8, 14, 10, 6][bar]}
-              rx="1.1"
-              style={{
-                transformOrigin: `${-8 + bar * 4}px 22px`,
-                animation: `mascot-bar-fade 2.4s ease-in-out ${bar * 0.12}s infinite`,
-              }}
-            />
-          ))}
-          {/* the words: three lines type in on the right, one under another */}
-          {[0, 1, 2].map((line) => (
-            <rect
-              key={`line-${line}`}
-              x="65"
-              y={15 + line * 5.5}
-              width={[13, 9, 11][line]}
-              height="2.4"
-              rx="1.2"
-              style={{
-                transformOrigin: "65px 16px",
-                animation: `mascot-line-type 2.4s ease-out ${0.7 + line * 0.3}s infinite`,
-                opacity: 0,
-              }}
-            />
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "transcribing"} out={FADE_OUT}>
+        {state === "transcribing" ? (
+          <g fill={COLOR.transcribing}>
+            {/* the voice: four bars that breathe, then go quiet */}
+            {[0, 1, 2, 3].map((bar) => (
+              <rect
+                key={`bar-${bar}`}
+                x={-9 + bar * 4}
+                y={22 - [4, 7, 5, 3][bar]!}
+                width="2.2"
+                height={[8, 14, 10, 6][bar]}
+                rx="1.1"
+                style={{
+                  transformOrigin: `${-8 + bar * 4}px 22px`,
+                  animation: `mascot-bar-fade 2.4s ease-in-out ${bar * 0.12}s infinite`,
+                }}
+              />
+            ))}
+            {/* the words: three lines type in on the right, one under another */}
+            {[0, 1, 2].map((line) => (
+              <rect
+                key={`line-${line}`}
+                x="65"
+                y={15 + line * 5.5}
+                width={[13, 9, 11][line]}
+                height="2.4"
+                rx="1.2"
+                style={{
+                  transformOrigin: "65px 16px",
+                  animation: `mascot-line-type 2.4s ease-out ${0.7 + line * 0.3}s infinite`,
+                  opacity: 0,
+                }}
+              />
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* parsing: cards appear over the head one by one and slide into a stack on the right */}
-      {state === "parsing" ? (
-        <g>
-          {[0, 1, 2].map((card) => (
-            <g
-              key={card}
-              style={{
-                transformOrigin: `${20 + card * 14}px -4px`,
-                animation: `mascot-sort-card 2.4s ease-in-out ${card * 0.3}s infinite`,
-                opacity: 0,
-              }}
-            >
-              <rect x={12 + card * 14} y="-9" width="13" height="10" rx="2.5" fill="var(--surface)" stroke={COLOR.parsing} strokeWidth="1.4" />
-              <path d={`M${15 + card * 14} -5h7M${15 + card * 14} -2h4`} stroke={COLOR.parsing} strokeWidth="1.1" strokeLinecap="round" />
-            </g>
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "parsing"} out={FADE_OUT}>
+        {state === "parsing" ? (
+          <g>
+            {[0, 1, 2].map((card) => (
+              <g
+                key={card}
+                style={{
+                  transformOrigin: `${20 + card * 14}px -4px`,
+                  animation: `mascot-sort-card 2.4s ease-in-out ${card * 0.3}s infinite`,
+                  opacity: 0,
+                }}
+              >
+                <rect x={12 + card * 14} y="-9" width="13" height="10" rx="2.5" fill="var(--surface)" stroke={COLOR.parsing} strokeWidth="1.4" />
+                <path d={`M${15 + card * 14} -5h7M${15 + card * 14} -2h4`} stroke={COLOR.parsing} strokeWidth="1.1" strokeLinecap="round" />
+              </g>
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* offering: the parsed cards wait in hand — a ring ripples out of the blob and the
           stack lifts every time it pops back, so the face itself says «tap me» */}
@@ -961,16 +993,18 @@ export function Mascot({
 
 
       {/* sleeping: two small z-s drift up from the head, one after the other */}
-      {asleep ? (
-        <g fill="var(--text-muted)" fontFamily="var(--font-display), system-ui, sans-serif" fontWeight="700">
-          <text x="50" y="12" fontSize="8" style={{ transformOrigin: "52px 12px", animation: "mascot-zzz 3.5s ease-out infinite", opacity: 0 }}>
-            z
-          </text>
-          <text x="56" y="4" fontSize="6" style={{ transformOrigin: "58px 4px", animation: "mascot-zzz 3.5s ease-out 1.75s infinite", opacity: 0 }}>
-            z
-          </text>
-        </g>
-      ) : null}
+      <Linger show={asleep} out={FADE_OUT}>
+        {asleep ? (
+          <g fill="var(--text-muted)" fontFamily="var(--font-display), system-ui, sans-serif" fontWeight="700">
+            <text x="50" y="12" fontSize="8" style={{ transformOrigin: "52px 12px", animation: "mascot-zzz 3.5s ease-out infinite", opacity: 0 }}>
+              z
+            </text>
+            <text x="56" y="4" fontSize="6" style={{ transformOrigin: "58px 4px", animation: "mascot-zzz 3.5s ease-out 1.75s infinite", opacity: 0 }}>
+              z
+            </text>
+          </g>
+        ) : null}
+      </Linger>
 
       {/* processing: the store the assistant plugs into, and the data crossing into the head */}
       {reading ? (
@@ -994,19 +1028,21 @@ export function Mascot({
       ) : null}
 
       {/* happy: two sparks pop beside the blob in turn */}
-      {state === "happy" ? (
-        <g fill={COLOR.happy}>
-          {/* clear of the body: drawn behind it, a spark half inside it read as a pointed ear */}
-          <path
-            d="M1 10 L2.6 14.4 L7 16 L2.6 17.6 L1 22 L-0.6 17.6 L-5 16 L-0.6 14.4 Z"
-            style={{ transformOrigin: "1px 16px", animation: "mascot-spark 3.8s infinite", opacity: 0 }}
-          />
-          <path
-            d="M56 6 L57.2 9.2 L60.4 10.4 L57.2 11.6 L56 14.8 L54.8 11.6 L51.6 10.4 L54.8 9.2 Z"
-            style={{ transformOrigin: "56px 10.4px", animation: "mascot-spark 3.8s 1.9s infinite", opacity: 0 }}
-          />
-        </g>
-      ) : null}
+      <Linger show={state === "happy"} out={FADE_OUT}>
+        {state === "happy" ? (
+          <g fill={COLOR.happy}>
+            {/* clear of the body: drawn behind it, a spark half inside it read as a pointed ear */}
+            <path
+              d="M1 10 L2.6 14.4 L7 16 L2.6 17.6 L1 22 L-0.6 17.6 L-5 16 L-0.6 14.4 Z"
+              style={{ transformOrigin: "1px 16px", animation: "mascot-spark 3.8s infinite", opacity: 0 }}
+            />
+            <path
+              d="M56 6 L57.2 9.2 L60.4 10.4 L57.2 11.6 L56 14.8 L54.8 11.6 L51.6 10.4 L54.8 9.2 Z"
+              style={{ transformOrigin: "56px 10.4px", animation: "mascot-spark 3.8s 1.9s infinite", opacity: 0 }}
+            />
+          </g>
+        ) : null}
+      </Linger>
 
       {/* the wind-up of a throw: the card in the hand behind the head, only its top over the crown
           — `sending`, and the employee's «Сдал» (under the body, so the head hides the rest) */}
@@ -1032,11 +1068,15 @@ export function Mascot({
       >
         {/* the lean towards whoever the face is looking at (D-84) — a transition, not a loop */}
         <g data-gaze={gaze ? "on" : undefined} style={{ transformOrigin: "32px 60px", transform: lean, transition: LOOK_EASE }}>
-        {/* act: a one-shot over whatever the state is doing — the yawn, the roll, the hop (D-82) */}
-        <g style={{ transformOrigin: "32px 58px", animation: act ? ACT_BODY[act] : "none" }}>
-          {/* pose: one-shot on entry */}
+        {/* act: a one-shot over whatever the state is doing — the yawn, the roll, the hop (D-82); an
+            act cut short (the face got busy) goes back to rest from where it was, not in one frame */}
+        <Carry on={detailed} k={actBody} origin="32px 58px">
+        <g style={{ transformOrigin: "32px 58px", animation: actBody }}>
+          {/* pose: one-shot on entry — it starts from the pose the last state left (the lean to the ear) */}
+          <Carry on={detailed} k={POSE[state]} origin="32px 52px">
           <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
-            {/* loop: the body's own motion */}
+            {/* loop: the body's own motion — taken over from wherever the last loop was */}
+            <Carry on={detailed} k={BODY[state]} origin="32px 44px">
             <g style={{ transformOrigin: "32px 44px", animation: BODY[state] }}>
               {/* calling: the new order over the head — a card with a «!» badge (D-110), the bare «!»
                   at avatar size. It rides the body, so it goes up with every hop instead of hanging
@@ -1233,28 +1273,35 @@ export function Mascot({
 
               <g style={{ transform: gazeShift, transition: LOOK_EASE }}>
               <g style={{ transformOrigin: "32px 33px", animation: DRAG[state] ?? "none" }}>
-                <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: gaze ? "none" : EYES[state] }}>
+                {/* the state's own look; off for a held look — the eyes leave it quickly, not in one frame */}
+                <Carry on={detailed} k={eyeLoop} origin="32px 33px" eyes>
+                <g fill="var(--bg)" style={{ transformOrigin: "32px 33px", animation: eyeLoop }}>
                   {/* where an act sends the gaze, over the state's own look */}
-                  <g style={{ transformOrigin: "32px 33px", animation: actGaze }}>
+                  <Carry on={detailed} k={actGaze} origin="32px 33px" eyes>
+                  <g data-front style={{ transformOrigin: "32px 33px", animation: actGaze }}>
                     {/* The eye keeps one geometry and changes shape by transform: animating rx/ry
                         would re-run layout and paint of the SVG on every frame of the change. */}
                     <g key={`l-${gazeKey}`} style={{ transformOrigin: "24px 33px", animation: gazeBlink }}>
                     <g style={{ transformOrigin: "24px 33px", animation: blink }}>
+                      <Carry on={detailed} k={lids?.[0] ?? "none"} origin="24px 33px" eyes>
                       <g style={{ transformOrigin: "24px 33px", animation: lids?.[0] ?? "none" }}>
                         <g style={{ transformOrigin: "24px 33px", transform: eyeShape, transition: "transform 120ms var(--ease-out)" }}>
                           <ellipse cx="24" cy="33" rx={EYE_RX} ry={EYE_RY} style={{ animation: reading ? "mascot-eye-return 1.9s both" : undefined }} />
                         </g>
                       </g>
+                      </Carry>
                     </g>
                     </g>
                     {/* both lids on one animation, no offset: a face blinks with both eyes at once */}
                     <g key={`r-${gazeKey}`} style={{ transformOrigin: "40px 33px", animation: gazeBlink }}>
                     <g style={{ transformOrigin: "40px 33px", animation: blink }}>
+                      <Carry on={detailed} k={lids?.[1] ?? "none"} origin="40px 33px" eyes>
                       <g style={{ transformOrigin: "40px 33px", animation: lids?.[1] ?? "none" }}>
                         <g style={{ transformOrigin: "40px 33px", transform: eyeShape, transition: "transform 120ms var(--ease-out)" }}>
                           <ellipse cx="40" cy="33" rx={EYE_RX} ry={EYE_RY} style={{ animation: reading ? "mascot-eye-return 1.9s both" : undefined }} />
                         </g>
                       </g>
+                      </Carry>
                     </g>
                     </g>
                     {reading ? (
@@ -1353,12 +1400,17 @@ export function Mascot({
                       <ellipse cx="32" cy="46" rx="2.2" ry="2.6" style={{ transformOrigin: "32px 46px", animation: "mascot-act-phew 1.8s ease-in-out both" }} />
                     ) : null}
                   </g>
+                  </Carry>
                 </g>
+                </Carry>
               </g>
               </g>
             </g>
+            </Carry>
           </g>
+          </Carry>
         </g>
+        </Carry>
         </g>
       </g>
 
@@ -1396,45 +1448,49 @@ export function Mascot({
       ) : null}
 
       {/* serving: steam off the cup, two curls in turn, over the body */}
-      {state === "serving" && detailed ? (
-        <g fill="none" stroke="var(--text-muted)" strokeWidth="1.4" strokeLinecap="round">
-          {[49.5, 55].map((x, curl) => (
-            <path
-              key={x}
-              d={`M${x} 44 c-2.2 -2.6 2.2 -4.2 0 -6.8 c-2.2 -2.6 2.2 -4.2 0 -6.8`}
-              style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: `mascot-steam 2.4s ease-out ${(0.4 + curl * 1.2).toFixed(1)}s infinite`, opacity: 0 }}
-            />
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "serving" && detailed} out={FADE_OUT}>
+        {state === "serving" && detailed ? (
+          <g fill="none" stroke="var(--text-muted)" strokeWidth="1.4" strokeLinecap="round">
+            {[49.5, 55].map((x, curl) => (
+              <path
+                key={x}
+                d={`M${x} 44 c-2.2 -2.6 2.2 -4.2 0 -6.8 c-2.2 -2.6 2.2 -4.2 0 -6.8`}
+                style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: `mascot-steam 2.4s ease-out ${(0.4 + curl * 1.2).toFixed(1)}s infinite`, opacity: 0 }}
+              />
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* celebrating: the confetti goes up off the crown, opens out and falls */}
-      {state === "celebrating" && detailed ? (
-        <g data-confetti>
-          {CONFETTI.map((bit, index) => (
-            <rect
-              key={index}
-              x="31"
-              y="4"
-              width={bit.round ? 2.4 : 3}
-              height={bit.round ? 2.4 : 1.8}
-              rx={bit.round ? 1.2 : 0.4}
-              fill={bit.color}
-              style={
-                {
-                  "--cx": `${bit.x}px`,
-                  "--cy": `${bit.y}px`,
-                  "--cr": `${bit.r}deg`,
-                  transformBox: "fill-box",
-                  transformOrigin: "50% 50%",
-                  animation: `mascot-confetti 2.6s cubic-bezier(0.15, 0.7, 0.3, 1) ${(0.12 + (index % 3) * 0.05).toFixed(2)}s infinite`,
-                  opacity: 0,
-                } as CSSProperties
-              }
-            />
-          ))}
-        </g>
-      ) : null}
+      <Linger show={state === "celebrating" && detailed} out={FADE_OUT}>
+        {state === "celebrating" && detailed ? (
+          <g data-confetti>
+            {CONFETTI.map((bit, index) => (
+              <rect
+                key={index}
+                x="31"
+                y="4"
+                width={bit.round ? 2.4 : 3}
+                height={bit.round ? 2.4 : 1.8}
+                rx={bit.round ? 1.2 : 0.4}
+                fill={bit.color}
+                style={
+                  {
+                    "--cx": `${bit.x}px`,
+                    "--cy": `${bit.y}px`,
+                    "--cr": `${bit.r}deg`,
+                    transformBox: "fill-box",
+                    transformOrigin: "50% 50%",
+                    animation: `mascot-confetti 2.6s cubic-bezier(0.15, 0.7, 0.3, 1) ${(0.12 + (index % 3) * 0.05).toFixed(2)}s infinite`,
+                    opacity: 0,
+                  } as CSSProperties
+                }
+              />
+            ))}
+          </g>
+        ) : null}
+      </Linger>
 
       {/* snore: a bubble swells at the mouth with the breath out and pops */}
       {acting === "snore" ? (

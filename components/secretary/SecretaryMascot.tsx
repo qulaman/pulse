@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { Blend, EYE_BLEND, SETTLE_LEAD } from "@/components/brand/Blend";
 import { FADE_OUT, Linger } from "@/components/brand/Linger";
 import { SeasonWear } from "@/components/brand/MascotSeason";
 import type { MascotSeason } from "@/lib/mascot/season";
@@ -262,6 +263,7 @@ export function SecretaryMascot({
           : "scale(1, 1)";
   const blink = glad || asleep ? "none" : "mascot-blink 9.2s infinite";
   const lids = act ? ACT_LIDS[act] : undefined;
+  const settle = asked ? "mascot-settle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both" : "none";
 
   const body = talking
     ? "mascot-talk 1.1s ease-in-out infinite"
@@ -282,7 +284,7 @@ export function SecretaryMascot({
                 ? "smc-walk 0.52s ease-in-out 3"
                 : reading
                   ? "none"
-                  : "smc-type 0.84s ease-in-out infinite"
+                  : "smc-type 3.36s ease-in-out infinite"
               : IDLE;
   // the outer motion: an act moves the whole body; the finish carries the job out and back
   // (the director's desk walks its small secretary over to the big face instead — SecretaryDesk)
@@ -367,18 +369,22 @@ export function SecretaryMascot({
         </g>
       ) : null}
 
-      {/* the body: every motion rides these groups, the props in hand ride with them */}
+      {/* the body: every motion rides these groups, the props in hand ride with them; a motion cut by
+          a new phase (a hop in the air when the request is taken) is carried back to rest, not snapped */}
+      <Blend k={detailed ? outer : ""} origin="32px 58px">
       <g style={{ transformOrigin: "32px 58px", animation: outer }}>
+        <Blend k={detailed ? settle : ""} origin="32px 52px" lead={SETTLE_LEAD}>
         <g
           style={{
             transformOrigin: "32px 52px",
             // dozing: the head sinks towards the desk and tips over
             transform: asleep ? "translateY(2.4px) rotate(7deg)" : undefined,
             transition: "transform 600ms var(--ease-out)",
-            animation: asked ? "mascot-settle 0.22s cubic-bezier(0.16, 1, 0.3, 1) both" : "none",
+            animation: settle,
           }}
         >
-          <g key={`${bare ? "bare" : phase}-${job ?? ""}-${asleep ? "z" : ""}`} style={{ transformOrigin: "32px 44px", animation: body }}>
+          <Blend k={detailed ? body : ""} origin="32px 44px">
+          <g style={{ transformOrigin: "32px 44px", animation: body }}>
             {/* arms, drawn before the body so the body covers their roots */}
             {show("coffee") && room ? (
               <g style={{ animation: "smc-press 2.6s ease-in-out infinite" }}>
@@ -415,7 +421,9 @@ export function SecretaryMascot({
             ) : null}
 
             <path d="M32 4 C47 4 59 16 59 31 C59 47 47 60 32 60 C17 60 5 49 5 33 C5 18 17 4 32 4 Z" fill={SECRETARY_TONE} />
-            <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" opacity="0.14" />
+            {/* the tints of a still drawing are fill-opacity, here and in the room: «уменьшить движение»
+                sets opacity 1 on everything around the body (globals.css) and made this gleam a white patch */}
+            <ellipse cx="24" cy="18" rx="9" ry="5" fill="#ffffff" fillOpacity="0.14" />
 
             {/* the bow tie: the receptionist's sign, under the chin */}
             <g fill={GEAR}>
@@ -436,7 +444,7 @@ export function SecretaryMascot({
             {season && detailed && !alarm ? <SeasonWear season={season} /> : null}
 
             {glad ? (
-              <g fill="#ffffff" opacity="0.22">
+              <g fill="#ffffff" fillOpacity="0.22">
                 <ellipse cx="16" cy="41" rx="4" ry="2" />
                 <ellipse cx="48" cy="41" rx="4" ry="2" />
               </g>
@@ -444,6 +452,7 @@ export function SecretaryMascot({
 
             {/* the eyes: one geometry, reshaped and moved by transform only */}
             <g style={{ transform: `translate(${base.x}px, ${base.y}px)`, transition: LOOK_EASE }}>
+              <Blend k={detailed ? eyeLoop : ""} origin="32px 33px" timing={EYE_BLEND}>
               <g style={{ transformOrigin: "32px 33px", animation: eyeLoop }}>
                 <g fill="var(--bg)">
                   {[24, 40].map((cx) => (
@@ -462,6 +471,7 @@ export function SecretaryMascot({
                   ))}
                 </g>
               </g>
+              </Blend>
             </g>
 
             <Mouth talking={talking || job === "doctor" || job === "taxi" || job === "security"} asked={asked} alarm={alarm} glad={glad} job={job} rest={rest && !asleep} yawn={stretching} />
@@ -481,8 +491,11 @@ export function SecretaryMascot({
               </g>
             ) : null}
           </g>
+          </Blend>
         </g>
+        </Blend>
       </g>
+      </Blend>
 
       {/* rest: the desk in front, the hands on the keys */}
       <Linger show={room && rest} out={FADE_OUT}>

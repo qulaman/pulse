@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
+import { Blend } from "@/components/brand/Blend";
 import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { Glyph, Mitten, SECRETARY_TONE } from "@/components/secretary/secretaryRoom";
 import { untilLine, type DeskPhase, type DeskScene, type Urgency } from "@/lib/errands/scene";
@@ -151,6 +152,19 @@ export function SecretaryDesk({
   const deep = useDeepRest();
   const season = useMascotSeason();
   const frozen = deep && phase === "rest" && !attending && !move && !nodding;
+  // walking out or in; typing; the small hop of turning round to the big face; or, after «Готово»,
+  // the walk over to the big face with the job in hand and back (D-97)
+  const motion = move
+    ? `${move === "leave" ? "smc-desk-leave" : "smc-desk-arrive"} ${MOVE_MS}ms ease-in-out both`
+    : nodding
+      ? `smc-desk-nod ${NOD_MS}ms ease-in-out both`
+      : attending
+        ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
+        : handing
+          ? "smc-handoff 2.2s ease-in-out both"
+          : working
+            ? "none"
+            : "sec-type 3.8s ease-in-out infinite";
   return (
     <button
       type="button"
@@ -207,7 +221,7 @@ export function SecretaryDesk({
             stroke="var(--text-muted)"
             strokeWidth="1.1"
             strokeLinecap="round"
-            style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: `sec-steam 2.4s ease-out ${puff * 1.2}s infinite`, opacity: 0 }}
+            style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: `sec-steam 4.8s ease-out ${puff * 1.2}s infinite`, opacity: 0 }}
           />
         ))}
 
@@ -271,10 +285,10 @@ export function SecretaryDesk({
                 stroke="var(--accent)"
                 strokeWidth="2"
                 strokeLinecap="round"
-                style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `sec-line 2.8s ease-out ${line.d}s infinite` }}
+                style={{ transformBox: "fill-box", transformOrigin: "0% 50%", animation: `sec-line 5.6s ease-out ${line.d}s infinite` }}
               />
             ))}
-            <rect x="74" y="34" width="2" height="4" rx="0.6" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
+            <rect x="74" y="34" width="2" height="4" rx="0.6" fill="var(--accent)" style={{ animation: "sec-cursor 3.6s steps(1) infinite" }} />
           </>
         )}
         </g>
@@ -322,25 +336,9 @@ export function SecretaryDesk({
             transition: "transform 600ms cubic-bezier(0.34, 1.2, 0.64, 1)",
           }}
         >
-          <span
-            className="block"
-            style={{
-              transformOrigin: "50% 100%",
-              // walking out or in; typing; the small hop of turning round to the big face; or,
-              // after «Готово», the walk over to the big face with the job in hand and back (D-97)
-              animation: move
-                ? `${move === "leave" ? "smc-desk-leave" : "smc-desk-arrive"} ${MOVE_MS}ms ease-in-out both`
-                : nodding
-                  ? `smc-desk-nod ${NOD_MS}ms ease-in-out both`
-                  : attending
-                    ? "sec-turn 380ms cubic-bezier(0.34, 1.5, 0.64, 1) both"
-                    : handing
-                      ? "smc-handoff 2.2s ease-in-out both"
-                      : working
-                        ? "none"
-                        : "sec-type 0.95s ease-in-out infinite",
-            }}
-          >
+          {/* a turn from one of these to another starts from where the last one left the body */}
+          <Blend k={motion} origin="50% 100%" html>
+          <span className="block" style={{ transformOrigin: "50% 100%", animation: motion }}>
             <SecretaryMascot
               mini
               season={season}
@@ -362,6 +360,7 @@ export function SecretaryDesk({
               }
             />
           </span>
+          </Blend>
         </span>
         {asking ? (
           // a question waits for the director's answer: «?» over the small head
@@ -390,14 +389,14 @@ export function SecretaryDesk({
         ))}
         {/* the key being pressed: one light hopping over the keys, not four pulsing ones — the same
             typing for a quarter of the frames it cost */}
-        {typing ? <rect x="39" y="49.6" width="3" height="1.8" rx="0.5" fill="var(--accent)" style={{ animation: "sec-key-hop-desk 0.95s steps(1) infinite" }} /> : null}
+        {typing ? <rect x="39" y="49.6" width="3" height="1.8" rx="0.5" fill="var(--accent)" style={{ animation: "sec-key-hop-desk 3.8s steps(1) infinite" }} /> : null}
         {/* the small secretary's hands on the keys, tapping in turn */}
         <g style={{ opacity: typing ? 1 : 0, transition: FADE }} data-testid="desk-hands">
           {[
             { cx: 41, d: "0s" },
             { cx: 49, d: "0.24s" },
           ].map((hand) => (
-            <Mitten key={hand.cx} cx={hand.cx} cy={49.2} rx={2.4} ry={1.8} style={{ animation: typing ? `smc-tap 0.48s ease-in-out ${hand.d} infinite` : "none" }} />
+            <Mitten key={hand.cx} cx={hand.cx} cy={49.2} rx={2.4} ry={1.8} style={{ animation: typing ? `smc-tap 1.92s ease-in-out ${hand.d} infinite` : "none" }} />
           ))}
         </g>
       </svg>

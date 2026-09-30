@@ -85,15 +85,15 @@ export function RoomBack({ daypart, clockAct, still = false }: { daypart: Daypar
         </g>
       ) : daypart === "evening" ? (
         <g>
-          <circle cx="74" cy="15" r="5" fill="var(--warn)" opacity="0.9" />
+          <circle cx="74" cy="15" r="5" fill="var(--warn)" fillOpacity="0.9" />
           <rect x="62.6" y="15" width="22.8" height="2.4" fill={sky} />
         </g>
       ) : (
         <g>
           <circle cx={daypart === "morning" ? 68 : 79} cy={daypart === "morning" ? 13 : 3.5} r="3.6" fill="var(--gold)" />
           <g style={{ animation: still ? "none" : "smc-cloud 9s ease-in-out infinite" }}>
-            <ellipse cx="71" cy="7" rx="4" ry="1.8" fill="#ffffff" opacity="0.55" />
-            <ellipse cx="73.5" cy="5.8" rx="2.6" ry="1.8" fill="#ffffff" opacity="0.55" />
+            <ellipse cx="71" cy="7" rx="4" ry="1.8" fill="#ffffff" fillOpacity="0.55" />
+            <ellipse cx="73.5" cy="5.8" rx="2.6" ry="1.8" fill="#ffffff" fillOpacity="0.55" />
           </g>
         </g>
       )}
@@ -163,7 +163,7 @@ export function RoomFront({ act, asleep, still = false }: { act: string | null; 
       <g style={{ transformOrigin: "-1.65px 45.5px", animation: act === "sip" ? "smc-sip 2.6s ease-in-out both" : "none" }}>
         <path d="M-7 41 H1.5 V47.4 A2.6 2.6 0 0 1 -1.1 50 H-4.4 A2.6 2.6 0 0 1 -7 47.4 Z" fill="var(--surface)" stroke={EDGE} strokeWidth="1.1" />
         <path d="M1.5 42.6 a2.2 2.2 0 0 1 0 4.4" fill="none" stroke={EDGE} strokeWidth="1.1" />
-        <rect x="-5.8" y="43.4" width="6" height="2" rx="1" fill="var(--accent-2)" opacity="0.8" />
+        <rect x="-5.8" y="43.4" width="6" height="2" rx="1" fill="var(--accent-2)" fillOpacity="0.8" />
         {act === "sip" ? (
           <Mitten cx={3.2} cy={45.2} rx={3.5} ry={2.6} style={{ animation: "smc-held-sip 2.6s linear both", opacity: 0 }} />
         ) : still ? null : (
@@ -190,10 +190,10 @@ export function RoomFront({ act, asleep, still = false }: { act: string | null; 
               stroke="var(--accent)"
               strokeWidth="1.7"
               strokeLinecap="round"
-              style={{ ...box("0% 50%", `sec-line 2.8s ease-out ${line.d}s infinite`), animationPlayState: typing ? "running" : "paused" }}
+              style={{ ...box("0% 50%", `sec-line 5.6s ease-out ${line.d}s infinite`), animationPlayState: typing ? "running" : "paused" }}
             />
           ))}
-          <rect x="68" y="36.4" width="1.7" height="3.4" rx="0.5" fill="var(--accent)" style={{ animation: "sec-cursor 0.9s steps(1) infinite" }} />
+          <rect x="68" y="36.4" width="1.7" height="3.4" rx="0.5" fill="var(--accent)" style={{ animation: "sec-cursor 3.6s steps(1) infinite" }} />
         </g>
       )}
 
@@ -202,11 +202,11 @@ export function RoomFront({ act, asleep, still = false }: { act: string | null; 
       {asleep ? null : (
         <>
           {[0, 1, 2, 3, 4].map((key) => (
-            <rect key={key} x={19.6 + key * 5.4} y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" opacity="0.3" />
+            <rect key={key} x={19.6 + key * 5.4} y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" fillOpacity="0.3" />
           ))}
           {/* the key being pressed: one light hopping from key to key (steps, so it repaints once a
               hop), not five pulsing — the pulses were a third of the whole desk's cost */}
-          {typing ? <rect x="19.6" y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" style={{ animation: "sec-key-hop 0.84s steps(1) infinite" }} /> : null}
+          {typing ? <rect x="19.6" y="47.4" width="3.2" height="1.5" rx="0.4" fill="var(--accent)" style={{ animation: "sec-key-hop 3.36s steps(1) infinite" }} /> : null}
         </>
       )}
     </g>
@@ -249,7 +249,7 @@ export function TypingHands({ asleep, act = null, still = false }: { asleep: boo
           cy={47.2}
           rx={3.5}
           ry={2.6}
-          style={{ animation: busy ? busy[i] : asleep || still || act ? "none" : `smc-tap 0.42s ease-in-out ${hand.d} infinite` }}
+          style={{ animation: busy ? busy[i] : asleep || still || act ? "none" : `smc-tap 1.68s ease-in-out ${hand.d} infinite` }}
         />
       ))}
     </g>
@@ -265,7 +265,7 @@ export function CoffeeMachine() {
       <rect x="-27" y="18" width="22" height="9" rx="3.5" fill="var(--surface-2)" stroke={EDGE} strokeWidth="1.3" />
       <circle cx="-16" cy="22.5" r="1.5" fill={EDGE} />
       <circle cx="-10" cy="22.5" r="1.6" fill="var(--ok)" style={{ animation: "smc-light 1.3s steps(1) infinite" }} />
-      <rect x="-24" y="30.5" width="16" height="22" rx="2" fill="var(--bg)" opacity="0.55" />
+      <rect x="-24" y="30.5" width="16" height="22" rx="2" fill="var(--bg)" fillOpacity="0.55" />
       <rect x="-18" y="30.5" width="4" height="3" rx="1" fill={EDGE} />
       <rect x="-16.6" y="33.5" width="1.2" height="12.5" fill={COFFEE} style={box("50% 0%", "smc-stream 2.6s ease-in-out infinite")} />
       <path d="M-21 46 H-11 V49.6 A3.6 3.6 0 0 1 -14.6 53.2 H-17.4 A3.6 3.6 0 0 1 -21 49.6 Z" fill="var(--surface)" stroke="var(--text-muted)" strokeWidth="1.1" />
@@ -322,7 +322,7 @@ export function Pourer({ kind }: { kind: "teapot" | "carafe" }) {
               {/* a glass carafe: a round belly, a narrow neck, water inside */}
               <path d="M-19 -5.5 L-14 -3.4" stroke="var(--text-muted)" strokeWidth="1.8" strokeLinecap="round" />
               <path d="M-13.5 -7 H-6.5 V-3 C-1.5 -1.5 -1 7 -6 8 H-14 C-19 7 -18.5 -1.5 -13.5 -3 Z" fill="color-mix(in srgb, var(--surface) 60%, transparent)" stroke="var(--text-muted)" strokeWidth="1.1" />
-              <path d="M-17.4 2 C-17 5.8 -15.4 7 -14 7 H-6 C-4.6 7 -3 5.8 -2.6 2 Z" fill={WATER} opacity="0.85" />
+              <path d="M-17.4 2 C-17 5.8 -15.4 7 -14 7 H-6 C-4.6 7 -3 5.8 -2.6 2 Z" fill={WATER} fillOpacity="0.85" />
               <path d="M-2 -3 Q1.6 -0.6 -2.4 3" fill="none" stroke="var(--text-muted)" strokeWidth="1.4" />
             </>
           )}
@@ -378,12 +378,12 @@ export function Siren() {
   return (
     <g>
       <g style={{ transformOrigin: "32px 0px", animation: "smc-spin 0.9s linear infinite" }}>
-        <path d="M32 0 L12 -9 L12 -3 Z" fill="var(--danger)" opacity="0.4" />
-        <path d="M32 0 L52 9 L52 3 Z" fill="var(--danger)" opacity="0.4" />
+        <path d="M32 0 L12 -9 L12 -3 Z" fill="var(--danger)" fillOpacity="0.4" />
+        <path d="M32 0 L52 9 L52 3 Z" fill="var(--danger)" fillOpacity="0.4" />
       </g>
       <rect x="25.5" y="0.6" width="13" height="3.4" rx="1.2" fill={GEAR} />
       <path d="M27.4 1 Q27.4 -6.4 32 -6.4 Q36.6 -6.4 36.6 1 Z" fill="var(--danger)" style={{ animation: "smc-light 0.5s steps(1) infinite" }} />
-      <ellipse cx="30.4" cy="-3" rx="1.1" ry="1.7" fill="#ffffff" opacity="0.6" />
+      <ellipse cx="30.4" cy="-3" rx="1.1" ry="1.7" fill="#ffffff" fillOpacity="0.6" />
     </g>
   );
 }
@@ -505,7 +505,7 @@ export function MeetingTable() {
       <rect x="-28" y="44" width="8" height="2" rx="0.5" fill="var(--surface)" stroke={EDGE} strokeWidth="0.6" />
       <g style={{ animation: "smc-place 2.6s ease-in-out infinite" }}>
         <path d="M-15 39.5 H-9.4 L-10 46 H-14.4 Z" fill="color-mix(in srgb, var(--surface) 60%, transparent)" stroke="var(--text-muted)" strokeWidth="0.8" />
-        <rect x="-14.4" y="42" width="4.4" height="3.6" fill={WATER} opacity="0.8" />
+        <rect x="-14.4" y="42" width="4.4" height="3.6" fill={WATER} fillOpacity="0.8" />
       </g>
     </g>
   );
@@ -538,7 +538,7 @@ export function Carried({ scene }: { scene: DeskScene }) {
       return (
         <g style={box("50% 100%", "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both")}>
           <path d="M45 42 H56 L55 55 H46 Z" fill="color-mix(in srgb, var(--surface) 60%, transparent)" stroke="var(--text-muted)" strokeWidth="1.1" />
-          <path d="M45.6 47 H55.4 L55 55 H46 Z" fill={WATER} opacity="0.85" />
+          <path d="M45.6 47 H55.4 L55 55 H46 Z" fill={WATER} fillOpacity="0.85" />
           <Mitten cx={50.5} cy={56.6} rx={4} ry={2.6} />
         </g>
       );
@@ -548,7 +548,7 @@ export function Carried({ scene }: { scene: DeskScene }) {
           <path d="M45.5 37 Q50.5 31 55.5 37" fill="none" stroke={KRAFT} strokeWidth="1.4" />
           <path d="M43 37 H58 L59.5 56 H41.5 Z" fill={KRAFT} />
           <path d="M43 40 H58" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" />
-          <circle cx="50.5" cy="47" r="3.2" fill="var(--surface)" opacity="0.85" />
+          <circle cx="50.5" cy="47" r="3.2" fill="var(--surface)" fillOpacity="0.85" />
           <path d="M49 47 l1.2 1.2 l2.2 -2.4" fill="none" stroke="var(--ok)" strokeWidth="0.9" strokeLinecap="round" />
           <Mitten cx={50.5} cy={36.6} rx={3} ry={2.4} />
         </g>
@@ -557,7 +557,7 @@ export function Carried({ scene }: { scene: DeskScene }) {
       return (
         <g style={box("50% 100%", "mascot-prop-in 0.4s cubic-bezier(0.34, 1.4, 0.64, 1) both")}>
           <rect x="40" y="41" width="22" height="18" rx="1.6" fill={KRAFT} />
-          <rect x="49.4" y="41" width="3.2" height="18" fill="color-mix(in srgb, var(--gold) 40%, var(--surface))" opacity="0.8" />
+          <rect x="49.4" y="41" width="3.2" height="18" fill="color-mix(in srgb, var(--gold) 40%, var(--surface))" fillOpacity="0.8" />
           <path d="M42.5 45 h4 M42.5 47.2 h3" stroke="var(--bg)" strokeOpacity="0.4" strokeWidth="0.7" />
           <Mitten cx={38.6} cy={51} rx={2.6} ry={3.4} />
           <Mitten cx={63.4} cy={51} rx={2.6} ry={3.4} />

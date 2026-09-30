@@ -749,19 +749,21 @@ h1 { letter-spacing: -0.025em; }
   100% { transform: translate(0, 1px); }
 }
 @keyframes mascot-panic-pose { from { transform: scale(1); } to { transform: scale(1.08, 0.92); } }
+/* four shakes per cycle (see sec-type) */
 @keyframes mascot-panic {
-  0% { transform: translate(0, 0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
-  25% { transform: translate(-2px, 1px) rotate(-3deg) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
-  50% { transform: translate(2.2px, -1px) rotate(3deg) scale(0.94, 1.07); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
-  75% { transform: translate(-1.4px, 0.7px) rotate(-2deg) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  0%, 25%, 50%, 75% { transform: translate(0, 0) rotate(0deg) scale(1); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  6.25%, 31.25%, 56.25%, 81.25% { transform: translate(-2px, 1px) rotate(-3deg) scale(1.07, 0.93); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: translate(2.2px, -1px) rotate(3deg) scale(0.94, 1.07); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
+  18.75%, 43.75%, 68.75%, 93.75% { transform: translate(-1.4px, 0.7px) rotate(-2deg) scale(1.04, 0.96); animation-timing-function: cubic-bezier(0.25, 0, 0.15, 1); }
   100% { transform: translate(0, 0) rotate(0deg) scale(1); }
 }
 /* panicking - nothing to hold on to: every look is cut short by the next one */
+/* four darts per cycle (see sec-type) */
 @keyframes mascot-panic-look {
-  0% { transform: translate(0, -1px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
-  22%, 30% { transform: translate(-2.4px, -2px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
-  52%, 62% { transform: translate(2.4px, -1.5px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
-  80%, 86% { transform: translate(-1.2px, -2.2px); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
+  0%, 25%, 50%, 75% { transform: translate(0, -1px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  5.5%, 7.5%, 30.5%, 32.5%, 55.5%, 57.5%, 80.5%, 82.5% { transform: translate(-2.4px, -2px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  13%, 15.5%, 38%, 40.5%, 63%, 65.5%, 88%, 90.5% { transform: translate(2.4px, -1.5px); animation-timing-function: cubic-bezier(0.15, 0, 0.05, 1); }
+  20%, 21.5%, 45%, 46.5%, 70%, 71.5%, 95%, 96.5% { transform: translate(-1.2px, -2.2px); animation-timing-function: cubic-bezier(0.2, 0, 0.1, 1); }
   100% { transform: translate(0, -1px); }
 }
 @keyframes mascot-swear {
@@ -776,11 +778,12 @@ h1 { letter-spacing: -0.025em; }
   30%, 48% { transform: translate(1.2px, 1.7px); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
   100% { transform: translate(0, 1px); }
 }
+/* four drops per cycle (see sec-type) */
 @keyframes mascot-sweat {
-  0% { transform: translate(0, -2px) scale(0.55); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
-  28% { transform: translate(0, 0) scale(1.05); opacity: 1; animation-timing-function: linear; }
-  44% { transform: translate(-0.2px, 0.6px) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.5); }
-  100% { transform: translate(-1px, 8px) scale(0.8); opacity: 0; }
+  0%, 25%, 50%, 75% { transform: translate(0, -2px) scale(0.55); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1); }
+  7%, 32%, 57%, 82% { transform: translate(0, 0) scale(1.05); opacity: 1; animation-timing-function: linear; }
+  11%, 36%, 61%, 86% { transform: translate(-0.2px, 0.6px) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.45, 0, 0.9, 0.5); }
+  24.999%, 49.999%, 74.999%, 100% { transform: translate(-1px, 8px) scale(0.8); opacity: 0; }
 }
 /* swearing - the cloud shakes on the same beat as the body, and never quite settles */
 @keyframes mascot-swear-cloud {
@@ -2702,9 +2705,10 @@ button, a[href] { -webkit-tap-highlight-color: transparent; }
     animation: none !important;
     opacity: 1 !important;
   }
-  /* the one prop with no readable still frame: confetti at rest is a heap on the crown */
-  .mascot > g[data-confetti],
-  .mascot > g[data-confetti] * {
+  /* the one prop with no readable still frame: confetti at rest is a heap on the crown (it sits in
+     the Linger that fades it out, so not a direct child) */
+  .mascot g[data-confetti],
+  .mascot g[data-confetti] * {
     opacity: 0 !important;
   }
   /* a copy that only exists in motion (the card behind the head on the wind-up) is no still frame;
@@ -3152,48 +3156,46 @@ html[data-tabbar="away"] .above-tabbar { translate: 0 var(--tabbar-space); trans
 /* The secretary at the desk (D-85): the small face types, the lines run on the screen, the
    cursor blinks, steam rises off the mug. Transform and opacity only; all of it stops the
    moment the secretary turns to the director's face. */
+/* four turns per cycle, the same motion: every loop boundary wakes the main thread (React listens for animationiteration), so a fast loop is written out four times */
 @keyframes sec-type {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  22% { transform: translateY(-1.4px) rotate(1.4deg); }
-  44% { transform: translateY(0) rotate(0deg); }
-  66% { transform: translateY(-0.9px) rotate(-0.8deg); }
+  0%, 11%, 25%, 36%, 50%, 61%, 75%, 86%, 100% { transform: translateY(0) rotate(0deg); }
+  5.5%, 30.5%, 55.5%, 80.5% { transform: translateY(-1.4px) rotate(1.4deg); }
+  16.5%, 41.5%, 66.5%, 91.5% { transform: translateY(-0.9px) rotate(-0.8deg); }
 }
+/* two turns per cycle, the same motion (see sec-type) */
 @keyframes sec-line {
-  0% { transform: scaleX(0); opacity: 1; }
-  28%, 86% { transform: scaleX(1); opacity: 1; }
-  100% { transform: scaleX(1); opacity: 0; }
+  0%, 50% { transform: scaleX(0); opacity: 1; }
+  14%, 43%, 64%, 93% { transform: scaleX(1); opacity: 1; }
+  49.999%, 100% { transform: scaleX(1); opacity: 0; }
 }
+/* four blinks per cycle (see sec-type) */
 @keyframes sec-cursor {
-  0%, 49% { opacity: 1; }
-  50%, 100% { opacity: 0; }
+  0%, 12.25%, 25%, 37.25%, 50%, 62.25%, 75%, 87.25% { opacity: 1; }
+  12.5%, 24.999%, 37.5%, 49.999%, 62.5%, 74.999%, 87.5%, 100% { opacity: 0; }
 }
 /* the key being pressed: one light hops from key to key in a typist's order (steps(1): it jumps,
    so the desk repaints once a hop, not every frame) — the secretary's room keys, 5.4 apart */
+/* four runs per cycle (see sec-type) */
 @keyframes sec-key-hop {
-  0% { transform: translateX(0); }
-  12.5% { transform: translateX(16.2px); }
-  25% { transform: translateX(5.4px); }
-  37.5% { transform: translateX(21.6px); }
-  50% { transform: translateX(10.8px); }
-  62.5% { transform: translateX(0); }
-  75% { transform: translateX(21.6px); }
-  87.5%, 100% { transform: translateX(5.4px); }
+  0%, 15.625%, 25%, 40.625%, 50%, 65.625%, 75%, 90.625% { transform: translateX(0); }
+  3.125%, 28.125%, 53.125%, 78.125% { transform: translateX(16.2px); }
+  6.25%, 21.875%, 24.999%, 31.25%, 46.875%, 49.999%, 56.25%, 71.875%, 74.999%, 81.25%, 96.875%, 100% { transform: translateX(5.4px); }
+  9.375%, 18.75%, 34.375%, 43.75%, 59.375%, 68.75%, 84.375%, 93.75% { transform: translateX(21.6px); }
+  12.5%, 37.5%, 62.5%, 87.5% { transform: translateX(10.8px); }
 }
 /* the same on the director's desk, whose four keys are 5 apart */
+/* four runs per cycle (see sec-type) */
 @keyframes sec-key-hop-desk {
-  0% { transform: translateX(0); }
-  12.5% { transform: translateX(10px); }
-  25% { transform: translateX(5px); }
-  37.5% { transform: translateX(15px); }
-  50% { transform: translateX(0); }
-  62.5% { transform: translateX(15px); }
-  75% { transform: translateX(5px); }
-  87.5%, 100% { transform: translateX(10px); }
+  0%, 12.5%, 25%, 37.5%, 50%, 62.5%, 75%, 87.5% { transform: translateX(0); }
+  3.125%, 21.875%, 24.999%, 28.125%, 46.875%, 49.999%, 53.125%, 71.875%, 74.999%, 78.125%, 96.875%, 100% { transform: translateX(10px); }
+  6.25%, 18.75%, 31.25%, 43.75%, 56.25%, 68.75%, 81.25%, 93.75% { transform: translateX(5px); }
+  9.375%, 15.625%, 34.375%, 40.625%, 59.375%, 65.625%, 84.375%, 90.625% { transform: translateX(15px); }
 }
+/* two turns per cycle, the same motion (see sec-type) */
 @keyframes sec-steam {
-  0% { transform: translateY(0) scaleY(0.8); opacity: 0; }
-  30% { opacity: 0.75; }
-  100% { transform: translateY(-9px) scaleY(1.15); opacity: 0; }
+  0%, 50% { transform: translateY(0) scaleY(0.8); opacity: 0; }
+  15%, 65% { opacity: 0.75; }
+  49.999%, 100% { transform: translateY(-9px) scaleY(1.15); opacity: 0; }
 }
 @keyframes sec-turn {
   0% { transform: translateY(0); }
