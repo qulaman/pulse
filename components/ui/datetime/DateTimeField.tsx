@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { Clock } from "@/components/ui/datetime/Clock";
 import { CalendarIcon, ClockIcon, PickerPanel, PickerTrigger, useDismiss } from "@/components/ui/datetime/PickerShell";
+import { useGlidingState } from "@/components/ui/motion";
 import { aqtobeIsoToYmdHm, compactYmd, todayYmd, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
 
 type Props = {
@@ -23,8 +24,9 @@ type Props = {
  * is a thumb's worth of wrong day.
  */
 export function DateTimeField({ value, onChange, defaultHm = "18:00", minYmd, now }: Props) {
-  const [open, setOpen] = useState<"day" | "time" | null>(null);
-  const box = useDismiss(open !== null, () => setOpen(null));
+  const box = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useGlidingState<"day" | "time" | null>(null, box);
+  useDismiss(open !== null, () => setOpen(null), box);
 
   const parts = aqtobeIsoToYmdHm(value);
   const ymd = parts?.ymd ?? null;

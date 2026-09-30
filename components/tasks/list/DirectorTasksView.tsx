@@ -29,7 +29,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { DirectorTaskCard } from "./DirectorTaskCard";
 import { PeopleStrip } from "./PeopleStrip";
 import { StatusScreen } from "./StatusScreen";
-import { Tabs } from "./Tabs";
+import { TabColumnBox, Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
 import { useDirectorControls } from "./useDirectorControls";
 
@@ -226,7 +226,7 @@ export function DirectorTasksView({
         ) : null}
       </Tabs>
 
-      <div key={`${current}|${personId ?? ""}`} className="card-in mt-1">
+      <TabColumnBox columnKey={`${current}|${personId ?? ""}`}>
         <TaskColumn
           sections={sections}
           empty={empty}
@@ -246,7 +246,7 @@ export function DirectorTasksView({
             />
           )}
         />
-      </div>
+      </TabColumnBox>
 
       {current === "closed" && moreClosed ? (
         <div className="mt-4 flex justify-center">

@@ -8,9 +8,10 @@ import { useEffect, useRef, type ReactNode, type RefObject } from "react";
  * time) can share one full-width panel instead of squeezing a calendar into half a row.
  */
 
-/** Closes on a tap outside or Escape, the way every other surface here does. */
-export function useDismiss(open: boolean, onClose: () => void): RefObject<HTMLDivElement | null> {
-  const box = useRef<HTMLDivElement>(null);
+/** Closes on a tap outside or Escape, the way every other surface here does. `ref` — a box the field already holds. */
+export function useDismiss(open: boolean, onClose: () => void, ref?: RefObject<HTMLDivElement | null>): RefObject<HTMLDivElement | null> {
+  const own = useRef<HTMLDivElement>(null);
+  const box = ref ?? own;
 
   useEffect(() => {
     if (!open) return;
@@ -27,7 +28,7 @@ export function useDismiss(open: boolean, onClose: () => void): RefObject<HTMLDi
       document.removeEventListener("pointerdown", away, true);
       document.removeEventListener("keydown", escape);
     };
-  }, [open, onClose]);
+  }, [open, onClose, box]);
 
   return box;
 }
@@ -71,7 +72,8 @@ export function PickerTrigger({ open, onClick, label, placeholder, value, icon }
  * `@container` so the grids inside can thin out when the panel is half a row wide, and a
  * nudge into view on open: the panel appears in flow, and near the bottom of a page it
  * would open under the tab bar and the microphone. The scroll margin is what keeps it
- * clear of both.
+ * clear of both. It fades in dropping from under its field (`picker-in`); what stands
+ * below glides to make room — the field's state is `useGlidingState` on its box.
  */
 export function PickerPanel({ children }: { children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
@@ -92,7 +94,7 @@ export function PickerPanel({ children }: { children: ReactNode }) {
     <div
       ref={panel}
       style={{ scrollMarginBottom: `${BOTTOM_CHROME_PX}px` }}
-      className="@container mt-2 rounded-[12px] border border-border bg-surface p-2"
+      className="picker-in @container mt-2 rounded-[12px] border border-border bg-surface p-2"
     >
       {children}
     </div>

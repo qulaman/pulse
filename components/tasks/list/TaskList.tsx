@@ -1,8 +1,8 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "framer-motion";
+import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion, MotionConfig } from "framer-motion";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
@@ -224,6 +224,12 @@ export function CardShell({
   /** Extra `data-*` of the head button — what a test or a screen needs to find it by. */
   headData?: Record<`data-${string}`, string>;
 }) {
+  // The body stays out of the column's layout group: leaving it, a node that has faded out
+  // would dirty every card (the group's remove, then its forceRender) — a second measuring
+  // pass over the whole column for something already out of the flow. It moves with its card.
+  const { id: groupId } = useContext(LayoutGroupContext);
+  const quiet = useMemo(() => ({ id: groupId }), [groupId]);
+
   return (
     <motion.article
       layout
@@ -247,18 +253,26 @@ export function CardShell({
           {head}
         </button>
       </motion.div>
-      {open ? (
-        <motion.div
-          layout="position"
-          transition={CARD_SPRING}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.06 } }}
-          data-testid="task-body"
-        >
-          <div className="mx-3.5 border-t border-border/60" />
-          <div className="px-3.5 pb-3.5 pt-3">{children}</div>
-        </motion.div>
-      ) : null}
+      {/* Closing, the body leaves the flow at once (popLayout) and fades inside the shrinking
+          card, which clips it — never an empty, still-tall box around the head */}
+      <LayoutGroupContext.Provider value={quiet}>
+        <AnimatePresence initial={false} mode="popLayout">
+          {open ? (
+            <motion.div
+              key="body"
+              layout="position"
+              transition={CARD_SPRING}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1, transition: { duration: 0.2, delay: 0.06 } }}
+              exit={{ opacity: 0, transition: { duration: 0.14 } }}
+              data-testid="task-body"
+            >
+              <div className="mx-3.5 border-t border-border/60" />
+              <div className="px-3.5 pb-3.5 pt-3">{children}</div>
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </LayoutGroupContext.Provider>
     </motion.article>
   );
 }

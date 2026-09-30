@@ -1,12 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 
 import { AnswerSheet } from "@/components/tasks/desk/AnswerSheet";
 import { DirectorSheets, type DirectorSheetName, type PassTo } from "@/components/tasks/desk/DirectorSheets";
 import { Icon } from "@/components/tasks/desk/icons";
-import { Sheet } from "@/components/ui/Sheet";
+import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
@@ -174,15 +174,27 @@ export function useDirectorControls({
     toast(named("Ответ ушёл", task));
   };
 
-  const sheetTask = sheet ? byId(sheet.taskId) : null;
-  const question = sheetTask ? questionOf(sheetTask.id) : null;
+  // the task the sheets were last opened for: they stay mounted while they slide away (as in
+  // useEmployeeControls) — unmounted with the state, a closing sheet vanished in one frame.
+  // Each opening from nothing gets fresh sheets, so a word left in one never meets the next.
+  const [heldId, setHeldId] = useState<string | null>(null);
+  const [opening, setOpening] = useState({ n: 0, up: false });
+  if (sheet && sheet.taskId !== heldId) setHeldId(sheet.taskId);
+  if (Boolean(sheet) !== opening.up) setOpening({ n: opening.n + (sheet ? 1 : 0), up: Boolean(sheet) });
+  const sheetId = sheet?.taskId ?? heldId;
+  const sheetTask = sheetId ? byId(sheetId) : null;
+  // answered, the question is gone from the data at once: the sheet keeps its words while it slides away
+  const liveQuestion = sheetTask ? questionOf(sheetTask.id) : null;
+  const [heldQuestion, setHeldQuestion] = useState<string | null>(null);
+  if (liveQuestion && liveQuestion !== heldQuestion) setHeldQuestion(liveQuestion);
+  const question = liveQuestion ?? heldQuestion;
   const flags = sheetTask
     ? { request: Boolean(requestOf(sheetTask.id)), suggestion: Boolean(sheetTask.status === "declined" && suggestionOf(sheetTask.id)) }
     : {};
   const choices: DeskAction[] = sheetTask ? [...allActionsFor(sheetTask, flags), ...(onThread ? (["open"] as const) : [])] : [];
 
   const sheets = sheetTask ? (
-    <>
+    <Fragment key={opening.n}>
       <DirectorSheets
         task={sheetTask}
         open={sheet && sheet.name !== "answer" && sheet.name !== "more" ? sheet.name : null}
@@ -195,7 +207,7 @@ export function useDirectorControls({
           const taskId = sheetTask.id;
           // the picker leaves first, «Срок для …» slides in after it
           setSheet(null);
-          setTimeout(() => setSheet({ name: "passDeadline", taskId, passTo }), 170);
+          setTimeout(() => setSheet({ name: "passDeadline", taskId, passTo }), SHEET_CLOSE_MS);
         }}
       />
       {question ? (
@@ -229,7 +241,7 @@ export function useDirectorControls({
                   setSheet(null);
                   // the next sheet slides in after this one has gone
                   const instant = action === "approve" || action === "insist" || action === "open" || action === "grant" || action === "keep" || action === "nudge" || action === "sendNow";
-                  setTimeout(() => press(action, sheetTask), instant ? 0 : 170);
+                  setTimeout(() => press(action, sheetTask), instant ? 0 : SHEET_CLOSE_MS);
                 }}
                 className={`flex min-h-[52px] items-center gap-3 rounded-[14px] px-3 text-left text-[16px] font-medium transition-colors duration-[120ms] active:bg-surface-2 ${
                   danger ? "text-danger" : "text-text"
@@ -250,7 +262,7 @@ export function useDirectorControls({
           })}
         </div>
       </Sheet>
-    </>
+    </Fragment>
   ) : null;
 
   return { actions, press, answer, more: (task) => setSheet({ name: "more", taskId: task.id }), sheets };

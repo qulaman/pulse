@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { CalendarIcon, PickerPanel, PickerTrigger, useDismiss } from "@/components/ui/datetime/PickerShell";
+import { useGlidingState } from "@/components/ui/motion";
 import { compactYmd, humanYmd, type Ymd } from "@/lib/datetime/calendar";
 
 type Props = {
@@ -20,8 +21,9 @@ type Props = {
 
 /** A day, chosen from our own calendar. The panel closes on the pick — a day is one tap. */
 export function DateField({ value, onChange, min, max, label = "Дата", placeholder = "Выбрать дату", compact = false, now }: Props) {
-  const [open, setOpen] = useState(false);
-  const box = useDismiss(open, () => setOpen(false));
+  const box = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useGlidingState(false, box);
+  useDismiss(open, () => setOpen(false), box);
 
   return (
     <div ref={box}>

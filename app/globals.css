@@ -20,7 +20,12 @@
   --t-screen: 150ms;
   --t-effect: 400ms;
   --t-tv: 500ms;
+  /* a bottom sheet travels its own height from the screen's edge (Sheet.tsx) — 150 ms of
+     `--t-screen` is a blink over that distance; it leaves on ¾ of this, accelerating */
+  --t-sheet: 280ms;
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  /* the way out: whatever leaves the screen gathers speed instead of settling */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   --radius-card: 16px;
@@ -2583,13 +2588,14 @@ h1 { letter-spacing: -0.025em; }
   46% { opacity: 1; }
   100% { transform: translate(60%, -96px) rotate(14deg) scale(0.7); opacity: 0; }
 }
+/* the whole sheet comes up from the bottom edge and goes back down there (Sheet.tsx) */
 @keyframes sheet-up {
-  from { transform: translateY(24px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 @keyframes sheet-down {
-  from { transform: translateY(0); opacity: 1; }
-  to { transform: translateY(24px); opacity: 0; }
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
 }
 @keyframes overlay-in {
   from { opacity: 0; }
@@ -2603,6 +2609,11 @@ h1 { letter-spacing: -0.025em; }
   from { opacity: 0; transform: translateY(-8px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
+/* the way back up, where it came from (Toast.tsx drops it when this ends) */
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
 @keyframes shimmer {
   0% { opacity: 0.55; }
   50% { opacity: 1; }
@@ -2612,6 +2623,14 @@ h1 { letter-spacing: -0.025em; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* a date or time panel opening under its field (components/ui/datetime) */
+@keyframes picker-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* a beat late: the fields below glide out of its way first (useGlidingState), and a panel
+   fading in under them would read through their gaps */
+.picker-in { animation: picker-in 180ms var(--ease-out) 70ms both; }
 
 /* A screen does not fade in: the route skeleton, the page without its data and the page with
    it are separate <main>s, and each one rising from 0 was a blink between two pictures of the

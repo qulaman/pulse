@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+
+import { fromNextFrame } from "@/components/ui/motion";
 
 type Props = {
   open: boolean;
@@ -10,14 +12,29 @@ type Props = {
   children: ReactNode;
 };
 
-const OPEN_MS = 180;
-const CLOSE_MS = 150;
+/** `--t-sheet`: the whole sheet travels up from the bottom edge; it leaves in three quarters of that. */
+const OPEN_MS = 280;
+const CLOSE_MS = 210;
+/** A sheet that follows another waits this long: the first one is gone before the next comes up. */
+export const SHEET_CLOSE_MS = CLOSE_MS;
+/** If the slide never reports its end (a hidden tab runs no animations), this is when it counts as done. */
+const GRACE_MS = 600;
+
+/** The first `data-autofocus` field, once per opening (the slide's end or the grace timer, whichever comes first). */
+function focusFirstField(dialog: HTMLElement | null, done: { current: boolean }) {
+  if (done.current) return;
+  done.current = true;
+  dialog?.querySelector<HTMLElement>("[data-autofocus]")?.focus({ preventScroll: true });
+}
 
 /**
  * Bottom sheet: overlay token, 20px top corners, safe-area padding (docs/DESIGN.md §2).
- * Nothing behind it moves: the page is locked while the sheet is up, the sheet slides
- * out instead of vanishing, and the first `data-autofocus` field gets focus only after
- * the slide — a keyboard that pops mid-animation drags the whole viewport.
+ * Nothing behind it moves: the page is locked while the sheet is up, the sheet slides in
+ * from the bottom edge and back down instead of vanishing, and the first `data-autofocus`
+ * field gets focus only after the slide — a keyboard that pops mid-animation drags the
+ * whole viewport. Both ends of the slide are its own `animationend`, not a timer: on a
+ * busy phone the closing render alone can outlast a timer, and the sheet would vanish
+ * before its first frame down.
  */
 export function Sheet({ open, onClose, title, children }: Props) {
   // stays mounted through the closing slide, then unmounts
@@ -25,10 +42,19 @@ export function Sheet({ open, onClose, title, children }: Props) {
   if (open && !mounted) setMounted(true);
   const phase: "closed" | "open" | "closing" = !mounted ? "closed" : open ? "open" : "closing";
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLButtonElement>(null);
+  const focused = useRef(false);
+
+  // the render that opens (or closes) a sheet is often the heaviest of the tap: the slide
+  // starts from the first frame drawn after it, not from the frame clock it left behind
+  useLayoutEffect(() => {
+    if (phase === "closed") return;
+    for (const node of [overlayRef.current, dialogRef.current]) node?.getAnimations().forEach(fromNextFrame);
+  }, [phase]);
 
   useEffect(() => {
     if (open) return;
-    const timer = setTimeout(() => setMounted(false), CLOSE_MS);
+    const timer = setTimeout(() => setMounted(false), CLOSE_MS + GRACE_MS);
     return () => clearTimeout(timer);
   }, [open]);
 
@@ -50,10 +76,8 @@ export function Sheet({ open, onClose, title, children }: Props) {
 
   useEffect(() => {
     if (phase !== "open") return;
-    const timer = setTimeout(() => {
-      const field = dialogRef.current?.querySelector<HTMLElement>("[data-autofocus]");
-      field?.focus({ preventScroll: true });
-    }, OPEN_MS);
+    focused.current = false;
+    const timer = setTimeout(() => focusFirstField(dialogRef.current, focused), OPEN_MS + GRACE_MS);
     return () => clearTimeout(timer);
   }, [phase]);
 
@@ -68,13 +92,14 @@ export function Sheet({ open, onClose, title, children }: Props) {
       style={{ touchAction: "none", pointerEvents: closing ? "none" : "auto" }}
     >
       <button
+        ref={overlayRef}
         type="button"
         aria-label="Закрыть"
         className="absolute inset-0 h-full w-full"
         style={{
           background: "var(--overlay)",
           animation: closing
-            ? `overlay-out ${CLOSE_MS}ms var(--ease-out) both`
+            ? `overlay-out ${CLOSE_MS}ms var(--ease-in) both`
             : `overlay-in ${OPEN_MS}ms var(--ease-out) both`,
         }}
         onClick={onClose}
@@ -91,8 +116,13 @@ export function Sheet({ open, onClose, title, children }: Props) {
           paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
           boxShadow: "var(--shadow-raised)",
           animation: closing
-            ? `sheet-down ${CLOSE_MS}ms var(--ease-out) both`
+            ? `sheet-down ${CLOSE_MS}ms var(--ease-in) both`
             : `sheet-up ${OPEN_MS}ms var(--ease-out) both`,
+        }}
+        onAnimationEnd={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.animationName === "sheet-down") setMounted(false);
+          else if (event.animationName === "sheet-up") focusFirstField(dialogRef.current, focused);
         }}
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />

@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { AskSheet, CantSheet, ReportSheet } from "@/components/tasks/TaskSheets";
+import { SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import { NOT_MINE, requestToast } from "@/lib/tasks/lifecycle";
@@ -85,7 +86,7 @@ export function useEmployeeControls({
             // the sheet leaves first, the picker slides in after it (as «Все действия» does)
             const taskId = sheetTask.id;
             setSheet(null);
-            setTimeout(() => open({ name: "pass", taskId, words }), 170);
+            setTimeout(() => open({ name: "pass", taskId, words }), SHEET_CLOSE_MS);
           }}
         />
       ) : null}

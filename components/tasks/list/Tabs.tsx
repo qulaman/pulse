@@ -108,3 +108,21 @@ export function Tabs<K extends string>({
     </>
   );
 }
+
+/**
+ * The column under the tabs, remounted per tab (its `card-in` plays again, its paging starts
+ * over) inside a box that stays. The steady box is load-bearing: React removes a parent's
+ * deleted children before it walks that parent's other children, so a column keyed straight
+ * under the page is already gone when the tab thumb (framer `layoutId`) measures itself on
+ * unmount — for that read the page is one screen tall, Chrome clamps the scroll to the top,
+ * and the thumb flies in from there. Inside this box the old column leaves after the tabs.
+ */
+export function TabColumnBox({ columnKey, className = "mt-1", children }: { columnKey: string; className?: string; children: ReactNode }) {
+  return (
+    <div className={className}>
+      <div key={columnKey} className="card-in">
+        {children}
+      </div>
+    </div>
+  );
+}

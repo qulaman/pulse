@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef } from "react";
 
 import { Clock } from "@/components/ui/datetime/Clock";
 import { ClockIcon, PickerPanel, PickerTrigger, useDismiss } from "@/components/ui/datetime/PickerShell";
+import { useGlidingState } from "@/components/ui/motion";
 import { parseHm, type Hm } from "@/lib/datetime/calendar";
 
 type Props = {
@@ -19,8 +20,9 @@ type Props = {
  * usually the next tap — and the minute closes it, which makes «:00» the confirm.
  */
 export function TimeField({ value, onChange, step, label = "Время", placeholder = "Выбрать время" }: Props) {
-  const [open, setOpen] = useState(false);
-  const box = useDismiss(open, () => setOpen(false));
+  const box = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useGlidingState(false, box);
+  useDismiss(open, () => setOpen(false), box);
   const before = parseHm(value);
 
   return (

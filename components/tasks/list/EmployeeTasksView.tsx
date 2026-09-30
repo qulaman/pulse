@@ -15,7 +15,7 @@ import { TEXT } from "@/lib/tasks/status-text";
 
 import { EmployeeTaskCard } from "./EmployeeTaskCard";
 import { StatusScreen } from "./StatusScreen";
-import { Tabs } from "./Tabs";
+import { TabColumnBox, Tabs } from "./Tabs";
 import { TaskColumn, useAccordion, useRevealOpen } from "./TaskList";
 import { useEmployeeControls } from "./useEmployeeControls";
 
@@ -101,7 +101,7 @@ export function EmployeeTasksView({
         ]}
       />
 
-      <div key={current} className="card-in mt-1">
+      <TabColumnBox columnKey={current}>
         <TaskColumn
           sections={sections}
           empty={<EmptyState tab={current} nothingAtAll={all.length === 0} working={piles.working.length} onWorking={() => setTab("working")} />}
@@ -117,7 +117,7 @@ export function EmployeeTasksView({
             />
           )}
         />
-      </div>
+      </TabColumnBox>
 
       {sheets}
     </main>

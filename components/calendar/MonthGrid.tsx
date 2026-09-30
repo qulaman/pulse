@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { useRef } from "react";
 
+import { useGlideOn } from "@/components/ui/motion";
 import { shiftDay } from "@/lib/calendar/agenda";
 import {
   compareYmd,
@@ -68,6 +69,14 @@ function weekCells(selected: Ymd): Cell[][] {
 export function MonthGrid({ nav, today, marks, now }: Props) {
   const reduce = useReducedMotion();
   const touch = useRef<{ x: number; y: number } | null>(null);
+  const box = useRef<HTMLElement>(null);
+  // folding changes the grid by five rows: the list under it glides that way instead of jumping
+  const markFold = useGlideOn(box, nav.mode);
+  const fold = (mode: "week" | "month") => {
+    if (mode === nav.mode) return;
+    markFold();
+    nav.setMode(mode);
+  };
   const folded = nav.mode === "week";
   const rows = folded ? weekCells(nav.selected) : monthCells(nav.month);
   const title = monthTitleRu(folded ? { year: parseYmd(nav.selected)!.year, month: parseYmd(nav.selected)!.month } : nav.month);
@@ -76,6 +85,7 @@ export function MonthGrid({ nav, today, marks, now }: Props) {
 
   return (
     <section
+      ref={box}
       aria-label={folded ? "Неделя" : "Месяц"}
       data-testid="month-grid"
       data-mode={nav.mode}
@@ -94,7 +104,7 @@ export function MonthGrid({ nav, today, marks, now }: Props) {
         const dy = t.clientY - from.y;
         if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.5) nav.step(dx < 0 ? 1 : -1);
         // folding follows the finger: up folds to the week, down opens the month
-        else if (Math.abs(dy) > SWIPE_PX && Math.abs(dy) > Math.abs(dx) * 1.5) nav.setMode(dy < 0 ? "week" : "month");
+        else if (Math.abs(dy) > SWIPE_PX && Math.abs(dy) > Math.abs(dx) * 1.5) fold(dy < 0 ? "week" : "month");
       }}
     >
       <div className="flex items-center justify-between pl-2.5">
@@ -148,7 +158,7 @@ export function MonthGrid({ nav, today, marks, now }: Props) {
         data-testid="grid-fold"
         aria-label={folded ? "Показать месяц" : "Свернуть до недели"}
         aria-expanded={!folded}
-        onClick={() => nav.setMode(folded ? "month" : "week")}
+        onClick={() => fold(folded ? "month" : "week")}
         className="group flex h-6 w-full items-center justify-center"
       >
         <span

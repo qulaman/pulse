@@ -57,10 +57,12 @@ export const durations = {
   screen: "150ms",
   effect: "400ms",
   tv: "500ms",
+  sheet: "280ms",
 } as const;
 
 export const easing = {
   out: "cubic-bezier(0.2, 0, 0, 1)",
+  in: "cubic-bezier(0.4, 0, 1, 1)",
   inOut: "cubic-bezier(0.4, 0, 0.2, 1)",
 } as const;
 

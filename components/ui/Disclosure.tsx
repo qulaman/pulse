@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
+
+import { useGlidingState } from "@/components/ui/motion";
 
 type Props = {
   title: string;
@@ -18,14 +20,16 @@ type Props = {
 /**
  * A settings section that starts closed and says its current value in one line, so the
  * screen is a list to scan instead of a wall of fields. Opening it is one tap; motion is
- * the chevron's rotation and the body's fade (DESIGN §2 — transform and opacity only, a
- * height animation is neither).
+ * the chevron's rotation, the body's fade and the sections below gliding to their new place
+ * instead of jumping by the body's height (DESIGN §2 — transform and opacity only, a height
+ * animation is neither).
  */
 export function Disclosure({ title, summary, hint, icon, dirty, defaultOpen = false, children }: Props) {
-  const [open, setOpen] = useState(defaultOpen);
+  const section = useRef<HTMLElement>(null);
+  const [open, setOpen] = useGlidingState(defaultOpen, section);
 
   return (
-    <section className="card overflow-hidden">
+    <section ref={section} className="card overflow-hidden">
       <button
         type="button"
         aria-expanded={open}
