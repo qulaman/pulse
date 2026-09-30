@@ -3,6 +3,8 @@
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+import { useHydrated } from "@/lib/useHydrated";
+
 export type OrbitId = "tasks" | "messages" | "ether" | "calendar" | "secretary" | "rating";
 
 export type OrbitBall = {
@@ -17,6 +19,8 @@ export type OrbitBall = {
 const BALL = 60;
 /** One turn of the orbit; slow enough to read, fast enough to feel alive. */
 const ORBIT_S = 28;
+/** `orbit-spin` turns twenty times in one iteration (globals.css): an iteration end wakes the main thread. */
+const TURNS = 20;
 /** The same spring the face and its box ride, so the ball lands with them (D-60). */
 const SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
 
@@ -98,16 +102,28 @@ export function OrbitBalls({
   /** ring only: the face is asleep — the balls are inside the head, ready to come out */
   hidden?: boolean;
 }) {
+  const hydrated = useHydrated();
   const n = balls.length;
   if (n === 0) return null;
   const ring = mode === "ring";
+  // The ring hidden in the sleeping head is drawn only once the page has hydrated. Its balls and
+  // counts come from data, and data that lands between the server's HTML and the hydration of this
+  // page (a query another part of the screen already started) made React throw the page's HTML
+  // away and draw it again (#418) — a blink at the very first frame. Nothing is lost: the balls are
+  // invisible in the head, and the walk out of it starts from a mounted ring.
+  if (ring && hidden && !hydrated) return null;
   const spinning = ring && !hidden;
+  // The ring is paused in the head, not stopped: stopping snapped it back to its first angle while
+  // the balls were still shrinking in — a jump of up to a whole turn. Paused, it keeps its angle and
+  // costs nothing; waking, it turns on from there.
+  const orbit = (name: "orbit-spin" | "orbit-counter") =>
+    ring ? { animation: `${name} ${ORBIT_S * TURNS}s linear infinite`, animationPlayState: spinning ? "running" : "paused" } : undefined;
 
   return (
     // plain divs carry the ring: the CSS orbit owns their transforms, framer only moves the balls
     <div
       className={ring ? "pointer-events-none absolute inset-0" : "flex justify-center gap-2"}
-      style={spinning ? { animation: `orbit-spin ${ORBIT_S}s linear infinite` } : undefined}
+      style={orbit("orbit-spin")}
       data-testid="orbit"
       data-mode={mode}
       data-hidden={hidden ? "1" : "0"}
@@ -129,7 +145,7 @@ export function OrbitBalls({
             {/* counter-rotation keeps the icon and the label upright while the ring turns; it
                 wraps the travelling ball, so the ball itself is never turned and its box —
                 the one the walk into the row is measured from — stays square to the screen */}
-            <span className="block" style={spinning ? { animation: `orbit-counter ${ORBIT_S}s linear infinite` } : undefined}>
+            <span className="block" style={orbit("orbit-counter")}>
               <motion.div layoutId={`orbit-${ball.id}`} transition={SPRING} className="block">
                 <motion.button
                   type="button"

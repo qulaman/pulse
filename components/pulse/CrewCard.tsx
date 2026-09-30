@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import Link from "next/link";
 import type { Ref } from "react";
 
@@ -7,6 +8,9 @@ import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { isLate, wordOf } from "@/lib/idle/look";
 import type { Member, Seat } from "@/lib/idle/people";
 import { untilWords } from "@/lib/tasks/lifecycle";
+
+/** `--ease-out` of DESIGN §2. */
+const EASE_OUT = [0.2, 0, 0, 1] as const;
 
 /**
  * The card of a person at work (D-118, replaces the read-only star card of D-73 §3): who he is
@@ -16,6 +20,8 @@ import { untilWords } from "@/lib/tasks/lifecycle";
  *
  * It stands next to him — under him when he is high up, above him when not — and never runs
  * off the screen. `reach` — how far out of his seat the card starts (his ring and a gap).
+ * It comes up next to him and, closed or given way to another person's card, fades back the same
+ * way in 150 ms (the field keeps it in an AnimatePresence, keyed by person).
  */
 export function CrewCard({
   ref,
@@ -49,9 +55,13 @@ export function CrewCard({
       className="pointer-events-auto absolute left-1/2 top-1/2 z-30"
       style={{ width, transform: below ? `translate(${left}px, ${seat.y + reach}px)` : `translate(${left}px, calc(${seat.y - reach}px - 100%))` }}
     >
-      <div
+      <motion.div
         className="rounded-[20px] border border-border bg-surface p-3"
-        style={{ boxShadow: "var(--shadow-raised)", animation: "crew-card 220ms var(--ease-out) both", transformOrigin: below ? "50% 0" : "50% 100%" }}
+        style={{ boxShadow: "var(--shadow-raised)", transformOrigin: below ? "50% 0" : "50% 100%" }}
+        // the old `crew-card` keyframes, and their way back
+        initial={{ opacity: 0, y: 6, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.22, ease: EASE_OUT } }}
+        exit={{ opacity: 0, y: 4, scale: 0.97, transition: { duration: 0.15, ease: EASE_OUT } }}
         data-testid="crew-card"
       >
         <div className="flex items-center gap-2 pl-1">
@@ -101,7 +111,7 @@ export function CrewCard({
             Все дела ›
           </Link>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

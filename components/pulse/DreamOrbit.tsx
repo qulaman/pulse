@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useId, type ReactNode } from "react";
 
 import { SLEEP_COLOR } from "@/components/brand/Mascot";
+import { Loops, loop } from "@/components/pulse/loops";
 import { keyframesOf, type Chase } from "@/lib/idle/flight";
 import type { Touch } from "@/lib/idle/wake";
 
@@ -33,7 +34,9 @@ type Actor = { key: string; size: number; track: "lead" | "chase"; trail: number
  * appearing beside it.
  *
  * Perf contract is the mascot's own (docs/DESIGN.md §3): one SVG per figure, CSS keyframes on
- * transform and opacity only, nothing on filter or box-shadow.
+ * transform and opacity only, nothing on filter or box-shadow. The figures' own loops (the run, the
+ * wings, the jet) are folded so that one iteration outlasts the flight (components/pulse/loops.tsx):
+ * an iteration end wakes the main thread, and a bee's wings used to end one eleven times a second.
  */
 export function DreamFlight({
   dream,
@@ -60,6 +63,7 @@ export function DreamFlight({
           // the blue the face itself wears while asleep, so the dream is plainly his
           style={{ color: SLEEP_COLOR }}
         >
+          <Loops />
           <style>{`${keyframesOf(`${base}-lead`, chase.lead, ms)} ${keyframesOf(`${base}-chase`, chase.chase, ms)}`}</style>
           {/* the swell: the whole scene comes out of the head as a speck and grows until the
               figures are turning at the real edges of the screen */}
@@ -85,6 +89,11 @@ export function DreamFlight({
   );
 }
 
+/** The run of the drop — every dream's runner has it. */
+const STEP = loop("dream-step", 440, "ease-in-out infinite");
+/** A bee's wings. */
+const BUZZ = loop("dream-buzz", 90, "linear infinite");
+
 /**
  * The drop from above: the same body, the eyes thrown back over the shoulder at whatever is
  * behind him. The eyes are the whole dial of the mood here, exactly as on the big face.
@@ -98,7 +107,7 @@ function DropTop(): ReactNode {
         <path d="M-20 0 C-26 -0.9 -31 -1.2 -36 -1.2 C-31 0.7 -26 1 -20 1.4 Z" />
         <path d="M-19 9.5 C-24 11 -28 12 -32 12.5 C-28 10.5 -24 9.5 -19 8.5 Z" />
       </g>
-      <g style={{ transformOrigin: "0px 0px", animation: "dream-step 0.44s ease-in-out infinite" }}>
+      <g style={{ transformOrigin: "0px 0px", animation: STEP }}>
         {/* the body, leaning into the run: the drop's own silhouette seen from over him */}
         <path d="M21 0 C21 8.4 13.6 14.6 1 15 C-11.6 15.4 -20 8.6 -20 0 C-20 -8.6 -11.6 -15.4 1 -15 C13.6 -14.6 21 -8.4 21 0 Z" />
         {/* the highlight the big face has too, so the top of the head reads as the top */}
@@ -156,7 +165,7 @@ function DragonHead(): ReactNode {
  */
 function DragonLink({ phase, claws = false, fins = false }: { phase: number; claws?: boolean; fins?: boolean }) {
   return (
-    <g fill="currentColor" style={{ transformOrigin: "0px 0px", animation: "dream-wave 1.3s ease-in-out infinite", animationDelay: `${phase.toFixed(2)}s` }}>
+    <g fill="currentColor" style={{ transformOrigin: "0px 0px", animation: loop("dream-wave", 1_300, `ease-in-out ${phase.toFixed(2)}s infinite`) }}>
       {claws ? (
         <g>
           <path d="M-1 -8 C-3 -13 -7 -16 -12 -17 C-11 -14 -9.4 -12 -8 -10 L-12 -12 L-9 -8.6 L-13 -9 L-8 -6 Z" />
@@ -180,7 +189,7 @@ function DragonLink({ phase, claws = false, fins = false }: { phase: number; cla
 /** The tail: the body thins into a fin of flame. */
 function DragonTail({ phase }: { phase: number }) {
   return (
-    <g fill="currentColor" style={{ transformOrigin: "0px 0px", animation: "dream-wave 1.3s ease-in-out infinite", animationDelay: `${phase.toFixed(2)}s` }}>
+    <g fill="currentColor" style={{ transformOrigin: "0px 0px", animation: loop("dream-wave", 1_300, `ease-in-out ${phase.toFixed(2)}s infinite`) }}>
       <path d="M8 0 C4 -5 -2 -8 -10 -9.6 C-5.4 -5.6 -3.4 -2.6 -3.4 0 C-3.4 2.6 -5.4 5.6 -10 9.6 C-2 8 4 5 8 0 Z" />
       <ellipse cx="9" cy="0" rx="6" ry="5" />
     </g>
@@ -192,7 +201,7 @@ function MonsterTop(): ReactNode {
   return (
     <g fill="currentColor">
       {/* the arms reach forward and grab at the air */}
-      <g style={{ transformOrigin: "0px 0px", animation: "dream-grab 0.58s ease-in-out infinite" }}>
+      <g style={{ transformOrigin: "0px 0px", animation: loop("dream-grab", 580, "ease-in-out infinite") }}>
         <path d="M8 -11 C15 -17 23 -18 28 -15 C29 -13.4 29 -12 28 -10.6 L31 -9 L26 -8.6 L28 -5.6 L24 -7.4 L23.6 -4 L21.6 -7.6 C18 -8.6 14 -7.4 10 -4.6 Z" />
         <path d="M8 11 C15 17 23 18 28 15 C29 13.4 29 12 28 10.6 L31 9 L26 8.6 L28 5.6 L24 7.4 L23.6 4 L21.6 7.6 C18 8.6 14 7.4 10 4.6 Z" />
       </g>
@@ -230,15 +239,15 @@ function RocketTop(): ReactNode {
     <g fill="currentColor">
       {/* the thrust: a jet that pulses out of the nozzle, a bright core inside it, and two
           puffs of exhaust that break off and fall behind */}
-      <g style={{ transformOrigin: "-17px 0px", animation: "dream-thrust 0.19s ease-in-out infinite" }}>
+      <g style={{ transformOrigin: "-17px 0px", animation: loop("dream-thrust", 190, "ease-in-out infinite") }}>
         <path d="M-17 -7.2 C-24 -6.2 -30 -3.6 -39 0 C-30 3.6 -24 6.2 -17 7.2 Z" opacity="0.4" />
         <path d="M-17 -4.8 C-22 -4.2 -26.4 -2.4 -32 0 C-26.4 2.4 -22 4.2 -17 4.8 Z" />
         <path d="M-17 -2.2 C-19.6 -2 -22.4 -1.1 -26 0 C-22.4 1.1 -19.6 2 -17 2.2 Z" fill="#ffffff" opacity="0.3" />
       </g>
       {/* the exhaust breaks off the nozzle in puffs and falls behind */}
       <g opacity="0.5">
-        <ellipse cx="-20" cy="0" rx="3.6" ry="3" style={{ transformOrigin: "-20px 0px", animation: "dream-puff 0.62s linear infinite" }} />
-        <ellipse cx="-20" cy="0" rx="3" ry="2.6" style={{ transformOrigin: "-20px 0px", animation: "dream-puff 0.62s linear 0.31s infinite" }} />
+        <ellipse cx="-20" cy="0" rx="3.6" ry="3" style={{ transformOrigin: "-20px 0px", animation: loop("dream-puff", 620, "linear infinite") }} />
+        <ellipse cx="-20" cy="0" rx="3" ry="2.6" style={{ transformOrigin: "-20px 0px", animation: loop("dream-puff", 620, "linear 0.31s infinite") }} />
       </g>
       {/* the fins, swept back off the tail */}
       <path d="M-4 -7 C-6 -12 -10 -16 -16 -18 C-17.4 -14 -17.4 -10 -16.4 -7 Z" />
@@ -267,7 +276,7 @@ function RocketTop(): ReactNode {
 function PlaneTop(): ReactNode {
   return (
     <g fill="currentColor">
-      <g style={{ transformOrigin: "0px 0px", animation: "dream-bank 1.6s ease-in-out infinite" }}>
+      <g style={{ transformOrigin: "0px 0px", animation: loop("dream-bank", 1_600, "ease-in-out infinite") }}>
         {/* the wings: one dart, folded down the middle */}
         <path d="M30 0 L-18 -19 L-10 0 L-18 19 Z" />
         {/* the near half catches the light, the fold is a darker line */}
@@ -297,7 +306,7 @@ function TrailDot(): ReactNode {
  */
 function BeeTop({ hover }: { hover: number }): ReactNode {
   return (
-    <g style={{ transformOrigin: "0px 0px", animation: `dream-hover ${(0.9 + hover * 0.23).toFixed(2)}s ease-in-out ${(-hover * 0.31).toFixed(2)}s infinite` }}>
+    <g style={{ transformOrigin: "0px 0px", animation: loop("dream-hover", Math.round((0.9 + hover * 0.23) * 1000), `ease-in-out ${(-hover * 0.31).toFixed(2)}s infinite`) }}>
       <g fill="currentColor">
         {/* the sting */}
         <path d="M-15 0 L-10 -2.4 L-10 2.4 Z" />
@@ -316,8 +325,8 @@ function BeeTop({ hover }: { hover: number }): ReactNode {
       </g>
       {/* the wings: a blur, beating far too fast to see */}
       <g fill="#ffffff" opacity="0.4">
-        <ellipse cx="-2" cy="-9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px -5px", animation: "dream-buzz 0.09s linear infinite" }} />
-        <ellipse cx="-2" cy="9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px 5px", animation: "dream-buzz 0.09s linear infinite" }} />
+        <ellipse cx="-2" cy="-9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px -5px", animation: BUZZ }} />
+        <ellipse cx="-2" cy="9" rx="6.6" ry="4.2" style={{ transformOrigin: "-2px 5px", animation: BUZZ }} />
       </g>
     </g>
   );
@@ -330,7 +339,7 @@ function BeeTop({ hover }: { hover: number }): ReactNode {
 function UfoTop(): ReactNode {
   return (
     <g fill="currentColor">
-      <circle cx="0" cy="0" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transformOrigin: "0px 0px", animation: "dream-beam 1.4s ease-out infinite" }} />
+      <circle cx="0" cy="0" r="22" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ transformOrigin: "0px 0px", animation: loop("dream-beam", 1_400, "ease-out infinite") }} />
       {/* the rim, and the ring of lights running round it */}
       <circle cx="0" cy="0" r="20" />
       <circle cx="0" cy="0" r="20" fill="#ffffff" opacity="0.08" />
@@ -343,7 +352,7 @@ function UfoTop(): ReactNode {
               cx={(Math.cos(a) * 15).toFixed(2)}
               cy={(Math.sin(a) * 15).toFixed(2)}
               r="1.8"
-              style={{ animation: `dream-lights 0.8s linear ${(-(i / 8) * 0.8).toFixed(2)}s infinite` }}
+              style={{ animation: loop("dream-lights", 800, `linear ${(-(i / 8) * 0.8).toFixed(2)}s infinite`) }}
             />
           );
         })}

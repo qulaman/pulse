@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -93,6 +93,8 @@ const CHEER_MS = 1_800;
 const PILL_MS = 4_000;
 /** A pile of events is played one after another, but never more than this far behind. */
 const QUEUE_MAX_MS = 3_000;
+/** The face's spring on a mode change; the words above it and the cards under it ride it too (D-60). */
+const BAND_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
 
 /**
  * Лента — the employee's home (D-62): the same sleeping face in the middle of the
@@ -450,16 +452,20 @@ export default function FeedPage() {
           ) : null}
         </div>
       ) : null}
+      {/* framer's own motion (the balls, the bands) honours «уменьшить движение» (DESIGN §4) */}
+      <MotionConfig reducedMotion="user">
       <LayoutGroup>
-        {/* above the head: what the assistant says */}
-        <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
-          <div className="mt-auto pb-3 pt-2" style={topInset ? { paddingTop: 8 + topInset } : undefined}>
+        {/* above the head: what the assistant says — it glides with the band's edge on a mode change */}
+        <motion.div layoutScroll className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
+          <motion.div layout="position" transition={BAND_SPRING} className="mt-auto pb-3 pt-2" style={topInset ? { paddingTop: 8 + topInset } : undefined}>
             <Assistant lines={loading && mode !== "idle" && lines.length === 0 ? [{ id: "loading", text: "Смотрю, что нового…" }] : lines} />
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         <div className="relative flex shrink-0 flex-col items-center">
-          <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+          {/* not animated: its middle never moves, and a layout animation of its size only squashed
+              what is inside it (the dream, the thought) — the face animates its own size */}
+          <div className="relative flex items-center justify-center" style={{ width: box, height: box }}>
             {/* the same waiting screen the director has (D-89): dust and a dream behind the
                 head while the board is at rest, gone at the first touch */}
             {isSecretary ? (
@@ -526,7 +532,7 @@ export default function FeedPage() {
                 />
               ) : null}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </div>
 
         {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
@@ -608,7 +614,7 @@ export default function FeedPage() {
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
             </div>
           ) : null}
-          <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
             {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
             {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
@@ -635,8 +641,19 @@ export default function FeedPage() {
                 <InstallHint bubble />
               </>
             ) : null}
+            {/* a panel folding away fades out where it stood; position only (a size animation squashed its cards) */}
+            <AnimatePresence mode="popLayout">
             {mode === "panel" ? (
-              <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
+              <motion.div
+                key={panel}
+                layout="position"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}
+                transition={BAND_SPRING}
+                data-testid="panel"
+                data-panel={panel}
+              >
                 {panel === "tasks" ? (
                   todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
@@ -699,9 +716,11 @@ export default function FeedPage() {
                 ) : null}
               </motion.div>
             ) : null}
-          </div>
+            </AnimatePresence>
+          </motion.div>
         </div>
       </LayoutGroup>
+      </MotionConfig>
 
       {/* the hint never lies over the secretary's cards */}
       {mode === "idle" && !(isSecretary && (mineErrands.length > 0 || visitRows.some((v) => !v.closed_at))) ? (

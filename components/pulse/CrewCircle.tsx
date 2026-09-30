@@ -2,11 +2,14 @@
 
 import { memo, type CSSProperties } from "react";
 
+import { Loops, loop } from "@/components/pulse/loops";
 import { hashOf, RING_OUT } from "@/lib/idle/people";
 import type { Look } from "@/lib/idle/look";
 
 /** One turn of a ring: steady — a machine running, not an alarm going off. */
 const TURN_MS = 3_200;
+/** `crew-spin` turns twenty times in one iteration (globals.css): an iteration end wakes the main thread. */
+const TURNS = 20;
 /** How thick the ring is. */
 const BAND = 2.5;
 
@@ -63,6 +66,7 @@ export const CrewCircle = memo(function CrewCircle({
 
   return (
     <span className="relative block" style={{ width: size, height: size }} data-ring={look.ring} data-badge={look.badge ?? undefined} data-accepted={look.accepted ? "1" : undefined}>
+      <Loops />
       {/* the ring: swings in after a flight, fades over when the stage changes */}
       <span
         key={`${look.ring}:${count}`}
@@ -70,7 +74,7 @@ export const CrewCircle = memo(function CrewCircle({
         style={{ inset: -RING_OUT, animation: fresh ? "crew-ignite 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both" : "crew-in 320ms var(--ease-out) both" }}
       >
         {look.ring === "spinning" ? (
-          <span className="crew-anim absolute inset-0 block" style={{ animation: `crew-spin ${TURN_MS}ms linear ${fresh ? 0 : phase}ms infinite`, willChange: "transform" }}>
+          <span className="crew-anim absolute inset-0 block" style={{ animation: `crew-spin ${TURN_MS * TURNS}ms linear ${fresh ? 0 : phase}ms infinite`, willChange: "transform" }}>
             <span className="crew-band absolute inset-0 block rounded-full" style={{ background: arcsOf(count, tone) }} />
             {Array.from({ length: count }, (_, k) => (
               <span key={k} className="absolute left-1/2 top-1/2 block" style={{ transform: `rotate(${((k + 1) / count).toFixed(4)}turn) translateY(${-(box / 2 - BAND / 2)}px)` }}>
@@ -83,7 +87,7 @@ export const CrewCircle = memo(function CrewCircle({
           </span>
         ) : null}
         {look.ring === "waiting" ? (
-          <span className="crew-anim absolute inset-0 block rounded-full" style={{ border: `1.5px solid ${tone}`, animation: `crew-wait 2.6s ease-in-out ${phase}ms infinite` }} />
+          <span className="crew-anim absolute inset-0 block rounded-full" style={{ border: `1.5px solid ${tone}`, animation: loop("crew-wait", 2_600, `ease-in-out ${phase}ms infinite`) }} />
         ) : null}
         {look.ring === "closed" || look.ring === "done" ? (
           <>
@@ -93,7 +97,7 @@ export const CrewCircle = memo(function CrewCircle({
               style={{
                 border: `1.5px solid ${tone}`,
                 opacity: 0,
-                animation: look.ring === "done" ? "crew-done 900ms var(--ease-out) both" : `crew-ping 4s ease-out ${phase}ms infinite`,
+                animation: look.ring === "done" ? "crew-done 900ms var(--ease-out) both" : loop("crew-ping", 4_000, `ease-out ${phase}ms infinite`),
               }}
             />
           </>
@@ -183,8 +187,10 @@ export function IdleCircle({ id, initials, size, picked = false }: { id: string;
   return (
     <span
       className="crew-anim relative block"
-      style={{ "--orb-dx": `${dx}px`, "--orb-dy": `${dy}px`, animation: `orb-drift ${driftMs}ms ease-in-out ${delay}ms infinite alternate` } as CSSProperties}
+      // there and back is one cycle of the folded shiver (components/pulse/loops.tsx)
+      style={{ "--orb-dx": `${dx}px`, "--orb-dy": `${dy}px`, animation: loop("orb-drift", driftMs * 2, `ease-in-out ${delay}ms infinite`) } as CSSProperties}
     >
+      <Loops />
       <span
         className="crew-anim flex items-center justify-center rounded-full font-display font-bold"
         style={{
@@ -194,7 +200,7 @@ export function IdleCircle({ id, initials, size, picked = false }: { id: string;
           color: "var(--bg)",
           background: picked ? "var(--accent)" : "var(--text-muted)",
           transition: "background-color 240ms var(--ease-out)",
-          animation: picked ? "orb-caught 640ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "orb-breathe 5.2s ease-in-out infinite",
+          animation: picked ? "orb-caught 640ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : loop("orb-breathe", 5_200, "ease-in-out infinite"),
         }}
       >
         {initials}

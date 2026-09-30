@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
@@ -227,7 +228,16 @@ export function PeopleField({
   // A touch anywhere but the card and his own circle puts the card away — and still does what
   // it touched: the field lives in the box of the face, so a veil under the card could not
   // cover the screen, and a second tap for everything else would be one tap too many.
-  const card = useRef<HTMLDivElement>(null);
+  const card = useRef<HTMLDivElement | null>(null);
+  // the card on screen — while one fades out another may already be up: the one leaving never
+  // takes the ref from the one arriving
+  const cardRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    card.current = node;
+    return () => {
+      if (card.current === node) card.current = null;
+    };
+  }, []);
   useEffect(() => {
     if (!opened) return;
     const away = (event: PointerEvent) => {
@@ -339,9 +349,21 @@ export function PeopleField({
       })}
       <Overflow count={layout.overflow.top} y={-box.h / 2 + 2} x={box.w / 2 - 48} />
       <Overflow count={layout.overflow.bottom} y={box.h / 2 - 22} x={box.w / 2 - 48} />
-      {openedCrew && openedSeat ? (
-        <CrewCard ref={card} member={{ ...openedCrew.member, tasks: openedCrew.tasks }} seat={openedSeat} box={box} reach={layout.size / 2 + RING_OUT + 6} allHref={allHref?.(openedCrew.member.id)} onClose={closeCard} />
-      ) : null}
+      {/* keyed by person: closing fades the card out, another person's card replaces it with a fade */}
+      <AnimatePresence>
+        {openedCrew && openedSeat ? (
+          <CrewCard
+            key={openedCrew.member.id}
+            ref={cardRef}
+            member={{ ...openedCrew.member, tasks: openedCrew.tasks }}
+            seat={openedSeat}
+            box={box}
+            reach={layout.size / 2 + RING_OUT + 6}
+            allHref={allHref?.(openedCrew.member.id)}
+            onClose={closeCard}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

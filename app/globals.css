@@ -2360,19 +2360,12 @@ h1 { letter-spacing: -0.025em; }
 /* the press: the circle gives under the finger and springs back */
 .crew-hit .crew-press { transition: transform 160ms cubic-bezier(0.34, 1.4, 0.64, 1); }
 .crew-hit:active .crew-press { transform: scale(0.92); transition-duration: 90ms; }
-/* work in hand: the arc goes round, evenly — a machine running, not a warning */
+/* work in hand: the arc goes round, evenly — a machine running, not a warning. Twenty turns in
+   one iteration (CrewCircle multiplies the turn by the same), so the iteration ends once a minute:
+   while React listens to `animationiteration`, every iteration end wakes the main thread. The
+   breathing, the shiver and the pings are folded the same way in components/pulse/loops.tsx. */
 @keyframes crew-spin {
-  to { transform: rotate(1turn); }
-}
-/* handed out, not taken up yet: the ring is whole and breathes */
-@keyframes crew-wait {
-  0%, 100% { opacity: 0.35; }
-  50% { opacity: 0.95; }
-}
-/* handed in: now and then a ring leaves the closed one — «готово, посмотри» */
-@keyframes crew-ping {
-  0% { transform: scale(1); opacity: 0.7; }
-  32%, 100% { transform: scale(1.5); opacity: 0; }
+  to { transform: rotate(20turn); }
 }
 /* the ring comes on after the flight: it swings round into place */
 @keyframes crew-ignite {
@@ -2408,19 +2401,6 @@ h1 { letter-spacing: -0.025em; }
 @keyframes crew-card {
   0% { transform: translateY(6px) scale(0.96); opacity: 0; }
   100% { transform: none; opacity: 1; }
-}
-/* an idler: the slowest breath on the screen, and nothing else */
-@keyframes orb-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.82; }
-  50% { transform: scale(1.05); opacity: 1; }
-}
-/* an idler stands in his row and shivers: nothing to do, and it shows */
-@keyframes orb-drift {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  25% { transform: translate(var(--orb-dx), var(--orb-dy)) rotate(1.2deg); }
-  50% { transform: translate(0, calc(var(--orb-dy) * -1)) rotate(-0.8deg); }
-  75% { transform: translate(calc(var(--orb-dx) * -1), var(--orb-dy)) rotate(0.6deg); }
-  100% { transform: translate(0, 0) rotate(0deg); }
 }
 /* caught: it stops dead and jumps once, and the input opens with his name in it */
 @keyframes orb-caught {
@@ -2486,69 +2466,20 @@ h1 { letter-spacing: -0.025em; }
   34%, 100% { opacity: 0; }
 }
 
-/* the run: a short bob on every step */
-@keyframes dream-step {
-  0%, 100% { transform: translateY(-0.8px) rotate(-3deg); }
-  50% { transform: translateY(0.8px) rotate(3deg); }
-}
-/* the long body slithers: every link rides this with its own phase, so a wave runs down it */
-@keyframes dream-wave {
-  0%, 100% { transform: translateY(-2.6px) rotate(-4deg); }
-  50% { transform: translateY(2.6px) rotate(4deg); }
-}
-/* the claws open and close on the air behind the runner */
-@keyframes dream-grab {
-  0%, 100% { transform: scaleY(0.88) translateX(-0.6px); }
-  50% { transform: scaleY(1.12) translateX(0.8px); }
-}
-/* the jet: the flame is never the same length two frames running */
-@keyframes dream-thrust {
-  0%, 100% { transform: scale(0.82, 0.88); opacity: 0.8; }
-  50% { transform: scale(1.14, 1.06); opacity: 1; }
-}
-/* what the jet leaves behind: a puff that falls back and thins out */
-@keyframes dream-puff {
-  0% { transform: translateX(2px) scale(0.5); opacity: 0.75; }
-  100% { transform: translateX(-16px) scale(1.7); opacity: 0; }
-}
-/* the paper plane banks: from above, a bank is the wings getting narrower and wide again (D-82) */
-@keyframes dream-bank {
-  0%, 100% { transform: scaleY(1); }
-  30% { transform: scaleY(0.78); }
-  60% { transform: scaleY(1.04); }
-}
-/* a bee's wings: a blur, never still */
-@keyframes dream-buzz {
-  0%, 100% { transform: scaleY(1); }
-  50% { transform: scaleY(0.35); }
-}
-/* each bee hovers off the line on its own beat, so the swarm is a swarm and not a train */
-@keyframes dream-hover {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(2px, -5px); }
-  50% { transform: translate(-1px, 1px); }
-  75% { transform: translate(1.5px, 5px); }
-}
-/* the saucer's lights run round the rim */
-@keyframes dream-lights {
-  0%, 100% { opacity: 0.25; }
-  12% { opacity: 1; }
-  40% { opacity: 0.25; }
-}
-/* the saucer's beam: a ring that leaves the rim and fades */
-@keyframes dream-beam {
-  0% { transform: scale(0.9); opacity: 0.7; }
-  100% { transform: scale(1.5); opacity: 0; }
-}
+/* The dream's own loops (the run, the wings, the jet, the lights…) live folded in
+   components/pulse/loops.tsx: many cycles in one iteration, so the main thread is not woken at
+   every cycle's end while a dream flies. */
 
-/* the balls orbit the face; each ball turns the other way so its label stays upright */
+/* the balls orbit the face; each ball turns the other way so its label stays upright. Twenty
+   turns in one iteration (OrbitBalls multiplies the turn by the same): an iteration end wakes the
+   main thread, and this way it comes once in ten minutes */
 @keyframes orbit-spin {
   from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  to { transform: rotate(20turn); }
 }
 @keyframes orbit-counter {
   from { transform: rotate(0deg); }
-  to { transform: rotate(-360deg); }
+  to { transform: rotate(-20turn); }
 }
 
 /* the lever: a short shiver when the hold fires, before listening takes over (D-60) */

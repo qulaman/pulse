@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo, type TargetAndTransition } from "framer-motion";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -28,6 +28,22 @@ const UNDO_MS = 4000;
 type DeckItem = { kind: "task"; task: BoardTask; lane: Lane } | { kind: "work"; tasks: BoardTask[] };
 
 type Primary = { label: string; run: () => void };
+
+/**
+ * Where a card that appears later comes from: from behind the one on top, into its place — not
+ * thrown from the face again. The throw is the deck's arrival; after that a card showing up behind
+ * (a swipe, a card that left) is only uncovered.
+ */
+const RISE: Record<"prev" | "current" | "next", TargetAndTransition> = {
+  prev: { x: "-118%", y: 0, scale: 1, opacity: 0, rotate: -8 },
+  current: { x: 0, y: 6, scale: 0.96, opacity: 0, rotate: 0 },
+  next: { x: 0, y: 12, scale: 0.9, opacity: 0, rotate: 0 },
+};
+/**
+ * A card that leaves the board on its own (settled elsewhere, deleted): it sinks and fades — over the
+ * card rising into its place, or that one would hide the leaving.
+ */
+const LEAVE: TargetAndTransition = { opacity: 0, scale: 0.96, y: 10, zIndex: 4, transition: { duration: 0.18, ease: "easeOut", zIndex: { duration: 0 } } };
 
 /** The one action a swipe up means on a lane — none where a choice or a date is needed. */
 function primaryOf(item: DeckItem, actions: TaskActions): Primary | null {
@@ -88,6 +104,12 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
 
   const [index, setIndex] = useState(0);
   const safeIndex = Math.min(index, Math.max(0, items.length - 1));
+  // the deck has been on screen: cards mounted from now on rise from behind instead of being thrown
+  const [arrived, setArrived] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setArrived(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const current = items[safeIndex];
 
   // a tap on a ball: that card comes to the top (derived state: applied once per tap,
@@ -238,6 +260,9 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
   return (
     <section aria-label="Стопка задач" className="mt-3" data-testid="deck" data-index={safeIndex} data-count={items.length}>
       <div className="relative grid" style={{ touchAction: "pan-y" }}>
+        {/* popLayout: a card that leaves is lifted out of the stack at once, so the deck's height
+            and the next card do not wait for its fade */}
+        <AnimatePresence mode="popLayout">
         {roles.map(({ item, role }) => {
           const id = keyOf(item);
           const isCurrent = role === "current";
@@ -247,8 +272,11 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
               key={id}
               className="[grid-area:1/1]"
               style={{ zIndex: role === "current" ? 2 : role === "next" ? 1 : 3, touchAction: isCurrent ? "none" : "auto" }}
-              // thrown from the face: from above, small, then settling into the stack
-              initial={{ y: -180, scale: 0.4, opacity: 0 }}
+              // thrown from the face when the deck arrives: from above, small, then settling into the
+              // stack; a card uncovered later (a swipe, a card that left) rises from behind
+              initial={arrived ? RISE[role] : { y: -180, scale: 0.4, opacity: 0 }}
+              // a flown card has already gone (swipe up or down); one that leaves by itself sinks
+              exit={fly ? { opacity: 0, transition: { duration: 0 } } : LEAVE}
               animate={
                 fly === "up"
                   ? { y: -560, opacity: 0, rotate: -6, transition: { duration: 0.22, ease: "easeIn" } }
@@ -296,6 +324,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
             </motion.div>
           );
         })}
+        </AnimatePresence>
       </div>
 
       <div className="mt-2 flex items-center justify-between px-1 text-[13px] leading-4 text-muted">

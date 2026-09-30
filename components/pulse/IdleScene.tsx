@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "framer-motion";
 
 import { SLEEP_COLOR } from "@/components/brand/Mascot";
 import { DreamFlight, TOUCHES, type DreamId, DREAMS } from "@/components/pulse/DreamOrbit";
@@ -135,26 +135,51 @@ export function IdleScene({
     <>
       {/* the anchor is the face's own box: the whole scene is measured out from its centre */}
       <div ref={anchor} className="pointer-events-none absolute inset-0" aria-hidden />
-      {active && area && team ? (
-        <PeopleField
-          members={team.members}
-          hx={area.hx}
-          hy={area.hy}
-          // the rows stand still, so they may use the room the flight has to leave at the edge
-          wide={area.hx + MARGIN - 6}
-          reach={area.hy + MARGIN - 6}
-          dream={dream}
-          chase={chase}
-          picked={picked}
-          still={reduced}
-          onPick={onPick}
-          onLook={onLook}
-          allHref={team.allHref}
-        />
-      ) : null}
+      {/* the team leaves with the rest of the scene — it dissolves in 180 ms at the first touch
+          instead of vanishing in one frame — and comes back softly when the face falls asleep */}
+      <AnimatePresence>
+        {active && area && team ? (
+          <Fade key="team">
+            <PeopleField
+              members={team.members}
+              hx={area.hx}
+              hy={area.hy}
+              // the rows stand still, so they may use the room the flight has to leave at the edge
+              wide={area.hx + MARGIN - 6}
+              reach={area.hy + MARGIN - 6}
+              dream={dream}
+              chase={chase}
+              picked={picked}
+              still={reduced}
+              onPick={onPick}
+              onLook={onLook}
+              allHref={team.allHref}
+            />
+          </Fade>
+        ) : null}
+      </AnimatePresence>
       <RimWake dream={dream} chase={chase} ms={FLIGHT_MS} />
       <DreamFlight dream={dream} chase={chase} ms={FLIGHT_MS} />
     </>
+  );
+}
+
+/**
+ * A layer of the scene coming and going: in over 240 ms, out over 180 ms. While it goes, nothing in
+ * it takes a finger — a circle half faded is not a button any more.
+ */
+function Fade({ children }: { children: ReactNode }) {
+  const present = useIsPresent();
+  return (
+    <motion.div
+      className="pointer-events-none absolute inset-0"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1, transition: { duration: 0.24, ease: "easeOut" } }}
+      exit={{ opacity: 0, transition: { duration: 0.18, ease: "easeOut" } }}
+      inert={!present}
+    >
+      {children}
+    </motion.div>
   );
 }
 

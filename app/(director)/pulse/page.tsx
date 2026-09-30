@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "framer-motion";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -87,6 +87,11 @@ const RING_RADIUS = 124;
 const THOUGHT_MS = 9_000;
 /** The batch has landed: the face jumps for joy this long after the throw (D-82). */
 const CHEER_MS = 1_800;
+/**
+ * The spring the face rides when the mode changes; the words above it and the cards under it ride
+ * the same one, so the three bands move together instead of the outer two jumping (D-60).
+ */
+const BAND_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
 
 /**
  * An open ball is a job the face does by hand while the panel is open (D-82): it ticks off
@@ -627,10 +632,13 @@ export default function PulsePage() {
       data-mode={mode}
       data-board=""
     >
+      {/* framer's own motion (the balls, the deck, the bands) honours «уменьшить движение» (DESIGN §4) */}
+      <MotionConfig reducedMotion="user">
       <LayoutGroup>
-        {/* above the head: what the assistant says */}
-        <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
-          <div className="mt-auto pb-3 pt-2">
+        {/* above the head: what the assistant says. A mode change moves the band's edge by up to
+            110 px: the words glide there on the face's spring instead of jumping in one frame */}
+        <motion.div layoutScroll className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
+          <motion.div layout="position" transition={BAND_SPRING} className="mt-auto pb-3 pt-2">
             <Assistant
               // «не разобрал»: what was heard, in the director's bubble, and the assistant's answer under it
               said={exchange?.said ?? (unparsed ? heard : null)}
@@ -650,12 +658,16 @@ export default function PulsePage() {
                 <UnparsedButtons onFix={() => useComposeStore.getState().request(heard)} onManual={startManual} onClose={resetIngest} />
               ) : null}
             </Assistant>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         {/* the face, and the balls orbiting it (ring) or in a row under it (panel) */}
         <div className="relative flex shrink-0 flex-col items-center">
-          <motion.div layout className="relative flex items-center justify-center" style={{ width: box, height: box }} transition={{ type: "spring", stiffness: 260, damping: 26 }}>
+          {/* The box changes size with the mode, but its middle never moves (the bands around it are
+              equal), so it is not animated: a layout animation of it was a pure scale, and it squashed
+              everything inside without a `layout` of its own — the team came in twice too big when
+              the face fell asleep, a thought's text zoomed. The face animates its own size. */}
+          <div className="relative flex items-center justify-center" style={{ width: box, height: box }}>
             {/* The waiting screen (D-89, D-91): drawn before the face, so the team and the
                 dream pass behind the head. It belongs to the screen being at rest, not to one
                 pose of the face — since D-70 the resting face is a barometer and only sleeps
@@ -823,7 +835,7 @@ export default function PulsePage() {
                 />
               ) : null}
             </AnimatePresence>
-          </motion.div>
+          </div>
         </div>
 
         {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
@@ -834,7 +846,8 @@ export default function PulsePage() {
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
             </div>
           ) : null}
-          <div className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+          {/* the band's top moves with the mode, as the words' bottom does: the cards glide with it */}
+          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
             {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
             {confirming ? <ConfirmInline ref={confirmRef} /> : null}
             {!phraseInHand && visitorsWaiting ? <VisitAsk
@@ -847,8 +860,21 @@ export default function PulsePage() {
             {!phraseInHand && messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
             {/* service cards only once the face has been tapped — the idle screen is the face alone */}
             {!phraseInHand && mode !== "idle" ? serviceLines : null}
+            {/* a panel folding away or giving way to another fades out where it stood (popLayout: the
+                rest does not wait for it); position only — a layout animation of its size squashed the
+                deck inside whenever a card of another height came to the top */}
+            <AnimatePresence mode="popLayout">
             {mode === "panel" && !phraseInHand ? (
-              <motion.div key={panel} layout initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 260, damping: 26 }} data-testid="panel" data-panel={panel}>
+              <motion.div
+                key={panel}
+                layout="position"
+                initial={{ opacity: 0, y: 24 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}
+                transition={BAND_SPRING}
+                data-testid="panel"
+                data-panel={panel}
+              >
                 {panel === "tasks" ? (
                   taskCount === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
@@ -882,9 +908,11 @@ export default function PulsePage() {
                 ) : null}
               </motion.div>
             ) : null}
-          </div>
+            </AnimatePresence>
+          </motion.div>
         </div>
       </LayoutGroup>
+      </MotionConfig>
 
       {/* the bottom: the gesture hint — never under the face */}
       {/* the hint is for an idle face: while the phrase is in flight the face says what it does */}

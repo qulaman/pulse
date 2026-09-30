@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";
 import { CrewCircle, IdleCircle } from "@/components/pulse/CrewCircle";
+import { DREAMS } from "@/components/pulse/DreamOrbit";
 import { IdleScene } from "@/components/pulse/IdleScene";
 import { lookOf, type CrewTask } from "@/lib/idle/look";
 import { initialsOf, type Member, type Pick } from "@/lib/idle/people";
@@ -93,7 +94,9 @@ const inWork = (t: CrewTask) => t.status === "accepted" || t.status === "rework"
  * The waiting screen's team (D-118) on a made-up company: the very scene Пульс draws —
  * `IdleScene` with its dreams and the circles — with a remote for what happens to the tasks.
  */
-export function TeamSandbox({ initialCount, initialAuto }: { initialCount: 8 | 20 | 52; initialAuto: boolean }) {
+export function TeamSandbox({ initialCount, initialAuto, dream: asked }: { initialCount: 8 | 20 | 52; initialAuto: boolean; dream?: string }) {
+  // one dream over and over (?dream=…), so two measurements of the scene compare like with like
+  const dream = DREAMS.find((id) => id === asked);
   const pool = useMemo(() => poolOf(), []);
   const [count, setCount] = useState<8 | 20 | 52>(initialCount);
   const [people, setPeople] = useState<Member[]>(() => teamOf(initialCount, pool));
@@ -231,7 +234,7 @@ export function TeamSandbox({ initialCount, initialAuto }: { initialCount: 8 | 2
 
       <main className="relative min-h-0 flex-1 overflow-hidden" data-still={still ? "" : undefined}>
         <div data-dream-area className="relative flex h-full w-full items-center justify-center">
-          <IdleScene active quiet={!target} team={team} picked={pickedPerson ? pickedPerson.id : null} onPick={setPicked} onLook={setLooking} />
+          <IdleScene active quiet={!target} only={dream} team={team} picked={pickedPerson ? pickedPerson.id : null} onPick={setPicked} onLook={setLooking} />
           <div className="relative z-10">
             <Mascot state={face} size={128} gaze={target ? lookAt(target.x, target.y) : null} />
           </div>

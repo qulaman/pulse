@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useReducedMotion, useSpring } from "framer-motion";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 
 import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
@@ -28,6 +28,14 @@ const USES_KEY = "pulse.lever.uses";
 const BASE = 128;
 /** The face travels with the box around it — one spring for both, or they arrive apart. */
 const SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+/**
+ * The face gives a little under a pulling finger — down towards the typed input, up towards «отмена»
+ * while it records — so the gesture is seen working before the finger lets go. A third of the pull
+ * (a quarter for the cancel), never more than this; a tight spring follows the finger, and lets
+ * the face back when the finger is gone.
+ */
+const GIVE_PX = 16;
+const GIVE_SPRING = { stiffness: 700, damping: 40 };
 
 function readUses(): number {
   try {
@@ -132,12 +140,29 @@ export function MascotLever({
   );
 
   const [shaking, setShaking] = useState(false);
+  // The stretch of waking up plays once per wake, on the same face. It used to remount the face
+  // (`key={wakeKey}`), which restarted every animation of it from the first frame — and after a
+  // hold's shiver the stretch played again, in the middle of listening.
+  const [waking, setWaking] = useState(false);
+  const [wakeSeen, setWakeSeen] = useState(wakeKey);
+  if (wakeSeen !== wakeKey) {
+    setWakeSeen(wakeKey);
+    setWaking(true);
+  }
   // this face is being held with the microphone open — the screen may want to know
   const setHeld = useCallback((value: boolean) => onHold?.(value), [onHold]);
   const [cancelArmed, setCancelArmed] = useState(false);
   // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
   const faceRef = useRef<HTMLSpanElement>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
+
+  // the give under the finger: a motion value, not state — a pointer move must not re-render the face
+  const pull = useMotionValue(0);
+  const give = useSpring(pull, GIVE_SPRING);
+  // a finger (or a button) is down on the face — a hovering mouse moves nothing; nor does anything
+  // under «уменьшить движение»
+  const pressed = useRef(false);
+  const still = useReducedMotion() ?? false;
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdFired = useRef(false);
@@ -161,7 +186,6 @@ export function MascotLever({
       const now = performance.now();
       if (now - last < 50) return;
       last = now;
-      // read each time: a wake animation remounts the wrapper
       faceRef.current?.style.setProperty("--mascot-level", Math.min(1, Math.max(0, value)).toFixed(3));
     });
     return () => {
@@ -189,6 +213,7 @@ export function MascotLever({
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLButtonElement>) => {
       if (busy || !voice) return;
+      pressed.current = !still;
       event.currentTarget.setPointerCapture(event.pointerId);
       start.current = { x: event.clientX, y: event.clientY };
       holdFired.current = false;
@@ -206,7 +231,7 @@ export function MascotLever({
         bumpUses();
       }, HOLD_MS);
     },
-    [busy, clearHold, startVoice, voice, pin, setHeld],
+    [busy, clearHold, startVoice, voice, pin, setHeld, still],
   );
 
   const onPointerMove = useCallback(
@@ -214,19 +239,23 @@ export function MascotLever({
       const dy = event.clientY - start.current.y;
       if (holdFired.current) {
         setCancelArmed(-dy >= CANCEL_DISTANCE_PX);
+        if (pressed.current) pull.set(dy < 0 ? -Math.min(GIVE_PX, -dy / 4) : 0);
         return;
       }
+      if (pressed.current) pull.set(dy > 0 ? Math.min(GIVE_PX, dy / 3) : 0);
       if (dy >= TEXT_DISTANCE_PX && !pulledDown.current) {
         // a pull, not a hold: the microphone never starts
         pulledDown.current = true;
         clearHold();
       }
     },
-    [clearHold],
+    [clearHold, pull],
   );
 
   const onPointerUp = useCallback(async () => {
     clearHold();
+    pressed.current = false;
+    pull.set(0);
     if (!voice) {
       onTap();
       return;
@@ -251,10 +280,12 @@ export function MascotLever({
       return;
     }
     await stopVoice();
-  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice, setHeld]);
+  }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice, setHeld, pull]);
 
   const onPointerCancel = useCallback(() => {
     clearHold();
+    pressed.current = false;
+    pull.set(0);
     pulledDown.current = false;
     if (holdFired.current) {
       holdFired.current = false;
@@ -262,7 +293,7 @@ export function MascotLever({
     }
     setHeld(false);
     setCancelArmed(false);
-  }, [cancelVoice, clearHold, setHeld]);
+  }, [cancelVoice, clearHold, setHeld, pull]);
 
   // The pipeline plays on this face, where the director is already looking: no second
   // mascot over the screen, the same one listens, saves, reads, sorts and throws (D-60).
@@ -281,7 +312,7 @@ export function MascotLever({
       <motion.div layout className="relative flex items-center justify-center" style={{ width: BASE + 24, height: BASE + 24 }} transition={SPRING}>
         {/* the size the screen asked for is a scale, not a new face: growing and shrinking
             rides the same spring as the box and never re-draws the SVG mid-flight */}
-        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} className="flex items-center justify-center">
+        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ y: give }} className="flex items-center justify-center">
           <button
             type="button"
             aria-label={recording ? "Идёт запись, отпусти для отправки" : (label ?? (voice ? "Маскот: удержи — говори, тап — задачи, потяни вниз — текст" : "Маскот: тап — дела"))}
@@ -317,10 +348,13 @@ export function MascotLever({
               }}
             />
             <span
-              key={wakeKey}
               ref={faceRef}
               className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
-              style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
+              style={{ animation: shaking ? "mascot-shake 220ms ease-in-out both" : waking ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
+              onAnimationEnd={(event) => {
+                // the face's own animations end in here too: only the stretch of this wrapper counts
+                if (event.target === event.currentTarget && event.animationName === "mascot-wake") setWaking(false);
+              }}
             >
               <Mascot state={face} size={BASE} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} />
             </span>
