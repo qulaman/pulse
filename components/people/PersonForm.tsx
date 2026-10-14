@@ -179,9 +179,13 @@ export function PersonForm({
 
   const person = draft.role !== "tv";
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+  // A new person signs in with a one-time code (D-135); an email and a password are only for
+  // a password login — a computer, a habit — and open on request.
+  const [withEmail, setWithEmail] = useState(false);
+  const typedEmail = (draft.email ?? "").trim();
   const valid =
     draft.full_name.trim().length >= 2 &&
-    (mode === "edit" || ((draft.email ?? "").includes("@") && (draft.password ?? "").length >= 6));
+    (mode === "edit" || !typedEmail || (typedEmail.includes("@") && (draft.password ?? "").length >= 6));
 
   const submit = async () => {
     try {
@@ -197,21 +201,37 @@ export function PersonForm({
       {mode === "create" ? (
         <Section title="Вход">
           <div className="card flex flex-col gap-4 p-4">
-            <Field label="Почта">
-              <input
-                type="email"
-                inputMode="email"
-                autoComplete="off"
-                autoCapitalize="none"
-                className={FIELD}
-                value={draft.email}
-                onChange={(e) => set({ email: e.target.value })}
-                placeholder="name@company.kz"
-              />
-            </Field>
-            <Field label="Первый пароль" hint="После добавления покажу вход целиком — скопировать или отправить в мессенджер">
-              <PasswordField label="Первый пароль" value={draft.password ?? ""} onChange={(password) => set({ password })} />
-            </Field>
+            <p className="text-[14px] leading-[18px] text-muted" data-testid="new-person-code-hint">
+              По коду: после «Добавить» покажу код из 8 цифр и QR — почта и пароль не нужны.
+            </p>
+            {withEmail ? (
+              <>
+                <Field label="Почта">
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    className={FIELD}
+                    value={draft.email}
+                    onChange={(e) => set({ email: e.target.value })}
+                    placeholder="name@company.kz"
+                  />
+                </Field>
+                <Field label="Первый пароль" hint="После добавления покажу вход целиком — скопировать или отправить в мессенджер">
+                  <PasswordField label="Первый пароль" value={draft.password ?? ""} onChange={(password) => set({ password })} />
+                </Field>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setWithEmail(true)}
+                className="self-start text-[14px] leading-[18px] text-accent"
+                data-testid="new-person-with-email"
+              >
+                + Почта и пароль — для входа с компьютера
+              </button>
+            )}
           </div>
         </Section>
       ) : null}

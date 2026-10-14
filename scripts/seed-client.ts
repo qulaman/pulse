@@ -107,13 +107,14 @@ async function seed(supabase: SupabaseClient, q: Questionnaire, people: Plan[], 
   for (const p of people) console.log(`  ${p.role.padEnd(10)} ${p.full_name.padEnd(28)} ${p.email.padEnd(30)} алиасы: ${p.aliases.join(", ") || "—"}`);
   if (dryRun) return;
 
+  // the slug is the company's address in a sign-in link, `/c/<slug>` (D-135)
   let companyId = existing?.id;
   if (!companyId) {
-    const inserted = await supabase.from("companies").insert({ name: q.company_name, settings }).select("id").single();
+    const inserted = await supabase.from("companies").insert({ name: q.company_name, settings, slug: q.slug }).select("id").single();
     if (inserted.error) throw new Error(`company insert failed: ${inserted.error.message}`);
     companyId = inserted.data.id;
   } else {
-    const updated = await supabase.from("companies").update({ settings }).eq("id", companyId);
+    const updated = await supabase.from("companies").update({ settings, slug: q.slug }).eq("id", companyId);
     if (updated.error) throw new Error(`company settings update failed: ${updated.error.message}`);
   }
 

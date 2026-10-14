@@ -41,6 +41,7 @@
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Vercel | **своя пара среды** | см. предупреждение ниже |
 | `VAPID_PRIVATE_KEY` | Vercel server-only | пара среды | |
 | `VAPID_SUBJECT` | Vercel | `mailto:...` | контактный email |
+| `LOGIN_CODE_SECRET` | Vercel server-only, `.env.local` | необязателен | ключ HMAC кодов входа и адресов в `login_attempts` (D-135); без него — производный от `SUPABASE_SERVICE_ROLE_KEY`. Смена ключа гасит только живые коды (15 минут) |
 | `CRON_SECRET` | Vercel server-only, `.env.local` | свой | секрет тика: `/api/push/sweep` сверяет `Authorization: Bearer <CRON_SECRET>`, без него — 401 (§3, шаг 7) |
 | `DEMO_RESET_ENABLED` | Vercel server-only, `.env.local` | `1` | замок кнопки «Обнулить демо-базу» (`POST /api/admin/reset-demo`, стирает активность компании, людей и настройки оставляет); без него роут отвечает 403; **на проде не задавать** — в общем деплое включился бы всем компаниям; переезд в признак демо-компании — D-134 п. 6 |
 | `NEXT_PUBLIC_DEMO_MODE` | Vercel, `.env.local` | `1` | показывает раздел «Демо» в Настройках; решает всё равно серверный замок; **на проде не задавать** (D-134 п. 6) |

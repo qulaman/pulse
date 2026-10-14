@@ -128,8 +128,9 @@ export function useUpdatePerson() {
 }
 
 export type NewPerson = {
-  email: string;
-  password: string;
+  /** Only for a password login; without it the person signs in with a code (D-135). */
+  email?: string;
+  password?: string;
   full_name: string;
   role: Role;
   position?: string;
@@ -175,6 +176,55 @@ export function usePersonLogin(id: string, enabled: boolean) {
       const res = await fetch(`/api/people/${id}/login`, { credentials: "include" });
       if (!res.ok) throw await failure(res, "Не удалось прочитать вход");
       return (await res.json()) as PersonLogin;
+    },
+  });
+}
+
+/** A code just issued (D-135): it is in this answer only — the base keeps an HMAC. */
+export type IssuedCode = { code: string; expires_at: string; link: string; company: string; name: string };
+
+export type LoginCodeStatus = {
+  state: "none" | "open" | "used" | "expired" | "cancelled";
+  issued_at: string | null;
+  expires_at: string | null;
+  used_at: string | null;
+  device: string | null;
+  issued_by: string | null;
+  link: string;
+  company: string;
+};
+
+/** A fresh one-time sign-in code for a person (D-135); the previous open one stops working. */
+export function useIssueLoginCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, requestId }: { id: string; requestId: string }): Promise<IssuedCode> => {
+      const res = await fetch(`/api/people/${id}/login-code`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ client_request_id: requestId }),
+      });
+      if (!res.ok) throw await failure(res, "Не получилось выдать код");
+      return (await res.json()) as IssuedCode;
+    },
+    onSuccess: (_issued, { id }) => void queryClient.invalidateQueries({ queryKey: ["people", id, "login-code"] }),
+  });
+}
+
+/**
+ * The last code of a person: «ждёт входа» → «вошли с iPhone». `poll` while a sheet waits for
+ * the sign-in — two seconds, so the issuer sees it land while the person is still in front of them.
+ */
+export function useLoginCodeStatus(id: string, enabled: boolean, poll: boolean) {
+  return useQuery({
+    queryKey: ["people", id, "login-code"],
+    enabled,
+    refetchInterval: poll ? 2000 : false,
+    queryFn: async (): Promise<LoginCodeStatus> => {
+      const res = await fetch(`/api/people/${id}/login-code`, { credentials: "include" });
+      if (!res.ok) throw await failure(res, "Не удалось прочитать код входа");
+      return (await res.json()) as LoginCodeStatus;
     },
   });
 }

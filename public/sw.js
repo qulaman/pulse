@@ -39,7 +39,12 @@ function isBuildFile(url) {
 
 /** Screens worth keeping: the app's own pages — not the API, not the sign-in, not the sandboxes. */
 function isKeptScreen(url) {
-  return !url.pathname.startsWith("/api/") && !url.pathname.startsWith("/dev") && url.pathname !== "/login";
+  return (
+    !url.pathname.startsWith("/api/") &&
+    !url.pathname.startsWith("/dev") &&
+    url.pathname !== "/login" &&
+    !url.pathname.startsWith("/c/") // a company's sign-in screen (D-135)
+  );
 }
 
 async function buildFile(request) {

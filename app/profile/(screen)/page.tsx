@@ -4,6 +4,7 @@ import { InstallHint } from "@/components/InstallHint";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { AfterPoints } from "@/components/profile/AfterPoints";
+import { OtherDeviceRow } from "@/components/profile/OtherDeviceRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
@@ -51,6 +52,7 @@ export default async function ProfilePage() {
         <h2 className="eyebrow mt-6 px-1">Личное</h2>
         <RowGroup className="mt-2">
           <PasswordRow />
+          <OtherDeviceRow userId={profile.userId} fullName={profile.fullName} />
           <NotificationsRow director={director} />
           <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
         </RowGroup>

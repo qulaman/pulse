@@ -12,7 +12,7 @@ function isPublicPath(pathname: string): boolean {
   }
   return (
     pathname === "/" ||
-    pathname === "/login" ||
+    isSignInPath(pathname) ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname.includes(".")
@@ -64,7 +64,7 @@ export async function proxy(request: NextRequest) {
     return redirectTo(request, response, "/login");
   }
 
-  if (pathname === "/" || pathname === "/login") {
+  if (pathname === "/" || isSignInPath(pathname)) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -79,6 +79,11 @@ export async function proxy(request: NextRequest) {
   }
 
   return response;
+}
+
+/** The sign-in screen: `/login`, or a company's own address from a QR, `/c/<slug>` (D-135). */
+function isSignInPath(pathname: string): boolean {
+  return pathname === "/login" || /^\/c\/[^/]+\/?$/.test(pathname);
 }
 
 /** Redirect that keeps the refreshed auth cookies of `response`. */
