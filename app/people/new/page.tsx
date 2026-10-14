@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Credentials } from "@/components/people/Credentials";
+import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { PersonForm, draftOf } from "@/components/people/PersonForm";
 import { PageHead } from "@/components/ui/PageHead";
 import { NewPersonFormBone } from "@/components/ui/PageSkeletons";
@@ -12,12 +13,12 @@ import { assignableRoles } from "@/lib/people/access";
 import { useCreatePerson, usePeople } from "@/lib/people/queries";
 import { useMe } from "@/lib/tasks/queries";
 
-type Created = { id: string; name: string; email: string; password: string };
+type Created = { id: string; name: string; email: string | null; password: string | null };
 
 /**
- * A new person (D-104): email, a ready first password, card and role on one screen; after
- * «Добавить» the login is handed over in a sheet — copy it or send it to a messenger —
- * instead of a password the director has to remember and retype.
+ * A new person (D-104): card and role on one screen; after «Добавить» the way in is handed
+ * over in a sheet. By default a one-time code with a QR (D-135) — nothing to remember, nothing
+ * to retype; with an email typed, the email and the first password, to copy or send.
  */
 export default function NewPersonPage() {
   const router = useRouter();
@@ -50,11 +51,10 @@ export default function NewPersonPage() {
             roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
             pending={create.isPending}
             onSubmit={async (draft) => {
-              const email = (draft.email ?? "").trim().toLowerCase();
-              const password = draft.password ?? "";
+              const email = (draft.email ?? "").trim().toLowerCase() || null;
+              const password = email ? (draft.password ?? "") : null;
               const { id } = await create.mutateAsync({
-                email,
-                password,
+                ...(email && password ? { email, password } : {}),
                 full_name: draft.full_name.trim(),
                 role: draft.role,
                 position: draft.position.trim() || undefined,
@@ -67,8 +67,12 @@ export default function NewPersonPage() {
         )}
       </div>
 
-      <Sheet open={created !== null} onClose={finish} title={created ? `${created.name.split(/\s+/)[0]} — в команде` : ""}>
-        {created ? (
+      <Sheet
+        open={created !== null}
+        onClose={finish}
+        title={created ? `${created.name.split(/\s+/)[0]} — в команде${created.email ? "" : " · код входа"}` : ""}
+      >
+        {created?.email && created.password ? (
           <Credentials
             name={created.name}
             email={created.email}
@@ -76,6 +80,8 @@ export default function NewPersonPage() {
             note="Это первый пароль. Свой можно поставить в «Профиле» — старый тогда перестанет работать."
             onDone={finish}
           />
+        ) : created ? (
+          <LoginCodePanel person={{ id: created.id, full_name: created.name }} autoIssue onDone={finish} />
         ) : null}
       </Sheet>
     </main>

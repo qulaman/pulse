@@ -3,13 +3,15 @@
 import { useState, type FormEvent } from "react";
 
 import { Credentials } from "@/components/people/Credentials";
+import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { PasswordField } from "@/components/people/PasswordField";
-import { ClockIcon, KeyIcon, MailIcon } from "@/components/settings/icons";
+import { ClockIcon, KeyIcon, MailIcon, QrIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { visibleEmail } from "@/lib/people/email";
 import { generatePassword } from "@/lib/people/password";
 import { useChangeLoginEmail, usePersonLogin, useResetPassword, type Person } from "@/lib/people/queries";
 
@@ -17,22 +19,28 @@ const FIELD =
   "min-h-[52px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
 
 /**
- * «Вход» on the person's editor (D-104): the email they sign in with, when they last did,
- * and «Сбросить пароль» — a ready password in one tap, then handed over by copy or share.
- * Shown only where `canResetLogin` allows; the routes check the same rule.
+ * «Вход» on the person's editor (D-104): «Код входа» first — eight digits and a QR, and the
+ * person is in (D-135); then the email they sign in with, when they last did, and «Сбросить
+ * пароль» — a ready password in one tap, handed over by copy or share. A person added without
+ * an email carries a service address in Auth: it shows as «нет», and a password waits for a
+ * real email (lib/people/email.ts). Shown only where `canResetLogin` allows; the routes check
+ * the same rule.
  */
 export function LoginCard({ person }: { person: Person }) {
   const login = usePersonLogin(person.id, true);
   const reset = useResetPassword();
   const changeEmail = useChangeLoginEmail();
 
-  const [sheet, setSheet] = useState<"password" | "email" | null>(null);
+  const [sheet, setSheet] = useState<"code" | "password" | "email" | null>(null);
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // a fresh panel per opening; the closing sheet keeps the last one on screen as it slides away
+  const [codeKey, setCodeKey] = useState(0);
 
   const first = person.full_name.split(/\s+/)[0] || person.full_name;
+  const shownEmail = visibleEmail(login.data?.email);
   const close = () => setSheet(null);
 
   const openPassword = () => {
@@ -42,7 +50,7 @@ export function LoginCard({ person }: { person: Person }) {
     setSheet("password");
   };
   const openEmail = () => {
-    setEmail(login.data?.email ?? "");
+    setEmail(shownEmail ?? "");
     setError(null);
     setSheet("email");
   };
@@ -57,13 +65,13 @@ export function LoginCard({ person }: { person: Person }) {
     event.preventDefault();
     const next = email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(next)) return setError("Похоже, в почте опечатка");
-    if (next === login.data?.email) return close();
+    if (next === shownEmail) return close();
     setError(null);
     changeEmail.mutate(
       { id: person.id, email: next },
       {
         onSuccess: () => {
-          toast(`Теперь ${first} входит с ${next}`);
+          toast(`Теперь ${first} может входить и с ${next}`);
           close();
         },
         onError: (e) => setError(e.message),
@@ -77,9 +85,18 @@ export function LoginCard({ person }: { person: Person }) {
       <h2 className="eyebrow px-1">Вход</h2>
       <RowGroup className="mt-2">
         <Row
+          icon={<QrIcon />}
+          title="Код входа"
+          value="выдать"
+          onClick={() => {
+            setCodeKey((k) => k + 1);
+            setSheet("code");
+          }}
+        />
+        <Row
           icon={<MailIcon />}
           title="Почта"
-          value={login.isLoading ? "…" : login.isError ? "не прочиталась" : (login.data?.email ?? "нет")}
+          value={login.isLoading ? "…" : login.isError ? "не прочиталась" : (shownEmail ?? "нет")}
           onClick={login.data ? openEmail : undefined}
         />
         <Row
@@ -89,19 +106,27 @@ export function LoginCard({ person }: { person: Person }) {
           value={login.isLoading ? "…" : last ? humanAqtobe(new Date(last)) : login.data ? "ни разу" : "—"}
           valueColor={login.data && !last ? "var(--warn)" : undefined}
         />
-        <Row icon={<KeyIcon />} title="Сбросить пароль" value="новый" onClick={openPassword} />
+        {login.data && !shownEmail ? (
+          <Row icon={<KeyIcon />} title="Пароль" value="нужна почта" onClick={openEmail} />
+        ) : (
+          <Row icon={<KeyIcon />} title="Сбросить пароль" value="новый" onClick={openPassword} />
+        )}
       </RowGroup>
       {login.data && !last ? (
         <p className="mt-2 px-1 text-[13px] leading-4 text-muted">
-          Этим входом ещё ни разу не пользовались — отправь его заново: «Сбросить пароль» → «Отправить»
+          Входа ещё не было — поможет «Код входа»
         </p>
       ) : null}
+
+      <Sheet open={sheet === "code"} onClose={close} title={`Код входа · ${first}`}>
+        <LoginCodePanel key={codeKey} person={person} onDone={close} />
+      </Sheet>
 
       <Sheet open={sheet === "password"} onClose={close} title={done ? "Пароль задан" : `Новый пароль · ${first}`}>
         {done ? (
           <Credentials
             name={person.full_name}
-            email={login.data?.email ?? null}
+            email={shownEmail}
             password={password}
             note="Старый пароль больше не работает. Свой пароль можно поставить в «Профиле»."
             onDone={close}
@@ -124,7 +149,11 @@ export function LoginCard({ person }: { person: Person }) {
 
       <Sheet open={sheet === "email"} onClose={close} title="Почта для входа">
         <form onSubmit={submitEmail} className="flex flex-col gap-3">
-          <p className="text-[14px] leading-[18px] text-muted">С этой почтой {first} входит в приложение. Пароль не меняется.</p>
+          <p className="text-[14px] leading-[18px] text-muted">
+            {shownEmail
+              ? `С этой почтой ${first} входит по паролю. Пароль не меняется.`
+              : "Почта нужна только для входа по паролю — например, с компьютера. По коду вход работает и без неё."}
+          </p>
           <input
             type="email"
             inputMode="email"

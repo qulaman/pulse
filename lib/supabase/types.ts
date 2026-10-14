@@ -191,18 +191,21 @@ export type Database = {
           id: string
           name: string
           settings: Json
+          slug: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
           settings?: Json
+          slug?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
           settings?: Json
+          slug?: string | null
         }
         Relationships: []
       }
@@ -628,6 +631,97 @@ export type Database = {
           },
           {
             foreignKeyName: "ingest_batches_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      login_attempts: {
+        Row: {
+          at: string
+          device: string | null
+          id: number
+          ip_hash: string
+          ok: boolean
+        }
+        Insert: {
+          at?: string
+          device?: string | null
+          id?: never
+          ip_hash: string
+          ok: boolean
+        }
+        Update: {
+          at?: string
+          device?: string | null
+          id?: never
+          ip_hash?: string
+          ok?: boolean
+        }
+        Relationships: []
+      }
+      login_codes: {
+        Row: {
+          cancelled_at: string | null
+          code_hash: string
+          company_id: string
+          expires_at: string
+          id: string
+          issue_request_id: string | null
+          issued_at: string
+          issued_by: string
+          redeem_request_id: string | null
+          used_at: string | null
+          used_device: string | null
+          user_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          code_hash: string
+          company_id: string
+          expires_at: string
+          id?: string
+          issue_request_id?: string | null
+          issued_at?: string
+          issued_by: string
+          redeem_request_id?: string | null
+          used_at?: string | null
+          used_device?: string | null
+          user_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          code_hash?: string
+          company_id?: string
+          expires_at?: string
+          id?: string
+          issue_request_id?: string | null
+          issued_at?: string
+          issued_by?: string
+          redeem_request_id?: string | null
+          used_at?: string | null
+          used_device?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "login_codes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "login_codes_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "login_codes_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -2277,6 +2371,16 @@ export type Database = {
           user_id: string
         }[]
       }
+      issue_login_code: {
+        Args: {
+          p_code_hash: string
+          p_issued_by: string
+          p_request_id?: string
+          p_ttl_seconds?: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
       is_event_participant: { Args: { p_event: string }; Returns: boolean }
       mark_thread_read: {
         Args: { seq: number; task_id: string }
@@ -2339,6 +2443,17 @@ export type Database = {
         }
         Returns: Json
       }
+      redeem_login_code: {
+        Args: {
+          p_code_hash: string
+          p_device?: string
+          p_ip_hash: string
+          p_request_id?: string
+          p_used_device?: string
+        }
+        Returns: Json
+      }
+      release_login_code: { Args: { p_code_id: string }; Returns: undefined }
       request_deadline: {
         Args: {
           client_request_id?: string

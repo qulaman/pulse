@@ -4,12 +4,15 @@ import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
 import { assignableRoles } from "@/lib/people/access";
 import { suggestAliases } from "@/lib/people/aliases";
+import { syntheticEmail } from "@/lib/people/email";
 import { loadRoster } from "@/lib/roster";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const BodySchema = z.strictObject({
-  email: z.email(),
-  password: z.string().min(6).max(72),
+  // both optional (D-135): a person signs in with a one-time code; email + password are
+  // for a password login only
+  email: z.email().optional(),
+  password: z.string().min(6).max(72).optional(),
   full_name: z.string().trim().min(2).max(120),
   role: z.enum(["director", "manager", "employee", "shopkeeper", "secretary", "tv"]),
   position: z.string().trim().max(120).optional(),
@@ -22,7 +25,8 @@ const BodySchema = z.strictObject({
  * a director (the role picker's rule, lib/people/access.ts). Auth user via the admin API
  * (service role), profile insert right after; if the profile fails, the auth user is
  * removed again so a retry with the same email does not hit "already registered".
- * The QR-invite + PIN flow of D-06 replaces the password field in the onboarding order.
+ * Without an email the person gets a service address on `.invalid` and a password nobody
+ * knows: the way in is a one-time code from the card (D-135).
  */
 export const POST = withAuth<z.infer<typeof BodySchema>>(
   ["director", "secretary"],
@@ -33,8 +37,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const service = createServiceSupabase();
 
     const created = await service.auth.admin.createUser({
-      email: body.email,
-      password: body.password,
+      email: body.email ?? syntheticEmail(),
+      // two random UUIDs: 72 characters, bcrypt's limit — a password no one has
+      password: body.password ?? `${globalThis.crypto.randomUUID()}${globalThis.crypto.randomUUID()}`,
       email_confirm: true,
       user_metadata: { full_name: body.full_name },
     });

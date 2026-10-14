@@ -4,7 +4,7 @@
 
 Метки: `[есть]`, `[за флагом: settings.<ключ>]`. Документ описывает построенное; идеи непостроенного — `IDEAS.md`, смена способа — решением в `DECISIONS.md`.
 
-Модель SaaS — V-02: одна БД = один клиент, изолированный инстанс (свой Supabase-проект) на каждую компанию клиента. `company_id` и RLS при этом СОХРАНЯЮТСЯ во всех таблицах — как защита ролей внутри компании и страховка архитектуры. Кросс-клиентской логики нет; всё клиентское — в `company.settings`.
+Модель SaaS — D-134 (пересматривает V-02): одна БД на всех клиентов; отдельный инстанс (свой Supabase-проект) — опция поставки, схема та же. `company_id` и RLS во всех таблицах — граница между клиентами и защита ролей внутри компании: каждая новая таблица получает политику по `company_id` и негативный pgTAP «компания A не видит компанию B» (TESTING §2). Пути в бакетах начинаются с `company_id`. Всё клиентское — в `company.settings`.
 
 ## Общие правила
 
@@ -43,7 +43,7 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 ## Таблицы
 
 ### companies
-`id, name text, settings jsonb not null default '{}'`, created_at. Секции `settings` — `CompanySettingsSchema` в `lib/settings.ts` (код подставляет дефолты, неизвестные ключи сохраняет):
+`id, name text, settings jsonb not null default '{}'`, `slug text` (адрес компании в ссылке входа `/c/<slug>`, `^[a-z0-9-]{2,40}$`, уникален где не null; ставит `seed:client` из анкеты — D-135), created_at. Секции `settings` — `CompanySettingsSchema` в `lib/settings.ts` (код подставляет дефолты, неизвестные ключи сохраняет):
 
 | Секция | Содержимое | Решение |
 |---|---|---|
@@ -319,6 +319,12 @@ created_at, accepted_at null, done_at null, updated_at
 
 **Сообщение секретаря на стену (D-116)** — та же таблица, `kind` (`visitor` по умолчанию | `message`; миграция `20260924180000_visit_messages`). Проверка статуса по виду: посетитель — `waiting | wait | invited | declined | expired`, сообщение — `waiting → read | expired`; у сообщения `note` обязателен (`visits_message_note_check`). Outbox: `visit_message` директорам (категория «Секретарь»), автору — только `visit_answered` «Директор не прочитал» при истечении (30 минут); `read` снимает неушедший `visit_message`. `tv_overlay()` отдаёт свежее непрочитанное сообщение и их число, гостю — без текста; приглашённый визит больше не отдаёт. pgTAP — `032_visit_messages.test.sql`.
 
+### login_codes — одноразовые коды входа (D-135)
+`id, company_id fk companies, user_id fk profiles, issued_by fk profiles` (все cascade), `code_hash text` — HMAC-SHA256 кода (сам код база не хранит: 8 цифр по простому хешу подбираются за секунды), `issued_at, expires_at` (15 минут), `issue_request_id uuid` (уникален — двойной тап), `used_at, cancelled_at, redeem_request_id uuid, used_device text` («iPhone / Android / компьютер» для карточки). Уникальный индекс по `code_hash` среди открытых (`used_at` и `cancelled_at` пусты) — **на всю базу**: код сам находит человека и компанию (D-134). RLS включён без политик, `revoke all` у anon/authenticated: читает и пишет только сервер (service role) через функции ниже. Старше 30 дней удаляются при выдаче. Миграция `20261014150000_login_codes`.
+
+### login_attempts — попытки входа по коду (D-135)
+`id bigint identity, at timestamptz, ip_hash text` (HMAC адреса, сам IP не хранится), `device text` (случайный id браузера), `ok boolean`. Лимиты неверных попыток: 10 за 15 минут с адреса, 10 за 15 минут с устройства, 200 за 10 минут на всю базу. RLS без политик, только service role; старше суток удаляются при выдаче кода.
+
 ### consents
 Не построено: таблицы согласий и анонимизации по согласию нет; идея — IDEAS.md (И-81).
 
@@ -440,6 +446,16 @@ fn_rating(p_from timestamptz, p_to timestamptz)
 -- состав — активные team_role(); rating_mode='top5' — топ-5 + строка запрашивающего; директору — все
 update_company_settings(patch jsonb) returns jsonb            -- director, secretary (D-104), settings || patch
 update_company_profile(p_name text) returns jsonb             -- director, secretary (D-104), название 1–120
+
+-- вход по коду (D-135) — только service_role; кто кому выдаёт, проверяет роут (canResetLogin)
+issue_login_code(p_user_id uuid, p_issued_by uuid, p_code_hash text, p_ttl_seconds int default 900,
+                 p_request_id uuid default null) returns json   -- {id, expires_at}; прежний открытый код человека отменяется;
+                                                              -- ошибки: not_found (не одна компания), inactive, duplicate, collision, too_many_codes (30 открытых)
+redeem_login_code(p_code_hash text, p_ip_hash text, p_device text default null, p_request_id uuid default null,
+                  p_used_device text default null) returns json -- {ok, user_id, company_id, code_id} | {ok:false, error: bad_code|too_many};
+                                                              -- код берётся одним update (один раз), ушедший человек не входит; тот же p_request_id
+                                                              -- за 10 минут — снова тот же человек (потерянный ответ)
+release_login_code(p_code_id uuid) returns void               -- сессию не выдали: код возвращается, пока жив
 
 -- магазин (hold-final, D-10)
 create_shop_order(p_item_id uuid, client_request_id uuid default null) returns jsonb

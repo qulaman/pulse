@@ -54,20 +54,43 @@ export async function loadBrand(companyId?: string): Promise<Brand> {
     // read serves the header too; an id that is not it still gets its own read
     const first = await loadCompanyRow();
     const data = !companyId || first?.id === companyId ? first : await loadCompanyRow(companyId);
-    if (!data) return FALLBACK;
-    const settings = parseCompanySettings(data.settings);
-    const { accent, custom } = effectiveAccent(settings.brand.accent);
-    return {
-      companyId: data.id,
-      name: data.name,
-      tagline: settings.brand.tagline,
-      logoUrl: settings.brand.logo_url,
-      accent,
-      customAccent: custom,
-      pointsEnabled: settings.points_enabled,
-    };
+    return data ? brandOf(data) : FALLBACK;
   } catch (error) {
     console.error("brand load failed:", error instanceof Error ? error.message : error);
     return FALLBACK;
   }
+}
+
+/**
+ * The brand behind a company's address `/c/<slug>` (D-135): the sign-in screen a QR opens.
+ * An unknown slug gets the product's brand with no «не найдено» — the page must not tell a
+ * passer-by which addresses exist (D-134: the list of clients is nobody's business).
+ */
+export async function loadBrandBySlug(slug: string): Promise<Brand> {
+  if (!/^[a-z0-9-]{2,40}$/.test(slug)) return FALLBACK;
+  try {
+    const { data } = await createServiceSupabase()
+      .from("companies")
+      .select("id, name, settings")
+      .eq("slug", slug)
+      .maybeSingle();
+    return data ? brandOf(data) : FALLBACK;
+  } catch (error) {
+    console.error("brand by slug failed:", error instanceof Error ? error.message : error);
+    return FALLBACK;
+  }
+}
+
+function brandOf(data: CompanyRow): Brand {
+  const settings = parseCompanySettings(data.settings);
+  const { accent, custom } = effectiveAccent(settings.brand.accent);
+  return {
+    companyId: data.id,
+    name: data.name,
+    tagline: settings.brand.tagline,
+    logoUrl: settings.brand.logo_url,
+    accent,
+    customAccent: custom,
+    pointsEnabled: settings.points_enabled,
+  };
 }

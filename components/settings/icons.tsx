@@ -181,3 +181,20 @@ export const MailIcon = () => (
     <path d="m3.4 5.6 6.6 5.2 6.6-5.2" />
   </svg>
 );
+
+export const QrIcon = () => (
+  <svg {...stroke}>
+    <rect x="3" y="3" width="5.5" height="5.5" rx="1" />
+    <rect x="11.5" y="3" width="5.5" height="5.5" rx="1" />
+    <rect x="3" y="11.5" width="5.5" height="5.5" rx="1" />
+    <path d="M11.5 11.5h2.2v2.2M17 11.5v2.2M11.5 17h2.2M15.8 15.8H17V17" />
+  </svg>
+);
+
+export const DevicesIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.6" y="4.2" width="10.4" height="8.6" rx="1.6" />
+    <path d="M5.4 15.8h4.8" />
+    <rect x="13.4" y="7.4" width="4.2" height="8.6" rx="1.2" />
+  </svg>
+);
