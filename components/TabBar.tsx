@@ -1,12 +1,16 @@
 "use client";
 
-import { motion, MotionConfig, useReducedMotion, useSpring, useTransform, useVelocity } from "framer-motion";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
+import { warmCalendarMonth } from "@/lib/calendar/queries";
+import { monthOf } from "@/lib/datetime/calendar";
+import { warmNotes } from "@/lib/notes/queries";
+import { afterHydration } from "@/lib/offline/persist";
 import type { TabBarRole } from "@/lib/routes";
-import { inboxCounts, useDirectorInbox, useFreshTaskCount, useMe } from "@/lib/tasks/queries";
+import { inboxCounts, useDirectorInbox, useFreshTaskCount, useMe, warmMyTasks, warmSentTasks } from "@/lib/tasks/queries";
 import { useVisualViewport } from "@/lib/ui/useVisualViewport";
 
 import styles from "./TabBar.module.css";
@@ -274,24 +278,110 @@ function useKeyboardUp(): boolean {
 let lastIndex = -1;
 const seenBadges = new Map<string, number>();
 
-const THUMB = { stiffness: 520, damping: 38, mass: 0.9 };
+/**
+ * The thumb's spring (stiffness 520, damping 38, mass 0.9) written out: the slide is the
+ * `linear()` curve of `.thumb` in the CSS, the stretch is its speed sampled below — per
+ * column of travel, columns per second at [ms]. Both play on the compositor: the next
+ * screen rendering on the main thread no longer stalls the thumb mid-way (D-136).
+ */
+const THUMB_MS = 320;
+const THUMB_SPEED: ReadonlyArray<readonly [number, number]> = [
+  [0, 0], [15, 6.29], [30, 9.03], [43, 9.62], [60, 9.01], [90, 6.46], [130, 3.22], [170, 1.29], [210, 0.4], [260, 0.03], [320, 0],
+];
+
+/** Stretched along the travel by its speed, round again when it lands: a drop of light pulled across the glass. */
+export function stretchKeyframes(columns: number): Keyframe[] {
+  return THUMB_SPEED.map(([ms, speed]) => ({
+    transform: `scaleX(${(1 + Math.min(speed * columns * 0.03, 0.34)).toFixed(3)})`,
+    offset: ms / THUMB_MS,
+  }));
+}
 
 /**
- * The thumb rides a spring measured in columns and stretches with its own speed — a drop
- * of light pulled across the glass, round again when it lands. Transform only.
+ * Slides the thumb to `index` in whole columns (`--i`, a CSS transition) and stretches it on
+ * the way. A bar mounted in another layout first stands where the last one stood (`from`, set
+ * in its markup — the bar's own layout effects compute styles before this one runs), then slides.
  */
-function useThumb(index: number, from: number) {
-  const reduce = useReducedMotion();
-  const pos = useSpring(Math.max(from, 0), THUMB);
+function useThumb(thumb: RefObject<HTMLSpanElement | null>, index: number, from: number) {
+  const shown = useRef<number | null>(null);
+  const stretching = useRef<Animation | null>(null);
+  useLayoutEffect(() => {
+    const el = thumb.current;
+    if (!el || index < 0 || shown.current === index) return;
+    let start = shown.current;
+    if (start === null) {
+      start = Math.max(from, 0);
+      // the transition needs the starting column computed before the target replaces it
+      void getComputedStyle(el).transform;
+    }
+    shown.current = index;
+    el.style.setProperty("--i", String(index));
+    const travel = Math.abs(index - start);
+    const pad = el.firstElementChild;
+    if (!travel || !pad || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    stretching.current?.cancel();
+    stretching.current = pad.animate(stretchKeyframes(travel), { duration: THUMB_MS, easing: "linear" });
+  }, [thumb, index, from]);
+}
+
+/**
+ * The tabs are prefetched in full (`prefetch` on their links) and such a copy lives 30
+ * minutes (`staleTimes.static`, next.config): a tab opens without asking the server. A phone
+ * back from a longer stay in the background asks for fresh copies at once, so its first tap
+ * does not wait either (D-136).
+ */
+const WARM_MS = 25 * 60_000;
+let warmedAt = 0;
+
+function useWarmTabs(tabs: Tab[]) {
+  const router = useRouter();
   useEffect(() => {
-    if (index < 0) return;
-    if (reduce) pos.jump(index);
-    else pos.set(index);
-  }, [index, reduce, pos]);
-  const x = useTransform(pos, (column) => `${column * 100}%`);
-  const speed = useVelocity(pos);
-  const stretch = useTransform(speed, (v) => 1 + Math.min(Math.abs(v) * 0.03, 0.34));
-  return { x, stretch };
+    const warm = () => {
+      if (document.visibilityState !== "visible" || Date.now() - warmedAt < WARM_MS) return;
+      warmedAt = Date.now();
+      for (const tab of tabs) router.prefetch(tab.href);
+    };
+    warm();
+    document.addEventListener("visibilitychange", warm);
+    return () => document.removeEventListener("visibilitychange", warm);
+  }, [router, tabs]);
+}
+
+/**
+ * The lists behind the tabs, fetched once the screen in front has settled (D-136): the first
+ * open of a tab after signing in or after an update (the phone's copy of the data belongs to
+ * one build, D-127) paints the list at once instead of its skeleton. Not before the page has
+ * hydrated — data a still-hydrating part reads would differ from the server's HTML (#418).
+ * Data already fresh is left alone; nothing here listens live — a screen subscribes when it opens.
+ */
+const WARM_DATA_AFTER_MS = 1_500;
+let dataWarmedFor: string | null = null;
+
+function useWarmTabData(role: TabRole) {
+  const queryClient = useQueryClient();
+  const userId = useMe().data?.userId;
+  useEffect(() => {
+    if (!userId || dataWarmedFor === userId) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let gone = false;
+    void afterHydration().then(() => {
+      if (gone) return;
+      timer = setTimeout(() => {
+        dataWarmedFor = userId;
+        if (role === "director") {
+          void warmSentTasks(queryClient, userId);
+          void warmNotes(queryClient, userId);
+        } else {
+          void warmMyTasks(queryClient, userId);
+        }
+        void warmCalendarMonth(queryClient, monthOf(null));
+      }, WARM_DATA_AFTER_MS);
+    });
+    return () => {
+      gone = true;
+      clearTimeout(timer);
+    };
+  }, [queryClient, role, userId]);
 }
 
 /**
@@ -321,7 +411,10 @@ export function TabBar({ role }: { role: TabRole }) {
   const route = activeTab(role, pathname);
   const index = tapped ?? route.index;
   const [from] = useState(() => (lastIndex >= 0 ? lastIndex : index));
-  const thumb = useThumb(index, from);
+  const thumbRef = useRef<HTMLSpanElement>(null);
+  useThumb(thumbRef, index, from);
+  useWarmTabs(tabs);
+  useWarmTabData(role);
 
   useEffect(() => {
     if (index >= 0) lastIndex = index;
@@ -348,72 +441,70 @@ export function TabBar({ role }: { role: TabRole }) {
       {/* the capsule floats; this keeps its room at the end of the page so nothing ends under it */}
       <div aria-hidden className={styles.spacer} />
       <div aria-hidden className={styles.scrim} data-away={away ? "" : undefined} />
-      <MotionConfig reducedMotion="user">
-        <nav
-          ref={nav}
-          aria-label="Основная навигация"
-          className={styles.capsule}
-          data-away={away ? "" : undefined}
-          style={{ "--n": tabs.length } as CSSProperties}
+      <nav
+        ref={nav}
+        aria-label="Основная навигация"
+        className={styles.capsule}
+        data-away={away ? "" : undefined}
+        style={{ "--n": tabs.length } as CSSProperties}
+      >
+        <span
+          ref={thumbRef}
+          aria-hidden
+          className={styles.thumb}
+          data-off={index >= 0 ? undefined : ""}
+          style={{ "--i": Math.max(from, 0) } as CSSProperties}
         >
-          <motion.span
-            aria-hidden
-            className={styles.thumb}
-            style={{ x: thumb.x }}
-            initial={{ opacity: index >= 0 ? 1 : 0 }}
-            animate={{ opacity: index >= 0 ? 1 : 0 }}
-            transition={{ duration: 0.15 }}
-          >
-            <motion.span className={styles.stretch} style={{ scaleX: thumb.stretch }}>
-              <span className={styles.lamp} />
-              <span className={styles.pill} />
-            </motion.span>
-          </motion.span>
-          <ul className={styles.row}>
-            {tabs.map((tab, i) => {
-              const active = i === index;
-              const count = badges[tab.href] ?? 0;
-              const seen = seenBadges.get(tab.href);
-              const pop = seen !== undefined && seen !== count;
-              return (
-                <li key={tab.href} className="min-w-0">
-                  <Link
-                    href={tab.href}
-                    aria-label={count > 0 ? `${tab.label}, ${count} требуют внимания` : tab.label}
-                    aria-current={i === route.index ? (route.own ? "page" : "true") : undefined}
-                    data-active={active ? "" : undefined}
-                    className={styles.cell}
-                    onClick={(event) => {
-                      // a new browser tab or window leaves this screen where it is
-                      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
-                      if (pathname === tab.href) {
-                        // the tab of this very screen takes it back to the top, as on every phone
-                        event.preventDefault();
-                        const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                        window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
-                        return;
-                      }
-                      if (i !== index) setTapped(i);
-                    }}
-                  >
-                    <span className={styles.icon}>
-                      {tab.icon}
-                      {count > 0 ? (
-                        <span key={count} className={`nums ${styles.badge} ${pop ? styles.badgePop : ""}`} aria-hidden>
-                          {count > 99 ? "99+" : count}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={styles.label} aria-hidden>
-                      {tab.label}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-      </MotionConfig>
+          <span className={styles.stretch}>
+            <span className={styles.lamp} />
+            <span className={styles.pill} />
+          </span>
+        </span>
+        <ul className={styles.row}>
+          {tabs.map((tab, i) => {
+            const active = i === index;
+            const count = badges[tab.href] ?? 0;
+            const seen = seenBadges.get(tab.href);
+            const pop = seen !== undefined && seen !== count;
+            return (
+              <li key={tab.href} className="min-w-0">
+                <Link
+                  href={tab.href}
+                  prefetch
+                  aria-label={count > 0 ? `${tab.label}, ${count} требуют внимания` : tab.label}
+                  aria-current={i === route.index ? (route.own ? "page" : "true") : undefined}
+                  data-active={active ? "" : undefined}
+                  className={styles.cell}
+                  onClick={(event) => {
+                    // a new browser tab or window leaves this screen where it is
+                    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) return;
+                    if (pathname === tab.href) {
+                      // the tab of this very screen takes it back to the top, as on every phone
+                      event.preventDefault();
+                      const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                      window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+                      return;
+                    }
+                    if (i !== index) setTapped(i);
+                  }}
+                >
+                  <span className={styles.icon}>
+                    {tab.icon}
+                    {count > 0 ? (
+                      <span key={count} className={`nums ${styles.badge} ${pop ? styles.badgePop : ""}`} aria-hidden>
+                        {count > 99 ? "99+" : count}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className={styles.label} aria-hidden>
+                    {tab.label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
     </>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData } from "@tanstack/react-query";
+import { keepPreviousData, type QueryClient } from "@tanstack/react-query";
 
 import type { Month } from "@/lib/datetime/calendar";
 import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
@@ -64,6 +64,15 @@ export function useCalendar(enabled = true) {
     channel: { table: "events" },
     enabled,
   });
+}
+
+/**
+ * The month /calendar opens on, filled before its first open by the tab bar (D-136) — the key
+ * and the fetch of `useCalendarMonth`.
+ */
+export function warmCalendarMonth(client: QueryClient, month: Month): Promise<void> {
+  const { from, to } = monthWindow(month);
+  return client.prefetchQuery({ queryKey: calendarKeys.month(month), queryFn: () => fetchWindow(from, to) });
 }
 
 /**

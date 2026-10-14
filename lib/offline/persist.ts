@@ -114,9 +114,10 @@ function stillHydrating(): boolean | null {
 /**
  * The page has hydrated. Data put into the cache before that made a component draw what the
  * server's HTML did not have (React #418) — even data taken for a component already mounted,
- * when another one still hydrating reads the same query. So the kept data waits for this.
+ * when another one still hydrating reads the same query. So the kept data waits for this, and
+ * so does the tab bar's warm-up of the other tabs' lists (D-136).
  */
-function afterHydration(): Promise<void> {
+export function afterHydration(): Promise<void> {
   const start = performance.now();
   return new Promise((resolve) => {
     const check = () => {

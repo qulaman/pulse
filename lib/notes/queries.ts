@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -65,6 +65,11 @@ async function fetchNotes(userId: string): Promise<Note[]> {
   if (bin.error) throw new Error(bin.error.message);
   if (points.error) throw new Error(points.error.message);
   return [...(live.data ?? []), ...(bin.data ?? []), ...(points.data ?? [])].sort(newestFirst);
+}
+
+/** «Заметки» filled before their first open by the tab bar (D-136) — the key and the fetch of `useNotes`. */
+export function warmNotes(client: QueryClient, userId: string): Promise<void> {
+  return client.prefetchQuery({ queryKey: noteKeys.mine(userId), queryFn: () => fetchNotes(userId) });
 }
 
 /**

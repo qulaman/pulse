@@ -33,10 +33,11 @@ const nextConfig: NextConfig = {
     PULSE_BUILD_AT: git("log -1 --format=%cI"),
   },
   experimental: {
-    // a tab visited in the last 30 s opens from the router cache, not from the server (D-126):
-    // the screens are client pages fed by TanStack Query and Realtime, the server part is the
-    // shell and the session — nothing there goes stale in half a minute
-    staleTimes: { dynamic: 30 },
+    // screens open from the router cache, not from the server (D-126, D-136): they are client
+    // pages fed by TanStack Query and Realtime, the server part is the shell and the session.
+    // A visited screen is kept 5 minutes; the tabs, prefetched in full by the tab bar, 30
+    // (`static` is the life of a full prefetch). Signing in or out drops the whole cache.
+    staleTimes: { dynamic: 300, static: 1800 },
   },
 };
 

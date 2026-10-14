@@ -527,13 +527,17 @@ export function LastWord({ name, text, at, now, unread }: { name: string; text: 
   );
 }
 
-/** The row under the buttons: the task's own screen, and whatever else the card has to offer. */
+/**
+ * The row under the buttons: the task's own screen, and whatever else the card has to offer.
+ * Only an open card has this row, so its prefetch is one per card the person opened, not one
+ * per card in the list (D-126 п.10): «Открыть задачу» then opens without asking the server (D-136).
+ */
 export function CardFoot({ href, extra }: { href: string; extra?: ReactNode }) {
   return (
     <div className="-mx-1.5 mt-2 flex items-center justify-between">
       <Link
         href={href}
-        prefetch={false}
+        prefetch
         data-testid="task-thread"
         className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
       >

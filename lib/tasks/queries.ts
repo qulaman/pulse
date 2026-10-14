@@ -250,6 +250,19 @@ async function fetchSentTasks(userId: string): Promise<TaskWithPeople[]> {
   return rows.sort(newestFirst);
 }
 
+/**
+ * The tab bar fills a tab's list before its first open (D-136): the key and the fetch of
+ * `useSentTasks` / `useMyTasks`, so the screen paints at once instead of its skeleton. Data
+ * already fresh in the cache is left alone.
+ */
+export function warmSentTasks(client: QueryClient, userId: string): Promise<void> {
+  return client.prefetchQuery({ queryKey: taskKeys.sent(userId), queryFn: () => fetchSentTasks(userId) });
+}
+
+export function warmMyTasks(client: QueryClient, userId: string): Promise<void> {
+  return client.prefetchQuery({ queryKey: taskKeys.mine(userId), queryFn: () => fetchMyTasks(userId) });
+}
+
 /** Everything the director sent, newest first — «Отправленные». Scheduled ones included (author sees them). */
 export function useSentTasks(userId: string | undefined) {
   return useRealtimeQuery<TaskWithPeople[], TaskRow>({
