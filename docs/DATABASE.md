@@ -1,8 +1,8 @@
 # DATABASE.md — схема данных Pulse (Supabase / Postgres)
 
-Что это: контракт схемы БД Pulse (таблицы, RLS, функции, триггеры, индексы, расписание) — для агентов, пишущих миграции. **Единственный источник правды по схеме — миграции в `/supabase/migrations`; этот документ описывает, что в них есть, и служит контрактом для новых. Арбитр — `DECISIONS.md`, читать с раздела «Сейчас действует».** При расхождении: DECISIONS.md > этот файл > остальные доки.
+Что это: схема БД Pulse (таблицы, RLS, функции, триггеры, индексы, расписание) — для агентов, пишущих миграции. **Единственный источник правды по схеме — миграции в `/supabase/migrations`; этот документ описывает, что в них есть, и правила, по которым пишутся новые. Арбитр — `DECISIONS.md`, читать с раздела «Сейчас действует».** При расхождении: DECISIONS.md > этот файл > остальные доки.
 
-Метки: `[есть]`, `[за флагом: settings.<ключ>]`, `[не построено]`. Раздел без метки описывает то, что есть в миграциях.
+Метки: `[есть]`, `[за флагом: settings.<ключ>]`. Документ описывает построенное; идеи непостроенного — `IDEAS.md`, смена способа — решением в `DECISIONS.md`.
 
 Модель SaaS — V-02: одна БД = один клиент, изолированный инстанс (свой Supabase-проект) на каждую компанию клиента. `company_id` и RLS при этом СОХРАНЯЮТСЯ во всех таблицах — как защита ролей внутри компании и страховка архитектуры. Кросс-клиентской логики нет; всё клиентское — в `company.settings`.
 
@@ -14,10 +14,9 @@
 - В политиках `auth_company_id()`, `auth_role()`, `auth.uid()` — только обёрнутыми: `(select auth_company_id())`. Голый вызов выполняется на каждую строку (и сам — чтение `profiles`), обёрнутый — один раз на запрос и годится в условие индекса; старые политики переписаны миграцией `20260926210000_rls_initplan_fk_indexes` (D-126: чтение директора на 20 000 задач 72 → 8 мс). Внешний ключ, по которому удаляют родителя, — с индексом (там же пять таких индексов).
 - Баланс очков = `SUM(point_transactions.amount)`, никогда не поле. Append-only.
 - Просрочка — **вычислимое свойство**, НЕ колонка: `deadline < now() and status in ('sent','accepted','in_progress','rework')`. Колонку `is_overdue` не добавлять.
-- Materialized views **не используем**; допустимы только обычные view `with (security_invoker = on)`. Сейчас view в БД нет ни одного: Пульс читает задачи одним запросом с вложенными сообщениями (D-57 §3).
-- Партиционирование **не нужно**; порог пересмотра — 10 млн строк в task_messages. `company_id` — первым столбцом составных индексов.
-- `point_balance_checkpoints (user_id, as_of, balance)` — зарезервировано, не строить.
-- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются на всём флоте. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `mind_boards`, `events`, `event_participants`, `errands`, `profiles` (клиент слушает только строки секретарей, `role=eq.secretary` — «на месте / не на месте до …» без перезагрузки, D-99; миграция `20260923235500`).
+- Сейчас view только обычные, `with (security_invoker = on)`, materialized views нет (G.1): обычный view читается под RLS вызывающего и не требует обновления по расписанию; MV — по факту медленных запросов. View в БД один — `point_balances` (D-126); Пульс читает задачи одним запросом с вложенными сообщениями (D-57 §3).
+- Партиционирования нет — при текущих объёмах оно не нужно; порог пересмотра — 10 млн строк в task_messages. `company_id` — первым столбцом составных индексов.
+- Миграция, добавляющая таблицу в Realtime, делает это с guard'ом «если ещё не в публикации» — миграции переигрываются с нуля на каждом инстансе. В публикации `supabase_realtime`: `tasks`, `task_messages`, `announcements`, `announcement_acks`, `point_transactions`, `notification_deliveries`, `shop_items`, `orders`, `tv_events`, `tv_state`, `notes`, `mind_boards`, `events`, `event_participants`, `errands`, `profiles` (клиент слушает только строки секретарей, `role=eq.secretary` — «на месте / не на месте до …» без перезагрузки, D-99; миграция `20260923235500`).
 
 ## Enum-типы
 
@@ -39,7 +38,7 @@ create type inbox_status   as enum ('recorded','transcribed','parsed','confirmed
 create type errand_status  as enum ('sent','accepted','done','declined','cancelled');  -- D-79
 ```
 
-Статусная машина задач: `scheduled → sent → accepted → pending_review → done | rework(→accepted) | declined(→sent, «Настоять», G.20) | revoked`. `revoked` — из любого статуса, кроме `done`/`revoked` (в т.ч. `declined` — «Отменить»), только директор. `in_progress` в enum есть, переходов в него нет (D-04). `scheduled → sent` guard пускает только service role (`auth.uid() is null`); исполнителя нет — `[не построено]`, наряд 017. Матрицу проверяет триггер `trg_task_status_guard`; переходы идут только через RPC `transition_task` (плюс `revoke_task`, `reassign_task`, `request_deadline`). «Не могу» с доработки (D-128) — `transition_task` проходит собственными рёбрами стража `rework → accepted → declined` в одной транзакции; сам страж этого ребра не знает. Политика `tasks_update` (update в границах видимости select) осталась с первой миграции — клиент ею статус не меняет; поля не-автора защищает `trg_tasks_field_guard`.
+Статусная машина задач: `scheduled → sent → accepted → pending_review → done | rework(→accepted) | declined(→sent, «Настоять», G.20) | revoked`. `revoked` — из любого статуса, кроме `done`/`revoked` (в т.ч. `declined` — «Отменить»), только директор. `in_progress` в enum есть, переходов в него нет (D-04). `scheduled → sent` guard пускает service role (`auth.uid() is null`) — тик `publish_due_scheduled` (D-114, наряд 017) — и директора — «Отправить сейчас», `send_task_now` (D-129). Матрицу проверяет триггер `trg_task_status_guard`; переходы идут только через RPC `transition_task` (плюс `revoke_task`, `reassign_task`, `request_deadline`). «Не могу» с доработки (D-128) — `transition_task` проходит собственными рёбрами стража `rework → accepted → declined` в одной транзакции; сам страж этого ребра не знает. Политика `tasks_update` (update в границах видимости select) осталась с первой миграции — клиент ею статус не меняет; поля не-автора защищает `trg_tasks_field_guard`.
 
 ## Таблицы
 
@@ -62,7 +61,7 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `secretary` | `escalate_after_min` (дефолт 3), `actions[]` — `{code, label, icon, synonyms}` | D-79 |
 | `dictionary` | `dismissed[]` — уроки «Из ваших записей», спрятанные «×» (`personId:форма`, до 200, пишет `/api/dictionary/misheard`); `dismissed_words[]` — спрятанные предложения «Часто встречается» (ключи основ, до 200, пишет `/api/dictionary/words`) | D-111 |
 
-Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет `[не построено]`.
+Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет.
 
 ### profiles (расширение auth.users; id = fk auth.users on delete cascade, без default)
 ```
@@ -74,7 +73,7 @@ telegram_chat_id bigint null,                 -- колонка есть, при
 is_active bool not null default true,         -- оффбординг: false = вне рейтинга/матчинга/рассылок
 availability availability_t not null default 'active',
 settings jsonb not null default '{}',         -- ключей код не читает
-streak_count int not null default 0, streak_updated_at timestamptz null,  -- streak не считается [не построено]
+streak_count int not null default 0, streak_updated_at timestamptz null,  -- streak не считается: колонки никто не пишет
 created_at
 ```
 Роль `tv` — служебный auth-пользователь киоска; `secretary` — сотрудник с правом вести заявки (D-79), а с D-104 — ещё настройки и команду: карточки, роли и вход всех, кроме директоров. Кто «команда» — функция `team_role(role)`: `employee`, `manager`, `shopkeeper`, `secretary`. Аватаров нет (бакета `avatars` нет).
@@ -109,7 +108,7 @@ meta jsonb not null default '{}', created_at
 - системные строки RPC: `deadline_changed` + `old_deadline`/`new_deadline`/`stricter` («Срок»; у согласованной просьбы ещё `request_id`), `deadline_kept` + `request_id` («Оставить прежний»), `reassigned_to` + `assignee_id` («Переназначить», на старой задаче), `passed_from` + `from_assignee_id` («Передана от …», на новой), `nudge: true` («Директор напомнил» — не закрывает вопрос);
 - D-128, предложения сотрудника — сообщения с флагом, статусов не прибавляют: `time_request: true` + `proposed_deadline`, `old_deadline`, `words` («Прошу срок до 27.09 10:00 · …»; `answered_at` + `answer` ∈ `approved | kept | changed | replaced | closed` проставляют RPC и триггер `trg_close_time_requests`; открыта — без `answered_at`); у причины отказа `suggest_assignee_id` + `suggest_name` («Это к другому»); у отчёта `partial: true` («Сделано не всё»); `handoff_note: true` — слово директора новому исполнителю при передаче.
 
-Реакций нет `[не построено]`. Таблицы `task_events`/`feed_items` **не вводить** — task_messages+seq и tv_events закрывают ленты (DECISIONS.md, раздел G).
+Реакций нет. Таблиц `task_events`/`feed_items` нет: ленты закрывают task_messages+seq и tv_events (DECISIONS.md, раздел G).
 
 ### task_reads — курсор прочтения треда (D-61)
 `task_id fk tasks (cascade), user_id fk profiles (cascade), company_id fk companies, last_seq bigint not null default 0, seen_at timestamptz not null default now()`, PK (task_id, user_id), без `id`/`created_at`. Одна строка на человека и задачу: сообщения треда с `seq > last_seq` для него непрочитаны. Читает только сам человек (RLS `user_id = auth.uid()`); пишет **только RPC `mark_thread_read(task_id, seq)`** (security definer, `greatest(old, new)` — курсор монотонный, оффлайн-повтор старого «Прочитал» его не откатывает; та же транзакция ставит `acted_at` квитанциям `message` треда, D-64). Прямые insert/update-политики «своё» остались как страховка, клиент ими не пользуется. Двигают курсор: открытие треда (страница и шторка), «Прочитал» на карточке и в шторке уведомления (`/api/push/acted`), собственный ответ. «Сообщения» Пульса и Ленты = задачи, где последнее настоящее сообщение (text/voice/photo, не status_change/system) — **не моё и выше моего курсора** (читающий любой: директор, менеджер, сотрудник), плюс открытые вопросы (`is_question` без `answered_at`). Флаг «прочитано» на самом сообщении не вводить: сообщения общие и append-only, курсор — личный.
@@ -126,7 +125,7 @@ reason text not null check (length(trim(reason)) > 0),
 source point_source not null, rule_code text null,
 task_id uuid null → tasks, order_id uuid null, actor_id uuid null → profiles, created_at
 ```
-Insert-политик нет: строки пишут только security-definer-функции — `award_points` (ручные ± директора, `source='manual'`), `confirm_voice_batch` (очки голосом: только плюс и только при `points_enabled`), магазинные RPC (`shop_hold` / `shop_release`). Авто-правил и реакций нет `[не построено]`, но ключ заложен: `unique (task_id, rule_code) where source='auto_rule'` — бонус только за **первый** done (D-31). Заморозка магазина — **hold-final** (D-10): заказ → `shop_hold`(−price); отмена → `shop_release`(+price, ровно сумма hold по order_id); выдача → новых транзакций НЕТ, hold финален. Максимум один hold и один release на заказ: `unique (order_id, source) where order_id is not null`. Страховка — `trg_point_transactions_hold_guard`: после `shop_hold` баланс ≥ 0; ручной минус директора уводить баланс в минус вправе (D-12).
+Insert-политик нет: строки пишут только security-definer-функции — `award_points` (ручные ± директора, `source='manual'`), `confirm_voice_batch` (очки голосом: только плюс и только при `points_enabled`), магазинные RPC (`shop_hold` / `shop_release`). Авто-правил и реакций нет, но ключ заложен: `unique (task_id, rule_code) where source='auto_rule'` — бонус только за **первый** done (D-31). Заморозка магазина — **hold-final** (D-10): заказ → `shop_hold`(−price); отмена → `shop_release`(+price, ровно сумма hold по order_id); выдача → новых транзакций НЕТ, hold финален. Максимум один hold и один release на заказ: `unique (order_id, source) where order_id is not null`. Страховка — `trg_point_transactions_hold_guard`: после `shop_hold` баланс ≥ 0; ручной минус директора уводить баланс в минус вправе (D-12).
 
 **View `point_balances`** (D-126) — баланс считает база, телефон ленту не суммирует: `company_id, user_id, balance` (= SUM(amount)), `spent` (холды минус возвраты), `earned_30d` (поощрения за 30 дней без магазина). `security_invoker` — читается под RLS `point_transactions`: человек видит свою строку, директор — все, anon — доступа нет. Хранимого поля по-прежнему нет. pgTAP — `039_point_balances`.
 
@@ -170,7 +169,7 @@ digest_id uuid null → notification_deliveries   -- строка ушла вн�
 ```
 Триггеры и RPC **вставляют строку**, не зовут HTTP; отправляет воркер `lib/push/send.ts` (BACKEND §4). Виды `event_kind` (матрица — BACKEND §4): директору (автору задачи) — `pending_review`, `declined`, `message` (просьба о сроке — тоже `message`, с `meta.time_request` и `is_question`: категория «Вопросы», в переписку не складывается); исполнителю — `task_sent`, `rework`, `done`, `revoked` (у переданной — заголовок «Задача передана · …»), `deadline_extended`, `deadline_moved` (срок раньше или впервые), `deadline_kept` («Срок прежний»), `task_nudge` («Напомнить»), `deadline_soon` («Скоро срок»), `message` (D-128); всем активным, кроме `tv` и автора, — `announcement`; магазин — `shop_order`, `shop_approved`, `shop_ready`, `shop_cancelled`; календарь — `event_invite`, `event_moved`, `event_cancelled`, `event_reminder`, `event_declined`; заявки — `errand_sent`, `errand_accepted`, `errand_done`, `errand_declined` (адрес карточки — `meta.errand_id`, `task_id` пуст). Строки прежних видов `question`/`reply` могут остаться, новых нет.
 **Маршрут строки** — триггер `trg_notification_deliveries_deliver_after` (before insert; тело с D-114 — `20260924150200_notify_prefs.sql`) ставит `category` каждой строке и дальше делит по получателю. **Не директор** (сотрудник, секретарь, завхоз — фиксированная политика): `deliver_after = next_delivery_slot(company, now())` для `reply, rework, done, revoked, deadline_extended, announcement, shop_order, shop_approved, shop_ready, shop_cancelled, event_invite, event_moved, event_cancelled`, а также для `message` человеку, который не автор задачи; остальные виды (все `errand_*`, `visit_*`, `event_reminder`, `event_declined`, `note_reminder`, `test`) уходят сразу; `task_sent` при «Настоять» (`declined → sent`) производитель сам кладёт на открытие окна. **Директор**: категории `alarm` и `system` не трогаются; «Не присылать» → `failed` + `last_error='muted'`; «Тихо» → `silent`; «текст на блокировке» → `private`; «Не беспокоить» → `mode='digest'`, `held='quiet'`, `deliver_after` = конец тишины (пробивают свои напоминания, посетитель, важные люди — по флагам `pass`); встреча из календаря при `meetings` → `held='meeting'` до её конца (проходят «скоро», посетитель, важные люди); «Сводкой» → `held='schedule'` до слота сводки; важные люди (исполнитель задачи в `vip`) поднимают «Тихо»/«Сводкой» до «Сразу». Сбой правила строку не ломает — уходит как раньше. Воркер берёт только `mode='now'` и `deliver_after <= now()` (`claim_deliveries`), индекс `notification_deliveries_due_idx`; сводки — `notification_deliveries_digest_idx`.
-**Самоочистка** (D-114 §10): ушедшие и неудавшиеся строки живут 30 дней, не ушедшие (`queued`) — 7; `notification_deliveries_purge()` из минутного тика удаляет до 2000 самых старых за раз, индекс `notification_deliveries_created_idx`. `channel` сейчас всегда `push`, `tier` — всегда 1; Telegram-ярус и эскалация по таймауту `[не построено]` (D-21, D-32); `sms` в enum есть, в v1 не отправляется (D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
+**Самоочистка** (D-114 §10): ушедшие и неудавшиеся строки живут 30 дней, не ушедшие (`queued`) — 7; `notification_deliveries_purge()` из минутного тика удаляет до 2000 самых старых за раз, индекс `notification_deliveries_created_idx`. `channel` сейчас всегда `push`, `tier` — всегда 1: Telegram-яруса, эскалации по таймауту и SMS нет (значения `telegram` и `sms` в enum есть, не используются; D-21, D-32, D-41). Индикатор директора = «не открывал с HH:MM» (нет seen_at), не «не получил».
 
 ### ingest_batches — идемпотентность мутаций
 `id, company_id, user_id, client_request_id uuid not null, result jsonb not null default '{}', created_at`, constraint `ingest_batches_company_request_key unique (company_id, client_request_id)`. При дубле RPC возвращает сохранённый result (те же id сущностей). `client_request_id` обязателен на мутирующих вызовах; исключения — BACKEND §0.
@@ -198,7 +197,7 @@ actor_id uuid null → profiles,      -- о ком событие: сотруд�
 task_id uuid null → tasks on delete cascade,
 payload jsonb not null default '{}', payload_guest jsonb not null default '{}', created_at
 ```
-Строки рождаются только в security-definer-проекциях через `tv_emit(...)`: триггер на `tasks` (вставка `sent` и переходы в `sent`/`accepted`/`pending_review`/`done`), на `point_transactions` (только поощрение: сумма > 0 и не магазин), на `announcements`, на `orders` (выдача → `merch`); вид `event` пишет `events_due_reminders`. Отказ, доработка, отзыв и просрочка не проецируются вообще (D-45). **Маскирование — при записи**: `payload = {name, title, amount}`, `payload_guest` — имя без фамилии, `title` пуст (кроме названия награды), `amount` пуст (D-33). Хвост чистит `tv_events_prune(p_days default 30)` — вызова нет `[не построено]`.
+Строки рождаются только в security-definer-проекциях через `tv_emit(...)`: триггер на `tasks` (вставка `sent` и переходы в `sent`/`accepted`/`pending_review`/`done`), на `point_transactions` (только поощрение: сумма > 0 и не магазин), на `announcements`, на `orders` (выдача → `merch`); вид `event` пишет `events_due_reminders`. Отказ, доработка, отзыв и просрочка не проецируются вообще (D-45). **Маскирование — при записи**: `payload = {name, title, amount}`, `payload_guest` — имя без фамилии, `title` пуст (кроме названия награды), `amount` пуст (D-33). Хвост чистит `tv_events_prune(p_days default 30)` из тика `/api/push/sweep` (D-126): лента живёт последние 30 дней.
 
 ### tv_state — пульт ТВ (D-76)
 ```
@@ -241,7 +240,7 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 `id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, recorded_at timestamptz null (когда директор отпустил лицо, по часам телефона — D-130; `created_at − recorded_at` = сколько фраза ждала на телефоне), created_at, updated_at`; `unique (company_id, client_request_id)` — одна строка на захват, NULL-ключи не сталкиваются (D-126). Заводит `/api/voice/upload-url` (`director_input`: сразу вставка, конфликт 23505 — ответ существующей строкой), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
 
 ### recurrence_rules
-`id, company_id, author_id, assignee_id, title not null, body null, priority task_priority, rrule text not null, is_active bool default true, next_run_at timestamptz null`, без `created_at`. Пишет `confirm_voice_batch` (сущность `recurrence`, `next_run_at = now`). Исполнителя, который порождает задачи по правилу, нет `[не построено]`.
+`id, company_id, author_id, assignee_id, title not null, body null, priority task_priority, rrule text not null, is_active bool default true, next_run_at timestamptz null`, без `created_at`. Пишет `confirm_voice_batch` (сущность `recurrence`, `next_run_at = now`). Исполнителя, который порождает задачи по правилу, нет.
 ### reminders
 `id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
@@ -290,8 +289,8 @@ created_at, accepted_at null, done_at null, updated_at
 
 **Сообщение секретаря на стену (D-116)** — та же таблица, `kind` (`visitor` по умолчанию | `message`; миграция `20260924180000_visit_messages`). Проверка статуса по виду: посетитель — `waiting | wait | invited | declined | expired`, сообщение — `waiting → read | expired`; у сообщения `note` обязателен (`visits_message_note_check`). Outbox: `visit_message` директорам (категория «Секретарь»), автору — только `visit_answered` «Директор не прочитал» при истечении (30 минут); `read` снимает неушедший `visit_message`. `tv_overlay()` отдаёт свежее непрочитанное сообщение и их число, гостю — без текста; приглашённый визит больше не отдаёт. pgTAP — `032_visit_messages.test.sql`.
 
-### consents — `[не построено]` (G.12)
-Таблицы согласий нет; анонимизации «Сотрудник №N» по согласию нет ни в рейтинге, ни на ТВ.
+### consents
+Не построено: таблицы согласий и анонимизации по согласию нет; идея — IDEAS.md (И-81).
 
 ## RLS — канонический паттерн (обязателен, не изобретать свой)
 
@@ -348,7 +347,7 @@ create policy tasks_insert on tasks for insert with check (
 - **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят. **mind_boards** — те же четыре политики по автору; `notes_insert` / `notes_update` дополнительно требуют, чтобы `board_id` был доской того же автора (D-102).
 - **events**: select — компания, кроме `tv`: director — всё, остальные — автор или участник; update — director; insert/delete — нет (создаёт `confirm_voice_batch`). **event_participants**: select — кроме `tv`, кто видит мероприятие (`can_see_event`); запись — только RPC и `confirm_voice_batch`.
 - **errands**: select — автор + любой `director` / `secretary` своей компании, `tv` никогда; insert — director (автор — он сам); update/delete — нет (только `transition_errand`).
-- View нет. Функции клиентским ролям — перечисленные ниже security-definer-функции: `execute` отозван у `public`/`anon`, выдан `authenticated`; тики `events_due_reminders` и `errands_due_escalation` — только `service_role`.
+- View — один, `point_balances` (`security_invoker`, читается под RLS `point_transactions`, D-126). Функции клиентским ролям — перечисленные ниже security-definer-функции: `execute` отозван у `public`/`anon`, выдан `authenticated`; все шаги тика (`publish_due_scheduled`, `*_due*`, `errands_expire`, `notes_purge_trash`, `notification_deliveries_purge`, `tv_events_prune`) и `claim_deliveries` — только `service_role`.
 
 ## Атомарные операции — функции security definer (вызов через rpc())
 
@@ -503,9 +502,16 @@ events (company_id, starts_at) where cancelled_at is null;
 events (starts_at) where reminded_at is null and cancelled_at is null;   -- минутный тик
 event_participants (user_id);
 errands (company_id, created_at desc) where status in ('sent','accepted');  errands (author_id, created_at desc);
+visits (company_id, created_at desc) where closed_at is null;
+notification_deliveries_digest_idx (user_id, deliver_after) where status='queued' and mode='digest';   -- D-114
+notification_deliveries_created_idx (created_at);   -- самоочистка, D-114 §10
+-- D-126: tasks (author_id, created_at desc); task_messages (sender_id, created_at desc);
+--        FK-индексы tasks (parent_task_id), notes (converted_task_id), notes (converted_announcement_id),
+--        tv_events (task_id), notification_deliveries (digest_id) — все where not null
 + unique: point_transactions (task_id, rule_code) where source='auto_rule'; point_transactions (order_id, source) where order_id is not null;
   ingest_batches (company_id, client_request_id); push_subscriptions (endpoint);
-  notes (client_request_id) where not null; errands (client_request_id) where not null
+  notes (client_request_id) where not null; errands (client_request_id) where not null;
+  visits (client_request_id) where not null; inbox_items (company_id, client_request_id)   -- D-126
 ```
 
 ## Storage
@@ -516,19 +522,19 @@ errands (company_id, created_at desc) where status in ('sent','accepted');  erra
 | `photos` | private, ≤10 МБ, JPEG/PNG/WebP | `{company_id}/{owner_id}/{client_request_id}.{ext}` | как у `voice` (G.20b) |
 | `brand` | public, ≤2 МБ, PNG/JPEG/WebP/SVG | `{company_id}/logo-{stamp}.{ext}` | чтение — всем (экран входа до логина); пишет сервер service role (G.20d) |
 
-Бакетов `shop` и `avatars` нет. Любое чтение чужого файла (директор слушает аудио, адресат слушает оригинал задачи, участник открывает фото) — **только signed URL, выданный сервером** после проверки прав: `/api/voice/audio-url`, `/api/files/url`. Загрузка клиентом — напрямую в Storage по signed upload URL (лимит Vercel 4.5 МБ). Срок хранения аудио — `[не построено]`: аудио копится бессрочно (D-18 ◐, D-66 п.6); транскрипты — вечно.
+Бакетов `shop` и `avatars` нет. Любое чтение чужого файла (директор слушает аудио, адресат слушает оригинал задачи, участник открывает фото) — **только signed URL, выданный сервером** после проверки прав: `/api/voice/audio-url`, `/api/files/url`. Загрузка клиентом — напрямую в Storage по signed upload URL (лимит Vercel 4.5 МБ). Срока хранения аудио нет: аудио копится бессрочно (D-18 ◐, D-66 п.6); транскрипты — вечно.
 
 ## Расписание — минутный тик (вместо pg_cron)
 
-pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json`: `* * * * *` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10). Один вызов: `deadline_reminders_due()` (D-128), `events_due_reminders()`, `errands_due_escalation()`, `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), затем рассылка outbox. Выпуск `scheduled → sent` (`publish_due_scheduled`) — `[не построено]`, наряд 017.
+pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10); сейчас `0 3 * * *` — раз в сутки (проект на Vercel Hobby), минутный тик — открытый вопрос В-8 (D-125). Локально тот же свип раз в минуту зовёт `pnpm dev:tick`. Один вызов по порядку: `publish_due_scheduled()` — выпуск `scheduled → sent` (D-114, наряд 017), `events_due_reminders()`, `errands_due_escalation()`, `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()`, «Скоро срок» `deadline_reminders_due()` (D-128), `team_channel_alerts_due()`, `director_day_summaries_due()` («Итог дня»), `director_digests_due()` (сводки, D-114), `notification_deliveries_purge()` (D-114 §10), `tv_events_prune()` (D-126), затем рассылка outbox.
 
-Исполнителя нет `[не построено]` у: `recurrence_rules` (записываются, не исполняются), пометки просрочек и авто-очков (D-28), streak, вечерней сводки, еженедельной проверки подписок, чистки аудио (D-18), чистки `tv_events` (`tv_events_prune`). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `notes.reminded_at`.
+Исполнителя нет у: `recurrence_rules` (записываются, не исполняются), авто-очков (D-28), streak, чистки аудио (D-18). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`.
 
 ## Миграции — дисциплина
 
 - Имя: `YYYYMMDDHHMMSS_описание.sql`. **Одна миграция = одна фича.** Правка старых миграций запрещена; откат — новой миграцией. `create or replace function` в новой миграции несёт тело функции целиком.
 - Новое значение enum — отдельной миграцией (его нельзя использовать в той же транзакции, D-79 §2).
-- Dev — `pnpm db:push`. В прод — только `supabase migration up` через CI; **`db push` в прод запрещён**. Прод-проекта и CI пока нет (D-19 🔴) `[не построено]`; при флоте инстансов — миграции на весь флот через CI (V-02).
+- Dev — `pnpm db:push`. **`db push` в прод запрещён.** Прод-проекта и CI нет, вопрос открыт в D-19.
 
 ## seed.sql (dev-фикстуры; обязателен для RLS-тестов и Пульса)
 
@@ -559,15 +565,28 @@ pg_cron и pg_net не подключены. Единственное распи
 | `019_tv_state.test.sql` | пульт ТВ: командует только директор, киоск читает и квитирует, сотрудник не видит |
 | `020_calendar.test.sql` | мероприятия: состав, видимость своих, ответы, минутный тик |
 | `021_errands.test.sql` | заявки: уходят всем секретарям, забирает первая, другие роли не видят |
+| `022_errand_thanks.test.sql` | «Спасибо» за заявку (D-97): только автор и только за «Готово»; второе не сдвигает время первого; повтор ключа — дубль |
 | `022_tv_wall_v2.test.sql` | стена v2: часы и календарь пультом, гость с таймером, карточка сотрудника по стадиям, неделя для киоска |
+| `023_calendar_edit.test.sql` | правка и удаление мероприятия (D-94): `edit_event` / `delete_event`; кто знал о встрече — узнаёт о переносе, новом месте, отмене; кто не узнал — ничего |
 | `023_visits.test.sql` | «К вам посетитель»: объявляет секретарь, отвечает директор, квитанция стены, маска гостя, истечение |
+| `024_secretary_link.test.sql` | связь директора и секретаря (D-99): обещание, вопрос и ответ, результат, «Напомнить ещё раз», тревога, «не на месте», срок просьбы |
 | `024_tv_calendar_month.test.sql` | календарь на стене: «Неделя / Месяц» пультом, шесть недель для киоска |
 | `025_mind_boards.test.sql` | доски: приватность по автору, пункт только на свою доску, на стену — только автор, киоск читает функцией, гость, версия стены, корзина |
 | `026_secretary_admin.test.sql` | секретарь: правит чужие карточки и роли, кроме директора, директором никого не делает, своё не трогает; настройки и название компании — да, сотрудник — нет (D-104) |
 | `027_tv_wake.test.sql` | разбудка стены: два часа от «сейчас», `false` усыпляет, другие команды не трогают, будит только директор |
-| `038_task_lifecycle.test.sql` | жизнь задачи (D-128): «Не могу» с доработки и подсказка коллеги (себя — нет), просьба о сроке и ответы, «Срок» раньше / позже, «Напомнить» раз в полчаса без закрытия вопроса, передача со сроком и словом, «Скоро срок» раз на срок, «Просрочено» молчит при просьбе, `passed_to` не пишет сотрудник |
-| `035_tv_wall_v4.test.sql` | стена v4: заставка «Рейтинг» и её период пультом, круг выключается выбором руками и снимает доску; пятёрка без шестого, награды без штрафов и магазина, гостю скрыто, без очков — нет; одно дело: отказ не встаёт, ставший отказом снимается (D-123) |
-| `033_tv_focus_story.test.sql` | стена v3: история дела видом и временем, без слов, отказа и комментария к доработке; место только из пятёрки, очки для любого места, гостю без рейтинга; хелпер истории напрямую не зовут (D-120) |
+| `028_errand_due.test.sql` | просьба ко времени (D-106 §8): «· к 18:00» в пуше, одно напоминание за 10 минут взявшему, ничья — кто на месте; «впритык» и прошедший срок — без напоминания |
+| `029_push_foundation.test.sql` | доставка (D-114): отложенные задачи уходят тиком, воркер захватывает строки, «Настоять» ночью ждёт окна, удалённое объявление забирает свои пуши, «Не смогу» дважды — один пуш |
+| `030_notify_prefs.test.sql` | правила пушей директора (D-114): маршрут строки глушит, делает тихой, складывает в сводку, держит «Не беспокоить»; важные люди — сразу; тревога не трогается; у сотрудника — фиксированная политика; сохранение правил перестраивает очередь; `push_health` — тем, кто ведёт команду |
+| `031_director_signals.test.sql` | сигналы директора (D-114): ждущие строки — одной «Сводкой», увиденное в приложении не повторяется, «Задача не принята» раз и в окне, «Просрочено» раз на срок, «Итог дня» раз |
+| `032_push_followups.test.sql` | доделки D-114: «Задача не принята» и после показа пуша, «Уведомления не доходят» раз в неделю на человека, самоочистка outbox — 30 дней ушедшему, 7 не ушедшему |
 | `032_visit_messages.test.sql` | сообщение секретаря на стену: только со словами, пуш директору, «Понятно» только директор и только сообщению, маска гостя, «Заходите» нет, 30 минут без ответа (D-116); счёт по своим строкам — проходит и на dev |
+| `033_tv_focus_story.test.sql` | стена v3: история дела видом и временем, без слов, отказа и комментария к доработке; место только из пятёрки, очки для любого места, гостю без рейтинга; хелпер истории напрямую не зовут (D-120) |
+| `034_mind_board_v2.test.sql` | доска v2 (D-121): подпункты одного уровня, корзина веткой, ведущий с пульта, вид стены |
+| `035_tv_wall_v4.test.sql` | стена v4: заставка «Рейтинг» и её период пультом, круг выключается выбором руками и снимает доску; пятёрка без шестого, награды без штрафов и магазина, гостю скрыто, без очков — нет; одно дело: отказ не встаёт, ставший отказом снимается (D-123) |
+| `036_push_words.test.sql` | слова пушей (D-125): имя другой стороны и срок, пока он впереди; просьба без комментария называет автора; посетитель без имени — вопрос директору; `push_when()` говорит как `humanAqtobe()` |
+| `037_send_now.test.sql` | «Отправить сейчас» (D-129): отложенная задача и её слова уходят сразу, свои отложенные пуши директора остаются, отложенное объявление — так же; кнопка только у директора |
+| `038_task_lifecycle.test.sql` | жизнь задачи (D-128): «Не могу» с доработки и подсказка коллеги (себя — нет), просьба о сроке и ответы, «Срок» раньше / позже, «Напомнить» раз в полчаса без закрытия вопроса, передача со сроком и словом, «Скоро срок» раз на срок, «Просрочено» молчит при просьбе, `passed_to` не пишет сотрудник |
+| `039_point_balances.test.sql` | view `point_balances` (D-126): баланс считает база под RLS вызывающего; уникальный ключ `inbox_items` делает загрузку голоса идемпотентной |
+| `040_rework_handover.test.sql` | «Выполнено» после доработки одним вызовом (D-130): `transition_task` проходит `rework → accepted → pending_review` сам, отчёт в той же транзакции, повтор ключа — дубль, ребро никому другому не доступно |
 
-Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для вида `event` (`020`).
+Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для видов `event` (`020`) и `task_sent` при выпуске отложенной задачи (`029`, `037`).

@@ -1,10 +1,10 @@
-# BACKEND.md — контракт бэкенда Pulse
+# BACKEND.md — серверный слой Pulse
 
-Что это: контракт серверного слоя Pulse (route handlers, RPC, подсистема доставки, минутный тик, env) — для агентов, реализующих бэкенд. **Арбитр — `DECISIONS.md`, читать с раздела «Сейчас действует».** Схема БД — `docs/DATABASE.md`. Промпты/evals — `docs/AI.md`. Провижининг инстансов — `docs/SETUP.md`.
+Что это: серверный слой Pulse как он есть в коде (route handlers, RPC, подсистема доставки, тик, env) — для агентов, работающих с бэкендом. **Арбитр — `DECISIONS.md`, читать с раздела «Сейчас действует».** Схема БД — `docs/DATABASE.md`. Промпты/evals — `docs/AI.md`. Провижининг инстансов — `docs/SETUP.md`.
 
-Метки: `[есть]`, `[за флагом: settings.<ключ>]`, `[не построено]`. Раздел без метки описывает то, что есть в коде; план всегда помечен.
+Метки: `[есть]`, `[за флагом: settings.<ключ>]`. Документ описывает построенное; идеи непостроенного — `IDEAS.md`, смена способа реализации — решением в `DECISIONS.md`.
 
-Бэкенд = Next.js route handlers (`/app/api/*`) + Postgres-функции (RPC) в миграциях + один минутный Vercel cron (`vercel.json` → `/api/push/sweep`, §10). Supabase Edge Functions, pg_cron и pg_net не подключены (папки `supabase/functions` нет, G.20c). Service role key — только на сервере.
+Бэкенд = Next.js route handlers (`/app/api/*`) + Postgres-функции (RPC) в миграциях + один Vercel cron (`vercel.json` → `/api/push/sweep`, §10; на Hobby — раз в сутки). Supabase Edge Functions, pg_cron и pg_net не подключены (папки `supabase/functions` нет, G.20c). Service role key — только на сервере.
 
 ## 0. Незыблемые правила слоя
 
@@ -16,7 +16,7 @@
 
 ## 1. Auth и модель проверки прав
 
-Вход — email + пароль Supabase Auth (G.21). Продуктовый флоу D-06 (QR-инвайт, PIN, логин по телефону, детект in-app-браузера) — `[не построено]`, D-06 🔴. Людей заводит директор (`POST /api/people`); пароль сотруднику задаёт директор на карточке (`/api/people/:id/password`), свой сотрудник меняет в профиле через `auth.updateUser` (G.20b).
+Вход — email + пароль Supabase Auth (G.21); QR-инвайта, PIN и логина по телефону нет (D-06). Людей заводит директор или секретарь (`POST /api/people`, D-104); пароль человеку задаёт директор или секретарь на карточке (`/api/people/:id/password`), свой сотрудник меняет в профиле через `auth.updateUser` (G.20b).
 
 `lib/auth.ts`:
 
@@ -34,7 +34,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 
 `'any'` = любой активный профиль. Без `withAuth`: `/api/company/logo` (multipart; те же `getSessionProfile` + `requireRole`), `/api/me`, `/api/health`, `/api/version`, `/api/push/sweep` (секрет cron). Роли: `director | manager | employee | shopkeeper | secretary | tv` (`secretary` — D-79).
 
-Лимитов частоты запросов нет `[не построено]`: ни `company.settings.limits`, ни счётчиков в БД.
+Лимитов частоты запросов нет: ни `company.settings.limits`, ни счётчиков в БД.
 
 ### Таблица «эндпоинт → роль»
 
@@ -45,7 +45,6 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/voice/parse` | POST | director | §2 |
 | `/api/voice/confirm` | POST | director | §2 |
 | `/api/voice/audio-url` | GET | любая | `?path=` → signed URL оригинала на 10 мин; доступ решает RLS: путь должен быть `source_audio_path` видимой задачи или `audio_path` объявления |
-| `/api/voice/query` | — | — | `[не построено, этап 3]` (§2) |
 | `/api/tasks/:id/transition` | POST | любая (право перехода проверяет `trg_task_status_guard`) | `{to_status, reason?, comment?, suggest_assignee_id?, report?: {text?, file_path?, partial?}, client_request_id}` → `transition_task`; при `accepted` закрывает квитанцию `task_sent` (`acted_at`, D-32); ошибки подсказки — `404 assignee_not_found`, `409 same_assignee` (D-128) |
 | `/api/tasks/:id/revoke` | POST | director | `{client_request_id}` → `revoke_task` (D-01) |
 | `/api/tasks/:id/send-now` | POST | director | `{client_request_id}` → `send_task_now` (D-129): отложенная задача уходит сейчас, её слова команде, ждущие окна, — с ней; затем `kickDeliveries()` |
@@ -72,11 +71,12 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/push/sweep` | GET, POST | — (`Authorization: Bearer <CRON_SECRET>`) | минутный тик §10 (Vercel cron шлёт GET) |
 | `/api/files/upload-url` | POST | любая | `{ext: jpg\|png\|webp, client_request_id}` → signed upload URL в бакет `photos`, путь `{company}/{user}/{client_request_id}.{ext}` (G.20b); объект этого ключа уже есть — `{signed_url: "", stored: true}`, повтор идёт дальше (D-130) |
 | `/api/files/url` | GET | любая | `?message_id=` → signed URL файла сообщения на 10 мин; доступ решает RLS `task_messages`, бакет по типу: `photo` → `photos`, `voice` → `voice`; путь в Storage клиент не называет |
-| `/api/people` | POST | director | создаёт auth-пользователя через admin API service role + профиль (роли — весь enum, в т.ч. `secretary`, `tv`); при провале профиля auth-пользователь удаляется; `409 email_exists` |
-| `/api/people/:id/password` | POST | director | `{password}` (6–72) через service role; только своя компания, пароль другого директора — `403` (G.20b) |
-| `/api/company` | GET, PATCH | director | название (RPC `update_company_profile`) и `settings.brand` (`accent`, `tagline`, `logo_url` через `update_company_settings`), G.20d |
-| `/api/company/logo` | POST | director | multipart ≤2 МБ, PNG/JPEG/WebP/SVG → публичный бакет `brand/{company}/logo-*.ext`, URL — в `settings.brand.logo_url` |
-| `/api/settings` | GET, PATCH | director | D-48: секции `stt`, `parser`, `vocabulary`, `conventions` (D-15), `matching` (D-16), `points_enabled`, `rating_mode`, `delivery_window`, `secretary` (D-79), `brand`; PATCH дополняет присланную секцию текущими значениями и сливает через RPC `update_company_settings` |
+| `/api/people` | POST | director, secretary (D-104) | создаёт auth-пользователя через admin API service role + профиль (роли — весь enum, в т.ч. `secretary`, `tv`); директора добавляет только директор — `403`; при провале профиля auth-пользователь удаляется; `409 email_exists` |
+| `/api/people/:id/password` | POST | director, secretary (D-104) | `{password}` (6–72) через service role; только своя компания, вход директора меняет только он сам — `403` (G.20b, `canResetLogin`) |
+| `/api/people/:id/login` | GET, PATCH | director, secretary (D-104) | GET — почта входа и `last_sign_in_at` («ни разу не входил») из `auth.users` service role'ом; PATCH `{email}` — исправить почту без второго аккаунта; права те же, что у пароля (`403`), `409 email_exists` |
+| `/api/company` | GET, PATCH | director, secretary (D-104) | название (RPC `update_company_profile`) и `settings.brand` (`accent`, `tagline`, `logo_url` через `update_company_settings`), G.20d |
+| `/api/company/logo` | POST | director, secretary (D-104) | multipart ≤2 МБ, PNG/JPEG/WebP/SVG → публичный бакет `brand/{company}/logo-*.ext`, URL — в `settings.brand.logo_url` |
+| `/api/settings` | GET, PATCH | director, secretary (D-104) | D-48: секции `stt`, `parser`, `vocabulary`, `conventions` (D-15), `matching` (D-16), `points_enabled`, `rating_mode`, `delivery_window`, `secretary` (D-79), `brand`; PATCH дополняет присланную секцию текущими значениями и сливает через RPC `update_company_settings` |
 | `/api/settings/vocabulary` | POST | director, secretary | D-111: `{add?, remove?, kind?, set_kind?: {word, kind}, rename?: {from, to}}` — слова в словарь и из него, тип, исправленное написание; сервер применяет `applyVocabularyEdit` к сохранённым `settings.vocabulary` и `vocabulary_meta` (тип, кто, когда), множество — повтор безвреден, id запроса не нужен; больше 200 — 422 `vocabulary_full`, написание, которое уже есть, — 409 `vocabulary_conflict`; ответ — настройки целиком |
 | `/api/dictionary/kinds` | POST | director, secretary | D-111 §19: одна правка типов слов — `{op: "add", id, label}` / `{op: "rename", id, label}` / `{op: "remove", id, move_to}` / `{op: "move", id, index}`; сервер применяет `applyKindEdit` к `settings.word_kinds` и `vocabulary_meta` (слова удалённого типа — в `move_to` или «Без типа»); имя, которое есть у другого типа, 13-й тип — 409 `kind_conflict`; id нового типа приходит с экрана — повтор безвреден |
 | `/api/dictionary/words` | GET, POST | director, secretary | D-111 §16: GET — `{days, phrases, usage, suggestions}`: сколько раз каждое слово встретилось в разобранных фразах за 30 дней и названия, которых нет в словаре (`lib/dictionary-usage.ts`), `ai_logs` — серверным ключом в пределах компании, наружу только числа и слова; POST `{dismiss: [key]}` — спрятать предложения для всех (`settings.dictionary.dismissed_words`, до 200) |
@@ -89,7 +89,7 @@ userSupabase(req)                              // клиент с JWT вызыв
 
 ## 2. Голосовой конвейер
 
-Метрика (D-43): **p50 ≤ 6 с / p90 ≤ 10 с** от отпускания кнопки до интерактивных карточек подтверждения (на доске Пульса, D-60; `/confirm` — запасной экран). Голосовое уходит одним blob после отпускания (G.23); стриминг чанков MediaRecorder `timeslice` — `[не построено]`. Латентность по этапам пишется в `ai_logs` (`stt_ms`, `parse_ms`, `latency_ms`).
+Метрика (D-43): **p50 ≤ 6 с / p90 ≤ 10 с** от отпускания кнопки до интерактивных карточек подтверждения (на доске Пульса, D-60; `/confirm` — запасной экран). Голосовое уходит одним blob после отпускания (G.23); кусками во время речи — не построено. Латентность по этапам пишется в `ai_logs` (`stt_ms`, `parse_ms`, `latency_ms`).
 
 Без экрана подтверждения сохраняются только заметки (D-75 §4: фраза из одних заметок сразу уходит в `/api/voice/confirm`, тост «Записал» с «Отменить»; диктовка на экране «Заметки» — строкой `notes` под RLS, см. `note_id` ниже) и заявки секретарю (D-79 §9: матчер в `/api/voice/parse` → `/api/errands`).
 
@@ -116,18 +116,18 @@ transcribe(audio: Buffer, mime: string, opts: { language, vocabularyHints }, pro
 
 ### POST /api/voice/parse
 `export const maxDuration = 60`.
-Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id, suspicious?, assignee_id? }`. Текст одной строкой идёт сюда же — один парсер на все входы. Web Share Target — `[не построено]` (D-36); значение `shared` схема принимает.
+Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id, suspicious?, assignee_id? }`. Текст одной строкой идёт сюда же — один парсер на все входы. Web Share Target не построен (D-36); значение `shared` схема принимает.
 
 Порядок:
 1. **Идемпотентность:** удачный разбор с тем же `client_request_id` уже есть в `ai_logs` → возвращается он, модель не зовётся.
 2. **Матчер заявок до модели (D-79 §9, `lib/errands/matcher.ts`):** при активном секретаре фраза до трёх слов без имени из ростера, совпавшая с `label`/`synonyms` каталога, → `{ entities: [], errand, model: 'matcher' }`; ни токена, ни подтверждения.
-3. **Модель** `settings.parser.model` (дефолт `claude-haiku-4-5`), **structured outputs** собственной JSON Schema (G.17) — невалидный JSON исключён схемой, **repair-retry не существует**. Эскалация на `settings.parser.escalation_model` по триггерам G.17, если `settings.parser.escalate`. DeepSeek — только сравнение в «Лаб» (D-63).
+3. **Модель** `settings.parser.model` (дефолт `claude-haiku-4-5`), **structured outputs** собственной JSON Schema (G.17) — невалидный JSON исключён схемой, **repair-retry не существует**. Эскалация на `settings.parser.escalation_model` по триггерам G.17, если `settings.parser.escalate`. DeepSeek — только сравнение в «Лаб» (D-63). Сейчас Claude зовётся через `@anthropic-ai/sdk` напрямую, без Vercel AI SDK (G.6): structured outputs и `cache_control` промпта задаются параметрами API провайдера без прослойки.
 4. **Постобработка** (`lib/ai/postprocess.ts`): модель называет исполнителя именем, id ставит сервер (D-56) через `lib/matchName.ts` по порогам `settings.matching` (D-16, D-54); минус очков голосом и очки из `shared` блокируются (D-30, D-36); `suspicious` от transcribe — потолок уверенности исполнителя 0.5 и жёлтый чип.
 5. **Закреплённый исполнитель (D-84, `lib/ai/pin.ts`):** `assignee_id` — человек, выбранный до фразы (кружок на экране ожидания, «Дать задачу» на карточке); сервер ставит его всем сущностям с одним исполнителем, кроме той, где модель узнала другое, произнесённое вслух имя.
 
 Выход: `{ entities, model, escalated, latency_ms }`; строка `ai_logs` (`kind='parse'`), `inbox_items` → `parsed`. Ошибки: `422 parse_refused`, `502 parse_failed` (§9). Контракт сущностей — `lib/ai/schema.ts` (`EntitySchema`; модели уходит `ModelEntitySchema`), промпт, few-shot, конвенции времени (D-15) и evals — `docs/AI.md`; копия контракта здесь не ведётся. Ничего не выдумывать: нет исполнителя/дедлайна → `null`.
 
-`kind:'query'` — вопрос к данным: `/api/voice/query` `[не построено]`, ответы на Пульсе детерминированные (D-51 п.4, `lib/pulse/answers.ts`), `confirm_voice_batch` вопрос не сохраняет.
+`kind:'query'` — вопрос к данным: роута `/api/voice/query` нет, ответы на Пульсе детерминированные (D-51 п.4, `lib/pulse/answers.ts`), `confirm_voice_batch` вопрос не сохраняет.
 
 ### POST /api/voice/confirm
 Вход: `{ client_request_id, source, audio_path?, transcript, parsed_entities, confirmed_entities, force_now?, inbox_id?, note_id? }`.
@@ -142,8 +142,8 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 Выход: `{ result: { task_ids, announcement_ids, reminder_ids, recurrence_ids, note_ids, event_ids, point_ids, skipped, scheduled }, duplicate }`. Ошибки: `400 assignee_required`, `400 event_time_required`, `403 forbidden`.
 
-### POST /api/voice/query — `[не построено, этап 3]`
-План (D-34, G.6): только director, модель Sonnet-класса, tool use со `strict: true`; 5–8 инструментов (`search_tasks`, `employee_tasks`, `overdue_list`, `who_not_reported`, `summary_today`, `employee_score`), параметр-исполнитель — только валидный `user_id` (enum из ростера); факты — только из tool results; максимум 4 итерации, таймаут 15 с; обёртки под RLS-контекстом директора, не service role; карточки ответа рендерит бэкенд из tool results; ручной SSE через `@anthropic-ai/sdk` (`text_delta`, `cards`, `done`, `error`). **Vercel AI SDK в стек не вносить.**
+### POST /api/voice/query
+Не построено; идея — IDEAS.md (И-3).
 
 ## 3. RPC-функции (контракт транзакций)
 
@@ -167,8 +167,8 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 | `next_delivery_slot` | `(p_company uuid, p_now timestamptz) → timestamptz` | null внутри окна доставки компании, иначе ближайшее открытие окна (Asia/Aqtobe). Общее правило D-38 для производителей задач и для `deliver_after` |
 | `award_points` | `(p_user_id uuid, p_amount int, p_reason text, client_request_id uuid) → jsonb` | `[за флагом: settings.points_enabled]` в интерфейсе; сама функция флаг не проверяет. Только director; `amount ≠ 0`, причина обязательна всегда (D-30), получатель — активный человек компании; `point_transactions(source='manual')`; возвращает `{id, balance}`. Ошибки `amount_required`, `reason_required`, `user_not_found` |
 | `fn_rating` | `(p_from timestamptz, p_to timestamptz) → table(user_id, display_name, points, rank, delta_vs_prev, on_time_pct, is_me)` | Рейтинг за период (D-11, D-29): состав — активные `team_role()`; `rating_mode='top5'` — топ-5 + строка запрашивающего, директору — все |
-| `update_company_settings` | `(patch jsonb) → jsonb`, без `client_request_id` | Только director; `settings || patch` — секции заменяются целиком (роут дополняет их текущими значениями) |
-| `update_company_profile` | `(p_name text) → jsonb`, без `client_request_id` | Только director; название 1–120 символов, иначе `invalid_name` (G.20d) |
+| `update_company_settings` | `(patch jsonb) → jsonb`, без `client_request_id` | Director или secretary (D-104); `settings || patch` — секции заменяются целиком (роут дополняет их текущими значениями) |
+| `update_company_profile` | `(p_name text) → jsonb`, без `client_request_id` | Director или secretary (D-104); название 1–120 символов, иначе `invalid_name` (G.20d) |
 | `create_shop_order` | `(p_item_id uuid, client_request_id uuid) → jsonb` | Advisory lock на пользователя; баланс `SUM(point_transactions) ≥ price` и остаток; insert order(`pending`, снимок цены, `stock_reserved`) + `point_transactions(shop_hold, −price)` + декремент stock (`stock is null` = без ограничения, не трогается); outbox `shop_order` директору и завхозу (кроме заказчика). Роль `tv` — `forbidden`. Ошибки: `insufficient_points`, `out_of_stock`, `item_not_found` |
 | `cancel_shop_order` | `(p_order_id uuid, client_request_id uuid) → jsonb` | Владелец — только из `pending` (D-37); director/shopkeeper — из `pending/approved`. `point_transactions(shop_release, +price)` ровно на сумму холда по `order_id`; остаток возвращается, только если резервировался (`stock_reserved`); чужую отмену владелец узнаёт из outbox `shop_cancelled`. Ошибки: `wrong_status`, `order_not_found`, `forbidden` |
 | `set_shop_order_status` | `(p_order_id uuid, p_status order_status, client_request_id uuid) → jsonb` | Завхоз/директор ведёт заказ: `pending → approved`, `pending\|approved → delivered`; свой заказ не проводит никто; outbox `shop_approved` / `shop_ready` владельцу. Выдача новых транзакций **не пишет** — hold финален, `shop_final` не существует (D-10) |
@@ -212,8 +212,8 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 ### Ack-семантика (D-32)
 «Увидел» = SW шлёт `POST /api/push/seen {delivery_id}` при показе уведомления, ЛИБО открытое приложение шлёт тот же роут без `delivery_id` и закрывает все незакрытые строки человека (`seen_at`). «Принял» = переход задачи в `accepted` ставит `acted_at` строке `task_sent`; для `message` — `mark_thread_read`. Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
 
-### Эскалация — `[не построено]` (D-32 ◐, D-21 🔴, D-41 🔴)
-План: ярус 1 — push; ошибка отправки или нет `seen_at` за таймаут в рабочие часы → ярус 2 — Telegram-дубль с кнопками «Принял / Вопрос» (§5); ярус 3 — SMS: канал в enum заложен, в v1 не строится (D-41). Дедупликация: ярус N+1 стреляет, только если ярус N не подтверждён (`seen_at is null`) по таймауту — иначе сотрудники замьютят бота. Эскалация заявок секретарю — отдельная и есть: повторный push, §3 `errands_due_escalation`.
+### Эскалация
+Эскалации по каналам (Telegram, SMS) нет — не построено (D-21, D-32, D-41; указатели — IDEAS.md). Эскалация заявок секретарю — отдельная и есть: повторный push, §3 `errands_due_escalation`.
 
 ### Гигиена канала
 - Чистка подписок: ответ `404`/`410` → подписка удаляется немедленно `[есть]`.
@@ -264,15 +264,15 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 Про `message`: **схлопывание** — пока строка ещё `queued`, следующее сообщение того же треда не создаёт новую, а обновляет её («N новых сообщения · последние слова»), один сигнал на очередь, а не N. **Не сообщения:** причина отказа, комментарий к доработке и отчёт при сдаче — у них свои события (`declined`, `rework`, `pending_review`). **Квитанцию закрывает** `mark_thread_read` — «Прочитал» из шторки или открытый тред. В таблице могут лежать строки прежних видов `question` и `reply` — новых не появляется. Очки (`award_points`) уведомлений не порождают. Удалённое объявление забирает свои ещё не ушедшие пуши (`meta.announcement_id`, D-114). У `errand_declined` ссылка — `/secretary?e={id}`, у «принято / готово» — `/pulse`.
 
-## 5. Telegram — `[не построено]` (D-21 🔴)
+## 5. Telegram
 
-План: привязка — обязательный шаг онбординга (D-21): PWA получает одноразовый код (TTL 15 мин) → deep-link `https://t.me/<bot>?start=<code>` → вебхук на `/start` пишет `profiles.telegram_chat_id` (колонка есть, больше ничего нет). Вебхук сверяет заголовок `X-Telegram-Bot-Api-Secret-Token` с `TELEGRAM_WEBHOOK_SECRET`, несовпадение → 401. Inline-кнопки «Принял / Вопрос» → `transition_task` / сообщение в треде, `acted_at` в доставке. Бот — grammY; на dev — отдельный тестовый бот.
+Не построено; идея — IDEAS.md (указатель D-21). В схеме есть только колонка `profiles.telegram_chat_id`, её никто не пишет.
 
 ## 6. Очки, реакции, магазин
 
 - **Очки** `[за флагом: settings.points_enabled]` (D-48, дефолт выключено): ручное начисление и снятие — RPC `award_points` прямо из клиента (`lib/points/queries.ts`), только director, причина обязательна всегда, `amount ≠ 0` (D-30). Голосом — только плюс и только при включённом флаге (`confirm_voice_batch`); из `source='shared'` очков нет (D-36). Рейтинг — `fn_rating` (§3).
-- **Авто-правила и автоштрафы** (`auto_penalties_enabled`, D-28 🔴) — `[не построено]`; ключ идемпотентности `(task_id, rule_code) where source='auto_rule'` в схеме есть (D-31).
-- **Реакции** (`/api/reactions`, `reaction_points`) — `[не построено]`.
+- **Авто-правил и автоштрафов нет** (D-28); ключ идемпотентности `(task_id, rule_code) where source='auto_rule'` в схеме есть (D-31).
+- **Реакций нет.**
 - **Магазин** — только RPC `create_shop_order` / `cancel_shop_order` / `set_shop_order_status` (§3), hold-final (D-10). Баланс всегда = `SUM(point_transactions)`, нигде не хранится.
 
 ## 7. Статусная машина задач
@@ -281,8 +281,8 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 | Переход | Кто |
 |---|---|
-| `scheduled → sent` | только service role (guard пускает при `auth.uid() is null`); исполнитель — минутный тик, `[не построено]`, наряд 017 |
-| `sent → accepted` | исполнитель («Принял»; из Telegram — `[не построено]`) |
+| `scheduled → sent` | service role — тик `publish_due_scheduled` (guard пускает при `auth.uid() is null`, D-114, наряд 017); director — «Отправить сейчас», `send_task_now` (D-129) |
+| `sent → accepted` | исполнитель («Принял») |
 | `sent/accepted → declined` | исполнитель; причина — `payload.reason`, сервер её не требует; подсказка коллеги — `payload.suggest_assignee_id` (D-128) |
 | `rework → declined` | исполнитель через `transition_task` — шагами `rework → accepted → declined` в одной транзакции (D-128; самого ребра в страже нет) |
 | `accepted → pending_review` | исполнитель (отчёт — в той же транзакции, D-64 §3) |
@@ -305,13 +305,13 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 - **«К вам посетитель» (D-96)**: `POST /api/visits` (secretary → RPC `announce_visit`, пуш директору сразу) и `POST /api/visits/[id]/answer` (director → `answer_visit`, пуш секретарю сразу); закрытие — RPC `close_visit` с клиента; минутный свип зовёт `visits_due_expiry` (20 минут без ответа, после «Подождёт» — час). Визит поднимает версию `tv_state`, киоск перечитывает надпись `tv_overlay()`. Сообщение секретаря на стену (D-116) идёт тем же путём с `kind: 'message'`, ответ — `read`; `tv_overlay()` отдаёт `{visit, waiting, message, messages}` — приглашённый визит больше не отдаётся.
 - Guest-режим — поле `tv_state.guest` (переключатель «Гость в кабинете» на пульте, D-33; «Пусть заходит» посетителю включает его на час — `guest_until`, D-96); `?guest=1` — лишь стартовое значение до прихода строки.
 - **Квитанция экрана** — `tv_heartbeat(p_applied_version)` от роли `tv` раз в минуту и после каждого применённого состояния; пульт показывает «На стене» / «Отправлено, экран ещё не показал» / «Экран не отвечает с 9:14» (принцип 8). Перезапуск с пульта — `reload_requested_at`; киоск сравнивает отметку с временем своей загрузки.
-- Чистка хвоста `tv_events` — функция `tv_events_prune(p_days)` есть, вызова нет `[не построено]`.
+- Чистка хвоста `tv_events` — `tv_events_prune(p_days default 30)` из тика `/api/push/sweep` (§10, D-126): лента стены живёт последний месяц.
 
 ## 9. Контракт ошибок AI-конвейера (для фронта)
 
 | Состояние | HTTP | JSON | Поведение фронта |
 |---|---|---|---|
-| upload-fail | — (Storage напрямую) или `502` | ошибка signed-URL upload / `upload_url_failed` | ретрай с этапа загрузки; запись держится в сторе `lib/store/ingest.ts` (IndexedDB-очереди нет) |
+| upload-fail | — (Storage напрямую) или `502` | ошибка signed-URL upload / `upload_url_failed` | ретрай с этапа загрузки; запись держится на телефоне в IndexedDB (`lib/voice/kept.ts`, D-130) и возвращается директору повтором (`lib/voice/keptReplay.ts`); где IndexedDB нет — только в сторе `lib/store/ingest.ts` |
 | stt-fail | 502 | `{error:{code:'stt_failed'}, audio_path}` | «Не расслышал» + ретрай по сохранённому `audio_path`, без перезаписи |
 | empty-transcript | 200 | `{transcript: null, code:'empty_transcript', guard}` | guard отбраковал не-речь; парсер не вызывался |
 | empty-entities | 200 | `{entities:[]}` | показать сырой транскрипт + «Повторить / отправить как текст» |
@@ -326,15 +326,15 @@ Handler: auth → zod (служебные поля карточек `assignee`, 
 
 ## 10. Минутный тик
 
-pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `* * * * *` → `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`); роут отвечает и на `GET` (так зовёт Vercel cron), и на `POST`, `maxDuration = 60`. Раз в минуту cron Vercel работает на тарифе Pro; сейчас проект на Hobby — раз в сутки. Минутный тик без Pro — pg_cron + pg_net в базе инстанса (адрес и секрет в Vault) — ждёт владельца, В-8 (D-125).
+pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`); роут отвечает и на `GET` (так зовёт Vercel cron), и на `POST`, `maxDuration = 60`. Сейчас расписание `0 3 * * *` — раз в сутки (08:00 Asia/Aqtobe): проект на Vercel Hobby, cron раз в минуту — тариф Pro. Минутный тик — открытый вопрос В-8 (D-125).
 
-Один вызов тика делает по порядку: `publish_due_scheduled()` — выпуск отложенных задач `scheduled → sent` (D-38, tasks/017, D-114), `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()` (молчит, пока ждёт просьба о сроке, D-128), «Скоро срок» исполнителю `deadline_reminders_due()` (D-128), `team_channel_alerts_due()`, `director_day_summaries_due()` и последними сводки `director_digests_due()` (D-114), чистка outbox `notification_deliveries_purge()` (30 дней ушедшему, 7 — не ушедшему, до 2000 строк за тик, D-114 §10), затем `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. **Локально** cron нет: `pnpm dev:tick` зовёт тот же свип раз в минуту.
+Один вызов тика делает по порядку: `publish_due_scheduled()` — выпуск отложенных задач `scheduled → sent` (D-38, tasks/017, D-114), `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()` (молчит, пока ждёт просьба о сроке, D-128), «Скоро срок» исполнителю `deadline_reminders_due()` (D-128), `team_channel_alerts_due()`, `director_day_summaries_due()` и последними сводки `director_digests_due()` (D-114), чистка outbox `notification_deliveries_purge()` (30 дней ушедшему, 7 — не ушедшему, до 2000 строк за тик, D-114 §10), чистка ленты стены `tv_events_prune()` (30 дней, D-126), затем `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. **Локально** cron нет: `pnpm dev:tick` зовёт тот же свип раз в минуту.
 
-Исполнителя нет `[не построено]` у: повторов (`recurrence_rules`) — записываются, но не исполняются (наряд 017, «Вне скоупа»); «напомни мне» с D-95 — заметка со временем, её исполняет `notes_due_reminders`; авто-очков (D-28); чистки аудио старше срока хранения (D-18 ◐, D-66 п.6); чистки `tv_events` (`tv_events_prune`); подсчёта streak.
+Исполнителя нет у: повторов (`recurrence_rules` записываются, задачи по ним не рождаются); авто-очков (D-28); чистки аудио — аудио копится бессрочно (D-18 ◐, D-66 п.6); подсчёта streak.
 
 ## 11. Environments (D-19)
 
-Сейчас есть только dev-проект Supabase; прод-проекта и CI нет (D-19 🔴). План: **dev** и **prod**, Vercel preview → dev, production → prod; миграции в dev — `pnpm db:push`, в prod — только из CI `[не построено]`. Отдельные VAPID-пары на среду. **Смена VAPID-ключей = мгновенная смерть всех push-подписок** — prod-пару не трогать никогда без плана ре-подписки.
+Сейчас есть только dev-проект Supabase; прод-проекта и CI нет, вопрос открыт в D-19. Vercel-проект `pulse` — и Production, и Preview — смотрит в dev (SETUP.md §1). Миграции в dev — `pnpm db:push`; `db push` в прод запрещён. Своя VAPID-пара на каждую среду. **Смена VAPID-ключей = смерть всех push-подписок** до следующего открытия приложения (SETUP.md §2) — пару, на которую подписаны люди, не трогать без плана переподписки.
 
 | Переменная | Где | Примечание |
 |---|---|---|
@@ -346,16 +346,15 @@ pg_cron, pg_net и Edge Functions не подключены (G.20c). Единс�
 | `DEEPSEEK_API_KEY` | Vercel | только сравнение в «Лаб» (D-63) |
 | `STT_PROVIDER` / `STT_FALLBACK_PROVIDER` | Vercel | значения по умолчанию `getSttProviders()`; роут транскрипции берёт провайдеров из `settings.stt` |
 | `PARSER_MODEL` / `PARSER_ESCALATION_MODEL` | Vercel | значения по умолчанию `lib/ai/parse.ts`; роут парсера передаёт модели из `settings.parser` |
-| `QUERY_MODEL` | — | зарезервировано под `/api/voice/query` `[не построено]`, код не читает |
+| `QUERY_MODEL` | — | объявлена в `.env.example`, код не читает |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Vercel | отдельные пары dev/prod; без ключей воркер не шлёт ничего |
 | `CRON_SECRET` | Vercel | Bearer минутного тика §10 |
 | `DEMO_RESET_ENABLED` / `NEXT_PUBLIC_DEMO_MODE` | только dev/демо | серверный замок и видимость кнопки «Обнулить демо-базу» (D-58); прод клиента их не ставит |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` | — | зарезервировано: Telegram `[не построено]` (§5) |
-| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | — | зарезервировано: Sentry `[не построено]` |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` / `INTERNAL_FN_SECRET` / `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | — | объявлены в `.env.example`, код не использует (Telegram, Edge Functions и Sentry нет) |
 
 ## 12. Наблюдаемость
 
 - Ошибки роутов — `console.error` в логи Vercel без тела запроса и ключей (`withAuth`, §1).
-- Алерты на рост `failed` в `notification_deliveries` и на `status='error:*'` в `ai_logs` — `[не построено]`.
 - `ai_logs` (схема в DATABASE.md): каждый вызов STT и парсера — провайдер, модель, латентность по этапам, токены (`input`, `output`, `cache_read`), `parsed/confirmed_entities` + `was_edited` / `edit_fields`, `source`, `client_request_id`, `status` (`ok` | `error:<код>`). Колонки стоимости нет: цену считает «Лаб» по `lib/ai/pricing.ts` (D-63). `tool_calls` не заполняется (вопросов к данным нет). Аудио в логи не пишется.
 - `/api/health` — liveness без БД.
+- Алертов и Sentry нет — не построено; идея — IDEAS.md (И-85).
