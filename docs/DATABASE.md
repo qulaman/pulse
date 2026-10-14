@@ -57,11 +57,15 @@ create type errand_status  as enum ('sent','accepted','done','declined','cancell
 | `matching` | пороги матчера имён (переопределения) | D-16 |
 | `points_enabled` | очки и рейтинг, дефолт `false` | D-48 |
 | `rating_mode` | `top5 \| full`, дефолт `top5` | D-11 |
+| `points_rules` | авто-правила: `quick_accept` (1) за «Принял» в первые `quick_accept_min` (10) минут после пуша, `on_time` (3), `early` (5, в первой половине срока — вместо `on_time`), `late_on` (false) и `late` (5) — штраф за сдачу после срока; `reactions` — цена реакции директора по коду (`like` 1, `fire` 10, `heart` 100, `clap`/`zap`/`think`/`dislike` 0). База читает те же ключи (`points_rule()`, `reaction_points()`): битое значение — дефолт, цена реакции не бывает отрицательной | D-133, D-13, D-28 |
+| `ether_events` | `{merch, praise}`, дефолт оба `true` — выдача награды и похвала директора строкой в Эфире | D-133, И-46 |
+| `mascot_seasons` | наряды лиц к праздникам, дефолт `true` | D-119 |
+| `mascot_telegraph` | лицо сотрудника переживает за свои дела (`calling` / `panicking` / `nervous`), дефолт `true`; `false` — лицо показывает только то, что в руках | D-133, В-5 |
 | `delivery_window` | `{from, to}`, дефолт 08:00–21:00 Asia/Aqtobe | D-38 |
 | `secretary` | `escalate_after_min` (дефолт 3), `actions[]` — `{code, label, icon, synonyms}` | D-79 |
 | `dictionary` | `dismissed[]` — уроки «Из ваших записей», спрятанные «×» (`personId:форма`, до 200, пишет `/api/dictionary/misheard`); `dismissed_words[]` — спрятанные предложения «Часто встречается» (ключи основ, до 200, пишет `/api/dictionary/words`) | D-111 |
 
-Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Правил авто-очков, карты реакций и таймаута Telegram в настройках нет.
+Пишет только RPC `update_company_settings` (директор или секретарь — D-104; слияние по секциям) и `/api/lab` (секции `stt`, `parser`, service role, D-63). Таймаута Telegram в настройках нет.
 
 ### profiles (расширение auth.users; id = fk auth.users on delete cascade, без default)
 ```
@@ -73,7 +77,7 @@ telegram_chat_id bigint null,                 -- колонка есть, при
 is_active bool not null default true,         -- оффбординг: false = вне рейтинга/матчинга/рассылок
 availability availability_t not null default 'active',
 settings jsonb not null default '{}',         -- ключей код не читает
-streak_count int not null default 0, streak_updated_at timestamptz null,  -- streak не считается: колонки никто не пишет
+streak_count int not null default 0, streak_updated_at timestamptz null,  -- серия сдач в срок, пишет trg_tasks_points на «Принято» (D-133)
 created_at
 ```
 Роль `tv` — служебный auth-пользователь киоска; `secretary` — сотрудник с правом вести заявки (D-79), а с D-104 — ещё настройки и команду: карточки, роли и вход всех, кроме директоров. Кто «команда» — функция `team_role(role)`: `employee`, `manager`, `shopkeeper`, `secretary`. Аватаров нет (бакета `avatars` нет).
@@ -123,11 +127,37 @@ meta jsonb not null default '{}', created_at
 id, company_id, user_id, amount int check (amount <> 0),
 reason text not null check (length(trim(reason)) > 0),
 source point_source not null, rule_code text null,
-task_id uuid null → tasks, order_id uuid null, actor_id uuid null → profiles, created_at
+task_id uuid null → tasks, order_id uuid null, actor_id uuid null → profiles,
+quiet bool not null default false,   -- ручное поощрение не для Эфира и стены (D-133)
+created_at
 ```
-Insert-политик нет: строки пишут только security-definer-функции — `award_points` (ручные ± директора, `source='manual'`), `confirm_voice_batch` (очки голосом: только плюс и только при `points_enabled`), магазинные RPC (`shop_hold` / `shop_release`). Авто-правил и реакций нет, но ключ заложен: `unique (task_id, rule_code) where source='auto_rule'` — бонус только за **первый** done (D-31). Заморозка магазина — **hold-final** (D-10): заказ → `shop_hold`(−price); отмена → `shop_release`(+price, ровно сумма hold по order_id); выдача → новых транзакций НЕТ, hold финален. Максимум один hold и один release на заказ: `unique (order_id, source) where order_id is not null`. Страховка — `trg_point_transactions_hold_guard`: после `shop_hold` баланс ≥ 0; ручной минус директора уводить баланс в минус вправе (D-12).
+Insert-политик нет: строки пишут только security-definer-функции — `award_points` (ручные ± директора, `source='manual'`; `p_public = false` — `quiet`), `confirm_voice_batch` (очки голосом: только плюс и только при `points_enabled`), магазинные RPC (`shop_hold` / `shop_release`), `tasks_points` (авто-правила, `source='auto_rule'`, `rule_code` `quick_accept | on_time | early | late`), `react_to_task` (`source='reaction'`, строки реакции одного директора по задаче в сумме равны цене текущей реакции), `resolve_points_dispute` (возврат по спору — `manual`, `rule_code='refund'`, `quiet`). Ключ `unique (task_id, rule_code) where source='auto_rule'` — бонус за задачу и правило один раз (D-31). Заморозка магазина — **hold-final** (D-10): заказ → `shop_hold`(−price); отмена → `shop_release`(+price, ровно сумма hold по order_id); выдача → новых транзакций НЕТ, hold финален. Максимум один hold и один release на заказ: `unique (order_id, source) where order_id is not null`. Страховка — `trg_point_transactions_hold_guard`: после `shop_hold` баланс ≥ 0; ручной минус директора уводить баланс в минус вправе (D-12).
 
 **View `point_balances`** (D-126) — баланс считает база, телефон ленту не суммирует: `company_id, user_id, balance` (= SUM(amount)), `spent` (холды минус возвраты), `earned_30d` (поощрения за 30 дней без магазина). `security_invoker` — читается под RLS `point_transactions`: человек видит свою строку, директор — все, anon — доступа нет. Хранимого поля по-прежнему нет. pgTAP — `039_point_balances`.
+
+### task_reactions — реакция директора на задачу (D-133, И-68)
+```
+task_id → tasks on delete cascade, author_id → profiles, company_id,
+code text check (code in ('like','fire','heart','clap','zap','think','dislike')),
+created_at, updated_at, primary key (task_id, author_id)
+```
+Одна реакция директора на задачу; пишет только `react_to_task` (снять — `p_code = null`). Видят автор, директор и исполнитель задачи. В Realtime-публикации. Очки — строками `point_transactions source='reaction'`, цена — `settings.points_rules.reactions`.
+
+### point_disputes — «Оспорить» минус (D-133, D-14)
+```
+id, company_id, transaction_id unique → point_transactions, user_id → profiles,
+text not null, status text check (status in ('open','refunded','kept')) default 'open',
+answer null, resolved_by null → profiles, resolved_at null, refund_id null → point_transactions, created_at
+```
+Один спор на минус (не магазинный). Пишут только `dispute_points` (сам человек) и `resolve_points_dispute` (директор). Видят сам человек и директор. В Realtime-публикации.
+
+### ether_events — хорошие новости в Эфире (D-133, И-46)
+```
+id, company_id, kind text check (kind in ('merch','praise')), user_id → profiles, actor_id null → profiles,
+title not null, icon null, amount int null, order_id null → orders on delete cascade,
+transaction_id null → point_transactions, created_at
+```
+Рождаются только в триггерах: `trg_ether_events_merch` (заказ → `delivered`) и `trg_ether_events_praise` (ручной плюс без `quiet`) — при `points_enabled` и включённой секции `settings.ether_events`. Минуса здесь не бывает (D-45), пуша команде нет. Видит вся компания, кроме `tv`; удаляет директор. В Realtime-публикации.
 
 ### shop_items / orders
 ```
@@ -392,7 +422,18 @@ director_digests_due(p_now timestamptz default now()) returns int     -- сво�
 -- director_quiet_until(prefs, at), director_meeting_until(user, at), director_digest_slot(prefs, at), ru_plural(n, …)
 
 -- очки, настройки
-award_points(p_user_id uuid, p_amount int, p_reason text, client_request_id uuid default null) returns jsonb
+award_points(p_user_id uuid, p_amount int, p_reason text, client_request_id uuid default null,
+             p_public boolean default true) returns jsonb   -- p_public = false → quiet: ни Эфира, ни стены (D-133)
+react_to_task(p_task uuid, p_code text, client_request_id uuid default null) returns jsonb
+  -- director; задача не scheduled/revoked и не своя; null снимает; очки — разницей к цене текущей реакции;
+  -- пуш 'reaction' исполнителю (неотправленный переписывается); {task_id, code, points}
+dispute_points(p_transaction uuid, p_text text, client_request_id uuid default null) returns jsonb
+  -- сам человек, только свой немагазинный минус, один раз; пуш 'points_dispute' директорам
+resolve_points_dispute(p_dispute uuid, p_refund boolean, p_answer text default null, client_request_id uuid default null) returns jsonb
+  -- director; 'open' → 'refunded' (+ строка возврата quiet) | 'kept'; пуш 'points_answer' человеку
+task_streak_of(p_company uuid, p_user uuid) returns int        -- серия сдач в срок; внутренняя
+task_sent_at(p_task uuid, p_fallback timestamptz) returns timestamptz  -- когда задача дошла (пуш 'task_sent'); внутренняя
+points_rule(p_settings jsonb, p_key text, p_default int) / reaction_points(p_settings jsonb, p_code text) / reaction_glyph(p_code text)
 fn_rating(p_from timestamptz, p_to timestamptz)
   returns table (user_id uuid, display_name text, points int, rank int,
                  delta_vs_prev int, on_time_pct numeric, is_me boolean)
@@ -467,6 +508,8 @@ tv_emit(p_company, p_kind, p_actor, p_task, p_title, p_amount, p_title_guest) re
 5. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; секретарь на чужой строке меняет `role`, `is_active`, `manager_id`, но не трогает директора и никого им не делает, на своей — как все (D-104, миграция `20260924100000_secretary_admin`); service role (`auth.uid()` null) — без ограничений.
 6. `trg_point_transactions_hold_guard` (constraint trigger after insert on point_transactions, deferrable initially immediate) — только для `shop_hold`: баланс < 0 → `insufficient_points`.
 7. Outbox (только вставка строк): `trg_notify_outbox_tasks` (after insert or update of status on tasks), `trg_notify_outbox_messages` (after insert on task_messages), `trg_notify_outbox_announcements` (after insert on announcements), `trg_notify_outbox_event_participant` (after insert on event_participants), `trg_notify_outbox_event` (after update on events), `trg_notify_outbox_errand` (after insert or update of status on errands); `trg_notification_deliveries_deliver_after` (before insert on notification_deliveries) — окно доставки.
+7a. `trg_tasks_points` (after update of status on tasks, D-133) — авто-правила очков (`sent → accepted`: быстро; `→ done`: в срок / досрочно / штраф) и серия `profiles.streak_count` на `→ done`.
+7b. Эфир: `trg_ether_events_praise` (after insert on point_transactions), `trg_ether_events_merch` (after update of status on orders) — D-133.
 8. Проекции ТВ: `trg_tv_events_task` (after insert or update on tasks), `trg_tv_events_points` (after insert on point_transactions), `trg_tv_events_announcement` (after insert on announcements), `trg_tv_events_order` (after update on orders).
 9. `trg_events_reset_reminder` (before update on events) — перенос `starts_at` обнуляет `reminded_at`.
 10. `moddatetime` (extension) — `updated_at` на tasks, inbox_items, shop_items, orders, notes, mind_boards, tv_state, events, errands.
@@ -485,6 +528,9 @@ ai_logs (company_id, created_at);  ai_logs (company_id, client_request_id, kind)
 announcements (company_id, created_at desc);  inbox_items (company_id, user_id);
 recurrence_rules (next_run_at) where is_active;  reminders (remind_at) where not sent;
 point_transactions (company_id, user_id, created_at);
+task_reactions (company_id, updated_at desc);  task_reactions (author_id);           -- D-133
+point_disputes (company_id, status, created_at desc);  point_disputes (user_id);  point_disputes (resolved_by);  point_disputes (refund_id);
+ether_events (company_id, created_at desc);  ether_events (user_id);  ether_events (actor_id);  ether_events (order_id);  ether_events (transaction_id);
 push_subscriptions (user_id);
 notes (user_id, created_at desc) where deleted_at is null;  notes (client_request_id) unique where not null;
 notes (remind_at) where remind_at is not null and reminded_at is null and deleted_at is null;  notes (deleted_at) where deleted_at is not null;
@@ -528,7 +574,7 @@ notification_deliveries_created_idx (created_at);   -- самоочистка, D
 
 pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10); сейчас `0 3 * * *` — раз в сутки (проект на Vercel Hobby), минутный тик — открытый вопрос В-8 (D-125). Локально тот же свип раз в минуту зовёт `pnpm dev:tick`. Один вызов по порядку: `publish_due_scheduled()` — выпуск `scheduled → sent` (D-114, наряд 017), `events_due_reminders()`, `errands_due_escalation()`, `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()`, «Скоро срок» `deadline_reminders_due()` (D-128), `team_channel_alerts_due()`, `director_day_summaries_due()` («Итог дня»), `director_digests_due()` (сводки, D-114), `notification_deliveries_purge()` (D-114 §10), `tv_events_prune()` (D-126), затем рассылка outbox.
 
-Исполнителя нет у: `recurrence_rules` (записываются, не исполняются), авто-очков (D-28), streak, чистки аудио (D-18). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`.
+Исполнителя нет у: `recurrence_rules` (записываются, не исполняются), чистки аудио (D-18). Авто-очки и серия — не тик, а триггер на переходе задачи (D-133). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`.
 
 ## Миграции — дисциплина
 
@@ -588,5 +634,6 @@ pg_cron и pg_net не подключены. Единственное распи
 | `038_task_lifecycle.test.sql` | жизнь задачи (D-128): «Не могу» с доработки и подсказка коллеги (себя — нет), просьба о сроке и ответы, «Срок» раньше / позже, «Напомнить» раз в полчаса без закрытия вопроса, передача со сроком и словом, «Скоро срок» раз на срок, «Просрочено» молчит при просьбе, `passed_to` не пишет сотрудник |
 | `039_point_balances.test.sql` | view `point_balances` (D-126): баланс считает база под RLS вызывающего; уникальный ключ `inbox_items` делает загрузку голоса идемпотентной |
 | `040_rework_handover.test.sql` | «Выполнено» после доработки одним вызовом (D-130): `transition_task` проходит `rework → accepted → pending_review` сам, отчёт в той же транзакции, повтор ключа — дубль, ребро никому другому не доступно |
+| `041_points_game.test.sql` | очки и game feel (D-133): авто-правила на переходах (быстро, в срок, досрочно, штраф выключен и не с отпуска, ничего при выключенных очках), серия, реакции с ценой и разницей, один пуш, права и RLS; «Оспорить» (свой минус, один раз, возврат тихой строкой, ответ пушем); Эфир (похвала, тихая, минус, выдача, выключено), стена без авто-бонусов и тихих |
 
 Магазинные RPC (`create_shop_order` и соседние) не покрыты ни одним тестом; проекции `tv_events` проверены только для видов `event` (`020`) и `task_sent` при выпуске отложенной задачи (`029`, `037`).
