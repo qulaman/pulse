@@ -26,18 +26,21 @@ function left(ms: number): string {
  * live, a QR that opens the company's sign-in screen, «Скопировать» and «Отправить» with a
  * ready message — and the sign-in landing live, «Вход выполнен · iPhone», so the issuer sees it
  * while the person is still in front of them. `self` — the person's own code for another
- * device («Войти на другом устройстве»). The code exists in this sheet only: closed, it is gone
+ * device («Войти на другом устройстве»); `tv` — the wall's kiosk user from the remote: no QR
+ * (a TV has no camera), the address in large type, the code typed with the TV's remote. The code exists in this sheet only: closed, it is gone
  * from the app, and a new one cancels it.
  */
 export function LoginCodePanel({
   person,
   autoIssue = false,
   self = false,
+  tv = false,
   onDone,
 }: {
   person: { id: string; full_name: string };
   autoIssue?: boolean;
   self?: boolean;
+  tv?: boolean;
   onDone: () => void;
 }) {
   const issue = useIssueLoginCode();
@@ -112,7 +115,9 @@ export function LoginCodePanel({
     return (
       <div className="flex flex-col gap-4">
         <p className="text-[14px] leading-[18px] text-muted">
-          {self
+          {tv
+            ? "Код из 8 цифр для экрана: действует 15 минут и срабатывает один раз — вводится пультом на телевизоре."
+            : self
             ? "Код из 8 цифр для второго устройства: действует 15 минут и срабатывает один раз."
             : `Код из 8 цифр: действует 15 минут и срабатывает один раз. На телефоне ${first} сначала ставит приложение на главный экран, потом вводит код в нём.`}
         </p>
@@ -139,7 +144,7 @@ export function LoginCodePanel({
             <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <p className="font-display text-[19px] font-semibold leading-6">Вход выполнен</p>
+        <p className="font-display text-[19px] font-semibold leading-6">{tv ? "Экран подключён" : "Вход выполнен"}</p>
         <p className="text-[14px] leading-[18px] text-muted">
           {status.data?.device ?? "Устройство"} · {status.data?.used_at ? hm(status.data.used_at) : ""}
         </p>
@@ -174,14 +179,22 @@ export function LoginCodePanel({
         </span>
       </div>
 
-      <div className="flex items-center gap-4">
-        <QrCode text={issued.code.link} size={132} label={`QR-код: вход в ${issued.code.company}`} />
-        <p className="text-[14px] leading-[18px] text-muted">
-          {self
-            ? "Камера второго устройства откроет вход по этому QR — код вводится там."
-            : "Камера телефона откроет вход по этому QR. Сначала приложение — на главный экран, потом код."}
-        </p>
-      </div>
+      {tv ? (
+        <div className="flex flex-col gap-1" data-testid="code-address">
+          <span className="text-[14px] leading-[18px] text-muted">В браузере телевизора открыть адрес</span>
+          <span className="select-all break-all font-mono text-[19px] font-semibold leading-6">{issued.code.link.replace(/^https?:\/\//, "")}</span>
+          <span className="text-[14px] leading-[18px] text-muted">и ввести код пультом — экран сам перейдёт на стену.</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          <QrCode text={issued.code.link} size={132} label={`QR-код: вход в ${issued.code.company}`} />
+          <p className="text-[14px] leading-[18px] text-muted">
+            {self
+              ? "Камера второго устройства откроет вход по этому QR — код вводится там."
+              : "Камера телефона откроет вход по этому QR. Сначала приложение — на главный экран, потом код."}
+          </p>
+        </div>
+      )}
 
       <p className="flex items-center gap-2 text-[14px] leading-[18px]" data-testid="code-waiting">
         <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />

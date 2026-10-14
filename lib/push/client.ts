@@ -135,6 +135,15 @@ async function runSync(force: boolean): Promise<void> {
 }
 
 /** Sign-out: this browser stops being this person's, before the session is gone. */
+/** This browser's push endpoint, if it has one — «Выйти на других устройствах» keeps it (D-135). */
+export async function thisDeviceEndpoint(): Promise<string | null> {
+  try {
+    return (await currentSubscription(false))?.subscription.endpoint ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function forgetThisDevice(): Promise<void> {
   try {
     if (pushState() !== "granted") return;

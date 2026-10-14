@@ -75,7 +75,7 @@ export function SignOutRow({ action, userId, className = "" }: { action: () => P
 
       <Sheet open={open} onClose={() => !pending && setOpen(false)} title="Выйти из аккаунта?">
         <p className="text-[16px] leading-[22px] text-muted">
-          Задачи, сообщения и очки останутся на месте. Чтобы вернуться, понадобится пароль.
+          Задачи, сообщения и очки останутся на месте. Чтобы вернуться, понадобится код входа или пароль.
         </p>
         {held ? (
           // unsent recordings are not lost by a sign-out (principle 5): they wait for the person

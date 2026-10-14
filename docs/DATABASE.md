@@ -331,13 +331,20 @@ created_at, accepted_at null, done_at null, updated_at
 ## RLS — канонический паттерн (обязателен, не изобретать свой)
 
 ```sql
+-- живая сессия: session_id токена есть в auth.sessions; токен без session_id (pgTAP, скрипты) — живой (D-135)
+create or replace function auth_session_live() returns boolean
+language sql stable security definer set search_path = public
+as $$ select coalesce(auth.jwt() ->> 'session_id', '') = ''
+          or exists (select 1 from auth.sessions s where s.id = (auth.jwt() ->> 'session_id')::uuid) $$;
+
+-- отвечают только работающему человеку с живой сессией: уволенный и отозванный не видят компанию сразу (D-135)
 create or replace function auth_company_id() returns uuid
 language sql stable security definer set search_path = public
-as $$ select company_id from profiles where id = auth.uid() $$;
+as $$ select company_id from profiles where id = auth.uid() and is_active and auth_session_live() $$;
 
 create or replace function auth_role() returns text
 language sql stable security definer set search_path = public
-as $$ select role::text from profiles where id = auth.uid() $$;
+as $$ select role::text from profiles where id = auth.uid() and is_active and auth_session_live() $$;
 
 create or replace function subordinates(mgr uuid) returns setof uuid
 language sql stable security definer set search_path = public
@@ -366,7 +373,7 @@ create policy tasks_insert on tasks for insert with check (
 Плюс `tasks_update` (та же видимость, `with check` своей компании) и `tasks_delete` (director, только `scheduled`). В новых политиках вызовы оборачивать в `(select auth.uid())` / `(select auth_company_id())` — initplan считается раз на запрос (так сделаны `task_messages`, `task_reads`, `notes`, `errands`).
 
 Матрица по остальным таблицам:
-- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); update — владелец (защищённые поля — `trg_profiles_guard`) + director + secretary (`profiles_update_secretary`: строка директора вне досягаемости, строка не уходит директорской — D-104); insert/delete — только service role. **companies**: select — компания, кроме `tv`; write — service role и RPC `update_company_settings` / `update_company_profile`.
+- **profiles**: select — вся компания (через `auth_company_id()`, НЕ подзапросом к profiles — иначе рекурсия 42P17), кроме роли `tv` — она видит только собственную строку (нужна layout-гарду /tv); своя строка — только при живой сессии (`auth_session_live()`: отозванный телефон не читает даже себя → сервер отвечает 401, уволенный с живой сессией читает себя → «Аккаунт отключён», D-135); update — владелец (защищённые поля — `trg_profiles_guard`) + director + secretary (`profiles_update_secretary`: строка директора вне досягаемости, строка не уходит директорской — D-104); insert/delete — только service role. **companies**: select — компания, кроме `tv`; write — service role и RPC `update_company_settings` / `update_company_profile`.
 - **task_messages**: select и insert — участники задачи (автор/исполнитель/директор/менеджер глубины 1; `sender_id = auth.uid()`); update/delete — нет (append-only, `answered_at` ставит триггер).
 - **task_reads**: только свои строки — select/insert/update по `user_id = auth.uid()`, `company_id` сверяется с `auth_company_id()`; delete — нет (каскад от задачи).
 - **point_transactions**: select — свои + director; insert/update/delete — нет (только security-definer-функции). Рейтинг клиентом из сырых транзакций НЕ читается — только `fn_rating()`.
@@ -456,6 +463,11 @@ redeem_login_code(p_code_hash text, p_ip_hash text, p_device text default null, 
                                                               -- код берётся одним update (один раз), ушедший человек не входит; тот же p_request_id
                                                               -- за 10 минут — снова тот же человек (потерянный ответ)
 release_login_code(p_code_id uuid) returns void               -- сессию не выдали: код возвращается, пока жив
+revoke_sessions(p_user_id uuid, p_keep_current boolean default false, p_keep_endpoint text default null) returns json
+                                                              -- «Выйти со всех устройств» (D-135): сессии человека удаляются (с ними — refresh-токены),
+                                                              -- push-подписки и открытые коды — тоже; сам себе (keep_current — этот телефон остаётся
+                                                              -- со своими пушами), director/secretary — человеку своей компании, директору — только он сам;
+                                                              -- {sessions, devices}; ошибки not_found, forbidden. authenticated
 
 -- магазин (hold-final, D-10)
 create_shop_order(p_item_id uuid, client_request_id uuid default null) returns jsonb
@@ -522,6 +534,7 @@ tv_emit(p_company, p_kind, p_actor, p_task, p_title, p_amount, p_title_guest) re
 4. `trg_question_answered` (after insert on task_messages) — первое сообщение автора задачи проставляет `meta.answered_at` открытым вопросам этой задачи; строка «Напомнить» (`meta.nudge`) ответом не считается (D-128).
 4a. `trg_close_time_requests` (after update of status on tasks) — задача ушла из рук исполнителя (сдана, отказ, закрыта, отозвана) — ждущая просьба о сроке закрывается `answer='closed'` (D-128).
 5. `trg_profiles_guard` (before update on profiles) — не-директор не меняет `role`, `company_id`, `is_active`, `manager_id`, `streak_*`; секретарь на чужой строке меняет `role`, `is_active`, `manager_id`, но не трогает директора и никого им не делает, на своей — как все (D-104, миграция `20260924100000_secretary_admin`); service role (`auth.uid()` null) — без ограничений.
+5a. `trg_profiles_deactivated` (after update of is_active on profiles) — увольнение (`true → false`) само удаляет сессии человека, его push-подписки и отменяет открытые коды входа, каким бы путём ни выключили (D-135, миграция `20261014180000_login_sessions`).
 6. `trg_point_transactions_hold_guard` (constraint trigger after insert on point_transactions, deferrable initially immediate) — только для `shop_hold`: баланс < 0 → `insufficient_points`.
 7. Outbox (только вставка строк): `trg_notify_outbox_tasks` (after insert or update of status on tasks), `trg_notify_outbox_messages` (after insert on task_messages), `trg_notify_outbox_announcements` (after insert on announcements), `trg_notify_outbox_event_participant` (after insert on event_participants), `trg_notify_outbox_event` (after update on events), `trg_notify_outbox_errand` (after insert or update of status on errands); `trg_notification_deliveries_deliver_after` (before insert on notification_deliveries) — окно доставки.
 7a. `trg_tasks_points` (after update of status on tasks, D-133) — авто-правила очков (`sent → accepted`: быстро; `→ done`: в срок / досрочно / штраф) и серия `profiles.streak_count` на `→ done`.

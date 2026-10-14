@@ -8,9 +8,11 @@ import { BoardPresenter, usePresenterBusy } from "@/components/mindboard/BoardPr
 import { BoardSeam } from "@/components/screen/BoardSeam";
 import { ScreenPageSkeleton } from "@/components/screen/RemoteSkeleton";
 import { useWallBoard } from "@/components/screen/useWallBoard";
+import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { PageHead } from "@/components/ui/PageHead";
 import { Body, Dot, Gauge, Key, Lcd, LcdDim, Lens, Seam, Switch, type LedTone } from "@/components/ui/device/Device";
 import { PersonPad } from "@/components/ui/device/PersonPad";
+import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { ANSWERS } from "@/components/visits/VisitAsk";
 import { useBoards } from "@/lib/mindboard/queries";
@@ -137,6 +139,10 @@ export default function ScreenPage() {
   const now = useTick();
   const state = useTvState();
   const people = usePeople();
+  // «Подключить экран» (D-135): a code for the wall's kiosk user, typed with the TV's remote
+  const screens = (people.data ?? []).filter((p) => p.role === "tv" && p.is_active);
+  const [connect, setConnect] = useState<{ open: boolean; id: string | null; key: number }>({ open: false, id: null, key: 0 });
+  const connectTo = screens.find((p) => p.id === connect.id) ?? (screens.length === 1 ? screens[0] : null);
   const control = useTvControl();
   const visits = useVisits();
   const answer = useAnswerVisit();
@@ -497,10 +503,51 @@ export default function ScreenPage() {
                   }
                 />
               </div>
+
+              {/* the wall signs in with a code from here: no email typed with a TV remote (D-135) */}
+              <Seam label="Подключение" />
+              <div className="mt-2 flex">
+                <Key
+                  icon={<ConnectIcon />}
+                  data-testid="remote-connect"
+                  onClick={() => setConnect((c) => ({ open: true, id: null, key: c.key + 1 }))}
+                >
+                  Подключить экран
+                </Key>
+              </div>
             </motion.div>
           </AnimatePresence>
         </MotionConfig>
       </Body>
+
+      <Sheet
+        open={connect.open}
+        onClose={() => setConnect((c) => ({ ...c, open: false }))}
+        title={connectTo ? `Подключить экран · ${connectTo.full_name}` : "Подключить экран"}
+      >
+        {connectTo ? (
+          <LoginCodePanel
+            key={connect.key}
+            person={connectTo}
+            tv
+            autoIssue
+            onDone={() => setConnect((c) => ({ ...c, open: false }))}
+          />
+        ) : screens.length > 1 ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-[14px] leading-[18px] text-muted">Какой экран подключить?</p>
+            {screens.map((screen) => (
+              <Key key={screen.id} icon={<ConnectIcon />} onClick={() => setConnect((c) => ({ ...c, id: screen.id }))}>
+                {screen.full_name}
+              </Key>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[16px] leading-[22px] text-muted">
+            Экрана нет среди сотрудников: «Настройки» → «Сотрудники» → «Новый сотрудник», роль «ТВ-экран». Потом — сюда.
+          </p>
+        )}
+      </Sheet>
     </main>
   );
 }
@@ -516,6 +563,14 @@ const icon = {
   strokeLinejoin: "round" as const,
   "aria-hidden": true,
 };
+
+const ConnectIcon = () => (
+  <svg {...icon}>
+    <rect x="2.5" y="3.5" width="15" height="10" rx="1.6" />
+    <path d="M7 16.5h6M10 13.5v3" />
+    <path d="M8 8.5h4M10.5 7l1.5 1.5-1.5 1.5" />
+  </svg>
+);
 
 const EtherIcon = () => (
   <svg {...icon}>

@@ -5,6 +5,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { AfterPoints } from "@/components/profile/AfterPoints";
 import { OtherDeviceRow } from "@/components/profile/OtherDeviceRow";
+import { SignOutOthersRow } from "@/components/profile/SignOutOthersRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
 import { PointsCard } from "@/components/profile/PointsCard";
 import { ProfileCard } from "@/components/profile/ProfileCard";
@@ -53,6 +54,7 @@ export default async function ProfilePage() {
         <RowGroup className="mt-2">
           <PasswordRow />
           <OtherDeviceRow userId={profile.userId} fullName={profile.fullName} />
+          <SignOutOthersRow userId={profile.userId} />
           <NotificationsRow director={director} />
           <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
         </RowGroup>

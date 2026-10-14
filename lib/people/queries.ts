@@ -229,6 +229,27 @@ export function useLoginCodeStatus(id: string, enabled: boolean, poll: boolean) 
   });
 }
 
+/**
+ * «Выйти со всех устройств» (D-135): the person's sessions, push devices and open codes go.
+ * `keepCurrent` — one's own «на других устройствах»: this phone stays signed in with its pushes.
+ */
+export function useRevokeSessions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, keepCurrent, keepEndpoint }: { id: string; keepCurrent?: boolean; keepEndpoint?: string | null }) => {
+      const res = await fetch(`/api/people/${id}/sessions`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keep_current: keepCurrent ?? false, ...(keepEndpoint ? { keep_endpoint: keepEndpoint } : {}) }),
+      });
+      if (!res.ok) throw await failure(res, "Не получилось закрыть вход");
+      return (await res.json()) as { sessions: number; devices: number };
+    },
+    onSuccess: (_result, { id }) => void queryClient.invalidateQueries({ queryKey: ["people", id] }),
+  });
+}
+
 /** A new password set by the director or the secretary; the caller shows it once. */
 export function useResetPassword() {
   return useMutation({

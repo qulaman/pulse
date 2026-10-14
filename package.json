@@ -35,6 +35,7 @@
     "smoke:stages": "tsx scripts/smoke-stages.ts",
     "smoke:offline": "tsx scripts/smoke-offline.ts",
     "smoke:code-login": "tsx scripts/smoke-code-login.ts",
+    "smoke:sessions": "tsx scripts/smoke-sessions.ts",
     "db:clean": "tsx scripts/db-clean.ts",
     "seed:client": "tsx scripts/seed-client.ts"
   },

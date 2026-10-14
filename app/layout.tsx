@@ -6,6 +6,7 @@ import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
 import { MediaReplay } from "@/components/MediaReplay";
+import { SessionWatch } from "@/components/auth/SessionWatch";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
@@ -72,6 +73,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ErrandReplay />
           {/* the push channel re-registers itself and the icon keeps its number (D-114) */}
           <PushSync />
+          {/* a sign-in taken away (all devices, a fired person) lands on the sign-in screen (D-135) */}
+          <SessionWatch />
         </QueryProvider>
       </body>
     </html>

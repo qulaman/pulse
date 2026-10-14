@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { Credentials } from "@/components/people/Credentials";
 import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { PasswordField } from "@/components/people/PasswordField";
+import { ExitIcon } from "@/components/profile/icons";
 import { ClockIcon, KeyIcon, MailIcon, QrIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Row, RowGroup } from "@/components/ui/Row";
@@ -13,7 +14,7 @@ import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { visibleEmail } from "@/lib/people/email";
 import { generatePassword } from "@/lib/people/password";
-import { useChangeLoginEmail, usePersonLogin, useResetPassword, type Person } from "@/lib/people/queries";
+import { useChangeLoginEmail, usePersonLogin, useResetPassword, useRevokeSessions, type Person } from "@/lib/people/queries";
 
 const FIELD =
   "min-h-[52px] w-full field px-3 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] focus:border-accent";
@@ -23,15 +24,17 @@ const FIELD =
  * person is in (D-135); then the email they sign in with, when they last did, and «Сбросить
  * пароль» — a ready password in one tap, handed over by copy or share. A person added without
  * an email carries a service address in Auth: it shows as «нет», and a password waits for a
- * real email (lib/people/email.ts). Shown only where `canResetLogin` allows; the routes check
- * the same rule.
+ * real email (lib/people/email.ts). Last, «Выйти со всех устройств» — a lost phone: every
+ * session goes at once, with the push devices. Shown only where `canResetLogin` allows; the
+ * routes check the same rule.
  */
 export function LoginCard({ person }: { person: Person }) {
   const login = usePersonLogin(person.id, true);
   const reset = useResetPassword();
   const changeEmail = useChangeLoginEmail();
+  const revoke = useRevokeSessions();
 
-  const [sheet, setSheet] = useState<"code" | "password" | "email" | null>(null);
+  const [sheet, setSheet] = useState<"code" | "password" | "email" | "signout" | null>(null);
   const [password, setPassword] = useState("");
   const [done, setDone] = useState(false);
   const [email, setEmail] = useState("");
@@ -111,6 +114,15 @@ export function LoginCard({ person }: { person: Person }) {
         ) : (
           <Row icon={<KeyIcon />} title="Сбросить пароль" value="новый" onClick={openPassword} />
         )}
+        <Row
+          icon={<ExitIcon />}
+          title="Выйти со всех устройств"
+          tone="danger"
+          onClick={() => {
+            setError(null);
+            setSheet("signout");
+          }}
+        />
       </RowGroup>
       {login.data && !last ? (
         <p className="mt-2 px-1 text-[13px] leading-4 text-muted">
@@ -145,6 +157,43 @@ export function LoginCard({ person }: { person: Person }) {
             </Button>
           </form>
         )}
+      </Sheet>
+
+      <Sheet open={sheet === "signout"} onClose={() => !revoke.isPending && close()} title={`Выйти со всех устройств · ${first}`}>
+        <div className="flex flex-col gap-3">
+          <p className="text-[16px] leading-[22px] text-muted">
+            Вход закроется сразу на всех телефонах и компьютерах, уведомления на них перестанут приходить. Задачи и история
+            останутся. Войти снова — по новому коду.
+          </p>
+          {error ? (
+            <p role="alert" className="text-[14px] leading-[18px] text-danger">
+              {error}
+            </p>
+          ) : null}
+          <Button
+            block
+            variant="danger"
+            loading={revoke.isPending}
+            data-testid="revoke-all"
+            onClick={() =>
+              revoke.mutate(
+                { id: person.id },
+                {
+                  onSuccess: ({ sessions }) => {
+                    toast(sessions > 0 ? `Вход закрыт на всех устройствах · ${sessions}` : "Открытых входов не было");
+                    close();
+                  },
+                  onError: (e) => setError(e.message),
+                },
+              )
+            }
+          >
+            Выйти со всех устройств
+          </Button>
+          <Button block variant="ghost" disabled={revoke.isPending} onClick={close}>
+            Отмена
+          </Button>
+        </div>
       </Sheet>
 
       <Sheet open={sheet === "email"} onClose={close} title="Почта для входа">

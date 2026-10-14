@@ -2489,6 +2489,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      revoke_sessions: {
+        Args: { p_keep_current?: boolean; p_keep_endpoint?: string; p_user_id: string }
+        Returns: Json
+      }
       revoke_task: {
         Args: { client_request_id?: string; task_id: string }
         Returns: Json
