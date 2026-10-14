@@ -322,6 +322,20 @@ export function isSendable(entity: PostprocessedEntity, pointsEnabled = false): 
 }
 
 /**
+ * Why a phrase has nothing to send — the face's line on Пульс says the real reason, not always
+ * «исполнителя» (D-137): a name nobody recognised, a meeting without a time, points while the
+ * company has them off, points from shared text (D-36). Empty when something can go.
+ */
+export function whyNothingToSend(entities: PostprocessedEntity[], pointsEnabled = false): string {
+  if (entities.length === 0 || entities.some((entity) => isSendable(entity, pointsEnabled))) return "";
+  if (entities.some((entity) => entity.blocked === "assignee_unmatched")) return "Не хватает исполнителя.";
+  if (entities.some((entity) => entity.blocked === "time_missing")) return "Не хватает времени встречи.";
+  if (entities.some((entity) => entity.kind === "points" && !pointsEnabled)) return "Очки выключены в Настройках.";
+  if (entities.some((entity) => entity.blocked === "points_blocked")) return "Очки из пересланного текста не начисляются.";
+  return "Отправлять нечего.";
+}
+
+/**
  * A phrase that held nothing but thoughts needs no confirm screen (D-75 §3): there is
  * no assignee to pick and no deadline to check, so the note is saved straight away and
  * the toast offers «Отменить». An empty parse is not «notes only» — that is the

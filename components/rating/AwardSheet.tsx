@@ -37,7 +37,7 @@ export function AwardSheet({
       <div className="flex items-center gap-3">
         <Mascot state="happy" size={44} />
         <p className="text-[13px] leading-4 text-muted">
-          Очки видят все в рейтинге. Снятие очков — только с причиной и не голосом
+          Очки видят все в рейтинге. Снятие — с причиной, сотрудник может его оспорить
         </p>
       </div>
 

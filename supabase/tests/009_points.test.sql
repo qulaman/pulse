@@ -38,8 +38,9 @@ select ok(
   (select count(*) from fn_rating(now() - interval '7 days', now() + interval '1 minute')) between 1 and 6,
   'employee: rating is top-5 plus own row at most'
 );
+-- their own rows are theirs to read (auto-rules give them some, D-133): only others' must be invisible
 select is(
-  (select count(*) from point_transactions), 0::bigint,
+  (select count(*) from point_transactions where user_id <> '10000000-0000-0000-0000-000000000005'), 0::bigint,
   'employee reads no transactions of other people'
 );
 

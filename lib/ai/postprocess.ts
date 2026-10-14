@@ -66,8 +66,8 @@ export function postprocess(
 
     if (entity.kind === "points") {
       if (entity.amount === 0) continue; // nothing to award, nothing to show
-      // Taking points away by voice is forbidden (D-30); shared text may not award any (D-36).
-      if (source === "shared" || entity.amount < 0) entity.blocked = "points_blocked";
+      // A minus the director says is a minus (D-137, revises D-30); shared text may not award any (D-36).
+      if (source === "shared") entity.blocked = "points_blocked";
     }
 
     if (entity.kind === "event") {

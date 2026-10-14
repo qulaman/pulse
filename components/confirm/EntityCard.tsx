@@ -336,7 +336,7 @@ export function EntityCard({
 
               {entity.kind === "points" ? (
                 <>
-                  <Chip tone={pointsEnabled ? "accent" : "muted"} interactive={false}>
+                  <Chip tone={pointsEnabled ? (entity.amount < 0 ? "danger" : "accent") : "muted"} interactive={false}>
                     {entity.amount > 0 ? `+${entity.amount}` : entity.amount}
                   </Chip>
                   {!pointsEnabled ? (

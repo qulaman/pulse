@@ -86,10 +86,10 @@ describe("postprocess", () => {
     expect(run([points({ amount: 0 })])).toHaveLength(0);
   });
 
-  it("blocks negative points from voice instead of deleting them (D-30)", () => {
+  it("keeps a minus from voice sendable — the director said it (D-137, revises D-30)", () => {
     const [entity] = run([points({ amount: -5 })]);
     expect(entity.kind === "points" && entity.amount).toBe(-5);
-    expect(entity.blocked).toBe("points_blocked");
+    expect(entity.blocked).toBeUndefined();
   });
 
   it("blocks any points coming from shared text (D-36)", () => {

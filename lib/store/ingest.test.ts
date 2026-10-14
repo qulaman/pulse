@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PostprocessedEntity } from "../ai/postprocess";
 import { VoiceApiError, type VoiceApi } from "../voice/api";
-import { describeParticipants, isNotesOnly, useIngestStore } from "./ingest";
+import { describeParticipants, isNotesOnly, useIngestStore, whyNothingToSend } from "./ingest";
 
 // Hoisted: vi.mock runs before the imports it replaces.
 const api = vi.hoisted(() => ({
@@ -332,5 +332,23 @@ describe("describeParticipants", () => {
     expect(
       describeParticipants({ everyone: false, participant_ids: ["u-003", "u-005", "u-001"] }, nameOf),
     ).toBe("Марат +2");
+  });
+});
+
+describe("whyNothingToSend — the face says the real reason (D-137)", () => {
+  const points = (amount: number, blocked?: "points_blocked") =>
+    ({ kind: "points", assignee_id: "u-005", amount, reason: null, source_span: "Айгуль минус 10", blocked }) as unknown as PostprocessedEntity;
+
+  it("a minus said by the director is sendable: nothing to explain", () => {
+    expect(whyNothingToSend([points(-10)], true)).toBe("");
+  });
+  it("points while the company has them off", () => {
+    expect(whyNothingToSend([points(-10)], false)).toBe("Очки выключены в Настройках.");
+  });
+  it("points from shared text", () => {
+    expect(whyNothingToSend([points(10, "points_blocked")], true)).toBe("Очки из пересланного текста не начисляются.");
+  });
+  it("a task without an assignee is still «исполнителя»", () => {
+    expect(whyNothingToSend([taskEntity({ blocked: "assignee_unmatched" } as Partial<PostprocessedEntity>)], true)).toBe("Не хватает исполнителя.");
   });
 });

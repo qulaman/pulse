@@ -58,7 +58,7 @@ import { answer } from "@/lib/pulse/answers";
 import { countsOf, emptyLanes, hasMessage, hasUnread, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { alarmOf } from "@/lib/pulse/mood";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
-import { isCountable, isSendable, useIngestStore, type IngestError } from "@/lib/store/ingest";
+import { isCountable, isSendable, useIngestStore, whyNothingToSend, type IngestError } from "@/lib/store/ingest";
 import { ERROR_ACT } from "@/lib/voice/stages";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
@@ -595,7 +595,7 @@ export default function PulsePage() {
           // no «тапни меня» in words: the face asks for the tap itself (`offering`)
           text: throwing
             ? "Отправляю…"
-            : `Понял так: ${entitiesSummary(entities)}.${sendableCount > 0 ? "" : " Не хватает исполнителя."}`,
+            : `Понял так: ${entitiesSummary(entities)}.${sendableCount > 0 ? "" : ` ${whyNothingToSend(entities, pointsEnabled)}`}`,
           tone: sendableCount > 0 ? "ok" : "warn",
         },
       ]
