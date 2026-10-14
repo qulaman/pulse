@@ -58,7 +58,10 @@ export function SignOutRow({ action, userId, className = "" }: { action: () => P
       .then(() => Promise.race([forgetThisDevice(), new Promise((resolve) => setTimeout(resolve, 1500))]))
       .then(() => {
         forgotten.current = true;
-        target.requestSubmit();
+        // a task later, never from this chain: without pushes it settles while the browser is
+        // still firing this very submit, and a requestSubmit() then is silently dropped (HTML
+        // spec, «firing submission events») — the button would spin forever
+        setTimeout(() => target.requestSubmit(), 0);
       });
   };
 
