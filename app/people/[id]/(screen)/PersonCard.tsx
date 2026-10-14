@@ -287,9 +287,9 @@ export function PersonCard() {
         target={awardTarget}
         onClose={() => setAwardTarget(null)}
         pending={award.isPending}
-        onSubmit={(amount, reason) => {
+        onSubmit={(amount, reason, isPublic) => {
           if (!awardTarget) return;
-          award.mutate({ userId: awardTarget.user_id, amount, reason });
+          award.mutate({ userId: awardTarget.user_id, amount, reason, isPublic });
           setAwardTarget(null);
         }}
       />

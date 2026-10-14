@@ -5,12 +5,13 @@ import { useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { AwardSheet, type AwardTarget } from "@/components/rating/AwardSheet";
+import { DisputesBlock } from "@/components/rating/DisputesBlock";
 import { Podium } from "@/components/rating/Podium";
 import { PeriodChips } from "@/components/rating/PeriodChips";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
-import { initialsOf } from "@/lib/people/queries";
+import { initialsOf, usePeople } from "@/lib/people/queries";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
 
 const RING = ["var(--gold)", "#B8C2CC", "#C98A5B"];
@@ -26,7 +27,20 @@ function Delta({ value }: { value: number }) {
   );
 }
 
-function Row({ row, canAward, onAward, onOpen }: { row: RatingRow; canAward: boolean; onAward: (row: RatingRow) => void; onOpen: (row: RatingRow) => void }) {
+function Row({
+  row,
+  streak,
+  canAward,
+  onAward,
+  onOpen,
+}: {
+  row: RatingRow;
+  /** Handovers in time in a row, counted by the database (И-69); shown from two. */
+  streak: number;
+  canAward: boolean;
+  onAward: (row: RatingRow) => void;
+  onOpen: (row: RatingRow) => void;
+}) {
   const ring = row.points > 0 && row.rank <= 3 ? RING[row.rank - 1] : null;
   return (
     <li
@@ -57,6 +71,11 @@ function Row({ row, canAward, onAward, onOpen }: { row: RatingRow; canAward: boo
           <span className="flex items-center gap-2 text-[13px] leading-4 text-muted">
             <Delta value={row.delta_vs_prev} />
             {row.on_time_pct !== null ? <span className="nums">{row.on_time_pct}% в срок</span> : <span>без закрытых</span>}
+            {streak >= 2 ? (
+              <span className="nums font-semibold" style={{ color: "var(--gold)" }} data-testid="streak">
+                🔥 {streak} подряд
+              </span>
+            ) : null}
           </span>
         </span>
         <span className="nums text-[19px] font-semibold leading-6" style={{ color: row.points > 0 ? "var(--gold)" : "var(--text-muted)" }}>
@@ -92,6 +111,9 @@ export function RatingList({
   const [open, setOpen] = useState<RatingRow | null>(null);
   const rating = useRating(period);
   const award = useAwardPoints();
+  // the streak lives on the profile (И-69, D-133): the team list already carries it
+  const people = usePeople();
+  const streakOf = (userId: string) => (pointsEnabled ? (people.data?.find((person) => person.id === userId)?.streak_count ?? 0) : 0);
 
   const rows = rating.data ?? [];
   const scored = rows.filter((r) => r.points > 0);
@@ -114,16 +136,19 @@ export function RatingList({
         <p className="mt-4 rounded-[12px] border border-warn/40 bg-warn/10 px-3 py-2 text-[13px] leading-4 text-warn">
           {isDirector ? (
             <>
-              Очки выключены на время пилота.{" "}
+              Очки выключены.{" "}
               <Link href="/settings?tab=team" className="underline underline-offset-2">
                 Включить в Настройках
               </Link>
             </>
           ) : (
-            "Очки включатся после пилота"
+            "Очки пока выключены"
           )}
         </p>
       ) : null}
+
+      {/* what the team disputes waits on top, where the points are (D-14) */}
+      {isDirector ? <DisputesBlock /> : null}
 
       {rating.isLoading ? (
         <RatingListBone withAward={canAward} />
@@ -186,7 +211,7 @@ export function RatingList({
           {rows.length > 0 ? (
             <ul className="mt-4 space-y-2">
               {rows.map((row) => (
-                <Row key={row.user_id} row={row} canAward={canAward && pointsEnabled === true} onAward={startAward} onOpen={setOpen} />
+                <Row key={row.user_id} row={row} streak={streakOf(row.user_id)} canAward={canAward && pointsEnabled === true} onAward={startAward} onOpen={setOpen} />
               ))}
             </ul>
           ) : null}
@@ -205,9 +230,9 @@ export function RatingList({
         target={target}
         onClose={() => setTarget(null)}
         pending={award.isPending}
-        onSubmit={(amount, reason) => {
+        onSubmit={(amount, reason, isPublic) => {
           if (!target) return;
-          award.mutate({ userId: target.user_id, amount, reason });
+          award.mutate({ userId: target.user_id, amount, reason, isPublic });
           setTarget(null);
         }}
       />

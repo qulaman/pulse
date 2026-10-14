@@ -200,3 +200,63 @@ export function useSendAnnouncementNow() {
     onSettled: () => void queryClient.invalidateQueries({ queryKey: heldKeys.announcements }),
   });
 }
+
+/**
+ * Public good news on Эфир (D-133, И-46): a reward handed out, the director's praise. Born in the
+ * database (`ether_events`), never a minus, no push to the team and nothing to acknowledge — it
+ * sits in the same feed as the announcements, by time.
+ */
+export type EtherEvent = {
+  id: string;
+  kind: "merch" | "praise";
+  user_id: string;
+  title: string;
+  icon: string | null;
+  amount: number | null;
+  created_at: string;
+  user: { full_name: string } | null;
+};
+
+export const etherEventKeys = { feed: ["ether", "events"] as const };
+
+export function useEtherEvents(enabled = true) {
+  return useRealtimeQuery<EtherEvent[]>({
+    queryKey: etherEventKeys.feed,
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("ether_events")
+        .select("id, kind, user_id, title, icon, amount, created_at, user:profiles!ether_events_user_id_fkey(full_name)")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as unknown as EtherEvent[];
+    },
+    channel: { table: "ether_events" },
+    enabled,
+  });
+}
+
+/** The director takes a line off Эфир (RLS: director only); the points stay where they are. */
+export function useDeleteEtherEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const supabase = createBrowserSupabase();
+      const { error } = await supabase.from("ether_events").delete().eq("id", id);
+      if (error) throw new Error(error.message);
+    },
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: etherEventKeys.feed });
+      const previous = queryClient.getQueryData<EtherEvent[]>(etherEventKeys.feed);
+      if (previous) queryClient.setQueryData<EtherEvent[]>(etherEventKeys.feed, previous.filter((item) => item.id !== id));
+      return { previous };
+    },
+    onSuccess: () => toast("Убрал из Эфира"),
+    onError: (_error, _id, context) => {
+      if (context?.previous) queryClient.setQueryData(etherEventKeys.feed, context.previous);
+      toast("Не получилось убрать. Попробуй ещё раз");
+    },
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: etherEventKeys.feed }),
+  });
+}

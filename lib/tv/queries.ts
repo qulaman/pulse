@@ -298,6 +298,8 @@ export type TvLeader = {
   delta: number;
   done: number;
   on_time: number;
+  /** Handovers in time in a row (`profiles.streak_count`, D-133); older databases send none. */
+  streak?: number;
 };
 
 export type TvAward = { name: string; amount: number; reason: string; at: string };

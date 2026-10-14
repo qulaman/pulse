@@ -334,6 +334,84 @@ export type Database = {
           },
         ]
       }
+      ether_events: {
+        Row: {
+          actor_id: string | null
+          amount: number | null
+          company_id: string
+          created_at: string
+          icon: string | null
+          id: string
+          kind: string
+          order_id: string | null
+          title: string
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          amount?: number | null
+          company_id: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          kind: string
+          order_id?: string | null
+          title: string
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          amount?: number | null
+          company_id?: string
+          created_at?: string
+          icon?: string | null
+          id?: string
+          kind?: string
+          order_id?: string | null
+          title?: string
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ether_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ether_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ether_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ether_events_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "point_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ether_events_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_participants: {
         Row: {
           created_at: string
@@ -934,6 +1012,84 @@ export type Database = {
           },
         ]
       }
+      point_disputes: {
+        Row: {
+          answer: string | null
+          company_id: string
+          created_at: string
+          id: string
+          refund_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          text: string
+          transaction_id: string
+          user_id: string
+        }
+        Insert: {
+          answer?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          refund_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          text: string
+          transaction_id: string
+          user_id: string
+        }
+        Update: {
+          answer?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          refund_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          text?: string
+          transaction_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "point_disputes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_disputes_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "point_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_disputes_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_disputes_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "point_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_disputes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       point_transactions: {
         Row: {
           actor_id: string | null
@@ -942,6 +1098,7 @@ export type Database = {
           created_at: string
           id: string
           order_id: string | null
+          quiet: boolean
           reason: string
           rule_code: string | null
           source: Database["public"]["Enums"]["point_source"]
@@ -955,6 +1112,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_id?: string | null
+          quiet?: boolean
           reason: string
           rule_code?: string | null
           source: Database["public"]["Enums"]["point_source"]
@@ -968,6 +1126,7 @@ export type Database = {
           created_at?: string
           id?: string
           order_id?: string | null
+          quiet?: boolean
           reason?: string
           rule_code?: string | null
           source?: Database["public"]["Enums"]["point_source"]
@@ -1356,6 +1515,55 @@ export type Database = {
           },
           {
             foreignKeyName: "task_messages_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      task_reactions: {
+        Row: {
+          author_id: string
+          code: string
+          company_id: string
+          created_at: string
+          task_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          code: string
+          company_id: string
+          created_at?: string
+          task_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          code?: string
+          company_id?: string
+          created_at?: string
+          task_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reactions_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_reactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_reactions_task_id_fkey"
             columns: ["task_id"]
             isOneToOne: false
             referencedRelation: "tasks"
@@ -1868,6 +2076,7 @@ export type Database = {
         Args: {
           client_request_id?: string
           p_amount: number
+          p_public?: boolean
           p_reason: string
           p_user_id: string
         }
@@ -1948,6 +2157,10 @@ export type Database = {
       deadline_reminders_due: { Args: { p_now?: string }; Returns: number }
       delete_event: { Args: { p_event: string }; Returns: undefined }
       delete_task: { Args: { task_id: string }; Returns: Json }
+      dispute_points: {
+        Args: { client_request_id?: string; p_text: string; p_transaction: string }
+        Returns: Json
+      }
       delivery_category: {
         Args: { p_kind: string; p_meta: Json }
         Returns: string
@@ -2111,6 +2324,10 @@ export type Database = {
         }[]
       }
       push_when: { Args: { p_at: string; p_now?: string }; Returns: string }
+      react_to_task: {
+        Args: { client_request_id?: string; p_code: string | null; p_task: string }
+        Returns: Json
+      }
       reassign_task: {
         Args: {
           change_deadline?: boolean
@@ -2128,6 +2345,15 @@ export type Database = {
           proposed: string
           task_id: string
           words?: string
+        }
+        Returns: Json
+      }
+      resolve_points_dispute: {
+        Args: {
+          client_request_id?: string
+          p_answer?: string
+          p_dispute: string
+          p_refund: boolean
         }
         Returns: Json
       }

@@ -1,11 +1,13 @@
 "use client";
 
+import { ReactionBadge } from "@/components/points/ReactionBar";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
 import { passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import { statusWord, stepsOf } from "@/lib/tasks/overview";
+import type { ReactionCode } from "@/lib/points/reactions";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
 
@@ -30,6 +32,8 @@ export function EmployeeTaskCard({
   now,
   onToggle,
   onAction,
+  reaction = null,
+  reactionPoints = null,
 }: {
   task: TaskWithPeople;
   row: BoardTask | undefined;
@@ -38,6 +42,10 @@ export function EmployeeTaskCard({
   now: Date;
   onToggle: () => void;
   onAction: (action: EmployeeAction, task: TaskWithPeople) => void;
+  /** The director's reaction to this task (D-133): a gold outline and a badge inside. */
+  reaction?: ReactionCode | null;
+  /** What it brought, when points are on. */
+  reactionPoints?: number | null;
 }) {
   const unread = row ? hasUnread(row, meId) : false;
   const closed = task.status === "done" || task.status === "revoked" || task.status === "declined";
@@ -63,6 +71,7 @@ export function EmployeeTaskCard({
       onToggle={onToggle}
       testId="my-task"
       status={task.status}
+      reacted={Boolean(reaction)}
       head={
         <CardHead
           task={task}
@@ -81,6 +90,8 @@ export function EmployeeTaskCard({
           {author ? `Поручил ${author} · ` : ""}
           <span className="nums">{humanAqtobe(new Date(task.created_at), now)}</span>
         </p>
+
+        {reaction ? <ReactionBadge code={reaction} points={reactionPoints} className="mt-2" /> : null}
 
         {task.status === "rework" ? (
           <Note tone="warn" icon={<Icon name="rotate" size={15} />}>

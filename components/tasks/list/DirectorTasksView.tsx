@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
+import { useTaskReactions } from "@/lib/points/game";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import type { BoardTask } from "@/lib/pulse/board";
 import type { DeskReason } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -70,6 +73,9 @@ export function DirectorTasksView({
    */
   closedPages?: { total: number | undefined; loading: boolean; onMore: () => void };
 }) {
+  // the director's own reactions (D-133): gold on the card, the row of seven once it is handed in
+  const reactions = useTaskReactions();
+  const pointsEnabled = usePointsEnabled().data === true;
   const [personId, setPersonId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -239,6 +245,9 @@ export function DirectorTasksView({
               open={accordion.openId === task.id}
               now={now}
               showPerson={!personId}
+              reacted={Boolean(reactions.data?.[task.id])}
+              canReact={isReactable(task, meId) && showsReactionBar(task.status, Boolean(reactions.data?.[task.id]))}
+              pointsEnabled={pointsEnabled}
               onToggle={() => accordion.toggle(task.id)}
               onAction={press}
               onAnswer={answer}

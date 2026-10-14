@@ -53,6 +53,15 @@ describe("leadersView — заставка «Рейтинг» (D-123)", () => {
     expect([card.points, card.pointsWord, card.delta, card.done]).toEqual([441, "очко", null, "сдано 3"]);
   });
 
+  it("серия сдач в срок — с двух, в той же строке (D-133)", () => {
+    const view = leadersView(scene({ top: [leader(1, { done: 5, on_time: 4, streak: 3 }), leader(2, { done: 0, on_time: 0, streak: 2 }), leader(3, { done: 2, on_time: 2, streak: 1 })] }), NOW);
+    if (view.state !== "ready") throw new Error(view.state);
+    const byRank = new Map([...view.podium, ...view.rest].map((card) => [card.rank, card.done]));
+    expect(byRank.get(1)).toBe("сдано 5 · в срок 4 · 🔥 3 подряд");
+    expect(byRank.get(2)).toBe("🔥 2 подряд");
+    expect(byRank.get(3)).toBe("сдано 2 · в срок 2");
+  });
+
   it("шестой и ниже на стену не попадают, даже если база их отдала (D-45)", () => {
     const view = leadersView(scene({ top: [1, 2, 3, 4, 5, 6].map((rank) => leader(rank)) }), NOW);
     if (view.state !== "ready") throw new Error(view.state);

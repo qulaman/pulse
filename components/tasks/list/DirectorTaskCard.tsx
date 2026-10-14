@@ -1,5 +1,6 @@
 "use client";
 
+import { ReactionBar } from "@/components/points/ReactionBar";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -233,6 +234,9 @@ export function DirectorTaskCard({
   onAnswer,
   onMore,
   showPerson = true,
+  reacted = false,
+  canReact = false,
+  pointsEnabled = false,
 }: {
   task: TaskWithPeople;
   /** The board row: question, refusal reason, last word, read cursor. Closed tasks have none. */
@@ -246,6 +250,11 @@ export function DirectorTaskCard({
   onAnswer: (task: TaskWithPeople, text: string | null) => void;
   onMore: (task: TaskWithPeople) => void;
   showPerson?: boolean;
+  /** The director's reaction is on this task (D-133): the card wears a gold outline. */
+  reacted?: boolean;
+  /** The reaction row under the keys: handed in or accepted, or already reacted to. */
+  canReact?: boolean;
+  pointsEnabled?: boolean;
 }) {
   const question = row?.question ?? null;
   const request = row?.time_request && isWorking(task.status) ? row.time_request : null;
@@ -277,6 +286,7 @@ export function DirectorTaskCard({
       onToggle={onToggle}
       testId="sent-task"
       status={task.status}
+      reacted={reacted}
       head={
         <CardHead
           task={task}
@@ -350,6 +360,8 @@ export function DirectorTaskCard({
       ) : null}
 
       <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => onAction(key, task)} />
+
+      {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
 
       <CardFoot
         href={`/tasks/${task.id}`}

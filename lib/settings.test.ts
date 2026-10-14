@@ -8,6 +8,30 @@ import {
   withSecretaryCodes,
 } from "@/lib/settings";
 
+describe("points rules, Эфир and the telegraph (D-133)", () => {
+  it("a fresh company gets the D-13 rules with the penalty off, both Эфир lines and a worrying face", () => {
+    const settings = parseCompanySettings({});
+    expect(settings.points_rules).toMatchObject({ quick_accept: 1, quick_accept_min: 10, on_time: 3, early: 5, late_on: false, late: 5 });
+    expect(settings.points_rules.reactions).toMatchObject({ like: 1, fire: 10, heart: 100, clap: 0 });
+    expect(settings.ether_events).toEqual({ merch: true, praise: true });
+    expect(settings.mascot_telegraph).toBe(true);
+  });
+
+  it("keeps what a company stored and fills the rest", () => {
+    const settings = parseCompanySettings({ points_rules: { on_time: 7, reactions: { heart: 50 } }, mascot_telegraph: false });
+    expect(settings.points_rules.on_time).toBe(7);
+    expect(settings.points_rules.early).toBe(5);
+    expect(settings.points_rules.reactions).toMatchObject({ heart: 50, fire: 10 });
+    expect(settings.mascot_telegraph).toBe(false);
+  });
+
+  it("the patch takes the points section whole and refuses a negative price", () => {
+    expect(SettingsPatchSchema.safeParse({ points_rules: { reactions: { fire: 20 } } }).success).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ points_rules: { reactions: { fire: -1 } } }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ ether_events: { merch: false, praise: true }, mascot_telegraph: false }).success).toBe(true);
+  });
+});
+
 describe("secretary settings (D-79)", () => {
   it("gives a fresh company the seven default buttons (D-87: «не беспокоить», the guest; D-99: «охрана»)", () => {
     const settings = parseCompanySettings({});

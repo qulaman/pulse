@@ -102,6 +102,18 @@ describe("employeeLoad — что лицо держит в покое (D-110)", 
   });
 });
 
+describe("employeeLoad без телеграфа (settings.mascot_telegraph = false, D-133)", () => {
+  const SOON = new Date(NOW.getTime() + 20 * 60_000).toISOString();
+  it("не зовёт, не паникует и не нервничает — лицо показывает только то, что в руках", () => {
+    expect(employeeLoad([row("sent")], NOW, ME, false).rest).toBe("free");
+    expect(employeeLoad([row("accepted", { deadline: SOON })], NOW, ME, false).rest).toBe("working");
+    expect(employeeLoad([row("pending_review", { last_message: word("m9", 3), seen_seq: 2 })], NOW, ME, false).rest).toBe("review");
+  });
+  it("горячая стопка в руках остаётся фактом", () => {
+    expect(employeeLoad([row("accepted", { deadline: SOON })], NOW, ME, false).hot).toBe(true);
+  });
+});
+
 describe("employeeEvents — что только что случилось (D-110)", () => {
   const events = (before: BoardTask[], after: BoardTask[]) => employeeEvents(before, after, ME);
 

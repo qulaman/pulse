@@ -3134,3 +3134,7 @@ html[data-tabbar="away"] .above-tabbar { translate: 0 var(--tabbar-space); trans
   100% { transform: translateY(0); }
 }
 .sec-paused, .sec-paused * { animation-play-state: paused !important; }
+
+/* ---- D-133: the director's reaction lights the task in gold ---------------------------- */
+.task-card[data-reacted] { border-color: color-mix(in srgb, var(--gold) 72%, transparent); }
+.status-screen[data-reacted] { border-color: color-mix(in srgb, var(--gold) 72%, transparent); }

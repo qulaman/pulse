@@ -57,6 +57,9 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
       if (patch.points_enabled !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_enabled"] });
       // the home faces read the holiday switch on their own (D-119)
       if (patch.mascot_seasons !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "mascot_seasons"] });
+      // the reaction prices and the employee face's worry switch (D-133)
+      if (patch.points_rules !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "points_rules"] });
+      if (patch.mascot_telegraph !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "mascot_telegraph"] });
       // the secretary's buttons and their scenes are read by Пульс and the secretary's screen (D-97)
       if (patch.secretary !== undefined) void queryClient.invalidateQueries({ queryKey: ["company"] });
       toast("Сохранил настройки");
@@ -79,10 +82,14 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         stt: !same(draft.stt, server.stt),
         parser: !same(draft.parser, server.parser),
         conventions: !same(conventions, server.conventions),
-        points: draft.points_enabled !== server.points_enabled || draft.rating_mode !== server.rating_mode,
+        points:
+          draft.points_enabled !== server.points_enabled ||
+          draft.rating_mode !== server.rating_mode ||
+          !same(draft.points_rules, server.points_rules) ||
+          !same(draft.ether_events, server.ether_events),
         window: !same(draft.delivery_window, server.delivery_window),
         secretary: !same(draft.secretary, server.secretary),
-        mascot: draft.mascot_seasons !== server.mascot_seasons,
+        mascot: draft.mascot_seasons !== server.mascot_seasons || draft.mascot_telegraph !== server.mascot_telegraph,
       },
       save: (patch) => save.mutate(patch),
       saving: (key) => save.isPending && save.variables?.[key] !== undefined,

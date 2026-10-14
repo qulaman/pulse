@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { humanAqtobe } from "@/lib/ai/time";
+import { usePerson } from "@/lib/people/queries";
 import { useBalance, usePointHistory, useRating } from "@/lib/points/queries";
 
 /** The balance before it loads: inline, so the 44 px line of the number keeps its height (D-122). */
@@ -47,6 +48,8 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
   const balance = total.data ?? 0;
   const rating = useRating("all", balance > 0);
   const myRow = (rating.data ?? []).find((row) => row.user_id === userId);
+  // handovers in time in a row — counted by the database on «Принято» (И-69, D-133)
+  const streak = usePerson(userId).data?.streak_count ?? 0;
 
   if (!enabled && rows.length === 0) return null;
 
@@ -72,6 +75,11 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
                   ? "за закрытые в срок задачи и поощрения"
                   : "Первые придут за закрытые задачи"}
           </p>
+          {enabled && streak >= 2 ? (
+            <p className="nums mt-1 text-[13px] font-semibold leading-4" style={{ color: "var(--gold)" }} data-testid="profile-streak">
+              🔥 {streak} подряд в срок
+            </p>
+          ) : null}
         </div>
         <span className="ml-auto shrink-0">
           <Mascot state={balance > 0 ? "happy" : "calm"} size={56} />

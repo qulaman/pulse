@@ -149,6 +149,37 @@ const WordMetaSchema = z.object({
 /** How many hidden lessons are kept — the oldest go first. */
 export const DICTIONARY_DISMISSED_MAX = 200;
 
+/** D-133: the price of each reaction of the director, by code (lib/points/reactions.ts). */
+export const ReactionPricesSchema = z.object({
+  like: z.number().int().min(0).max(100000).default(1),
+  fire: z.number().int().min(0).max(100000).default(10),
+  heart: z.number().int().min(0).max(100000).default(100),
+  clap: z.number().int().min(0).max(100000).default(0),
+  zap: z.number().int().min(0).max(100000).default(0),
+  think: z.number().int().min(0).max(100000).default(0),
+  dislike: z.number().int().min(0).max(100000).default(0),
+});
+
+/**
+ * D-133 (D-13, D-28): what the automatic rules pay on a task's moves — the database reads the
+ * same keys (`points_rule()`, migration 20261014120000). The penalty exists and is off.
+ */
+export const PointsRulesSchema = z.object({
+  quick_accept: z.number().int().min(0).max(1000).default(1),
+  quick_accept_min: z.number().int().min(1).max(240).default(10),
+  on_time: z.number().int().min(0).max(1000).default(3),
+  early: z.number().int().min(0).max(1000).default(5),
+  late_on: z.boolean().default(false),
+  late: z.number().int().min(0).max(1000).default(5),
+  reactions: ReactionPricesSchema.prefault({}),
+});
+
+/** D-133 (И-46): which good news goes public on Эфир. */
+export const EtherEventsSchema = z.object({
+  merch: z.boolean().default(true),
+  praise: z.boolean().default(true),
+});
+
 export const CompanySettingsSchema = z.object({
   brand: BrandSchema.prefault({}),
   // prefault: the empty object goes through the section schema, so its own defaults apply
@@ -173,6 +204,10 @@ export const CompanySettingsSchema = z.object({
   rating_mode: z.enum(["top5", "full"]).default("top5"),
   /** The faces dress for the holidays of the company's calendar (D-119, lib/mascot/season.ts). */
   mascot_seasons: z.boolean().default(true),
+  /** The employee's face worries over their own work — calling, panicking, nervous (D-133, В-5). */
+  mascot_telegraph: z.boolean().default(true),
+  points_rules: PointsRulesSchema.prefault({}),
+  ether_events: EtherEventsSchema.prefault({}),
   delivery_window: DeliveryWindowSchema.prefault({}),
   /** The secretary's buttons and the repeat-push timeout (D-79). */
   secretary: SecretarySettingsSchema.prefault({}),
@@ -200,6 +235,10 @@ export const SettingsPatchSchema = z
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),
     mascot_seasons: z.boolean(),
+    mascot_telegraph: z.boolean(),
+    // a section arrives whole: the screen sends everything it shows
+    points_rules: PointsRulesSchema,
+    ether_events: EtherEventsSchema,
     delivery_window: DeliveryWindowSchema.partial(),
     secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,

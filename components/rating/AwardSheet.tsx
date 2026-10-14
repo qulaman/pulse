@@ -22,11 +22,13 @@ export function AwardSheet({
   target: AwardTarget | null;
   onClose: () => void;
   pending: boolean;
-  onSubmit: (amount: number, reason: string) => void;
+  /** `isPublic` — «Сказать в Эфире» (D-133): the praise becomes a line on Эфир; a minus never does. */
+  onSubmit: (amount: number, reason: string, isPublic: boolean) => void;
 }) {
   const [amount, setAmount] = useState(10);
   const [reason, setReason] = useState(REASONS[0]);
   const [custom, setCustom] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
 
   const finalReason = custom.trim() || reason;
 
@@ -75,8 +77,23 @@ export function AwardSheet({
         onChange={(e) => setCustom(e.target.value)}
       />
 
+      {amount > 0 ? (
+        <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-3 text-[15px] leading-5" data-testid="award-public">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(event) => setIsPublic(event.target.checked)}
+            className="h-5 w-5 shrink-0 accent-[var(--accent)]"
+          />
+          <span>
+            Сказать в Эфире
+            <span className="block text-[13px] leading-4 text-muted">Команда увидит похвалу — без пуша</span>
+          </span>
+        </label>
+      ) : null}
+
       <div className="mt-4">
-        <Button block disabled={pending || amount === 0 || !finalReason} onClick={() => onSubmit(amount, finalReason)}>
+        <Button block disabled={pending || amount === 0 || !finalReason} onClick={() => onSubmit(amount, finalReason, amount > 0 && isPublic)}>
           {amount > 0 ? `Начислить +${amount}` : `Снять ${amount}`}
         </Button>
       </div>

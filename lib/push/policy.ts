@@ -61,6 +61,10 @@ const RULES: Record<string, Rule> = {
   shop_approved: { ttl: 48 * HOUR, urgency: "normal", silent: true },
   shop_ready: { ttl: 48 * HOUR, urgency: "normal", silent: true },
   shop_cancelled: { ttl: 48 * HOUR, urgency: "normal", silent: true },
+  // points (D-133): a reaction and the answer to a dispute are good news, quiet; a dispute is the director's to answer
+  reaction: { ttl: 24 * HOUR, urgency: "normal", silent: true },
+  points_answer: { ttl: 48 * HOUR, urgency: "normal", silent: true },
+  points_dispute: { ttl: 48 * HOUR, urgency: "normal" },
   // the secretary's desk lives in minutes
   errand_sent: { ttl: 30 * MIN, urgency: "high" },
   errand_accepted: { ttl: 30 * MIN, urgency: "high" },
@@ -125,7 +129,7 @@ const PRIVATE_TITLE: Record<string, string> = {
   overdue: "Просрочка",
   secretary: "От секретаря",
   calendar: "Календарь",
-  shop: "Магазин",
+  shop: "Магазин и очки",
   team: "Уведомления команды",
   reminders: "Напоминание",
   tasks: "Задачи",

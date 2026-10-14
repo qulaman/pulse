@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { initialsOf } from "@/lib/people/queries";
+import { useOpenDisputes } from "@/lib/points/game";
 import { useRating } from "@/lib/points/queries";
 import { useTvControl } from "@/lib/tv/mutations";
 
@@ -20,9 +21,21 @@ export function RatingPanel() {
   const rating = useRating("week");
   const control = useTvControl();
   const rows = (rating.data ?? []).filter((row) => row.points > 0).slice(0, 5);
+  // a disputed minus is the one thing here that waits for an answer (D-14, D-133)
+  const disputes = useOpenDisputes(true).data?.length ?? 0;
 
   return (
     <div className="flex flex-col gap-2" data-testid="rating-panel">
+      {disputes > 0 ? (
+        <Link
+          href="/rating#disputes"
+          className="flex min-h-[44px] items-center justify-between gap-3 rounded-[12px] border border-warn/40 bg-warn/10 px-3 text-[15px] font-semibold leading-5 text-warn"
+          data-testid="rating-disputes"
+        >
+          Оспаривают начисление: {disputes}
+          <span aria-hidden>›</span>
+        </Link>
+      ) : null}
       {rating.isLoading ? null : rows.length === 0 ? (
         <p className="py-4 text-center text-[16px] leading-[22px] text-muted">
           За неделю очков пока нет. Скажи «Марату 50 очков за объект».

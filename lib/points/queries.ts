@@ -151,13 +151,15 @@ export function usePointsArrival(userId: string | undefined, enabled: boolean): 
 export function useAwardPoints() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (input: { userId: string; amount: number; reason: string }) => {
+    mutationFn: async (input: { userId: string; amount: number; reason: string; isPublic?: boolean }) => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase.rpc("award_points", {
         p_user_id: input.userId,
         p_amount: input.amount,
         p_reason: input.reason,
         client_request_id: crypto.randomUUID(),
+        // «Сказать в Эфире» (D-133); the database keeps a minus off Эфир whatever comes here
+        p_public: input.isPublic ?? true,
       });
       if (error) throw new Error(error.message);
       return data as { balance: number };

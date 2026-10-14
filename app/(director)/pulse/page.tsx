@@ -52,6 +52,7 @@ import type { SecretaryAction } from "@/lib/settings";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 import { usePeople } from "@/lib/people/queries";
+import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
 import { countsOf, emptyLanes, hasMessage, hasUnread, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
@@ -177,6 +178,8 @@ export default function PulsePage() {
     [],
   );
   const pointsEnabled = usePointsEnabled().data === true;
+  // a disputed minus waits for the director's answer on the rating (D-14, D-133)
+  const disputes = useOpenDisputes(pointsEnabled).data?.length ?? 0;
   const draftCount = stage === "confirm" ? entities.filter((entity) => isCountable(entity, pointsEnabled)).length : 0;
 
   // ---- the phrase just parsed, confirmed right here (D-60, sixth refinement) ---------------
@@ -318,11 +321,11 @@ export default function PulsePage() {
         tone: eventSoon ? "var(--warn)" : "var(--accent)",
       },
       // the secretary is not a ball: it sits at its own desk next to the face (D-85)
-      // the rating, one tap from the face — only while points are on (D-48, D-123); a quiet
-      // ball: there is nothing to count, only to look at
-      ...(pointsEnabled ? [{ id: "rating" as const, label: "Рейтинг", count: 0, tone: "var(--gold)" }] : []),
+      // the rating, one tap from the face — only while points are on (D-48, D-123); it counts
+      // only what waits for an answer — a disputed minus (D-133)
+      ...(pointsEnabled ? [{ id: "rating" as const, label: "Рейтинг", count: disputes, tone: disputes > 0 ? "var(--warn)" : "var(--gold)" }] : []),
     ],
-    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, pointsEnabled],
+    [taskCount, counts.overdue, counts.declined, counts.review, messageTasks.length, ether.data, events, now, eventSoon, pointsEnabled, disputes],
   );
   // the deck behind each ball: tasks without the message lane, or every task with a message (whatever its lane)
   const taskLanes = useMemo<Lanes>(() => ({ ...lanes, question: [] }), [lanes]);

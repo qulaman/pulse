@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+import { ReactionBadge, ReactionBar } from "@/components/points/ReactionBar";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { Icon } from "@/components/tasks/desk/icons";
@@ -18,6 +19,9 @@ import { Chip } from "@/components/ui/Chip";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
+import { useReactionPrices, useTaskReactions } from "@/lib/points/game";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
 import {
   handedInPartly,
@@ -120,6 +124,12 @@ export function TaskDetail({
     : [];
 
   const person = isDirector ? task.assignee?.full_name : task.author?.full_name;
+  // D-133: the director's reaction — a row of seven for the director, a gold badge for the assignee
+  const pointsEnabled = usePointsEnabled().data === true;
+  const reactions = useTaskReactions();
+  const prices = useReactionPrices();
+  const reaction = reactions.data?.[task.id] ?? null;
+  const canReact = isDirector && isReactable(task, me.userId) && showsReactionBar(task.status, Boolean(reaction));
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4">
@@ -142,6 +152,7 @@ export function TaskDetail({
       <article
         data-testid="task-screen"
         data-status={task.status}
+        data-reacted={reaction ? true : undefined}
         className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5"
         style={{ "--tone": TONE_VAR[tone] } as CSSProperties}
       >
@@ -194,6 +205,10 @@ export function TaskDetail({
             </span>
           ) : null}
         </div>
+
+        {!isDirector && reaction ? (
+          <ReactionBadge code={reaction} points={pointsEnabled ? prices[reaction] : null} className="mt-3" />
+        ) : null}
 
         <div className="mt-4">
           <Stepper steps={stepsOf(task, now)} now={now} deadline={task.deadline} />
@@ -258,6 +273,7 @@ export function TaskDetail({
         {isDirector ? (
           <DirectorKeys keys={keys} reason={reason} request={request} suggestion={suggestion} now={now} onPress={(key) => director.press(key, task)} />
         ) : null}
+        {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
         {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}
         {!isDirector && task.assignee_id === me.userId ? (
           <EmployeeButtons task={task} onAction={(action) => employee.press(action, task)} now={now} />

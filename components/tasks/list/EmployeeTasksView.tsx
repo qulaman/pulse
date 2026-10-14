@@ -6,6 +6,8 @@ import { Mascot } from "@/components/brand/Mascot";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { PageHead } from "@/components/ui/PageHead";
+import { useReactionPrices, useTaskReactions } from "@/lib/points/game";
+import { usePointsEnabled } from "@/lib/points/queries";
 import type { BoardTask } from "@/lib/pulse/board";
 import { compareTasks } from "@/lib/tasks/grouping";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -45,6 +47,10 @@ export function EmployeeTasksView({
   actions: TaskActions;
   now: Date;
 }) {
+  // the director's reactions (D-133): a gold outline and a badge on the card
+  const reactions = useTaskReactions();
+  const prices = useReactionPrices();
+  const pointsEnabled = usePointsEnabled().data === true;
 
   const rows = useMemo(() => new Map(board.map((row) => [row.id, row] as [string, BoardTask])), [board]);
   const screen = useMemo(() => employeeScreen(all, now), [all, now]);
@@ -114,6 +120,8 @@ export function EmployeeTasksView({
               now={now}
               onToggle={() => accordion.toggle(task.id)}
               onAction={press}
+              reaction={reactions.data?.[task.id] ?? null}
+              reactionPoints={pointsEnabled && reactions.data?.[task.id] ? prices[reactions.data[task.id]] : null}
             />
           )}
         />

@@ -56,9 +56,12 @@ export function formatPoints(value: number): string {
   return Math.round(value).toLocaleString("ru-RU").replace(/\s/g, " ");
 }
 
-function doneLine(done: number, onTime: number): string | null {
-  if (done <= 0) return null;
-  return onTime > 0 ? `сдано ${done} · в срок ${Math.min(onTime, done)}` : `сдано ${done}`;
+/** «сдано 5 · в срок 4», and the run of handovers in time from two (И-69, D-133). */
+function doneLine(done: number, onTime: number, streak = 0): string | null {
+  const run = streak >= 2 ? `🔥 ${streak} подряд` : null;
+  if (done <= 0) return run;
+  const base = onTime > 0 ? `сдано ${done} · в срок ${Math.min(onTime, done)}` : `сдано ${done}`;
+  return run ? `${base} · ${run}` : base;
 }
 
 export function leadersView(data: TvRatingScene | null, now: Date): LeadersView {
@@ -79,7 +82,7 @@ export function leadersView(data: TvRatingScene | null, now: Date): LeadersView 
       points: row.points,
       pointsWord: pluralRu(row.points, ["очко", "очка", "очков"]),
       delta: row.delta > 0 ? row.delta : null,
-      done: doneLine(row.done, row.on_time),
+      done: doneLine(row.done, row.on_time, row.streak ?? 0),
     }));
 
   const [first, second, third] = cards;

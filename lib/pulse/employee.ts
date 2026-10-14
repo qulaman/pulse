@@ -131,16 +131,18 @@ function burning(task: Pick<BoardTask, "deadline">, now: Date): boolean {
  * The load of the person's board. Closed rows may linger in the cache until the screen says
  * goodbye to them — only the statuses count. The deadline alarm is `alarmOf`'s (D-68), but the
  * unread one is the director's word alone: the person's own open question is not news to them.
+ * `worry: false` — the company switched the telegraph off (`settings.mascot_telegraph`, D-133):
+ * no calling, panic or nerves, the face shows only what is in its hands.
  */
-export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: string): EmployeeLoad {
+export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: string, worry = true): EmployeeLoad {
   const carried = tasks.filter(inHands);
   const hot = carried.some((task) => burning(task, now));
   const onBoard = tasks.filter((task) => isOnBoard(task.status));
-  const rest: EmployeeRest = onBoard.some(isTodo)
+  const rest: EmployeeRest = worry && onBoard.some(isTodo)
     ? "todo"
-    : alarmOf(onBoard, now, meId) === "deadline"
+    : worry && alarmOf(onBoard, now, meId) === "deadline"
       ? "deadline"
-      : onBoard.some((task) => hasUnread(task, meId))
+      : worry && onBoard.some((task) => hasUnread(task, meId))
         ? "unread"
         : carried.length > 0
           ? "working"
@@ -298,6 +300,8 @@ export function weightiest(events: readonly EmployeeEvent[]): EmployeeEvent | nu
 /**
  * «N подряд в срок» (D-110, game feel behind `points_enabled`): the person's latest accepted
  * orders that had a deadline, newest first, counted until the first one handed over late.
+ * The database keeps the same count in `profiles.streak_count` (`task_streak_of`, D-133) for the
+ * screens that show other people; Лента counts its own at the moment of the medal.
  * An order without a deadline neither counts nor breaks the run; «в срок» is the handover
  * (`completed_at`), not the director's acceptance — the wait for the director is not theirs.
  */

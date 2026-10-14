@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/Button";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { usePeople } from "@/lib/people/queries";
+import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
 // labels and helpers only — lib/settings.ts itself would bring zod into this page (D-126)
 import {
@@ -57,6 +58,37 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
         />
       </span>
     </button>
+  );
+}
+
+/** A whole number of points: a narrow field at the end of a row; an empty field means 0. */
+function PointsInput({ value, onChange, label, max = 1000 }: { value: number; onChange: (v: number) => void; label: string; max?: number }) {
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={0}
+      max={max}
+      aria-label={label}
+      value={Number.isFinite(value) ? value : 0}
+      onChange={(e) => {
+        const next = Math.round(Number(e.target.value));
+        onChange(Number.isFinite(next) ? Math.min(Math.max(next, 0), max) : 0);
+      }}
+      className="nums min-h-[44px] w-[76px] shrink-0 field px-2 text-center text-[16px] leading-[22px] outline-none focus:border-accent"
+    />
+  );
+}
+
+function RuleRow({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block text-[16px] leading-[22px]">{label}</span>
+        {hint ? <span className="block text-[13px] leading-4 text-muted">{hint}</span> : null}
+      </span>
+      {children}
+    </div>
   );
 }
 
@@ -425,6 +457,10 @@ export function SecretarySection() {
 
 export function PointsSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
+  const rules = draft.points_rules;
+  const setRules = (patch: Partial<CompanySettings["points_rules"]>) => update({ points_rules: { ...rules, ...patch } });
+  const setPrice = (code: (typeof REACTION_CODES)[number], value: number) =>
+    setRules({ reactions: { ...rules.reactions, [code]: value } });
   return (
     <Disclosure
       icon={<StarIcon />}
@@ -435,7 +471,7 @@ export function PointsSection() {
           ? `включены · ${draft.rating_mode === "top5" ? "топ-5 всем" : "полный список всем"}`
           : "выключены"
       }
-      hint="Во время пилота очки выключены (D-40). Включи, когда команда привыкнет к задачам."
+      hint="Очки начисляются сами за задачи и реакции, директор добавляет свои. Тратятся в магазине."
     >
       <div className="flex flex-col gap-4">
         <Toggle
@@ -445,26 +481,107 @@ export function PointsSection() {
           onChange={(v) => update({ points_enabled: v })}
         />
         {draft.points_enabled ? (
-          <Field label="Кто видит рейтинг целиком">
-            <select className={FIELD} value={draft.rating_mode} onChange={(e) => update({ rating_mode: e.target.value as "top5" | "full" })}>
-              <option value="top5">Топ-5 всем, полный список — директору</option>
-              <option value="full">Полный список всем</option>
-            </select>
-          </Field>
+          <>
+            <Field label="Кто видит рейтинг целиком">
+              <select className={FIELD} value={draft.rating_mode} onChange={(e) => update({ rating_mode: e.target.value as "top5" | "full" })}>
+                <option value="top5">Топ-5 всем, полный список — директору</option>
+                <option value="full">Полный список всем</option>
+              </select>
+            </Field>
+
+            {/* D-133 (D-13, D-28): what the work earns by itself */}
+            <div className="flex flex-col gap-3" data-testid="points-rules">
+              <p className="text-[14px] font-medium leading-[18px] text-muted">Сами за задачу</p>
+              <RuleRow label="Принял быстро" hint={`нажал «Принял» в первые ${rules.quick_accept_min} мин после пуша`}>
+                <PointsInput label="Очков за быстрое «Принял»" value={rules.quick_accept} onChange={(v) => setRules({ quick_accept: v })} />
+              </RuleRow>
+              <RuleRow label="Быстро — это, минут">
+                <PointsInput label="Минут на «Принял»" value={rules.quick_accept_min} max={240} onChange={(v) => setRules({ quick_accept_min: Math.max(v, 1) })} />
+              </RuleRow>
+              <RuleRow label="Сдал в срок" hint="очки приходят, когда директор принял">
+                <PointsInput label="Очков за сдачу в срок" value={rules.on_time} onChange={(v) => setRules({ on_time: v })} />
+              </RuleRow>
+              <RuleRow label="Сдал досрочно" hint="в первой половине срока — вместо «в срок»">
+                <PointsInput label="Очков за досрочную сдачу" value={rules.early} onChange={(v) => setRules({ early: v })} />
+              </RuleRow>
+              <Toggle
+                label="Штраф за просрочку"
+                hint="Не снимается с тех, кто в отпуске или на больничном. Сотрудник может оспорить"
+                checked={rules.late_on}
+                onChange={(v) => setRules({ late_on: v })}
+              />
+              {rules.late_on ? (
+                <RuleRow label="Снять за сдачу после срока">
+                  <PointsInput label="Очков штрафа" value={rules.late} onChange={(v) => setRules({ late: v })} />
+                </RuleRow>
+              ) : null}
+            </div>
+
+            {/* D-133 (И-68): a reaction of the director to a task pays its price */}
+            <div className="flex flex-col gap-2" data-testid="reaction-prices">
+              <p className="text-[14px] font-medium leading-[18px] text-muted">Реакция директора на задачу</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                {REACTION_CODES.map((code) => (
+                  <label key={code} className="flex items-center justify-between gap-2">
+                    {/* the face says what it is; the name is for the screen reader */}
+                    <span aria-hidden className="text-[24px] leading-7">
+                      {REACTION_GLYPH[code]}
+                    </span>
+                    <PointsInput label={`Очков за ${REACTION_LABEL[code]}`} value={rules.reactions[code]} max={100000} onChange={(v) => setPrice(code, v)} />
+                  </label>
+                ))}
+              </div>
+              <p className="text-[13px] leading-4 text-muted">0 — реакция без очков. Сменил реакцию — разница доплачивается или списывается</p>
+            </div>
+
+            {/* D-133 (И-46): which good news the team sees on Эфир */}
+            <div className="flex flex-col gap-1">
+              <p className="text-[14px] font-medium leading-[18px] text-muted">В Эфир — всей команде</p>
+              <Toggle
+                label="Выдача наград"
+                hint="«Айгуль — Брендовая куртка» после «Выдал»"
+                checked={draft.ether_events.merch}
+                onChange={(v) => update({ ether_events: { ...draft.ether_events, merch: v } })}
+              />
+              <Toggle
+                label="Похвала директора"
+                hint="При «Поощрить» можно снять галочку. Минусы в Эфир не попадают никогда"
+                checked={draft.ether_events.praise}
+                onChange={(v) => update({ ether_events: { ...draft.ether_events, praise: v } })}
+              />
+            </div>
+          </>
         ) : null}
       </div>
       {dirty.points ? (
         <SectionActions
           pending={saving("points_enabled")}
-          onSave={() => save({ points_enabled: draft.points_enabled, rating_mode: draft.rating_mode })}
-          onReset={() => update({ points_enabled: server.points_enabled, rating_mode: server.rating_mode })}
+          onSave={() =>
+            save({
+              points_enabled: draft.points_enabled,
+              rating_mode: draft.rating_mode,
+              points_rules: draft.points_rules,
+              ether_events: draft.ether_events,
+            })
+          }
+          onReset={() =>
+            update({
+              points_enabled: server.points_enabled,
+              rating_mode: server.rating_mode,
+              points_rules: server.points_rules,
+              ether_events: server.ether_events,
+            })
+          }
         />
       ) : null}
     </Disclosure>
   );
 }
 
-/** The faces (D-119): whether they dress for the holidays of the company's calendar. */
+/**
+ * The faces: whether they dress for the holidays (D-119), and whether the employee's face worries
+ * over their own work — the telegraph of D-45 (D-133, В-5).
+ */
 export function MascotSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
   return (
@@ -472,20 +589,28 @@ export function MascotSection() {
       icon={<StarIcon />}
       title="Маскот"
       dirty={dirty.mascot}
-      summary={draft.mascot_seasons ? "наряжается к праздникам" : "без праздничных нарядов"}
+      summary={[draft.mascot_seasons ? "наряды" : "без нарядов", draft.mascot_telegraph ? "переживает за дела" : "всегда спокоен"].join(" · ")}
       hint="Новый год — колпак с 20 декабря по 7 января, Наурыз — тюльпан 20–23 марта"
     >
-      <Toggle
-        label="Праздничные наряды"
-        hint="Лица директора, сотрудников, секретаря и экрана в кабинете"
-        checked={draft.mascot_seasons}
-        onChange={(v) => update({ mascot_seasons: v })}
-      />
+      <div className="flex flex-col gap-3">
+        <Toggle
+          label="Праздничные наряды"
+          hint="Лица директора, сотрудников, секретаря и экрана в кабинете"
+          checked={draft.mascot_seasons}
+          onChange={(v) => update({ mascot_seasons: v })}
+        />
+        <Toggle
+          label="Лицо сотрудника переживает за дела"
+          hint="Зовёт, пока ждёт «Принял», волнуется у срока, ждёт ответа на слово директора. Выключите — лицо спокойно, сценки и сны остаются"
+          checked={draft.mascot_telegraph}
+          onChange={(v) => update({ mascot_telegraph: v })}
+        />
+      </div>
       {dirty.mascot ? (
         <SectionActions
           pending={saving("mascot_seasons")}
-          onSave={() => save({ mascot_seasons: draft.mascot_seasons })}
-          onReset={() => update({ mascot_seasons: server.mascot_seasons })}
+          onSave={() => save({ mascot_seasons: draft.mascot_seasons, mascot_telegraph: draft.mascot_telegraph })}
+          onReset={() => update({ mascot_seasons: server.mascot_seasons, mascot_telegraph: server.mascot_telegraph })}
         />
       ) : null}
     </Disclosure>

@@ -39,6 +39,7 @@ import { haptic } from "@/lib/haptics";
 import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
 import { useErrands, useSecretaries, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
 import { askedDetails, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
+import { useMascotTelegraph } from "@/lib/points/game";
 import { usePointsArrival, usePointsEnabled } from "@/lib/points/queries";
 import type { SecretaryAction } from "@/lib/settings";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
@@ -267,7 +268,9 @@ export default function FeedPage() {
   // is nerves. The director's face only ever watches. Since D-110 the face also shows what is in
   // its hands: the orders in work as a stack, the handed-over ones as an hourglass — and it
   // sleeps only with empty hands (владелец, 2026-09-17 — Марат спал с пятью делами).
-  const load = useMemo(() => employeeLoad(open, now, meId), [open, now, meId]);
+  // the company may switch the worry off (`settings.mascot_telegraph`, D-133, В-5)
+  const telegraph = useMascotTelegraph();
+  const load = useMemo(() => employeeLoad(open, now, meId, telegraph), [open, now, meId, telegraph]);
   const restFace = employeeFace(load.rest, false);
   // the medal has landed and the points are on (D-40, D-48): a jump with confetti after it
   const [cheering, setCheering] = useState(false);

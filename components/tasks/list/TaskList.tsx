@@ -212,6 +212,7 @@ export function CardShell({
   testId,
   status,
   headData,
+  reacted = false,
 }: {
   id: string;
   open: boolean;
@@ -223,6 +224,8 @@ export function CardShell({
   status?: TaskStatus;
   /** Extra `data-*` of the head button — what a test or a screen needs to find it by. */
   headData?: Record<`data-${string}`, string>;
+  /** The director reacted to this task (D-133): the card wears a gold outline. */
+  reacted?: boolean;
 }) {
   // The body stays out of the column's layout group: leaving it, a node that has faded out
   // would dirty every card (the group's remove, then its forceRender) — a second measuring
@@ -237,6 +240,7 @@ export function CardShell({
       data-task-id={id}
       data-open={open || undefined}
       data-closed={closed || undefined}
+      data-reacted={reacted || undefined}
       className="task-card relative scroll-mb-[150px] scroll-mt-[120px] overflow-hidden"
       style={{ borderRadius: 18 }}
     >
