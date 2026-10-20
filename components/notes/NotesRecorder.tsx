@@ -4,6 +4,7 @@ import { onlineManager } from "@tanstack/react-query";
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { splitCounts, splitLabel, splitList, type SplitPoint } from "@/lib/mindboard/split";
 import type { Dictation, Receipt } from "@/lib/notes/dictation";
 import type { NotesHero } from "@/lib/notes/list";
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
@@ -95,6 +96,11 @@ type Props = {
   writing: boolean;
   /** Typed text: already a note, no parser (D-75 §6). */
   onWrite: (text: string) => void;
+  /**
+   * A board (D-140): a typed or pasted list is offered as points — «Разбить на 5 пунктов»;
+   * the round key still writes it as one line with its details.
+   */
+  onSplit?: (points: SplitPoint[]) => void;
   /** The microphone opened: the page turns to the feed, where the note will land. */
   onCapture: () => void;
 };
@@ -106,7 +112,7 @@ type Props = {
  * «Распознаю», «Записал». Under it, inside the same screen, the field for a typed thought
  * and the round microphone: hold it and talk, or tap it and talk until the next tap (D-81).
  */
-export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onCapture }: Props) {
+export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onSplit, onCapture }: Props) {
   const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
   const [draft, setDraft] = useState("");
   const [armed, setArmed] = useState(false);
@@ -137,6 +143,14 @@ export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictati
     if (!text) return;
     setDraft("");
     onWrite(text);
+  };
+
+  // a list in the field (D-140): the screen offers its points instead of the board's numbers
+  const split = onSplit && !recording && !failed ? splitList(draft) : null;
+  const splitIt = () => {
+    if (!split || !onSplit) return;
+    setDraft("");
+    onSplit(split);
   };
 
   const busy = recording || stage === "saving" || stage === "transcribing" || writing;
@@ -172,6 +186,21 @@ export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictati
   } else if (stage === "transcribing" && !receipt) {
     eyebrow = "Распознаю";
     body = <Big title="Голос сохранён" line="Слова появятся через пару секунд" />;
+  } else if (split) {
+    eyebrow = "Похоже на список";
+    body = (
+      <div className="flex h-full items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-[17px] font-semibold leading-[22px] tracking-[-0.015em]" data-testid="split-label">
+            {splitCounts(split)}
+          </p>
+          <p className="mt-0.5 text-[13px] leading-[18px] text-muted">«Разбить» — пунктами, ↑ — одним с подробностями</p>
+        </div>
+        <Button size="sm" className="shrink-0" aria-label={splitLabel(split)} data-testid="split-run" onClick={splitIt}>
+          Разбить
+        </Button>
+      </div>
+    );
   } else if (receipt) {
     eyebrow = receipt.eyebrow;
     body = <Big title={receipt.headline} line={receipt.line} lineTone={receipt.tone} clamp />;

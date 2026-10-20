@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { boardUntilFrom, FOCUS_MS, WAKE_MS, type BoardView, type CalendarView, type ClockStyle, type RatingView, type TvScene } from "./state";
+import { boardCapFrom, boardUntilFrom, FOCUS_MS, WAKE_MS, type BoardView, type CalendarView, type ClockStyle, type RatingView, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -40,6 +40,8 @@ export type TvControlInput = {
   calendar?: CalendarView;
   /** Поставить эту доску на стену (D-102). */
   board?: string;
+  /** With `board`: up for this many minutes instead of till the end of the day, never past the cap (D-140). */
+  boardMinutes?: number;
   /** «Показать гостю» — доска на стене и при госте в кабинете (D-102 §7). */
   boardGuest?: boolean;
   /** Разбудить стену ночью на два часа (`true`) или вернуть ночь (`false`) (D-105). */
@@ -72,7 +74,9 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
   if (input.board) {
     next.scene = "board";
     next.board_id = input.board;
-    next.board_until = boardUntilFrom(now).toISOString();
+    next.board_until = (
+      input.boardMinutes ? new Date(Math.min(now.getTime() + input.boardMinutes * 60_000, boardCapFrom(now).getTime())) : boardUntilFrom(now)
+    ).toISOString();
     next.board_guest = false;
     // another board ends the spotlight (the trigger on tv_state does the same, D-121)
     if (old.board_id !== input.board) next.board_point = null;
@@ -138,6 +142,7 @@ export function useTvControl() {
         p_wake: input.wake,
         p_rating: input.rating,
         p_carousel: input.carousel,
+        p_board_minutes: input.board ? input.boardMinutes : undefined,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),
@@ -175,10 +180,14 @@ export type TvBoardControlInput = {
   clearPoint?: boolean;
   /** «Список» или «Карта». */
   view?: BoardView;
+  /** «+30 мин» (D-140): the board stays up till this time — absolute, so a repeat is harmless (`boardExtendTo`). */
+  until?: string;
 };
 
 const BOARD_ERRORS: Record<string, string> = {
   bad_point: "Этот пункт уже не на доске — обновил",
+  bad_board: "Доски уже нет на стене",
+  bad_until: "Это время уже прошло — обновил",
   no_wall: "Экран ещё не подключался",
   forbidden: "Доской на стене управляет только директор",
 };
@@ -202,6 +211,7 @@ export function useTvBoardControl() {
         p_point: input.point,
         p_clear_point: input.clearPoint ?? false,
         p_view: input.view,
+        p_board_until: input.until,
       });
       const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS));
       const { data, error } = await Promise.race([call, timeout]);
@@ -217,6 +227,10 @@ export function useTvBoardControl() {
         if (input.clearPoint) next.board_point = null;
         else if (input.point) next.board_point = input.point;
         if (input.view) next.board_view = input.view;
+        if (input.until && next.board_until) {
+          // the same cap as the server: the screen never shows a time the wall will not keep
+          next.board_until = new Date(Math.min(new Date(input.until).getTime(), boardCapFrom(new Date()).getTime())).toISOString();
+        }
         return next;
       });
       return { snapshot };

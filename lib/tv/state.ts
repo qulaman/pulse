@@ -135,6 +135,27 @@ export function boardUntilFrom(now: Date): Date {
   return new Date(now.getTime() + 2 * HOUR_MS);
 }
 
+/**
+ * The latest a board may stay on the wall (D-140 keeps D-102 §6): today's 21:00 Aqtobe, or two
+ * hours from now when that is later — «на час» at 20:30 runs to 21:30, but no choice of time
+ * and no «+30 мин» lets a board forgotten in the evening light up before the team next morning.
+ * The same cap as `tv_control` / `tv_board_control`.
+ */
+export function boardCapFrom(now: Date): Date {
+  const local = new Date(now.getTime() + AQTOBE_OFFSET_MS);
+  const dayEnd = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) + NIGHT_FROM_HOUR * HOUR_MS - AQTOBE_OFFSET_MS;
+  return new Date(Math.max(dayEnd, now.getTime() + 2 * HOUR_MS));
+}
+
+/**
+ * «+30 мин» (D-140) as the new end, not as a step: the end it shows now (or now, if it is about
+ * to run out) plus the minutes, under the cap. Sent as a time, a repeat lands on the same row.
+ */
+export function boardExtendTo(state: Pick<TvState, "board_until"> | null, minutes: number, now: Date): Date {
+  const from = Math.max(state?.board_until ? new Date(state.board_until).getTime() : 0, now.getTime());
+  return new Date(Math.min(from + minutes * 60_000, boardCapFrom(now).getTime()));
+}
+
 /** Цифры или стрелки — везде, где стена рисует часы (D-96). Незнакомое — цифры. */
 export function clockStyleOf(state: TvState | null): ClockStyle {
   return state?.clock_style === "analog" ? "analog" : "digital";

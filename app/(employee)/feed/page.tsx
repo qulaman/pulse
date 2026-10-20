@@ -843,7 +843,7 @@ function MessageRow({
       <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: "var(--warn)" }} />
       <span className="block text-[13px] leading-4 text-muted">{otherSideOf(task)}</span>
       <button type="button" onClick={onOpen} className="mt-1 block w-full text-left">
-        <span className="line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
+        <span className="line-clamp-2 text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
       </button>
       <ThreadTail taskId={task.id} meId={meId} enabled />
       <div className="mt-3 flex flex-wrap gap-2">

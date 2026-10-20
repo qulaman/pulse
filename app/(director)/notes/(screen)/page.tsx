@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
-import { BoardCard, BoardTrashCard, NewBoardCard } from "@/components/mindboard/BoardCards";
+import { BoardCard, BoardTrashCard, FinishedBoards, NewBoardCard } from "@/components/mindboard/BoardCards";
+import { BoardPicker } from "@/components/mindboard/BoardPicker";
 import { AssignSheet } from "@/components/notes/AssignSheet";
 import { ConvertedCard, NoteCard, PendingCard, TrashCard } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
@@ -21,8 +22,9 @@ import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { binCards } from "@/lib/mindboard/branch";
-import { boardOnWall, defaultTitle, splitBoards, summariesOf } from "@/lib/mindboard/list";
-import { useCreateBoard, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
+import { boardOnWall, defaultTitle, previewOf, splitBoards, summariesOf } from "@/lib/mindboard/list";
+import { useCreateBoard, useMovePoint, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
+import { nextPlaceIn } from "@/lib/mindboard/tree";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
 import { useDictation, type Receipt } from "@/lib/notes/dictation";
 import { filterNotes, firstLine, groupNotes, notesHero, phoneRow, splitNotes, TRASH_DAYS, type NoteFilter, type NoteGroupKey } from "@/lib/notes/list";
@@ -35,6 +37,7 @@ import type { Section } from "@/lib/tasks/overview";
 import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useTvState } from "@/lib/tv/queries";
+import { boardLive } from "@/lib/tv/state";
 
 /** A receipt stays on the screen long enough to be read over the shoulder of a thought. */
 const RECEIPT_MS = 4_000;
@@ -79,6 +82,7 @@ export default function NotesPage() {
   const createBoard = useCreateBoard(me.data);
   const restoreBoard = useRestoreBoard(me.data);
   const purgeBoards = usePurgeBoards(me.data);
+  const movePoint = useMovePoint(me.data);
   const tv = useTvState();
   const router = useRouter();
   const startFromNote = useIngestStore((state) => state.startFromNote);
@@ -97,6 +101,8 @@ export default function NotesPage() {
   const [reminding, setReminding] = useState<Note | null>(null);
   // «Поручить»: the people sheet over the feed, the task leaves from here (D-108)
   const [assigning, setAssigning] = useState<Note | null>(null);
+  // «На доску» (D-140): the thought becomes a point of the board picked in the sheet
+  const [boarding, setBoarding] = useState<Note | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
 
@@ -157,15 +163,23 @@ export default function NotesPage() {
     };
   }, [cached, search.data, pending, online, now]);
 
-  // the boards (D-102): the live ones for their tab, the deleted ones for the bin
-  const boardPiles = useMemo(() => splitBoards(boards.data ?? [], now), [boards.data, now]);
-  const liveBoards = useMemo(() => new Set(boardPiles.live.map((board) => board.id)), [boardPiles.live]);
+  // the boards (D-102, D-140): the live ones for their tab (the one on the wall first, then the
+  // pinned), the finished ones folded under them, the deleted ones for the bin
+  const wallBoardId = boardLive(tv.data ?? null, now) ? (tv.data?.board_id ?? null) : null;
+  const boardPiles = useMemo(() => splitBoards(boards.data ?? [], now, wallBoardId), [boards.data, now, wallBoardId]);
+  const liveBoards = useMemo(() => new Set([...boardPiles.live, ...boardPiles.finished].map((board) => board.id)), [boardPiles]);
   const titleOf = useMemo(() => new Map((boards.data ?? []).map((board) => [board.id, board.title])), [boards.data]);
   const summaries = useMemo(() => summariesOf(rows), [rows]);
-  const shownBoards = useMemo(() => {
+  const { shownBoards, shownFinished } = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return needle ? boardPiles.live.filter((board) => board.title.toLowerCase().includes(needle)) : boardPiles.live;
-  }, [boardPiles.live, query]);
+    const hit = (board: MindBoard) => !needle || board.title.toLowerCase().includes(needle);
+    return { shownBoards: boardPiles.live.filter(hit), shownFinished: boardPiles.finished.filter(hit) };
+  }, [boardPiles, query]);
+  const previews = useMemo(() => {
+    const byBoard = new Map<string, Note[]>();
+    for (const row of rows) if (row.board_id) byBoard.set(row.board_id, [...(byBoard.get(row.board_id) ?? []), row]);
+    return new Map([...byBoard].map(([boardId, lines]) => [boardId, previewOf(lines)]));
+  }, [rows]);
 
   const split = useMemo(() => splitNotes(rows, now, liveBoards), [rows, now, liveBoards]);
   // the bin by branches (D-121): sub-points that left with their point ride on its card
@@ -181,7 +195,7 @@ export default function NotesPage() {
     if (query.trim()) {
       return {
         active: filterNotes(piles.active, query).length,
-        boards: shownBoards.length,
+        boards: shownBoards.length + shownFinished.length,
         converted: filterNotes(piles.converted, query).length,
         trash: filterNotes(piles.trash, query).length,
       };
@@ -193,7 +207,7 @@ export default function NotesPage() {
       converted: Math.max(piles.converted.length, server?.converted ?? 0),
       trash: piles.trash.length + boardPiles.trash.length,
     };
-  }, [piles, query, serverCounts.data, shownBoards, boardPiles]);
+  }, [piles, query, serverCounts.data, shownBoards, shownFinished, boardPiles]);
 
   // the feed is filed by day (reminders, then pinned first); «В деле» and the bin are one plain pile each
   const sections: Section<Note>[] = useMemo(() => {
@@ -240,9 +254,17 @@ export default function NotesPage() {
     <div className="card-in mt-3 flex flex-col gap-2" data-testid="boards-list">
       {query.trim() ? null : <NewBoardCard onCreate={newBoard} busy={false} />}
       {shownBoards.map((board: MindBoard) => (
-        <BoardCard key={board.id} board={board} summary={summaries.get(board.id)} onWall={boardOnWall(tv.data, board.id, now)} now={now} />
+        <BoardCard key={board.id} board={board} summary={summaries.get(board.id)} preview={previews.get(board.id)} onWall={boardOnWall(tv.data, board.id, now)} now={now} />
       ))}
-      {shownBoards.length === 0 ? (
+      {shownFinished.length > 0 ? (
+        // a search that hit a finished board shows it unfolded
+        <FinishedBoards key={query.trim() ? "search" : "all"} count={shownFinished.length} open={query.trim() !== ""}>
+          {shownFinished.map((board) => (
+            <BoardCard key={board.id} board={board} summary={summaries.get(board.id)} onWall={boardOnWall(tv.data, board.id, now)} now={now} />
+          ))}
+        </FinishedBoards>
+      ) : null}
+      {shownBoards.length + shownFinished.length === 0 ? (
         <div className="mt-1 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-8 text-center" data-testid="boards-empty">
           <Mascot state="calm" size={56} />
           <p className="mt-3 font-display text-[17px] font-semibold">{query ? "Ничего не нашёл" : "Досок пока нет"}</p>
@@ -336,7 +358,26 @@ export default function NotesPage() {
         onAnnounce={() => startFromNote({ id: note.id, text: note.text, audio_path: note.audio_path }, "announcement")}
         onRetranscribe={() => dictation.retranscribe(note)}
         onRemind={() => setReminding(note)}
+        onToBoard={() => setBoarding(note)}
       />
+    );
+  };
+
+  // the thought goes to the bottom of the board as a point; a new board is made first
+  const toBoard = (target: { id: string; title: string; fresh: boolean }) => {
+    const note = boarding;
+    setBoarding(null);
+    if (!note) return;
+    if (accordion.openId === note.id) accordion.toggle(note.id);
+    const position = target.fresh ? 1 : nextPlaceIn(cached.filter((row) => row.board_id === target.id && row.deleted_at === null), null);
+    movePoint.mutate(
+      { note, to: { boardId: target.id, position } },
+      {
+        onSuccess: () =>
+          toast(note.remind_at && !note.reminded_at ? `На доске «${target.title}» · напоминание снято` : `На доске «${target.title}»`, {
+            action: { label: "Открыть", onClick: () => router.push(`/notes/b/${target.id}`) },
+          }),
+      },
     );
   };
 
@@ -458,6 +499,26 @@ export default function NotesPage() {
       ) : null}
 
       <AssignSheet note={assigning} onClose={() => setAssigning(null)} me={me.data} />
+
+      <BoardPicker
+        open={boarding !== null}
+        onClose={() => setBoarding(null)}
+        subject={boarding ? firstLine(boarding.text) : null}
+        boards={boardPiles.live}
+        summaries={summaries}
+        onPick={(board) => toBoard({ id: board.id, title: board.title, fresh: false })}
+        onNew={() => {
+          // a move needs the network; a board made «for later» would wait with nothing on it
+          if (!navigator.onLine) {
+            setBoarding(null);
+            toast("Нет связи — мысль осталась в «Мыслях»");
+            return;
+          }
+          const id = crypto.randomUUID();
+          const title = defaultTitle(new Date());
+          createBoard.mutate({ id, title, client_request_id: crypto.randomUUID() }, { onSuccess: () => toBoard({ id, title, fresh: true }) });
+        }}
+      />
 
       <RemindSheet
         open={reminding !== null}

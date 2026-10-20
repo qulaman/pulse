@@ -152,7 +152,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
           {interactive ? (
             <button type="button" onClick={onToggle} aria-expanded={false} className="block w-full text-left transition-transform duration-[120ms] active:scale-[0.99]">
               {header}
-              <span className="mt-1.5 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
+              <span className="mt-1.5 line-clamp-2 text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
               {/* with the thread tail below, the one-line context would say it twice */}
               {showReply ? null : (
                 <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" ? "var(--text-muted)" : color }}>
@@ -163,7 +163,7 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
           ) : (
             <div>
               {header}
-              <span className="mt-1.5 line-clamp-2 block text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
+              <span className="mt-1.5 line-clamp-2 text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
               <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" || leaving ? "var(--text-muted)" : color }}>
                 {contextOf(task, lane, now, meId)}
               </span>

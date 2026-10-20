@@ -52,6 +52,16 @@ export function presenterStage(points: readonly PresenterPoint[], current: strin
   return { kind: "point", at, total: points.length, point: points[at], next: points[at + 1] ?? null };
 }
 
+/**
+ * «Отметить» on the remote (D-140): the point is talked over — the light goes straight on to
+ * the next one after it that is not ticked; none left — it stays. One tap a point, not two.
+ */
+export function nextOpen(points: readonly PresenterPoint[], current: string): string | null {
+  const at = points.findIndex((point) => point.id === current);
+  if (at < 0) return null;
+  return points.slice(at + 1).find((point) => !point.done)?.id ?? null;
+}
+
 const pointsWord = (n: number) => `${n} ${pluralRu(n, ["пункт", "пункта", "пунктов"])}`;
 
 /** Дисплей ведущего на пульте: надстрочник, главная строка (до двух строк), строка под ней. */

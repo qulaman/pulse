@@ -4,6 +4,7 @@ import { onlineManager, useMutation, useMutationState, useQueryClient, type Quer
 
 import { toast } from "@/components/ui/Toast";
 import { revertEdit, valuesBefore } from "@/lib/mindboard/offline";
+import { nextPlaceIn } from "@/lib/mindboard/tree";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
@@ -115,6 +116,42 @@ export class WaitsForPoint extends NetworkError {
 }
 
 /**
+ * A sub-point the server will never take under its point: the point became a sub-point or
+ * left the board on another device meanwhile. The words are not lost — they land as a point.
+ */
+export const BRANCH_AS_POINT = "Пункт изменился на другом устройстве — записал подпункт отдельным пунктом";
+
+/** After the last point of the board as the cache has it: where a refused sub-point lands. */
+export function lastPointPlace(queryClient: QueryClient, userId: string, boardId: string | null | undefined): number {
+  const rows = (queryClient.getQueryData<Note[]>(noteKeys.mine(userId)) ?? []).filter((note) => note.board_id === (boardId ?? null) && note.deleted_at === null);
+  return nextPlaceIn(rows, null);
+}
+
+/**
+ * An edit of a row the server does not have yet: its create was handed to the replay (a dead
+ * network after the retries). The update touches no row and says nothing — the edit must not
+ * settle then, or the replay lands the old words. It stays on the phone and the replay, which
+ * sends creates before edits, writes it right after the row lands.
+ */
+export class WaitsForRow extends Error {
+  constructor() {
+    super("Правка ждёт свою строку");
+    this.name = "WaitsForRow";
+  }
+}
+
+/**
+ * One update of one row; a row that is still only in the replay's hands answers `WaitsForRow`.
+ * Written — or refused for good (the row is gone and nothing waits to create it).
+ */
+export async function writeNoteFields(id: string, fields: NoteFields): Promise<void> {
+  const supabase = createBrowserSupabase();
+  const { data, error } = await supabase.from("notes").update(fields).eq("id", id).select("id");
+  if (error) throw new Error(error.message);
+  if ((data ?? []).length === 0 && (await hasCreate(id))) throw new WaitsForRow();
+}
+
+/**
  * Creates and edits of notes run one after another (TanStack `scope`): an edit made
  * while its note is still on its way must not reach the server before the note does.
  */
@@ -172,6 +209,11 @@ export function useCreateNote(me: Me | undefined) {
         if (row.parent_id && refusedBranch(error) && (await hasCreate(row.parent_id))) {
           if (onlineManager.isOnline()) requestReplay();
           throw new WaitsForPoint();
+        }
+        if (row.parent_id && refusedBranch(error) && me) {
+          const note = await insertNote(me, { ...row, parent_id: null, position: lastPointPlace(queryClient, me.userId, row.board_id) });
+          toast(BRANCH_AS_POINT);
+          return note;
         }
         throw error;
       }
@@ -255,11 +297,7 @@ export function useUpdateNote(me: { userId: string } | undefined) {
   return useMutation({
     mutationKey: UPDATE_KEY,
     scope: SERIAL,
-    mutationFn: async ({ id, ...fields }: { id: string } & NoteFields) => {
-      const supabase = createBrowserSupabase();
-      const { error } = await supabase.from("notes").update(fields).eq("id", id);
-      if (error) throw new Error(error.message);
-    },
+    mutationFn: ({ id, ...fields }: { id: string } & NoteFields) => writeNoteFields(id, fields),
     onMutate: async ({ id, ...fields }) => {
       // this mutation answers for these fields until it settles: the replay leaves them alone
       holdEdit(id);
@@ -277,6 +315,11 @@ export function useUpdateNote(me: { userId: string } | undefined) {
       // the edit stays on screen and on the phone; the replay writes it later
       if (isNetworkError(error)) {
         toast(KEPT_OFFLINE);
+        return;
+      }
+      // the row is still on its way: the edit waits on the phone and goes right after it
+      if (error instanceof WaitsForRow) {
+        if (onlineManager.isOnline()) requestReplay();
         return;
       }
       void settleEdit(id, fields);

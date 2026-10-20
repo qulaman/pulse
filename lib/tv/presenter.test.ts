@@ -9,6 +9,7 @@ import {
   cartridgeLine,
   countLine,
   mapHint,
+  nextOpen,
   pipsOf,
   presenterPill,
   presenterPoints,
@@ -53,6 +54,8 @@ function board(id: string, patch: Partial<MindBoard> = {}): MindBoard {
     user_id: "u",
     title: `Доска ${id}`,
     deleted_at: null,
+    pinned_at: null,
+    finished_at: null,
     client_request_id: null,
     created_at: "2026-09-25T03:00:00Z",
     updated_at: "2026-09-25T03:00:00Z",
@@ -235,5 +238,25 @@ describe("boardShelf", () => {
 
   it("без досок — пустая полка", () => {
     expect(boardShelf([], NOW, null)).toEqual({ keys: [], rest: 0, live: [] });
+  });
+
+  it("закреплённая — первой, завершённой на полке нет (D-140)", () => {
+    const shelf = boardShelf(
+      [...boards, board("pin", { updated_at: "2026-09-01T03:00:00Z", pinned_at: "2026-09-24T03:00:00Z" }), board("done", { finished_at: "2026-09-25T03:00:00Z" })],
+      NOW,
+      null,
+    );
+    expect(shelf.keys.map((b) => b.id)).toEqual(["pin", "new", "mid"]);
+    expect(shelf.live.map((b) => b.id)).not.toContain("done");
+  });
+});
+
+describe("nextOpen", () => {
+  it("«Отметить» ведёт к следующему неотмеченному после этого пункта (D-140)", () => {
+    expect(nextOpen(points(5, [3]), "p2")).toBe("p4");
+    expect(nextOpen(points(5), "p5")).toBeNull();
+    expect(nextOpen(points(5, [4, 5]), "p3")).toBeNull();
+    expect(nextOpen(points(3, [1]), "p1")).toBe("p2");
+    expect(nextOpen(points(3), "gone")).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { binCards, demotedPlace, glimpse, lineState, numbersOf, parentsFirst, promotedPlace } from "./branch";
+import { afterPlace, binCards, chainEnd, demotedPlace, glimpse, lineState, numbersOf, parentsFirst, promotedPlace } from "./branch";
 import { branchesOf } from "./tree";
 
 type Row = { id: string; parent_id: string | null; position: number | null; created_at: string; text: string };
@@ -38,6 +38,42 @@ describe("glimpse", () => {
   it("says «ещё N» past that", () => {
     expect(glimpse([1, 2, 3, 4, 5])).toEqual({ shown: [1, 2, 3], more: 2 });
     expect(glimpse([], 3)).toEqual({ shown: [], more: 0 });
+  });
+});
+
+describe("afterPlace", () => {
+  const rows = [row("a", 1), row("b", 2), row("a1", 1, "a"), row("c", 4)];
+
+  it("puts the line right after its point, before the next one", () => {
+    expect(afterPlace(rows, "a")).toBe(1.5);
+    expect(afterPlace(rows, "b")).toBe(3);
+  });
+
+  it("keeps several lines from the same row in their order", () => {
+    expect(afterPlace(rows, "a", 1.5)).toBe(1.75);
+    expect(afterPlace([...rows, row("n1", 1.5)], "a", 1.5)).toBe(1.75);
+  });
+
+  it("goes past the last point, and to the bottom for a point that is gone", () => {
+    expect(afterPlace(rows, "c")).toBe(5);
+    expect(afterPlace(rows, "zzz")).toBe(5);
+  });
+});
+
+describe("chainEnd", () => {
+  it("follows the lines given places under the point", () => {
+    const rows = [row("a", 1), row("n1", 1.5), row("n2", 1.75), row("b", 2)];
+    expect(chainEnd(rows, "a", new Set([1.5, 1.75]))).toBe(1.75);
+    expect(chainEnd(rows, "a", new Set([1.5]))).toBe(1.5);
+    expect(chainEnd(rows, "a", new Set())).toBeNull();
+  });
+
+  it("breaks where the point moved away or a line left", () => {
+    // «a» dragged to the top: what stands under it now was never given there
+    expect(chainEnd([row("a", 0.25), row("z", 0.5), row("n1", 1.5), row("b", 2)], "a", new Set([1.5]))).toBeNull();
+    // the first line deleted, the second still right under the point
+    expect(chainEnd([row("a", 1), row("n2", 1.75), row("b", 2)], "a", new Set([1.5, 1.75]))).toBe(1.75);
+    expect(chainEnd([row("b", 2)], "a", new Set([1.5]))).toBeNull();
   });
 });
 

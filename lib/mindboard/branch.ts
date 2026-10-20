@@ -53,6 +53,39 @@ export function promotedPlace(rows: readonly Movable[], subId: string): { parent
 }
 
 /**
+ * «+ пункт ниже» (D-140): the place right after a point — after the lines already put there
+ * from the same row (`last`), before the next point of the board — so a point said in the
+ * middle of the agenda lands in the middle, and several in a row keep their order. A point
+ * that is gone puts the line at the bottom.
+ */
+export function afterPlace(rows: readonly Movable[], anchorId: string, last: number | null = null): number {
+  const top = branchesOf(rows).map((branch) => branch.point);
+  const anchor = top.find((point) => point.id === anchorId);
+  if (!anchor) return nextPlaceIn(rows, null);
+  const from = Math.max(anchor.position ?? 0, last ?? Number.NEGATIVE_INFINITY);
+  const next = top.find((point) => (point.position ?? 0) > from);
+  return positionBetween(from, next ? (next.position ?? 0) : null);
+}
+
+/**
+ * Where the lines said «ниже» a point end now (D-140): walking down from the point, the lines
+ * that still stand right under it at a place this row gave them (`given`). A reorder, a
+ * deletion or a drag breaks the chain there — the next line goes right after the point again,
+ * never after a place that is no longer under it. Null — nothing of the chain is under it.
+ */
+export function chainEnd(rows: readonly Movable[], anchorId: string, given: ReadonlySet<number>): number | null {
+  const top = branchesOf(rows).map((branch) => branch.point);
+  const at = top.findIndex((point) => point.id === anchorId);
+  if (at < 0) return null;
+  let end: number | null = null;
+  for (const point of top.slice(at + 1)) {
+    if (!given.has(point.position ?? Number.NaN)) break;
+    end = point.position ?? 0;
+  }
+  return end;
+}
+
+/**
  * «Сделать подпунктом»: the point goes under the point right above it, as its last sub-point.
  * The server's rule (one level, a live point of the board) is also the UI's: the first point,
  * a point with sub-points of its own, and a point above that is not a point on the server

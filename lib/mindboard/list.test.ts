@@ -9,8 +9,12 @@ import {
   boardSummary,
   cleanTitle,
   defaultTitle,
+  boardText,
   nextPosition,
+  nextTitle,
+  openPoints,
   pointsOf,
+  previewOf,
   positionBetween,
   splitBoards,
   summariesOf,
@@ -52,6 +56,8 @@ function board(overrides: Partial<MindBoard> = {}): MindBoard {
     user_id: "u-1",
     title: "Планёрка",
     deleted_at: null,
+    pinned_at: null,
+    finished_at: null,
     client_request_id: null,
     created_at: "2026-09-23T05:00:00Z",
     updated_at: "2026-09-23T05:00:00Z",
@@ -170,6 +176,65 @@ describe("splitBoards", () => {
     expect(live.map((b) => b.id)).toEqual(["fresh", "old"]);
     expect(trash.map((b) => b.id)).toEqual(["binned"]);
     expect(boardExpiresAt(binned).toISOString()).toBe("2026-09-25T05:00:00.000Z");
+  });
+  it("puts the board on the wall first, the pinned next, and the finished apart (D-140)", () => {
+    const old = board({ id: "old", updated_at: "2026-09-20T05:00:00Z" });
+    const fresh = board({ id: "fresh", updated_at: "2026-09-23T05:00:00Z" });
+    const pinned = board({ id: "pinned", updated_at: "2026-09-10T05:00:00Z", pinned_at: "2026-09-21T05:00:00Z" });
+    const pinnedLater = board({ id: "pinned-later", updated_at: "2026-09-01T05:00:00Z", pinned_at: "2026-09-22T05:00:00Z" });
+    const done = board({ id: "done", finished_at: "2026-09-22T05:00:00Z" });
+    const doneLater = board({ id: "done-later", finished_at: "2026-09-23T05:00:00Z" });
+    const binnedDone = board({ id: "binned-done", finished_at: "2026-09-22T05:00:00Z", deleted_at: "2026-09-22T06:00:00Z" });
+
+    const piles = splitBoards([old, fresh, pinned, pinnedLater, done, doneLater, binnedDone], NOW, "old");
+    expect(piles.live.map((b) => b.id)).toEqual(["old", "pinned-later", "pinned", "fresh"]);
+    expect(piles.finished.map((b) => b.id)).toEqual(["done-later", "done"]);
+    expect(piles.trash.map((b) => b.id)).toEqual(["binned-done"]);
+    expect(splitBoards([fresh, pinned], NOW).live.map((b) => b.id)).toEqual(["pinned", "fresh"]);
+  });
+});
+
+describe("nextTitle", () => {
+  it("moves the date of the meeting to today", () => {
+    expect(nextTitle("Планёрка · 16 сент.", NOW)).toBe("Планёрка · 23 сент.");
+    expect(nextTitle("Доска · 3 мая", NOW)).toBe("Доска · 23 сент.");
+    expect(nextTitle("Совещание по складу", NOW)).toBe("Совещание по складу · 23 сент.");
+    expect(nextTitle(" · 1 сент.", NOW)).toBe("Доска · 23 сент.");
+    // a number with a word that is not a month is the director's, not a date
+    expect(nextTitle("Склад · 2 этаж", NOW)).toBe("Склад · 2 этаж · 23 сент.");
+    expect(nextTitle("Отдел · 3 смены · 16 сент.", NOW)).toBe("Отдел · 3 смены · 23 сент.");
+    // every month the date is written with
+    for (const month of ["янв.", "февр.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сент.", "окт.", "нояб.", "дек."]) {
+      expect(nextTitle(`Планёрка · 5 ${month}`, NOW)).toBe("Планёрка · 23 сент.");
+    }
+  });
+});
+
+describe("openPoints, previewOf, boardText", () => {
+  const rows = [
+    point({ id: "p1", text: "Новый склад\nаренда до пятницы", position: 1 }),
+    point({ id: "p2", text: "Продажи Q4", position: 2, done_at: "2026-09-23T05:00:00Z" }),
+    point({ id: "p3", text: "Поручено", position: 3, converted_task_id: "t-1" }),
+    point({ id: "p4", text: "", position: 4, audio_path: "a.webm" }),
+    point({ id: "p5", text: "Отпуска", position: 0.5 }),
+    point({ id: "s1", text: "Охрана", parent_id: "p1", position: 2 }),
+    point({ id: "s2", text: "Аренда", parent_id: "p1", position: 1, done_at: "2026-09-23T05:00:00Z" }),
+    point({ id: "gone", text: "Удалён", position: 6, deleted_at: "2026-09-23T05:00:00Z" }),
+  ];
+
+  it("takes the open points with words for a new board", () => {
+    expect(openPoints(rows).map((row) => row.id)).toEqual(["p5", "p1"]);
+  });
+
+  it("previews the first points with words", () => {
+    expect(previewOf(rows)).toEqual(["Отпуска", "Новый склад"]);
+    expect(previewOf([])).toEqual([]);
+  });
+
+  it("writes the board for a messenger, numbered as the wall numbers it", () => {
+    expect(boardText("Планёрка · 23 сент.", rows)).toBe(
+      ["Планёрка · 23 сент.", "", "1. Отпуска", "2. Новый склад", "   аренда до пятницы", "   – ✓ Аренда", "   – Охрана", "3. ✓ Продажи Q4", "4. Поручено"].join("\n"),
+    );
   });
 });
 

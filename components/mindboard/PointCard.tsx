@@ -80,6 +80,14 @@ export type PointHandlers = {
   retranscribe: (row: Note) => void;
   /** A sub-point typed under this point. */
   write: (text: string) => void;
+  /** Sub-points of a pasted list, in order (D-140). */
+  writeMany: (texts: string[]) => void;
+  /** «+ пункт ниже» (D-140): points typed or pasted right after this one. */
+  writeAfter: (texts: string[]) => void;
+  /** The screen's microphone is about to open for a point right after this one. */
+  aimAfter: () => void;
+  /** «На другую доску» (D-140): the point leaves with its branch; absent while it is only on the phone. */
+  move?: () => void;
   /** A sub-point dropped between its siblings (D-121): one row written, its new place. */
   place: (sub: Note, position: number) => void;
   /** The screen's microphone is about to open for a sub-point of this point. */
@@ -103,6 +111,11 @@ type Props = {
   openSub: string | null;
   /** The wall shows this point now (D-121). */
   lit: boolean;
+  /**
+   * «Раздать поручения» is on (D-140): the card stays closed, a tap picks a person, the chip
+   * says whom; `can` — the point can be handed (it has words and no task yet).
+   */
+  hand?: { person: string | null; can: boolean };
   look: RowLook;
   grip?: ReactNode;
   dictation: Dictation;
@@ -118,10 +131,12 @@ type Props = {
  * moves by its handle), «+ подпункт» with the microphone, «Показать на стене» during a meeting,
  * and «Отметить / Поручить / Удалить». A point is a note underneath, and so is a sub-point.
  */
-export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, look, grip, dictation, aimed, on }: Props) {
+export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, hand, look, grip, dictation, aimed, on }: Props) {
   const { point, children } = branch;
   const [dirty, setDirty] = useState(false);
   const [saved, setSaved] = useState(false);
+  // «+ пункт ниже» unfolds its row in place, the caret in it (D-140)
+  const [below, setBelow] = useState(false);
   const phone = look.phone(point.id);
   const wait = look.wait(point);
   const state = stateOf(point, look);
@@ -187,6 +202,21 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
   }
   // a point without words already says what it waits for in its own words («Голос на телефоне»)
   if (wait && state === "words") meta.push(<WaitMark key="wait" wait={wait} />);
+  // handing out (D-140): whom this point goes to; a handed one and one without words say so already
+  if (hand?.can) {
+    meta.unshift(
+      <span
+        key="hand"
+        data-testid="point-hand"
+        className={`inline-flex min-h-[26px] items-center gap-1.5 rounded-full border px-2.5 text-[13px] font-semibold ${
+          hand.person ? "border-accent/60 bg-accent/[0.12] text-accent" : "border-dashed border-accent/50 text-accent"
+        }`}
+      >
+        <NoteIcon name="task" size={12} />
+        {hand.person ?? "Кому?"}
+      </span>,
+    );
+  }
 
   const { shown, more } = glimpse(children);
 
@@ -327,7 +357,15 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
             </Reorder.Group>
           ) : null}
 
-          <SubComposer pointId={point.id} dictation={dictation} aimed={aimed} onAim={on.aim} onWrite={on.write} first={children.length === 0} />
+          <SubComposer
+            aimKey={`sub:${point.id}`}
+            dictation={dictation}
+            aimed={aimed}
+            onAim={on.aim}
+            onWrite={on.write}
+            onWriteMany={on.writeMany}
+            first={children.length === 0}
+          />
 
           {on.demote && demoteLabel ? (
             <button
@@ -363,7 +401,7 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
               </button>
             ) : null}
 
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2" data-testid="point-actions">
               <Button
                 variant="secondary"
                 className={`!px-2 whitespace-nowrap !text-[14px] ${done ? "!border-ok/60 !text-ok" : ""}`}
@@ -386,6 +424,48 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, loo
               >
                 Удалить
               </Button>
+            </div>
+
+            {/* the agenda grows in the middle and lines move between boards (D-140) */}
+            {below ? (
+              <div className="mt-3">
+                <SubComposer
+                  aimKey={`after:${point.id}`}
+                  mode="after"
+                  dictation={dictation}
+                  aimed={aimed}
+                  onAim={on.aimAfter}
+                  onWrite={(text) => on.writeAfter([text])}
+                  onWriteMany={on.writeAfter}
+                  first={false}
+                  autoFocus
+                />
+              </div>
+            ) : null}
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                aria-pressed={below}
+                onClick={() => setBelow((was) => !was)}
+                data-testid="point-below"
+                className={`flex min-h-[44px] items-center justify-center gap-1.5 rounded-[12px] px-2 text-[14px] font-semibold transition-colors duration-[120ms] active:bg-accent/10 ${
+                  below ? "bg-accent/[0.08] text-accent" : "text-accent"
+                }`}
+              >
+                <NoteIcon name="plus" size={16} />
+                Пункт ниже
+              </button>
+              {on.move ? (
+                <button
+                  type="button"
+                  onClick={on.move}
+                  data-testid="point-move"
+                  className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[12px] px-2 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
+                >
+                  <NoteIcon name="move" size={16} />
+                  На другую доску
+                </button>
+              ) : null}
             </div>
           </>
         )}

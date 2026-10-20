@@ -4,6 +4,8 @@ import type { TvState } from "./queries";
 import {
   awakeUntil,
   boardLive,
+  boardCapFrom,
+  boardExtendTo,
   boardUntilFrom,
   burnInShift,
   calendarViewOf,
@@ -236,6 +238,24 @@ describe("board on the wall (D-102)", () => {
     expect(boardUntilFrom(new Date("2026-09-18T18:00:00Z")).toISOString()).toBe("2026-09-18T20:00:00.000Z");
     // 00:30 Aqtobe (19:30 UTC the day before) is still before 21:00 of the new day
     expect(boardUntilFrom(new Date("2026-09-17T19:30:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
+  });
+
+  it("never lets a chosen time or «+30 мин» run past the end of the day (D-140)", () => {
+    // 10:00 Aqtobe → 21:00 the same day
+    expect(boardCapFrom(new Date("2026-09-18T05:00:00Z")).toISOString()).toBe("2026-09-18T16:00:00.000Z");
+    // 20:30 Aqtobe → two hours from now: an hour-long meeting still fits
+    expect(boardCapFrom(new Date("2026-09-18T15:30:00Z")).toISOString()).toBe("2026-09-18T17:30:00.000Z");
+    // 23:00 Aqtobe → two hours
+    expect(boardCapFrom(new Date("2026-09-18T18:00:00Z")).toISOString()).toBe("2026-09-18T20:00:00.000Z");
+  });
+
+  it("extends a board to a time, from what is left or from now, under the cap (D-140)", () => {
+    const now = new Date("2026-09-18T10:00:00Z"); // 15:00 Aqtobe
+    expect(boardExtendTo({ board_until: "2026-09-18T10:20:00Z" }, 30, now).toISOString()).toBe("2026-09-18T10:50:00.000Z");
+    // run out already: from now
+    expect(boardExtendTo({ board_until: "2026-09-18T09:00:00Z" }, 30, now).toISOString()).toBe("2026-09-18T10:30:00.000Z");
+    // never past 21:00
+    expect(boardExtendTo({ board_until: "2026-09-18T15:50:00Z" }, 30, now).toISOString()).toBe("2026-09-18T16:00:00.000Z");
   });
 });
 

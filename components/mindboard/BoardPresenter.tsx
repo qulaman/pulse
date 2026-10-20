@@ -15,6 +15,7 @@ import { useMe } from "@/lib/tasks/queries";
 import { useTvBoardControl } from "@/lib/tv/mutations";
 import {
   mapHint,
+  nextOpen,
   pipsOf,
   presenterPill,
   presenterStage,
@@ -94,6 +95,12 @@ function usePresenter(boardId: string, points: readonly PresenterPoint[], now: D
     view: boardViewOf(row),
     direction,
     step,
+    /** Straight to this point (forward); null — stay. */
+    goTo: (pointId: string | null) => {
+      if (!pointId) return;
+      setDirection(1);
+      control.mutate({ point: pointId });
+    },
     clear: () => control.mutate({ clearPoint: true }),
     setView: (view: BoardView) => control.mutate({ view }),
   };
@@ -118,9 +125,13 @@ function PresenterDeck({ boardId, points, now }: { boardId: string; points: read
   const done = stage.kind === "point" && stage.point.done;
   const hint = mapHint(points.length);
 
+  // the point is talked over: ticked, and the light goes on to the next open one (D-140) —
+  // one tap a point; taking a tick back stays where it is
   const mark = () => {
     if (stage.kind !== "point") return;
-    update.mutate({ id: stage.point.id, done_at: stage.point.done ? null : new Date().toISOString() });
+    const ticking = !stage.point.done;
+    update.mutate({ id: stage.point.id, done_at: ticking ? new Date().toISOString() : null });
+    if (ticking) presenter.goTo(nextOpen(points, stage.point.id));
   };
 
   return (
@@ -164,7 +175,7 @@ function PresenterDeck({ boardId, points, now }: { boardId: string; points: read
             className={rockerKey.ok}
             on={done}
             icon={<CheckIcon />}
-            aria-label={done ? "Снять отметку с пункта" : "Отметить пункт"}
+            aria-label={done ? "Снять отметку с пункта" : "Отметить пункт и перейти к следующему"}
             disabled={stage.kind !== "point"}
             data-testid="presenter-mark"
             onClick={mark}

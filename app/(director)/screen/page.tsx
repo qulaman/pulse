@@ -22,7 +22,7 @@ import { createBrowserSupabase } from "@/lib/supabase/client";
 import { useMe } from "@/lib/tasks/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
-import { useTvState } from "@/lib/tv/queries";
+import { useTvState, type TvState } from "@/lib/tv/queries";
 import { CALENDAR_LABEL, CLOCK_LABEL, RATING_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
   awakeUntil,
@@ -185,8 +185,9 @@ export default function ScreenPage() {
   const inFlight = control.isPending || presenting || (receipt.tone === "muted" && !neverSeen);
   const led: LedTone = inFlight ? "accent" : neverSeen ? "off" : receipt.tone;
 
-  const show = (input: Parameters<typeof control.mutate>[0], message: string) => {
-    control.mutate(input, { onSuccess: () => toast(message) });
+  // the receipt of a command: its words in a toast, or (D-140) what the caller does instead
+  const show = (input: Parameters<typeof control.mutate>[0], then: string | ((row: TvState) => void)) => {
+    control.mutate(input, { onSuccess: (row) => (typeof then === "string" ? toast(then) : then(row)) });
   };
 
   return (
@@ -394,6 +395,10 @@ export default function ScreenPage() {
                   : SCENE_HINT[scene]}
               </p>
 
+              {/* the director's boards (D-102, D-121): the one on the wall as a cartridge, the others on a
+                  shelf — the first seam under the scenes (D-140): a meeting starts here */}
+              <BoardSeam wall={wall} row={row} now={now} guest={guest} show={show} />
+
               {/* the rating on the wall (D-123): the week or the month. Outside the round a tap puts the
                   rating up in that period; inside it only the period changes and the round goes on */}
               {pointsEnabled.data === true ? (
@@ -446,9 +451,6 @@ export default function ScreenPage() {
                   </Key>
                 ))}
               </div>
-
-              {/* the director's boards (D-102, D-121): the one on the wall as a cartridge, the others on a shelf */}
-              <BoardSeam wall={wall} row={row} now={now} guest={guest} show={show} />
 
               {/* the clock on the wall: digits or hands, everywhere it is drawn (D-96) */}
               <Seam label="Часы на стене" />

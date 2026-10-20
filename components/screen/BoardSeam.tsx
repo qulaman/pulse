@@ -1,18 +1,26 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 
+import { ejectReceipt } from "@/components/mindboard/carry";
+import { EXTEND_MINUTES } from "@/components/mindboard/WallSheet";
 import { Key, Led, Seam, Switch } from "@/components/ui/device/Device";
 import s from "@/components/ui/device/device.module.css";
 import { Sheet } from "@/components/ui/Sheet";
+import { toast } from "@/components/ui/Toast";
+import { defaultTitle } from "@/lib/mindboard/list";
+import { useCreateBoard } from "@/lib/mindboard/mutations";
 import type { MindBoard } from "@/lib/mindboard/queries";
+import { useNotes } from "@/lib/notes/queries";
+import { useMe } from "@/lib/tasks/queries";
 import { boardCountLine } from "@/lib/tv/board";
 import { tvTime } from "@/lib/tv/clock";
-import type { TvControlInput } from "@/lib/tv/mutations";
+import { useTvBoardControl, type TvControlInput } from "@/lib/tv/mutations";
 import { boardShelf, cartridgeLine, countLine, type BoardCount } from "@/lib/tv/presenter";
-import type { TvState } from "@/lib/tv/queries";
-import { boardUntilFrom } from "@/lib/tv/state";
+import { tvKeys, type TvState } from "@/lib/tv/queries";
+import { boardExtendTo, boardUntilFrom } from "@/lib/tv/state";
 
 import c from "./board-seam.module.css";
 import type { WallBoard } from "./useWallBoard";
@@ -23,24 +31,59 @@ type Props = {
   now: Date;
   /** «Гость в кабинете» is on: the board hides from the wall unless shown to the guest (D-102 §7). */
   guest: boolean;
-  /** The remote's command: the page's `tv_control`, so the lens blinks for it like for every key. */
-  show: (input: TvControlInput, message: string) => void;
+  /**
+   * The remote's command: the page's `tv_control`, so the lens blinks for it like for every key.
+   * `then` is what the success says — a toast's words, or what to do instead.
+   */
+  show: (input: TvControlInput, then: string | ((row: TvState) => void)) => void;
 };
 
+const TIME = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" });
+
 /**
- * «Доска на стене» (D-102 §9, D-121). The board on the wall sits in a slot like a cartridge:
- * its name, how many points and until when, «Открыть доску» and «Убрать со стены»; with a
- * guest in the office — «Показать гостю» right under it. Below, the shelf: the three latest
- * other boards as keys (one tap puts a board on the wall till 21:00) and «Все доски» — a
- * sheet with every live board — when there are more. No boards — the way to make one.
+ * «Доска на стене» (D-102 §9, D-121, D-140). The board on the wall sits in a slot like a
+ * cartridge: its name, how many points and until when, «Открыть», «+30 мин» and «Убрать» —
+ * taking it down says what the meeting got through and offers its open points to the next
+ * board; with a guest in the office — «Показать гостю» right under it. Below, the shelf: the
+ * latest other boards as keys (the pinned first; one tap puts a board on the wall till 21:00),
+ * «Новая доска» — made, up on the wall and open with the microphone in one tap — and «Все
+ * доски» — a sheet with every live board — when there are more. Finished boards stay off it.
  */
 export function BoardSeam({ wall, row, now, guest, show }: Props) {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const me = useMe();
+  const notes = useNotes(me.data?.userId);
+  const create = useCreateBoard(me.data);
+  const extend = useTvBoardControl();
   const [picking, setPicking] = useState(false);
   const shelf = boardShelf(wall.boards, now, wall.boardId);
   const until = row?.board_until ? new Date(row.board_until) : null;
+  const mine = wall.board !== null && wall.board.deleted_at === null;
 
   const put = (board: MindBoard) => show({ board: board.id }, `На стене — «${board.title}»`);
+  const open = (boardId: string) => router.push(`/notes/b/${boardId}`);
+
+  // «Новая доска» (D-140): a meeting from scratch — the board is made, goes up, opens with the
+  // microphone; every point said appears on the wall as it is said
+  const fresh = () => {
+    if (!navigator.onLine) {
+      toast("Нет связи — новую доску на стену не поставить");
+      return;
+    }
+    const id = crypto.randomUUID();
+    create.mutate(
+      { id, title: defaultTitle(new Date()), client_request_id: crypto.randomUUID() },
+      {
+        // the board opens once the wall has it: the remote stays (with its «нет связи») if not
+        onSuccess: () =>
+          show({ board: id }, () => {
+            toast("Новая доска на стене — говорите пункты");
+            open(id);
+          }),
+      },
+    );
+  };
 
   return (
     <>
@@ -49,17 +92,30 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
       {wall.boardId ? (
         <div className="mt-2" data-testid="remote-cartridge">
           <Cartridge wall={wall} until={until} />
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Key
-              icon={<OpenIcon />}
-              disabled={!wall.board || wall.board.deleted_at !== null}
-              data-testid="remote-board-open"
-              onClick={() => router.push(`/notes/b/${wall.boardId}`)}
-            >
-              Открыть доску
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <Key icon={<OpenIcon />} disabled={!mine} data-testid="remote-board-open" onClick={() => open(wall.boardId as string)}>
+              Открыть
             </Key>
-            <Key icon={<EjectIcon />} data-testid="remote-board-eject" onClick={() => show({ scene: "face" }, "Доска убрана со стены")}>
-              Убрать со стены
+            <Key
+              icon={<ClockIcon />}
+              disabled={!mine || extend.isPending}
+              data-testid="remote-board-extend"
+              onClick={() =>
+                extend.mutate(
+                  // from the row as the cache holds it this instant: taps in a row add up, a repeat does not
+                  { until: boardExtendTo(queryClient.getQueryData<TvState | null>(tvKeys.state) ?? row, EXTEND_MINUTES, new Date()).toISOString() },
+                  { onSuccess: (next) => toast(next.board_until ? `Доска на стене до ${TIME.format(new Date(next.board_until))}` : "Продлил") },
+                )
+              }
+            >
+              +{EXTEND_MINUTES} мин
+            </Key>
+            <Key
+              icon={<EjectIcon />}
+              data-testid="remote-board-eject"
+              onClick={() => show({ scene: "face" }, () => ejectReceipt(queryClient, me.data, wall.board, notes.data ?? [], open))}
+            >
+              Убрать
             </Key>
           </div>
           {guest ? (
@@ -78,16 +134,14 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
 
       {shelf.live.length === 0 && !wall.loading ? (
         <div className="mt-2" data-testid="remote-boards-empty">
-          <p className="px-1 text-center text-[13px] leading-[18px] text-muted">
-            Досок пока нет. Надиктуйте пункты — и доска встанет на стену одним тапом
-          </p>
+          <p className="px-1 text-center text-[13px] leading-[18px] text-muted">Досок пока нет. Новая — сразу на стене: говорите пункты, они появляются в кабинете</p>
           <div className="mt-2">
-            <Key icon={<PlusIcon />} onClick={() => router.push("/notes?tab=boards")}>
-              Создать в «Заметках»
+            <Key icon={<PlusIcon />} disabled={create.isPending} data-testid="remote-board-new" onClick={fresh}>
+              Новая доска на стену
             </Key>
           </div>
         </div>
-      ) : shelf.keys.length > 0 || shelf.rest > 0 ? (
+      ) : (
         <>
           {wall.boardId ? <p className={`${s.print} mt-3 px-1`}>Другие доски</p> : null}
           <div className="mt-2 grid grid-cols-2 gap-2" data-testid="remote-boards">
@@ -103,6 +157,10 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
                 <span className={c.keyCount}>ещё {shelf.rest}</span>
               </Key>
             ) : null}
+            <Key tall icon={<PlusIcon />} disabled={create.isPending} data-testid="remote-board-new" onClick={fresh}>
+              <span>Новая доска</span>
+              <span className={c.keyCount}>сразу на стене</span>
+            </Key>
           </div>
           {wall.boardId ? null : (
             <p className="mt-1.5 px-1 text-center text-[13px] leading-[18px] text-muted">
@@ -110,7 +168,7 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
             </p>
           )}
         </>
-      ) : null}
+      )}
 
       <Sheet open={picking} onClose={() => setPicking(false)} title="Доски">
         <div className="flex flex-col gap-2" data-testid="remote-boards-sheet">
@@ -130,10 +188,13 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
         <button
           type="button"
           className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 text-[14px] font-semibold text-accent"
-          onClick={() => router.push("/notes?tab=boards")}
+          onClick={() => {
+            setPicking(false);
+            fresh();
+          }}
         >
           <PlusIcon />
-          Новая доска — в «Заметках»
+          Новая доска — сразу на стене
         </button>
       </Sheet>
     </>
@@ -153,7 +214,7 @@ function Cartridge({ wall, until }: { wall: WallBoard; until: Date | null }) {
         <Led tone={binned ? "off" : "accent"} />
         <span className="min-w-0 flex-1">
           <span
-            className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] [overflow-wrap:anywhere]"
+            className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] [overflow-wrap:anywhere]"
             data-testid="remote-cartridge-title"
           >
             {title}
@@ -193,7 +254,7 @@ function BoardRow({ board, count, onWall, onPick }: { board: MindBoard; count: B
         <BoardIcon size={13} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] [overflow-wrap:anywhere]">
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] [overflow-wrap:anywhere]">
           {board.title}
         </span>
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
@@ -246,6 +307,14 @@ const OpenIcon = () => (
   <Svg>
     <path d="M9 4H5.2A2.2 2.2 0 0 0 3 6.2v8.6A2.2 2.2 0 0 0 5.2 17h8.6a2.2 2.2 0 0 0 2.2-2.2V11" />
     <path d="M11.4 3h5.6v5.6M17 3l-7.2 7.2" />
+  </Svg>
+);
+
+/** More time on the wall: a clock with a plus. */
+const ClockIcon = () => (
+  <Svg>
+    <circle cx="9" cy="10.5" r="6.2" />
+    <path d="M9 7.4v3.3l2.2 1.4M15.6 2.6v4M13.6 4.6h4" />
   </Svg>
 );
 

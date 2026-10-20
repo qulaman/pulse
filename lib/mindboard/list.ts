@@ -116,15 +116,83 @@ export function boardExpiresAt(board: MindBoard): Date {
   return new Date(new Date(board.deleted_at ?? board.updated_at).getTime() + BOARD_TRASH_DAYS * DAY_MS);
 }
 
-/** Live boards (latest touched first) and the bin (latest deletion first, not past its three days). */
-export function splitBoards(boards: readonly MindBoard[], now: Date): { live: MindBoard[]; trash: MindBoard[] } {
+/**
+ * The boards in the order of the list (D-140): live ones — the one on the wall first, then
+ * the pinned (the latest pinned first), then the latest touched; finished ones apart (the
+ * latest finished first) — their meeting is over, the board stays whole; the bin — the latest
+ * deletion first, not past its three days.
+ */
+export function splitBoards(
+  boards: readonly MindBoard[],
+  now: Date,
+  onWallId: string | null = null,
+): { live: MindBoard[]; finished: MindBoard[]; trash: MindBoard[] } {
   const live: MindBoard[] = [];
+  const finished: MindBoard[] = [];
   const trash: MindBoard[] = [];
   for (const board of boards) {
-    if (board.deleted_at === null) live.push(board);
-    else if (boardExpiresAt(board).getTime() > now.getTime()) trash.push(board);
+    if (board.deleted_at !== null) {
+      if (boardExpiresAt(board).getTime() > now.getTime()) trash.push(board);
+    } else if (board.finished_at) finished.push(board);
+    else live.push(board);
   }
-  live.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+  const rank = (board: MindBoard) => (board.id === onWallId ? 0 : board.pinned_at ? 1 : 2);
+  live.sort((a, b) => rank(a) - rank(b) || (b.pinned_at ?? "").localeCompare(a.pinned_at ?? "") || b.updated_at.localeCompare(a.updated_at));
+  finished.sort((a, b) => (b.finished_at ?? "").localeCompare(a.finished_at ?? ""));
   trash.sort((a, b) => (b.deleted_at ?? "").localeCompare(a.deleted_at ?? ""));
-  return { live, trash };
+  return { live, finished, trash };
+}
+
+/** « · 24 сент.» — the tail `defaultTitle` and `nextTitle` write: a day and a short month, nothing else. */
+const DATED = /\s*·\s*\d{1,2}\s+(?:янв|февр?|мар|апр|мая|июн|июл|авг|сент?|окт|нояб?|дек)\.?$/i;
+
+/**
+ * The name of «Новая доска из этой» (D-140): the same meeting on another day —
+ * «Планёрка · 20 окт.» → «Планёрка · 27 окт.»; a name without a date gets one.
+ */
+export function nextTitle(title: string, now: Date): string {
+  const base = title.replace(DATED, "").trim() || "Доска";
+  return cleanTitle(`${base} · ${TITLE_DATE.format(now)}`, title);
+}
+
+/**
+ * The points «Новая доска из этой» takes (the same rule as `mind_board_copy`): live points
+ * with words, not ticked, not handed over. Their open sub-points go with them.
+ */
+export function openPoints(rows: readonly Note[]): Note[] {
+  const ids = new Set(rows.map((row) => row.id));
+  return rows
+    .filter((row) => (row.parent_id === null || !ids.has(row.parent_id)) && row.deleted_at === null)
+    .filter((row) => row.text.trim() !== "" && row.done_at === null && row.converted_task_id === null)
+    .sort(byPlace);
+}
+
+/** The first lines of the first points — what a closed board card shows of the board. */
+export function previewOf(rows: readonly Note[], count = 2): string[] {
+  const ids = new Set(rows.map((row) => row.id));
+  return rows
+    .filter((row) => (row.parent_id === null || !ids.has(row.parent_id)) && row.deleted_at === null && row.text.trim() !== "")
+    .sort(byPlace)
+    .slice(0, count)
+    .map((row) => row.text.trim().split("\n")[0].trim());
+}
+
+/**
+ * The board as text for a messenger (D-140): the title, the points numbered as the wall
+ * numbers them, a tick on the done ones, the sub-points under their point.
+ */
+export function boardText(title: string, rows: readonly Note[]): string {
+  const ids = new Set(rows.map((row) => row.id));
+  const live = rows.filter((row) => row.deleted_at === null && row.text.trim() !== "");
+  const top = live.filter((row) => row.parent_id === null || !ids.has(row.parent_id)).sort(byPlace);
+  const lines = [title.trim(), ""];
+  top.forEach((point, index) => {
+    const [head, ...rest] = point.text.trim().split("\n");
+    lines.push(`${index + 1}. ${point.done_at ? "✓ " : ""}${head.trim()}`);
+    for (const more of rest) if (more.trim()) lines.push(`   ${more.trim()}`);
+    for (const sub of live.filter((row) => row.parent_id === point.id).sort(byPlace)) {
+      lines.push(`   – ${sub.done_at ? "✓ " : ""}${sub.text.trim().replace(/\s*\n\s*/g, " ")}`);
+    }
+  });
+  return lines.join("\n").trim();
 }

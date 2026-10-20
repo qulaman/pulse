@@ -735,7 +735,9 @@ export type Database = {
           company_id: string
           created_at: string
           deleted_at: string | null
+          finished_at: string | null
           id: string
+          pinned_at: string | null
           title: string
           updated_at: string
           user_id: string
@@ -745,7 +747,9 @@ export type Database = {
           company_id: string
           created_at?: string
           deleted_at?: string | null
+          finished_at?: string | null
           id?: string
+          pinned_at?: string | null
           title: string
           updated_at?: string
           user_id: string
@@ -755,7 +759,9 @@ export type Database = {
           company_id?: string
           created_at?: string
           deleted_at?: string | null
+          finished_at?: string | null
           id?: string
+          pinned_at?: string | null
           title?: string
           updated_at?: string
           user_id?: string
@@ -2386,6 +2392,32 @@ export type Database = {
         Args: { seq: number; task_id: string }
         Returns: number
       }
+      mind_board_copy: {
+        Args: {
+          p_client_request_id: string
+          p_id: string
+          p_source: string
+          p_title: string
+        }
+        Returns: {
+          client_request_id: string | null
+          company_id: string
+          created_at: string
+          deleted_at: string | null
+          finished_at: string | null
+          id: string
+          pinned_at: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "mind_boards"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       next_delivery_slot: {
         Args: { p_company: string; p_now?: string }
         Returns: string
@@ -2552,7 +2584,12 @@ export type Database = {
       }
       tv_board: { Args: { p_guest?: boolean }; Returns: Json }
       tv_board_control: {
-        Args: { p_clear_point?: boolean; p_point?: string; p_view?: string }
+        Args: {
+          p_board_until?: string
+          p_clear_point?: boolean
+          p_point?: string
+          p_view?: string
+        }
         Returns: {
           applied_version: number | null
           awake_until: string | null
@@ -2594,6 +2631,7 @@ export type Database = {
         Args: {
           p_board?: string
           p_board_guest?: boolean
+          p_board_minutes?: number
           p_calendar?: string
           p_carousel?: boolean
           p_clock?: string

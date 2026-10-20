@@ -14,12 +14,13 @@ import { parentsFirst } from "@/lib/mindboard/branch";
 import { insertBoard, upsertBoardCached } from "@/lib/mindboard/mutations";
 import { withoutBranch } from "@/lib/mindboard/offline";
 
-import { insertNote, refusedBranch, REFUSED_LATER, upsertCached } from "./mutations";
+import { BRANCH_AS_POINT, insertNote, lastPointPlace, refusedBranch, REFUSED_LATER, upsertCached } from "./mutations";
 import {
   claim,
   dropBoard,
   dropCreate,
   editHeld,
+  hasCreate,
   listBoards,
   listCreates,
   listEdits,
@@ -157,6 +158,7 @@ async function sendRound(me: Me, queryClient: QueryClient): Promise<number> {
   // a sub-point goes after its point, whatever the clocks said (D-121)
   const creates = parentsFirst(await listCreates(me.userId));
   const behind = new Set<string>();
+  let asPoints = 0;
   for (const entry of creates) {
     // its point did not land in this round (sent by someone else right now, or refused):
     // the server would refuse the sub-point too — it waits for the next round
@@ -169,8 +171,7 @@ async function sendRound(me: Me, queryClient: QueryClient): Promise<number> {
       behind.add(entry.id);
       continue;
     }
-    try {
-      const note = await deliverCreate(me, entry);
+    const landed = async (note: Note) => {
       upsertCached(queryClient, me.userId, note);
       sent += 1;
       if (entry.audio && note.text.trim() === "") {
@@ -179,10 +180,29 @@ async function sendRound(me: Me, queryClient: QueryClient): Promise<number> {
         markHearing(note.id, false);
         if (words) applyWords(queryClient, me.userId, note.id, words);
       }
+    };
+    try {
+      await landed(await deliverCreate(me, entry));
     } catch (error) {
       if (isTransient(error)) return sent;
-      // the server refused this one for good: it stays on the phone until «Удалить»
-      behind.add(entry.id);
+      if (entry.parentId && refusedBranch(error) && !(await hasCreate(entry.parentId))) {
+        // its point is on the server but no point of this board any more (it became a
+        // sub-point, or moved, on another device): asked again every round it would be
+        // refused forever — the words land as a point instead (D-121)
+        const position = lastPointPlace(queryClient, me.userId, entry.boardId);
+        await patchCreate(entry.id, { parentId: null, position });
+        try {
+          await landed(await deliverCreate(me, { ...entry, parentId: null, position }));
+          if (asPoints === 0) toast(BRANCH_AS_POINT);
+          asPoints += 1;
+        } catch (again) {
+          if (isTransient(again)) return sent;
+          behind.add(entry.id);
+        }
+      } else {
+        // the server refused this one for good: it stays on the phone until «Удалить»
+        behind.add(entry.id);
+      }
     } finally {
       release(entry.id);
     }
@@ -192,8 +212,11 @@ async function sendRound(me: Me, queryClient: QueryClient): Promise<number> {
   for (const edit of await listEdits(me.userId)) {
     // this tab's own mutation is writing these fields right now: it answers for them
     if (editHeld(edit.id)) continue;
-    const { error } = await supabase.from("notes").update(edit.fields).eq("id", edit.id);
+    const { data, error } = await supabase.from("notes").update(edit.fields).eq("id", edit.id).select("id");
     if (error && isNetworkError(error)) return sent;
+    // its row has not landed yet (refused this round, or sent by another tab right now): an
+    // update of nothing is no answer — the edit waits for the next round
+    if (!error && (data ?? []).length === 0 && (await hasCreate(edit.id))) continue;
     if (error && refusedBranch(error)) {
       // a move made without network met a board that changed meanwhile (D-121): the move is
       // refused, the text and the tick owed with it still go

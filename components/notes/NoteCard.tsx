@@ -239,6 +239,8 @@ type CardProps = {
   onRetranscribe: () => void;
   /** «Напомнить»: the page opens the time sheet for this note. */
   onRemind: () => void;
+  /** «На доску» (D-140): the thought becomes a point of a board — the page opens the boards sheet. */
+  onToBoard?: () => void;
 };
 
 /**
@@ -248,7 +250,7 @@ type CardProps = {
  * Закрепить», and copy, share, delete.
  */
 export function NoteCard(props: CardProps) {
-  const { note, group, now, query, open, busy, offline, onToggle, onChangeText, onPin, onDelete, onAssign, onAnnounce, onRetranscribe, onRemind } = props;
+  const { note, group, now, query, open, busy, offline, onToggle, onChangeText, onPin, onDelete, onAssign, onAnnounce, onRetranscribe, onRemind, onToBoard } = props;
   const waiting = awaitsWords(note);
   const head = firstLine(note.text);
   const rest = restLines(note.text);
@@ -312,11 +314,11 @@ export function NoteCard(props: CardProps) {
     )
   ) : (
     <>
-      <span className={`${open ? "" : "line-clamp-2"} block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]`}>
+      <span className={`${open ? "block" : "line-clamp-2"} font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]`}>
         <Marked text={head || "Без текста"} query={query} />
       </span>
       {rest && !open ? (
-        <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">
+        <span className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-[19px] text-muted">
           <Marked text={rest} query={query} />
         </span>
       ) : null}
@@ -413,18 +415,32 @@ export function NoteCard(props: CardProps) {
       {note.audio_path ? <AudioOriginal path={note.audio_path} /> : null}
       {edited ? <Original raw={raw} /> : null}
 
-      {/* a time on the thought (D-95): set, moved or dropped in the sheet */}
+      {/* a time on the thought (D-95): set, moved or dropped in the sheet; the thought onto a board (D-140) */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={onRemind}
         data-testid="note-remind"
-        className={`mt-3 inline-flex min-h-[40px] max-w-full items-center gap-2 rounded-full border px-3.5 text-[14px] font-semibold transition-[transform,background-color] duration-[120ms] active:scale-[0.98] ${
+        className={`inline-flex min-h-[40px] max-w-full items-center gap-2 rounded-full border px-3.5 text-[14px] font-semibold transition-[transform,background-color] duration-[120ms] active:scale-[0.98] ${
           ringing ? "border-accent/50 bg-accent/10 text-accent" : "border-border/80 bg-surface-2/40 text-text/85"
         }`}
       >
         <NoteIcon name="bell" size={16} />
         <span className="nums truncate">{ringing && reminder ? reminder : note.reminded_at && reminder ? `${reminder} · ещё раз` : "Напомнить"}</span>
       </button>
+      {onToBoard ? (
+        <button
+          type="button"
+          onClick={onToBoard}
+          disabled={empty}
+          data-testid="note-to-board"
+          className="inline-flex min-h-[40px] items-center gap-2 rounded-full border border-border/80 bg-surface-2/40 px-3.5 text-[14px] font-semibold text-text/85 transition-[transform,background-color] duration-[120ms] active:scale-[0.98] disabled:opacity-40"
+        >
+          <NoteIcon name="board" size={16} />
+          На доску
+        </button>
+      ) : null}
+      </div>
 
       {/* what the thought can become — the same three-button row as a task's card */}
       <div className="mt-4 grid grid-cols-3 gap-2">
@@ -497,7 +513,7 @@ export function ConvertedCard({ note, task, now, query }: { note: Note; task: Ta
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
           <Marked text={firstLine(note.text) || "Без текста"} query={query} />
         </span>
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
@@ -556,7 +572,7 @@ export function TrashCard({
         <NoteIcon name="trash" size={13} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] text-text/70">
           <Marked text={firstLine(note.text) || (note.audio_path ? "Голосовая заметка" : "Без текста")} query={query} />
         </span>
         <span className="mt-1 block text-[12px] leading-4 text-muted">
@@ -611,10 +627,10 @@ export function PendingCard({ note, voiced, now, onDiscard }: { note: Note; voic
         <NoteIcon name={voiced ? "wave" : "cloud"} size={13} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 block font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
+        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">
           {head || (voiced ? "Голосовая заметка" : "Без текста")}
         </span>
-        {rest ? <span className="mt-1 line-clamp-2 block whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
+        {rest ? <span className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4">
           <Dot tone="warn" pulse />
           <span style={{ color: "var(--warn)" }}>{voiced ? "Голос на телефоне — отправлю, как появится связь" : "Ждёт связи — отправлю сам"}</span>

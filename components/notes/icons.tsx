@@ -31,7 +31,11 @@ export type NoteIconName =
   | "plus"
   | "wall"
   | "indent"
-  | "outdent";
+  | "outdent"
+  | "pencil"
+  | "stack"
+  | "flag"
+  | "move";
 
 const PATHS: Record<NoteIconName, ReactNode> = {
   mic: (
@@ -109,6 +113,19 @@ const PATHS: Record<NoteIconName, ReactNode> = {
       <path d="M9 20.5h6M12 16.5v4" />
     </>
   ),
+  // a new name (D-140)
+  pencil: <path d="M4.5 19.5l1-4.5L15.8 4.7a2 2 0 0 1 2.8 0l.7.7a2 2 0 0 1 0 2.8L9 18.5zM13.5 7l3.5 3.5" />,
+  // a board made of another: two sheets, the front one new (D-140)
+  stack: (
+    <>
+      <rect x="7.5" y="7.5" width="13" height="13" rx="2.2" />
+      <path d="M16.5 4.5h-10a2 2 0 0 0-2 2v10M11 14h6M14 11v6" />
+    </>
+  ),
+  // the meeting is over (D-140)
+  flag: <path d="M6 21V4.5M6 5h11l-2.5 4L17 13H6" />,
+  // a line goes to another board (D-140)
+  move: <path d="M4 12h11M11 7.5 15.5 12 11 16.5M19.5 5v14" />,
 };
 
 export function NoteIcon({ name, size = 16, className = "" }: { name: NoteIconName; size?: number; className?: string }) {

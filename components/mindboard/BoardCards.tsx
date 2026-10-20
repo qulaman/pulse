@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState, type ReactNode } from "react";
 
 import { NoteIcon } from "@/components/notes/icons";
 import { Button } from "@/components/ui/Button";
@@ -23,21 +24,52 @@ function BoardGlyph({ lit }: { lit: boolean }) {
 }
 
 /**
- * A board in the «Доски» tab (D-102 §3): the title, how many points and how many ticked,
- * the lamp «на стене» while it is up in the office. A tap opens the board.
+ * A board in the «Доски» tab (D-102 §3, D-140): the title, its first points, how many points
+ * and how many ticked, «закреплена», the lamp «на стене» while it is up in the office. A tap
+ * opens the board.
  */
-export function BoardCard({ board, summary, onWall, now }: { board: MindBoard; summary: BoardSummary | undefined; onWall: boolean; now: Date }) {
+export function BoardCard({
+  board,
+  summary,
+  preview = [],
+  onWall,
+  now,
+}: {
+  board: MindBoard;
+  summary: BoardSummary | undefined;
+  /** The first lines of its first points. */
+  preview?: string[];
+  onWall: boolean;
+  now: Date;
+}) {
+  // a base older than the client has no such field: not finished (D-140)
+  const finished = Boolean(board.finished_at);
   return (
     <Link
       href={`/notes/b/${board.id}`}
       className="task-card flex items-start gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5 transition-transform duration-[120ms] active:scale-[0.99]"
       data-testid="board-card"
       data-board-id={board.id}
+      data-closed={finished || undefined}
     >
       <BoardGlyph lit={onWall} />
       <span className="min-w-0 flex-1">
-        <span className="line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em]">{board.title}</span>
+        <span className={`line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${finished ? "text-text/70" : ""}`}>{board.title}</span>
+        {preview.length > 0 ? (
+          <span className="mt-1 flex flex-col text-[13px] leading-[18px] text-muted" data-testid="board-card-preview">
+            {preview.map((line, index) => (
+              <span key={index} className="truncate">
+                {index + 1}. {line}
+              </span>
+            ))}
+          </span>
+        ) : null}
         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+          {board.pinned_at && !finished ? (
+            <span className="inline-flex shrink-0 items-center gap-1 text-accent" data-testid="board-card-pinned">
+              <NoteIcon name="pin" size={11} />
+            </span>
+          ) : null}
           <span className="min-w-0 truncate" data-testid="board-card-summary">{summaryLine(summary)}</span>
           {onWall ? (
             <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-accent" data-testid="board-card-wall">
@@ -54,6 +86,44 @@ export function BoardCard({ board, summary, onWall, now }: { board: MindBoard; s
         </svg>
       </span>
     </Link>
+  );
+}
+
+/**
+ * «Завершённые» (D-140): boards whose meeting is over, at the bottom of the tab, folded — the
+ * way back to «что решили в прошлый вторник» without them crowding the live ones.
+ */
+export function FinishedBoards({ count, children, open: initial = false }: { count: number; children: ReactNode; open?: boolean }) {
+  const [open, setOpen] = useState(initial);
+  return (
+    <div className="mt-3" data-testid="boards-finished">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((was) => !was)}
+        data-testid="boards-finished-toggle"
+        className="flex min-h-[40px] w-full items-center gap-2 px-1 text-left font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted"
+      >
+        <NoteIcon name="flag" size={13} />
+        Завершённые
+        <span className="nums">{count}</span>
+        <svg
+          aria-hidden
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`ml-auto transition-transform duration-[160ms] ${open ? "rotate-180" : ""}`}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open ? <div className="mt-1 flex flex-col gap-2">{children}</div> : null}
+    </div>
   );
 }
 

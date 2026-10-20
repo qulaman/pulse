@@ -56,7 +56,7 @@ export function AssignSheet({ note, onClose, me }: { note: Note | null; onClose:
         ) : null
       }
       onPick={(person) => {
-        if (note) assign.mutate({ note, person, forceNow: now });
+        if (note) assign.mutate({ note, person, forceNow: now, client_request_id: crypto.randomUUID() });
       }}
     />
   );

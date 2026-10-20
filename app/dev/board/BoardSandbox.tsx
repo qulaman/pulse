@@ -5,21 +5,31 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BoardPresenter } from "@/components/mindboard/BoardPresenter";
-import { BoardScreen, type BoardActions, type BoardLines } from "@/components/mindboard/BoardScreen";
+import { BoardScreen, type AimKey, type BoardActions, type BoardLines } from "@/components/mindboard/BoardScreen";
+import { WallSheet } from "@/components/mindboard/WallSheet";
 import { TabBar } from "@/components/TabBar";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { toast } from "@/components/ui/Toast";
+import { afterPlace } from "@/lib/mindboard/branch";
 import { nextPlaceIn } from "@/lib/mindboard/tree";
+import { wallBoardOf } from "@/lib/mindboard/wall";
 import type { Dictation, DictationStage, Receipt } from "@/lib/notes/dictation";
 import { firstLine } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
 import { tvKeys, type TvState } from "@/lib/tv/queries";
+import type { BoardView } from "@/lib/tv/state";
 
 import { BOARD_CASES, BOARD_ID, buildBoard, COMPANY, DIRECTOR, wallRow, type BoardCase } from "./fixtures";
 
 const RECEIPT_MS = 4_000;
 /** What the sandbox's «STT» hears, in turn. */
 const HEARD = ["Позвонить поставщику бетона", "Подготовить отчёт к пятнице", "Собрать цифры по регионам", "Проверить договор аренды"];
+/** Whom «Раздать поручения» picks here, in turn: the people sheet needs a login. */
+const PEOPLE = [
+  { id: "p-marat", full_name: "Марат Оспанов" },
+  { id: "p-aigul", full_name: "Айгуль Сапарова" },
+  { id: "p-erlan", full_name: "Ерлан Байжанов" },
+];
 
 /**
  * The dictaphone of the screen without a microphone or a network: the same contract as
@@ -153,10 +163,15 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
   const [hearing, setHearing] = useState<ReadonlySet<string>>(() => new Set(fixture.hearing));
   const [onWall, setOnWall] = useState(fixture.wall.onWall);
   const [spot, setSpot] = useState<string | null>(fixture.wall.spot);
-  const [aimed, setAimed] = useState<string | null>(null);
+  const [aimed, setAimed] = useState<AimKey>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const aimRef = useRef<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
+  const [finished, setFinished] = useState<string | null>(null);
+  const [view, setView] = useState<BoardView>("list");
+  const [wallOpen, setWallOpen] = useState(false);
+  const aimRef = useRef<AimKey>(null);
   const heardCount = useRef(0);
+  const picked = useRef(0);
 
   const wall = useMemo(() => (onWall ? wallRow(now, spot) : null), [onWall, now, spot]);
   useSeededWall(wall);
@@ -198,7 +213,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
     [show],
   );
 
-  const add = useCallback((text: string, parentId: string | null, voice: boolean) => {
+  const add = useCallback((text: string, parentId: string | null, voice: boolean, place: number | null = null) => {
     const at = new Date().toISOString();
     const id = crypto.randomUUID();
     const row: Note = {
@@ -211,7 +226,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
       inbox_item_id: null,
       pinned: false,
       board_id: BOARD_ID,
-      position: nextPlaceIn(rowsRef.current.filter((note) => note.deleted_at === null), parentId),
+      position: place ?? nextPlaceIn(rowsRef.current.filter((note) => note.deleted_at === null), parentId),
       parent_id: parentId,
       done_at: null,
       converted_task_id: null,
@@ -225,17 +240,22 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
       updated_at: at,
     };
     setRows((list) => [...list, row]);
+    // the next line said here goes after this one, before the state has caught up
+    rowsRef.current = [...rowsRef.current, row];
     return id;
   }, []);
 
   const dictation = useFakeDictation(which === "recording", () => {
-    const parentId = aimRef.current;
-    hear(add("", parentId, true), parentId);
+    const key = aimRef.current;
+    const parentId = key?.startsWith("sub:") ? key.slice(4) : null;
+    const after = key?.startsWith("after:") ? key.slice(6) : null;
+    const live = rowsRef.current.filter((note) => note.deleted_at === null);
+    hear(add("", parentId, true, after ? afterPlace(live, after) : null), parentId);
   });
 
-  const aim = (parentId: string | null) => {
-    aimRef.current = parentId;
-    setAimed(parentId);
+  const aim = (key: AimKey) => {
+    aimRef.current = key;
+    setAimed(key);
   };
 
   const edit = (id: string, fields: Partial<Note>) => setRows((list) => list.map((row) => (row.id === id ? { ...row, ...fields } : row)));
@@ -265,6 +285,34 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
     rename: setTitle,
     deleteBoard: () => toast("Доска в корзине — в песочнице она остаётся"),
     aim,
+    writeMany: (points, at) => {
+      if (at.parent) {
+        for (const text of points.flatMap((point) => [point.text, ...point.children]).filter((line) => line.trim())) add(text, at.parent, false);
+        return;
+      }
+      let last: number | null = null;
+      for (const point of points) {
+        const live = rowsRef.current.filter((note) => note.deleted_at === null);
+        last = at.after ? afterPlace(live, at.after, last) : null;
+        const id = add(point.text, null, false, last);
+        for (const child of point.children) add(child, id, false);
+      }
+      show({ tone: "ok", eyebrow: "Записал", headline: `${points.length} пунктов`, line: at.after ? "Встали после пункта" : "Встали в конец доски" });
+    },
+    pin: (on) => setPinned(on ? new Date().toISOString() : null),
+    finish: (on) => setFinished(on ? new Date().toISOString() : null),
+    copyOpen: () => toast("Новая доска из открытых — в песочнице не создаётся"),
+    move: (row) => {
+      setRows((list) => list.filter((note) => note.id !== row.id && note.parent_id !== row.id));
+      toast("Пункт ушёл на другую доску — в песочнице он просто исчез");
+    },
+    openWall: () => setWallOpen(true),
+    pickPerson: (_row, then) => then(PEOPLE[picked.current++ % PEOPLE.length]),
+    assignMany: async (picks) => {
+      for (const pick of picks) edit(pick.row.id, { converted_task_id: `t-${pick.row.id}` });
+      toast(`Поручено ${picks.length} — в песочнице задачи никуда не ушли`);
+      return [];
+    },
   };
 
   const live = rows.filter((row) => row.deleted_at === null);
@@ -277,13 +325,16 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
     hearing,
   };
   const points = live.filter((row) => row.parent_id === null && row.text.trim());
+  const preview = wallBoardOf({ id: BOARD_ID, title, updated_at: now.toISOString() }, live.filter((row) => !fixture.phone.includes(row.id)), { view, focus: spot }, () => null);
+  const until = onWall && wall?.board_until ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" }).format(new Date(wall.board_until)) : null;
 
   return (
     <div className="app-shell flex min-h-dvh flex-col" data-sandbox-case={which}>
       <BoardScreen
-        board={{ id: BOARD_ID, title }}
+        board={{ id: BOARD_ID, title, pinned_at: pinned, finished_at: finished }}
         lines={lines}
-        wall={{ onWall, until: onWall && wall?.board_until ? new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" }).format(new Date(wall.board_until)) : null, spot, ready: true }}
+        wall={{ onWall, until, spot, ready: true, preview: preview.items.length > 0 ? preview : null }}
+        quiet={null}
         now={now}
         taskOf={() => undefined}
         dictation={dictation}
@@ -305,6 +356,24 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
         }
         presenter={(agenda) => <BoardPresenter variant="board" boardId={BOARD_ID} points={agenda} now={now} />}
         sheets={
+          <>
+          <WallSheet
+            open={wallOpen}
+            onClose={() => setWallOpen(false)}
+            data={preview}
+            now={now}
+            onWall={onWall}
+            until={onWall && wall?.board_until ? new Date(wall.board_until) : null}
+            busy={false}
+            onView={setView}
+            onShow={() => setOnWall(true)}
+            onExtend={() => toast("+30 мин — в песочнице время не идёт")}
+            onEject={() => {
+              setWallOpen(false);
+              setOnWall(false);
+              setSpot(null);
+            }}
+          />
           <nav aria-label="Случаи песочницы" className="mt-10 border-t border-border/60 pt-3 text-[13px] leading-5 text-muted" data-testid="sandbox-cases">
             <p className="font-display font-semibold text-accent">/dev/board</p>
             <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
@@ -328,6 +397,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
               </p>
             ) : null}
           </nav>
+          </>
         }
       />
       <TabBar role="director" />

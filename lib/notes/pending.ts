@@ -125,7 +125,7 @@ export async function keepCreate(entry: PendingCreate): Promise<boolean> {
   return ok;
 }
 
-export async function patchCreate(id: string, fields: Partial<Pick<PendingCreate, "audioPath" | "inboxId" | "text">>): Promise<void> {
+export async function patchCreate(id: string, fields: Partial<Pick<PendingCreate, "audioPath" | "inboxId" | "text" | "parentId" | "position">>): Promise<void> {
   const current = await run<PendingCreate | undefined>(CREATES, "readonly", (store) => store.get(id));
   if (!current.value) return;
   await run(CREATES, "readwrite", (store) => store.put({ ...current.value, ...fields }));

@@ -42,8 +42,10 @@ const MAP_MARGIN = 1.6;
  * только что сказанный минуту мягко светится. Рядом с поручённым — нейтральное «→ Марат»
  * (D-45). При госте доски нет — часы и «скрыта» (D-33). Движение — только opacity и transform.
  */
-export function TvBoard({ data, now }: { data: TvBoardData | null; now: Date }) {
-  const aspect = useSyncExternalStore(subscribeResize, clientAspect, serverAspect);
+export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null; now: Date; aspect?: number }) {
+  // the preview on the phone (D-140) draws the wall's own proportions, not the phone's
+  const screen = useSyncExternalStore(subscribeResize, clientAspect, serverAspect);
+  const aspect = fixed ?? screen;
   const still = useReducedMotion() ?? false;
   const frame = useMemo(() => boardFrame(aspect), [aspect]);
   const board = data?.hidden ? null : (data?.board ?? null);
