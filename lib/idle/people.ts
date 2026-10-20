@@ -1,4 +1,4 @@
-import { OPEN_CREW, urgencyOf, type CrewTask } from "@/lib/idle/look";
+import { HELD_CREW, OPEN_CREW, urgencyOf, type CrewTask } from "@/lib/idle/look";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
 /**
@@ -41,6 +41,8 @@ export type BoardRow = {
   decline_reason?: string | null;
   /** an unread word in the thread (lib/pulse/board.ts `hasUnread`) */
   unread?: boolean;
+  /** a task held for the morning: when it goes out (D-139) */
+  scheduled_send_at?: string | null;
 };
 
 /**
@@ -53,7 +55,7 @@ export function tasksOf(rows: BoardRow[], now: number): Record<string, CrewTask[
   const at = new Date(now);
   for (const row of rows) {
     if (!row.assignee_id) continue;
-    if (!OPEN_CREW.includes(row.status) && row.status !== "done") continue;
+    if (!OPEN_CREW.includes(row.status) && row.status !== "done" && row.status !== HELD_CREW) continue;
     (byPerson[row.assignee_id] ??= []).push({
       id: row.id,
       title: row.title,
@@ -63,6 +65,7 @@ export function tasksOf(rows: BoardRow[], now: number): Record<string, CrewTask[
       request: row.request ?? null,
       unread: Boolean(row.unread),
       reason: row.decline_reason ?? null,
+      sendAt: row.status === HELD_CREW ? (row.scheduled_send_at ?? null) : null,
       href: `/tasks/${row.id}`,
     });
   }

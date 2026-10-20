@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, type ReactNode } from "react";
 
@@ -10,6 +11,7 @@ import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
+import { peopleQuery } from "@/lib/people/queries";
 import type { DeskAction } from "@/lib/tasks/desk";
 import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -28,6 +30,7 @@ const MORE_LABEL: Partial<Record<DeskAction, string>> = {
   keep: "Оставить прежний срок",
   handoff: "Передать предложенному",
   nudge: "Напомнить",
+  reissue: "Выдать снова",
 };
 
 function firstName(full: string | null | undefined): string {
@@ -75,6 +78,7 @@ export function useDirectorControls({
 } {
   const router = useRouter();
   const [sheet, setSheet] = useState<SheetState>(null);
+  const queryClient = useQueryClient();
 
   const byId = (id: string) => tasks.find((task) => task.id === id) ?? null;
   const named = (text: string, task: TaskWithPeople) => {
@@ -82,25 +86,21 @@ export function useDirectorControls({
     return who ? `${text} · ${who}` : text;
   };
 
-  // the same actions with a receipt in words: the card leaves under the thumb, the toast says where it went
+  // the same actions with a receipt in words: the card leaves under the thumb, the toast says where it
+  // went. «Принято», «Снова отправлено», «Отозвано» and «Удалено» are the mutation's own, with
+  // «Отменить» (D-139); «Выдать снова» opens the new task from its toast.
   const actions: TaskActions = {
     ...base,
     transition: (input) => {
       const task = byId(input.taskId);
       base.transition(input);
-      if (!task) return;
-      if (input.toStatus === "done") toast(named("Принято", task));
-      else if (input.toStatus === "rework") toast(named("На доработку", task));
-      else if (input.toStatus === "sent") toast(named("Снова отправлено", task));
+      if (task && input.toStatus === "rework") toast(named("На доработку", task));
     },
     extend: (input) => {
       base.extend(input);
       toast(input.deadlineIso ? `Срок: ${humanAqtobe(new Date(input.deadlineIso), now)}` : "Теперь без срока");
     },
-    revoke: (taskId) => {
-      base.revoke(taskId);
-      toast("Отозвано");
-    },
+    reissue: (input) => base.reissue({ ...input, onOpen: (id) => router.push(`/tasks/${id}`) }),
   };
 
   const press = (action: DeskAction, task: TaskWithPeople) => {
@@ -159,6 +159,30 @@ export function useDirectorControls({
       case "remove":
         setSheet({ name: "delete", taskId: task.id });
         return;
+      case "reissue": {
+        // the same person only while he still works here — the team as the phone knows it (the
+        // director's screens hold it already; asked for only when it is not there)
+        void queryClient
+          .ensureQueryData(peopleQuery)
+          .catch(() => null)
+          .then((people) => {
+            const left = people ? !people.some((p) => p.id === task.assignee_id && p.is_active) : false;
+            // nobody to give it to (no assignee, or the person left): the picker first
+            if (!task.assignee_id || !task.assignee?.full_name || left) {
+              setSheet({ name: "reissueTo", taskId: task.id });
+              return;
+            }
+            const person = { id: task.assignee_id, full_name: task.assignee.full_name };
+            // a deadline already behind would reach the person late at birth: a new one first
+            if (reassignNeedsDeadline(task.deadline, new Date())) {
+              setSheet({ name: "reissueDeadline", taskId: task.id, passTo: { person, note: "" } });
+              return;
+            }
+            haptic(12);
+            actions.reissue({ task, assigneeId: person.id, assigneeName: person.full_name, deadlineIso: task.deadline });
+          });
+        return;
+      }
       default:
         setSheet({ name: action, taskId: task.id });
     }
@@ -203,11 +227,11 @@ export function useDirectorControls({
         afterRemove={afterRemove}
         suggestedId={sheetTask.status === "declined" ? (suggestionOf(sheetTask.id)?.id ?? null) : null}
         passTo={sheet?.passTo ?? null}
-        onNeedsDeadline={(passTo) => {
+        onNeedsDeadline={(passTo, then) => {
           const taskId = sheetTask.id;
           // the picker leaves first, «Срок для …» slides in after it
           setSheet(null);
-          setTimeout(() => setSheet({ name: "passDeadline", taskId, passTo }), SHEET_CLOSE_MS);
+          setTimeout(() => setSheet({ name: then, taskId, passTo }), SHEET_CLOSE_MS);
         }}
       />
       {question ? (
@@ -240,6 +264,7 @@ export function useDirectorControls({
                 onClick={() => {
                   setSheet(null);
                   // the next sheet slides in after this one has gone
+                  // «Выдать снова» may open «Кому выдать?» or «Срок для …»: it waits like the other sheets
                   const instant = action === "approve" || action === "insist" || action === "open" || action === "grant" || action === "keep" || action === "nudge" || action === "sendNow";
                   setTimeout(() => press(action, sheetTask), instant ? 0 : SHEET_CLOSE_MS);
                 }}

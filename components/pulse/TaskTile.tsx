@@ -13,7 +13,7 @@ import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { Composer } from "@/components/tasks/thread/Composer";
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
-import { LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
+import { hasUnread, LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
 import { untilWords } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, TEXT } from "@/lib/tasks/status-text";
@@ -63,6 +63,8 @@ export type TaskTileProps = {
   readOnly?: boolean;
   /** Public screens without consent: no names (FRONTEND «Анонимизация»). */
   anonymized?: boolean;
+  /** «⋯» in the corner: every move the task allows (D-139) — the long press made visible. */
+  onMore?: () => void;
 };
 
 function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string {
@@ -93,16 +95,19 @@ function contextOf(task: BoardTask, lane: Lane, now: Date, meId: string): string
  * of context the lane needs, and the director's quick actions right on the tile. A tap
  * on the text opens the full card in place; the tile never navigates on its own.
  */
-export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, onReply, showReply = false, readOnly = false, anonymized = false }: TaskTileProps) {
+export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, actions, companyId, meId, onReply, showReply = false, readOnly = false, anonymized = false, onMore }: TaskTileProps) {
   const [rework, setRework] = useState(false);
   const tone: Tone = leaving ? (task.status === "done" ? "gold" : "muted") : LANE_TONE[lane];
   const color = TONE_VAR[tone];
   const who = anonymized ? "Сотрудник" : whoOf(task);
   const word = leaving ? (task.status === "done" ? "принято" : task.status === "revoked" ? "отозвана" : "закрыта") : LANE_WORD[lane];
   const interactive = !readOnly && !leaving;
+  const more = interactive && onMore ? onMore : null;
+  // handed in with words — a report, a photo: they ride on the card of приёмка (D-139)
+  const report = lane === "review" && hasUnread(task, meId) ? messageOf(task, meId, now) : null;
 
   const header = (
-    <span className="flex items-center justify-between gap-2">
+    <span className={`flex items-center justify-between gap-2 ${more ? "pr-9" : ""}`}>
       <span className="flex min-w-0 items-center gap-1.5 text-[13px] leading-4 text-muted">
         {fresh && !leaving ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /> : null}
         <span className="truncate">{who}</span>
@@ -138,6 +143,20 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
         style={{ background: `radial-gradient(circle, color-mix(in srgb, ${color} ${leaving ? 28 : 14}%, transparent), transparent 70%)`, transition: "background 200ms" }}
       />
 
+      {more ? (
+        <button
+          type="button"
+          aria-label="Все действия"
+          onClick={more}
+          // the deck reads a long press from the card; a press on this button is a plain tap
+          onPointerDown={(event) => event.stopPropagation()}
+          className="absolute right-2 top-2 z-10 flex h-10 w-10 items-center justify-center rounded-full text-[20px] leading-none text-muted transition-colors duration-[120ms] active:bg-surface-2"
+          data-testid="tile-more"
+        >
+          ⋯
+        </button>
+      ) : null}
+
       {expanded && interactive ? (
         <div className="relative p-3 pl-4">
           <button type="button" onClick={onToggle} aria-expanded className="block w-full py-1 text-left">
@@ -159,6 +178,12 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
                   {contextOf(task, lane, now, meId)}
                 </span>
               )}
+              {report ? (
+                <span className="mt-1 flex items-center gap-1.5 text-[14px] leading-[18px] text-text/85" data-testid="tile-report">
+                  <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
+                  <span className="truncate">«{report}»</span>
+                </span>
+              ) : null}
             </button>
           ) : (
             <div>

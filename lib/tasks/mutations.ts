@@ -5,11 +5,13 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError, NetworkError } from "@/lib/net";
-import { dequeue, enqueue } from "@/lib/outbox";
+import { dequeue, enqueue, release } from "@/lib/outbox";
 import type { BoardTask } from "@/lib/pulse/board";
 import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Json } from "@/lib/supabase/types";
+import { voiceApi, VoiceApiError } from "@/lib/voice/api";
+import { forgetHold, holdForUndo, Undone } from "./grace";
 import {
   markBoardRead,
   taskKeys,
@@ -42,8 +44,10 @@ async function postJson(path: string, payload: unknown): Promise<unknown> {
     });
   } catch {
     // the mutation pauses and resumes when the network is back (QueryProvider, networkMode
-    // offlineFirst); the persisted copy survives a closed tab and replays on the next start
+    // offlineFirst); the persisted copy survives a closed tab and replays on the next start.
+    // A tap fresh out of its «Отменить» window waited there unseen; now it really waits (D-139)
     enqueue({ id: key, path, payload });
+    release(key);
     throw new NetworkError("Нет связи. Отправлю, как появится");
   }
   dequeue(key);
@@ -102,6 +106,53 @@ function restoreTasks(queryClient: QueryClient, snapshot: ReturnType<typeof snap
   for (const [key, data] of snapshot) queryClient.setQueryData(key, data);
 }
 
+/** One row back to how a snapshot had it — in a list at its old place, or the task's own object. */
+export function restoreOne(before: unknown, now: unknown, taskId: string): unknown {
+  if (Array.isArray(before) && Array.isArray(now)) {
+    const index = (before as TaskWithPeople[]).findIndex((task) => task?.id === taskId);
+    if (index === -1) return now;
+    const row = before[index];
+    const at = (now as TaskWithPeople[]).findIndex((task) => task?.id === taskId);
+    const copy = [...now];
+    if (at >= 0) copy[at] = row;
+    else copy.splice(Math.min(index, copy.length), 0, row);
+    return copy;
+  }
+  if (before && typeof before === "object" && (before as { id?: unknown }).id === taskId) return before;
+  return now;
+}
+
+/**
+ * A tap taken back or refused inside its window (D-139): only that task goes back. The whole
+ * snapshot would also take back a neighbour's tap still in its own window and whatever the
+ * socket brought meanwhile.
+ */
+function rollbackTask(queryClient: QueryClient, snapshot: ReturnType<typeof snapshotTasks>, taskId: string) {
+  for (const [key, before] of snapshot) queryClient.setQueryData(key, (now: unknown) => restoreOne(before, now, taskId));
+}
+
+/**
+ * The patches of the «Отменить» windows open right now (D-139), by call. The server has not
+ * heard of these taps yet, so any list fetched meanwhile — a new task's refetch, a resubscribe,
+ * another screen — brings the task back as it was; the patch goes over it again at once.
+ */
+const overlays = new Map<string, (old: unknown) => unknown>();
+const overlaid = new WeakSet<QueryClient>();
+
+function keepOverlays(queryClient: QueryClient) {
+  if (overlaid.has(queryClient)) return;
+  overlaid.add(queryClient);
+  queryClient.getQueryCache().subscribe((event) => {
+    if (overlays.size === 0 || event.type !== "updated" || event.action.type !== "success") return;
+    // our own setQueryData is `manual`: only a fetch is laid over, so this never loops
+    if (event.action.manual || event.query.queryKey[0] !== taskKeys.root[0]) return;
+    const data = event.query.state.data;
+    let next: unknown = data;
+    for (const apply of overlays.values()) next = apply(next);
+    if (next !== data) queryClient.setQueryData(event.query.queryKey, next);
+  });
+}
+
 /** The board row carries what the task row does not — a request for time, a reminder (D-128). */
 function patchBoard(queryClient: QueryClient, taskId: string, patch: Partial<BoardTask>) {
   queryClient.setQueryData<BoardTask[]>(taskKeys.board(), (old) =>
@@ -138,6 +189,8 @@ export type TransitionInput = {
   comment?: string;
   /** «Выполнено»: the report rides inside the transition — one call, one transaction (D-64 §3). */
   report?: Report;
+  /** The receipt of a director's «Принять» / «Настоять»: the call waits out «Отменить» (D-139). */
+  undo?: string;
 };
 
 /** The words and the photo of a handover; `partial` — «сделано не всё» (D-128). */
@@ -148,53 +201,80 @@ export function useTransition() {
 
   return useMutation({
     mutationFn: async (input: TransitionInput) => {
-      await postJson(`/api/tasks/${input.taskId}/transition`, {
+      const path = `/api/tasks/${input.taskId}/transition`;
+      const payload = {
         to_status: input.toStatus,
         reason: input.reason,
         comment: input.comment,
         suggest_assignee_id: input.suggestAssigneeId,
         report: input.report,
         client_request_id: input.requestId,
-      });
+      };
+      // the lists show the move already; the server hears of it once «Отменить» is over (D-139)
+      if (input.undo) await holdForUndo({ id: input.requestId, path, payload, taskId: input.taskId, text: input.undo });
+      await postJson(path, payload);
     },
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.root });
       const snapshot = snapshotTasks(queryClient);
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-        patchCached(old, input.taskId, { status: input.toStatus }),
-      );
+      const patch = (old: unknown) => patchCached(old, input.taskId, { status: input.toStatus });
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      if (input.undo) overlays.set(input.requestId, patch);
       return { snapshot };
     },
-    onError: (error, _input, context) => {
-      if (context) restoreTasks(queryClient, context.snapshot);
+    onError: (error, input, context) => {
+      if (input.undo) overlays.delete(input.requestId);
+      if (context) {
+        if (input.undo) rollbackTask(queryClient, context.snapshot, input.taskId);
+        else restoreTasks(queryClient, context.snapshot);
+      }
+      if (error instanceof Undone) return;
       toast(error instanceof Error ? error.message : GENERIC_ERROR);
     },
-    onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
+    onSettled: (_data, _error, input) => {
+      settleWindow(input.requestId);
+      invalidateTasks(queryClient, input.taskId);
+    },
   });
+}
+
+/** The call is over, one way or another: its window's patch and mark are not needed any more. */
+function settleWindow(requestId: string) {
+  overlays.delete(requestId);
+  forgetHold(requestId);
 }
 
 export function useRevoke() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ taskId, requestId }: { taskId: string; requestId: string }) => {
-      await postJson(`/api/tasks/${taskId}/revoke`, {
-        client_request_id: requestId,
-      });
+    mutationFn: async ({ taskId, requestId, undo }: { taskId: string; requestId: string; undo?: string }) => {
+      const path = `/api/tasks/${taskId}/revoke`;
+      const payload = { client_request_id: requestId };
+      if (undo) await holdForUndo({ id: requestId, path, payload, taskId, text: undo });
+      await postJson(path, payload);
     },
-    onMutate: async ({ taskId }) => {
+    onMutate: async ({ taskId, requestId, undo }) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.root });
       const snapshot = snapshotTasks(queryClient);
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) =>
-        patchCached(old, taskId, { status: "revoked" }),
-      );
+      const patch = (old: unknown) => patchCached(old, taskId, { status: "revoked" });
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      if (undo) overlays.set(requestId, patch);
       return { snapshot };
     },
-    onError: (error, _input, context) => {
-      if (context) restoreTasks(queryClient, context.snapshot);
+    onError: (error, { taskId, requestId, undo }, context) => {
+      if (undo) overlays.delete(requestId);
+      if (context) {
+        if (undo) rollbackTask(queryClient, context.snapshot, taskId);
+        else restoreTasks(queryClient, context.snapshot);
+      }
+      if (error instanceof Undone) return;
       toast(error instanceof Error ? error.message : GENERIC_ERROR);
     },
-    onSettled: (_data, _error, { taskId }) => invalidateTasks(queryClient, taskId),
+    onSettled: (_data, _error, { taskId, requestId }) => {
+      settleWindow(requestId);
+      invalidateTasks(queryClient, taskId);
+    },
   });
 }
 
@@ -494,24 +574,127 @@ function dropCached(old: unknown, taskId: string): unknown {
   return old;
 }
 
-/** «Удалить»: the order leaves every list at once; the server call follows. */
+/**
+ * «Удалить»: the order leaves every list at once; the server call follows the «Отменить»
+ * window (D-139). The key rides in the body only to be the outbox's key — the route has no
+ * body, and deleting what is already gone answers «ok», so a repeat is harmless.
+ */
 export function useDeleteTask() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ taskId }: { taskId: string }) => {
-      await postJson(`/api/tasks/${taskId}/delete`, {});
+    mutationFn: async ({ taskId, requestId, undo }: { taskId: string; requestId: string; undo?: string }) => {
+      const path = `/api/tasks/${taskId}/delete`;
+      const payload = { client_request_id: requestId };
+      if (undo) await holdForUndo({ id: requestId, path, payload, taskId, text: undo });
+      await postJson(path, payload);
     },
-    onMutate: async ({ taskId }) => {
+    onMutate: async ({ taskId, requestId, undo }) => {
       await queryClient.cancelQueries({ queryKey: taskKeys.root });
       const snapshot = snapshotTasks(queryClient);
-      queryClient.setQueriesData({ queryKey: taskKeys.root }, (old: unknown) => dropCached(old, taskId));
+      const patch = (old: unknown) => dropCached(old, taskId);
+      queryClient.setQueriesData({ queryKey: taskKeys.root }, patch);
+      if (undo) overlays.set(requestId, patch);
       return { snapshot };
     },
-    onSuccess: () => toast("Удалил"),
-    onError: (error, _input, context) => {
-      if (context) restoreTasks(queryClient, context.snapshot);
+    // with a window the receipt was its toast
+    onSuccess: (_data, { undo }) => {
+      if (!undo) toast("Удалил");
+    },
+    onError: (error, { taskId, requestId, undo }, context) => {
+      if (undo) overlays.delete(requestId);
+      if (context) {
+        if (undo) rollbackTask(queryClient, context.snapshot, taskId);
+        else restoreTasks(queryClient, context.snapshot);
+      }
+      if (error instanceof Undone) return;
       toast(error instanceof Error ? error.message : GENERIC_ERROR);
+    },
+    onSettled: (_data, error, { requestId }) => {
+      settleWindow(requestId);
+      // taken back: the task is as it was everywhere already — nothing to read anew
+      if (!(error instanceof Undone)) void queryClient.invalidateQueries({ queryKey: taskKeys.root });
+    },
+  });
+}
+
+export type ReissueInput = {
+  /** the closed task to hand out again */
+  task: TaskWithPeople;
+  assigneeId: string;
+  assigneeName: string;
+  /** null — without a deadline */
+  deadlineIso: string | null;
+  /** «Открыть» on the toast: the new task's screen */
+  onOpen?: (taskId: string) => void;
+};
+
+type ReissueResult = { taskId: string | null; scheduled: boolean };
+
+/**
+ * «Выдать снова» (D-139): a closed task — revoked by mistake, or accepted and needed again —
+ * goes out as a new one: the same words, the same recording (принцип 5), to the same person or
+ * the one picked, through the batch every task is born in (`confirm_voice_batch`, as «Поручить»
+ * of a note, D-108). The old one stays as it was. Outside the delivery window the new one waits
+ * for the morning (D-38). Online only, as «Поручить»: a task handed out «later» is worse than an
+ * honest «нет связи», and the button stays where it was.
+ */
+export function useReissue() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: "always",
+    // an answer now or an honest «нет связи» — never a task handed out a minute later by a retry
+    retry: false,
+    mutationFn: async (input: ReissueInput & { requestId: string }): Promise<ReissueResult> => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new NetworkError();
+      const { task } = input;
+      const words = [task.title, task.body].filter(Boolean).join("\n");
+      // what the director said and the recording of it travel with the new task, as a reassign's copy does
+      const res = await voiceApi.confirm({
+        client_request_id: input.requestId,
+        source: task.source ?? "typed",
+        audio_path: task.source_audio_path,
+        transcript: task.source_transcript ?? words,
+        parsed_entities: [],
+        confirmed_entities: [
+          {
+            kind: "task",
+            assignee_queries: [],
+            assignee_id: input.assigneeId,
+            assignee_name: input.assigneeName,
+            assignee_confidence: 1,
+            group_id: null,
+            title: task.title,
+            body: task.body,
+            deadline_iso: input.deadlineIso,
+            deadline_confidence: null,
+            deadline_source_text: null,
+            priority: task.priority,
+            scheduled_send_at: null,
+            source_span: words,
+          },
+        ],
+      });
+      const ids = (res.result.task_ids as string[] | null | undefined) ?? [];
+      return { taskId: ids[0] ?? null, scheduled: res.result.scheduled === true };
+    },
+    onSuccess: (result, input) => {
+      const who = input.assigneeName.trim().split(/\s+/)[0] ?? input.assigneeName;
+      const text = result.scheduled ? `Выдал снова: ${who} · получит утром` : `Выдал снова: ${who}`;
+      const id = result.taskId;
+      const open = input.onOpen;
+      toast(text, id && open ? { action: { label: "Открыть", onClick: () => open(id) }, lifetimeMs: 5_000 } : undefined);
+      // the new task is the director's own move: the push goes now, not on the minute sweep
+      if (!result.scheduled) kickPush();
+    },
+    onError: (error) => {
+      if (isNetworkError(error) || error instanceof NetworkError || (error instanceof VoiceApiError && (error.code === "network" || error.status === 0))) {
+        toast("Нет связи — не выдал, попробуйте ещё раз");
+        return;
+      }
+      const words = error instanceof VoiceApiError ? (error.body as ApiErrorBody | null)?.error?.message_ru : null;
+      toast(words ?? "Не получилось выдать снова. Попробуйте ещё раз");
     },
     onSettled: () => void queryClient.invalidateQueries({ queryKey: taskKeys.root }),
   });
@@ -663,12 +846,27 @@ export type TaskActions = {
   sendMessage: (input: SendMessageInput) => void;
   /** «Удалить»: hard delete, no trace — cleanup of wrong and test orders. */
   remove: (taskId: string) => void;
+  /** «Выдать снова»: a closed task goes out again as a new one (D-139). */
+  reissue: (input: ReissueInput) => void;
   /** «Прочитал» / the thread opened: the read cursor up to this seq. */
   markRead: (input: MarkReadInput) => void;
   busy: boolean;
 };
 
+/** The director's taps that wait out «Отменить» (D-139), by the status they move to. */
+const UNDO_WORDS: Partial<Record<TaskStatus, string>> = {
+  done: "Принято",
+  sent: "Снова отправлено",
+};
+
 export function useTaskActions(me: Me | undefined): TaskActions {
+  const queryClient = useQueryClient();
+  keepOverlays(queryClient);
+  // the receipt names the assignee, from whatever list holds the task: «Принято · Ерлан»
+  const named = (text: string, taskId: string) => {
+    const who = assigneeOf(snapshotTasks(queryClient), taskId);
+    return who ? `${text} · ${who}` : text;
+  };
   const transition = useTransition();
   const revoke = useRevoke();
   const sendNow = useSendNow();
@@ -679,10 +877,14 @@ export function useTaskActions(me: Me | undefined): TaskActions {
   const nudge = useNudge();
   const sendMessage = useSendMessage(me);
   const remove = useDeleteTask();
+  const reissue = useReissue();
   const markRead = useMarkRead(me);
 
   return {
-    transition: (input) => transition.mutate({ ...input, requestId: crypto.randomUUID() }),
+    transition: (input) => {
+      const words = UNDO_WORDS[input.toStatus];
+      transition.mutate({ ...input, requestId: crypto.randomUUID(), undo: words ? named(words, input.taskId) : undefined });
+    },
     extend: (input) => extend.mutate({ ...input, requestId: crypto.randomUUID() }),
     reassign: (input) => reassign.mutate({ ...input, requestId: crypto.randomUUID() }),
     requestTime: (input) => requestTime.mutate({ ...input, requestId: crypto.randomUUID() }),
@@ -692,10 +894,11 @@ export function useTaskActions(me: Me | undefined): TaskActions {
     // itself, in the same transaction (D-130). It used to be two calls, and a tab closed between
     // them left the task «в работе» with the report gone.
     complete: ({ taskId, report }) => transition.mutate({ taskId, toStatus: "pending_review", requestId: crypto.randomUUID(), report }),
-    revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID() }),
+    revoke: (taskId) => revoke.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Отозвано", taskId) }),
     sendNow: (taskId) => sendNow.mutate({ taskId, requestId: crypto.randomUUID() }),
     sendMessage: (input) => sendMessage.mutate({ ...input, id: input.id ?? crypto.randomUUID() }),
-    remove: (taskId) => remove.mutate({ taskId }),
+    remove: (taskId) => remove.mutate({ taskId, requestId: crypto.randomUUID(), undo: named("Удалено", taskId) }),
+    reissue: (input) => reissue.mutate({ ...input, requestId: crypto.randomUUID() }),
     markRead: (input) => markRead.mutate(input),
     // sending a message is not «busy»: the composer stays live, the row carries its own clock
     busy:
@@ -706,6 +909,7 @@ export function useTaskActions(me: Me | undefined): TaskActions {
       reassign.isPending ||
       requestTime.isPending ||
       answerTime.isPending ||
-      nudge.isPending,
+      nudge.isPending ||
+      reissue.isPending,
   };
 }

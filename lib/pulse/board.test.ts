@@ -381,3 +381,50 @@ describe("messages of the thread (D-61)", () => {
     expect(describeChange(before, asked, NOW, ME)?.text).toBe("Марат спрашивает по «Отчёт»: «Какой формат?»");
   });
 });
+
+describe("Пульс manages tasks (D-139)", () => {
+  const marat = "u-Марат";
+  const report = { id: "m9", content: "Готово, фото в чате", type: "text", sender_id: marat, seq: 5, created_at: "2026-09-11T04:20:00Z" };
+
+  it("work handed in with a report is «на приёмке» — only an open question goes before it", () => {
+    const withReport = row("a", "Смета", "Марат", "pending_review", { last_message: report, seen_seq: 2 });
+    expect(hasUnread(withReport, ME)).toBe(true);
+    expect(laneOf(withReport, NOW, ME)).toBe("review");
+    // still a message to the director: the «Сообщения» ball counts it too
+    expect(hasMessage(withReport, ME)).toBe(true);
+    const asked = row("b", "КП", "Марат", "pending_review", { question: "А печать нужна?", question_id: "m1" });
+    expect(laneOf(asked, NOW, ME)).toBe("question");
+  });
+
+  it("the greeting tells a question from a message, and counts a report as приёмка", () => {
+    const lanes = lanesOf(
+      [
+        row("q", "КП", "Марат", "accepted", { question: "Когда?", question_id: "m1" }),
+        row("w", "Отчёт", "Ерлан", "accepted", { last_message: { ...report, id: "m2", sender_id: "u-Ерлан" }, seen_seq: 0 }),
+        row("r", "Смета", "Марат", "pending_review", { last_message: report, seen_seq: 0 }),
+      ],
+      NOW,
+      ME,
+    );
+    expect(openingLine(lanes, NOW, "Асхат").text).toBe("Доброе утро, Асхат. 1 вопрос, 1 сообщение, 1 на приёмке.");
+  });
+
+  it("the director's board takes a task held for the morning; anybody else's never does", () => {
+    const board = [row("a", "Отчёт", "Марат", "sent")];
+    expect(applyTaskChange(board, { id: "night", status: "scheduled" })).toBeNull();
+    expect(applyTaskChange(board, { id: "night", status: "scheduled" }, { held: true })).toBe("refetch");
+    // held or not, it sits in no lane: nobody has it yet
+    expect(laneOf(row("n", "Утром", "Марат", "scheduled"), NOW, ME)).toBeNull();
+  });
+
+  it("a tap taken back is said as «Отменено», not as news", () => {
+    const handed = row("a", "Смета", "Марат", "pending_review");
+    const accepted = { ...handed, status: "done" as const };
+    const undone = (id: string) => id === "a";
+    expect(describeChanges([accepted], [handed], NOW, ME, undone).map((p) => [p.text, p.kind])).toEqual([["Отменено: «Смета»", "undone"]]);
+    // a delete taken back: the row is back — not «новая задача»
+    expect(describeChanges([], [handed], NOW, ME, undone).map((p) => p.text)).toEqual(["Отменено: «Смета»"]);
+    // without the mark it is what it looks like
+    expect(describeChanges([accepted], [handed], NOW, ME).map((p) => p.kind)).toEqual(["handed"]);
+  });
+});

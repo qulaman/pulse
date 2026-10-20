@@ -29,6 +29,7 @@ const actions: TaskActions = {
   reassign: (input) => console.log("reassign", input),
   sendMessage: (input) => console.log("sendMessage", input),
   remove: (taskId) => console.log("remove", taskId),
+  reissue: (input) => console.log("reissue", input.task.id),
   markRead: (input) => console.log("markRead", input),
   requestTime: (input) => console.log("requestTime", input),
   answerTime: (input) => console.log("answerTime", input),

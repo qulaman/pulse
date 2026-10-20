@@ -41,20 +41,22 @@ export const peopleKeys = {
 };
 
 /** Everybody in the company, inactive last — RLS shows the director the whole roster. */
+export const peopleQuery = {
+  queryKey: peopleKeys.all,
+  queryFn: async (): Promise<Person[]> => {
+    const supabase = createBrowserSupabase();
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .order("is_active", { ascending: false })
+      .order("full_name");
+    if (error) throw new Error(error.message);
+    return data ?? [];
+  },
+};
+
 export function usePeople() {
-  return useQuery({
-    queryKey: peopleKeys.all,
-    queryFn: async (): Promise<Person[]> => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("is_active", { ascending: false })
-        .order("full_name");
-      if (error) throw new Error(error.message);
-      return data ?? [];
-    },
-  });
+  return useQuery(peopleQuery);
 }
 
 export type PersonMessage = Database["public"]["Tables"]["task_messages"]["Row"] & {

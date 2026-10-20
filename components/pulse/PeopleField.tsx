@@ -67,6 +67,7 @@ export function PeopleField({
   onPick,
   onLook,
   allHref,
+  onTaskMore,
 }: {
   members: Member[];
   /** half the play area, px from the middle of the face */
@@ -88,6 +89,8 @@ export function PeopleField({
   onLook?: (pick: Pick | null) => void;
   /** where «Все дела» of a person goes, when not his card on «Команда» */
   allHref?: (id: string) => string;
+  /** «⋯» on a task in a person's card: its «Действия» (D-139) */
+  onTaskMore?: (taskId: string) => void;
 }) {
   // ---- the moment of acceptance: gold for a moment, then the circle goes down ---------------
   // A task the screen saw open and now sees done has just been accepted. It keeps its person
@@ -360,6 +363,7 @@ export function PeopleField({
             box={box}
             reach={layout.size / 2 + RING_OUT + 6}
             allHref={allHref?.(openedCrew.member.id)}
+            onMore={onTaskMore}
             onClose={closeCard}
           />
         ) : null}

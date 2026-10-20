@@ -100,3 +100,16 @@ describe("teamField", () => {
     for (const seat of roomy.seats.values()) expect(Math.abs(seat.y) + roomy.size / 2).toBeLessThanOrEqual(290);
   });
 });
+
+describe("tasksOf — held for the morning (D-139)", () => {
+  it("keeps a held task with its sending time; a revoked one stays out", () => {
+    const byPerson = tasksOf(
+      [
+        { id: "n", assignee_id: "a", status: "scheduled" as const, deadline: null, title: "утром", scheduled_send_at: "2026-09-18T03:00:00Z" },
+        { id: "r", assignee_id: "a", status: "revoked" as const, deadline: null, title: "отозвана" },
+      ],
+      NOW,
+    );
+    expect(byPerson.a).toEqual([expect.objectContaining({ id: "n", status: "scheduled", sendAt: "2026-09-18T03:00:00Z" })]);
+  });
+});

@@ -8,6 +8,7 @@ import type { Errand } from "@/lib/errands/queries";
 import { describeErrandsForDirector } from "@/lib/errands/say";
 import { describeChanges, openingLine, type BoardTask, type Lanes, type Phrase } from "@/lib/pulse/board";
 import { describeEther, type EtherPost } from "@/lib/pulse/ether";
+import { wasUndone } from "@/lib/tasks/grace";
 
 /** How long the mascot's mouth moves after a new line. */
 const SPEAKING_MS = 1_200;
@@ -49,7 +50,7 @@ export function useSpeech(
   const voice = useMemo<Voice>(
     () => ({
       opening: openingLine,
-      describe: (prev, next, at) => describeChanges(prev, next, at, meId),
+      describe: (prev, next, at) => describeChanges(prev, next, at, meId, wasUndone),
       describeEther: (prev, next) => describeEther(prev, next, meId),
       describeCalendar: (prev, next, at) => describeCalendar(prev, next, at, meId),
       describeErrands: (prev, next) => describeErrandsForDirector(prev, next),

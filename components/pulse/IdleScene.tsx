@@ -92,7 +92,7 @@ export function IdleScene({
    */
   quiet?: boolean;
   only?: DreamId;
-  team?: { members: Member[]; allHref?: (id: string) => string };
+  team?: { members: Member[]; allHref?: (id: string) => string; onTaskMore?: (taskId: string) => void };
   /** the idler picked on this screen (D-84) — the screen keeps it, the field draws it */
   picked?: string | null;
   onPick?: (pick: Pick | null) => void;
@@ -154,6 +154,7 @@ export function IdleScene({
               onPick={onPick}
               onLook={onLook}
               allHref={team.allHref}
+              onTaskMore={team.onTaskMore}
             />
           </Fade>
         ) : null}

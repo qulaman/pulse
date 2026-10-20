@@ -77,7 +77,9 @@ export type DeskAction =
   | "retime"
   | "keep"
   | "handoff"
-  | "nudge";
+  | "nudge"
+  // D-139: a closed task handed out again as a new one
+  | "reissue";
 
 /** A key is a command, so a verb — `BUTTON` in status-text.ts keeps the card's own words. */
 export const KEY_LABEL: Record<DeskAction, string> = {
@@ -97,6 +99,7 @@ export const KEY_LABEL: Record<DeskAction, string> = {
   keep: "Оставить прежний",
   handoff: "Передать",
   nudge: "Напомнить",
+  reissue: "Выдать снова",
 };
 
 /** What the director's keys need to know besides the status (D-128). */
@@ -142,6 +145,8 @@ export function keysFor(
   if (working) return ["extend", "reassign", "revoke"];
   // held for the morning (D-38): «Отправить сейчас» brings it forward (D-129)
   if (task.status === "scheduled") return ["sendNow", "extend", "revoke"];
+  // closed: taken back by mistake, or needed once more — a new task from this one (D-139)
+  if (task.status === "done" || task.status === "revoked") return ["reissue", "open", "remove"];
   return ["open", "remove"];
 }
 

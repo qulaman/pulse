@@ -52,6 +52,7 @@ function Sandbox({ role, id }: { role: "director" | "employee"; id: string }) {
     reassign: ({ assigneeName }) => patch({ assignee: { full_name: assigneeName } }),
     sendMessage: () => {},
     remove: () => setTask(null),
+    reissue: () => {},
     markRead: () => {},
     requestTime: ({ fromStatus, proposedIso, words }) => {
       if (fromStatus === "sent") patch({ status: "accepted", accepted_at: stamp });

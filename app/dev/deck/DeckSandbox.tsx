@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { CardDeck } from "@/components/pulse/CardDeck";
+import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { lanesOf, type BoardTask } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -45,12 +46,21 @@ export function DeckSandbox() {
     reassign: () => {},
     sendMessage: () => {},
     remove: (taskId) => setBoard((list) => list.filter((row) => row.id !== taskId)),
+    reissue: () => {},
     markRead: () => {},
     requestTime: () => {},
     answerTime: () => {},
     nudge: () => {},
     busy: false,
   };
+  // «Все действия» of the long press and «⋯» — the same hook as on Пульс (D-139)
+  const director = useDirectorControls({
+    base: actions,
+    companyId: "company",
+    tasks: board,
+    questionOf: (id) => board.find((row) => row.id === id)?.question ?? null,
+    now,
+  });
 
   // somebody else settled the card on top: it leaves the board under the director's eyes
   const leave = () => {
@@ -90,9 +100,10 @@ export function DeckSandbox() {
           </div>
         </div>
         <div className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto pb-4 pt-2">
-          <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId="company" meId={DIRECTOR.id} focus={null} onCurrentChange={setCurrent} />
+          <CardDeck lanes={lanes} now={now} since={since} actions={actions} companyId="company" meId={DIRECTOR.id} focus={null} onCurrentChange={setCurrent} onMore={director.more} />
         </div>
       </main>
+      {director.sheets}
     </div>
   );
 }

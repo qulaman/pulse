@@ -9,6 +9,7 @@ import {
   applyRead,
   applyTaskChange,
   BOARD_STATUSES,
+  HELD_STATUS,
   CHAT_TYPES,
   isOnBoard,
   lanesOf,
@@ -467,10 +468,12 @@ type BoardRow = TaskWithPeople & { notes: BoardNote[] | null; last: BoardMessage
  */
 async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
   const supabase = createBrowserSupabase();
+  // the director's board also holds what waits for the morning — the team on Пульс shows it (D-139);
+  // a person's own board never does: a held task is not theirs yet (D-38)
   let request = supabase
     .from("tasks")
     .select(BOARD_SELECT)
-    .in("status", [...BOARD_STATUSES]);
+    .in("status", assigneeId ? [...BOARD_STATUSES] : [...BOARD_STATUSES, HELD_STATUS]);
   if (assigneeId) request = request.eq("assignee_id", assigneeId);
   const { data, error } = await request
     // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128)
@@ -532,7 +535,7 @@ export function usePulseBoard(me: Me | undefined, enabled = true) {
       const row = payload.new as TaskRow;
       const cached = client.getQueryData<BoardTask[]>(queryKey);
       if (!cached) return; // nothing to patch yet — the first fetch will have it
-      const next = applyTaskChange(cached, row);
+      const next = applyTaskChange(cached, row, { held: !assigneeId });
       if (next === "refetch") scheduleBoardRefetch(client);
       else if (next) client.setQueryData(queryKey, next);
     },

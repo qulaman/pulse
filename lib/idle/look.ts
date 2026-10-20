@@ -1,3 +1,4 @@
+import { humanAqtobe } from "@/lib/ai/time";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import { TONE_VAR, toneOf } from "@/lib/tasks/tone";
 
@@ -10,7 +11,8 @@ import { TONE_VAR, toneOf } from "@/lib/tasks/tone";
  *            (lib/tasks/tone.ts), so a tap from the circle to the task changes nothing;
  *   ring     whether the work is moving: an arc going round while it is being done, a whole
  *            ring that breathes while it waits to be taken up, closed and still when handed in,
- *            snapped on a refusal, closed in gold the moment the director accepts it;
+ *            snapped on a refusal, closed in gold the moment the director accepts it; dashed
+ *            and still on grey while it only waits for the morning (D-139);
  *   badge    whether there is something to read or to settle: a refusal, a question or a request
  *            for time (D-128), an unread word in the thread — one at a time, the most pressing.
  */
@@ -28,10 +30,12 @@ export type CrewTask = {
   unread: boolean;
   /** why «Не могу» */
   reason: string | null;
+  /** when a task held for the morning goes out (D-38, D-139) */
+  sendAt?: string | null;
   href: string;
 };
 
-export type Ring = "idle" | "waiting" | "spinning" | "closed" | "broken" | "done";
+export type Ring = "idle" | "waiting" | "spinning" | "closed" | "broken" | "done" | "held";
 export type Badge = "declined" | "question" | "message" | null;
 
 export type Look = {
@@ -51,6 +55,11 @@ export type Look = {
 
 /** On the board and still the director's business: a refusal is his to settle. */
 export const OPEN_CREW: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework", "pending_review", "declined"];
+/**
+ * Given out, not sent yet — it waits for the morning (D-38). The person is on the screen with
+ * work, quietly: the same grey and dashed mark the task has on «Задачи» (D-139).
+ */
+export const HELD_CREW: TaskStatus = "scheduled";
 const MOVING: readonly TaskStatus[] = ["accepted", "in_progress", "rework"];
 
 /** A deadline is his problem only while the work is his: handed in, it waits for the director. */
@@ -68,6 +77,7 @@ export function urgencyOf(task: CrewTask): number {
   if (task.status === "pending_review") return 2;
   if (task.status === "sent") return 3;
   if (task.status === "rework") return 4;
+  if (task.status === HELD_CREW) return 6;
   return 5;
 }
 
@@ -83,11 +93,13 @@ export function toneFor(task: CrewTask): string {
 export function lookOf(tasks: CrewTask[]): Look {
   const open = tasks.filter((t) => OPEN_CREW.includes(t.status));
   const done = tasks.find((t) => t.status === "done") ?? null;
+  const held = tasks.find((t) => t.status === HELD_CREW) ?? null;
   if (!open.length) {
     // the last one accepted: the ring closes in gold before the circle goes back down
-    return done
-      ? { busy: true, ring: "done", tone: "var(--gold)", arcs: 1, badge: null, lead: done, accepted: true }
-      : { busy: false, ring: "idle", tone: "var(--text-muted)", arcs: 1, badge: null, lead: null, accepted: false };
+    if (done) return { busy: true, ring: "done", tone: "var(--gold)", arcs: 1, badge: null, lead: done, accepted: true };
+    // only what waits for the morning: up with work, grey and still (D-139)
+    if (held) return { busy: true, ring: "held", tone: "var(--text-muted)", arcs: 1, badge: null, lead: held, accepted: false };
+    return { busy: false, ring: "idle", tone: "var(--text-muted)", arcs: 1, badge: null, lead: null, accepted: false };
   }
   const lead = [...open].sort((a, b) => urgencyOf(a) - urgencyOf(b))[0]!;
   const ring: Ring =
@@ -120,6 +132,8 @@ export function wordOf(task: CrewTask): string {
       return task.reason ? `не может: ${task.reason}` : "не может";
     case "done":
       return "принята";
+    case "scheduled":
+      return task.sendAt ? `уйдёт ${humanAqtobe(new Date(task.sendAt))}` : "отправлю позже";
     default:
       return "";
   }

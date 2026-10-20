@@ -104,9 +104,9 @@ async function main() {
     await page.getByRole("dialog").waitFor({ timeout: 5_000 });
     await page.screenshot({ path: join(SHOTS, "c1-delete-sheet.png") });
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();
-    // the card leaves its own page at once; the server call lands right after
+    // the card leaves its own page at once; the server call lands once «Отменить» is over (D-139)
     await page.waitForURL((url) => !url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
-    await page.waitForTimeout(1_500);
+    await page.waitForTimeout(6_500);
     const { data: stillThere } = await director.supabase.from("tasks").select("id").eq("id", doomed).maybeSingle();
     record("«Удалить» на карточке: задача исчезла из базы", stillThere === null, `left the page for ${new URL(page.url()).pathname}`);
 

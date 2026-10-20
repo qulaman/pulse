@@ -97,8 +97,9 @@ describe("keysFor", () => {
     ["in_progress", [{ status: "in_progress" }], ["extend", "reassign", "revoke"]],
     ["rework", [{ status: "rework" }], ["extend", "reassign", "revoke"]],
     ["scheduled", [{ status: "scheduled" }], ["sendNow", "extend", "revoke"]],
-    ["done", [{ status: "done" }], ["open", "remove"]],
-    ["revoked", [{ status: "revoked" }], ["open", "remove"]],
+    // closed: «Выдать снова» first — a new task from this one (D-139)
+    ["done", [{ status: "done" }], ["reissue", "open", "remove"]],
+    ["revoked", [{ status: "revoked" }], ["reissue", "open", "remove"]],
   ];
 
   it.each(cases)("%s", (_name, args, keys) => {
@@ -112,7 +113,7 @@ describe("keysFor", () => {
     expect(keysFor({ status: "rework" }, { question: true, overdue: true })).toEqual(["answer", "extend", "open"]);
     // flags do not make a closed or declined task open
     expect(keysFor({ status: "declined" }, { question: true, overdue: true })).toEqual(["insist", "reassign", "cancel"]);
-    expect(keysFor({ status: "done" }, { question: true, overdue: true })).toEqual(["open", "remove"]);
+    expect(keysFor({ status: "done" }, { question: true, overdue: true })).toEqual(["reissue", "open", "remove"]);
   });
 
   it("never more than three keys", () => {
@@ -134,7 +135,7 @@ describe("keysFor", () => {
     expect(keysFor({ status: "accepted" }, { request: true, question: true, overdue: true })).toEqual(["grant", "retime", "keep"]);
     expect(keysFor({ status: "pending_review" }, { request: true })).toEqual(["approve", "rework", "open"]);
     // a request on a closed task is history
-    expect(keysFor({ status: "done" }, { request: true })).toEqual(["open", "remove"]);
+    expect(keysFor({ status: "done" }, { request: true })).toEqual(["reissue", "open", "remove"]);
   });
 });
 

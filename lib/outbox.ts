@@ -28,6 +28,14 @@ export type MessageWriter = (row: unknown) => Promise<{ error: { message: string
 /** Entries dropped for age since the replay last asked — the replay says so once (D-130). */
 let stale = 0;
 
+/**
+ * Entries inside an «Отменить» window of this very session (lib/tasks/grace.ts, D-139): kept
+ * here so a closed app still sends them on the next start, but not sent by the replay and not
+ * counted as waiting — the tap has not been let go yet. A new session starts with none, so
+ * what a closed app left behind goes out like any other entry.
+ */
+const held = new Set<string>();
+
 const listeners = new Set<() => void>();
 
 /** The send line counts what waits here (components/OfflineBanner.tsx). */
@@ -64,7 +72,7 @@ function write(entries: OutboxEntry[]): void {
 }
 
 export function outboxSize(): number {
-  return typeof window === "undefined" ? 0 : read().length;
+  return typeof window === "undefined" ? 0 : read().filter((e) => !held.has(e.id)).length;
 }
 
 export function enqueue(entry: Omit<OutboxEntry, "at">): void {
@@ -75,9 +83,22 @@ export function enqueue(entry: Omit<OutboxEntry, "at">): void {
 
 export function dequeue(id: string): void {
   if (typeof window === "undefined") return;
+  held.delete(id);
   const all = read();
   const rest = all.filter((e) => e.id !== id);
   if (rest.length !== all.length) write(rest);
+}
+
+/** A tap inside its «Отменить» window (D-139): on the phone already, not yet to be sent. */
+export function hold(entry: Omit<OutboxEntry, "at">): void {
+  held.add(entry.id);
+  enqueue(entry);
+}
+
+/** The window is over: the entry is an ordinary one now — the call goes out and closes it. */
+export function release(id: string): void {
+  if (!held.delete(id)) return;
+  for (const listener of listeners) listener();
 }
 
 /** How many entries went for age since the last call; the count starts over. */
@@ -116,6 +137,8 @@ export async function replayOutbox(writeMessage?: MessageWriter): Promise<Replay
   const entries = read();
   const result: ReplayResult = { sent: 0, left: 0, refused: [] };
   for (const entry of entries) {
+    // still inside its «Отменить» window: the person may yet take it back
+    if (held.has(entry.id)) continue;
     if (entry.kind === "message") {
       if (!writeMessage) continue;
       const { error } = await writeMessage(entry.payload);
@@ -143,6 +166,6 @@ export async function replayOutbox(writeMessage?: MessageWriter): Promise<Replay
     if (res.ok) result.sent += 1;
     else result.refused.push(await refusalOf(res));
   }
-  result.left = read().length;
+  result.left = read().filter((e) => !held.has(e.id)).length;
   return result;
 }

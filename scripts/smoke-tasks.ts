@@ -150,6 +150,8 @@ async function main() {
     await page.screenshot({ path: join(SHOTS, "t3-question-open.png") });
     await page.locator('[data-task-id][data-open]').getByRole("button", { name: "Да", exact: true }).click();
     await page.waitForTimeout(1500);
+    // «Принять» reaches the server once its «Отменить» is over (D-139)
+    await page.waitForTimeout(3_500);
 
     const reviewRow = await director.supabase.from("tasks").select("status").eq("id", reviewId).single();
     record("в базе: принята (done)", reviewRow.data?.status === "done", `status=${reviewRow.data?.status}`);
@@ -180,7 +182,8 @@ async function main() {
     await page.locator('[data-testid="more-remove"]').click();
     await page.getByRole("dialog").getByRole("button", { name: "Удалить", exact: true }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/tasks/"), { timeout: 10_000 });
-    await page.waitForTimeout(1_500);
+    // the server hears «Удалить» once «Отменить» is over (D-139)
+    await page.waitForTimeout(6_500);
     const gone = await director.supabase.from("tasks").select("id").eq("id", questionId).maybeSingle();
     record("«⋯ → Удалить» на экране задачи: задачи нет в базе", gone.data === null);
     record("директор: без ошибок страницы", errors.length === 0, errors.join(" | "));

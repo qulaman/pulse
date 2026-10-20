@@ -16,7 +16,9 @@ const EASE_OUT = [0.2, 0, 0, 1] as const;
  * The card of a person at work (D-118, replaces the read-only star card of D-73 §3): who he is
  * and what he is on, each task a tap away from its own screen — with the same stage mark the
  * task has on «Задачи», so the circle, the card and the screen speak one language. A refusal
- * says why, a question is quoted, an unread word is flagged. «Все дела» opens his card.
+ * says why, a question is quoted, an unread word is flagged. «Все дела» opens his card. «⋯» on
+ * a row is everything the task allows, right here — revoke, delete, another deadline — without
+ * the trip to its screen (D-139).
  *
  * It stands next to him — under him when he is high up, above him when not — and never runs
  * off the screen. `reach` — how far out of his seat the card starts (his ring and a gap).
@@ -30,6 +32,7 @@ export function CrewCard({
   box,
   reach,
   allHref,
+  onMore,
   onClose,
 }: {
   ref?: Ref<HTMLDivElement>;
@@ -40,6 +43,8 @@ export function CrewCard({
   reach: number;
   /** where «Все дела» goes — his card on «Команда» (a sandbox points it elsewhere) */
   allHref?: string;
+  /** «⋯» on a row: the task's «Действия» (D-139); without it the row only leads to the task */
+  onMore?: (taskId: string) => void;
   onClose: () => void;
 }) {
   const width = Math.min(box.w - 24, 304);
@@ -80,8 +85,8 @@ export function CrewCard({
         </p>
         <ul className="mt-1.5 flex flex-col">
           {shown.map((task) => (
-            <li key={task.id}>
-              <Link href={task.href} prefetch={false} className="flex items-start gap-2.5 rounded-[14px] px-1 py-2 active:bg-surface-2" data-testid="crew-task">
+            <li key={task.id} className="flex items-start">
+              <Link href={task.href} prefetch={false} className="flex min-w-0 flex-1 items-start gap-2.5 rounded-[14px] px-1 py-2 active:bg-surface-2" data-testid="crew-task">
                 <span className="pt-px">
                   <StatusGlyph status={task.status} overdue={isLate(task)} size={20} />
                 </span>
@@ -98,10 +103,23 @@ export function CrewCard({
                     <span className="mt-0.5 block text-[12px] leading-4 text-accent">новое сообщение</span>
                   ) : null}
                 </span>
-                <span aria-hidden className="pt-0.5 text-[18px] leading-5 text-muted">
-                  ›
-                </span>
+                {onMore ? null : (
+                  <span aria-hidden className="pt-0.5 text-[18px] leading-5 text-muted">
+                    ›
+                  </span>
+                )}
               </Link>
+              {onMore ? (
+                <button
+                  type="button"
+                  aria-label={`Действия: ${task.title}`}
+                  onClick={() => onMore(task.id)}
+                  className="-mr-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[20px] leading-none text-muted transition-colors duration-[120ms] active:bg-surface-2"
+                  data-testid="crew-task-more"
+                >
+                  ⋯
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

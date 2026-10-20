@@ -24,6 +24,7 @@ import { thoughtAct } from "@/components/pulse/thoughtActs";
 import { useMascotActs } from "@/components/pulse/useMascotActs";
 import { useSpeech } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
+import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
 import { Button } from "@/components/ui/Button";
@@ -55,7 +56,7 @@ import { usePeople } from "@/lib/people/queries";
 import { useOpenDisputes } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { answer } from "@/lib/pulse/answers";
-import { countsOf, emptyLanes, hasMessage, hasUnread, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
+import { countsOf, emptyLanes, hasMessage, hasUnread, HELD_STATUS, isOnBoard, lanesOf, toBriefTask, WORK_STATUSES, type BoardTask, type Lanes } from "@/lib/pulse/board";
 import { alarmOf } from "@/lib/pulse/mood";
 import { useLastVisit, useNow } from "@/lib/pulse/queries";
 import { isCountable, isSendable, useIngestStore, whyNothingToSend, type IngestError } from "@/lib/store/ingest";
@@ -221,6 +222,26 @@ export default function PulsePage() {
   const rows = board.data;
   const lanes = useMemo(() => lanesOf(rows ?? [], now, meId), [rows, now, meId]);
   const counts = countsOf(lanes);
+  // what waits for the morning (D-38): no lane of its own, named on the closing card (D-139)
+  const heldTasks = useMemo(() => (rows ?? []).filter((task) => task.status === HELD_STATUS), [rows]);
+  // «Все действия» of any task on the screen — the deck's long press and «⋯», a person's card
+  // (D-139): the same sheet and the same buttons as on «Задачи» and on the task's own screen
+  const director = useDirectorControls({
+    base: actions,
+    companyId,
+    tasks: rows ?? [],
+    questionOf: (id) => rows?.find((task) => task.id === id)?.question ?? null,
+    requestOf: (id) => {
+      const request = rows?.find((task) => task.id === id)?.time_request ?? null;
+      return request && request.senderId !== meId ? request : null;
+    },
+    suggestionOf: (id) => rows?.find((task) => task.id === id)?.suggestion ?? null,
+    now,
+  });
+  const moreOf = (id: string) => {
+    const task = rows?.find((row) => row.id === id);
+    if (task) director.more(task);
+  };
   const ether = useEther();
   const calendar = useCalendar();
   const events = useMemo(() => calendar.data ?? [], [calendar.data]);
@@ -574,6 +595,7 @@ export default function PulsePage() {
         request: t.time_request && t.time_request.senderId !== meId ? t.time_request.proposed : null,
         decline_reason: t.decline_reason,
         unread: hasUnread(t, meId),
+        scheduled_send_at: t.scheduled_send_at,
       })),
       now.getTime(),
     );
@@ -681,7 +703,7 @@ export default function PulsePage() {
               active={mode === "idle" && (stage === "idle" || stage === "recording")}
               // a face that is looking at somebody is not dreaming
               quiet={!thought && stage === "idle" && !attending && !reading && !asking}
-              team={field}
+              team={{ ...field, onTaskMore: moreOf }}
               picked={picked?.id ?? null}
               onPick={(orb) => {
                 // a sleeping face wakes up with a stretch before it looks
@@ -861,8 +883,14 @@ export default function PulsePage() {
                 onErrand={() => void errands.refetch()}
               /> : null}
             {!phraseInHand && messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
-            {/* service cards only once the face has been tapped — the idle screen is the face alone */}
-            {!phraseInHand && mode !== "idle" ? serviceLines : null}
+            {/* service cards only once the face has been tapped — the idle screen is the face alone;
+                with a panel open they wait under it — the panel is what the tap asked for (D-139):
+                moved by flex order, not by another slot, so the cards are not mounted anew */}
+            {!phraseInHand && mode !== "idle" ? (
+              <div className="flex flex-col gap-2 empty:hidden" style={{ order: mode === "panel" ? 1 : 0 }}>
+                {serviceLines}
+              </div>
+            ) : null}
             {/* a panel folding away or giving way to another fades out where it stood (popLayout: the
                 rest does not wait for it); position only — a layout animation of its size squashed the
                 deck inside whenever a card of another height came to the top */}
@@ -883,17 +911,18 @@ export default function PulsePage() {
                 data-panel={panel}
               >
                 {panel === "tasks" ? (
-                  taskCount === 0 ? (
+                  // what waits for the morning still has its closing card (D-139)
+                  taskCount === 0 && heldTasks.length === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
                   ) : (
-                    <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} />
+                    <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} held={heldTasks} onMore={director.more} />
                   )
                 ) : null}
                 {panel === "messages" ? (
                   messageTasks.length === 0 ? (
                     <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
                   ) : (
-                    <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} />
+                    <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} onMore={director.more} />
                   )
                 ) : null}
                 {panel === "calendar" ? (
@@ -935,6 +964,8 @@ export default function PulsePage() {
       ) : null}
 
       <EventSheet event={openEvent} onClose={() => setOpenEvent(null)} meId={meId} isDirector />
+
+      {director.sheets}
 
       <ThreadSheet
         open={Boolean(thread)}

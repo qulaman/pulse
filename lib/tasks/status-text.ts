@@ -131,7 +131,8 @@ export function pluralRu(count: number, forms: [string, string, string]): string
 
 export type VerdictTone = "ok" | "warn" | "danger";
 
-export type InboxCounts = { overdue: number; questions: number; review: number; declined?: number };
+/** `messages` — new words that ask nothing (D-139); a question is counted in `questions`. */
+export type InboxCounts = { overdue: number; questions: number; review: number; declined?: number; messages?: number };
 
 /** Block 1 of Пульс: one line, one colour (docs/FRONTEND.md «Пульс»). */
 export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string } {
@@ -145,6 +146,10 @@ export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string 
   }
   if (counts.questions > 0) {
     parts.push(`${counts.questions} ${pluralRu(counts.questions, ["вопрос", "вопроса", "вопросов"])}`);
+  }
+  if ((counts.messages ?? 0) > 0) {
+    const n = counts.messages ?? 0;
+    parts.push(`${n} ${pluralRu(n, ["сообщение", "сообщения", "сообщений"])}`);
   }
   if (counts.review > 0) parts.push(`${counts.review} на приёмке`);
 

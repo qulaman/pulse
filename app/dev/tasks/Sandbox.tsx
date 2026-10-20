@@ -70,6 +70,24 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
       setTasks((list) => list.filter((task) => task.id !== taskId));
       setBoard((list) => list.filter((row) => row.id !== taskId));
     },
+    // «Выдать снова» (D-139): a fresh copy, handed out now
+    reissue: ({ task, assigneeId, assigneeName, deadlineIso }) => {
+      const copy: TaskWithPeople = {
+        ...task,
+        id: `${task.id}-again-${Date.now()}`,
+        assignee_id: assigneeId,
+        assignee: { full_name: assigneeName },
+        status: "sent",
+        deadline: deadlineIso,
+        created_at: stamp,
+        updated_at: stamp,
+        accepted_at: null,
+        completed_at: null,
+        closed_at: null,
+      };
+      setTasks((list) => [copy, ...list]);
+      toast(`Выдал снова: ${assigneeName.split(" ")[0]}`);
+    },
     markRead: () => {},
     requestTime: ({ taskId, fromStatus, proposedIso, words }) => {
       if (fromStatus === "sent") patch(taskId, { status: "accepted", accepted_at: stamp });

@@ -33,6 +33,7 @@ const LABEL: Record<DeskAction, string> = {
   keep: "Оставить прежний",
   handoff: "Передать",
   nudge: "Напомнить",
+  reissue: "Выдать снова",
 };
 
 const ICON: Partial<Record<DeskAction, IconName>> = {
@@ -50,6 +51,7 @@ const ICON: Partial<Record<DeskAction, IconName>> = {
   keep: "undo",
   handoff: "swap",
   nudge: "bell",
+  reissue: "send",
 };
 
 /** What the keys need from the board row besides the status (D-128). */
@@ -73,6 +75,9 @@ export function allActionsFor(task: { status: TaskWithPeople["status"] }, { requ
       return request ? ["grant", "retime", "keep", "reassign", "revoke", "remove"] : ["extend", "nudge", "reassign", "revoke", "remove"];
     case "scheduled":
       return ["sendNow", "extend", "revoke", "remove"];
+    case "done":
+    case "revoked":
+      return ["reissue", "remove"];
     default:
       return ["remove"];
   }

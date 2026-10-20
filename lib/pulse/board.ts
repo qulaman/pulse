@@ -70,6 +70,12 @@ export const ATTENTION_LANES: ReadonlySet<Lane> = new Set<Lane>(["overdue", "dec
 /** Statuses that keep a task on the board. Closed ones (done / revoked) leave it. */
 export const BOARD_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework", "pending_review", "declined"];
 
+/**
+ * A task held for the morning (D-38). The director's board fetches it too — the team on Пульс
+ * shows who gets what in the morning (D-139) — but it sits in no lane: nobody has it yet.
+ */
+export const HELD_STATUS: TaskStatus = "scheduled";
+
 /** Still being worked on — the quiet line and the answers count these. */
 export const WORK_STATUSES: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework"];
 
@@ -149,14 +155,25 @@ export function messageOf(task: BoardTask, meId: string, now: Date = new Date())
   return last.content ?? "";
 }
 
-/** Where a task sits; null once it has left the board. First match wins, in D-05 order. */
+/**
+ * Where a task sits; null once it has left the board. First match wins, in D-05 order — except
+ * that work handed in is «на приёмке» whatever words came with it (D-139): a report is the
+ * usual way to hand in, and in the message lane it fell out of «Задачи», where the swipe up
+ * accepts. Only an open question still goes first — it asks for an answer before the приёмка.
+ */
 export function laneOf(task: BoardTask, now: Date, meId: string): Lane | null {
   if (!isOnBoard(task.status)) return null;
   if (isOverdue(task, now)) return "overdue";
   if (task.status === "declined") return "declined";
+  if (task.status === "pending_review" && !task.question) return "review";
   if (hasMessage(task, meId)) return "question";
   if (task.status === "pending_review") return "review";
   return "work";
+}
+
+/** The message lane holds asks (a question, a request for time) and plain new words; the greeting tells them apart. */
+export function isAsk(task: Pick<BoardTask, "question" | "time_request">): boolean {
+  return Boolean(task.question) || Boolean(task.time_request);
 }
 
 function urgency(task: BoardTask, now: Date): number {
@@ -220,10 +237,15 @@ const PATCHABLE = [
  * it). Unknown row, or a new assignee: the joined names are not in the payload, so the
  * answer is «refetch». Unknown and already closed: nothing to do.
  */
-export function applyTaskChange(board: readonly BoardTask[], row: Partial<TaskRow> & { id: string }): BoardTask[] | "refetch" | null {
+export function applyTaskChange(
+  board: readonly BoardTask[],
+  row: Partial<TaskRow> & { id: string },
+  { held = false }: { held?: boolean } = {},
+): BoardTask[] | "refetch" | null {
   const index = board.findIndex((task) => task.id === row.id);
   if (index === -1) {
-    if (row.status && !isOnBoard(row.status)) return null;
+    // the director's board takes tasks held for the morning too (D-139)
+    if (row.status && !isOnBoard(row.status) && !(held && row.status === HELD_STATUS)) return null;
     return "refetch";
   }
   const current = board[index]!;
@@ -356,7 +378,9 @@ export type BoardEventKind =
   | "answered"
   | "message"
   | "moved"
-  | "passed";
+  | "passed"
+  // «Отменить» on the director's own tap (D-139): the board coming back is not news
+  | "undone";
 
 /** The assignee as the director calls them — first name, nominative, never declined. */
 export function whoOf(task: Pick<BoardTask, "assignee">): string {
@@ -445,12 +469,27 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
   return null;
 }
 
-/** Every change between two boards, in board order — the last one is what the assistant says. */
-export function describeChanges(prev: readonly BoardTask[], next: readonly BoardTask[], now: Date, meId: string): Phrase[] {
+/**
+ * Every change between two boards, in board order — the last one is what the assistant says.
+ * `undone` — a task whose tap the director has just taken back (D-139): its row coming back
+ * («сдана» again, a deleted one reappearing as «новая») is said as what it is — «Отменено».
+ */
+export function describeChanges(
+  prev: readonly BoardTask[],
+  next: readonly BoardTask[],
+  now: Date,
+  meId: string,
+  undone?: (taskId: string) => boolean,
+): Phrase[] {
   const before = new Map(prev.map((task) => [task.id, task]));
   const phrases: Phrase[] = [];
   for (const task of next) {
-    const phrase = describeChange(before.get(task.id), task, now, meId);
+    const was = before.get(task.id);
+    if (undone?.(task.id) && (!was || was.status !== task.status)) {
+      phrases.push({ text: `Отменено: ${quoteTitle(task.title)}`, tone: "muted", kind: "undone" });
+      continue;
+    }
+    const phrase = describeChange(was, task, now, meId);
     if (phrase) phrases.push(phrase);
   }
   return phrases;
@@ -478,7 +517,9 @@ export function openingLine(lanes: Lanes, now: Date, directorName: string): Phra
     const open = [...lanes.work].map(toBriefTask);
     return { text: `${hello} ${quietLine(open, now)}`, tone: "ok" };
   }
-  const line = verdict({ overdue: counts.overdue, declined: counts.declined, questions: counts.question, review: counts.review });
+  // a question is a question; a report or a word in the thread is a message (D-139)
+  const asks = lanes.question.filter(isAsk).length;
+  const line = verdict({ overdue: counts.overdue, declined: counts.declined, questions: asks, messages: counts.question - asks, review: counts.review });
   return { text: `${hello} ${line.text}.`, tone: line.tone };
 }
 

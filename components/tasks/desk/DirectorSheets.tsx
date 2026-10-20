@@ -14,9 +14,9 @@ import { BUTTON, TEXT } from "@/lib/tasks/status-text";
 
 import { ReworkSheet } from "../TaskSheets";
 
-export type DirectorSheetName = "rework" | "extend" | "reassign" | "revoke" | "delete" | "passDeadline";
+export type DirectorSheetName = "rework" | "extend" | "reassign" | "revoke" | "delete" | "passDeadline" | "reissueTo" | "reissueDeadline";
 
-const NAMES: readonly string[] = ["rework", "extend", "reassign", "revoke", "delete", "passDeadline"];
+const NAMES: readonly string[] = ["rework", "extend", "reassign", "revoke", "delete", "passDeadline", "reissueTo", "reissueDeadline"];
 
 /** A reassign waiting for its new deadline (D-128): who takes the task and the director's word. */
 export type PassTo = { person: PickedPerson; note: string };
@@ -51,8 +51,11 @@ export function DirectorSheets({
   suggestedId?: string | null;
   /** The reassign that asks for a new deadline before it goes (D-128). */
   passTo?: PassTo | null;
-  /** The old deadline is behind or within the hour: the caller opens «Срок для …». */
-  onNeedsDeadline?: (pass: PassTo) => void;
+  /**
+   * The old deadline is behind or within the hour: the caller opens «Срок для …» — of the
+   * reassign, or of «Выдать снова» (D-139).
+   */
+  onNeedsDeadline?: (pass: PassTo, then: "passDeadline" | "reissueDeadline") => void;
 }) {
   const [note, setNote] = useState("");
   const now = new Date();
@@ -98,7 +101,7 @@ export function DirectorSheets({
           setNote("");
           // a deadline already behind (or all but gone) would reach the new person late at birth
           if (reassignNeedsDeadline(task.deadline, new Date()) && onNeedsDeadline) {
-            onNeedsDeadline({ person, note: word });
+            onNeedsDeadline({ person, note: word }, "passDeadline");
             return;
           }
           actions.reassign({ taskId: task.id, assigneeId: person.id, assigneeName: person.full_name, note: word || undefined });
@@ -120,6 +123,34 @@ export function DirectorSheets({
             deadlineIso: iso,
             note: passTo.note || undefined,
           });
+        }}
+      />
+
+      {/* «Выдать снова» (D-139): nobody to give it to — the picker; an old deadline — a new one */}
+      <PeoplePicker
+        open={open === "reissueTo"}
+        onClose={onClose}
+        title="Кому выдать?"
+        subject={task.title}
+        hint="Уйдёт как новая задача; эта останется как есть"
+        currentId={null}
+        onPick={(person) => {
+          if (reassignNeedsDeadline(task.deadline, new Date()) && onNeedsDeadline) {
+            onNeedsDeadline({ person, note: "" }, "reissueDeadline");
+            return;
+          }
+          actions.reissue({ task, assigneeId: person.id, assigneeName: person.full_name, deadlineIso: task.deadline });
+        }}
+      />
+      <DeadlineSheet
+        open={open === "reissueDeadline" && Boolean(passTo)}
+        onClose={onClose}
+        title={passFirst ? `Срок для: ${passFirst}` : "Новый срок"}
+        hint={oldLine}
+        currentIso={null}
+        onPick={(iso) => {
+          if (!passTo) return;
+          actions.reissue({ task, assigneeId: passTo.person.id, assigneeName: passTo.person.full_name, deadlineIso: iso });
         }}
       />
 

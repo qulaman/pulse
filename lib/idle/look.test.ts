@@ -76,3 +76,22 @@ describe("team look", () => {
     expect(wordOf(task({ status: "declined", reason: "занят срочным" }))).toBe("не может: занят срочным");
   });
 });
+
+describe("a task held for the morning (D-139)", () => {
+  it("puts the person up with work, grey and dashed, still", () => {
+    const look = lookOf([task({ status: "scheduled", sendAt: "2026-09-18T03:00:00Z" })]);
+    expect(look).toMatchObject({ busy: true, ring: "held", tone: "var(--text-muted)", badge: null, accepted: false });
+  });
+
+  it("gives way to any open work, and comes last in the card", () => {
+    const held = task({ id: "h", status: "scheduled" });
+    const work = task({ id: "w", status: "accepted" });
+    expect(lookOf([held, work])).toMatchObject({ ring: "spinning", lead: { id: "w" } });
+    expect(urgencyOf(held)).toBeGreaterThan(urgencyOf(work));
+  });
+
+  it("says when it goes", () => {
+    expect(wordOf(task({ status: "scheduled", sendAt: null }))).toBe("отправлю позже");
+    expect(wordOf(task({ status: "scheduled", sendAt: "2026-09-18T03:00:00Z" }))).toMatch(/^уйдёт /);
+  });
+});

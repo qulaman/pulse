@@ -4,15 +4,13 @@ import { AnimatePresence, motion, type PanInfo, type TargetAndTransition } from 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
-import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { TaskCard } from "@/components/tasks/TaskCard";
-import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { dismissToast, toast } from "@/components/ui/Toast";
+import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { ATTENTION_LANES, LANE_ORDER, quoteTitleOf, workRowLabel, type BoardTask, type Lane, type Lanes } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
-import { BUTTON, TEXT } from "@/lib/tasks/status-text";
+import { BUTTON, pluralRu } from "@/lib/tasks/status-text";
 import { TaskTile } from "./TaskTile";
 
 /** A horizontal pull past this (or a flick) turns the page. */
@@ -20,12 +18,10 @@ const PAGE_PX = 56;
 const FLICK = 450;
 /** A vertical pull past this acts (up) or postpones (down). */
 const ACT_PX = 88;
-/** A finger that stays this long without moving opens the quick menu. */
+/** A finger that stays this long without moving opens «Все действия». */
 const LONG_PRESS_MS = 480;
-/** A deferred action can be taken back this long; the toast lives a little longer. */
-const UNDO_MS = 4000;
 
-type DeckItem = { kind: "task"; task: BoardTask; lane: Lane } | { kind: "work"; tasks: BoardTask[] };
+type DeckItem = { kind: "task"; task: BoardTask; lane: Lane } | { kind: "work"; tasks: BoardTask[]; held: BoardTask[] };
 
 type Primary = { label: string; run: () => void };
 
@@ -44,6 +40,33 @@ const RISE: Record<"prev" | "current" | "next", TargetAndTransition> = {
  * card rising into its place, or that one would hide the leaving.
  */
 const LEAVE: TargetAndTransition = { opacity: 0, scale: 0.96, y: 10, zIndex: 4, transition: { duration: 0.18, ease: "easeOut", zIndex: { duration: 0 } } };
+
+/**
+ * The finger that held the card is still down when «Все действия» slides up, and its release
+ * would press whatever the sheet has just put under it — «Настоять» on a refusal (found live,
+ * D-139). The click that comes with that release is swallowed, wherever it lands; a release the
+ * browser itself kept quiet (Android's own long press) leaves nothing to swallow, so the trap
+ * closes shortly after the finger is up.
+ */
+function swallowRelease() {
+  let timer = setTimeout(done, 1500);
+  function stop(event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
+    done();
+  }
+  function up() {
+    clearTimeout(timer);
+    timer = setTimeout(done, 350);
+  }
+  function done() {
+    clearTimeout(timer);
+    window.removeEventListener("click", stop, true);
+    window.removeEventListener("pointerup", up, true);
+  }
+  window.addEventListener("click", stop, true);
+  window.addEventListener("pointerup", up, true);
+}
 
 /** The one action a swipe up means on a lane — none where a choice or a date is needed. */
 function primaryOf(item: DeckItem, actions: TaskActions): Primary | null {
@@ -76,31 +99,36 @@ export type CardDeckProps = {
   onCurrentChange?: (id: string | null) => void;
   /** The closing «В работе · N» card; off for a deck of one kind (questions). */
   showWork?: boolean;
+  /** Tasks held for the morning (D-38): named on the closing card (D-139). */
+  held?: readonly BoardTask[];
+  /** «Все действия» of a task — a long press on the top card or its «⋯» (D-139). */
+  onMore: (task: BoardTask) => void;
 };
 
 /**
  * The deck (D-60): what needs the director as a stack of cards under the mascot — the
  * top card is the one to act on, the next peeks from behind. Swipe left or right to
- * browse, up to do the lane's one action (with «Отменить» for four seconds), down to
- * put the card at the end, tap to open the full card, hold for the quick menu. The
- * calm lane is one closing card that opens «Задачи».
+ * browse, up to do the lane's one action, down to put the card at the end, tap to open
+ * the full card, hold (or «⋯») for every move the task allows. «Отменить» after the swipe
+ * is the action's own (lib/tasks/grace.ts, D-139): it outlives the deck, so closing the
+ * panel or leaving the screen neither loses the tap nor takes it back. The calm lane is
+ * one closing card that opens «Задачи».
  */
-export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply, replyLine = false, focus, onCurrentChange, showWork = true }: CardDeckProps) {
+export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply, replyLine = false, focus, onCurrentChange, showWork = true, held = [], onMore }: CardDeckProps) {
   const [postponed, setPostponed] = useState<string[]>([]);
-  const [hidden, setHidden] = useState<Set<string>>(() => new Set());
 
   const items = useMemo<DeckItem[]>(() => {
     const attention: DeckItem[] = [];
     for (const lane of LANE_ORDER) {
       if (!ATTENTION_LANES.has(lane)) continue;
-      for (const task of lanes[lane]) if (!hidden.has(task.id)) attention.push({ kind: "task", task, lane });
+      for (const task of lanes[lane]) attention.push({ kind: "task", task, lane });
     }
     const later = attention.filter((item) => item.kind === "task" && postponed.includes(item.task.id));
     const soon = attention.filter((item) => !later.includes(item));
     const list = [...soon, ...later];
-    if (showWork && lanes.work.length > 0) list.push({ kind: "work", tasks: lanes.work });
+    if (showWork && (lanes.work.length > 0 || held.length > 0)) list.push({ kind: "work", tasks: lanes.work, held: [...held] });
     return list;
-  }, [lanes, hidden, postponed, showWork]);
+  }, [lanes, postponed, showWork, held]);
 
   const [index, setIndex] = useState(0);
   const safeIndex = Math.min(index, Math.max(0, items.length - 1));
@@ -130,49 +158,6 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
   }, [currentId, onCurrentChange]);
 
   const [open, setOpen] = useState<BoardTask | null>(null);
-  const [menu, setMenu] = useState<BoardTask | null>(null);
-  const [menuStep, setMenuStep] = useState<"list" | "reassign" | "revoke" | "delete">("list");
-  const closeMenu = () => {
-    setMenu(null);
-    setMenuStep("list");
-  };
-
-  // ---- deferred action with undo -------------------------------------------------------
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  const defer = useCallback((task: BoardTask, primary: Primary) => {
-    setHidden((set) => new Set(set).add(task.id));
-    const title = quoteTitleOf(task.title);
-    let toastId = 0;
-    const timer = setTimeout(() => {
-      timers.current.delete(task.id);
-      primary.run();
-      dismissToast(toastId);
-    }, UNDO_MS);
-    timers.current.set(task.id, timer);
-    toastId = toast(`${primary.label}: ${title}`, {
-      lifetimeMs: UNDO_MS + 400,
-      action: {
-        label: "Отменить",
-        onClick: () => {
-          clearTimeout(timer);
-          timers.current.delete(task.id);
-          setHidden((set) => {
-            const next = new Set(set);
-            next.delete(task.id);
-            return next;
-          });
-        },
-      },
-    });
-  }, []);
-  useEffect(() => {
-    const pending = timers.current;
-    return () => {
-      // leaving the screen commits what was not taken back
-      for (const timer of pending.values()) clearTimeout(timer);
-      pending.clear();
-    };
-  }, []);
 
   // ---- gestures on the top card ---------------------------------------------------------
   const [flying, setFlying] = useState<{ id: string; dir: "up" | "down" } | null>(null);
@@ -201,9 +186,10 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
         }
         haptic(15);
         setFlying({ id, dir: "up" });
+        // the card has flown: the move lands in every list now, with «Отменить» on its toast (D-139)
         setTimeout(() => {
           setFlying(null);
-          defer(current.task, primary);
+          primary.run();
         }, 220);
       } else if (y > ACT_PX) {
         haptic(8);
@@ -214,18 +200,19 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
         }, 220);
       }
     },
-    [actions, current, defer, items.length, safeIndex],
+    [actions, current, items.length, safeIndex],
   );
 
-  // long press: the quick menu; the click that follows the release is swallowed
-  const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number; fired: boolean }>({ timer: null, x: 0, y: 0, fired: false });
+  // long press: «Все действия»; the click that follows the release is swallowed
+  const press = useRef<{ timer: ReturnType<typeof setTimeout> | null; x: number; y: number }>({ timer: null, x: 0, y: 0 });
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!current || current.kind !== "task") return;
     const task = current.task;
-    press.current = { x: event.clientX, y: event.clientY, fired: false, timer: setTimeout(() => {
-      press.current.fired = true;
+    press.current = { x: event.clientX, y: event.clientY, timer: setTimeout(() => {
+      press.current.timer = null;
       haptic(20);
-      setMenu(task);
+      swallowRelease();
+      onMore(task);
     }, LONG_PRESS_MS) };
   };
   const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -239,13 +226,6 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
     const p = press.current;
     if (p.timer) clearTimeout(p.timer);
     p.timer = null;
-  };
-  const onClickCapture = (event: React.MouseEvent) => {
-    if (press.current.fired) {
-      press.current.fired = false;
-      event.stopPropagation();
-      event.preventDefault();
-    }
   };
 
   if (items.length === 0) return null;
@@ -299,7 +279,6 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
               onPointerMove={isCurrent ? onPointerMove : undefined}
               onPointerUp={isCurrent ? onPointerEnd : undefined}
               onPointerCancel={isCurrent ? onPointerEnd : undefined}
-              onClickCapture={isCurrent ? onClickCapture : undefined}
               data-testid="deck-card"
               data-role={role}
             >
@@ -317,9 +296,10 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
                   meId={meId}
                   onReply={onReply}
                   showReply={replyLine && isCurrent}
+                  onMore={isCurrent ? () => onMore(item.task) : undefined}
                 />
               ) : (
-                <WorkCard tasks={item.tasks} />
+                <WorkCard tasks={item.tasks} held={item.held} now={now} />
               )}
             </motion.div>
           );
@@ -341,90 +321,21 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
         ) : null}
       </Sheet>
 
-      {/* the quick menu of a long press */}
-      <Sheet open={menu !== null && menuStep !== "reassign"} onClose={closeMenu} title={menu ? quoteTitleOf(menu.title) : undefined}>
-        {menu && menuStep === "list" ? (
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="secondary"
-              block
-              onClick={() => {
-                const task = menu;
-                closeMenu();
-                setOpen(task);
-              }}
-            >
-              Открыть карточку
-            </Button>
-            <Button variant="secondary" block onClick={() => setMenuStep("reassign")}>
-              {BUTTON.reassign}
-            </Button>
-            <Button variant="ghost" block onClick={() => setMenuStep("revoke")}>
-              {BUTTON.revoke}
-            </Button>
-            <Button variant="ghost" block className="!text-danger/80" onClick={() => setMenuStep("delete")}>
-              {BUTTON.remove}
-            </Button>
-          </div>
-        ) : null}
-        {menu && menuStep === "revoke" ? (
-          <>
-            <p className="text-[16px] leading-[22px] text-muted">{TEXT.revokeConfirm}</p>
-            <div className="mt-4 flex gap-2">
-              <Button
-                variant="danger"
-                block
-                onClick={() => {
-                  actions.revoke(menu.id);
-                  closeMenu();
-                }}
-              >
-                {BUTTON.revoke}
-              </Button>
-              <Button variant="secondary" block onClick={closeMenu}>
-                Не сейчас
-              </Button>
-            </div>
-          </>
-        ) : null}
-        {menu && menuStep === "delete" ? (
-          <>
-            <p className="text-[16px] leading-[22px] text-muted">{TEXT.removeConfirm}</p>
-            <div className="mt-4 flex gap-2">
-              <Button
-                variant="danger"
-                block
-                onClick={() => {
-                  actions.remove(menu.id);
-                  closeMenu();
-                }}
-              >
-                {BUTTON.remove}
-              </Button>
-              <Button variant="secondary" block onClick={closeMenu}>
-                Не сейчас
-              </Button>
-            </div>
-          </>
-        ) : null}
-      </Sheet>
-      <PeoplePicker
-        open={menu !== null && menuStep === "reassign"}
-        onClose={closeMenu}
-        title="Кому передать?"
-        subject={menu?.title ?? null}
-        hint="Задача уйдёт этому человеку как новая, у прежнего исполнителя закроется с пометкой"
-        currentId={menu?.assignee_id ?? null}
-        onPick={(person) => {
-          if (menu) actions.reassign({ taskId: menu.id, assigneeId: person.id, assigneeName: person.full_name });
-        }}
-      />
     </section>
   );
 }
 
-/** The last card: the calm lane in one glance and the way to the whole list. */
-function WorkCard({ tasks }: { tasks: BoardTask[] }) {
+/**
+ * The last card: the calm lane in one glance and the way to the whole list — and what waits for
+ * the morning (D-139), so a task dictated at night is not lost from sight until it goes.
+ */
+function WorkCard({ tasks, held, now }: { tasks: BoardTask[]; held: BoardTask[]; now: Date }) {
+  const first = held[0];
+  const heldLine = first
+    ? held.length === 1
+      ? `Отправлю позже: ${quoteTitleOf(first.title)}${first.scheduled_send_at ? ` · ${humanAqtobe(new Date(first.scheduled_send_at), now)}` : ""}`
+      : `Отправлю позже · ${held.length} ${pluralRu(held.length, ["задача", "задачи", "задач"])}`
+    : null;
   return (
     <Link
       href="/sent"
@@ -432,18 +343,27 @@ function WorkCard({ tasks }: { tasks: BoardTask[] }) {
       data-testid="work-card"
     >
       <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: "var(--accent)" }} />
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[13px] leading-4 text-muted">{workRowLabel(tasks.length)}</span>
-        <span className="font-display text-[12px] font-semibold uppercase tracking-[0.06em] text-accent">в работе</span>
-      </span>
-      <ul className="mt-2 flex flex-col gap-1">
-        {tasks.slice(0, 3).map((task) => (
-          <li key={task.id} className="truncate text-[16px] font-semibold leading-[22px]">
-            {task.title}
-          </li>
-        ))}
-        {tasks.length > 3 ? <li className="text-[14px] leading-[18px] text-muted">и ещё {tasks.length - 3}</li> : null}
-      </ul>
+      {tasks.length > 0 ? (
+        <>
+          <span className="flex items-center justify-between gap-2">
+            <span className="text-[13px] leading-4 text-muted">{workRowLabel(tasks.length)}</span>
+            <span className="font-display text-[12px] font-semibold uppercase tracking-[0.06em] text-accent">в работе</span>
+          </span>
+          <ul className="mt-2 flex flex-col gap-1">
+            {tasks.slice(0, 3).map((task) => (
+              <li key={task.id} className="truncate text-[16px] font-semibold leading-[22px]">
+                {task.title}
+              </li>
+            ))}
+            {tasks.length > 3 ? <li className="text-[14px] leading-[18px] text-muted">и ещё {tasks.length - 3}</li> : null}
+          </ul>
+        </>
+      ) : null}
+      {heldLine ? (
+        <span className={`${tasks.length > 0 ? "mt-2" : ""} block truncate text-[14px] leading-[18px] text-muted`} data-testid="work-held">
+          {heldLine}
+        </span>
+      ) : null}
       <span className="mt-2 block text-[14px] leading-[18px] text-accent">Все задачи ›</span>
     </Link>
   );

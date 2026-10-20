@@ -34,6 +34,7 @@ function arcsOf(count: number, tone: string): string {
  *             small light on its head;
  *   closed    handed in — the ring is closed and still, and now and then a ring leaves it;
  *   broken    «не могу» — the ring stopped and snapped;
+ *   held      given out, waiting for the morning — grey and dashed, still, as on «Задачи» (D-139);
  *   done      accepted a moment ago — closed in gold, a tick for the initials, a flash.
  *
  * And one badge at one o'clock when there is something to read or to settle. Only transform and
@@ -101,6 +102,13 @@ export const CrewCircle = memo(function CrewCircle({
               }}
             />
           </>
+        ) : null}
+        {look.ring === "held" ? (
+          // nothing moves yet: the dashes of the «отложена» mark on «Задачи» (StatusGlyph), standing still
+          <span
+            className="crew-band absolute inset-0 block rounded-full"
+            style={{ background: `repeating-conic-gradient(from 0deg, ${tone} 0deg 16deg, transparent 16deg 30deg)` }}
+          />
         ) : null}
         {look.ring === "broken" ? (
           // stopped and snapped: the gap is where it broke
