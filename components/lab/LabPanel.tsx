@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/Button";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
+import { usd, whenAqtobe as when } from "@/lib/lab/format";
 import type { LabCall, LabResponse, LabRow } from "@/lib/lab/rows";
 import type { CompanySettings } from "@/lib/settings";
 // labels only — lib/settings.ts itself would bring zod into this page (D-126)
@@ -80,28 +81,12 @@ function shortModel(model: string): string {
   return MODEL_SHORT[model] ?? model;
 }
 
-function usd(value: number | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  if (value === 0) return "$0";
-  return value < 0.001 ? `$${value.toFixed(5)}` : `$${value.toFixed(4)}`;
-}
-
 function tokens(value: number): string {
   return value.toLocaleString("ru-RU");
 }
 
 function seconds(ms: number | null | undefined): string {
   return ms === null || ms === undefined ? "—" : `${(ms / 1000).toFixed(1)} с`;
-}
-
-function when(iso: string): string {
-  return new Date(iso).toLocaleString("ru-RU", {
-    timeZone: "Asia/Aqtobe",
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 interface ModelStat {
@@ -187,6 +172,8 @@ function ModelsCard({ settings }: { settings: LabSettings }) {
     onSuccess: (saved) => {
       queryClient.setQueryData<LabResponse>(["lab"], (prev) => (prev ? { ...prev, settings: saved } : prev));
       queryClient.invalidateQueries({ queryKey: ["settings"] });
+      // the «Парсер» tab runs the corpus on these models (D-138)
+      queryClient.invalidateQueries({ queryKey: ["lab", "parser"] });
       setEdited(null);
       toast("Модели переключил");
     },
@@ -311,6 +298,7 @@ function RowsTable({ rows }: { rows: LabRow[] }) {
                 <span className="nums text-[12px] leading-4 text-muted">
                   {when(row.created_at)} · {row.source ?? "?"}
                   {row.parse.escalated ? " · эскалация" : ""}
+                  {row.parse.rules_version ? ` · правила v${row.parse.rules_version}` : ""}
                   {row.status !== "ok" ? <span className="text-danger"> · {row.status}</span> : null}
                 </span>
                 <span className="nums shrink-0 text-[15px] font-semibold leading-5">{usd(row.total_cost)}</span>

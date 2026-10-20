@@ -43,6 +43,8 @@ export interface LabRow {
     parse_ms: number | null;
     calls: LabCall[];
     cost: number | null;
+    /** «Правила компании» the parse ran with (D-138): 0 — none, null — written before versions existed. */
+    rules_version: number | null;
   };
   total_cost: number | null;
 }
@@ -125,6 +127,11 @@ function callsOf(row: LogRow): LabCall[] {
   ];
 }
 
+function rulesVersionOf(row: LogRow): number | null {
+  const version = asRecord(row.raw_response).rules_version;
+  return typeof version === "number" ? version : null;
+}
+
 function sumCosts(values: (number | null)[]): number | null {
   const known = values.filter((v): v is number => v !== null);
   return known.length ? known.reduce((a, b) => a + b, 0) : null;
@@ -171,6 +178,7 @@ export function buildLabRows(logs: LogRow[], limit = LAB_ROW_LIMIT): LabRow[] {
         parse_ms: row.parse_ms,
         calls,
         cost: parseTotal,
+        rules_version: rulesVersionOf(row),
       },
       total_cost: sumCosts([sttInfo?.cost ?? null, parseTotal]),
     });

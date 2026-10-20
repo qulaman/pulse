@@ -7,7 +7,7 @@ import { pinAssignee } from "@/lib/ai/pin";
 import { postprocess, type PostprocessedEntity } from "@/lib/ai/postprocess";
 import { matchErrand } from "@/lib/errands/matcher";
 import { hasActiveSecretary, loadCompanySettings, loadRoster } from "@/lib/roster";
-import { parseCompanySettings } from "@/lib/settings";
+import { activeParserRules, parseCompanySettings } from "@/lib/settings";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import type { Json } from "@/lib/supabase/types";
 
@@ -85,6 +85,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     }
 
     const settings = parseCompanySettings(rawSettings);
+    const rules = activeParserRules(settings.parser_rules);
 
     // «Кофе» до модели (D-79): короткая фраза без имени из ростера, совпавшая с кнопкой
     // каталога, — это заявка, а не поручение. Ни токена, ни экрана подтверждения.
@@ -104,6 +105,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         escalate: settings.parser.escalate,
         escalationModel: settings.parser.escalation_model,
         conventions: settings.conventions,
+        rules: rules.text,
       });
     } catch (error) {
       const code = error instanceof ParseError ? error.code : "parse_failed";
@@ -146,6 +148,8 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         stop_reason: raw?.stop_reason ?? null,
         escalated: outcome.escalated,
         calls: outcome.calls as unknown as Json,
+        // which «Правила компании» the parse ran with, 0 — none (D-138): before/after in the lab
+        rules_version: rules.version,
       },
     });
 

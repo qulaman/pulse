@@ -10,10 +10,9 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { parseTranscript, ParseError } from "../../lib/ai/parse";
-import { postprocess, type PostprocessedEntity } from "../../lib/ai/postprocess";
-import type { ParseSource } from "../../lib/ai/prompt";
-import type { RosterUser } from "../../lib/matchName";
+import { loadCorpus } from "../../lib/ai/evals/corpus";
+import { runCase } from "../../lib/ai/evals/run";
+import { passesGates, summarize, type CaseResult } from "../../lib/ai/evals/score";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -24,48 +23,6 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1, output: 5 },
   "claude-sonnet-5": { input: 2, output: 10 },
 };
-
-interface ExpectedEntity {
-  kind: string;
-  id?: string;
-  assignee_id?: string | null;
-  deadline_iso?: string | null;
-  amount?: number;
-  group_with?: string;
-}
-
-interface EvalCase {
-  id: string;
-  source: ParseSource;
-  transcript: string;
-  frozen_now: string;
-  expected: { entities: ExpectedEntity[] };
-}
-
-interface CaseResult {
-  id: string;
-  ok: boolean;
-  model: string;
-  escalated: boolean;
-  latencyMs: number;
-  entityHits: number;
-  expectedCount: number;
-  predictedCount: number;
-  assigneeChecked: number;
-  assigneeCorrect: number;
-  deadlineChecked: number;
-  deadlineCorrect: number;
-  splitOk: boolean;
-  queryOk: boolean;
-  failures: string[];
-  error?: string;
-  /** model ids that exist in the roster, before postprocess repairs them (D-56) */
-  idValid: number;
-  idTotal: number;
-  /** matched assignees the director sees without a yellow «проверь» chip */
-  autoOk: number;
-  autoChecked: number;
-}
 
 function parseArgs(argv: string[]) {
   const out = { escalate: true, filter: "", limit: 0, gate: true, demoIds: false };
@@ -83,152 +40,6 @@ function loadEnv(): void {
   const file = join(ROOT, ".env.local");
   if (!existsSync(file)) return;
   process.loadEnvFile(file);
-}
-
-/** Fixture ids (u-003) → what production hands the model (uuids), and back for scoring. */
-const idBack = new Map<string, string>();
-
-/**
- * Production rosters carry uuids, and the few-shot examples carry u-0NN ids the model
- * happily copies (D-56) — a run on the demo ids never sees that. Real ids are the
- * default; `--demo-ids` keeps the fixtures' own ids for comparison with old runs.
- */
-function loadRoster(demoIds: boolean): RosterUser[] {
-  const raw = JSON.parse(readFileSync(join(ROOT, "tests", "stt", "roster.json"), "utf8")) as {
-    users: { id: string; full_name: string; aliases: string[] }[];
-  };
-  return raw.users.map((u, index) => {
-    const id = demoIds ? u.id : `10000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`;
-    idBack.set(id, u.id);
-    return { ...u, id, is_active: true };
-  });
-}
-
-function loadCases(): EvalCase[] {
-  return readFileSync(join(HERE, "parser_evals.jsonl"), "utf8")
-    .trim()
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as EvalCase);
-}
-
-function assigneeIdOf(entity: PostprocessedEntity): string | null {
-  const id = entity.assignee?.status === "matched" ? (entity.assignee.user_id ?? null) : null;
-  return id === null ? null : (idBack.get(id) ?? id);
-}
-
-/** Greedy match on (kind, assignee after matchName); kind-only fallback keeps recall honest. */
-function pair(
-  expected: ExpectedEntity[],
-  predicted: PostprocessedEntity[],
-): { exp: ExpectedEntity; pred: PostprocessedEntity }[] {
-  const free = [...predicted];
-  const pairs: { exp: ExpectedEntity; pred: PostprocessedEntity }[] = [];
-
-  for (const exp of expected) {
-    let index = free.findIndex(
-      (p) =>
-        p.kind === exp.kind &&
-        (exp.assignee_id === undefined || assigneeIdOf(p) === exp.assignee_id),
-    );
-    if (index === -1) index = free.findIndex((p) => p.kind === exp.kind);
-    if (index === -1) continue;
-    pairs.push({ exp, pred: free[index] });
-    free.splice(index, 1);
-  }
-  return pairs;
-}
-
-function deadlineOf(entity: PostprocessedEntity): string | null {
-  if (entity.kind === "task") return entity.deadline_iso;
-  if (entity.kind === "reminder") return entity.remind_at_iso;
-  // a meeting's moment lives in its own field, and expected.deadline_iso checks it (D-78)
-  if (entity.kind === "event") return entity.starts_at_iso;
-  return null;
-}
-
-function within30Min(a: string, b: string): boolean {
-  return Math.abs(Date.parse(a) - Date.parse(b)) <= 30 * 60 * 1000;
-}
-
-function groupIdOf(entity: PostprocessedEntity): string | null {
-  return entity.kind === "task" ? entity.group_id : null;
-}
-
-function scoreCase(c: EvalCase, predicted: PostprocessedEntity[]): Omit<
-  CaseResult,
-  "id" | "model" | "escalated" | "latencyMs" | "error" | "idValid" | "idTotal" | "autoOk" | "autoChecked"
-> {
-  const failures: string[] = [];
-  const pairs = pair(c.expected.entities, predicted);
-
-  let entityHits = 0;
-  let assigneeChecked = 0;
-  let assigneeCorrect = 0;
-  let deadlineChecked = 0;
-  let deadlineCorrect = 0;
-
-  for (const { exp, pred } of pairs) {
-    const assigneeOk =
-      exp.assignee_id === undefined || assigneeIdOf(pred) === (exp.assignee_id ?? null);
-    if (exp.assignee_id !== undefined) {
-      assigneeChecked++;
-      if (assigneeOk) assigneeCorrect++;
-      else failures.push(`${exp.kind}: assignee ожидался ${exp.assignee_id}, получен ${assigneeIdOf(pred)}`);
-    }
-    if (assigneeOk) entityHits++;
-
-    if (exp.deadline_iso !== undefined) {
-      deadlineChecked++;
-      const actual = deadlineOf(pred);
-      const ok =
-        exp.deadline_iso === null
-          ? actual === null
-          : actual !== null && within30Min(actual, exp.deadline_iso);
-      if (ok) deadlineCorrect++;
-      else failures.push(`${exp.kind}: дедлайн ожидался ${exp.deadline_iso}, получен ${actual}`);
-    }
-
-    if (exp.amount !== undefined) {
-      const actual = pred.kind === "points" ? pred.amount : null;
-      if (actual !== exp.amount) failures.push(`points: amount ожидался ${exp.amount}, получен ${actual}`);
-    }
-  }
-
-  const countOk = predicted.length === c.expected.entities.length;
-  if (!countOk) {
-    failures.push(`сущностей ожидалось ${c.expected.entities.length}, получено ${predicted.length}`);
-  }
-
-  // group_with: two expected entities must land on the same group_id.
-  let groupOk = true;
-  for (const { exp, pred } of pairs) {
-    if (!exp.group_with) continue;
-    const other = pairs.find((p) => p.exp.id === exp.group_with);
-    if (!other || groupIdOf(pred) === null || groupIdOf(pred) !== groupIdOf(other.pred)) {
-      groupOk = false;
-      failures.push(`group_id не совпал для ${exp.id ?? exp.kind} и ${exp.group_with}`);
-    }
-  }
-
-  const expectQuery = c.expected.entities.some((e) => e.kind === "query");
-  const gotQuery = predicted.some((e) => e.kind === "query");
-  const queryOk = expectQuery === gotQuery;
-  if (!queryOk) failures.push(`query: ожидалось ${expectQuery}, получено ${gotQuery}`);
-
-  return {
-    ok: failures.length === 0,
-    entityHits,
-    expectedCount: c.expected.entities.length,
-    predictedCount: predicted.length,
-    assigneeChecked,
-    assigneeCorrect,
-    deadlineChecked,
-    deadlineCorrect,
-    splitOk: countOk && groupOk,
-    queryOk,
-    failures,
-  };
 }
 
 function previousResult(): { file: string; data: { cases: CaseResult[] } } | null {
@@ -250,8 +61,9 @@ function stamp(date: Date): string {
 async function main(): Promise<void> {
   loadEnv();
   const args = parseArgs(process.argv.slice(2));
-  const roster = loadRoster(args.demoIds);
-  let cases = loadCases();
+  // scoring and the case run live in lib/ai/evals — the lab's corpus run uses the same (D-138)
+  const corpus = loadCorpus(ROOT, { demoIds: args.demoIds });
+  let cases = corpus.cases;
   if (args.filter) cases = cases.filter((c) => c.id.startsWith(args.filter));
   if (args.limit > 0) cases = cases.slice(0, args.limit);
 
@@ -265,112 +77,47 @@ async function main(): Promise<void> {
   let cost = 0;
 
   for (const c of cases) {
-    const now = new Date(c.frozen_now);
-    try {
-      const outcome = await parseTranscript({
-        transcript: c.transcript,
-        source: c.source,
-        now,
-        roster,
-        escalate: args.escalate,
-      });
-      // the model's own pick before postprocess: a full_name copied from the roster (D-56)
-      const rosterIds = new Set(roster.map((u) => u.full_name));
-      const rawIds = outcome.entities.flatMap((e) =>
-        "assignee_name" in e && e.assignee_name !== null ? [e.assignee_name] : [],
-      );
-      const predicted = postprocess(outcome.entities, roster, c.source);
-      const matched = predicted.filter((e) => e.assignee?.status === "matched");
-      const score = {
-        ...scoreCase(c, predicted),
-        idValid: rawIds.filter((id) => rosterIds.has(id)).length,
-        idTotal: rawIds.length,
-        autoOk: matched.filter((e) => e.assignee?.flag === "ok").length,
-        autoChecked: matched.length,
-      };
-
-      usage.input += outcome.usage.input_tokens;
-      usage.output += outcome.usage.output_tokens;
-      usage.cacheRead += outcome.usage.cache_read_input_tokens;
-      usage.cacheWrite += outcome.usage.cache_creation_input_tokens;
-
-      const price = PRICING[outcome.model] ?? PRICING["claude-haiku-4-5"];
-      cost +=
-        (outcome.usage.input_tokens * price.input +
-          outcome.usage.cache_creation_input_tokens * price.input * 1.25 +
-          outcome.usage.cache_read_input_tokens * price.input * 0.1 +
-          outcome.usage.output_tokens * price.output) /
-        1_000_000;
-
-      results.push({
-        id: c.id,
-        model: outcome.model,
-        escalated: outcome.escalated,
-        latencyMs: outcome.latencyMs,
-        ...score,
-      });
-      console.log(`${score.ok ? "ok  " : "FAIL"} ${c.id} (${outcome.model}${outcome.escalated ? ", escalated" : ""})`);
-      for (const f of score.failures) console.log(`       ${f}`);
-    } catch (error) {
-      const code = error instanceof ParseError ? error.code : "unknown";
-      const cause = (error as { cause?: unknown }).cause;
-      const detail = cause instanceof Error ? ` (${cause.name}: ${cause.message})` : "";
-      results.push({
-        id: c.id,
-        ok: false,
-        model: "-",
-        escalated: false,
-        latencyMs: 0,
-        entityHits: 0,
-        expectedCount: c.expected.entities.length,
-        predictedCount: 0,
-        assigneeChecked: 0,
-        assigneeCorrect: 0,
-        deadlineChecked: 0,
-        deadlineCorrect: 0,
-        splitOk: false,
-        queryOk: false,
-        failures: [],
-        idValid: 0,
-        idTotal: 0,
-        autoOk: 0,
-        autoChecked: 0,
-        error: `${code}: ${(error as Error).message}${detail}`,
-      });
-      console.log(`ERR  ${c.id} — ${code}: ${(error as Error).message}${detail}`);
+    const run = await runCase(c, corpus, { escalate: args.escalate });
+    const score = run.result;
+    results.push(score);
+    if (score.error) {
+      console.log(`ERR  ${c.id} — ${score.error}`);
+      continue;
     }
+    if (run.usage) {
+      usage.input += run.usage.input_tokens;
+      usage.output += run.usage.output_tokens;
+      usage.cacheRead += run.usage.cache_read_input_tokens;
+      usage.cacheWrite += run.usage.cache_creation_input_tokens;
+
+      const price = PRICING[score.model] ?? PRICING["claude-haiku-4-5"];
+      cost +=
+        (run.usage.input_tokens * price.input +
+          run.usage.cache_creation_input_tokens * price.input * 1.25 +
+          run.usage.cache_read_input_tokens * price.input * 0.1 +
+          run.usage.output_tokens * price.output) /
+        1_000_000;
+    }
+    console.log(`${score.ok ? "ok  " : "FAIL"} ${c.id} (${score.model}${score.escalated ? ", escalated" : ""})`);
+    for (const f of score.failures) console.log(`       ${f}`);
   }
 
-  const sum = (pick: (r: CaseResult) => number) => results.reduce((a, r) => a + pick(r), 0);
-  const hits = sum((r) => r.entityHits);
-  const expectedTotal = sum((r) => r.expectedCount);
-  const predictedTotal = sum((r) => r.predictedCount);
-  const precision = predictedTotal ? hits / predictedTotal : 0;
-  const recall = expectedTotal ? hits / expectedTotal : 0;
-  const f1 = precision + recall ? (2 * precision * recall) / (precision + recall) : 0;
-  const assigneeChecked = sum((r) => r.assigneeChecked);
-  const assignee = assigneeChecked ? sum((r) => r.assigneeCorrect) / assigneeChecked : 1;
-  const deadlineChecked = sum((r) => r.deadlineChecked);
-  const deadline = deadlineChecked ? sum((r) => r.deadlineCorrect) / deadlineChecked : 1;
-  const split = results.length ? results.filter((r) => r.splitOk).length / results.length : 0;
-  const query = results.length ? results.filter((r) => r.queryOk).length / results.length : 0;
-  const latencies = results.map((r) => r.latencyMs).sort((a, b) => a - b);
-  const p50 = latencies.length ? latencies[Math.floor(latencies.length / 2)] : 0;
+  const metrics = summarize(results);
+  const { assignee, precision, recall, f1, deadline, split, query } = metrics;
+  const p50 = metrics.p50LatencyMs;
 
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
   console.log("\n| метрика | значение |");
   console.log("|---|---|");
-  console.log(`| кейсов | ${results.length} (провалено ${results.filter((r) => !r.ok).length}) |`);
+  console.log(`| кейсов | ${metrics.cases} (провалено ${metrics.failed}) |`);
   console.log(`| assignee accuracy | ${pct(assignee)} (гейт 97%) |`);
-  const idTotal = sum((r) => r.idTotal);
-  const autoChecked = sum((r) => r.autoChecked);
-  console.log(`| имя исполнителя от модели — из ростера | ${idTotal ? pct(sum((r) => r.idValid) / idTotal) : "—"} |`);
-  console.log(`| исполнитель без чипа «проверь» | ${autoChecked ? pct(sum((r) => r.autoOk) / autoChecked) : "—"} |`);
+  console.log(`| имя исполнителя от модели — из ростера | ${metrics.idValid === null ? "—" : pct(metrics.idValid)} |`);
+  console.log(`| исполнитель без чипа «проверь» | ${metrics.autoOk === null ? "—" : pct(metrics.autoOk)} |`);
   console.log(`| entity F1 | ${pct(f1)} (гейт 90%), P ${pct(precision)} / R ${pct(recall)} |`);
   console.log(`| deadline accuracy | ${pct(deadline)} |`);
   console.log(`| полнота мульти-разбиения | ${pct(split)} |`);
   console.log(`| query/command accuracy | ${pct(query)} |`);
-  console.log(`| эскалаций | ${results.filter((r) => r.escalated).length} |`);
+  console.log(`| эскалаций | ${metrics.escalated} |`);
   console.log(
     `| токены | вход ${usage.input}, кэш-чтение ${usage.cacheRead}, кэш-запись ${usage.cacheWrite}, выход ${usage.output} |`,
   );
@@ -409,7 +156,7 @@ async function main(): Promise<void> {
   );
   console.log(`\nрезультат: ${outFile}`);
 
-  if (args.gate && (assignee < 0.97 || f1 < 0.9)) {
+  if (args.gate && !passesGates(metrics)) {
     console.error("ГЕЙТ КРАСНЫЙ: assignee < 97% или F1 < 90%.");
     process.exit(1);
   }

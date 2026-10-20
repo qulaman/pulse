@@ -5,13 +5,13 @@ import { useState, type ReactNode } from "react";
 
 import { LAB_TABS, type LabTab } from "@/lib/lab/tabs";
 
-const TITLES: Record<LabTab, string> = { models: "Модели", costs: "Себестоимость" };
+const TITLES: Record<LabTab, string> = { models: "Модели", parser: "Парсер", costs: "Себестоимость" };
 
 const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
 
 /**
- * The lab as two tabs: the model bench with its per-call costs, and what a client instance
- * costs to run. A tab is mounted on its first visit and then only hidden, so the calculator
+ * The lab as three tabs: the model bench with its per-call costs, the parser's prompt and the
+ * company's own rules (D-138), and what a client instance costs to run. A tab is mounted on its first visit and then only hidden, so the calculator
  * keeps its sliders across a trip to the models; the address keeps the tab for a reload.
  */
 export function LabTabs({ initialTab, panels }: { initialTab: LabTab; panels: Record<LabTab, ReactNode> }) {
@@ -27,7 +27,7 @@ export function LabTabs({ initialTab, panels }: { initialTab: LabTab; panels: Re
 
   return (
     <>
-      <div role="tablist" aria-label="Разделы лаборатории" className="seg mt-4 grid grid-cols-2 gap-1 rounded-[14px] p-1">
+      <div role="tablist" aria-label="Разделы лаборатории" className="seg mt-4 grid grid-cols-3 gap-1 rounded-[14px] p-1">
         {LAB_TABS.map((key) => {
           const active = key === tab;
           return (

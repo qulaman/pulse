@@ -1,5 +1,5 @@
 /** The lab's tabs in order; `?tab=` carries one of these keys. */
-export const LAB_TABS = ["models", "costs"] as const;
+export const LAB_TABS = ["models", "parser", "costs"] as const;
 export type LabTab = (typeof LAB_TABS)[number];
 
 /** An unknown or missing `?tab=` opens the models. */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CostReport } from "@/components/lab/CostReport";
 import { LabPanel } from "@/components/lab/LabPanel";
 import { LabTabs } from "@/components/lab/LabTabs";
+import { ParserPanel } from "@/components/lab/ParserPanel";
 import { PageHead } from "@/components/ui/PageHead";
 import type { LabTab } from "@/lib/lab/tabs";
 
@@ -43,6 +44,7 @@ export function LabScreen({ tab }: { tab: LabTab }) {
               </div>
             </>
           ),
+          parser: <ParserPanel />,
           costs: <CostReport />,
         }}
       />

@@ -17,6 +17,7 @@ describe("shouldKeep", () => {
   it("leaves out the heavy desk tools and a query that asks not to be kept", () => {
     expect(shouldKeep(query(["admin", "tasks", 0]))).toBe(false);
     expect(shouldKeep(query(["lab"]))).toBe(false);
+    expect(shouldKeep(query(["lab", "parser"]))).toBe(false);
     expect(shouldKeep(query(["people"], "success", { keep: false }))).toBe(false);
   });
 });

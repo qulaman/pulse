@@ -99,4 +99,13 @@ describe("buildLabRows", () => {
     expect(rows[0].parse.cost).toBeNull();
     expect(rows[0].total_cost).toBeNull();
   });
+
+  it("says which «Правила компании» a parse ran with (D-138)", () => {
+    const [withRules, before] = buildLabRows([
+      log({ id: "p2", kind: "parse", raw_response: { rules_version: 3 } }),
+      log({ id: "p3", kind: "parse", client_request_id: "req-2" }),
+    ]);
+    expect(withRules.parse.rules_version).toBe(3);
+    expect(before.parse.rules_version).toBeNull();
+  });
 });

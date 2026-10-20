@@ -88,6 +88,9 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/dictionary/aliases` | POST | director, secretary | D-111: `{person_id, add?, remove?}` — формы имени человека; сервер перечитывает строку и сливает под RLS вызывающего (строка директора секретарю недоступна — 403 `not_permitted`); множество — повтор из очереди безвреден |
 | `/api/dictionary/misheard` | GET, POST | director, secretary | D-111, вторая волна: GET — уроки подтверждённых разборов за 30 дней (`collectMisheard`): только пары «форма → человек», счёт и дата, без текстов — `ai_logs` читается серверным ключом в пределах компании; POST `{dismiss: [key]}` — спрятать пары для всех (`settings.dictionary.dismissed`, до 200) |
 | `/api/lab` | GET, PATCH | director, secretary (D-63) | GET — последние 400 строк `ai_logs` (stt/parse) с ценой по `lib/ai/pricing.ts`; PATCH — секции `stt`, `parser` service-клиентом |
+| `/api/lab/parser` | GET, PUT | director, secretary (D-138) | GET — промпт ровно как уйдёт в разбор, ростер, примеры, счёт токенов, версии правил, список корпуса; PUT `{ text, client_request_id, pieces }` — новая версия «Правил компании» в `settings.parser_rules` через `update_company_settings` от имени вызывающего; непустой текст — только с подписанными частями прогона всего корпуса этого текста на модели компании и с порогами CLI (`422 eval_forged / eval_stale / eval_incomplete / eval_gate`), тот же текст — `409 unchanged`, повтор `client_request_id` — прежний ответ |
+| `/api/lab/parser/try` | POST | director, secretary (D-138) | фраза → сущности с черновиком правил и с действующими (ростер, конвенции, матчер компании; `run` — другая модель для сравнения); ничего не пишет, в `ai_logs` тоже |
+| `/api/lab/parser/eval` | POST | director, secretary (D-138) | до 8 кейсов корпуса с черновиком правил → подписанная часть прогона `{ payload, stamp }` (`lib/ai/evals/stamp.ts`); ничего не пишет |
 | `/api/me` | GET | любая сессия | `{profile}` |
 | `/api/health` | GET | публичный | liveness `{ok, version, time}`, без БД |
 | `/api/version` | GET | публичный | сборка сервера `{id, sha, at, compat}` — с ней телефон сверяет свою (D-115); `no-store`, без БД |
@@ -367,6 +370,6 @@ pg_cron, pg_net и Edge Functions не подключены (G.20c). Единс�
 ## 12. Наблюдаемость
 
 - Ошибки роутов — `console.error` в логи Vercel без тела запроса и ключей (`withAuth`, §1).
-- `ai_logs` (схема в DATABASE.md): каждый вызов STT и парсера — провайдер, модель, латентность по этапам, токены (`input`, `output`, `cache_read`), `parsed/confirmed_entities` + `was_edited` / `edit_fields`, `source`, `client_request_id`, `status` (`ok` | `error:<код>`). Колонки стоимости нет: цену считает «Лаб» по `lib/ai/pricing.ts` (D-63). `tool_calls` не заполняется (вопросов к данным нет). Аудио в логи не пишется.
+- `ai_logs` (схема в DATABASE.md): каждый вызов STT и парсера — провайдер, модель, латентность по этапам, токены (`input`, `output`, `cache_read`), `parsed/confirmed_entities` + `was_edited` / `edit_fields`, `source`, `client_request_id`, `status` (`ok` | `error:<код>`); у разбора в `raw_response` — `calls` и `rules_version` (D-138). Колонки стоимости нет: цену считает «Лаб» по `lib/ai/pricing.ts` (D-63). `tool_calls` не заполняется (вопросов к данным нет). Аудио в логи не пишется.
 - `/api/health` — liveness без БД.
 - Алертов и Sentry нет — не построено; идея — IDEAS.md (И-85).

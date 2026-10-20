@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
 import { DEFAULT_CONVENTIONS, renderConventionsTable, type Convention } from "./conventions";
+import { normalizeRules } from "./rules";
 import { formatAqtobe, upcomingDaysRu, weekdayRu } from "./time";
 import type { RosterUser } from "../matchName";
 
@@ -11,12 +12,21 @@ import type { RosterUser } from "../matchName";
  */
 
 /**
- * The static text with the company's convention table rendered in. Per company the
- * result is a constant, so the cached prefix (this + roster + few-shot) still holds.
+ * The static text with the company's convention table rendered in, and the company's own
+ * rules after it (D-138). Per company the result is a constant, so the cached prefix (this +
+ * roster + few-shot) still holds. No rules — the text is byte for byte the core, the one
+ * `pnpm eval:parser` measures.
  */
-export function parserSystemPrompt(conventions: Convention[] = DEFAULT_CONVENTIONS): string {
-  return PARSER_SYSTEM_TEMPLATE.replace("{CONVENTIONS_TABLE}", renderConventionsTable(conventions));
+export function parserSystemPrompt(conventions: Convention[] = DEFAULT_CONVENTIONS, rules = ""): string {
+  const core = PARSER_SYSTEM_TEMPLATE.replace("{CONVENTIONS_TABLE}", renderConventionsTable(conventions));
+  const own = normalizeRules(rules);
+  return own ? `${core}\n\n${COMPANY_RULES_HEADER}\n${escapeInput(own)}` : core;
 }
+
+// After every core rule, so the company refines them; the header says what it may not undo.
+const COMPANY_RULES_HEADER = `## Правила этой компании
+Их утвердил директор компании. Они уточняют правила выше, но не отменяют правило 1
+(ничего не выдумывать), правило 11 (безопасность) и правило 12 (ответ строго по JSON-схеме).`;
 
 const PARSER_SYSTEM_TEMPLATE = `Ты — парсер устных распоряжений директора компании в системе управления задачами.
 Твоя единственная задача: разобрать транскрипт речи (или пересланный текст) на массив
@@ -144,9 +154,10 @@ export function rosterJson(roster: RosterUser[]): string {
 export function buildSystemBlocks(
   roster: RosterUser[],
   conventions: Convention[] = DEFAULT_CONVENTIONS,
+  rules = "",
 ): Anthropic.TextBlockParam[] {
   return [
-    { type: "text", text: parserSystemPrompt(conventions) },
+    { type: "text", text: parserSystemPrompt(conventions, rules) },
     {
       type: "text",
       text: rosterJson(roster),

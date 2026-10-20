@@ -32,6 +32,11 @@ const nextConfig: NextConfig = {
     PULSE_BUILD_SHA: sha.slice(0, 7),
     PULSE_BUILD_AT: git("log -1 --format=%cI"),
   },
+  // the lab's corpus run reads the parser corpus from disk, as `pnpm eval:parser` does (D-138)
+  outputFileTracingIncludes: {
+    "/api/lab/parser": ["./tests/ai/parser_evals.jsonl", "./tests/stt/roster.json"],
+    "/api/lab/parser/eval": ["./tests/ai/parser_evals.jsonl", "./tests/stt/roster.json"],
+  },
   experimental: {
     // screens open from the router cache, not from the server (D-126, D-136): they are client
     // pages fed by TanStack Query and Realtime, the server part is the shell and the session.

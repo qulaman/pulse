@@ -193,6 +193,17 @@ export function ParserSection() {
             </select>
           </Field>
         ) : null}
+        {/* the rules are saved only after a corpus run — that lives in the lab (D-138) */}
+        <Link href="/lab?tab=parser" data-testid="settings-parser-rules" className="flex min-h-[44px] items-center justify-between gap-3">
+          <span className="min-w-0">
+            <span className="block text-[16px] leading-[22px]">Правила компании</span>
+            <span className="block text-[13px] leading-4 text-muted">
+              {/* `?.`: a phone's offline copy (D-127) may hold settings from a build before D-138 */}
+              {server.parser_rules?.versions[0]?.text ? `Версия ${server.parser_rules.versions[0].version}` : "Своих нет"} · промпт, песочница и проверка — в Лаборатории
+            </span>
+          </span>
+          <span aria-hidden className="text-[18px] text-muted">›</span>
+        </Link>
       </div>
       {dirty.parser ? (
         <SectionActions pending={saving("parser")} onSave={() => save({ parser: draft.parser })} onReset={() => update({ parser: server.parser })} />

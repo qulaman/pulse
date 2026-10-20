@@ -1,12 +1,45 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  activeParserRules,
   parseCompanySettings,
   secretaryActionCode,
   SecretarySettingsSchema,
   SettingsPatchSchema,
   withSecretaryCodes,
 } from "@/lib/settings";
+
+describe("«Правила компании» (D-138)", () => {
+  const version = {
+    version: 2,
+    text: "«Склад» — это Тимур.",
+    saved_at: "2026-10-20T10:00:00.000Z",
+    saved_by: "u1",
+    saved_by_name: "Директор",
+    eval: { cases: 66, failed: 1, assignee: 1, f1: 0.97, deadline: 0.92, model: "claude-haiku-4-5", cost_usd: 0.2 },
+  };
+
+  it("a fresh company has none — the parser runs the core", () => {
+    const settings = parseCompanySettings({});
+    expect(settings.parser_rules).toEqual({ versions: [], request_id: null });
+    expect(activeParserRules(settings.parser_rules)).toEqual({ text: "", version: 0 });
+  });
+
+  it("the newest version is the one in force", () => {
+    const settings = parseCompanySettings({ parser_rules: { versions: [version, { ...version, version: 1, text: "старое" }] } });
+    expect(activeParserRules(settings.parser_rules)).toEqual({ text: "«Склад» — это Тимур.", version: 2 });
+  });
+
+  it("a broken section is no rules, never the whole settings back to defaults", () => {
+    const settings = parseCompanySettings({ parser_rules: { versions: "oops" }, points_enabled: true });
+    expect(settings.parser_rules.versions).toEqual([]);
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("no settings PATCH can write the rules — only the corpus-checked save can", () => {
+    expect(SettingsPatchSchema.safeParse({ parser_rules: { versions: [version] } }).success).toBe(false);
+  });
+});
 
 describe("points rules, Эфир and the telegraph (D-133)", () => {
   it("a fresh company gets the D-13 rules with the penalty off, both Эфир lines and a worrying face", () => {

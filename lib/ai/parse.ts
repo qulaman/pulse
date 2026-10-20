@@ -53,6 +53,8 @@ export interface ParseInput {
   escalationModel?: string;
   /** company.settings.conventions (D-15); the defaults when absent. */
   conventions?: Convention[];
+  /** The company's own rules after the core prompt (D-138); none when absent. */
+  rules?: string;
 }
 
 const MAX_TOKENS = 4096;
@@ -180,7 +182,7 @@ async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: nu
   const result = await callDeepSeek({
     model,
     messages: toChatMessages(
-      buildSystemBlocks(input.roster, input.conventions),
+      buildSystemBlocks(input.roster, input.conventions, input.rules),
       requestMessages(input),
       ENTITIES_JSON_SCHEMA,
     ),
@@ -219,7 +221,7 @@ async function callModel(
       model,
       max_tokens: maxTokens,
       thinking: thinkingFor(model),
-      system: buildSystemBlocks(input.roster, input.conventions),
+      system: buildSystemBlocks(input.roster, input.conventions, input.rules),
       messages: requestMessages(input),
       output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } },
     });

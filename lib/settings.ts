@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
+import { PARSER_RULES_HISTORY_MAX, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import { DEFAULT_WORD_KINDS, KIND_LABEL_MAX, WORD_KINDS_MAX } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
 import { STT_PROVIDERS } from "@/lib/settings-plain";
@@ -39,6 +40,48 @@ export const ParserSettingsSchema = z.object({
   /** Re-run on the stronger model when the parse looks shaky (docs/AI.md §8). */
   escalate: z.boolean().default(true),
 });
+
+/** The corpus run a version of the rules passed before it was saved (D-138). */
+export const ParserRulesEvalSchema = z.object({
+  cases: z.number().int(),
+  failed: z.number().int(),
+  assignee: z.number(),
+  f1: z.number(),
+  deadline: z.number(),
+  model: z.string(),
+  cost_usd: z.number().nullable(),
+});
+
+export const ParserRulesVersionSchema = z.object({
+  version: z.number().int().min(1),
+  /** Empty — the company went back to the core prompt. */
+  text: z.string().max(PARSER_RULES_MAX),
+  saved_at: z.string(),
+  saved_by: z.string().nullable(),
+  saved_by_name: z.string().nullable(),
+  /** null: an empty text needs no run — it is the core `pnpm eval:parser` measures. */
+  eval: ParserRulesEvalSchema.nullable(),
+});
+
+export type ParserRulesVersion = z.infer<typeof ParserRulesVersionSchema>;
+
+/**
+ * «Правила компании» (D-138): the active version is `versions[0]`, the older ones follow.
+ * Written by `/api/lab/parser` only — after a corpus run — so no settings PATCH carries it.
+ */
+export const ParserRulesSchema = z.object({
+  versions: z.array(ParserRulesVersionSchema).max(PARSER_RULES_HISTORY_MAX).default([]),
+  /** The client_request_id of the last save: a retried save makes no second version. */
+  request_id: z.string().nullable().default(null),
+});
+
+export type ParserRules = z.infer<typeof ParserRulesSchema>;
+
+/** What the parser runs with: the newest version's text, or nothing. */
+export function activeParserRules(rules: ParserRules): { text: string; version: number } {
+  const head = rules.versions[0];
+  return head ? { text: head.text, version: head.version } : { text: "", version: 0 };
+}
 
 /** Overrides only: an absent key keeps the default from lib/ai/config.ts. */
 export const MatchingSettingsSchema = z
@@ -185,6 +228,8 @@ export const CompanySettingsSchema = z.object({
   // prefault: the empty object goes through the section schema, so its own defaults apply
   stt: SttSettingsSchema.prefault({}),
   parser: ParserSettingsSchema.prefault({}),
+  /** The company's own parser rules and their versions (D-138); a broken section is no rules, not lost settings. */
+  parser_rules: ParserRulesSchema.prefault({}).catch({ versions: [], request_id: null }),
   /** Counterparties and site names — STT prompt hints (docs/AI.md §1). */
   vocabulary: z.array(z.string().min(1)).default([]),
   /** Kind, author and date of each word, keyed by `entryKey` — the screen's, not the prompt's (D-111). */
