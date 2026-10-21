@@ -11,6 +11,7 @@ import { QueryProvider } from "@/components/providers/QueryProvider";
 import { PushSync } from "@/components/push/PushSync";
 import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
+import { TapHaptics } from "@/components/TapHaptics";
 import { loadBrand } from "@/lib/brand";
 import { QUIET_LOOPS } from "@/lib/design/quiet-loops";
 import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
@@ -75,6 +76,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <PushSync />
           {/* a sign-in taken away (all devices, a fired person) lands on the sign-in screen (D-135) */}
           <SessionWatch />
+          {/* every tap ticks — one listener, no button codes it (D-147) */}
+          <TapHaptics />
         </QueryProvider>
       </body>
     </html>

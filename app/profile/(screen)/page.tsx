@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { InstallHint } from "@/components/InstallHint";
 import { PulseMark } from "@/components/brand/PulseMark";
+import { HapticsRow } from "@/components/profile/HapticsRow";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { AfterPoints } from "@/components/profile/AfterPoints";
 import { OtherDeviceRow } from "@/components/profile/OtherDeviceRow";
@@ -56,6 +57,7 @@ export default async function ProfilePage() {
           <OtherDeviceRow userId={profile.userId} fullName={profile.fullName} />
           <SignOutOthersRow userId={profile.userId} />
           <NotificationsRow director={director} />
+          <HapticsRow />
           <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
         </RowGroup>
 

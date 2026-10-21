@@ -2,6 +2,8 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+import { HapticSwitch } from "@/components/ui/HapticSwitch";
+
 export type ChipTone = "neutral" | "warn" | "danger" | "muted" | "accent" | "ok" | "gold";
 
 /** Status chips are tinted; the accent chip (an active filter) is filled — it reads as pressed. */
@@ -36,10 +38,12 @@ export function Chip({ tone = "neutral", interactive = true, className = "", chi
   return (
     <button
       type="button"
-      className={`${base} min-h-[34px] transition-[transform,background-color,color] duration-[120ms] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35`}
+      className={`${base} relative min-h-[34px] transition-[transform,background-color,color] duration-[120ms] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35`}
       {...rest}
     >
       {children}
+      {/* the iPhone's tick lies under the finger (D-147) */}
+      {rest.disabled ? null : <HapticSwitch />}
     </button>
   );
 }

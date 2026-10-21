@@ -26,6 +26,14 @@ export const BellIcon = () => (
   </svg>
 );
 
+/** A phone between two short waves: «вибрация». */
+export const VibrateIcon = () => (
+  <svg {...stroke}>
+    <rect x="6.5" y="3" width="7" height="14" rx="1.8" />
+    <path d="M3.5 7.5v5M16.5 7.5v5" />
+  </svg>
+);
+
 export const SendIcon = () => (
   <svg {...stroke}>
     <path d="M16.5 4 3.5 9.2l4.6 1.7L16.5 4z" />

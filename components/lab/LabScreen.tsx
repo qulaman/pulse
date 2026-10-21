@@ -30,10 +30,19 @@ export function LabScreen({ tab }: { tab: LabTab }) {
                   ›
                 </span>
               </Link>
-              <Link href="/lab/mascot" className="card flex min-h-[44px] items-center justify-between gap-3 p-4">
+              <Link href="/lab/mascot" className="card mb-3 flex min-h-[44px] items-center justify-between gap-3 p-4">
                 <span>
                   <span className="block text-[16px] font-semibold leading-[22px]">Анимации маскота</span>
                   <span className="block text-[13px] leading-4 text-muted">Все состояния, жесты и сцены «Капли» на одной полке</span>
+                </span>
+                <span aria-hidden className="text-[18px] text-muted">
+                  ›
+                </span>
+              </Link>
+              <Link href="/lab/haptics" className="card flex min-h-[44px] items-center justify-between gap-3 p-4">
+                <span>
+                  <span className="block text-[16px] font-semibold leading-[22px]">Вибрация</span>
+                  <span className="block text-[13px] leading-4 text-muted">Какой способ тикает на iPhone — проверка на своём телефоне</span>
                 </span>
                 <span aria-hidden className="text-[18px] text-muted">
                   ›

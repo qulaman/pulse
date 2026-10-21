@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 
+import { HapticSwitch } from "@/components/ui/HapticSwitch";
 import { warmCalendarMonth } from "@/lib/calendar/queries";
 import { monthOf } from "@/lib/datetime/calendar";
 import { warmNotes } from "@/lib/notes/queries";
@@ -512,6 +513,8 @@ export function TabBar({ role }: { role: TabRole }) {
                   <span className={styles.label} aria-hidden>
                     {tab.label}
                   </span>
+                  {/* the iPhone's tick lies under the finger (D-147) */}
+                  <HapticSwitch />
                 </Link>
               </li>
             );

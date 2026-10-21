@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { HapticSwitch } from "@/components/ui/HapticSwitch";
+
 export type HeadIconName = "search" | "close" | "tv" | "plus" | "wall" | "more";
 
 const STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -75,6 +77,8 @@ export function HeadButton({
     <>
       {icon ? <HeadIcon name={icon} /> : children}
       <span aria-hidden className="head-btn-led" />
+      {/* the iPhone's tick lies under the finger (D-147) */}
+      {disabled ? null : <HapticSwitch />}
     </>
   );
   const data = {

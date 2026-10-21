@@ -2,6 +2,8 @@
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
+import { HapticSwitch } from "@/components/ui/HapticSwitch";
+
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "gold";
 type Size = "sm" | "md" | "lg";
 
@@ -63,6 +65,10 @@ export function Button({ variant = "primary", size = "md", block, loading, icon,
         {icon ? <span className="-ml-0.5 inline-flex shrink-0">{icon}</span> : null}
         {children}
       </span>
+      {/* the iPhone's tick lies under the finger (D-147); a button that cannot be pressed has none,
+          and a form's submit has none either — a switch on top would take its press, and the
+          form would not go */}
+      {disabled || loading || rest.type === "submit" ? null : <HapticSwitch />}
     </button>
   );
 }
