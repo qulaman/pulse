@@ -116,7 +116,7 @@ function TopRow({ board, page, pages }: { board: Board; page: number; pages: num
   return (
     <div className="flex shrink-0 items-center justify-between gap-[4vh]" style={{ height: vh(BOARD_TOP_ROW) }}>
       <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--accent)" }}>
-        Доска
+        {board.week ? "Доска недели" : "Доска"}
       </p>
       <div className="flex items-center gap-[3vh]">
         <div className="grid justify-items-end [grid-template-areas:'cell'] *:[grid-area:cell]">

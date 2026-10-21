@@ -285,6 +285,8 @@ export function wallRow(now: Date, spot: string | null): TvState {
     board_point: spot,
     board_until: until,
     board_view: "list",
+    week_board_id: null,
+    week_board_until: null,
     calendar_view: "week",
     carousel: false,
     clock_style: "digital",

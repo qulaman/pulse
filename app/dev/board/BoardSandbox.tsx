@@ -16,6 +16,7 @@ import { wallBoardOf } from "@/lib/mindboard/wall";
 import type { Dictation, DictationStage, Receipt } from "@/lib/notes/dictation";
 import { firstLine } from "@/lib/notes/list";
 import type { Note } from "@/lib/notes/queries";
+import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { tvKeys, type TvState } from "@/lib/tv/queries";
 import type { BoardView } from "@/lib/tv/state";
 
@@ -163,6 +164,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
   const [hearing, setHearing] = useState<ReadonlySet<string>>(() => new Set(fixture.hearing));
   const [onWall, setOnWall] = useState(fixture.wall.onWall);
   const [spot, setSpot] = useState<string | null>(fixture.wall.spot);
+  const [week, setWeek] = useState(false);
   const [aimed, setAimed] = useState<AimKey>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
@@ -283,6 +285,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
       toast("Поручено — в песочнице задача никуда не ушла");
     },
     spotlight: setSpot,
+    showPerson: (_employeeId, name) => toast(`На стене — дела: ${name ?? "исполнитель"}, 10 минут · в песочнице стена своя`),
     showSketch: (pointId) => {
       setOnWall(true);
       setSpot(pointId);
@@ -347,7 +350,12 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
         wall={{ onWall, until, spot, ready: true, preview: preview.items.length > 0 ? preview : null }}
         quiet={null}
         now={now}
-        taskOf={() => undefined}
+        // a handed line of the sandbox went to Марат and is in work: «→ Марат · в работе», his work on the wall (D-144)
+        taskOf={(row) =>
+          row.converted_task_id
+            ? ({ id: row.converted_task_id, status: "accepted", deadline: null, assignee_id: "u-marat", assignee: { full_name: "Марат Сейткали" } } as unknown as TaskWithPeople)
+            : undefined
+        }
         dictation={dictation}
         aimed={aimed}
         receipt={receipt}
@@ -376,6 +384,11 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
             onWall={onWall}
             until={onWall && wall?.board_until ? new Date(wall.board_until) : null}
             busy={false}
+            week={{ can: true, on: week, taken: false, busy: false }}
+            onWeek={(on) => {
+              setWeek(on);
+              toast(on ? "Доска недели — в круге заставок до воскресенья, 21:00" : "Доска ушла из круга заставок");
+            }}
             onView={setView}
             onShow={() => setOnWall(true)}
             onExtend={() => toast("+30 мин — в песочнице время не идёт")}

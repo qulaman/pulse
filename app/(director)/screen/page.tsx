@@ -29,7 +29,6 @@ import {
   CALENDAR_VIEWS,
   calendarViewOf,
   carouselNext,
-  carouselOn,
   carouselScenes,
   CLOCK_STYLES,
   clockStyleOf,
@@ -41,9 +40,11 @@ import {
   isNight,
   RATING_VIEWS,
   ratingViewOf,
+  roundOn,
   sceneOf,
   TV_SCENES,
   WAKE_MS,
+  weekInRound,
   type CalendarView,
   type ClockStyle,
   type RatingView,
@@ -161,10 +162,12 @@ export default function ScreenPage() {
   const points = pointsEnabled.data ?? true;
   const guest = guestOf(row, false, now);
   const scene = sceneOf(row, now, points, guest);
-  const round = carouselOn(row);
+  const round = roundOn(row, now);
   // a guest takes the rating out of the round (D-33): the remote counts the same round as the wall
   const roundPoints = points && !guest;
-  const next = carouselNext(now, roundPoints);
+  // the week board takes its turn last in the round (D-144) — the same round as the wall's
+  const week = weekInRound(row, now, guest);
+  const next = carouselNext(now, roundPoints, week);
   const ratingView = ratingViewOf(row);
   const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || pointsEnabled.data === true);
   const clock = clockStyleOf(row);
@@ -376,7 +379,8 @@ export default function ScreenPage() {
                     data-testid="remote-carousel"
                     onClick={() =>
                       show(
-                        { carousel: !round },
+                        // off pins the face: a round that a run-out board left (D-144) stops as well
+                        round ? { carousel: false, scene: "face" } : { carousel: true },
                         round ? "Заставки больше не меняются" : "Заставки меняются по кругу · раз в 3 мин",
                       )
                     }
@@ -391,7 +395,7 @@ export default function ScreenPage() {
               {/* two lines always: «По кругу» spells out the round on two, and the seams below do not jump */}
               <p className="mt-1 min-h-[36px] px-1 text-center text-[13px] leading-[18px] text-muted">
                 {round
-                  ? `${carouselScenes(roundPoints).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
+                  ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                   : SCENE_HINT[scene]}
               </p>
 

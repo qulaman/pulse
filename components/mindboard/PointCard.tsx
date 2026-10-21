@@ -106,6 +106,8 @@ export type PointHandlers = {
   spotlight?: (on: boolean) => void;
   /** «На стену» of a drawing while the board is not up (D-141): the board goes up, the drawing over the whole wall. */
   showSketch?: () => void;
+  /** «Дела исполнителя на стене» (D-144): the person a handed point went to, ten minutes on the wall. */
+  showPerson?: () => void;
 };
 
 type Props = {
@@ -505,6 +507,19 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
                 Удалить
               </Button>
             </div>
+
+            {handed && on.showPerson ? (
+              <Button
+                block
+                variant="secondary"
+                className="mt-2 !text-[14px]"
+                icon={<NoteIcon name="wall" size={16} />}
+                data-testid="point-person-wall"
+                onClick={on.showPerson}
+              >
+                Дела исполнителя на стене
+              </Button>
+            ) : null}
 
             {/* the agenda grows in the middle and lines move between boards (D-140) */}
             {below ? (

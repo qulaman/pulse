@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { tvKeys, type TvState } from "./queries";
-import { boardCapFrom, boardUntilFrom, FOCUS_MS, WAKE_MS, type BoardView, type CalendarView, type ClockStyle, type RatingView, type TvScene } from "./state";
+import { boardCapFrom, boardUntilFrom, FOCUS_MS, WAKE_MS, weekEndFrom, type BoardView, type CalendarView, type ClockStyle, type RatingView, type TvScene } from "./state";
 
 /**
  * Пульт от телевизора: единственная дверь к стене — RPC `tv_control` (D-76 §2).
@@ -164,7 +164,13 @@ export function useTvControl() {
     onError: (error, _input, context) => {
       if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
       // a declined or revoked order never goes up (D-45, D-123): say so, not «no network»
-      toast(error instanceof Error && error.message.includes("bad_task") ? "Это дело на стену не встанет" : OFFLINE);
+      toast(
+        error instanceof Error && error.message.includes("bad_task")
+          ? "Это дело на стену не встанет"
+          : error instanceof Error && error.message.includes("bad_employee")
+            ? "Этого сотрудника на стену не вывести"
+            : OFFLINE,
+      );
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: tvKeys.state });
@@ -242,6 +248,55 @@ export function useTvBoardControl() {
       if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
       const code = Object.keys(BOARD_ERRORS).find((key) => error.message.includes(key));
       toast(code ? BOARD_ERRORS[code] : OFFLINE);
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: tvKeys.state });
+    },
+  });
+}
+
+/**
+ * «Доска недели» (D-144): the director's board in the round of screensavers till Sunday 21:00,
+ * or null — out of it. The same road as `useTvControl`: no queue, a ceiling on the wait; the wall
+ * row moves at once (as `tv_week_board` will set it) and rolls back on an error.
+ */
+export function useTvWeekBoard() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: "always",
+    mutationFn: async (board: string | null): Promise<TvState> => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new Error(OFFLINE);
+
+      const supabase = createBrowserSupabase();
+      const call = supabase.rpc("tv_week_board", board ? { p_board: board } : {});
+      const timeout = new Promise<never>((_, reject) => setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS));
+      const { data, error } = await Promise.race([call, timeout]);
+      if (error) throw new Error(error.message);
+      return data as unknown as TvState;
+    },
+    onMutate: async (board) => {
+      await queryClient.cancelQueries({ queryKey: tvKeys.state });
+      const snapshot = queryClient.getQueryData<TvState | null>(tvKeys.state);
+      const now = new Date();
+      queryClient.setQueryData<TvState | null>(tvKeys.state, (old) => {
+        if (!old) return old ?? null;
+        // on the face the round starts; a meeting's board or a scene picked by hand stays — the server's rule
+        return {
+          ...old,
+          week_board_id: board,
+          week_board_until: board ? weekEndFrom(now).toISOString() : null,
+          carousel: board && old.scene === "face" ? true : old.carousel,
+        };
+      });
+      return { snapshot };
+    },
+    onSuccess: (row) => {
+      queryClient.setQueryData<TvState | null>(tvKeys.state, row);
+    },
+    onError: (error, _board, context) => {
+      if (context) queryClient.setQueryData(tvKeys.state, context.snapshot);
+      toast(error.message.includes("bad_board") ? "Эту доску в круг не поставить — она завершена или удалена" : error.message.includes("forbidden") ? "Доску недели выбирает директор" : OFFLINE);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: tvKeys.state });

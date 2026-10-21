@@ -26,7 +26,7 @@ import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
-import type { TvBoardData } from "@/lib/tv/board";
+import { stageOf, type TvBoardData } from "@/lib/tv/board";
 import type { PresenterPoint } from "@/lib/tv/presenter";
 
 import { BoardMenu, type BoardMenuItem } from "./BoardMenu";
@@ -103,6 +103,8 @@ export type BoardActions = {
   spotlight: (pointId: string | null) => void;
   /** «Во весь экран» of a drawing while the board is not on the wall (D-141): the board goes up, the drawing lit. */
   showSketch: (pointId: string) => void;
+  /** «Дела исполнителя на стене» of a handed point (D-144): the person's focus on the wall. */
+  showPerson: (employeeId: string, name: string | null) => void;
   rename: (title: string) => void;
   deleteBoard: () => void;
   /** The screen's one microphone is about to open for this target. */
@@ -265,6 +267,16 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     });
   };
 
+  // a handed point's person on the wall (D-144): only while the task is under way — the one who
+  // declined is not put up beside the line the wall leaves without a stage (D-45)
+  const personOf = (task: TaskWithPeople | undefined) =>
+    task && stageOf(task.status) !== null && task.assignee_id
+      ? () => {
+          haptic(8);
+          actions.showPerson(task.assignee_id, firstNameOf(task.assignee?.full_name) || null);
+        }
+      : undefined;
+
   const handlersOf = (pointId: string): PointHandlers => {
     const point = rowById.get(pointId) as Note;
     // a drawing stays a point: a sub-point has no room for its picture (D-141)
@@ -320,6 +332,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
             actions.spotlight(on ? pointId : null);
           }
         : undefined,
+      showPerson: personOf(look.task(point)),
       showSketch:
         drawing && !onWall
           ? () => {

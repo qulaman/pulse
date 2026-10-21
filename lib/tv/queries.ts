@@ -23,7 +23,7 @@ export const tvKeys = {
   focus: ["tv", "focus"] as const,
   calendar: (guest: boolean, from: string, days: number) => ["tv", "calendar", guest, from, days] as const,
   overlay: ["tv", "overlay"] as const,
-  board: (guest: boolean) => ["tv", "board", guest] as const,
+  board: (guest: boolean, which: string | null = null) => ["tv", "board", guest, which] as const,
   rating: (guest: boolean, period: string) => ["tv", "rating", guest, period] as const,
 };
 
@@ -408,8 +408,10 @@ const BOARD_REFRESH_MS = 30_000;
  * отдаёт только доску, которую автор сам поставил на стену, с маской гостя. Правка такой
  * доски поднимает версию `tv_state`, которую киоск и так слушает, — отдельного сокета нет.
  */
-export function useTvBoard(guest: boolean, enabled: boolean) {
-  const key = tvKeys.board(guest);
+export function useTvBoard(guest: boolean, enabled: boolean, which: string | null = null) {
+  // the board the wall expects (the meeting's or the week's): another one is another cache, so a
+  // run-out meeting's board never stands in the week board's turn while the answer is on its way
+  const key = tvKeys.board(guest, which);
   const query = useQuery({
     queryKey: key,
     enabled,

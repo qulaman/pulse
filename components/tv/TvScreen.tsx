@@ -7,7 +7,6 @@ import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
 import {
   awakeUntil,
   calendarViewOf,
-  carouselOn,
   carouselScenes,
   clockStyleOf,
   effectiveMode,
@@ -15,7 +14,9 @@ import {
   guestOf,
   isNight,
   ratingViewOf,
+  roundOn,
   sceneOf,
+  weekInRound,
 } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
@@ -60,7 +61,7 @@ export function TvScreen({
   const points = summary.data?.points_enabled ?? true;
   const scene = sceneOf(row, now, points, guest);
   // the round prefetches its scenes, so a turn never lands on an empty screen (D-123)
-  const round = carouselOn(row) ? carouselScenes(points && !guest) : [];
+  const round = roundOn(row, now) ? carouselScenes(points && !guest, weekInRound(row, now, guest)) : [];
   const focus = useTvFocus(mode !== "ether");
   // the week from today, or six weeks from the Monday the month starts in (D-98)
   const calendarView = calendarViewOf(row);
@@ -70,8 +71,8 @@ export function TvScreen({
     calendarView === "month" ? { from: monthGridFrom(now), days: MONTH_DAYS } : { from: null, days: 7 },
   );
   const overlay = useTvOverlay();
-  // the director's board, only while it is on the wall (D-102)
-  const board = useTvBoard(guest, scene === "board");
+  // the director's board, only while it is on the wall (D-102) — or the week board's turn is in the round (D-144)
+  const board = useTvBoard(guest, scene === "board" || round.includes("board"), round.length > 0 ? (row?.week_board_id ?? null) : (row?.board_id ?? null));
   // the rating scene: the first five, the riser, the rewards (D-123)
   const rating = useTvRating(guest, scene === "rating" || round.includes("rating"), ratingViewOf(row));
   const offline = useOffline(summary.dataUpdatedAt);

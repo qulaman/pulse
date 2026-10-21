@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { TvBoard } from "@/components/tv/TvBoard";
+import { TvBranchFull } from "@/components/tv/TvBranchFull";
 import { TvSketchFull } from "@/components/tv/TvSketchFull";
 import type { TvBoardData } from "@/lib/tv/board";
 
@@ -57,8 +58,9 @@ export function WallPreview({ data, now, rounded = 14 }: { data: TvBoardData; no
         <div className="flex shrink-0 items-center justify-end px-[4vh] pb-[3.4vh]">
           <span className="text-[2.6vh] leading-[3.4vh] text-muted first-letter:uppercase">{DATE.format(now)}</span>
         </div>
-        {/* a lit drawing over the whole wall, as the kiosk shows it */}
+        {/* a lit drawing — or a branch lit on the map — over the whole wall, as the kiosk shows it */}
         <TvSketchFull board={data} />
+        <TvBranchFull board={data} />
       </div>
     </div>
   );

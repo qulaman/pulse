@@ -20,7 +20,7 @@ import { tvTime } from "@/lib/tv/clock";
 import { useTvBoardControl, type TvControlInput } from "@/lib/tv/mutations";
 import { boardShelf, cartridgeLine, countLine, type BoardCount } from "@/lib/tv/presenter";
 import { tvKeys, type TvState } from "@/lib/tv/queries";
-import { boardExtendTo, boardUntilFrom } from "@/lib/tv/state";
+import { afterBoard, boardExtendTo, boardUntilFrom } from "@/lib/tv/state";
 
 import c from "./board-seam.module.css";
 import type { WallBoard } from "./useWallBoard";
@@ -113,7 +113,7 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
             <Key
               icon={<EjectIcon />}
               data-testid="remote-board-eject"
-              onClick={() => show({ scene: "face" }, () => ejectReceipt(queryClient, me.data, wall.board, notes.data ?? [], open))}
+              onClick={() => show(afterBoard(row, new Date()), () => ejectReceipt(queryClient, me.data, wall.board, notes.data ?? [], open))}
             >
               Убрать
             </Key>

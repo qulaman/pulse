@@ -1,5 +1,5 @@
 import type { Note } from "@/lib/notes/queries";
-import type { TvBoardData, TvBoardLeaf } from "@/lib/tv/board";
+import type { HandedStage, TvBoardData, TvBoardLeaf } from "@/lib/tv/board";
 import { mapFits } from "@/lib/tv/board";
 import type { BoardView } from "@/lib/tv/state";
 
@@ -9,13 +9,13 @@ import { branchesOf } from "./tree";
 /**
  * The board as the wall will draw it (D-140), from the phone's own cache — the preview of the
  * board screen. The same rule as `tv_board()` (D-121 §8, D-141): points of the top level with words
- * or a drawing, each with its sub-points alike, in the order of the board; «→ Марат» beside a handed
- * line unless it was revoked; the spotlight only on a point that is there. The wall is not
+ * or a drawing, each with its sub-points alike, in the order of the board; «→ Марат · в работе» beside a
+ * handed line unless it was revoked (D-144); the spotlight only on a point that is there. The wall is not
  * asked: the preview must show the board before it goes up. Pure — tests in `wall.test.ts`.
  */
 
-/** What a handed line became, as the wall says it: a first name, and whether it is done. */
-export type Handed = { assignee: string | null; done: boolean };
+/** What a handed line became, as the wall says it: a first name, whether it is done, how far it went (D-144). */
+export type Handed = { assignee: string | null; done: boolean; stage?: HandedStage | null };
 
 export function wallBoardOf(
   board: { id: string; title: string; updated_at: string },
@@ -32,6 +32,7 @@ export function wallBoardOf(
       created_at: row.created_at,
       assignee: task?.assignee ?? null,
       handed_done: task?.done ?? false,
+      stage: task?.stage ?? null,
       sketch: sketchFrom(row.sketch),
     };
   };

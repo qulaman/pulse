@@ -10,6 +10,32 @@ import type { BoardView } from "./state";
  * Стена ни с чем не взаимодействует: всё решают данные, пульт и часы киоска.
  */
 
+/**
+ * How far a handed line went, in the wall's neutral words (D-144): sent, in work, handed in,
+ * done. No declines and no lateness — the wall never shames (D-45); those say only the name.
+ */
+export type HandedStage = "sent" | "work" | "review" | "done";
+export const STAGE_WORDS: Record<HandedStage, string> = { sent: "отправлено", work: "в работе", review: "на приёмке", done: "сдано" };
+export const HANDED_STAGES = Object.keys(STAGE_WORDS) as readonly HandedStage[];
+
+/** A task's status as the wall says it — the same rule as `tv_stage()` in the base. */
+export function stageOf(status: string | null | undefined): HandedStage | null {
+  switch (status) {
+    case "sent":
+      return "sent";
+    case "accepted":
+    case "in_progress":
+    case "rework":
+      return "work";
+    case "pending_review":
+      return "review";
+    case "done":
+      return "done";
+    default:
+      return null;
+  }
+}
+
 /** Подпункт на стене (D-121) — те же поля, что у пункта, без своих веток. */
 export type TvBoardLeaf = {
   id: string;
@@ -20,6 +46,8 @@ export type TvBoardLeaf = {
   assignee: string | null;
   /** Поручение сдано и принято. */
   handed_done: boolean;
+  /** How far the task went (D-144); null — not handed, declined, or a base older than the client. */
+  stage?: HandedStage | null;
   /** A drawing of the point (D-141); null — none (a base older than the client sends none). */
   sketch?: Sketch | null;
 };
@@ -38,6 +66,8 @@ export type TvBoardData = {
   view: BoardView;
   /** Обсуждаемый пункт (верхнего уровня) — подсвечен ведущим с пульта; null — никакой. */
   focus: string | null;
+  /** The week board in the round of screensavers (D-144), not a meeting's board. */
+  week?: boolean;
   items: TvBoardItem[];
 };
 
@@ -60,6 +90,7 @@ export function boardFrom(data: unknown): TvBoard {
     created_at: row.created_at ?? new Date(0).toISOString(),
     assignee: row.assignee ?? null,
     handed_done: row.handed_done === true,
+    stage: HANDED_STAGES.includes(row.stage as HandedStage) ? (row.stage as HandedStage) : null,
     sketch: sketchFrom(row.sketch),
   });
   const items = (Array.isArray(raw.items) ? raw.items : []).map((row) => ({
@@ -76,6 +107,7 @@ export function boardFrom(data: unknown): TvBoard {
       updated_at: raw.updated_at ?? new Date(0).toISOString(),
       view: raw.view === "map" ? "map" : "list",
       focus: typeof raw.focus === "string" && items.some((item) => item.id === raw.focus) ? raw.focus : null,
+      week: raw.week === true,
       items,
     },
   };
@@ -185,12 +217,31 @@ export function freshKey(items: readonly TvBoardItem[], now: Date): string {
 }
 
 /**
- * Нейтральная пометка у пункта: «→ Марат», «→ Марат · сдано» — ни отказов, ни просрочек (D-45).
- * Стрелка и имя — через неразрывный пробел: строка не рвётся на «→» и «Марат».
+ * Нейтральная пометка у пункта: «→ Марат», «→ Марат · в работе», «→ Марат · сдано» — ни
+ * отказов, ни просрочек (D-45, D-144). Стрелка и имя — через неразрывный пробел: строка не
+ * рвётся на «→» и «Марат». A base older than the client sends no stage: «сдано» from `handed_done`.
  */
-export function tagOf(item: Pick<TvBoardItem, "assignee" | "handed_done">): string | null {
+export function tagOf(item: Pick<TvBoardItem, "assignee" | "handed_done" | "stage">): string | null {
   if (!item.assignee) return null;
-  return item.handed_done ? `→\u00a0${item.assignee} · сдано` : `→\u00a0${item.assignee}`;
+  const stage = item.stage ?? (item.handed_done ? "done" : null);
+  return stage ? `→\u00a0${item.assignee} · ${STAGE_WORDS[stage]}` : `→\u00a0${item.assignee}`;
+}
+
+/**
+ * The lit point of a meeting's board and its place (D-141, D-144): the wall opens it over the
+ * whole screen — its drawing, or on the map its branch with large leaves. Null — nothing to open.
+ */
+export function litPoint(board: TvBoardData | null): { item: TvBoardItem; at: number } | null {
+  if (!board?.focus) return null;
+  const at = board.items.findIndex((item) => item.id === board.focus);
+  return at >= 0 ? { item: board.items[at], at } : null;
+}
+
+/** On the map a lit point with sub-points opens as its branch over the wall; a drawing opens as the drawing (D-144). */
+export function zoomedBranch(board: TvBoardData | null): { item: TvBoardItem; at: number } | null {
+  const lit = litPoint(board);
+  if (!board || !lit || lit.item.sketch || lit.item.children.length === 0) return null;
+  return wallView(board) === "map" ? lit : null;
 }
 
 /** Подпись под названием: «5 пунктов · 2 отмечено». */

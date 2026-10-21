@@ -28,6 +28,12 @@ type Props = {
   until: Date | null;
   /** The wall is busy with a command. */
   busy: boolean;
+  /**
+   * «Доска недели» (D-144): `can` — the board may go in the round (not finished); `on` — it is
+   * there now; `taken` — another board is; `busy` — the command is on its way.
+   */
+  week: { can: boolean; on: boolean; taken: boolean; busy: boolean };
+  onWeek: (on: boolean) => void;
   onView: (view: BoardView) => void;
   /** Up on the wall: for so many minutes, or (null) till the end of the day. */
   onShow: (minutes: number | null) => void;
@@ -40,9 +46,11 @@ type Props = {
  * is there — the same picture the kiosk draws, «Список / Карта» under it (a setting of the
  * wall, D-121 §7), and the time on the wall: a tap on «на стену» in the head is «до 21:00»;
  * here — half an hour or an hour for a short meeting, «+30 мин» and «Убрать» while it is up.
+ * «Доска недели» (D-144) puts it in the round of screensavers till Sunday 21:00 — the map of
+ * the week lives on the wall between meetings, its handed lines with their stages.
  * Opened by the preview card of the board screen and by a long press on «на стену».
  */
-export function WallSheet({ open, onClose, data, now, onWall, until, busy, onView, onShow, onExtend, onEject }: Props) {
+export function WallSheet({ open, onClose, data, now, onWall, until, busy, week, onWeek, onView, onShow, onExtend, onEject }: Props) {
   const note = wallNote(data);
   const dayEnd = tvTime(boardUntilFrom(now));
 
@@ -106,6 +114,35 @@ export function WallSheet({ open, onClose, data, now, onWall, until, busy, onVie
             </div>
           </>
         )}
+
+        {week.can || week.on ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={week.on}
+            disabled={week.busy}
+            onClick={() => onWeek(!week.on)}
+            data-testid="wall-week"
+            className="mt-4 flex min-h-[56px] w-full items-center justify-between gap-3 rounded-[14px] border border-border/80 bg-white/[0.03] px-3.5 py-2.5 text-left transition-colors duration-[120ms] active:bg-white/[0.06] disabled:opacity-60"
+          >
+            <span className="min-w-0">
+              <span className="block font-display text-[15px] font-semibold leading-5 tracking-[-0.01em]">Доска недели</span>
+              <span className={`block text-[13px] leading-[18px] ${week.on ? "text-accent" : "text-muted"}`}>
+                {week.on
+                  ? "В круге заставок до воскресенья, 21:00"
+                  : week.taken
+                    ? "Встанет в круг заставок вместо нынешней"
+                    : "В круге заставок до воскресенья, с живыми поручениями"}
+              </span>
+            </span>
+            <span aria-hidden className="relative h-7 w-12 shrink-0 rounded-full transition-colors duration-[120ms]" style={{ background: week.on ? "var(--accent)" : "var(--border)" }}>
+              <span
+                className="absolute top-1 h-5 w-5 rounded-full bg-bg transition-transform duration-[120ms]"
+                style={{ transform: week.on ? "translateX(24px)" : "translateX(4px)" }}
+              />
+            </span>
+          </button>
+        ) : null}
       </div>
     </Sheet>
   );

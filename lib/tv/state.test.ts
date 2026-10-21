@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { TvState } from "./queries";
 import {
+  afterBoard,
   awakeUntil,
   boardLive,
   boardCapFrom,
@@ -20,8 +21,12 @@ import {
   guestOf,
   isNight,
   ratingViewOf,
+  roundOn,
   sceneOf,
   shouldReload,
+  weekBoardLive,
+  weekEndFrom,
+  weekInRound,
   SHIFT_STEP_MS,
   wallAsleep,
 } from "./state";
@@ -46,6 +51,8 @@ function state(patch: Partial<TvState> = {}): TvState {
     board_guest: false,
     board_point: null,
     board_view: "list",
+    week_board_id: null,
+    week_board_until: null,
     awake_until: null,
     expires_at: null,
     version: 1,
@@ -305,5 +312,58 @@ describe("заставка «Рейтинг» и круг заставок (D-12
     const night = new Date("2026-09-18T18:00:00Z"); // 23:00 в Актобе
     expect(wallAsleep(state(), night)).toBe(true);
     expect(wallAsleep(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T18:05:00Z" }), night)).toBe(false);
+  });
+});
+
+describe("доска недели в круге заставок (D-144)", () => {
+  // 14:00 Aqtobe on Friday 18 September 2026
+  const DAY = new Date("2026-09-18T09:00:00Z");
+  const week = { week_board_id: "w1", week_board_until: "2026-09-20T16:00:00Z" };
+
+  it("lives till the end of its week", () => {
+    expect(weekBoardLive(state(week), DAY)).toBe(true);
+    expect(weekBoardLive(state(week), new Date("2026-09-20T16:00:01Z"))).toBe(false);
+    expect(weekBoardLive(state(), DAY)).toBe(false);
+  });
+
+  it("ends on the coming Sunday 21:00 Aqtobe, and on Sunday night — on the next one", () => {
+    expect(weekEndFrom(DAY).toISOString()).toBe("2026-09-20T16:00:00.000Z");
+    // Monday morning
+    expect(weekEndFrom(new Date("2026-09-14T03:00:00Z")).toISOString()).toBe("2026-09-20T16:00:00.000Z");
+    // Sunday 20:59 and 21:01 Aqtobe
+    expect(weekEndFrom(new Date("2026-09-20T15:59:00Z")).toISOString()).toBe("2026-09-20T16:00:00.000Z");
+    expect(weekEndFrom(new Date("2026-09-20T16:01:00Z")).toISOString()).toBe("2026-09-27T16:00:00.000Z");
+  });
+
+  it("takes its turn last in the round, by day only, and never with a guest in", () => {
+    expect(carouselScenes(true, true)).toEqual(["face", "rating", "calendar", "team", "board"]);
+    expect(weekInRound(state(week), DAY, false)).toBe(true);
+    expect(weekInRound(state(week), new Date("2026-09-18T17:00:00Z"), false)).toBe(false);
+    expect(weekInRound(state(week), DAY, true)).toBe(false);
+    // «Показать гостю» opens the meeting's board, not the week (D-33)
+    expect(weekInRound(state({ ...week, board_guest: true }), DAY, true)).toBe(false);
+  });
+
+  it("is the scene at its step of the round", () => {
+    const round = state({ ...week, carousel: true });
+    // the fifth step of the round with points: face, rating, calendar, team, board
+    const at = new Date(Math.ceil(DAY.getTime() / (5 * CAROUSEL_MS)) * 5 * CAROUSEL_MS + 4 * CAROUSEL_MS + 1000);
+    expect(sceneOf(round, at)).toBe("board");
+    expect(sceneOf(state({ carousel: true }), at)).not.toBe("board");
+  });
+
+  it("takes the wall after the meeting's board ran out — the round, as the remote sees it too", () => {
+    const ran = state({ ...week, scene: "board", board_id: "m1", board_until: "2026-09-18T08:00:00Z" });
+    expect(roundOn(ran, DAY)).toBe(true);
+    expect(carouselScenes(true, true)).toContain(sceneOf(ran, DAY));
+    // a live meeting's board holds the wall; without a week board a run-out one is the face
+    expect(roundOn(state({ ...week, scene: "board", board_id: "m1", board_until: "2026-09-18T12:00:00Z" }), DAY)).toBe(false);
+    expect(roundOn(state({ scene: "board", board_id: "m1", board_until: "2026-09-18T08:00:00Z" }), DAY)).toBe(false);
+    expect(sceneOf(state({ scene: "board", board_id: "m1", board_until: "2026-09-18T08:00:00Z" }), DAY)).toBe("face");
+  });
+
+  it("takes a meeting's board down to the round while a week board waits", () => {
+    expect(afterBoard(state(week), DAY)).toEqual({ carousel: true });
+    expect(afterBoard(state(), DAY)).toEqual({ scene: "face" });
   });
 });

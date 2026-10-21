@@ -35,9 +35,10 @@ import { useDeliveryWindow } from "@/lib/points/queries";
 import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
-import { useTvBoardControl, useTvControl } from "@/lib/tv/mutations";
+import { stageOf } from "@/lib/tv/board";
+import { useTvBoardControl, useTvControl, useTvWeekBoard } from "@/lib/tv/mutations";
 import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
-import { boardExtendTo, boardPointOf, boardViewOf } from "@/lib/tv/state";
+import { afterBoard, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive } from "@/lib/tv/state";
 import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
 
 /** A receipt stays on the screen long enough to be read over the shoulder of a point. */
@@ -84,6 +85,7 @@ export default function BoardPage() {
   const tv = useTvState();
   const control = useTvControl();
   const boardControl = useTvBoardControl();
+  const weekBoard = useTvWeekBoard();
   const create = useCreateNote(me.data);
   const update = useUpdateNote(me.data);
   const remove = useDeleteNote(me.data);
@@ -288,7 +290,7 @@ export default function BoardPage() {
   const preview = wallBoardOf(board, rows.filter((row) => !phone.has(row.id)), { view: boardViewOf(tv.data ?? null), focus: spot }, (row) => {
     const task = row.converted_task_id ? taskById.get(row.converted_task_id) : undefined;
     if (!task || task.status === "revoked") return null;
-    return { assignee: firstNameOf(task.assignee?.full_name) || null, done: task.status === "done" };
+    return { assignee: firstNameOf(task.assignee?.full_name) || null, done: task.status === "done", stage: stageOf(task.status) };
   });
 
   // tasks handed out after hours wait for the morning (D-38) — unless «сразу»
@@ -305,7 +307,8 @@ export default function BoardPage() {
 
   const openBoard = (boardId: string) => router.push(`/notes/b/${boardId}`);
   const eject = () =>
-    control.mutate({ scene: "face" }, { onSuccess: () => ejectReceipt(queryClient, me.data, board, notes.data ?? [], openBoard) });
+    // the wall goes to the face — or to the round, while a week board waits in it (D-144)
+    control.mutate(afterBoard(tv.data ?? null, new Date()), { onSuccess: () => ejectReceipt(queryClient, me.data, board, notes.data ?? [], openBoard) });
 
   const writeOne = (text: string, parent: string | null, position: number) =>
     create.mutate({ id: crypto.randomUUID(), text, client_request_id: crypto.randomUUID(), board_id: board.id, position, parent_id: parent });
@@ -383,6 +386,9 @@ export default function BoardPage() {
             ),
         },
       ),
+    // «Дела исполнителя на стене» (D-144): the person of a handed point, ten minutes over whatever is up
+    showPerson: (employeeId, name) =>
+      control.mutate({ mode: "employee", employeeId }, { onSuccess: () => toast(name ? `На стене — дела: ${name}, 10 минут` : "На стене — дела исполнителя, 10 минут") }),
     rename: (title) => rename.mutate({ id: board.id, title }),
     deleteBoard: () => {
       const boardId = board.id;
@@ -482,6 +488,17 @@ export default function BoardPage() {
             onWall={onWall}
             until={onWall && tv.data?.board_until ? new Date(tv.data.board_until) : null}
             busy={control.isPending || boardControl.isPending}
+            week={{
+              can: !board.finished_at,
+              on: tv.data?.week_board_id === board.id && weekBoardLive(tv.data ?? null, now),
+              taken: tv.data?.week_board_id !== board.id && weekBoardLive(tv.data ?? null, now),
+              busy: weekBoard.isPending,
+            }}
+            onWeek={(on) =>
+              weekBoard.mutate(on ? board.id : null, {
+                onSuccess: () => toast(on ? "Доска недели — в круге заставок до воскресенья, 21:00" : "Доска ушла из круга заставок"),
+              })
+            }
             onView={(view) => boardControl.mutate({ view })}
             onShow={(minutes) =>
               control.mutate(

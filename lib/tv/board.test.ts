@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { boardCountLine, boardFrame, boardFrom, freshKey, isFresh, mapFits, pageAt, PAGE_MS, PROGRESS_GAP, progressScale, tagOf, wallView, type TvBoardItem } from "./board";
+import {
+  boardCountLine,
+  boardFrame,
+  boardFrom,
+  freshKey,
+  isFresh,
+  litPoint,
+  mapFits,
+  pageAt,
+  PAGE_MS,
+  PROGRESS_GAP,
+  progressScale,
+  stageOf,
+  tagOf,
+  wallView,
+  zoomedBranch,
+  type TvBoardData,
+  type TvBoardItem,
+} from "./board";
 
 function item(n: number, patch: Partial<TvBoardItem> = {}): TvBoardItem {
   return { id: `p-${n}`, text: `Пункт ${n}`, done: false, created_at: "2026-09-18T08:00:00Z", assignee: null, handed_done: false, children: [], ...patch };
@@ -119,5 +137,78 @@ describe("progressScale", () => {
   it("пункт не найден — капсула у первого; за краем — у последнего", () => {
     expect(progressScale(5, -1).shift).toBe(progressScale(5, 0).shift);
     expect(progressScale(5, 9).shift).toBe(progressScale(5, 4).shift);
+  });
+});
+
+describe("стадии поручений на стене (D-144)", () => {
+  it("says only neutral stages: no declines, no lateness (D-45)", () => {
+    expect(stageOf("sent")).toBe("sent");
+    expect(stageOf("accepted")).toBe("work");
+    expect(stageOf("in_progress")).toBe("work");
+    expect(stageOf("rework")).toBe("work");
+    expect(stageOf("pending_review")).toBe("review");
+    expect(stageOf("done")).toBe("done");
+    expect(stageOf("declined")).toBeNull();
+    expect(stageOf("scheduled")).toBeNull();
+    expect(stageOf("revoked")).toBeNull();
+  });
+
+  it("puts the stage beside the name", () => {
+    expect(tagOf(item(1, { assignee: "Марат", stage: "work" }))).toBe("→\u00a0Марат · в работе");
+    expect(tagOf(item(1, { assignee: "Марат", stage: "review" }))).toBe("→\u00a0Марат · на приёмке");
+    expect(tagOf(item(1, { assignee: "Марат", stage: "sent" }))).toBe("→\u00a0Марат · отправлено");
+    // a declined task: the name only
+    expect(tagOf(item(1, { assignee: "Марат", stage: null }))).toBe("→\u00a0Марат");
+    // a base older than the client: «сдано» from handed_done
+    expect(tagOf(item(1, { assignee: "Марат", handed_done: true }))).toBe("→\u00a0Марат · сдано");
+    // a guest: no name, no tag at all
+    expect(tagOf(item(1, { assignee: null, stage: "work" }))).toBeNull();
+  });
+
+  it("reads the stage and the week mark from the base, and drops a stranger", () => {
+    const value = boardFrom({
+      board: {
+        id: "b1",
+        week: true,
+        items: [
+          { id: "p1", text: "Отгрузка", assignee: "Марат", stage: "review", children: [{ id: "c1", text: "Склад", stage: "declined" }] },
+        ],
+      },
+    });
+    expect(value.board?.week).toBe(true);
+    expect(value.board?.items[0].stage).toBe("review");
+    expect(value.board?.items[0].children[0].stage).toBeNull();
+    expect(boardFrom({ board: { id: "b2", items: [] } }).board?.week).toBe(false);
+  });
+});
+
+describe("пункт во весь экран (D-141, D-144)", () => {
+  const board = (patch: Partial<TvBoardData>): TvBoardData => ({
+    id: "b1",
+    title: "Планёрка",
+    total: 3,
+    done: 0,
+    updated_at: "2026-10-21T08:00:00Z",
+    view: "map",
+    focus: null,
+    items: [
+      item(1, { children: [item(11), item(12)] }),
+      item(2),
+      item(3, { children: [item(31)], sketch: { v: 1, strokes: [{ c: "text", w: 1, p: [0, 0, 10, 10] }] } }),
+    ],
+    ...patch,
+  });
+
+  it("finds the lit point and its place", () => {
+    expect(litPoint(board({ focus: "p-2" }))).toMatchObject({ at: 1 });
+    expect(litPoint(board({ focus: null }))).toBeNull();
+    expect(litPoint(board({ focus: "nope" }))).toBeNull();
+  });
+
+  it("opens a lit branch on the map only, with its sub-points, and never over a drawing", () => {
+    expect(zoomedBranch(board({ focus: "p-1" }))?.at).toBe(0);
+    expect(zoomedBranch(board({ focus: "p-1", view: "list" }))).toBeNull();
+    expect(zoomedBranch(board({ focus: "p-2" }))).toBeNull();
+    expect(zoomedBranch(board({ focus: "p-3" }))).toBeNull();
   });
 });

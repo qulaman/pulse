@@ -268,6 +268,8 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 
 **Пункт-рисунок (D-141, миграция `20261021100000_board_sketch`):** `notes.sketch jsonb` — рисунок пункта доски линиями на сетке 1600×900 (`{v, strokes: [{c, w, p}]}`), только у строки доски, хотя бы одна линия, не больше 256 КБ (`notes_sketch_check`). `tv_board()` v3 отдаёт `sketch` у пунктов и подпунктов и считает пунктом строку со словами **или** рисунком; `tv_board_control` подсвечивает и рисунок без слов; `mind_board_copy` переносит рисунки.
 
+**Связка телефон–ТВ (D-144, миграция `20261021150000_board_live_week`):** `tv_state.week_board_id` (FK `mind_boards`, on delete set null) и `week_board_until` — доска недели в круге заставок до воскресенья 21:00 по Актобе (`tv_week_end()`). `tv_week_board(p_board uuid default null)` (director) — своя живая незавершённая доска (иначе `bad_board`) или null — снять; на лице включает круг, доску совещания и выбранную руками заставку не трогает; поднимает версию. `tv_board()` v4: доска совещания (живая, круг выключен) — или доска недели (в круге либо после истёкшей доски совещания) с `week: true` и без подсветки; гостю доска недели не показывается никогда (`hidden: true`); у строк — `stage` (`tv_stage(task_status)`: `sent | work | review | done`; отказ, отложенное, отзыв и гость — null). `mind_board_touch_tv` v2 будит стену и правкой живой доски недели и снимает доску с круга при завершении или удалении; `trg_tasks_board_touch_tv` (after update of status, assignee_id on tasks) поднимает версию, если поручение — с доски на стене. pgTAP — `046_board_live_week.test.sql`.
+
 **Разбудка ночью (D-105, миграция `20260924095000_tv_wake`):** `tv_control(..., p_wake)` пересоздан: `true` ставит `awake_until = now() + 2 часа` (повтор — от нового «сейчас»), `false` — `null`; остальные команды колонку не трогают. Ночь (21:00–08:00) киоск считает по своим часам, пока `awake_until` впереди — стена в эфире. pgTAP — `027_tv_wake.test.sql`.
 
 ### inbox_items — staging голосового конвейера
@@ -389,7 +391,7 @@ create policy tasks_insert on tasks for insert with check (
 - **ingest_batches, ai_logs**: select — director; запись — service role и security-definer-функции.
 - **inbox_items**: select — автор + director; insert — своё; update — автор до `confirmed`.
 - **recurrence_rules**: select — компания, кроме `tv`; insert/update/delete — director. **reminders**: select — свои; записи нет (таблица выведена из оборота, D-95).
-- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_heartbeat` (и `tv_touch` изнутри функций визита, D-96). Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_calendar` / `tv_overlay` / `tv_board` / `tv_heartbeat`. Никакого anon.
+- **tv_events**: select — `auth_role() in ('tv','director')` своей компании; политик на запись нет. **tv_state**: то же; запись — только `tv_control` / `tv_board_control` / `tv_week_board` / `tv_heartbeat` (и `tv_touch` изнутри функций визита, D-96). Роль `tv` не видит ничего, кроме своей строки `profiles`, `tv_events`, `tv_state` и вызовов `tv_summary` / `tv_focus` / `tv_calendar` / `tv_overlay` / `tv_board` / `tv_heartbeat`. Никакого anon.
 - **visits** (D-96): select — директор и секретари своей компании; `tv` и остальные — никогда; политик на запись нет — только RPC `announce_visit` / `answer_visit` / `close_visit`.
 - **notes**: все четыре операции — только автор (`user_id = auth.uid()` + своя компания); роль не проверяется намеренно — заметка приватна по автору, не по оргструктуре (D-75 §2): менеджер, второй директор и `tv` чужих заметок не видят. **mind_boards** — те же четыре политики по автору; `notes_insert` / `notes_update` дополнительно требуют, чтобы `board_id` был доской того же автора (D-102).
 - **events**: select — компания, кроме `tv`: director — всё, остальные — автор или участник; update — director; insert/delete — нет (создаёт `confirm_voice_batch`). **event_participants**: select — кроме `tv`, кто видит мероприятие (`can_see_event`); запись — только RPC и `confirm_voice_batch`.
@@ -510,6 +512,7 @@ tv_control(p_mode text, p_employee_id uuid, p_task_id uuid, p_scene text, p_gues
 tv_rating(p_guest boolean default false, p_period text default 'week') returns jsonb   -- заставка «Рейтинг», D-123
 tv_board(p_guest boolean default false) returns jsonb   -- доска на стене для киоска, D-102; ветки, подсветка и вид — D-121
 tv_board_control(p_point uuid default null, p_clear_point boolean default false, p_view text default null, p_board_until timestamptz default null) returns tv_state   -- ведущий с пульта, D-121; «+30 мин» — D-140
+tv_week_board(p_board uuid default null) returns tv_state   -- доска недели в круге заставок до воскресенья, D-144
 tv_board_cap() returns timestamptz   -- потолок срока доски на стене, D-140
 mind_board_copy(p_source uuid, p_id uuid, p_title text, p_client_request_id uuid) returns mind_boards   -- «Новая доска из открытых», D-140
 tv_focus() returns jsonb   -- v3: дела с историей, сданное за неделю, рейтинг человека, D-120

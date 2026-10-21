@@ -1,6 +1,6 @@
 import { SKETCH_FIXTURE, SKETCH_UPRIGHT } from "@/app/dev/board/fixtures";
 import { sketchFrom } from "@/lib/mindboard/sketch";
-import type { TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/board";
+import type { HandedStage, TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/board";
 
 /**
  * Доска v2 на фикстурах (D-121) — случаи песочницы `/dev/tv?case=…`: ветки, подсветка
@@ -30,6 +30,10 @@ export const BOARD_CASES = [
   "board-sketch-upright",
   "board-sketch-upright-focus",
   "board-sketch-standing",
+  "board-live",
+  "board-live-branch",
+  "board-live-branch-many",
+  "board-week",
 ] as const;
 
 export type BoardCase = (typeof BOARD_CASES)[number];
@@ -45,7 +49,36 @@ const DRAWINGS: Record<"wide" | "upright" | "standing", unknown> = {
   standing: { ...SKETCH_UPRIGHT, r: 0 },
 };
 
-type Seed = { text: string; done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: Drawn; sub?: (string | { text: string; done?: boolean; who?: string; fresh?: boolean })[] };
+type Seed = {
+  text: string;
+  done?: boolean;
+  who?: string;
+  handed?: boolean;
+  /** How far the handed line went (D-144). */
+  stage?: HandedStage;
+  fresh?: boolean;
+  drawn?: Drawn;
+  sub?: (string | { text: string; done?: boolean; who?: string; stage?: HandedStage; fresh?: boolean })[];
+};
+
+/** The meeting after «Раздать поручения» (D-144): names and stages on the map, a branch to zoom. */
+const LIVE: Seed[] = [
+  { text: "Отгрузка Казхром до пятницы", who: "Марат", stage: "work" },
+  {
+    text: "Ремонт склада: смета к среде",
+    sub: [
+      { text: "Сверить остатки по стройматериалам", who: "Динара", stage: "sent" },
+      { text: "Счёт от подрядчика — на согласование", who: "Тимур", stage: "review" },
+      { text: "Фото кровли", done: true, who: "Ерлан", stage: "done" },
+      { text: "Вывезти мусор со двора", who: "Айгуль", stage: "work" },
+      "Договориться о кране на четверг",
+      { text: "Проверить пожарные выходы", who: "Марат" },
+    ],
+  },
+  { text: "Кого берём на выставку в Алматы", who: "Асель", stage: "sent" },
+  { text: "Новый прайс на мерч", sub: ["Толстовки и кепки", { text: "Цены у двух поставщиков", who: "Асель", stage: "review" }] },
+  { text: "Отпуск бухгалтера в октябре", done: true },
+];
 
 const BRANCHES: Seed[] = [
   { text: "Отгрузка Казхром до пятницы", who: "Марат" },
@@ -130,6 +163,22 @@ function seedsFor(wallCase: BoardCase): Seed[] {
     case "board-sketch-upright":
     case "board-sketch-upright-focus":
       return [BRANCHES[0], { text: "Офис — три этажа", drawn: "upright" }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
+    case "board-live":
+    case "board-live-branch":
+    case "board-week":
+      return LIVE;
+    // the worst the zoom meets: a two-line point with its tag, fifteen long handed sub-points
+    case "board-live-branch-many":
+      return [
+        LIVE[0],
+        {
+          text: LONG_POINT.slice(0, 120),
+          who: "Динара",
+          stage: "work",
+          sub: MORE.slice(0, 15).map((text, i) => ({ text: `${text} — с подробностями для прораба и бухгалтерии`, who: ["Марат", "Асель", "Тимур"][i % 3], stage: (["sent", "work", "review"] as const)[i % 3] })),
+        },
+        ...LIVE.slice(2),
+      ];
     case "board-sketch-standing":
       return [BRANCHES[0], { text: "Офис — три этажа", drawn: "standing" }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
   }
@@ -137,14 +186,16 @@ function seedsFor(wallCase: BoardCase): Seed[] {
 
 function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
   const seeds = seedsFor(wallCase);
-  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: Drawn }): TvBoardLeaf => ({
+  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; stage?: HandedStage; fresh?: boolean; drawn?: Drawn }): TvBoardLeaf => ({
     id,
     text,
     done: patch.done === true,
     created_at: new Date(patch.fresh ? base : base - 60 * MIN + index * MIN).toISOString(),
     // a guest gets no names in the tags (D-33)
     assignee: guest ? null : (patch.who ?? null),
-    handed_done: patch.handed === true,
+    handed_done: patch.handed === true || patch.stage === "done",
+    // a guest gets no stages either (D-33)
+    stage: guest ? null : (patch.stage ?? null),
     sketch: patch.drawn ? sketchFrom(DRAWINGS[patch.drawn === true ? "wide" : patch.drawn]) : null,
   });
   const items: TvBoardItem[] = seeds.map((seed, i) => ({
@@ -154,8 +205,13 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
       return leaf(`p${i + 1}.${j + 1}`, s.text, i, s);
     }),
   }));
-  const map = wallCase.startsWith("board-map") || wallCase === "board-sketch-map";
-  const focus = wallCase === "board-focus" || wallCase === "board-map-focus" ? "p3" : wallCase === "board-sketch-focus" || wallCase === "board-sketch-upright-focus" ? "p2" : null;
+  const map = wallCase.startsWith("board-map") || wallCase === "board-sketch-map" || wallCase.startsWith("board-live") || wallCase === "board-week";
+  const focus =
+    wallCase === "board-focus" || wallCase === "board-map-focus"
+      ? "p3"
+      : wallCase === "board-sketch-focus" || wallCase === "board-sketch-upright-focus" || wallCase.startsWith("board-live-branch")
+        ? "p2"
+        : null;
   const board: TvBoardData = {
     id: "b1",
     title: wallCase === "board-long" ? LONG_TITLE : "Планёрка · понедельник",
@@ -164,6 +220,7 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
     updated_at: new Date(base).toISOString(),
     view: map ? "map" : "list",
     focus,
+    week: wallCase === "board-week",
     items,
   };
   return { hidden: false, board };

@@ -1919,6 +1919,8 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           version: number
+          week_board_id: string | null
+          week_board_until: string | null
         }
         Insert: {
           applied_version?: number | null
@@ -1945,6 +1947,8 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           version?: number
+          week_board_id?: string | null
+          week_board_until?: string | null
         }
         Update: {
           applied_version?: number | null
@@ -1971,6 +1975,8 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           version?: number
+          week_board_id?: string | null
+          week_board_until?: string | null
         }
         Relationships: [
           {
@@ -2586,6 +2592,43 @@ export type Database = {
         Returns: Json
       }
       tv_board: { Args: { p_guest?: boolean }; Returns: Json }
+      tv_week_board: {
+        Args: { p_board?: string }
+        Returns: {
+          applied_version: number | null
+          awake_until: string | null
+          board_guest: boolean
+          board_id: string | null
+          board_point: string | null
+          board_until: string | null
+          board_view: string
+          calendar_view: string
+          carousel: boolean
+          clock_style: string
+          company_id: string
+          employee_id: string | null
+          expires_at: string | null
+          guest: boolean
+          guest_until: string | null
+          mode: string
+          rating_view: string
+          reload_requested_at: string | null
+          scene: string
+          seen_at: string | null
+          task_id: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number
+          week_board_id: string | null
+          week_board_until: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "tv_state"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       tv_board_control: {
         Args: {
           p_board_until?: string

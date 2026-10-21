@@ -3,7 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 
 import { SketchView } from "@/components/mindboard/SketchView";
-import { wallText, type TvBoardData } from "@/lib/tv/board";
+import { litPoint, wallText, type TvBoardData } from "@/lib/tv/board";
 
 import { Badge, EASE } from "./TvBoardParts";
 
@@ -16,8 +16,9 @@ import { Badge, EASE } from "./TvBoardParts";
  */
 export function TvSketchFull({ board }: { board: TvBoardData | null }) {
   const still = useReducedMotion() ?? false;
-  const at = board?.focus ? board.items.findIndex((item) => item.id === board.focus) : -1;
-  const item = at >= 0 ? board?.items[at] : undefined;
+  const lit = litPoint(board);
+  const item = lit?.item;
+  const at = lit?.at ?? -1;
   const sketch = item?.sketch ?? null;
 
   return (

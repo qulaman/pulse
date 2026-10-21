@@ -45,7 +45,7 @@ describe("wallBoardOf", () => {
     row({ id: "gone", text: "Удалён", position: 0, deleted_at: "2026-10-20T06:00:00Z" }),
   ];
   const handed = (note: Note) =>
-    note.converted_task_id === "t-1" ? { assignee: "Марат", done: false } : note.converted_task_id === "t-2" ? { assignee: null, done: true } : null;
+    note.converted_task_id === "t-1" ? { assignee: "Марат", done: false, stage: "review" as const } : note.converted_task_id === "t-2" ? { assignee: null, done: true } : null;
 
   it("draws what the wall draws: points with words in order, their sub-points with words", () => {
     const board = wallBoardOf(BOARD, rows, { view: "list", focus: null }, handed);
@@ -58,6 +58,9 @@ describe("wallBoardOf", () => {
   it("names whom a line was handed to, and when it is done", () => {
     const board = wallBoardOf(BOARD, rows, { view: "list", focus: null }, handed);
     expect(board.items[0].assignee).toBe("Марат");
+    // how far it went, as the wall says it (D-144); an older caller sends none
+    expect(board.items[0].stage).toBe("review");
+    expect(board.items[0].children[0].stage).toBeNull();
     expect(board.items[0].children[0]).toMatchObject({ assignee: null, handed_done: true });
     expect(board.items[1]).toMatchObject({ assignee: null, done: true });
   });

@@ -8,6 +8,7 @@ import { haptic } from "@/lib/haptics";
 import { boardOnWall } from "@/lib/mindboard/list";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState } from "@/lib/tv/queries";
+import { afterBoard } from "@/lib/tv/state";
 
 const TIME = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" });
 
@@ -66,7 +67,8 @@ export function BoardOnWall({ boardId, now, onHold, onEjected }: { boardId: stri
         disabled={control.isPending}
         testId="board-on-wall"
         onClick={() =>
-          control.mutate(onWall ? { scene: "face" } : { board: boardId }, {
+          // taken down, the wall goes to the face — or to the round, while a week board waits in it (D-144)
+          control.mutate(onWall ? afterBoard(state.data ?? null, new Date()) : { board: boardId }, {
             onSuccess: (row) => {
               if (onWall) {
                 if (onEjected) onEjected();

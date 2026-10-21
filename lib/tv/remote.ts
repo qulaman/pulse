@@ -4,14 +4,15 @@ import { mapFits } from "./board";
 import { tvTime } from "./clock";
 import type { TvState } from "./queries";
 import {
+  boardLive,
   boardPointOf,
   boardViewOf,
   calendarViewOf,
-  carouselOn,
   effectiveMode,
   focusRemainingMs,
   guestOf,
   ratingViewOf,
+  roundOn,
   sceneOf,
   wallAsleep,
   type CalendarView,
@@ -133,9 +134,14 @@ export function wallNow(
   }
   if (wallAsleep(state, now)) return "Ночь · тусклые часы";
   const scene = sceneOf(state, now, extra.points ?? true, extra.guest ?? false);
-  const round = carouselOn(state) ? " · по кругу" : "";
+  const round = roundOn(state, now) ? " · по кругу" : "";
   if (scene === "calendar" && calendarViewOf(state) === "month") return `Эфир · календарь · месяц${round}`;
   if (scene === "rating") return `${ratingViewOf(state) === "month" ? "Эфир · рейтинг месяца" : SCENE_NOW.rating}${round}`;
+  // the week board's turn in the round, or the wall after the meeting's board ran out (D-144)
+  if (scene === "board" && !boardLive(state, now) && state?.week_board_id) {
+    const title = boards.find((board) => board.id === state.week_board_id)?.title;
+    return `${title ? `Доска недели «${clip(title)}»` : "Доска недели"}${round}`;
+  }
   if (scene === "board" && state?.board_until) {
     const title = boards.find((board) => board.id === state.board_id)?.title;
     const boardPoints = extra.boardPoints ?? [];

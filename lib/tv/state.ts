@@ -73,24 +73,26 @@ export const CAROUSEL_MS = 3 * 60_000;
 
 /**
  * Круг заставок (D-123): лицо, рейтинг (только с очками), календарь, команда. Часы — тихий
- * экран для совещаний, доска — выбор директора: в круг не входят.
+ * экран для совещаний: в круг не входят. Доска совещания — тоже; доска недели (`week`, D-144) —
+ * последней в круге.
  */
-export function carouselScenes(points: boolean): TvScene[] {
-  return points ? ["face", "rating", "calendar", "team"] : ["face", "calendar", "team"];
+export function carouselScenes(points: boolean, week = false): TvScene[] {
+  const scenes: TvScene[] = points ? ["face", "rating", "calendar", "team"] : ["face", "calendar", "team"];
+  return week ? [...scenes, "board"] : scenes;
 }
 
 /**
  * Какая заставка сейчас в круге — по часам, без таймера и без обмена с пультом: киоск и
  * пульт считают одно и то же число и сходятся. Граница — ровные три минуты от эпохи.
  */
-export function carouselScene(now: Date, points: boolean): TvScene {
-  const list = carouselScenes(points);
+export function carouselScene(now: Date, points: boolean, week = false): TvScene {
+  const list = carouselScenes(points, week);
   return list[Math.floor(now.getTime() / CAROUSEL_MS) % list.length];
 }
 
 /** Когда круг сменит заставку и на какую — для пульта: «дальше — календарь в 14:03». */
-export function carouselNext(now: Date, points: boolean): { scene: TvScene; at: Date } {
-  const list = carouselScenes(points);
+export function carouselNext(now: Date, points: boolean, week = false): { scene: TvScene; at: Date } {
+  const list = carouselScenes(points, week);
   const step = Math.floor(now.getTime() / CAROUSEL_MS);
   return { scene: list[(step + 1) % list.length], at: new Date((step + 1) * CAROUSEL_MS) };
 }
@@ -109,11 +111,55 @@ export function carouselOn(state: TvState | null): boolean {
  * руками рейтинг при госте честно говорит, что скрыт (D-33).
  */
 export function sceneOf(state: TvState | null, now: Date = new Date(), points = true, guest = false): TvScene {
-  if (carouselOn(state)) return carouselScene(now, points && !guest);
+  if (roundOn(state, now)) return carouselScene(now, points && !guest, weekInRound(state, now, guest));
   const scene = state?.scene;
   if (scene === "board") return boardLive(state, now) ? "board" : "face";
   if (scene === "rating" && !points) return "face";
   return WALL_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
+}
+
+/** The week board (D-144) is alive: chosen, and its week has not ended. */
+export function weekBoardLive(state: Pick<TvState, "week_board_id" | "week_board_until"> | null, now: Date): boolean {
+  if (!state?.week_board_id || !state.week_board_until) return false;
+  return new Date(state.week_board_until).getTime() > now.getTime();
+}
+
+/**
+ * The week board takes its turn in the round (D-144): by day only — at night the wall sleeps
+ * (D-105) — and never with a guest in the office: «Показать гостю» opens the meeting's board,
+ * not the director's week (D-33); three minutes of «Доска скрыта» the round does not show.
+ */
+export function weekInRound(state: TvState | null, now: Date, guest: boolean): boolean {
+  return weekBoardLive(state, now) && !isNight(now) && !guest;
+}
+
+/**
+ * The wall goes round (D-123, D-144): the round is switched on — or a meeting's board ran out on
+ * the wall while a week board waits: then the round takes the wall with the week board in it, as
+ * `tv_board()` does, until a scene is picked by hand. The kiosk, the remote and its display use
+ * this one rule, so the remote never shows the round off while the wall turns.
+ */
+export function roundOn(state: TvState | null, now: Date): boolean {
+  if (carouselOn(state)) return true;
+  return state?.scene === "board" && !boardLive(state, now) && weekBoardLive(state, now);
+}
+
+/**
+ * The end of a week board's week, as `tv_week_end()` has it: the coming Sunday 21:00 Aqtobe;
+ * on Sunday after 21:00 — the next one. For the remote's optimistic row and its words.
+ */
+export function weekEndFrom(now: Date): Date {
+  const local = new Date(now.getTime() + AQTOBE_OFFSET_MS);
+  const day = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+  // Monday 0 … Sunday 6
+  const weekday = (local.getUTCDay() + 6) % 7;
+  const sunday = day + (6 - weekday) * DAY_MS + NIGHT_FROM_HOUR * HOUR_MS - AQTOBE_OFFSET_MS;
+  return new Date(sunday > now.getTime() ? sunday : sunday + 7 * DAY_MS);
+}
+
+/** Taking a meeting's board down (D-144): to the round while a week board waits in it, else to the face. */
+export function afterBoard(state: TvState | null, now: Date): { carousel: true } | { scene: "face" } {
+  return weekBoardLive(state, now) ? { carousel: true } : { scene: "face" };
 }
 
 /** Доска на стене жива: сцена доски, доска есть, её время не вышло (D-102 §6). */
