@@ -1,4 +1,4 @@
-import { SKETCH_FIXTURE } from "@/app/dev/board/fixtures";
+import { SKETCH_FIXTURE, SKETCH_UPRIGHT } from "@/app/dev/board/fixtures";
 import { sketchFrom } from "@/lib/mindboard/sketch";
 import type { TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/board";
 
@@ -27,13 +27,25 @@ export const BOARD_CASES = [
   "board-sketch",
   "board-sketch-focus",
   "board-sketch-map",
+  "board-sketch-upright",
+  "board-sketch-upright-focus",
+  "board-sketch-standing",
 ] as const;
 
 export type BoardCase = (typeof BOARD_CASES)[number];
 
 const MIN = 60_000;
 
-type Seed = { text: string; done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: boolean; sub?: (string | { text: string; done?: boolean; who?: string; fresh?: boolean })[] };
+/** A drawing of the seed: the warehouse on the wide sheet, the office drawn upright and laid along the wall, or left standing. */
+type Drawn = true | "upright" | "standing";
+
+const DRAWINGS: Record<"wide" | "upright" | "standing", unknown> = {
+  wide: SKETCH_FIXTURE,
+  upright: SKETCH_UPRIGHT,
+  standing: { ...SKETCH_UPRIGHT, r: 0 },
+};
+
+type Seed = { text: string; done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: Drawn; sub?: (string | { text: string; done?: boolean; who?: string; fresh?: boolean })[] };
 
 const BRANCHES: Seed[] = [
   { text: "Отгрузка Казхром до пятницы", who: "Марат" },
@@ -114,12 +126,18 @@ function seedsFor(wallCase: BoardCase): Seed[] {
     case "board-sketch-focus":
     case "board-sketch-map":
       return [BRANCHES[0], { text: "", drawn: true }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
+    // a drawing made on the phone held upright: laid along the wall, or left standing (D-141 amendment)
+    case "board-sketch-upright":
+    case "board-sketch-upright-focus":
+      return [BRANCHES[0], { text: "Офис — три этажа", drawn: "upright" }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
+    case "board-sketch-standing":
+      return [BRANCHES[0], { text: "Офис — три этажа", drawn: "standing" }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
   }
 }
 
 function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
   const seeds = seedsFor(wallCase);
-  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: boolean }): TvBoardLeaf => ({
+  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: Drawn }): TvBoardLeaf => ({
     id,
     text,
     done: patch.done === true,
@@ -127,7 +145,7 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
     // a guest gets no names in the tags (D-33)
     assignee: guest ? null : (patch.who ?? null),
     handed_done: patch.handed === true,
-    sketch: patch.drawn ? sketchFrom(SKETCH_FIXTURE) : null,
+    sketch: patch.drawn ? sketchFrom(DRAWINGS[patch.drawn === true ? "wide" : patch.drawn]) : null,
   });
   const items: TvBoardItem[] = seeds.map((seed, i) => ({
     ...leaf(`p${i + 1}`, seed.text, i, seed),
@@ -137,7 +155,7 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
     }),
   }));
   const map = wallCase.startsWith("board-map") || wallCase === "board-sketch-map";
-  const focus = wallCase === "board-focus" || wallCase === "board-map-focus" ? "p3" : wallCase === "board-sketch-focus" ? "p2" : null;
+  const focus = wallCase === "board-focus" || wallCase === "board-map-focus" ? "p3" : wallCase === "board-sketch-focus" || wallCase === "board-sketch-upright-focus" ? "p2" : null;
   const board: TvBoardData = {
     id: "b1",
     title: wallCase === "board-long" ? LONG_TITLE : "Планёрка · понедельник",

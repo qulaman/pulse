@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { glimpse, lineState, type LineState } from "@/lib/mindboard/branch";
 import { handedLabel } from "@/lib/mindboard/handed";
-import { sketchFrom } from "@/lib/mindboard/sketch";
+import { shownSize, sketchFrom } from "@/lib/mindboard/sketch";
 import type { Wait } from "@/lib/mindboard/offline";
 import type { Branch } from "@/lib/mindboard/tree";
 import type { Dictation } from "@/lib/notes/dictation";
@@ -21,7 +21,7 @@ import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import { DragRow, useReorder } from "./DragRow";
-import { SketchView } from "./SketchView";
+import { sketchAspect, SketchView } from "./SketchView";
 import { SubComposer } from "./SubComposer";
 import { STATE_WORDS, SubLine, SubPointRow, WaitMark } from "./SubPoint";
 
@@ -92,6 +92,8 @@ export type PointHandlers = {
   move?: () => void;
   /** «Дорисовать» (D-141): the pad over the screen with this point's drawing. */
   sketch: () => void;
+  /** «Повернуть» (D-141 amendment): the drawing a quarter turn on the wall, one row written. */
+  turnSketch: () => void;
   /** A sub-point dropped between its siblings (D-121): one row written, its new place. */
   place: (sub: Note, position: number) => void;
   /** The screen's microphone is about to open for a sub-point of this point. */
@@ -100,8 +102,10 @@ export type PointHandlers = {
   demote?: () => void;
   /** «Вынести в пункты» of one of its sub-points; absent for a sub-point still on the phone. */
   promote: (sub: Note) => (() => void) | undefined;
-  /** «Показать на стене» — only while the board is on the wall and the point can be lit. */
+  /** «Показать на стене» — only while the board is on the wall and the point can be lit (a drawing: «Во весь экран»). */
   spotlight?: (on: boolean) => void;
+  /** «На стену» of a drawing while the board is not up (D-141): the board goes up, the drawing over the whole wall. */
+  showSketch?: () => void;
 };
 
 type Props = {
@@ -157,6 +161,9 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
   const empty = !point.text.trim();
   // a drawing of the point (D-141): small on the closed card, large and «Дорисовать» on the open one
   const drawn = useMemo(() => sketchFrom(point.sketch), [point.sketch]);
+  // its shape as the wall shows it: a vertical one is held by its height, not stretched across the card
+  const box = drawn ? shownSize(drawn) : null;
+  const tall = box !== null && box.h > box.w;
   const head = firstLine(point.text);
   const rest = restLines(point.text);
   const raw = point.raw_transcript?.trim() ?? "";
@@ -171,8 +178,12 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
         {rest && !open ? <span className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
         {drawn && !open ? (
           <span
-            className="mt-2 block w-[208px] max-w-full overflow-hidden rounded-[10px] bg-surface-2/60"
-            style={{ aspectRatio: "16 / 9", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)" }}
+            className="mt-2 block max-w-full overflow-hidden rounded-[10px] bg-surface-2/60"
+            style={{
+              width: box && tall ? (150 * box.w) / box.h : 208,
+              aspectRatio: sketchAspect(drawn),
+              boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)",
+            }}
             data-testid="point-sketch-thumb"
           >
             <SketchView sketch={drawn} label={head || "Рисунок"} />
@@ -288,21 +299,56 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
               <SaveReceipt id={point.id} dirty={dirty} saved={saved} />
             </div>
 
-            {drawn ? (
-              <button
-                type="button"
-                onClick={on.sketch}
-                aria-label="Дорисовать рисунок"
-                data-testid="point-sketch"
-                className="relative mt-2 block w-full overflow-hidden rounded-[14px] bg-surface-2/60 transition-transform duration-[120ms] active:scale-[0.99]"
-                style={{ aspectRatio: "16 / 9", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)" }}
-              >
-                <SketchView sketch={drawn} label={head || "Рисунок"} />
-                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-bg/80 px-2.5 py-1 text-[13px] font-semibold text-accent">
-                  <NoteIcon name="pencil" size={13} />
-                  Дорисовать
-                </span>
-              </button>
+            {drawn && box ? (
+              <>
+                {/* the drawing as the wall will show it: its sheet, turned */}
+                <button
+                  type="button"
+                  onClick={on.sketch}
+                  aria-label="Дорисовать рисунок"
+                  data-testid="point-sketch"
+                  data-turn={drawn.r ?? 0}
+                  className="relative mx-auto mt-2 block max-w-full overflow-hidden rounded-[14px] bg-surface-2/60 transition-transform duration-[120ms] active:scale-[0.99]"
+                  style={{
+                    width: tall ? (340 * box.w) / box.h : "100%",
+                    aspectRatio: sketchAspect(drawn),
+                    boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)",
+                  }}
+                >
+                  <SketchView sketch={drawn} label={head || "Рисунок"} />
+                  <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-bg/80 px-2.5 py-1 text-[13px] font-semibold text-accent">
+                    <NoteIcon name="pencil" size={13} />
+                    Дорисовать
+                  </span>
+                </button>
+                <div className={`mt-2 grid gap-2 ${on.spotlight || on.showSketch ? "grid-cols-2" : "grid-cols-1"}`} data-testid="point-sketch-actions">
+                  <Button variant="secondary" className="!px-2 whitespace-nowrap !text-[14px]" icon={<NoteIcon name="retry" size={16} />} data-testid="point-sketch-turn" onClick={on.turnSketch}>
+                    Повернуть
+                  </Button>
+                  {on.spotlight ? (
+                    <Button
+                      variant="secondary"
+                      className={`!px-2 whitespace-nowrap !text-[14px] ${lit ? "!border-accent/60 !bg-accent/[0.12] !text-accent" : ""}`}
+                      icon={<NoteIcon name="wall" size={16} />}
+                      aria-pressed={lit}
+                      data-testid="point-sketch-full"
+                      onClick={() => on.spotlight?.(!lit)}
+                    >
+                      {lit ? "Снять с экрана" : "Во весь экран"}
+                    </Button>
+                  ) : on.showSketch ? (
+                    <Button
+                      variant="secondary"
+                      className="!px-2 whitespace-nowrap !text-[14px]"
+                      icon={<NoteIcon name="wall" size={16} />}
+                      data-testid="point-sketch-full"
+                      onClick={on.showSketch}
+                    >
+                      На стену
+                    </Button>
+                  ) : null}
+                </div>
+              </>
             ) : null}
 
             <div className="mt-2">
@@ -415,7 +461,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
 
         {phone ? null : (
           <>
-            {on.spotlight ? (
+            {/* a drawing has its own «Во весь экран» beside the picture */}
+            {on.spotlight && !drawn ? (
               <button
                 type="button"
                 aria-pressed={lit}

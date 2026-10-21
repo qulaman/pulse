@@ -1,6 +1,8 @@
 /**
- * A drawing of a board point (D-141): lines on a 1600×900 grid — 16:9, the shape of the wall —
- * kept as numbers, not as a picture. Small enough for the row of the point, sharp on 4K, open
+ * A drawing of a board point (D-141): lines on a grid — a horizontal sheet 1600×900 (16:9, the
+ * shape of the wall) or a vertical one 900×1600 (the shape of a phone held upright) — kept as
+ * numbers, not as a picture; the wall shows it turned as the director chose (`r`): a vertical
+ * sheet goes on the horizontal wall turned to lie along it (D-141 amendment). Small enough for the row of the point, sharp on 4K, open
  * to «Дорисовать». The phone's pad writes it, the phone and the wall draw it with the same
  * paths (`strokePath`). What comes from the database is checked here (`sketchFrom`): a wall
  * must not go dark over a drawing it cannot read. Pure — tests in `sketch.test.ts`.
@@ -21,7 +23,71 @@ export const WEIGHT_WIDTH: Record<Weight, number> = { 1: 7, 2: 18 };
 
 /** One line: its ink, its weight, its points as x, y, x, y… on the grid. */
 export type Stroke = { c: Ink; w: Weight; p: number[] };
-export type Sketch = { v: 1; strokes: Stroke[] };
+
+/** The sheet it was drawn on: horizontal, as the wall — or vertical, as the phone in the hand. */
+export type Sheet = "landscape" | "portrait";
+/** How the wall turns it, clockwise. */
+export type Turn = 0 | 90 | 180 | 270;
+export const TURNS: readonly Turn[] = [0, 90, 180, 270];
+
+/** `o` and `r` are left out while they are the old defaults: a horizontal sheet, not turned. */
+export type Sketch = { v: 1; o?: Sheet; r?: Turn; strokes: Stroke[] };
+
+export const SHEET_SIZE: Record<Sheet, { w: number; h: number }> = {
+  landscape: { w: SKETCH_W, h: SKETCH_H },
+  portrait: { w: SKETCH_H, h: SKETCH_W },
+};
+
+export function sheetOf(sketch: Pick<Sketch, "o"> | null | undefined): Sheet {
+  return sketch?.o === "portrait" ? "portrait" : "landscape";
+}
+
+export function turnOf(sketch: Pick<Sketch, "r"> | null | undefined): Turn {
+  return TURNS.includes(sketch?.r as Turn) ? (sketch?.r as Turn) : 0;
+}
+
+/** A new sheet's turn: a vertical one lies along the horizontal wall, a horizontal one stays. */
+export function defaultTurn(sheet: Sheet): Turn {
+  return sheet === "portrait" ? 90 : 0;
+}
+
+/** «Повернуть»: a quarter turn clockwise. */
+export function nextTurn(turn: Turn): Turn {
+  return TURNS[(TURNS.indexOf(turn) + 1) % TURNS.length];
+}
+
+/** The box the drawing takes as it is shown: the sheet, turned. */
+export function shownSize(sketch: Pick<Sketch, "o" | "r"> | null | undefined): { w: number; h: number } {
+  const { w, h } = SHEET_SIZE[sheetOf(sketch)];
+  const turn = turnOf(sketch);
+  return turn === 90 || turn === 270 ? { w: h, h: w } : { w, h };
+}
+
+/** Width over height of the drawing as it is shown. */
+export function shownRatio(sketch: Pick<Sketch, "o" | "r"> | null | undefined): number {
+  const { w, h } = shownSize(sketch);
+  return w / h;
+}
+
+/** The SVG transform that turns the sheet into its shown box (empty — not turned). */
+export function turnTransform(sketch: Pick<Sketch, "o" | "r"> | null | undefined): string {
+  const { w, h } = SHEET_SIZE[sheetOf(sketch)];
+  switch (turnOf(sketch)) {
+    case 90:
+      return `translate(${h} 0) rotate(90)`;
+    case 180:
+      return `translate(${w} ${h}) rotate(180)`;
+    case 270:
+      return `translate(0 ${w}) rotate(270)`;
+    default:
+      return "";
+  }
+}
+
+/** The same drawing with its sheet and turn written as they are (defaults left out). */
+export function withFrame(sketch: Sketch, sheet: Sheet, turn: Turn): Sketch {
+  return { v: 1, ...(sheet === "portrait" ? { o: sheet } : {}), ...(turn !== 0 ? { r: turn } : {}), strokes: sketch.strokes };
+}
 
 /**
  * Past this the pad stops taking lines: the row stays under the base's 256 KB cap — jsonb keeps
@@ -38,6 +104,10 @@ export function sketchFrom(value: unknown): Sketch | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const raw = (value as { strokes?: unknown }).strokes;
   if (!Array.isArray(raw)) return null;
+  const frame = value as { o?: unknown; r?: unknown };
+  const sheet: Sheet = frame.o === "portrait" ? "portrait" : "landscape";
+  const turn: Turn = TURNS.includes(frame.r as Turn) ? (frame.r as Turn) : 0;
+  const { w: width, h: height } = SHEET_SIZE[sheet];
   const strokes: Stroke[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
@@ -48,13 +118,13 @@ export function sketchFrom(value: unknown): Sketch | null {
       const x = Number(p[at]);
       const y = Number(p[at + 1]);
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-      points.push(clamp(x, SKETCH_W), clamp(y, SKETCH_H));
+      points.push(clamp(x, width), clamp(y, height));
     }
     if (points.length < 2) continue;
     strokes.push({ c: INKS.includes(c as Ink) ? (c as Ink) : "text", w: w === 2 ? 2 : 1, p: points });
     if (strokes.length >= MAX_STROKES) break;
   }
-  return strokes.length > 0 ? { v: 1, strokes } : null;
+  return strokes.length > 0 ? withFrame({ v: 1, strokes }, sheet, turn) : null;
 }
 
 /** How many points the drawing holds. */
@@ -66,7 +136,7 @@ export function pointCount(sketch: Sketch | null): number {
 export function withStroke(sketch: Sketch | null, stroke: Stroke): Sketch | null {
   const strokes = sketch?.strokes ?? [];
   if (strokes.length >= MAX_STROKES || pointCount(sketch) + stroke.p.length / 2 > MAX_POINTS) return null;
-  return { v: 1, strokes: [...strokes, stroke] };
+  return { ...(sketch ?? {}), v: 1, strokes: [...strokes, stroke] };
 }
 
 function distanceToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {

@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { hasContent, isDrawn, MAX_STROKES, pointCount, pointLabel, simplify, sketchFrom, strokePath, withStroke, type Sketch } from "./sketch";
+import {
+  defaultTurn,
+  hasContent,
+  isDrawn,
+  MAX_STROKES,
+  nextTurn,
+  pointCount,
+  pointLabel,
+  sheetOf,
+  shownSize,
+  simplify,
+  sketchFrom,
+  strokePath,
+  turnOf,
+  turnTransform,
+  withFrame,
+  withStroke,
+  type Sketch,
+} from "./sketch";
 
 describe("sketchFrom", () => {
   it("takes a drawing as it was written", () => {
@@ -82,5 +100,42 @@ describe("isDrawn", () => {
     expect(isDrawn({ v: 1 })).toBe(false);
     expect(isDrawn(null)).toBe(false);
     expect(hasContent({ text: "", sketch: { v: 1, strokes: [] } })).toBe(false);
+  });
+});
+
+describe("sheets and turns (D-141 amendment)", () => {
+  const upright = { v: 1 as const, o: "portrait" as const, strokes: [{ c: "text" as const, w: 1 as const, p: [0, 0, 900, 1600] }] };
+
+  it("keeps a vertical sheet on its own grid and the turn the wall shows it with", () => {
+    expect(sketchFrom({ ...upright, r: 90, strokes: [{ c: "text", w: 1, p: [950, 1700] }] })).toEqual({ v: 1, o: "portrait", r: 90, strokes: [{ c: "text", w: 1, p: [900, 1600] }] });
+    expect(sketchFrom({ v: 1, r: 45, strokes: [{ c: "text", w: 1, p: [1, 1] }] })).toEqual({ v: 1, strokes: [{ c: "text", w: 1, p: [1, 1] }] });
+    expect(sheetOf(null)).toBe("landscape");
+    expect(turnOf({ r: 270 })).toBe(270);
+  });
+
+  it("lays a vertical sheet along the wall by default, and turns a quarter at a time", () => {
+    expect(defaultTurn("portrait")).toBe(90);
+    expect(defaultTurn("landscape")).toBe(0);
+    expect(nextTurn(0)).toBe(90);
+    expect(nextTurn(270)).toBe(0);
+  });
+
+  it("shows the box of the turned sheet", () => {
+    expect(shownSize(upright)).toEqual({ w: 900, h: 1600 });
+    expect(shownSize({ ...upright, r: 90 })).toEqual({ w: 1600, h: 900 });
+    expect(shownSize({ r: 180 })).toEqual({ w: 1600, h: 900 });
+    expect(shownSize({ r: 270 })).toEqual({ w: 900, h: 1600 });
+  });
+
+  it("turns with a transform that keeps the drawing inside its box", () => {
+    expect(turnTransform(upright)).toBe("");
+    expect(turnTransform({ ...upright, r: 90 })).toBe("translate(1600 0) rotate(90)");
+    expect(turnTransform({ r: 180 })).toBe("translate(1600 900) rotate(180)");
+    expect(turnTransform({ r: 270 })).toBe("translate(0 1600) rotate(270)");
+  });
+
+  it("writes only what differs from the old defaults", () => {
+    expect(withFrame({ v: 1, strokes: [] }, "landscape", 0)).toEqual({ v: 1, strokes: [] });
+    expect(withFrame({ v: 1, o: "portrait", r: 90, strokes: [] }, "landscape", 180)).toEqual({ v: 1, r: 180, strokes: [] });
   });
 });

@@ -283,6 +283,11 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
       toast("Поручено — в песочнице задача никуда не ушла");
     },
     spotlight: setSpot,
+    showSketch: (pointId) => {
+      setOnWall(true);
+      setSpot(pointId);
+      toast("Рисунок во весь экран — в песочнице стена своя");
+    },
     rename: setTitle,
     deleteBoard: () => toast("Доска в корзине — в песочнице она остаётся"),
     aim,

@@ -1,3 +1,5 @@
+import { shownRatio } from "@/lib/mindboard/sketch";
+
 import { tagOf, wallText, type TvBoardItem, type TvBoardLeaf } from "./board";
 import { textLines } from "./boardText";
 
@@ -58,7 +60,8 @@ export const COLUMN_GAP = 5;
 /**
  * The picture of a point with a drawing (D-141), under its words: tall enough to make out a
  * scheme from the door, small enough for the list — the whole drawing opens when the presenter
- * lights the point. Its height in vh by the size of the list; the width is 16:9 of it.
+ * lights the point. Its height in vh by the size of the list; the width follows the drawing's
+ * shape as the wall shows it (`shownRatio`).
  */
 export const THUMB_H: Record<ListTier["key"], number> = { xl: 20, l: 17, m: 14, s: 11, xs: 9.5 };
 
@@ -141,8 +144,8 @@ export function rowsAt(items: readonly TvBoardItem[], tier: ListTier, width: num
   return items.map((item, index) => {
     const tag = tagOf(item);
     const lines = textLines(wallText(item), widths.point, tier.size, tier.lines, "point").lines;
-    // a drawing never runs wider than the words' room
-    const thumb = item.sketch ? Math.min(THUMB_H[tier.key], (widths.point * 9) / 16) : 0;
+    // a drawing at its own shape (a vertical one stays narrow), never wider than the words' room
+    const thumb = item.sketch ? Math.min(THUMB_H[tier.key], widths.point / shownRatio(item.sketch)) : 0;
     const all = item.children.map((leaf) => ({ leaf, lines: textLines(leafText(leaf), widths.leaf, tier.sub, tier.subLines, "leaf").lines, tag: tagOf(leaf) }));
     let shown = all.length;
     let height = rowHeight(tier, lines, tag, all, 0, thumb);

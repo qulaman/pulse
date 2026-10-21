@@ -361,6 +361,28 @@ export default function BoardPage() {
     retranscribe: (row) => dictation.retranscribe(row),
     assign: setAssigning,
     spotlight: (pointId) => boardControl.mutate(pointId ? { point: pointId } : { clearPoint: true }),
+    // the board goes up for its usual time, then the drawing is lit over the whole wall; the toast
+    // waits for the light (a failed one says so itself) and does not promise what a guest hides
+    showSketch: (pointId) =>
+      control.mutate(
+        { board: board.id },
+        {
+          onSuccess: () =>
+            boardControl.mutate(
+              { point: pointId },
+              {
+                onSuccess: (row) =>
+                  toast(
+                    row.guest && !row.board_guest
+                      ? "Доска на стене, но скрыта · гость в кабинете"
+                      : row.board_until
+                        ? `Рисунок во весь экран · доска на стене до ${TIME.format(new Date(row.board_until))}`
+                        : "Рисунок во весь экран",
+                  ),
+              },
+            ),
+        },
+      ),
     rename: (title) => rename.mutate({ id: board.id, title }),
     deleteBoard: () => {
       const boardId = board.id;

@@ -187,6 +187,16 @@ describe("a drawing in the list (D-141)", () => {
     expect(drawn.height).toBeGreaterThan(plain.height);
   });
 
+  it("keeps the picture at the drawing's shape: a vertical one is held by its height (D-141 amendment)", () => {
+    // a narrow column: 30 vh wide leaves 15.6 vh for the words
+    const wide = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.xl, 30)[0];
+    const upright = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const } }], LIST_TIERS.xl, 30)[0];
+    const lying = rowsAt([{ ...point(1), sketch: { ...drawing, o: "portrait" as const, r: 90 as const } }], LIST_TIERS.xl, 30)[0];
+    expect(wide.thumb).toBeCloseTo((15.6 * 9) / 16, 5);
+    expect(upright.thumb).toBe(20);
+    expect(lying.thumb).toBeCloseTo(wide.thumb, 5);
+  });
+
   it("names a drawing without words, and still fits the wall", () => {
     const items = [{ ...point(1, 0, ""), sketch: drawing }, ...points(5).slice(1)];
     const layout = listLayout(items, FRAME);

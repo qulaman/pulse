@@ -15,7 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { demotedPlace, numbersOf, promotedPlace } from "@/lib/mindboard/branch";
 import { boardSummary, boardText, cleanTitle, openPoints } from "@/lib/mindboard/list";
 import { waitOf } from "@/lib/mindboard/offline";
-import { hasContent, isDrawn, pointLabel, sketchFrom, type Sketch } from "@/lib/mindboard/sketch";
+import { hasContent, isDrawn, nextTurn, pointLabel, sheetOf, sketchFrom, turnOf, withFrame, type Sketch } from "@/lib/mindboard/sketch";
 import type { SplitPoint } from "@/lib/mindboard/split";
 import { branchesOf } from "@/lib/mindboard/tree";
 import type { Dictation, Receipt } from "@/lib/notes/dictation";
@@ -101,6 +101,8 @@ export type BoardActions = {
   assign: (row: Note) => void;
   /** «Показать на стене» — the point, or null to take the light off. */
   spotlight: (pointId: string | null) => void;
+  /** «Во весь экран» of a drawing while the board is not on the wall (D-141): the board goes up, the drawing lit. */
+  showSketch: (pointId: string) => void;
   rename: (title: string) => void;
   deleteBoard: () => void;
   /** The screen's one microphone is about to open for this target. */
@@ -268,6 +270,8 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
     // a drawing stays a point: a sub-point has no room for its picture (D-141)
     const demoteTo = phone.has(pointId) || isDrawn(point.sketch) ? null : demotedPlace(rows, pointId, (above) => !phone.has(above));
     const lightable = onWall && point.parent_id === null && hasContent(point) && !phone.has(pointId);
+    // a drawing goes over the whole wall from its card even while the board is not up (D-141)
+    const drawing = point.parent_id === null && !phone.has(pointId) && isDrawn(point.sketch);
     return {
       toggle: () => (handing ? pickFor(point) : accordion.toggle(pointId)),
       toggleSub: (subId) => {
@@ -288,6 +292,12 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
       aimAfter: () => actions.aim(`after:${pointId}`),
       move: phone.has(pointId) || point.parent_id !== null ? undefined : () => actions.move(point),
       sketch: () => setSketching({ row: point }),
+      turnSketch: () => {
+        const sketch = sketchFrom(point.sketch);
+        if (!sketch) return;
+        haptic(8);
+        actions.edit(point, { sketch: withFrame(sketch, sheetOf(sketch), nextTurn(turnOf(sketch))) });
+      },
       place: (sub, position) => actions.edit(sub, { position }),
       aim: () => actions.aim(`sub:${pointId}`),
       demote: demoteTo
@@ -310,6 +320,13 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
             actions.spotlight(on ? pointId : null);
           }
         : undefined,
+      showSketch:
+        drawing && !onWall
+          ? () => {
+              haptic(8);
+              actions.showSketch(pointId);
+            }
+          : undefined,
     };
   };
 

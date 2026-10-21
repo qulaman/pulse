@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
 
 import { SketchView } from "@/components/mindboard/SketchView";
+import { shownRatio } from "@/lib/mindboard/sketch";
 import { BOARD_TITLE_GAP, wallText } from "@/lib/tv/board";
 import { COLUMN_GAP, textTop, type ListLayout, type ListRow, type ListTier, type TitleFit } from "@/lib/tv/boardList";
 
@@ -132,7 +133,7 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
                 className="overflow-hidden"
                 style={{
                   marginTop: vh(tier.subTop),
-                  width: vh((row.thumb * 16) / 9),
+                  width: vh(row.thumb * shownRatio(item.sketch)),
                   height: vh(row.thumb),
                   borderRadius: vh(1.2),
                   background: "color-mix(in srgb, var(--surface) 70%, transparent)",

@@ -16,21 +16,17 @@ import {
   PROGRESS_H,
   PROGRESS_THUMB_H,
   progressScale,
-  wallText,
   wallView,
   type TvBoard as TvBoardData,
   type TvBoardData as Board,
-  type TvBoardItem,
 } from "@/lib/tv/board";
 import { listLayout, pageOfPoint, titleFit } from "@/lib/tv/boardList";
 import { mapLayout } from "@/lib/tv/boardMap";
 import { tvTime } from "@/lib/tv/clock";
 
-import { SketchView } from "@/components/mindboard/SketchView";
-
 import { TvBoardList } from "./TvBoardList";
 import { TvBoardMap } from "./TvBoardMap";
-import { Badge, EASE, vh } from "./TvBoardParts";
+import { EASE, vh } from "./TvBoardParts";
 
 const MAP_MARGIN = 1.6;
 
@@ -76,9 +72,6 @@ export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null
   const page = pageAt(now, pages, list ? pageOfPoint(list, focus) : null);
   const fresh = freshKey(board.items, now);
   const view = map ? "map" : "list";
-  // a drawing lit by the presenter opens over the whole board (D-141)
-  const litAt = focus ? board.items.findIndex((item) => item.id === focus) : -1;
-  const drawing = litAt >= 0 && board.items[litAt].sketch ? board.items[litAt] : null;
 
   return (
     <div
@@ -93,56 +86,20 @@ export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             // another view, or the map on another step of its scale, crossfades as a whole: type never resizes in view
-            key={drawing ? `sketch-${drawing.id}` : map ? `map-${map.tier.key}` : "list"}
+            key={map ? `map-${map.tier.key}` : "list"}
             className="absolute inset-0"
             initial={{ opacity: 0, scale: still ? 1 : 0.98 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: still ? 1 : 0.99, transition: { duration: still ? 0 : 0.28 } }}
             transition={{ duration: still ? 0 : 0.5, ease: EASE }}
           >
-            {drawing?.sketch ? (
-              <SketchFocus item={drawing} n={litAt + 1} frame={frame} />
-            ) : map ? (
+            {map ? (
               <TvBoardMap layout={map} title={board.title} focus={focus} fresh={fresh} still={still} />
             ) : list ? (
               <TvBoardList layout={list} title={board.title} heading={heading} page={page} focus={focus} fresh={fresh} still={still} />
             ) : null}
           </motion.div>
         </AnimatePresence>
-      </div>
-    </div>
-  );
-}
-
-/**
- * A drawing lit by the presenter (D-141): its number and words on top, the drawing over the rest
- * of the board at 16:9 — a scheme read from the far end of the office.
- */
-function SketchFocus({ item, n, frame }: { item: TvBoardItem; n: number; frame: { width: number; height: number } }) {
-  const caption = wallText(item);
-  const top = 6.4;
-  const room = frame.height - top - 2;
-  const width = Math.min(frame.width, (room * 16) / 9);
-  return (
-    <div className="flex h-full flex-col items-center" data-testid="tv-board-sketch" data-point={item.id}>
-      <div className="flex w-full items-center" style={{ height: vh(top), gap: vh(2) }}>
-        <Badge n={n} done={item.done} size={5.6} lit />
-        <p className="min-w-0 flex-1 truncate font-semibold tracking-[-0.015em]" style={{ fontSize: vh(4.4), lineHeight: vh(5.6) }}>
-          {caption}
-        </p>
-      </div>
-      <div
-        className="overflow-hidden"
-        style={{
-          marginTop: vh(2),
-          width: vh(width),
-          height: vh((width * 9) / 16),
-          borderRadius: vh(2),
-          background: "color-mix(in srgb, var(--surface) 60%, transparent)",
-          boxShadow: "inset 0 0 0 0.2vh color-mix(in srgb, var(--accent) 40%, transparent)",
-        }}
-      >
-        {item.sketch ? <SketchView sketch={item.sketch} label={caption} /> : null}
       </div>
     </div>
   );

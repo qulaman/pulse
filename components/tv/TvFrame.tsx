@@ -21,6 +21,7 @@ import { TvFocus } from "./TvFocus";
 import { TvLeaders } from "./TvLeaders";
 import { TvMascot } from "./TvMascot";
 import { TvOverlay } from "./TvOverlay";
+import { TvSketchFull } from "./TvSketchFull";
 import { TvTaskFocus } from "./TvTaskFocus";
 import { TvTeam } from "./TvTeam";
 import { TvTicker } from "./TvTicker";
@@ -203,6 +204,10 @@ export function TvFrame(props: TvFrameProps) {
             )}
           </div>
         </footer>
+
+        {/* a drawing lit on the board takes the whole wall (D-141) while the board is the scene — a person
+            or an order put up over it stays seen; a visitor's notice still stands above it */}
+        <TvSketchFull board={board && !focus && !task ? board.board : null} />
 
         <TvOverlay view={overlay} sound={sound} onCovered={() => setCoverShown(true)} />
       </div>

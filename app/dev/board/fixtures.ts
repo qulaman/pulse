@@ -23,6 +23,26 @@ export const SKETCH_FIXTURE = {
     { c: "text", w: 1, p: [380, 300, 520, 300, 520, 420, 380, 420, 380, 300] },
   ],
 };
+
+/**
+ * A three-storey office drawn on the phone held upright (D-141 amendment): the vertical sheet
+ * 900×1600, turned to lie along the wall (`r` 90) as a new vertical sheet is.
+ */
+export const SKETCH_UPRIGHT = {
+  v: 1,
+  o: "portrait",
+  r: 90,
+  strokes: [
+    { c: "text", w: 1, p: [170, 160, 730, 160, 730, 1440, 170, 1440, 170, 160] },
+    { c: "text", w: 1, p: [170, 590, 730, 590] },
+    { c: "text", w: 1, p: [170, 1020, 730, 1020] },
+    { c: "warn", w: 2, p: [260, 700, 470, 700, 470, 900, 260, 900, 260, 700] },
+    { c: "accent", w: 2, p: [450, 1560, 450, 1250] },
+    { c: "accent", w: 1, p: [390, 1320, 450, 1250, 510, 1320] },
+    { c: "text", w: 1, p: [560, 280, 640, 280, 640, 470, 560, 470, 560, 280] },
+  ],
+};
+
 export type BoardCase = (typeof BOARD_CASES)[number];
 
 export const COMPANY = "company";
@@ -174,6 +194,7 @@ export function buildBoard(which: BoardCase, now: Date): BoardFixture {
           note(base, "p1", "Аренда до конца года", 1),
           note(base, "p2", "", 2, { sketch: SKETCH_FIXTURE }),
           note(base, "p3", "Ворота — с южной стороны", 3, { sketch: SKETCH_FIXTURE }),
+          note(base, "p5", "Офис — три этажа", 5, { sketch: SKETCH_UPRIGHT }),
           note(base, "p4", "Охрана с 1 ноября", 4),
         ],
         wall: { onWall: true, spot: "p2" },

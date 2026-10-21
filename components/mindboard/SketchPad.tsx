@@ -1,25 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { createPortal } from "react-dom";
 
 import { NoteIcon } from "@/components/notes/icons";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
 import {
+  defaultTurn,
   INK_LABEL,
   INK_VAR,
   INKS,
-  SKETCH_H,
-  SKETCH_W,
+  nextTurn,
+  SHEET_SIZE,
+  sheetOf,
+  shownSize,
   simplify,
   strokePath,
+  turnOf,
   WEIGHT_WIDTH,
+  withFrame,
   withStroke,
   type Ink,
+  type Sheet,
   type Sketch,
+  type Turn,
   type Weight,
 } from "@/lib/mindboard/sketch";
+
+import { SketchView } from "./SketchView";
 
 type Props = {
   /** The drawing to go on with («Дорисовать»); null — a new one. */
@@ -43,18 +52,47 @@ function inkColors(): Record<Ink, string> {
   return { text: of("text"), accent: of("accent"), warn: of("warn") };
 }
 
+/** A new drawing starts on the sheet the phone is held as: upright — a vertical sheet. */
+function sheetForPhone(): Sheet {
+  return typeof window !== "undefined" && window.innerHeight > window.innerWidth ? "portrait" : "landscape";
+}
+
+// the phone held sideways — the same test as Tailwind's `landscape:`; the pad opens only on a tap, never on the server
+const SIDEWAYS = "(orientation: landscape)";
+const onTurnPhone = (change: () => void) => {
+  const query = window.matchMedia(SIDEWAYS);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+};
+const useSideways = () =>
+  useSyncExternalStore(
+    onTurnPhone,
+    () => window.matchMedia(SIDEWAYS).matches,
+    () => false,
+  );
+
 /**
- * The pad of «Рисунок» (D-141): a 16:9 sheet — the shape of the wall — over the whole screen,
- * drawn with a finger: three inks, a pen and a marker, «Отменить», «Стереть»; the words of the
- * point on top, if wanted; «На доску» puts the drawing on the board as a point. Drawn before
- * the meeting, not during it: nothing goes to the wall until it is saved. Turned sideways the
- * sheet is as large as the phone. The canvas draws the line under the finger; when the finger
- * lifts, the line is thinned (`simplify`) and redrawn with the same smoothed path the card and
- * the wall draw, so what is seen here is what will be seen there.
+ * The pad of «Рисунок» (D-141): a sheet over the whole screen, drawn with a finger — three inks,
+ * a pen and a marker, «Отменить», «Стереть»; the words of the point on top, if wanted; «На
+ * доску» puts the drawing on the board as a point. Drawn before the meeting, not during it:
+ * nothing goes to the wall until it is saved.
+ *
+ * The sheet is the phone's: held upright — a vertical sheet as tall as the screen; sideways — a
+ * horizontal one, the wall's own shape. The wall is horizontal, so a vertical drawing goes on it
+ * turned to lie along it; «Повернуть» turns it a quarter at a time, and the little wall beside
+ * the key shows how the office will see it. The sheet is chosen before the first line; the turn
+ * — any time, «Дорисовать» too.
+ *
+ * The canvas draws the line under the finger; when the finger lifts, the line is thinned
+ * (`simplify`) and redrawn with the same smoothed path the card and the wall draw, so what is
+ * seen here is what will be seen there.
  */
 export function SketchPad({ initial, caption: initialCaption, onSave, onClose, editing }: Props) {
   const [sketch, setSketch] = useState<Sketch | null>(initial);
   const [past, setPast] = useState<(Sketch | null)[]>([]);
+  const [sheet, setSheet] = useState<Sheet>(() => (initial ? sheetOf(initial) : sheetForPhone()));
+  const [turn, setTurn] = useState<Turn>(() => (initial ? turnOf(initial) : defaultTurn(sheet)));
+  const sideways = useSideways();
   const [ink, setInk] = useState<Ink>("text");
   const [weight, setWeight] = useState<Weight>(1);
   const [caption, setCaption] = useState(initialCaption);
@@ -65,26 +103,29 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
   const drawing = useRef<{ id: number; points: number[] } | null>(null);
   const colors = useRef<Record<Ink, string> | null>(null);
   const inkColor = useCallback((value: Ink) => (colors.current ??= inkColors())[value], []);
+  const grid = SHEET_SIZE[sheet];
   // the drawing as it stands, for a redraw after a resize
   const current = useRef(sketch);
   useEffect(() => {
     current.current = sketch;
   });
-  const dirty = past.length > 0 || caption.trim() !== initialCaption.trim();
+  const startTurn = initial ? turnOf(initial) : null;
+  const dirty = past.length > 0 || caption.trim() !== initialCaption.trim() || (startTurn !== null && turn !== startTurn);
 
-  // the sheet: as large as the room allows at 16:9
+  // the sheet: as large as the room allows at its own shape
   useLayoutEffect(() => {
     const node = room.current;
     if (!node) return;
     const fit = () => {
-      const width = Math.min(node.clientWidth, (node.clientHeight * 16) / 9);
-      setBox({ width: Math.floor(width), height: Math.floor((width * 9) / 16) });
+      const ratio = grid.w / grid.h;
+      const width = Math.min(node.clientWidth, node.clientHeight * ratio);
+      setBox({ width: Math.floor(width), height: Math.floor(width / ratio) });
     };
     fit();
     const resize = new ResizeObserver(fit);
     resize.observe(node);
     return () => resize.disconnect();
-  }, []);
+  }, [grid.w, grid.h]);
 
   // nothing under the pad scrolls while it is open
   useEffect(() => {
@@ -106,27 +147,27 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
     const node = canvas.current;
     const ctx = node?.getContext("2d");
     if (!node || !ctx) return null;
-    const scale = node.width / SKETCH_W;
+    const scale = node.width / grid.w;
     // grid units in, device pixels out
     ctx.setTransform(scale, 0, 0, scale, 0, 0);
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     return ctx;
-  }, []);
+  }, [grid.w]);
 
   // the whole drawing again: after a line is finished, «Отменить», «Стереть», a resize
   const redraw = useCallback(
     (next: Sketch | null) => {
       const ctx = context();
       if (!ctx) return;
-      ctx.clearRect(0, 0, SKETCH_W, SKETCH_H);
+      ctx.clearRect(0, 0, grid.w, grid.h);
       for (const stroke of next?.strokes ?? []) {
         ctx.strokeStyle = inkColor(stroke.c);
         ctx.lineWidth = WEIGHT_WIDTH[stroke.w];
         ctx.stroke(new Path2D(strokePath(stroke)));
       }
     },
-    [context, inkColor],
+    [context, inkColor, grid.w, grid.h],
   );
 
   // the canvas in device pixels for the sheet's size
@@ -142,9 +183,9 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
   // a finger that slides off the sheet stays on its edge: what is drawn here is what is saved
   const toGrid = (event: { clientX: number; clientY: number }): [number, number] => {
     const rect = (canvas.current as HTMLCanvasElement).getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * SKETCH_W;
-    const y = ((event.clientY - rect.top) / rect.height) * SKETCH_H;
-    return [Math.min(SKETCH_W, Math.max(0, x)), Math.min(SKETCH_H, Math.max(0, y))];
+    const x = ((event.clientX - rect.left) / rect.width) * grid.w;
+    const y = ((event.clientY - rect.top) / rect.height) * grid.h;
+    return [Math.min(grid.w, Math.max(0, x)), Math.min(grid.h, Math.max(0, y))];
   };
 
   const start = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -217,6 +258,21 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
     haptic(10);
   };
 
+  // the sheet is chosen before the first line: its grid is the drawing's — and a rubbed-out
+  // drawing of the other sheet does not come back on this one by «Отменить»
+  const chooseSheet = (next: Sheet) => {
+    if (next === sheet || sketch) return;
+    setSheet(next);
+    setTurn(defaultTurn(next));
+    setPast([]);
+    haptic(8);
+  };
+
+  const turnIt = () => {
+    setTurn((was) => nextTurn(was));
+    haptic(8);
+  };
+
   const close = () => {
     if (dirty && !armed) {
       setArmed(true);
@@ -227,10 +283,13 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
 
   const save = () => {
     haptic([8, 30, 12]);
-    onSave(sketch, caption.trim());
+    onSave(sketch ? withFrame(sketch, sheet, turn) : null, caption.trim());
   };
 
   const empty = !sketch && caption.trim() === "";
+  // one object per drawing and turn: the little wall smooths its paths again only when they change
+  const shown = useMemo(() => (sketch ? withFrame(sketch, sheet, turn) : null), [sketch, sheet, turn]);
+  const frame = <SheetAndTurn sheet={sheet} turn={turn} drawn={shown} locked={sketch !== null} onSheet={chooseSheet} onTurn={turnIt} />;
 
   return createPortal(
     <div
@@ -240,6 +299,8 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
       aria-modal="true"
       aria-label="Рисунок"
       data-testid="sketch-pad"
+      data-sheet={sheet}
+      data-turn={turn}
     >
       <div className="flex items-center gap-2 px-3 py-2">
         <button
@@ -260,6 +321,8 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
           data-testid="sketch-caption"
           className="field min-h-[40px] min-w-0 flex-1 rounded-[12px] px-3 text-[15px] outline-none placeholder:text-muted"
         />
+        {/* sideways the sheet and the turn live up here: the side column has room only for the pens */}
+        {sideways ? <span className="flex shrink-0">{frame}</span> : null}
         <button
           type="button"
           onClick={save}
@@ -292,13 +355,16 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
             />
             {!sketch ? (
               <p aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center px-6 text-center text-[14px] leading-[19px] text-muted">
-                Рисуйте пальцем — так это увидят на стене. Поверните телефон, и лист станет больше
+                {sheet === "portrait" ? "Рисуйте пальцем. Лист вертикальный — на стене он ляжет вдоль экрана, как на маленьком экране у «Повернуть»" : "Рисуйте пальцем — так это увидят на стене"}
               </p>
             ) : null}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-2.5 landscape:flex-col landscape:justify-center landscape:gap-1 landscape:px-2 landscape:py-1" data-testid="sketch-tools">
+        <div
+          className="flex items-center gap-2 px-3 py-2 landscape:flex-col landscape:justify-center landscape:gap-1 landscape:px-2 landscape:py-1"
+          data-testid="sketch-tools"
+        >
           {INKS.map((value) => (
             <button
               key={value}
@@ -352,7 +418,73 @@ export function SketchPad({ initial, caption: initialCaption, onSave, onClose, e
           </span>
         </div>
       </div>
+
+      {/* upright, the sheet and the turn get a row of their own under the pens */}
+      {sideways ? null : <div className="flex items-center justify-between gap-3 px-3 pb-2.5">{frame}</div>}
     </div>,
     document.body,
+  );
+}
+
+/**
+ * The sheet and the turn: «Вертикально / Горизонтально» before the first line, and the little
+ * wall — a 16:9 frame with the drawing as the office will see it — beside «Повернуть».
+ */
+function SheetAndTurn({
+  sheet,
+  turn,
+  drawn,
+  locked,
+  onSheet,
+  onTurn,
+}: {
+  sheet: Sheet;
+  turn: Turn;
+  drawn: Sketch | null;
+  locked: boolean;
+  onSheet: (sheet: Sheet) => void;
+  onTurn: () => void;
+}) {
+  const shown = shownSize({ o: sheet === "portrait" ? "portrait" : undefined, r: turn });
+  return (
+    <span className="flex items-center gap-2">
+      <span className="flex rounded-full bg-surface-2/70 p-0.5" role="radiogroup" aria-label="Лист" title={locked ? "Лист выбирают до первой линии" : undefined}>
+        {(["portrait", "landscape"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={sheet === value}
+            aria-label={value === "portrait" ? "Вертикальный лист" : "Горизонтальный лист"}
+            disabled={locked && sheet !== value}
+            onClick={() => onSheet(value)}
+            data-testid={`sketch-sheet-${value}`}
+            className={`flex h-9 w-10 items-center justify-center rounded-full transition-colors duration-[120ms] disabled:opacity-30 ${sheet === value ? "bg-surface text-text" : "text-muted"}`}
+          >
+            <span aria-hidden className="rounded-[3px] border-2 border-current" style={value === "portrait" ? { width: 11, height: 17 } : { width: 18, height: 11 }} />
+          </button>
+        ))}
+      </span>
+      <button
+        type="button"
+        onClick={onTurn}
+        aria-label="Повернуть рисунок на стене"
+        data-testid="sketch-turn"
+        className="flex min-h-[44px] items-center gap-2 rounded-[12px] pl-1 pr-2 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
+      >
+        {/* the wall in small: how the office will see it */}
+        <span aria-hidden className="relative flex h-[36px] w-[64px] items-center justify-center overflow-hidden rounded-[6px] bg-bg" style={{ boxShadow: "inset 0 0 0 1px var(--border)" }} data-testid="sketch-wall">
+          <span className="flex h-full max-h-[32px] max-w-[60px] items-center justify-center" style={{ aspectRatio: `${shown.w} / ${shown.h}` }}>
+            {drawn ? (
+              <SketchView sketch={drawn} />
+            ) : (
+              <span className="h-full w-full rounded-[3px] border border-dashed border-accent/60" />
+            )}
+          </span>
+        </span>
+        <NoteIcon name="retry" size={17} />
+        Повернуть
+      </button>
+    </span>
   );
 }
