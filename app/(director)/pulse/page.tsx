@@ -29,6 +29,7 @@ import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
 import { Button } from "@/components/ui/Button";
 import { useComposeStore } from "@/lib/store/compose";
+import { useHydrated } from "@/lib/useHydrated";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
 import { nextEventLine } from "@/lib/calendar/say";
@@ -219,7 +220,11 @@ export default function PulsePage() {
   const phraseInHand = confirming || throwing;
 
   const loading = me.isLoading || board.isLoading;
-  const rows = board.data;
+  // The first render reads as the server drew it — without data. The tab bar in the layout
+  // fetches the board (and a kept snapshot comes back) before this streamed segment hydrates, so
+  // the face drew «alert» over the server's «sleeping» and React threw the page away (D-142).
+  const hydrated = useHydrated();
+  const rows = hydrated ? board.data : undefined;
   const lanes = useMemo(() => lanesOf(rows ?? [], now, meId), [rows, now, meId]);
   const counts = countsOf(lanes);
   // what waits for the morning (D-38): no lane of its own, named on the closing card (D-139)
@@ -248,9 +253,11 @@ export default function PulsePage() {
   // the fifth ball, its socket and the catalogue exist only when the company has
   // somebody to ask (D-79 §4)
   const people = usePeople();
-  const hasSecretary = (people.data ?? []).some((p) => p.role === "secretary" && p.is_active);
+  const peopleRows = hydrated ? people.data : undefined;
+  const hasSecretary = (peopleRows ?? []).some((p) => p.role === "secretary" && p.is_active);
   const errands = useErrands(hasSecretary);
-  const errandRows = useMemo(() => errands.data ?? [], [errands.data]);
+  const errandsData = hydrated ? errands.data : undefined;
+  const errandRows = useMemo(() => errandsData ?? [], [errandsData]);
   const catalogue = useSecretaryActions(hasSecretary);
   // what the secretaries are doing about the requests, for the small secretary at the desk:
   // the job in its hands, the picture on its monitor, the cup brought over after «Готово» (D-97)
@@ -298,7 +305,8 @@ export default function PulsePage() {
   // «К вам посетитель» (D-96): somebody at the secretary's desk waits for an answer — the card
   // sits under the face even on the waiting screen, a person is standing there
   const visits = useVisits(hasSecretary);
-  const visitRows = useMemo(() => visits.data ?? [], [visits.data]);
+  const visitsData = hydrated ? visits.data : undefined;
+  const visitRows = useMemo(() => visitsData ?? [], [visitsData]);
   const visitorsWaiting = awaitingDirector(visitRows).length > 0;
   // the secretary's words on the wall (D-116): the same words under the face, «Понятно» clears both
   const messagesWaiting = unreadMessages(visitRows).length > 0;
@@ -374,7 +382,7 @@ export default function PulsePage() {
     return answer({
       question: asked,
       now,
-      people: (people.data ?? [])
+      people: (peopleRows ?? [])
         .filter((p) => p.is_active && p.role !== "tv")
         .map((p) => ({ id: p.id, fullName: p.full_name, aliases: p.aliases ?? [] })),
       open: rows.filter((t) => WORK_STATUSES.includes(t.status)).map((t) => ({ ...toBriefTask(t), status: t.status })),
@@ -386,7 +394,7 @@ export default function PulsePage() {
       questions: lanes.question.map(toBriefTask),
       review: lanes.review.map(toBriefTask),
     });
-  }, [asked, now, rows, lanes, people.isLoading, people.data, sent.isLoading, sent.data]);
+  }, [asked, now, rows, lanes, people.isLoading, peopleRows, sent.isLoading, sent.data]);
 
   // The exchange stays on screen after the pipeline goes idle: the assistant keeps its
   // answer until the director asks again, taps the face, or closes it.
@@ -578,7 +586,7 @@ export default function PulsePage() {
       if (!mood) acts.play("yawn");
     }
   };
-  const team = (people.data ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
+  const team = (peopleRows ?? []).filter((p) => p.is_active && p.role !== "director" && p.role !== "tv");
   // the secretaries sit at the desk, not among the circles (D-85)
   const secretaries = team.filter((p) => p.role === "secretary");
   // the waiting screen's own view of the team: who is carrying what right now (D-90), each
@@ -604,8 +612,8 @@ export default function PulsePage() {
         .filter((p) => p.role !== "secretary")
         .map((p) => ({ id: p.id, fullName: p.full_name, alias: p.aliases?.[0] ?? null, tasks: byPerson[p.id] ?? [] })),
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- team is derived from people.data
-  }, [people.data, rows, now, meId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- team is derived from peopleRows
+  }, [peopleRows, rows, now, meId]);
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
@@ -632,7 +640,7 @@ export default function PulsePage() {
           <span className="text-accent">Открыть ›</span>
         </Link>
       ) : null}
-      {people.data && team.length === 0 ? (
+      {peopleRows && team.length === 0 ? (
         <Link href="/people/new" className="card-in relative block py-1 pl-4 text-[15px] leading-5">
           <span aria-hidden className="absolute left-0 top-[8px] h-2 w-2 rounded-full bg-accent" />
           В команде пока никого. Добавь первого сотрудника. <span className="text-accent">Добавить ›</span>

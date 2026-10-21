@@ -72,7 +72,7 @@ export function useDirectorControls({
 }): {
   actions: TaskActions;
   press: (action: DeskAction, task: TaskWithPeople) => void;
-  answer: (task: TaskWithPeople, text: string | null) => void;
+  answer: (task: TaskWithPeople, text: string | null, deadlineIso?: string) => void;
   more: (task: TaskWithPeople) => void;
   sheets: ReactNode;
 } {
@@ -188,12 +188,14 @@ export function useDirectorControls({
     }
   };
 
-  const answer = (task: TaskWithPeople, text: string | null) => {
+  const answer = (task: TaskWithPeople, text: string | null, deadlineIso?: string) => {
     if (!text) {
       setSheet({ name: "answer", taskId: task.id });
       return;
     }
     haptic(10);
+    // «Когда срок?» — «Завтра 12:00»: the date goes on the task too, quietly (the answer is the receipt)
+    if (deadlineIso) base.extend({ taskId: task.id, deadlineIso });
     actions.sendMessage({ taskId: task.id, companyId, text });
     toast(named("Ответ ушёл", task));
   };
@@ -241,6 +243,7 @@ export function useDirectorControls({
           taskId={sheetTask.id}
           companyId={companyId}
           question={question}
+          deadline={sheetTask.deadline}
           actions={{
             ...actions,
             sendMessage: (input) => {

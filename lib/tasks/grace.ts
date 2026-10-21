@@ -17,9 +17,8 @@ import { dequeue, hold } from "@/lib/outbox";
  * harmless). The copy stays unseen until the call itself closes it, or a dead network makes it
  * a real wait (postJson releases it then): no «Отправляю» line on every tap.
  *
- * Known limit: the hold is this tab's. A second tab of the same director that replays the
- * outbox inside those five seconds (its start, a reconnect) sends the tap before the window
- * is over; «Отменить» in the first tab then only puts the card back until the next fetch.
+ * A second tab of the same director knows the window too (lib/outbox.ts, BroadcastChannel,
+ * D-142): its replay leaves the tap alone until the window is over.
  */
 
 export const UNDO_MS = 5_000;

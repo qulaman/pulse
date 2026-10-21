@@ -8,10 +8,17 @@ import { TaskCard } from "@/components/tasks/TaskCard";
 import { Sheet } from "@/components/ui/Sheet";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
-import { ATTENTION_LANES, LANE_ORDER, quoteTitleOf, workRowLabel, type BoardTask, type Lane, type Lanes } from "@/lib/pulse/board";
+import { ATTENTION_LANES, hasUnread, LANE_ORDER, quoteTitleOf, workRowLabel, type BoardTask, type Lane, type Lanes } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, pluralRu } from "@/lib/tasks/status-text";
+import { toast } from "@/components/ui/Toast";
 import { TaskTile } from "./TaskTile";
+
+/**
+ * «Вниз — позже» outlives the deck (D-142): closing the ball, opening the other one or going to
+ * another tab used to bring the card put off back on top. Kept for the life of the page.
+ */
+let putOff: string[] = [];
 
 /** A horizontal pull past this (or a flick) turns the page. */
 const PAGE_PX = 56;
@@ -115,7 +122,21 @@ export type CardDeckProps = {
  * one closing card that opens «Задачи».
  */
 export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply, replyLine = false, focus, onCurrentChange, showWork = true, held = [], onMore }: CardDeckProps) {
-  const [postponed, setPostponed] = useState<string[]>([]);
+  const [postponed, setPostponedState] = useState<string[]>(() => putOff);
+  const setPostponed = (update: (list: string[]) => string[]) =>
+    setPostponedState((list) => {
+      putOff = update(list);
+      return putOff;
+    });
+  // «Сообщения»: plain words nobody answered pile up for weeks — one tap reads them all (D-142);
+  // a question or a request for time is the director's move and stays
+  const plainWords = replyLine
+    ? lanes.question.filter((task) => !task.question && !(task.time_request && task.time_request.senderId !== meId) && hasUnread(task, meId))
+    : [];
+  const readAll = () => {
+    for (const task of plainWords) actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 });
+    toast(`Прочитано: ${plainWords.length}`);
+  };
 
   const items = useMemo<DeckItem[]>(() => {
     const attention: DeckItem[] = [];
@@ -309,8 +330,15 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
 
       <div className="mt-2 flex items-center justify-between px-1 text-[13px] leading-4 text-muted">
         <span>{current?.kind === "task" ? (primaryOf(current, actions) ? `вверх — ${primaryOf(current, actions)!.label.toLowerCase()} · вниз — позже` : "вниз — позже · тап — карточка") : ""}</span>
-        <span className="nums">
-          {safeIndex + 1} / {items.length}
+        <span className="flex items-center gap-3">
+          {plainWords.length >= 2 ? (
+            <button type="button" onClick={readAll} className="font-display text-[13px] font-semibold text-accent" data-testid="read-all">
+              Прочитал все · {plainWords.length}
+            </button>
+          ) : null}
+          <span className="nums">
+            {safeIndex + 1} / {items.length}
+          </span>
         </span>
       </div>
 

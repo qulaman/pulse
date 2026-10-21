@@ -407,7 +407,11 @@ export function useTaskMessages(taskId: string, enabled = true) {
         .gt("seq", lastSeq)
         .order("seq", { ascending: true });
       if (error) throw new Error(error.message);
-      return mergeBySeq(cached, (data ?? []) as unknown as TaskMessage[]);
+      // merged into the cache as it is NOW, not as it was when the request left: an UPDATE that
+      // landed meanwhile (the answered_at of a question, closed by the very reply that set off
+      // this fetch) stays — it used to be overwritten, and «ждёт ответа» hung until a reload (D-142)
+      const latest = queryClient.getQueryData<TaskMessage[]>(queryKey) ?? cached;
+      return mergeBySeq(latest, (data ?? []) as unknown as TaskMessage[]);
     },
     channel: { table: "task_messages", filter: `task_id=eq.${taskId}` },
     onEvent: (payload, client) => {

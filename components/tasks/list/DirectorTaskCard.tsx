@@ -3,16 +3,16 @@
 import { ReactionBar } from "@/components/points/ReactionBar";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { humanAqtobe } from "@/lib/ai/time";
 import { hasUnread, type BoardTask } from "@/lib/pulse/board";
-import { isWaiting, keysFor, QUICK_ANSWERS, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
+import { isWaiting, keysFor, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
 import { isWorking, passedWord, untilWords, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import { REASON_TONE, REASON_WORD, statusWord, stepsOf } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, TEXT } from "@/lib/tasks/status-text";
 
 import { Icon, type IconName } from "../desk/icons";
+import { QuickAnswers } from "../desk/QuickAnswers";
 import { CardFoot, CardHead, CardShell, LastWord, Note, Stepper } from "./TaskList";
 
 /** On a card the verbs are short: «Передать» fits a third of a phone, «Переназначить» does not. */
@@ -252,7 +252,7 @@ export function DirectorTaskCard({
   now: Date;
   onToggle: () => void;
   onAction: (action: DeskAction, task: TaskWithPeople) => void;
-  onAnswer: (task: TaskWithPeople, text: string | null) => void;
+  onAnswer: (task: TaskWithPeople, text: string | null, deadlineIso?: string) => void;
   onMore: (task: TaskWithPeople) => void;
   showPerson?: boolean;
   /** The director's reaction is on this task (D-133): the card wears a gold outline. */
@@ -314,16 +314,13 @@ export function DirectorTaskCard({
             <Note tone="warn" icon={<Icon name="question" size={15} />}>
               «{question}»
             </Note>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {QUICK_ANSWERS.map((text) => (
-                <Chip key={text} onClick={() => onAnswer(task, text)}>
-                  {text}
-                </Chip>
-              ))}
-              <Chip tone="muted" onClick={() => onAnswer(task, null)}>
-                Ответить словами…
-              </Chip>
-            </div>
+            <QuickAnswers
+              question={question}
+              deadline={task.deadline}
+              now={now}
+              onAnswer={(answer) => onAnswer(task, answer.text, answer.deadlineIso)}
+              onWords={() => onAnswer(task, null)}
+            />
           </div>
         ) : null}
 

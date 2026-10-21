@@ -36,6 +36,56 @@ let stale = 0;
  */
 const held = new Set<string>();
 
+/**
+ * Entries another tab of this browser holds in its window (D-142): two tabs share one outbox,
+ * and the other tab's replay (its start, a reconnect) used to send a tap before its «Отменить»
+ * was over. A tab says so over a BroadcastChannel; the hold expires on its own, so the tap of a
+ * tab that died mid-window still goes out from here afterwards.
+ */
+const heldElsewhere = new Map<string, number>();
+/** A window and the call after it fit well inside this; past it the other tab is gone. */
+const ELSEWHERE_MS = 30_000;
+let channel: BroadcastChannel | null | undefined;
+
+function bus(): BroadcastChannel | null {
+  if (channel !== undefined) return channel;
+  try {
+    channel = typeof BroadcastChannel === "undefined" ? null : new BroadcastChannel("pulse-outbox");
+  } catch {
+    channel = null;
+  }
+  // under Node (tests) an open channel would keep the process alive
+  (channel as { unref?: () => void } | null)?.unref?.();
+  channel?.addEventListener("message", (event: MessageEvent<{ type?: string; id?: string; until?: number }>) => {
+    const { type, id, until } = event.data ?? {};
+    if (!id) return;
+    if (type === "hold" && until) heldElsewhere.set(id, until);
+    else if (type === "release") heldElsewhere.delete(id);
+    for (const listener of listeners) listener();
+  });
+  return channel;
+}
+// every tab listens from its first import, before anybody else has a window to announce
+if (typeof window !== "undefined") bus();
+
+function say(type: "hold" | "release", id: string) {
+  try {
+    bus()?.postMessage(type === "hold" ? { type, id, until: Date.now() + ELSEWHERE_MS } : { type, id });
+  } catch {
+    // a closed channel: the expiry covers it
+  }
+}
+
+/** Not to be sent from here right now: in this tab's window, or in another tab's. */
+function isHeld(id: string): boolean {
+  if (held.has(id)) return true;
+  const until = heldElsewhere.get(id);
+  if (until === undefined) return false;
+  if (until > Date.now()) return true;
+  heldElsewhere.delete(id);
+  return false;
+}
+
 const listeners = new Set<() => void>();
 
 /** The send line counts what waits here (components/OfflineBanner.tsx). */
@@ -72,7 +122,7 @@ function write(entries: OutboxEntry[]): void {
 }
 
 export function outboxSize(): number {
-  return typeof window === "undefined" ? 0 : read().filter((e) => !held.has(e.id)).length;
+  return typeof window === "undefined" ? 0 : read().filter((e) => !isHeld(e.id)).length;
 }
 
 export function enqueue(entry: Omit<OutboxEntry, "at">): void {
@@ -83,7 +133,7 @@ export function enqueue(entry: Omit<OutboxEntry, "at">): void {
 
 export function dequeue(id: string): void {
   if (typeof window === "undefined") return;
-  held.delete(id);
+  if (held.delete(id)) say("release", id);
   const all = read();
   const rest = all.filter((e) => e.id !== id);
   if (rest.length !== all.length) write(rest);
@@ -92,12 +142,14 @@ export function dequeue(id: string): void {
 /** A tap inside its «Отменить» window (D-139): on the phone already, not yet to be sent. */
 export function hold(entry: Omit<OutboxEntry, "at">): void {
   held.add(entry.id);
+  say("hold", entry.id);
   enqueue(entry);
 }
 
 /** The window is over: the entry is an ordinary one now — the call goes out and closes it. */
 export function release(id: string): void {
   if (!held.delete(id)) return;
+  say("release", id);
   for (const listener of listeners) listener();
 }
 
@@ -137,8 +189,8 @@ export async function replayOutbox(writeMessage?: MessageWriter): Promise<Replay
   const entries = read();
   const result: ReplayResult = { sent: 0, left: 0, refused: [] };
   for (const entry of entries) {
-    // still inside its «Отменить» window: the person may yet take it back
-    if (held.has(entry.id)) continue;
+    // still inside its «Отменить» window, here or in another tab: the person may yet take it back
+    if (isHeld(entry.id)) continue;
     if (entry.kind === "message") {
       if (!writeMessage) continue;
       const { error } = await writeMessage(entry.payload);
@@ -166,6 +218,6 @@ export async function replayOutbox(writeMessage?: MessageWriter): Promise<Replay
     if (res.ok) result.sent += 1;
     else result.refused.push(await refusalOf(res));
   }
-  result.left = read().filter((e) => !held.has(e.id)).length;
+  result.left = read().filter((e) => !isHeld(e.id)).length;
   return result;
 }

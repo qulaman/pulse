@@ -73,7 +73,8 @@ describe("mascot keyframes", () => {
     expect(twice).toEqual([]);
   });
 
-  it("has keyframes for every animation a face names", () => {
+  // renders every face of the gallery to markup: ~2 s alone, past the default 5 s inside a loaded full run
+  it("has keyframes for every animation a face names", { timeout: 20_000 }, () => {
     const named = new Set(allMarkup().flatMap((markup) => animationsOf(markup).map((anim) => anim.name)));
     const declared = new Set(DECLARED);
     expect([...named].filter((name) => !declared.has(name))).toEqual([]);

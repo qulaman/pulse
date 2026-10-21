@@ -2548,6 +2548,15 @@ h1 { letter-spacing: -0.025em; }
   from { opacity: 1; transform: translateY(0) scale(1); }
   to { opacity: 0; transform: translateY(-8px) scale(0.98); }
 }
+/* a toast with a button sits by the thumb, above the tab bar (D-142): it comes up and goes back down */
+@keyframes toast-in-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toast-out-down {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
 @keyframes shimmer {
   0% { opacity: 0.55; }
   50% { opacity: 1; }

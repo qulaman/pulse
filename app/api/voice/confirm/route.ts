@@ -43,6 +43,26 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
 
     // User's own client: confirm_voice_batch checks the director role itself.
     const supabase = await userSupabase(req);
+
+    // A task only for somebody who still works here (D-142): the pickers never offer a dismissed
+    // person, but a reissue of an old task or a stale screen could — and the batch took it.
+    const assignees = [
+      ...new Set(
+        confirmed
+          .filter((entity) => entity.kind === "task")
+          .map((entity) => (entity as { assignee_id?: unknown }).assignee_id)
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      ),
+    ];
+    if (assignees.length > 0) {
+      const { data: people, error: peopleError } = await supabase.from("profiles").select("id, is_active").in("id", assignees);
+      if (peopleError) throw new Error(`profiles check failed: ${peopleError.message}`);
+      const working = new Set((people ?? []).filter((person) => person.is_active).map((person) => person.id));
+      if (assignees.some((id) => !working.has(id))) {
+        return apiError(400, "assignee_inactive", "Этот сотрудник больше не работает — выбери другого");
+      }
+    }
+
     const { data, error } = await supabase.rpc("confirm_voice_batch", {
       payload: {
         source: body.source,

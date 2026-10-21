@@ -15,14 +15,14 @@ import { useEmployeeControls } from "@/components/tasks/list/useEmployeeControls
 import { latestDeclineReason, latestOpenQuestion, messageFlags } from "@/components/tasks/TaskThread";
 import { ThreadView } from "@/components/tasks/thread/ThreadView";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
 import { useReactionPrices, useTaskReactions } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
-import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
+import { QuickAnswers } from "@/components/tasks/desk/QuickAnswers";
+import type { DeskAction } from "@/lib/tasks/desk";
 import {
   handedInPartly,
   isWorking,
@@ -94,6 +94,11 @@ export function TaskDetail({
   const suggestion = task.status === "declined" ? latestSuggestion(messages) : null;
   const partial = handedInPartly(task, messages);
   const nudgedAt = lastNudgeAt(messages);
+  // a recalled task that had been refused first keeps the refusal on its way (D-142)
+  const declinedAt =
+    task.status === "revoked"
+      ? ([...(messages ?? [])].reverse().find((message) => (message.meta as Record<string, unknown> | null)?.decline_reason === true)?.created_at ?? null)
+      : null;
   const reason = isDirector ? reasonFor(task, question, now, Boolean(request)) : null;
 
   const director = useDirectorControls({
@@ -211,7 +216,7 @@ export function TaskDetail({
         ) : null}
 
         <div className="mt-4">
-          <Stepper steps={stepsOf(task, now)} now={now} deadline={task.deadline} />
+          <Stepper steps={stepsOf(task, now, { declinedAt })} now={now} deadline={task.deadline} />
         </div>
 
         {/* what waits on this task: the employee's question, a refusal, a return, a recall */}
@@ -220,16 +225,13 @@ export function TaskDetail({
             <Note tone="warn" icon={<Icon name="question" size={15} />}>
               «{question}»
             </Note>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {QUICK_ANSWERS.map((text) => (
-                <Chip key={text} onClick={() => director.answer(task, text)}>
-                  {text}
-                </Chip>
-              ))}
-              <Chip tone="muted" onClick={() => director.answer(task, null)}>
-                Ответить словами…
-              </Chip>
-            </div>
+            <QuickAnswers
+              question={question}
+              deadline={task.deadline}
+              now={now}
+              onAnswer={(answer) => director.answer(task, answer.text, answer.deadlineIso)}
+              onWords={() => director.answer(task, null)}
+            />
           </div>
         ) : null}
         {myQuestion ? (
@@ -345,6 +347,8 @@ export function TaskDetail({
         userId={me.userId}
         actions={actions}
         isDirector={isDirector}
+        // taken back: nobody is on the other end of this thread any more (D-142)
+        closedNote={task.status === "revoked" ? "Задача отозвана — переписка закрыта" : null}
       />
 
       {isDirector ? director.sheets : employee.sheets}

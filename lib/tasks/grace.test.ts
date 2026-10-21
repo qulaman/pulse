@@ -92,6 +92,36 @@ describe("«Отменить» (D-139)", () => {
     expect(shown).toHaveLength(1);
   });
 
+  it("another tab's window is respected too: its tap is neither counted nor replayed here (D-142)", async () => {
+    // the channel delivers on the real event loop
+    vi.useRealTimers();
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 30));
+    // this tab opens the shared channel with a window of its own
+    const mine = holdForUndo(input("own"));
+    // the other tab of the same browser: its tap sits in the shared outbox, its window announced
+    const other = new BroadcastChannel("pulse-outbox");
+    window.localStorage.setItem(
+      "pulse.outbox.v1",
+      JSON.stringify([
+        ...JSON.parse(window.localStorage.getItem("pulse.outbox.v1") ?? "[]"),
+        { id: "theirs", path: "/api/tasks/t9/transition", payload: { client_request_id: "theirs" }, at: Date.now() },
+      ]),
+    );
+    other.postMessage({ type: "hold", id: "theirs", until: Date.now() + 30_000 });
+    await tick();
+    const fetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetch);
+    expect(outboxSize()).toBe(0);
+    expect((await replayOutbox()).sent).toBe(0);
+    // their window is over: here it is an ordinary tap again
+    other.postMessage({ type: "release", id: "theirs" });
+    await tick();
+    expect(outboxSize()).toBe(1);
+    other.close();
+    shown[0]!.undo!();
+    await expect(mine).rejects.toBeInstanceOf(Undone);
+  });
+
   it("leaving the app sends whatever waits at once", async () => {
     let gone = 0;
     void holdForUndo(input("d")).then(() => (gone += 1));

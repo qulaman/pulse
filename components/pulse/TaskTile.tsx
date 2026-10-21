@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { Composer } from "@/components/tasks/thread/Composer";
+import { QuickAnswers, sendQuickAnswer } from "@/components/tasks/desk/QuickAnswers";
 import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { hasUnread, LANE_WORD, messageOf, whoOf, type BoardTask, type Lane } from "@/lib/pulse/board";
 import { untilWords } from "@/lib/tasks/lifecycle";
@@ -38,8 +39,6 @@ const LANE_TONE: Record<Lane, Tone> = {
   work: "accent",
 };
 
-/** Quick answers of the swipe table (FRONTEND «Вопросы»); anything longer — in the thread. */
-const QUICK_ANSWERS = ["Да", "Нет", "Позже", "Действуй сам"] as const;
 
 export type TaskTileProps = {
   task: BoardTask;
@@ -172,8 +171,9 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
             <button type="button" onClick={onToggle} aria-expanded={false} className="block w-full text-left transition-transform duration-[120ms] active:scale-[0.99]">
               {header}
               <span className="mt-1.5 line-clamp-2 text-[17px] font-semibold leading-[22px] text-text">{task.title}</span>
-              {/* with the thread tail below, the one-line context would say it twice */}
-              {showReply ? null : (
+              {/* with the thread tail below, the one-line context would say it twice — only a plain word
+                  has that tail: a question keeps its words on the card, it is what is being answered (D-142) */}
+              {showReply && !task.question ? null : (
                 <span className="mt-1 block truncate text-[14px] leading-[18px]" style={{ color: lane === "work" ? "var(--text-muted)" : color }}>
                   {contextOf(task, lane, now, meId)}
                 </span>
@@ -250,20 +250,19 @@ export function TaskTile({ task, lane, now, fresh, leaving, expanded, onToggle, 
             </>
           ) : null}
           {interactive && lane === "question" && task.question ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {QUICK_ANSWERS.map((text) => (
-                <Chip
-                  key={text}
-                  onClick={() => {
-                    actions.sendMessage({ taskId: task.id, companyId, text });
-                    actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 });
-                    toast("Ответил");
-                  }}
-                >
-                  {text}
-                </Chip>
-              ))}
-            </div>
+            // the answers that fit the question (D-142); «Ответить словами» — the thread over the board
+            <QuickAnswers
+              question={task.question}
+              deadline={task.deadline}
+              now={now}
+              className="mt-3"
+              onAnswer={(answer) => {
+                sendQuickAnswer(actions, task.id, companyId, answer);
+                actions.markRead({ taskId: task.id, companyId, seq: task.last_message?.seq ?? 0 });
+                toast("Ответил");
+              }}
+              onWords={onReply ? () => onReply(task) : onToggle}
+            />
           ) : null}
           {interactive && lane === "review" ? (
             <div className="mt-3 flex gap-2">

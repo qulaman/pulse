@@ -40,7 +40,7 @@ export const BUTTON = {
   /** the decline sheet's submit: an action, distinct from the card button that opened it */
   declineSend: "Сообщить директору",
   complete: "Выполнено",
-  approve: "Принято",
+  approve: "Принять",
   rework: "Доработка",
   insist: "Настоять",
   cancel: "Отменить",

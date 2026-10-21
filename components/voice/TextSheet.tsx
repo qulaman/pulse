@@ -68,7 +68,7 @@ export function TextSheet({ open, onClose }: { open: boolean; onClose: () => voi
         </div>
       ) : (
         <p className="mb-3 text-[13px] leading-4 text-muted">
-          Текст разберу так же, как голос. Чтобы говорить — удерживай кнопку микрофона.
+          Текст разберу так же, как голос. Голосом — удержи лицо на Пульсе.
         </p>
       )}
       <textarea

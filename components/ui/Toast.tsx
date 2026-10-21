@@ -55,6 +55,8 @@ export function dismissToast(id: number): void {
 }
 
 function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | null) => void }) {
+  // a toast with a button lives at the bottom, by the thumb that has just acted (D-142)
+  const low = Boolean(item.action);
   const dismiss = useToastStore((state) => state.dismiss);
   const remove = useToastStore((state) => state.remove);
 
@@ -78,13 +80,17 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
       className="pointer-events-auto flex w-full max-w-lg items-center gap-3 field px-4 py-3 text-[14px] leading-[18px]"
       style={{
         boxShadow: "var(--shadow-raised)",
-        animation: item.leaving ? `toast-out ${OUT_MS}ms var(--ease-in) both` : "toast-in var(--t-instant) var(--ease-out) both",
+        animation: item.leaving
+          ? `${low ? "toast-out-down" : "toast-out"} ${OUT_MS}ms var(--ease-in) both`
+          : `${low ? "toast-in-up" : "toast-in"} var(--t-instant) var(--ease-out) both`,
         pointerEvents: item.leaving ? "none" : undefined,
       }}
       onAnimationEnd={(event) => {
-        if (event.target === event.currentTarget && event.animationName === "toast-out") remove(item.id);
+        if (event.target === event.currentTarget && (event.animationName === "toast-out" || event.animationName === "toast-out-down")) remove(item.id);
       }}
-      onClick={() => dismiss(item.id)}
+      // a tap on the words hides a plain toast; one with «Отменить» stays until its button or its
+      // time — hiding it looked like taking the tap back while the window ran on (D-142)
+      onClick={low ? undefined : () => dismiss(item.id)}
     >
       <span className="min-w-0 flex-1">{item.text}</span>
       {item.action ? (
@@ -138,21 +144,39 @@ export function ToastHost() {
 
   if (toasts.length === 0) return null;
 
+  const item = (toast: Toast) => (
+    <ToastItem
+      key={toast.id}
+      item={toast}
+      node={(el) => {
+        if (el) nodes.current.set(toast.id, el);
+        else nodes.current.delete(toast.id);
+      }}
+    />
+  );
+  const high = toasts.filter((toast) => !toast.action);
+  const low = toasts.filter((toast) => toast.action);
+
   return (
-    <div
-      className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
-      style={{ top: "calc(60px + env(safe-area-inset-top))" }}
-    >
-      {toasts.map((item) => (
-        <ToastItem
-          key={item.id}
-          item={item}
-          node={(el) => {
-            if (el) nodes.current.set(item.id, el);
-            else nodes.current.delete(item.id);
-          }}
-        />
-      ))}
-    </div>
+    <>
+      {high.length > 0 ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
+          style={{ top: "calc(60px + env(safe-area-inset-top))" }}
+        >
+          {high.map(item)}
+        </div>
+      ) : null}
+      {/* «Отменить», «Открыть»: where the thumb is, just above the tab bar — not a reach to the top (D-142) */}
+      {low.length > 0 ? (
+        <div
+          className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
+          style={{ bottom: "calc(var(--tabbar-space) + 10px)" }}
+          data-testid="toasts-low"
+        >
+          {low.map(item)}
+        </div>
+      ) : null}
+    </>
   );
 }

@@ -26,6 +26,8 @@ export type ThreadViewProps = {
   isDirector?: boolean;
   /** Inside a sheet: the composer is part of the flow, not fixed to the window. */
   compact?: boolean;
+  /** A line in place of the composer: the thread is over (a recalled task, D-142). */
+  closedNote?: string | null;
 };
 
 /**
@@ -33,7 +35,7 @@ export type ThreadViewProps = {
  * scroll, separated by days. The tail loads first (THREAD_PAGE messages) and «Показать
  * раньше» walks back a page at a time — a year-old task must open as fast as a new one.
  */
-export function ThreadView({ taskId, companyId, messages, loading, userId, actions, isDirector = false, compact = false }: ThreadViewProps) {
+export function ThreadView({ taskId, companyId, messages, loading, userId, actions, isDirector = false, compact = false, closedNote = null }: ThreadViewProps) {
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
@@ -158,7 +160,11 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
         </div>
       </section>
 
-      {compact ? (
+      {closedNote ? (
+        <p className="mt-2 px-1 pb-4 text-center text-[13px] leading-4 text-muted" data-testid="thread-closed">
+          {closedNote}
+        </p>
+      ) : compact ? (
         <div className="border-t border-border bg-bg px-1 pt-2">
           <Composer taskId={taskId} companyId={companyId} actions={actions} inline onSent={scrollToEnd} />
         </div>

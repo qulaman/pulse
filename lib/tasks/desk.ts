@@ -150,9 +150,6 @@ export function keysFor(
   return ["open", "remove"];
 }
 
-/** Quick answers of the swipe table (FRONTEND «Вопросы»), as chips; anything longer — in the thread. */
-export const QUICK_ANSWERS = ["Да", "Нет", "Позже", "Действуй сам"] as const;
-
 type Delivery = Database["public"]["Tables"]["notification_deliveries"]["Row"];
 
 export type ReceiptTone = "ok" | "warn" | "muted";

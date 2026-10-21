@@ -420,9 +420,11 @@ export type Step = { key: string; label: string; at: string | null; state: StepS
 /**
  * The life of a task in four steps — выдана → в работе → сдана → принята — with the time
  * of each one that happened. The step the task is stuck on is «current»; a detour (a
- * return for rework, a refusal, a recall) replaces the step it happened at.
+ * return for rework, a refusal, a recall) replaces the step it happened at. `declinedAt` — when
+ * a recalled task had been refused first (from its thread): the refusal stays on the way to the
+ * recall instead of vanishing behind it (D-142).
  */
-export function stepsOf(task: ListTask, now: Date = new Date()): Step[] {
+export function stepsOf(task: ListTask, now: Date = new Date(), { declinedAt = null }: { declinedAt?: string | null } = {}): Step[] {
   const handed: Step =
     task.status === "scheduled"
       ? { key: "handed", label: "Уйдёт", at: task.scheduled_send_at, state: "current" }
@@ -449,8 +451,12 @@ export function stepsOf(task: ListTask, now: Date = new Date()): Step[] {
     case "revoked":
       return [
         handed,
-        step("work", "В работе", task.accepted_at, task.accepted_at ? "done" : "todo"),
-        step("handed_in", "Сдана", task.completed_at, task.completed_at ? "done" : "todo"),
+        declinedAt && !task.accepted_at
+          ? step("work", "Отказ", declinedAt, "bad")
+          : step("work", "В работе", task.accepted_at, task.accepted_at ? "done" : "todo"),
+        declinedAt && task.accepted_at
+          ? step("handed_in", "Отказ", declinedAt, "bad")
+          : step("handed_in", "Сдана", task.completed_at, task.completed_at ? "done" : "todo"),
         // a handover is not a failure: the work went on with another person (D-128)
         task.passed_to ? step("closed", "Передана", closedAtOf(task), "done") : step("closed", "Отозвана", closedAtOf(task), "bad"),
       ];

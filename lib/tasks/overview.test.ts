@@ -25,6 +25,19 @@ describe("a handed-over task (D-128)", () => {
     expect(stepsFor({ ...base, passed_to: "p" }).at(-1)).toMatchObject({ label: "Передана", state: "done" });
   });
 
+  it("a recall after a refusal keeps the refusal on its way (D-142)", () => {
+    const refusedAt = "2026-09-20T05:00:00Z";
+    expect(stepsFor(base, new Date("2026-09-22T04:00:00Z"), { declinedAt: refusedAt }).map((s) => `${s.label}:${s.state}`)).toEqual([
+      "Выдана:done",
+      "Отказ:bad",
+      "Сдана:todo",
+      "Отозвана:bad",
+    ]);
+    // refused after it was taken: the refusal stands where the handover would have been
+    const taken = { ...base, accepted_at: "2026-09-20T04:30:00Z" };
+    expect(stepsFor(taken, new Date("2026-09-22T04:00:00Z"), { declinedAt: refusedAt }).map((s) => s.label)).toEqual(["Выдана", "В работе", "Отказ", "Отозвана"]);
+  });
+
   it("a plain revoke stays «отозвана»", () => {
     expect(wordOf(base, "director")).toBe("отозвана");
     expect(stepsFor(base).at(-1)).toMatchObject({ label: "Отозвана", state: "bad" });

@@ -186,7 +186,7 @@ async function main() {
 
     // ---- the director accepts on the tile: goodbye in gold, then gone ------------------
     const t5 = Date.now();
-    await tile(page, taskId).getByRole("button", { name: "Принято", exact: true }).click();
+    await tile(page, taskId).getByRole("button", { name: "Принять", exact: true }).click();
     const closingIn = await until(page, taskId, "data-lane", "closed", t5);
     record("«Принято» на плитке: прощание в тот же кадр (optimistic)", closingIn !== null && closingIn < 400, closingIn === null ? "timeout" : `${closingIn} ms`);
     await page.screenshot({ path: join(SHOTS, "b4-goodbye.png") });

@@ -6,11 +6,11 @@ import { useState, type ReactNode } from "react";
 
 import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskRail } from "@/components/tasks/TaskChrome";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { toast } from "@/components/ui/Toast";
 import type { BoardTask } from "@/lib/pulse/board";
-import { QUICK_ANSWERS, type DeskAction } from "@/lib/tasks/desk";
+import type { DeskAction } from "@/lib/tasks/desk";
 import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
+import type { QuickAnswer } from "@/lib/tasks/answers";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
@@ -18,6 +18,7 @@ import { toneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
 import { Icon, type IconName } from "./desk/icons";
+import { QuickAnswers, sendQuickAnswer } from "./desk/QuickAnswers";
 import { ACTION_ICON, ACTION_LABEL, allActionsFor, isPrimaryKey, LifecycleNotes, wideLabelOf } from "./list/DirectorTaskCard";
 import { useDirectorControls } from "./list/useDirectorControls";
 import { useEmployeeControls } from "./list/useEmployeeControls";
@@ -164,10 +165,13 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
       {variant === "director" && question ? (
         <QuestionBanner
           question={question}
-          onAnswer={(text) => {
-            actions.sendMessage({ taskId: task.id, companyId, text });
+          deadline={task.deadline}
+          now={now}
+          onAnswer={(answer) => {
+            sendQuickAnswer(actions, task.id, companyId, answer);
             toast("Ответил");
           }}
+          onWords={() => director.answer(task, null)}
         />
       ) : null}
 
@@ -190,19 +194,25 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
 /* -------------------------------------------------------------------------- */
 
-function QuestionBanner({ question, onAnswer }: { question: string; onAnswer: (text: string) => void }) {
+function QuestionBanner({
+  question,
+  deadline,
+  now,
+  onAnswer,
+  onWords,
+}: {
+  question: string;
+  deadline: string | null;
+  now: Date;
+  onAnswer: (answer: QuickAnswer) => void;
+  onWords: () => void;
+}) {
   return (
     <div className="mt-3">
       <Banner tone="warn" icon={<Icon name="question" size={15} />}>
         {question}
       </Banner>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {QUICK_ANSWERS.map((text) => (
-          <Chip key={text} onClick={() => onAnswer(text)}>
-            {text}
-          </Chip>
-        ))}
-      </div>
+      <QuickAnswers question={question} deadline={deadline} now={now} onAnswer={onAnswer} onWords={onWords} />
     </div>
   );
 }
