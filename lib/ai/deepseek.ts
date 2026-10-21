@@ -35,7 +35,7 @@ export function toChatMessages(
 ): ChatMessage[] {
   const systemText =
     system.map((block) => block.text).join("\n\n") +
-    "\n\n## Формат ответа\nОтвечай ТОЛЬКО одним JSON-объектом по этой JSON Schema, без markdown и без текста вокруг:\n" +
+    "\n\n## JSON Schema ответа\nОтвечай ТОЛЬКО одним JSON-объектом по этой JSON Schema, без markdown и без текста вокруг:\n" +
     JSON.stringify(schema);
   return [
     { role: "system", content: systemText },

@@ -41,6 +41,31 @@ describe("«Правила компании» (D-138)", () => {
   });
 });
 
+describe("the parser's kinds and time words (task 026)", () => {
+  it("a fresh company has every kind and every convention key", () => {
+    const settings = parseCompanySettings({});
+    expect(settings.parser.kinds).toEqual(["announcement", "task", "points", "reminder", "note", "event", "recurrence", "query"]);
+    expect(settings.conventions.map((row) => row.key)).toContain("before_lunch");
+  });
+
+  it("keeps the fixed order, always keeps `task`, drops a name it does not know", () => {
+    const settings = parseCompanySettings({ parser: { kinds: ["query", "note", "telepathy"] } });
+    expect(settings.parser.kinds).toEqual(["task", "note", "query"]);
+  });
+
+  it("a broken kinds value is every kind, never the whole settings back to defaults", () => {
+    const settings = parseCompanySettings({ parser: { kinds: "all" }, points_enabled: true });
+    expect(settings.parser.kinds).toHaveLength(8);
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("old phrase/meaning conventions are read in the new form, the rest of the settings intact", () => {
+    const settings = parseCompanySettings({ conventions: [{ phrase: "до обеда", meaning: "12:00 названного дня", confidence: 0.7 }], points_enabled: true });
+    expect(settings.conventions.find((row) => row.key === "before_lunch")?.time).toBe("12:00");
+    expect(settings.points_enabled).toBe(true);
+  });
+});
+
 describe("points rules, Эфир and the telegraph (D-133)", () => {
   it("a fresh company gets the D-13 rules with the penalty off, both Эфир lines and a worrying face", () => {
     const settings = parseCompanySettings({});

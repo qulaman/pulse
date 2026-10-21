@@ -2,14 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import rosterFixture from "../../tests/stt/roster.json";
 import { FEW_SHOT, fewShotMessages } from "./examples";
-import { ParseResultSchema } from "./schema";
+import { ModelParseResultSchema } from "./schema";
 
 const ROSTER_NAMES = new Set(rosterFixture.users.map((u) => u.full_name));
 
 describe("FEW_SHOT", () => {
-  it("every assistant answer validates against the entity schema", () => {
+  it("every assistant answer validates against the model's schema — the one the API enforces", () => {
     for (const pair of FEW_SHOT) {
-      expect(() => ParseResultSchema.parse(pair.assistant)).not.toThrow();
+      expect(() => ModelParseResultSchema.parse(pair.assistant)).not.toThrow();
     }
   });
 
@@ -22,13 +22,11 @@ describe("FEW_SHOT", () => {
     );
     expect(names.length).toBeGreaterThan(0);
     for (const name of names) expect(ROSTER_NAMES).toContain(name);
-    for (const pair of FEW_SHOT) {
-      for (const e of pair.assistant.entities) if ("assignee_id" in e) expect(e.assignee_id).toBeNull();
-    }
+    expect(JSON.stringify(FEW_SHOT)).not.toMatch(/"(assignee_id|participant_ids)"/);
   });
 
   it("П8 splits one phrase into two tasks sharing a group_id", () => {
-    const last = FEW_SHOT[7].assistant.entities;
+    const last = FEW_SHOT.find((pair) => pair.user.startsWith("Ерлану Б. и Марату"))!.assistant.entities;
     const tasks = last.filter((e) => e.kind === "task");
     expect(tasks).toHaveLength(2);
     expect(tasks[0].kind === "task" && tasks[0].group_id).toBeTruthy();

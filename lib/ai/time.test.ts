@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { aqtobeIsoToUtc, formatAqtobe, humanAqtobe, upcomingDaysRu, weekdayRu } from "./time";
+import { aqtobeDateAt, aqtobeIsoToUtc, aqtobeIsoWeekday, formatAqtobe, humanAqtobe, weekdayRu } from "./time";
 
 // Thursday, 13.08.2026, 10:00 Asia/Aqtobe.
 const NOW = new Date("2026-08-13T10:00:00+05:00");
@@ -29,7 +29,10 @@ describe("Aqtobe helpers", () => {
     expect(humanAqtobe(new Date(iso), NOW)).toBe(expected);
   });
 
-  it("lists the next seven days for the prompt", () => {
-    expect(upcomingDaysRu(NOW)).toBe("пт 14.08, сб 15.08, вс 16.08, пн 17.08, вт 18.08, ср 19.08, чт 20.08");
+  it("names the ISO weekday and builds a calendar instant, refusing a date that does not exist", () => {
+    expect(aqtobeIsoWeekday(NOW)).toBe(4);
+    expect(aqtobeIsoWeekday(new Date("2026-08-16T23:30:00+05:00"))).toBe(7);
+    expect(aqtobeDateAt(2026, 8, 25, 9, 30)?.toISOString()).toBe("2026-08-25T04:30:00.000Z");
+    expect(aqtobeDateAt(2026, 2, 31, 9, 0)).toBeNull();
   });
 });

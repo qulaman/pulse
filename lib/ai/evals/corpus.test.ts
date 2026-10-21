@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { piecesOf } from "@/lib/lab/parser";
-import { loadCorpus } from "./corpus";
+import { casesForKinds, loadCorpus } from "./corpus";
+import { PARSER_KINDS } from "../kinds/names";
 
 describe("the parser corpus on disk (docs/AI.md §6)", () => {
   const corpus = loadCorpus();
@@ -28,5 +29,21 @@ describe("the parser corpus on disk (docs/AI.md §6)", () => {
     const pieces = piecesOf(ids, 6);
     expect(pieces.flat()).toEqual(ids);
     expect(Math.max(...pieces.map((p) => p.length))).toBe(6);
+  });
+});
+
+describe("casesForKinds: the corpus of a company's kinds (task 026)", () => {
+  const corpus = loadCorpus();
+
+  it("keeps the cases whose expected kinds are all on; a case expecting nothing stays", () => {
+    const only = casesForKinds(corpus.cases, ["task"]);
+    expect(only.length).toBeGreaterThan(0);
+    expect(only.length).toBeLessThan(corpus.cases.length);
+    expect(only.every((c) => c.expected.entities.every((e) => e.kind === "task"))).toBe(true);
+    expect(only.some((c) => c.expected.entities.length === 0)).toBe(true);
+  });
+
+  it("every kind on — the whole corpus, in file order", () => {
+    expect(casesForKinds(corpus.cases, PARSER_KINDS).map((c) => c.id)).toEqual(corpus.cases.map((c) => c.id));
   });
 });

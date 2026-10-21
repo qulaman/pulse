@@ -8,6 +8,7 @@ import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } 
 import { Button } from "@/components/ui/Button";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
+import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
 import { usePeople } from "@/lib/people/queries";
 import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
@@ -34,14 +35,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
+      className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left disabled:opacity-60"
     >
       <span>
         <span className="block text-[16px] leading-[22px]">{label}</span>
@@ -160,6 +174,15 @@ export function SttSection() {
 
 export function ParserSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
+  // `??`: a phone's offline copy (D-127) may hold settings from before the kinds (task 026)
+  const kinds: readonly ParserKind[] = draft.parser.kinds ?? PARSER_KINDS;
+  const toggleKind = (kind: ParserKind, on: boolean) => {
+    const next = new Set(kinds);
+    if (on) next.add(kind);
+    else next.delete(kind);
+    // the fixed order, so switching a kind off and on again is no change
+    update({ parser: { ...draft.parser, kinds: PARSER_KINDS.filter((k) => k === REQUIRED_KIND || next.has(k)) } });
+  };
   return (
     <Disclosure
       icon={<ParseIcon />}
@@ -193,6 +216,20 @@ export function ParserSection() {
             </select>
           </Field>
         ) : null}
+        <div className="flex flex-col" data-testid="settings-parser-kinds">
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Что модель различает</span>
+          <span className="mt-1 text-[13px] leading-4 text-muted">Выключенного вида модель не знает: ни правил, ни примеров.</span>
+          {PARSER_KINDS.map((kind) => (
+            <Toggle
+              key={kind}
+              label={PARSER_KIND_LABEL[kind]}
+              hint={kind === REQUIRED_KIND ? "Всегда включены" : undefined}
+              checked={kind === REQUIRED_KIND || kinds.includes(kind)}
+              disabled={kind === REQUIRED_KIND}
+              onChange={(on) => toggleKind(kind, on)}
+            />
+          ))}
+        </div>
         {/* the rules are saved only after a corpus run — that lives in the lab (D-138) */}
         <Link href="/lab?tab=parser" data-testid="settings-parser-rules" className="flex min-h-[44px] items-center justify-between gap-3">
           <span className="min-w-0">
@@ -251,6 +288,23 @@ export function DictionarySection() {
   );
 }
 
+/** The fixed keys of «Слова о сроках» (task 026), in the order the server keeps them. */
+const CONVENTION_LABEL: Record<string, string> = {
+  morning: "Утро",
+  before_lunch: "До обеда",
+  lunch: "Обед",
+  after_lunch: "После обеда",
+  evening: "Вечер",
+  end_of_day: "Конец дня",
+  end_of_week: "Конец недели — пятница",
+  this_week: "На неделе — пятница",
+  day_default: "День без времени",
+  weekday_default: "День недели без времени",
+};
+
+/** Below 0.8 the deadline is a yellow chip on the confirmation screen. */
+const CONFIDENCE_STEPS = [0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
 export function ConventionsSection() {
   const { draft, server, update, conventions, dirty, save, saving } = useDraft();
   const updateConvention = (index: number, patch: Partial<CompanySettings["conventions"][number]>) =>
@@ -260,51 +314,42 @@ export function ConventionsSection() {
       icon={<ClockIcon />}
       title="Слова о сроках"
       dirty={dirty.conventions}
-      summary={conventions.length ? plural(conventions.length, "правило", "правила", "правил") : "нет правил"}
-      hint="Что значит «до обеда» или «к вечеру» именно у вас. Сверху — как говорите, под ним — во сколько это."
+      summary={plural(conventions.length, "правило", "правила", "правил")}
+      hint="Что значит «до обеда» или «к вечеру» именно у вас. Слова читает модель, время ставит система. Уверенность ниже 0.8 — срок придёт на проверку жёлтым."
     >
-      <div className="flex flex-col gap-3">
-        {draft.conventions.map((row, index) => (
-          // Two lines per row: a phone-width screen cannot fit both texts side by side.
-          <div key={index} className="grid grid-cols-[1fr_44px] gap-x-2 gap-y-1">
-            <input
-              className={FIELD}
-              aria-label="Как говорите"
-              placeholder="до обеда"
-              value={row.phrase}
-              onChange={(e) => updateConvention(index, { phrase: e.target.value })}
-            />
-            <button
-              type="button"
-              aria-label="Убрать строку"
-              className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
-              onClick={() => update({ conventions: draft.conventions.filter((_, i) => i !== index) })}
-            >
-              ×
-            </button>
-            <div className="col-span-2 flex items-center gap-2 pl-3">
-              <span aria-hidden className="text-[16px] text-muted">
-                =
-              </span>
+      <div className="flex flex-col gap-4">
+        {draft.conventions.map((row, index) => {
+          // a phone's offline copy (D-127) may hold rows from before the keys
+          const label = CONVENTION_LABEL[row.key] ?? row.phrase;
+          const steps = [...new Set([...CONFIDENCE_STEPS, row.confidence])].sort((a, b) => a - b);
+          return (
+            <div key={row.key ?? index} className="flex flex-col gap-2">
+              <span className="text-[14px] font-medium leading-[18px] text-muted">{label}</span>
               <input
                 className={FIELD}
-                aria-label="Означает"
-                placeholder="13:00 названного дня"
-                value={row.meaning}
-                onChange={(e) => updateConvention(index, { meaning: e.target.value })}
+                aria-label={`${label}: как говорите`}
+                placeholder="как говорите, через «/»"
+                value={row.phrase}
+                onChange={(e) => updateConvention(index, { phrase: e.target.value })}
               />
+              <div className="grid grid-cols-2 gap-2">
+                <TimeField label={`${label}: время`} value={row.time ?? null} onChange={(time) => updateConvention(index, { time })} />
+                <select
+                  className={FIELD}
+                  aria-label={`${label}: уверенность`}
+                  value={String(row.confidence)}
+                  onChange={(e) => updateConvention(index, { confidence: Number(e.target.value) })}
+                >
+                  {steps.map((step) => (
+                    <option key={step} value={String(step)}>
+                      {step < 0.8 ? `${step} · проверить` : `${step} · уверенно`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3">
-        <Button
-          variant="secondary"
-          block
-          onClick={() => update({ conventions: [...draft.conventions, { phrase: "", meaning: "", confidence: 0.7 }] })}
-        >
-          Добавить слово
-        </Button>
+          );
+        })}
       </div>
       {dirty.conventions ? (
         <SectionActions

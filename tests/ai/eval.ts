@@ -1,37 +1,36 @@
 /**
  * Parser evals (docs/AI.md §6, docs/TESTING.md §4).
- *   pnpm eval:parser [--no-escalate] [--filter <prefix>] [--limit N] [--no-gate]
+ *   pnpm eval:parser [--no-escalate] [--filter <prefix>] [--limit N] [--no-gate] [--base <file>]
  *
  * Gates: assignee accuracy >= 97%, entity F1 >= 90%. Exit code 1 below either,
- * unless --no-gate. Every run writes tests/ai/results/YYYY-MM-DD_HHmm.json and
- * diffs against the previous run.
+ * unless --no-gate. The deadline share has no gate (the owner's call) — below 90% it warns.
+ * Every run writes tests/ai/results/YYYY-MM-DD_HHmm.json and
+ * diffs against the previous run, or against `--base` (a file in tests/ai/results).
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadCorpus } from "../../lib/ai/evals/corpus";
+import { parseCost } from "../../lib/ai/pricing";
 import { runCase } from "../../lib/ai/evals/run";
 import { passesGates, summarize, type CaseResult } from "../../lib/ai/evals/score";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
 const RESULTS_DIR = join(HERE, "results");
-
-// Estimates in $ per million tokens; cache reads bill at 0.1x input (docs/AI.md §9).
-const PRICING: Record<string, { input: number; output: number }> = {
-  "claude-haiku-4-5": { input: 1, output: 5 },
-  "claude-sonnet-5": { input: 2, output: 10 },
-};
+// Not a gate (task 026): a run under it still passes, the warning is for the reader.
+const DEADLINE_WARNING = 0.9;
 
 function parseArgs(argv: string[]) {
-  const out = { escalate: true, filter: "", limit: 0, gate: true, demoIds: false };
+  const out = { escalate: true, filter: "", limit: 0, gate: true, demoIds: false, base: "" };
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--no-escalate") out.escalate = false;
     else if (argv[i] === "--no-gate") out.gate = false;
     else if (argv[i] === "--demo-ids") out.demoIds = true;
     else if (argv[i] === "--filter") out.filter = argv[++i] ?? "";
     else if (argv[i] === "--limit") out.limit = Number(argv[++i] ?? 0);
+    else if (argv[i] === "--base") out.base = argv[++i] ?? "";
   }
   return out;
 }
@@ -42,10 +41,10 @@ function loadEnv(): void {
   process.loadEnvFile(file);
 }
 
-function previousResult(): { file: string; data: { cases: CaseResult[] } } | null {
+function previousResult(base: string): { file: string; data: { cases: CaseResult[] } } | null {
   if (!existsSync(RESULTS_DIR)) return null;
   const files = readdirSync(RESULTS_DIR).filter((f) => f.endsWith(".json")).sort();
-  const last = files[files.length - 1];
+  const last = base ? files.find((f) => f === base || f === `${base}.json`) : files[files.length - 1];
   if (!last) return null;
   return {
     file: last,
@@ -89,15 +88,9 @@ async function main(): Promise<void> {
       usage.output += run.usage.output_tokens;
       usage.cacheRead += run.usage.cache_read_input_tokens;
       usage.cacheWrite += run.usage.cache_creation_input_tokens;
-
-      const price = PRICING[score.model] ?? PRICING["claude-haiku-4-5"];
-      cost +=
-        (run.usage.input_tokens * price.input +
-          run.usage.cache_creation_input_tokens * price.input * 1.25 +
-          run.usage.cache_read_input_tokens * price.input * 0.1 +
-          run.usage.output_tokens * price.output) /
-        1_000_000;
     }
+    // every paid call at its own model's price — an escalated case paid two models
+    for (const call of run.calls) cost += parseCost(call.model, call.usage) ?? 0;
     console.log(`${score.ok ? "ok  " : "FAIL"} ${c.id} (${score.model}${score.escalated ? ", escalated" : ""})`);
     for (const f of score.failures) console.log(`       ${f}`);
   }
@@ -114,7 +107,7 @@ async function main(): Promise<void> {
   console.log(`| имя исполнителя от модели — из ростера | ${metrics.idValid === null ? "—" : pct(metrics.idValid)} |`);
   console.log(`| исполнитель без чипа «проверь» | ${metrics.autoOk === null ? "—" : pct(metrics.autoOk)} |`);
   console.log(`| entity F1 | ${pct(f1)} (гейт 90%), P ${pct(precision)} / R ${pct(recall)} |`);
-  console.log(`| deadline accuracy | ${pct(deadline)} |`);
+  console.log(`| deadline accuracy | ${pct(deadline)} (без гейта, предупреждение ниже ${pct(DEADLINE_WARNING)}) |`);
   console.log(`| полнота мульти-разбиения | ${pct(split)} |`);
   console.log(`| query/command accuracy | ${pct(query)} |`);
   console.log(`| эскалаций | ${metrics.escalated} |`);
@@ -124,7 +117,7 @@ async function main(): Promise<void> {
   console.log(`| стоимость прогона | $${cost.toFixed(4)} |`);
   console.log(`| p50 латентности | ${p50} мс |`);
 
-  const previous = previousResult();
+  const previous = previousResult(args.base);
   if (previous) {
     const was = new Map(previous.data.cases.map((r) => [r.id, r.ok]));
     const broke = results.filter((r) => !r.ok && was.get(r.id) === true).map((r) => r.id);
@@ -155,6 +148,10 @@ async function main(): Promise<void> {
     "utf8",
   );
   console.log(`\nрезультат: ${outFile}`);
+
+  if (deadline < DEADLINE_WARNING) {
+    console.warn(`ПРЕДУПРЕЖДЕНИЕ: сроки ${pct(deadline)} — ниже ${pct(DEADLINE_WARNING)}. Гейта на сроки нет, решает владелец.`);
+  }
 
   if (args.gate && !passesGates(metrics)) {
     console.error("ГЕЙТ КРАСНЫЙ: assignee < 97% или F1 < 90%.");

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { ConventionSchema, DEFAULT_CONVENTIONS } from "@/lib/ai/conventions";
+import { CONVENTION_KEYS, ConventionSchema, normalizeConventions } from "@/lib/ai/conventions";
+import { normalizeKinds } from "@/lib/ai/kinds/names";
 import { PARSER_RULES_HISTORY_MAX, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import { DEFAULT_WORD_KINDS, KIND_LABEL_MAX, WORD_KINDS_MAX } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
@@ -39,6 +40,14 @@ export const ParserSettingsSchema = z.object({
   escalation_model: z.string().min(1).default("claude-sonnet-5"),
   /** Re-run on the stronger model when the parse looks shaky (docs/AI.md §8). */
   escalate: z.boolean().default(true),
+  /**
+   * The kinds the parser answers with (task 026): their prompt sections, examples and schema.
+   * Absent — all eight; `task` is always on; an unknown name is dropped, never an error.
+   */
+  kinds: z
+    .unknown()
+    .optional()
+    .transform((value) => normalizeKinds(Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : undefined)),
 });
 
 /** The corpus run a version of the rules passed before it was saved (D-138). */
@@ -240,8 +249,13 @@ export const CompanySettingsSchema = z.object({
     .max(WORD_KINDS_MAX)
     .catch(DEFAULT_WORD_KINDS)
     .default(DEFAULT_WORD_KINDS),
-  /** What «до обеда» means here (D-15); rendered into the parser prompt. */
-  conventions: z.array(ConventionSchema).max(40).default(DEFAULT_CONVENTIONS),
+  /**
+   * What «до обеда» means here (D-15): one row per fixed key, the phrases go to the parser
+   * prompt, the times to the resolver (task 026). Old `phrase/meaning` rows are converted,
+   * unknown ones dropped — never a failed parse of the whole settings.
+   */
+  // optional(): a transform alone makes the key required, and a missing key would drop every section
+  conventions: z.unknown().optional().transform(normalizeConventions),
   /** Name-matcher thresholds (D-16, docs/AI.md §5) — tuned per company from the gate, no UI. */
   matching: MatchingSettingsSchema.prefault({}),
   /** Points off during the pilot (D-40(в)); the director switches them on (D-48). */
@@ -275,7 +289,7 @@ export const SettingsPatchSchema = z
     stt: SttSettingsSchema.partial(),
     parser: ParserSettingsSchema.partial(),
     vocabulary: z.array(z.string().trim().min(1)).max(200),
-    conventions: z.array(ConventionSchema).max(40),
+    conventions: z.array(ConventionSchema).max(CONVENTION_KEYS.length).transform(normalizeConventions),
     matching: MatchingSettingsSchema,
     points_enabled: z.boolean(),
     rating_mode: z.enum(["top5", "full"]),

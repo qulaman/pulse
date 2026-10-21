@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { loadCorpus } from "@/lib/ai/evals/corpus";
+import { casesForKinds, loadCorpus } from "@/lib/ai/evals/corpus";
 import { passesGates } from "@/lib/ai/evals/score";
 import { collectRun, evalSecret, runFingerprint } from "@/lib/ai/evals/stamp";
 import { fewShotMessages } from "@/lib/ai/examples";
@@ -37,8 +37,12 @@ const COUNT_TIMEOUT_MS = 3_000;
 const counted = new Map<string, number>();
 
 /** The whole prefix by Claude's count — free, but a dead key or a slow API just means «—». */
-async function countPromptTokens(model: string, system: Anthropic.TextBlockParam[]): Promise<number | null> {
-  const key = createHash("sha256").update(JSON.stringify({ model, system })).digest("hex");
+async function countPromptTokens(
+  model: string,
+  system: Anthropic.TextBlockParam[],
+  shots: Anthropic.MessageParam[],
+): Promise<number | null> {
+  const key = createHash("sha256").update(JSON.stringify({ model, system, shots })).digest("hex");
   const known = counted.get(key);
   if (known !== undefined) return known;
   try {
@@ -46,7 +50,7 @@ async function countPromptTokens(model: string, system: Anthropic.TextBlockParam
     const result = await client.messages.countTokens({
       model: isDeepSeekModel(model) ? "claude-haiku-4-5" : model,
       system,
-      messages: [...fewShotMessages(), { role: "user", content: buildUserMessage({ transcript: "…", source: "voice", now: new Date() }) }],
+      messages: [...shots, { role: "user", content: buildUserMessage({ transcript: "…", source: "voice", now: new Date() }) }],
     });
     if (counted.size > 50) counted.clear();
     counted.set(key, result.input_tokens);
@@ -71,8 +75,10 @@ export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
   const active = activeParserRules(settings.parser_rules);
   const corpus = loadCorpus();
 
-  const system = buildSystemBlocks(roster, settings.conventions, active.text);
-  const messages = fewShotMessages();
+  // what the company's parse sends: its conventions, rules and kinds (D-138, task 026)
+  const kinds = settings.parser.kinds;
+  const system = buildSystemBlocks(roster, settings.conventions, active.text, kinds);
+  const messages = fewShotMessages(kinds);
   const examples: ParserLabState["prompt"]["examples"] = [];
   for (let i = 0; i + 1 < messages.length; i += 2) {
     const user = messages[i].content;
@@ -83,13 +89,14 @@ export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
     parser: settings.parser,
     versions: settings.parser_rules.versions,
     prompt: {
-      system: parserSystemPrompt(settings.conventions, active.text),
+      system: parserSystemPrompt(settings.conventions, active.text, kinds),
       roster: rosterJson(roster),
       rosterSize: roster.length,
       examples,
-      tokens: await countPromptTokens(settings.parser.model, system),
+      tokens: await countPromptTokens(settings.parser.model, system, messages),
     },
-    corpus: { cases: corpus.cases.map((c) => ({ id: c.id, transcript: c.transcript })) },
+    // the cases of the company's kinds: a kind switched off is not what its rules are checked on
+    corpus: { cases: casesForKinds(corpus.cases, kinds).map((c) => ({ id: c.id, transcript: c.transcript })) },
     gates: PARSER_GATES,
   };
   return apiOk(body);
@@ -138,13 +145,14 @@ export const PUT = withAuth<z.infer<typeof SaveSchema>>(
         escalate: settings.parser.escalate,
         escalationModel: settings.parser.escalation_model,
         matching: settings.matching,
+        kinds: settings.parser.kinds,
         corpusHash: corpus.hash,
       });
       const run = collectRun(
         evalSecret(),
         profile.companyId,
         fingerprint,
-        corpus.cases.map((c) => c.id),
+        casesForKinds(corpus.cases, settings.parser.kinds).map((c) => c.id),
         body.pieces,
       );
       if (!run.ok) return apiError(422, `eval_${run.reason}`, RUN_PROBLEM[run.reason]);

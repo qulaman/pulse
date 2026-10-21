@@ -2,15 +2,17 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 import { resolveMatchingConfig, type MatchingConfig } from "../config";
 import { DEFAULT_CONVENTIONS } from "../conventions";
-import { FEW_SHOT } from "../examples";
+import { fewShotPairs } from "../examples";
+import { normalizeKinds, type ParserKind } from "../kinds/names";
 import { parserSystemPrompt } from "../prompt";
-import { ENTITIES_JSON_SCHEMA } from "../schema";
+import { entitiesJsonSchema } from "../schema";
 import { summarize, type CaseResult, type EvalMetrics } from "./score";
 
 /**
  * The lab runs the corpus in pieces (one function call has 60 s), so a save cannot just
  * trust the numbers the page sends back (D-138). Every piece comes back signed by the
- * server over the company and a fingerprint of everything the parse depends on; the save
+ * server over the company and a fingerprint of everything the parse depends on — the kinds
+ * the company has on among them (task 026); the save
  * checks the signatures, that the pieces cover the whole corpus, and recomputes the metrics
  * itself. A deploy that changed the core prompt, a new model in the settings or an edited
  * corpus changes the fingerprint — the old run no longer counts.
@@ -22,16 +24,20 @@ export interface RunConfig {
   escalate: boolean;
   escalationModel: string;
   matching?: Partial<MatchingConfig>;
+  /** settings.parser.kinds: the prompt, the examples and the schema are those of these kinds. */
+  kinds?: readonly ParserKind[];
   corpusHash: string;
 }
 
 export function runFingerprint(config: RunConfig): string {
+  const kinds = normalizeKinds(config.kinds);
   return createHash("sha256")
     .update(
       JSON.stringify({
-        system: parserSystemPrompt(DEFAULT_CONVENTIONS, config.rules),
-        fewShot: FEW_SHOT,
-        schema: ENTITIES_JSON_SCHEMA,
+        kinds,
+        system: parserSystemPrompt(DEFAULT_CONVENTIONS, config.rules, kinds),
+        fewShot: fewShotPairs(kinds),
+        schema: entitiesJsonSchema(kinds),
         model: config.model,
         escalation: config.escalate ? config.escalationModel : null,
         matching: resolveMatchingConfig(config.matching),

@@ -1,11 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import type { Convention } from "./conventions";
-import { callDeepSeek, isDeepSeekModel, toChatMessages } from "./deepseek";
+import { callDeepSeek, isDeepSeekModel, toChatMessages, type ChatMessage, type DeepSeekResult } from "./deepseek";
 import { ParseError, type ParseErrorCode } from "./errors";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
-import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, withAssigneeId, type Entity } from "./schema";
+import { fromModelEntity } from "./postprocess";
+import type { ParserKind } from "./kinds/names";
+import { entitiesJsonSchema, modelParseResultSchema, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 export { ParseError, type ParseErrorCode };
@@ -55,6 +57,8 @@ export interface ParseInput {
   conventions?: Convention[];
   /** The company's own rules after the core prompt (D-138); none when absent. */
   rules?: string;
+  /** settings.parser.kinds (task 026): the prompt, few-shot and schema of these kinds; all when absent. */
+  kinds?: readonly ParserKind[];
 }
 
 const MAX_TOKENS = 4096;
@@ -65,6 +69,8 @@ const ESCALATION_ASSIGNEE_CONFIDENCE = 0.6;
 // Conventions from the table legitimately carry 0.5–0.6 («на неделе» = 0.5), so only a
 // deadline below the table's floor is a sign of a shaky parse.
 const ESCALATION_DEADLINE_CONFIDENCE = 0.5;
+// Enough for the model to see what to fix, short enough to stay one message.
+const SCHEMA_ISSUES_SHOWN = 8;
 
 export const DEFAULT_PARSER_MODEL = "claude-haiku-4-5";
 export const DEFAULT_ESCALATION_MODEL = "claude-sonnet-5";
@@ -140,33 +146,54 @@ interface CallResult {
   raw: unknown;
 }
 
+/** An attempt that was paid for and did not count — recorded before the call that did. */
+type PaidAttempt = (usage: ParseUsage, reasoningTokens: number) => void;
+
 /** Extraction with eight few-shot pairs needs no reasoning; thinking only adds seconds (D-43). */
 function thinkingFor(model: string): Anthropic.ThinkingConfigParam | undefined {
   return model.includes("haiku-4-5") ? undefined : { type: "disabled" };
 }
 
-/** The typed boundary shared by both providers: the API (or JSON mode) gives text, zod gives entities. */
-function entitiesFromText(model: string, text: string): Entity[] {
+type Answer = { ok: true; entities: Entity[] } | { ok: false; error: ParseError; issues: string };
+
+/**
+ * The typed boundary shared by both providers: the API (or JSON mode) gives text, zod gives
+ * entities, and code turns the model's TimeRefs into instants (task 026). A miss says what
+ * was wrong, in words the model can fix it by.
+ */
+function readAnswer(model: string, text: string, input: ParseInput): Answer {
   let json: unknown;
   try {
     json = JSON.parse(text);
   } catch (cause) {
-    throw new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
+    const error = new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
+    return { ok: false, error, issues: `ответ не является JSON (${(cause as Error).message})` };
   }
-  const parsed = ModelParseResultSchema.safeParse(json);
+  const parsed = modelParseResultSchema(input.kinds).safeParse(json);
   if (!parsed.success) {
-    throw new ParseError(
+    const error = new ParseError(
       "parse_failed",
       `${model}: ответ не прошёл схему (${parsed.error.issues.length} issue(s))`,
       { cause: parsed.error },
     );
+    const issues = parsed.error.issues
+      .slice(0, SCHEMA_ISSUES_SHOWN)
+      .map((issue) => `${issue.path.join(".") || "ответ"}: ${issue.message}`)
+      .join("; ");
+    return { ok: false, error, issues };
   }
-  return parsed.data.entities.map(withAssigneeId);
+  return { ok: true, entities: parsed.data.entities.map((entity) => fromModelEntity(entity, input.now, input.conventions)) };
+}
+
+function entitiesFromText(model: string, text: string, input: ParseInput): Entity[] {
+  const answer = readAnswer(model, text, input);
+  if (!answer.ok) throw answer.error;
+  return answer.entities;
 }
 
 function requestMessages(input: ParseInput): Anthropic.MessageParam[] {
   return [
-    ...fewShotMessages(),
+    ...fewShotMessages(input.kinds),
     {
       role: "user",
       content: buildUserMessage({
@@ -178,31 +205,51 @@ function requestMessages(input: ParseInput): Anthropic.MessageParam[] {
   ];
 }
 
-async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: number): Promise<CallResult> {
-  const result = await callDeepSeek({
-    model,
-    messages: toChatMessages(
-      buildSystemBlocks(input.roster, input.conventions, input.rules),
-      requestMessages(input),
-      ENTITIES_JSON_SCHEMA,
-    ),
-    maxTokens,
-    timeoutMs: DEEPSEEK_TIMEOUT_MS[model] ?? 25_000,
-  });
+/** One JSON-mode request; a cut-off answer is asked again with twice the room. */
+async function deepSeekAnswer(model: string, messages: ChatMessage[], maxTokens: number): Promise<DeepSeekResult> {
+  const result = await callDeepSeek({ model, messages, maxTokens, timeoutMs: DEEPSEEK_TIMEOUT_MS[model] ?? 25_000 });
   if (result.finishReason === "length") {
     if (maxTokens >= MAX_TOKENS * 4) {
       throw new ParseError("parse_failed", `${model}: ответ не уместился в max_tokens`);
     }
-    return callDeepSeekModel(model, input, maxTokens * 2);
+    return deepSeekAnswer(model, messages, maxTokens * 2);
   }
   if (result.finishReason === "content_filter") {
     throw new ParseError("parse_refused", `${model}: модель отказалась разбирать транскрипт`);
   }
+  return result;
+}
+
+/**
+ * JSON mode promises JSON, not the schema (task 026): an answer off the schema goes back to
+ * the model once, as its own turn, with what was wrong — then a second miss is a failure.
+ * The first, paid attempt is recorded on its own (`paid`), so the lab prices both calls.
+ */
+async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: number, paid: PaidAttempt): Promise<CallResult> {
+  const messages = toChatMessages(
+    buildSystemBlocks(input.roster, input.conventions, input.rules, input.kinds),
+    requestMessages(input),
+    entitiesJsonSchema(input.kinds),
+  );
+  const first = await deepSeekAnswer(model, messages, maxTokens);
+  const answer = readAnswer(model, first.text, input);
+  if (answer.ok) return { entities: answer.entities, usage: first.usage, reasoningTokens: first.reasoningTokens, raw: first.raw };
+
+  paid(first.usage, first.reasoningTokens);
+  const repair = await deepSeekAnswer(
+    model,
+    [
+      ...messages,
+      { role: "assistant", content: first.text },
+      { role: "user", content: `Ответ не прошёл схему: ${answer.issues}. Верни исправленный JSON по той же схеме.` },
+    ],
+    maxTokens,
+  );
   return {
-    entities: entitiesFromText(model, result.text),
-    usage: result.usage,
-    reasoningTokens: result.reasoningTokens,
-    raw: result.raw,
+    entities: entitiesFromText(model, repair.text, input),
+    usage: repair.usage,
+    reasoningTokens: repair.reasoningTokens,
+    raw: repair.raw,
   };
 }
 
@@ -211,9 +258,12 @@ async function callModel(
   model: string,
   input: ParseInput,
   maxTokens: number,
+  paid: PaidAttempt,
 ): Promise<CallResult> {
   // The reasoner thinks before it answers, so its budget must cover both.
-  if (isDeepSeekModel(model)) return callDeepSeekModel(model, input, model === "deepseek-reasoner" ? maxTokens * 4 : maxTokens);
+  if (isDeepSeekModel(model)) {
+    return callDeepSeekModel(model, input, model === "deepseek-reasoner" ? maxTokens * 4 : maxTokens, paid);
+  }
 
   let message: Anthropic.Message;
   try {
@@ -221,9 +271,9 @@ async function callModel(
       model,
       max_tokens: maxTokens,
       thinking: thinkingFor(model),
-      system: buildSystemBlocks(input.roster, input.conventions, input.rules),
+      system: buildSystemBlocks(input.roster, input.conventions, input.rules, input.kinds),
       messages: requestMessages(input),
-      output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } },
+      output_config: { format: { type: "json_schema", schema: entitiesJsonSchema(input.kinds) } },
     });
   } catch (cause) {
     throw new ParseError("parse_failed", `${model}: вызов парсера не удался`, { cause });
@@ -236,52 +286,48 @@ async function callModel(
     if (maxTokens >= MAX_TOKENS * 2) {
       throw new ParseError("parse_failed", `${model}: ответ не уместился в max_tokens`);
     }
-    return callModel(client, model, input, maxTokens * 2);
+    return callModel(client, model, input, maxTokens * 2, paid);
   }
   const text = message.content.find((block) => block.type === "text")?.text ?? "";
   return {
-    entities: entitiesFromText(model, text),
+    entities: entitiesFromText(model, text, input),
     usage: readUsage(message.usage),
     reasoningTokens: 0,
     raw: message,
   };
 }
 
-/** Runs one call and records it, so the lab sees every model that was paid for. */
+/**
+ * Runs one call and records it, so the lab sees every model that was paid for — and every
+ * attempt: a JSON-mode answer the model had to repair is its own entry (task 026).
+ */
 async function tracked(
   calls: ParseCall[],
   client: Anthropic,
   model: string,
   input: ParseInput,
 ): Promise<CallResult> {
-  const startedAt = Date.now();
+  let startedAt = Date.now();
+  const record = (entry: Omit<ParseCall, "model" | "provider">) => {
+    calls.push({ model, provider: providerOf(model), ...entry });
+    startedAt = Date.now();
+  };
+  const paid: PaidAttempt = (usage, reasoningTokens) =>
+    record({ usage, reasoning_tokens: reasoningTokens, latencyMs: Date.now() - startedAt, ok: false });
   try {
-    const result = await callModel(client, model, input, MAX_TOKENS);
-    calls.push({
-      model,
-      provider: providerOf(model),
-      usage: result.usage,
-      reasoning_tokens: result.reasoningTokens,
-      latencyMs: Date.now() - startedAt,
-      ok: true,
-    });
+    const result = await callModel(client, model, input, MAX_TOKENS, paid);
+    record({ usage: result.usage, reasoning_tokens: result.reasoningTokens, latencyMs: Date.now() - startedAt, ok: true });
     return result;
   } catch (error) {
-    calls.push({
-      model,
-      provider: providerOf(model),
-      usage: emptyUsage(),
-      reasoning_tokens: 0,
-      latencyMs: Date.now() - startedAt,
-      ok: false,
-    });
+    record({ usage: emptyUsage(), reasoning_tokens: 0, latencyMs: Date.now() - startedAt, ok: false });
     throw error;
   }
 }
 
 /**
- * Structured outputs guarantee the response shape, so there is no repair-retry here:
- * only refusal, max_tokens and transport failures are handled (docs/AI.md §3, §11).
+ * Structured outputs guarantee the response shape on Claude, so there is no repair turn
+ * there: only refusal, max_tokens and transport failures are handled (docs/AI.md §3, §11).
+ * JSON mode (DeepSeek, any OpenAI-compatible provider) gets one repair turn (task 026).
  */
 export async function parseTranscript(input: ParseInput): Promise<ParseOutcome> {
   const client = input.client ?? new Anthropic({ timeout: 20_000, maxRetries: 2 });

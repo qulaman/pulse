@@ -1,6 +1,8 @@
 import { resolveMatchingConfig, type MatchingConfig } from "./config";
+import { DEFAULT_CONVENTIONS, type Convention } from "./conventions";
 import type { ParseSource } from "./prompt";
-import type { Entity } from "./schema";
+import type { Entity, ModelEntity } from "./schema";
+import { resolveTimeRef } from "./timeref";
 import { matchName, type AssigneeMatch, type RosterUser } from "../matchName";
 
 export type BlockedReason = "points_blocked" | "assignee_unmatched" | "time_missing";
@@ -15,6 +17,59 @@ export type PostprocessedEntity = Entity & {
 };
 
 const HAS_ASSIGNEE_FIELDS = new Set(["task", "points", "recurrence", "delegation"]);
+
+const blank = (value: string): string | null => (value.trim() === "" ? null : value);
+
+/**
+ * The model's entity in the app's form (docs/AI.md §3): its TimeRefs become the ISO fields on
+ * the Aqtobe clock with the company's conventions (task 026), the assignee id waits for the
+ * match (D-56), and an event's "" / 0 become the nulls the card and the RPC speak in (D-78).
+ */
+export function fromModelEntity(
+  entity: ModelEntity,
+  now: Date,
+  conventions: readonly Convention[] = DEFAULT_CONVENTIONS,
+): Entity {
+  switch (entity.kind) {
+    case "task": {
+      const { deadline, scheduled_send, ...rest } = entity;
+      const due = resolveTimeRef(deadline, now, conventions, "task");
+      return {
+        ...rest,
+        assignee_id: null,
+        deadline_iso: due?.iso ?? null,
+        deadline_confidence: due?.confidence ?? null,
+        deadline_source_text: due?.source_text ?? null,
+        scheduled_send_at: resolveTimeRef(scheduled_send, now, conventions, "task")?.iso ?? null,
+      };
+    }
+    case "event": {
+      const { starts_at, ...rest } = entity;
+      const start = resolveTimeRef(starts_at, now, conventions, "event");
+      return {
+        ...rest,
+        body: null, // the agenda is typed on the card, never guessed
+        location: blank(entity.location),
+        starts_at_iso: start?.iso ?? null,
+        ends_at_iso: null,
+        time_confidence: start?.confidence ?? null,
+        time_source_text: start?.source_text ?? null,
+        remind_before_min: null, // default 30 in the DB; the director changes it on the card
+        participant_queries: entity.participant_names,
+        participant_ids: [],
+      };
+    }
+    case "reminder": {
+      const { remind_at, ...rest } = entity;
+      return { ...rest, remind_at_iso: resolveTimeRef(remind_at, now, conventions, "reminder")?.iso ?? null };
+    }
+    case "points":
+    case "recurrence":
+      return { ...entity, assignee_id: null };
+    default:
+      return entity;
+  }
+}
 
 function isValidIso(value: string): boolean {
   return !Number.isNaN(Date.parse(value));

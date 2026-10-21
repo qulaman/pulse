@@ -23,7 +23,7 @@ const PIECE_DEADLINE_MS = 50_000;
  * through the parser with the draft rules, scored exactly as `pnpm eval:parser` scores
  * them, and signed — the save (`PUT /api/lab/parser`) takes only signed pieces of this
  * fingerprint. The corpus keeps its own roster and the default conventions, as in the CLI;
- * the model and the matcher are the company's, or a model the lab is comparing.
+ * the model, the kinds and the matcher are the company's, or a model the lab is comparing.
  */
 
 const BodySchema = z.strictObject({
@@ -56,6 +56,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
             escalate: model.escalate,
             escalationModel: model.escalation_model,
             rules,
+            kinds: settings.parser.kinds,
             matching: settings.matching,
             client,
           }),
@@ -79,6 +80,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
         escalate: model.escalate,
         escalationModel: model.escalation_model,
         matching: settings.matching,
+        kinds: settings.parser.kinds,
         corpusHash: corpus.hash,
       }),
       ran_at: new Date().toISOString(),
