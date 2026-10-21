@@ -11,6 +11,7 @@ import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { passesGates, summarize, type CaseResult, type EvalMetrics } from "@/lib/ai/evals/score";
 import type { SignedPiece } from "@/lib/ai/evals/stamp";
+import { PARSER_KINDS } from "@/lib/ai/kinds/names";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import { normalizeRules, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import {
@@ -577,7 +578,12 @@ function PromptCard({ state }: { state: ParserLabState }) {
       </p>
       <Disclosure
         title="Системный промпт"
-        summary={`${prompt.system.length.toLocaleString("ru-RU")} знаков${state.versions[0]?.text ? " · с правилами компании" : ""}`}
+        // the text is assembled from the kinds the company has on (task 026); `??` — a cached state from before them
+        summary={`${prompt.system.length.toLocaleString("ru-RU")} знаков${
+          (state.parser.kinds ?? PARSER_KINDS).length < PARSER_KINDS.length
+            ? ` · видов ${(state.parser.kinds ?? PARSER_KINDS).length} из ${PARSER_KINDS.length}`
+            : ""
+        }${state.versions[0]?.text ? " · с правилами компании" : ""}`}
       >
         <pre className="no-bar max-h-[60vh] overflow-auto whitespace-pre-wrap break-words text-[12px] leading-[17px]" data-testid="parser-system-prompt">
           {prompt.system}

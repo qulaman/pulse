@@ -14,7 +14,7 @@ export const maxDuration = 60;
 
 /**
  * The lab's sandbox (D-138): one phrase through the parser with the draft rules and, side by
- * side, with the rules in force — the company's roster, conventions and matcher, nothing
+ * side, with the rules in force — the company's roster, conventions, kinds and matcher, nothing
  * written anywhere. Not an ai_logs row: the lab's cost table is the director's real parses,
  * and harvest (`pnpm eval:harvest`) must not mistake a probe for the director's speech.
  */
@@ -48,6 +48,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
           escalationModel: model.escalation_model,
           conventions: settings.conventions,
           rules,
+          kinds: settings.parser.kinds,
         });
         return {
           ok: true,

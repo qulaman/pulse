@@ -6,7 +6,8 @@ import { ParseError, type ParseErrorCode } from "./errors";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
 import { fromModelEntity } from "./postprocess";
-import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, type Entity } from "./schema";
+import type { ParserKind } from "./kinds/names";
+import { entitiesJsonSchema, modelParseResultSchema, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 export { ParseError, type ParseErrorCode };
@@ -56,6 +57,8 @@ export interface ParseInput {
   conventions?: Convention[];
   /** The company's own rules after the core prompt (D-138); none when absent. */
   rules?: string;
+  /** settings.parser.kinds (task 026): the prompt, few-shot and schema of these kinds; all when absent. */
+  kinds?: readonly ParserKind[];
 }
 
 const MAX_TOKENS = 4096;
@@ -166,7 +169,7 @@ function readAnswer(model: string, text: string, input: ParseInput): Answer {
     const error = new ParseError("parse_failed", `${model}: structured output не является JSON`, { cause });
     return { ok: false, error, issues: `ответ не является JSON (${(cause as Error).message})` };
   }
-  const parsed = ModelParseResultSchema.safeParse(json);
+  const parsed = modelParseResultSchema(input.kinds).safeParse(json);
   if (!parsed.success) {
     const error = new ParseError(
       "parse_failed",
@@ -190,7 +193,7 @@ function entitiesFromText(model: string, text: string, input: ParseInput): Entit
 
 function requestMessages(input: ParseInput): Anthropic.MessageParam[] {
   return [
-    ...fewShotMessages(),
+    ...fewShotMessages(input.kinds),
     {
       role: "user",
       content: buildUserMessage({
@@ -224,9 +227,9 @@ async function deepSeekAnswer(model: string, messages: ChatMessage[], maxTokens:
  */
 async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: number, paid: PaidAttempt): Promise<CallResult> {
   const messages = toChatMessages(
-    buildSystemBlocks(input.roster, input.conventions, input.rules),
+    buildSystemBlocks(input.roster, input.conventions, input.rules, input.kinds),
     requestMessages(input),
-    ENTITIES_JSON_SCHEMA,
+    entitiesJsonSchema(input.kinds),
   );
   const first = await deepSeekAnswer(model, messages, maxTokens);
   const answer = readAnswer(model, first.text, input);
@@ -268,9 +271,9 @@ async function callModel(
       model,
       max_tokens: maxTokens,
       thinking: thinkingFor(model),
-      system: buildSystemBlocks(input.roster, input.conventions, input.rules),
+      system: buildSystemBlocks(input.roster, input.conventions, input.rules, input.kinds),
       messages: requestMessages(input),
-      output_config: { format: { type: "json_schema", schema: ENTITIES_JSON_SCHEMA } },
+      output_config: { format: { type: "json_schema", schema: entitiesJsonSchema(input.kinds) } },
     });
   } catch (cause) {
     throw new ParseError("parse_failed", `${model}: вызов парсера не удался`, { cause });

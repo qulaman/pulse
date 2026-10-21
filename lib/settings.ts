@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { CONVENTION_KEYS, ConventionSchema, normalizeConventions } from "@/lib/ai/conventions";
+import { normalizeKinds } from "@/lib/ai/kinds/names";
 import { PARSER_RULES_HISTORY_MAX, PARSER_RULES_MAX } from "@/lib/ai/rules";
 import { DEFAULT_WORD_KINDS, KIND_LABEL_MAX, WORD_KINDS_MAX } from "@/lib/dictionary";
 import { DESK_SCENES } from "@/lib/errands/scene";
@@ -39,6 +40,14 @@ export const ParserSettingsSchema = z.object({
   escalation_model: z.string().min(1).default("claude-sonnet-5"),
   /** Re-run on the stronger model when the parse looks shaky (docs/AI.md §8). */
   escalate: z.boolean().default(true),
+  /**
+   * The kinds the parser answers with (task 026): their prompt sections, examples and schema.
+   * Absent — all eight; `task` is always on; an unknown name is dropped, never an error.
+   */
+  kinds: z
+    .unknown()
+    .optional()
+    .transform((value) => normalizeKinds(Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : undefined)),
 });
 
 /** The corpus run a version of the rules passed before it was saved (D-138). */

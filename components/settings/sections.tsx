@@ -8,6 +8,7 @@ import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } 
 import { Button } from "@/components/ui/Button";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
+import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
 import { usePeople } from "@/lib/people/queries";
 import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
@@ -34,14 +35,27 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  label,
+  hint,
+  checked,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  hint?: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  disabled?: boolean;
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
+      className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left disabled:opacity-60"
     >
       <span>
         <span className="block text-[16px] leading-[22px]">{label}</span>
@@ -160,6 +174,15 @@ export function SttSection() {
 
 export function ParserSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
+  // `??`: a phone's offline copy (D-127) may hold settings from before the kinds (task 026)
+  const kinds: readonly ParserKind[] = draft.parser.kinds ?? PARSER_KINDS;
+  const toggleKind = (kind: ParserKind, on: boolean) => {
+    const next = new Set(kinds);
+    if (on) next.add(kind);
+    else next.delete(kind);
+    // the fixed order, so switching a kind off and on again is no change
+    update({ parser: { ...draft.parser, kinds: PARSER_KINDS.filter((k) => k === REQUIRED_KIND || next.has(k)) } });
+  };
   return (
     <Disclosure
       icon={<ParseIcon />}
@@ -193,6 +216,20 @@ export function ParserSection() {
             </select>
           </Field>
         ) : null}
+        <div className="flex flex-col" data-testid="settings-parser-kinds">
+          <span className="text-[14px] font-medium leading-[18px] text-muted">Что модель различает</span>
+          <span className="mt-1 text-[13px] leading-4 text-muted">Выключенного вида модель не знает: ни правил, ни примеров.</span>
+          {PARSER_KINDS.map((kind) => (
+            <Toggle
+              key={kind}
+              label={PARSER_KIND_LABEL[kind]}
+              hint={kind === REQUIRED_KIND ? "Всегда включены" : undefined}
+              checked={kind === REQUIRED_KIND || kinds.includes(kind)}
+              disabled={kind === REQUIRED_KIND}
+              onChange={(on) => toggleKind(kind, on)}
+            />
+          ))}
+        </div>
         {/* the rules are saved only after a corpus run — that lives in the lab (D-138) */}
         <Link href="/lab?tab=parser" data-testid="settings-parser-rules" className="flex min-h-[44px] items-center justify-between gap-3">
           <span className="min-w-0">

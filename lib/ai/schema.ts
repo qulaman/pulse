@@ -1,57 +1,35 @@
 import { z } from "zod";
 
+import { AnnouncementEntitySchema } from "./kinds/announcement";
+import { ModelEventEntitySchema } from "./kinds/event";
+import { assigneeFields, PrioritySchema } from "./kinds/fields";
+import { PARSER_KINDS, type ParserKind } from "./kinds/names";
+import { NoteEntitySchema } from "./kinds/note";
+import { ModelPointsEntitySchema } from "./kinds/points";
+import { QueryEntitySchema } from "./kinds/query";
+import { ModelRecurrenceEntitySchema } from "./kinds/recurrence";
+import { ModelReminderEntitySchema } from "./kinds/reminder";
+import { ModelTaskEntitySchema } from "./kinds/task";
+import { kindModules } from "./kinds";
 import { TimeRefSchema } from "./timeref";
 
 /**
  * Single source of truth for the parser output contract (docs/AI.md §3).
- * TS types are inferred from the zod schemas and ENTITIES_JSON_SCHEMA is generated
- * from the same schemas — types and JSON Schema cannot drift apart.
+ * TS types are inferred from the zod schemas and the JSON Schema is generated
+ * from the same schemas — types and JSON Schema cannot drift apart. The model's variants
+ * live in their kind modules (lib/ai/kinds, task 026); the app's form lives here.
  *
  * Nullable fields use .nullable() and never .optional(): with structured outputs
  * every property is required.
  */
 
-export const PrioritySchema = z.enum(["high", "normal", "low"]);
+export { AnnouncementEntitySchema, NoteEntitySchema, PrioritySchema, QueryEntitySchema };
 export type Priority = z.infer<typeof PrioritySchema>;
-
-/**
- * What the MODEL says about the assignee: the verbatim mention and the roster's
- * full_name copied verbatim, or null. Names it copies reliably; ids it does not —
- * on a real (uuid) roster it echoed few-shot ids in every call (D-56). The id is the
- * server's to fill from the name (`assigneeId` below), and it is kept out of the model
- * schema: the API caps nullable fields at 16 and the id would be a wasted one.
- */
-const assigneeFields = {
-  assignee_queries: z.array(z.string()), // verbatim mentions as heard; [] if none
-  assignee_name: z.string().nullable(),
-  assignee_confidence: z.number(), // 0..1
-};
 
 /** App-side addition: set by postprocess from the match, what confirm and the UI use. */
 const assigneeId = { assignee_id: z.string().nullable() };
 
-export const AnnouncementEntitySchema = z.strictObject({
-  kind: z.literal("announcement"),
-  text: z.string(),
-  source_span: z.string(),
-});
-
-/**
- * Times the model names symbolically (TimeRef, lib/ai/timeref.ts); the ISO fields of the app
- * form below are computed from them by code — the model does no date arithmetic (task 026).
- */
-const ModelTaskEntitySchema = z.strictObject({
-  kind: z.literal("task"),
-  ...assigneeFields,
-  group_id: z.string().nullable(), // same for copies born from one multi-assignee phrase
-  title: z.string(),
-  body: z.string().nullable(),
-  deadline: TimeRefSchema.nullable(),
-  priority: PrioritySchema,
-  scheduled_send: TimeRefSchema.nullable(), // only on explicit "отправь утром/в понедельник"
-  source_span: z.string(),
-});
-
+/** The app's task: the ISO fields code resolved from the model's TimeRefs (task 026). */
 const taskFields = {
   ...assigneeFields,
   group_id: z.string().nullable(),
@@ -65,65 +43,10 @@ const taskFields = {
   source_span: z.string(),
 };
 
-const ModelPointsEntitySchema = z.strictObject({
-  kind: z.literal("points"),
-  ...assigneeFields,
-  amount: z.number(),
-  reason: z.string().nullable(),
-  source_span: z.string(),
-});
-
-/**
- * A thought the director keeps for himself (D-75): no assignee, no time, nobody else
- * ever reads it. `text` is already combed — the model drops «запиши», «заметка», «мысль».
- */
-export const NoteEntitySchema = z.strictObject({
-  kind: z.literal("note"),
-  text: z.string(),
-  source_span: z.string(),
-});
-
-/**
- * A meeting with a time (D-78): one row and N participants, unlike a task, which is
- * copied per assignee (D-02). Names the model copies from the roster verbatim, exactly
- * as for an assignee; the ids are the server's (D-56, `participant_ids` below).
- *
- * Why this variant is so much leaner than the app's event (below): the API compiles the
- * whole schema into one grammar and refuses it twice over — more than 16 union (nullable)
- * parameters, and a grammar «too large» (both live, 2026-09-18, once the ninth kind
- * arrived). So the model is asked only for what nothing else can supply: everything
- * unsaid is "" or 0 instead of null, and the end time, the agenda, the verbatim mentions
- * and the reminder offset are filled in by the app and by /confirm.
- */
-const ModelEventEntitySchema = z.strictObject({
-  kind: z.literal("event"),
-  title: z.string(), // «Планёрка», «Встреча с Альфой» — без даты и имён
-  location: z.string(), // «в офисе», «у Альфы»; "" — не сказано
-  starts_at: TimeRefSchema.nullable(), // null — ни даты, ни времени
-  participant_names: z.array(z.string()), // roster full_name copied verbatim (D-56)
-  everyone: z.boolean(), // «всем», «вся команда»
-  source_span: z.string(),
-});
-
-const ModelReminderEntitySchema = z.strictObject({
-  kind: z.literal("reminder"),
-  text: z.string(),
-  remind_at: TimeRefSchema.nullable(),
-  source_span: z.string(),
-});
-
 export const ReminderEntitySchema = z.strictObject({
   kind: z.literal("reminder"),
   text: z.string(),
   remind_at_iso: z.string().nullable(),
-  source_span: z.string(),
-});
-
-const ModelRecurrenceEntitySchema = z.strictObject({
-  kind: z.literal("recurrence"),
-  ...assigneeFields,
-  title: z.string(),
-  rrule: z.string(),
   source_span: z.string(),
 });
 
@@ -161,12 +84,6 @@ export const PointsEntitySchema = ModelPointsEntitySchema.extend(assigneeId);
 export const RecurrenceEntitySchema = ModelRecurrenceEntitySchema.extend(assigneeId);
 export const DelegationEntitySchema = ModelDelegationEntitySchema.extend(assigneeId);
 
-export const QueryEntitySchema = z.strictObject({
-  kind: z.literal("query"),
-  question: z.string(),
-  source_span: z.string(),
-});
-
 export const EntitySchema = z.discriminatedUnion("kind", [
   AnnouncementEntitySchema,
   TaskEntitySchema,
@@ -182,15 +99,16 @@ export const EntitySchema = z.discriminatedUnion("kind", [
 export const ParseResultSchema = z.strictObject({ entities: z.array(EntitySchema) });
 
 /**
- * The contract the API enforces: no assignee_id — that field is born in postprocess.
+ * The contract the API enforces, with every kind on: no assignee_id — that field is born in
+ * postprocess — and no ISO time, which code resolves from TimeRefs (task 026).
  *
- * Eight kinds, not nine: the API compiles this schema into one grammar and refuses a
- * ninth variant with «The compiled grammar is too large» — measured on 2026-09-18, and
- * it refuses it even when the new variant carries six fields and no nullable at all.
- * So a kind can only enter by trading places, and the owner traded `delegation` for
- * `event` (D-78): «распредели в группе» is a task for that manager, a meeting is not
- * expressible any other way. `DelegationEntitySchema` stays in the app union — rows
- * parsed before the trade are still valid.
+ * Eight kinds at most: the API compiles this schema into one grammar and refuses a ninth
+ * variant with «The compiled grammar is too large» — measured on 2026-09-18, and it refuses
+ * it even when the new variant carries six fields and no nullable at all. So a kind can
+ * only enter by trading places, and the owner traded `delegation` for `event` (D-78):
+ * «распредели в группе» is a task for that manager, a meeting is not expressible any other
+ * way. `DelegationEntitySchema` stays in the app union — rows parsed before the trade are
+ * still valid. A company may switch kinds off (`modelParseResultSchema`), never add one.
  */
 export const ModelEntitySchema = z.discriminatedUnion("kind", [
   AnnouncementEntitySchema,
@@ -292,3 +210,27 @@ export function modelJsonSchema(schema: z.ZodType): JsonSchemaNode {
 }
 
 export const ENTITIES_JSON_SCHEMA = modelJsonSchema(ModelParseResultSchema);
+
+const byKinds = new Map<string, { zod: typeof ModelParseResultSchema; json: JsonSchemaNode }>();
+
+/** The model's contract for the kinds a company has on: the union of their modules' variants. */
+function forKinds(kinds: readonly ParserKind[]): { zod: typeof ModelParseResultSchema; json: JsonSchemaNode } {
+  const modules = kindModules(kinds);
+  const key = modules.map((module) => module.kind).join(",");
+  const known = byKinds.get(key);
+  if (known) return known;
+  const variants = modules.map((module) => module.modelSchema) as unknown as Parameters<typeof z.discriminatedUnion>[1];
+  // a narrower union of the same variants: what parses under it parses under the full one
+  const zod = z.strictObject({ entities: z.array(z.discriminatedUnion("kind", variants)) }) as unknown as typeof ModelParseResultSchema;
+  const entry = { zod, json: modelJsonSchema(zod) };
+  byKinds.set(key, entry);
+  return entry;
+}
+
+export function modelParseResultSchema(kinds: readonly ParserKind[] = PARSER_KINDS): typeof ModelParseResultSchema {
+  return forKinds(kinds).zod;
+}
+
+export function entitiesJsonSchema(kinds: readonly ParserKind[] = PARSER_KINDS): JsonSchemaNode {
+  return forKinds(kinds).json;
+}

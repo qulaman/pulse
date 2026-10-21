@@ -2,6 +2,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 
 import type { MatchingConfig } from "../config";
 import type { Convention } from "../conventions";
+import type { ParserKind } from "../kinds/names";
 import { parseTranscript, ParseError, type ParseCall, type ParseUsage } from "../parse";
 import { postprocess } from "../postprocess";
 import type { Corpus } from "./corpus";
@@ -20,6 +21,8 @@ export interface RunOptions {
   /** The corpus is written against the default table (D-15) — leave unset to keep it so. */
   conventions?: Convention[];
   rules?: string;
+  /** The company's kinds in the lab (task 026); the CLI leaves it unset — every kind. */
+  kinds?: readonly ParserKind[];
   matching?: Partial<MatchingConfig>;
   client?: Anthropic;
 }
@@ -42,6 +45,7 @@ export async function runCase(c: EvalCase, corpus: Corpus, options: RunOptions =
       escalationModel: options.escalationModel,
       conventions: options.conventions,
       rules: options.rules,
+      kinds: options.kinds,
       client: options.client,
     });
     // the model's own pick before postprocess: a full_name copied from the roster (D-56)

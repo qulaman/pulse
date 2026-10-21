@@ -26,7 +26,7 @@ describe("FEW_SHOT", () => {
   });
 
   it("П8 splits one phrase into two tasks sharing a group_id", () => {
-    const last = FEW_SHOT[7].assistant.entities;
+    const last = FEW_SHOT.find((pair) => pair.user.startsWith("Ерлану Б. и Марату"))!.assistant.entities;
     const tasks = last.filter((e) => e.kind === "task");
     expect(tasks).toHaveLength(2);
     expect(tasks[0].kind === "task" && tasks[0].group_id).toBeTruthy();

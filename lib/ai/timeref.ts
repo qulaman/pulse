@@ -32,6 +32,11 @@ export const TimeRefSchema = z.strictObject({
 
 export type TimeRef = z.infer<typeof TimeRefSchema>;
 
+/** A TimeRef as a few-shot answer writes it: the words and what they name, no arithmetic. */
+export function spokenTime(text: string, said: Partial<Omit<TimeRef, "text" | "confidence">>, confidence = 0.95): TimeRef {
+  return { text, day: null, weekday: null, date: null, time: null, part: null, ...said, confidence };
+}
+
 export interface ResolvedTime {
   iso: string;
   confidence: number;
