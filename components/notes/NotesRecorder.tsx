@@ -101,6 +101,8 @@ type Props = {
    * the round key still writes it as one line with its details.
    */
   onSplit?: (points: SplitPoint[]) => void;
+  /** A board (D-141): «Рисунок» beside the microphone opens the pad; the drawing becomes a point. */
+  onSketch?: () => void;
   /** The microphone opened: the page turns to the feed, where the note will land. */
   onCapture: () => void;
 };
@@ -112,7 +114,7 @@ type Props = {
  * «Распознаю», «Записал». Under it, inside the same screen, the field for a typed thought
  * and the round microphone: hold it and talk, or tap it and talk until the next tap (D-81).
  */
-export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onSplit, onCapture }: Props) {
+export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictation, writing, onWrite, onSplit, onSketch, onCapture }: Props) {
   const online = useSyncExternalStore(subscribeOnline, isOnline, () => true);
   const [draft, setDraft] = useState("");
   const [armed, setArmed] = useState(false);
@@ -290,6 +292,19 @@ export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictati
             />
           </label>
         )}
+
+        {onSketch && !recording && !failed ? (
+          <button
+            type="button"
+            aria-label="Нарисовать пункт"
+            title="Рисунок"
+            data-testid="dictation-sketch"
+            onClick={onSketch}
+            className="flex h-14 w-11 shrink-0 items-center justify-center rounded-full text-accent transition-transform duration-[120ms] active:scale-[0.94]"
+          >
+            <NoteIcon name="pencil" size={22} />
+          </button>
+        ) : null}
 
         <span className="relative shrink-0">
           {recording ? <span aria-hidden className="absolute inset-0 rounded-full border-2 border-accent" style={{ animation: "pick-pulse 1.4s ease-out infinite" }} /> : null}

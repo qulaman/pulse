@@ -1,3 +1,5 @@
+import { SKETCH_FIXTURE } from "@/app/dev/board/fixtures";
+import { sketchFrom } from "@/lib/mindboard/sketch";
 import type { TvBoard, TvBoardData, TvBoardItem, TvBoardLeaf } from "@/lib/tv/board";
 
 /**
@@ -22,13 +24,16 @@ export const BOARD_CASES = [
   "board-long",
   "board-pages-branches",
   "board-empty",
+  "board-sketch",
+  "board-sketch-focus",
+  "board-sketch-map",
 ] as const;
 
 export type BoardCase = (typeof BOARD_CASES)[number];
 
 const MIN = 60_000;
 
-type Seed = { text: string; done?: boolean; who?: string; handed?: boolean; fresh?: boolean; sub?: (string | { text: string; done?: boolean; who?: string; fresh?: boolean })[] };
+type Seed = { text: string; done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: boolean; sub?: (string | { text: string; done?: boolean; who?: string; fresh?: boolean })[] };
 
 const BRANCHES: Seed[] = [
   { text: "Отгрузка Казхром до пятницы", who: "Марат" },
@@ -104,12 +109,17 @@ function seedsFor(wallCase: BoardCase): Seed[] {
       return [...BRANCHES, ...MORE.map((text, i) => ({ text, sub: i % 4 === 0 ? SUBS.slice(0, 2 + (i % 3)) : [] }))].slice(0, 30);
     case "board-empty":
       return [];
+    // a drawing without words and one with them (D-141)
+    case "board-sketch":
+    case "board-sketch-focus":
+    case "board-sketch-map":
+      return [BRANCHES[0], { text: "", drawn: true }, { text: "Ворота — с южной стороны", drawn: true }, BRANCHES[4]];
   }
 }
 
 function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
   const seeds = seedsFor(wallCase);
-  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; fresh?: boolean }): TvBoardLeaf => ({
+  const leaf = (id: string, text: string, index: number, patch: { done?: boolean; who?: string; handed?: boolean; fresh?: boolean; drawn?: boolean }): TvBoardLeaf => ({
     id,
     text,
     done: patch.done === true,
@@ -117,6 +127,7 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
     // a guest gets no names in the tags (D-33)
     assignee: guest ? null : (patch.who ?? null),
     handed_done: patch.handed === true,
+    sketch: patch.drawn ? sketchFrom(SKETCH_FIXTURE) : null,
   });
   const items: TvBoardItem[] = seeds.map((seed, i) => ({
     ...leaf(`p${i + 1}`, seed.text, i, seed),
@@ -125,8 +136,8 @@ function build(wallCase: BoardCase, base: number, guest: boolean): TvBoard {
       return leaf(`p${i + 1}.${j + 1}`, s.text, i, s);
     }),
   }));
-  const map = wallCase.startsWith("board-map");
-  const focus = wallCase === "board-focus" || wallCase === "board-map-focus" ? "p3" : null;
+  const map = wallCase.startsWith("board-map") || wallCase === "board-sketch-map";
+  const focus = wallCase === "board-focus" || wallCase === "board-map-focus" ? "p3" : wallCase === "board-sketch-focus" ? "p2" : null;
   const board: TvBoardData = {
     id: "b1",
     title: wallCase === "board-long" ? LONG_TITLE : "Планёрка · понедельник",

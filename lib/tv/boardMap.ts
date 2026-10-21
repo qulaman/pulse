@@ -1,4 +1,4 @@
-import { tagOf, type TvBoardItem, type TvBoardLeaf } from "./board";
+import { mapText, tagOf, wallText, type TvBoardItem, type TvBoardLeaf } from "./board";
 import { lineWidth, snugWidth, textLines } from "./boardText";
 
 /**
@@ -313,7 +313,7 @@ export function elbow(x0: number, y0: number, x1: number, y1: number, radius = 1
 
 function leafText(leaf: TvBoardLeaf): string {
   const tag = tagOf(leaf);
-  return tag ? `${leaf.text} ${tag}` : leaf.text;
+  return tag ? `${wallText(leaf)} ${tag}` : wallText(leaf);
 }
 
 function centerFit(title: string, t: MapTier): MapCenter {
@@ -352,7 +352,7 @@ type Block = {
 /** Ветвь без позиции: ширина узла, строки, листья под ним и высота всей ветви. */
 function blockOf(item: TvBoardItem, n: number, t: MapTier, sideW: number, leavesMax: number, leafLines: number): Block {
   const tag = tagOf(item);
-  const text = tag ? `${item.text} ${tag}` : item.text;
+  const text = tag ? `${mapText(item)} ${tag}` : mapText(item);
   const chrome = t.padX * 2 + t.badge + t.gap;
   const natural = chrome + lineWidth(text, t.size, "point") + 0.6;
   const room = Math.max(chrome + t.size * 3, Math.min(natural, sideW, 60));

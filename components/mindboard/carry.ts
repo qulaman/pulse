@@ -5,6 +5,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/Toast";
 import { boardSummary, nextTitle, openPoints } from "@/lib/mindboard/list";
 import { boardFailure, copyBoard } from "@/lib/mindboard/mutations";
+import { hasContent } from "@/lib/mindboard/sketch";
 import type { MindBoard } from "@/lib/mindboard/queries";
 import type { Note } from "@/lib/notes/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -55,7 +56,7 @@ export function ejectReceipt(
   rows: readonly Note[],
   open: (id: string) => void,
 ): void {
-  const summary = boardSummary(rows.filter((row) => row.board_id === board?.id && row.deleted_at === null && row.text.trim() !== ""));
+  const summary = boardSummary(rows.filter((row) => row.board_id === board?.id && row.deleted_at === null && hasContent(row)));
   const done = summary.total > 0 ? ` · отмечено ${summary.done} из ${summary.total}` : "";
   const left = board ? openPoints(rows.filter((row) => row.board_id === board.id)).length : 0;
   if (!board || left === 0) {

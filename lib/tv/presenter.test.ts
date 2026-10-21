@@ -40,6 +40,7 @@ function note(id: string, patch: Partial<Note> = {}): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: null,
     client_request_id: null,
     created_at: "2026-09-25T04:00:00Z",
     updated_at: "2026-09-25T04:00:00Z",
@@ -258,5 +259,12 @@ describe("nextOpen", () => {
     expect(nextOpen(points(5, [4, 5]), "p3")).toBeNull();
     expect(nextOpen(points(3, [1]), "p1")).toBe("p2");
     expect(nextOpen(points(3), "gone")).toBeNull();
+  });
+});
+
+describe("presenterPoints and a drawing (D-141)", () => {
+  it("steps through a drawing without words as «Рисунок»", () => {
+    const rows = [note("a", { position: 1 }), note("d", { text: "", position: 2, sketch: { v: 1, strokes: [{ c: "text", w: 1, p: [0, 0, 5, 5] }] } }), note("v", { text: "", position: 3, audio_path: "a.webm" })];
+    expect(presenterPoints(rows, "b1").map((point) => point.text)).toEqual(["Пункт a", "Рисунок"]);
   });
 });

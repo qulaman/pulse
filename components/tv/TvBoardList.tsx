@@ -3,7 +3,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { memo } from "react";
 
-import { BOARD_TITLE_GAP } from "@/lib/tv/board";
+import { SketchView } from "@/components/mindboard/SketchView";
+import { BOARD_TITLE_GAP, wallText } from "@/lib/tv/board";
 import { COLUMN_GAP, textTop, type ListLayout, type ListRow, type ListTier, type TitleFit } from "@/lib/tv/boardList";
 
 import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
@@ -118,12 +119,30 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
               className="font-semibold tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:pretty]"
               style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(row.lines), opacity: item.done ? DONE_TEXT : 1 }}
             >
-              {item.text}
+              {wallText(item)}
             </p>
             {row.tag ? (
               <p className="font-semibold" style={{ marginTop: vh(tier.tagTop), fontSize: vh(tier.tag), lineHeight: vh(tier.tagLh), color: "var(--accent)" }}>
                 {row.tag}
               </p>
+            ) : null}
+            {row.thumb > 0 && item.sketch ? (
+              // the drawing in small (D-141); lit by the presenter, it opens over the whole wall
+              <div
+                className="overflow-hidden"
+                style={{
+                  marginTop: vh(tier.subTop),
+                  width: vh((row.thumb * 16) / 9),
+                  height: vh(row.thumb),
+                  borderRadius: vh(1.2),
+                  background: "color-mix(in srgb, var(--surface) 70%, transparent)",
+                  boxShadow: "inset 0 0 0 0.15vh color-mix(in srgb, var(--border) 85%, transparent)",
+                  opacity: item.done ? DONE_TEXT + 0.1 : 1,
+                }}
+                data-testid="tv-board-thumb"
+              >
+                <SketchView sketch={item.sketch} label={wallText(item)} />
+              </div>
             ) : null}
             {row.children.length > 0 || row.more > 0 ? (
               <ul className="flex flex-col" style={{ marginTop: vh(tier.subTop), gap: vh(tier.subGap), opacity: item.done ? 0.6 : 1 }}>
@@ -159,7 +178,7 @@ function Branch({ row, tier, lit, dim, freshIds, still }: { row: ListRow; tier: 
                         opacity: leaf.done ? DONE_TEXT + 0.08 : 1,
                       }}
                     >
-                      {leaf.text}
+                      {wallText(leaf)}
                       {tag ? (
                         <span className="font-semibold" style={{ color: "var(--accent)" }}>
                           {" "}

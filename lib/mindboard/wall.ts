@@ -3,12 +3,13 @@ import type { TvBoardData, TvBoardLeaf } from "@/lib/tv/board";
 import { mapFits } from "@/lib/tv/board";
 import type { BoardView } from "@/lib/tv/state";
 
+import { hasContent, sketchFrom } from "./sketch";
 import { branchesOf } from "./tree";
 
 /**
  * The board as the wall will draw it (D-140), from the phone's own cache — the preview of the
- * board screen. The same rule as `tv_board()` (D-121 §8): points of the top level with words,
- * each with its sub-points with words, in the order of the board; «→ Марат» beside a handed
+ * board screen. The same rule as `tv_board()` (D-121 §8, D-141): points of the top level with words
+ * or a drawing, each with its sub-points alike, in the order of the board; «→ Марат» beside a handed
  * line unless it was revoked; the spotlight only on a point that is there. The wall is not
  * asked: the preview must show the board before it goes up. Pure — tests in `wall.test.ts`.
  */
@@ -31,10 +32,11 @@ export function wallBoardOf(
       created_at: row.created_at,
       assignee: task?.assignee ?? null,
       handed_done: task?.done ?? false,
+      sketch: sketchFrom(row.sketch),
     };
   };
-  // the wall draws no orphans: a sub-point whose point has no words is not on it at all
-  const items = branchesOf(rows.filter((row) => row.deleted_at === null && row.text.trim() !== ""))
+  // the wall draws no orphans: a sub-point whose point has no words nor drawing is not on it at all
+  const items = branchesOf(rows.filter((row) => row.deleted_at === null && hasContent(row)))
     .filter((branch) => branch.point.parent_id === null)
     .map((branch) => ({ ...leaf(branch.point), children: branch.children.map(leaf) }));
   return {

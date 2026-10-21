@@ -72,11 +72,14 @@ export function NoteEditor({
   onChangeText,
   onDirty,
   label = "Текст заметки",
+  placeholder = "Что было сказано…",
 }: {
   text: string;
   onChangeText: (text: string) => void;
   onDirty: (dirty: boolean) => void;
   label?: string;
+  /** What the empty field says: a drawing asks for its caption (D-141). */
+  placeholder?: string;
 }) {
   const [draft, setDraft] = useState(text);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -141,7 +144,7 @@ export function NoteEditor({
       onChange={(event) => schedule(event.target.value)}
       onBlur={flush}
       aria-label={label}
-      placeholder="Что было сказано…"
+      placeholder={placeholder}
       data-testid="note-editor"
       data-update-safe
       className="w-full resize-none rounded-[14px] bg-surface-2/60 px-3 py-2.5 text-[16px] leading-[22px] text-text outline-none placeholder:text-muted focus:bg-surface-2"

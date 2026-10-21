@@ -1,5 +1,7 @@
 "use client";
 
+import type { Json } from "@/lib/supabase/types";
+
 /**
  * Notes that have not reached the server yet, kept on the phone (D-95, принцип 5): a
  * thought dictated or typed without network, and an edit made without it. IndexedDB,
@@ -31,6 +33,8 @@ export type PendingCreate = {
   position?: number | null;
   /** A sub-point (D-121): the point it hangs under; its position is among its siblings. */
   parentId?: string | null;
+  /** A drawing of a board point (D-141): kept on the phone with the line until it lands. */
+  sketch?: Json | null;
 };
 
 /** A board born on the phone (D-102): it must reach the server before its points do. */
@@ -51,6 +55,8 @@ export type NoteFields = {
   position?: number;
   /** A point moved under another one, or back to the top of its board (D-121). */
   parent_id?: string | null;
+  /** «Дорисовать» (D-141): the drawing as a whole, the last one wins like the text. */
+  sketch?: Json | null;
 };
 
 /** The fields of one note still owed to the server, merged — the latest value of each wins. */
@@ -183,12 +189,21 @@ export async function keepEdit(userId: string, id: string, fields: NoteFields): 
  * A write of these values landed: each field is settled only if it still holds the value
  * that was written — a newer edit of the same field stays owed.
  */
+/**
+ * A field written is the field owed: by value — a drawing (D-141) comes back from IndexedDB as
+ * a copy, never the same object.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  return typeof a === "object" && a !== null && typeof b === "object" && b !== null && JSON.stringify(a) === JSON.stringify(b);
+}
+
 export async function settleEdit(id: string, written: NoteFields): Promise<void> {
   const current = await run<PendingEdit | undefined>(EDITS, "readonly", (store) => store.get(id));
   if (!current.value) return;
   const rest: NoteFields = { ...current.value.fields };
   for (const key of Object.keys(written) as (keyof NoteFields)[]) {
-    if (rest[key] === written[key]) delete rest[key];
+    if (sameValue(rest[key], written[key])) delete rest[key];
   }
   const { ok } = Object.keys(rest).length === 0
     ? await run(EDITS, "readwrite", (store) => store.delete(id))

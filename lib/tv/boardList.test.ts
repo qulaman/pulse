@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvBoardItem, TvBoardLeaf } from "./board";
-import { balanceColumns, COLUMN_GAP, fillColumns, LIST_TIERS, listLayout, pageOfPoint, rowsAt, stackHeight, titleFit, type ListLayout } from "./boardList";
+import { balanceColumns, COLUMN_GAP, fillColumns, LIST_TIERS, listLayout, pageOfPoint, rowsAt, stackHeight, textTop, titleFit, type ListLayout } from "./boardList";
 
 // the list body under a one-line title on 16:9: 74 − 4.4 − 1.4 − 8 − 2.6
 const FRAME = { width: 163.6, height: 57.6 };
@@ -171,5 +171,26 @@ describe("titleFit", () => {
     const fit = titleFit(long, 163.6);
     expect(fit.size).toBeLessThan(7);
     expect(fit.lines).toBe(2);
+  });
+});
+
+describe("a drawing in the list (D-141)", () => {
+  const drawing = { v: 1 as const, strokes: [{ c: "text" as const, w: 1 as const, p: [0, 0, 100, 100] }] };
+
+  it("gives the point room for its picture under the words", () => {
+    const plain = rowsAt([point(1)], LIST_TIERS.xl, 160)[0];
+    const drawn = rowsAt([{ ...point(1), sketch: drawing }], LIST_TIERS.xl, 160)[0];
+    expect(plain.thumb).toBe(0);
+    expect(drawn.thumb).toBeGreaterThan(0);
+    const t = LIST_TIERS.xl;
+    expect(drawn.height).toBeCloseTo(t.padY * 2 + Math.max(t.badge, textTop(t) + t.lh + t.subTop + drawn.thumb), 5);
+    expect(drawn.height).toBeGreaterThan(plain.height);
+  });
+
+  it("names a drawing without words, and still fits the wall", () => {
+    const items = [{ ...point(1, 0, ""), sketch: drawing }, ...points(5).slice(1)];
+    const layout = listLayout(items, FRAME);
+    assertSound(layout, items);
+    expect(rowsAt(items, layout.tier, layout.columnWidth)[0].lines).toBe(1);
   });
 });

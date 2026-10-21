@@ -2,7 +2,7 @@
 
 import { AnimatePresence, Reorder } from "framer-motion";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { Dot, NoteEditor, Original, SaveReceipt } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { glimpse, lineState, type LineState } from "@/lib/mindboard/branch";
 import { handedLabel } from "@/lib/mindboard/handed";
+import { sketchFrom } from "@/lib/mindboard/sketch";
 import type { Wait } from "@/lib/mindboard/offline";
 import type { Branch } from "@/lib/mindboard/tree";
 import type { Dictation } from "@/lib/notes/dictation";
@@ -20,6 +21,7 @@ import type { Note } from "@/lib/notes/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
 import { DragRow, useReorder } from "./DragRow";
+import { SketchView } from "./SketchView";
 import { SubComposer } from "./SubComposer";
 import { STATE_WORDS, SubLine, SubPointRow, WaitMark } from "./SubPoint";
 
@@ -88,6 +90,8 @@ export type PointHandlers = {
   aimAfter: () => void;
   /** «На другую доску» (D-140): the point leaves with its branch; absent while it is only on the phone. */
   move?: () => void;
+  /** «Дорисовать» (D-141): the pad over the screen with this point's drawing. */
+  sketch: () => void;
   /** A sub-point dropped between its siblings (D-121): one row written, its new place. */
   place: (sub: Note, position: number) => void;
   /** The screen's microphone is about to open for a sub-point of this point. */
@@ -151,6 +155,8 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
   const done = point.done_at !== null;
   const handed = point.converted_task_id !== null;
   const empty = !point.text.trim();
+  // a drawing of the point (D-141): small on the closed card, large and «Дорисовать» on the open one
+  const drawn = useMemo(() => sketchFrom(point.sketch), [point.sketch]);
   const head = firstLine(point.text);
   const rest = restLines(point.text);
   const raw = point.raw_transcript?.trim() ?? "";
@@ -160,9 +166,18 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
     state === "words" ? (
       <>
         <span className={`line-clamp-2 font-display text-[16px] font-semibold leading-[21px] tracking-[-0.01em] ${done ? "text-text/55" : ""}`}>
-          {head || "Без текста"}
+          {head || (drawn ? "Рисунок" : "Без текста")}
         </span>
         {rest && !open ? <span className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-[19px] text-muted">{rest}</span> : null}
+        {drawn && !open ? (
+          <span
+            className="mt-2 block w-[208px] max-w-full overflow-hidden rounded-[10px] bg-surface-2/60"
+            style={{ aspectRatio: "16 / 9", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)" }}
+            data-testid="point-sketch-thumb"
+          >
+            <SketchView sketch={drawn} label={head || "Рисунок"} />
+          </span>
+        ) : null}
       </>
     ) : state === "deaf" ? (
       <span className="block">
@@ -273,12 +288,30 @@ export function PointCard({ branch, n, demoteLabel, now, open, openSub, lit, han
               <SaveReceipt id={point.id} dirty={dirty} saved={saved} />
             </div>
 
+            {drawn ? (
+              <button
+                type="button"
+                onClick={on.sketch}
+                aria-label="Дорисовать рисунок"
+                data-testid="point-sketch"
+                className="relative mt-2 block w-full overflow-hidden rounded-[14px] bg-surface-2/60 transition-transform duration-[120ms] active:scale-[0.99]"
+                style={{ aspectRatio: "16 / 9", boxShadow: "inset 0 0 0 1px color-mix(in srgb, var(--border) 80%, transparent)" }}
+              >
+                <SketchView sketch={drawn} label={head || "Рисунок"} />
+                <span className="absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-full bg-bg/80 px-2.5 py-1 text-[13px] font-semibold text-accent">
+                  <NoteIcon name="pencil" size={13} />
+                  Дорисовать
+                </span>
+              </button>
+            ) : null}
+
             <div className="mt-2">
               <NoteEditor
                 // born again when STT brings the words (raw_transcript), never while the director types
                 key={`${point.id}:${point.raw_transcript ?? ""}`}
                 text={point.text}
-                label="Текст пункта"
+                label={drawn ? "Подпись к рисунку" : "Текст пункта"}
+                placeholder={drawn ? "Подпись к рисунку — по желанию" : undefined}
                 onDirty={setDirty}
                 onChangeText={(text) => {
                   setSaved(true);

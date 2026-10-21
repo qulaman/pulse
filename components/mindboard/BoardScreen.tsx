@@ -15,6 +15,7 @@ import { haptic } from "@/lib/haptics";
 import { demotedPlace, numbersOf, promotedPlace } from "@/lib/mindboard/branch";
 import { boardSummary, boardText, cleanTitle, openPoints } from "@/lib/mindboard/list";
 import { waitOf } from "@/lib/mindboard/offline";
+import { hasContent, isDrawn, pointLabel, sketchFrom, type Sketch } from "@/lib/mindboard/sketch";
 import type { SplitPoint } from "@/lib/mindboard/split";
 import { branchesOf } from "@/lib/mindboard/tree";
 import type { Dictation, Receipt } from "@/lib/notes/dictation";
@@ -33,6 +34,7 @@ import { openWords } from "./carry";
 import { DragRow, useReorder } from "./DragRow";
 import { HandOutBar } from "./HandOutBar";
 import { PointCard, type PointHandlers, type RowLook } from "./PointCard";
+import { SketchPad } from "./SketchPad";
 import { WallPreview } from "./WallPreview";
 
 const WORDS: RecorderWords = {
@@ -84,6 +86,8 @@ export type AimKey = string | null;
 export type BoardActions = {
   /** A point (parentId null) or a sub-point typed under a point: a new line at the end of its list. */
   write: (text: string, parentId: string | null) => void;
+  /** «Рисунок» (D-141): a drawing from the pad, a new point at the end of the board, its words optional. */
+  writeSketch: (sketch: Sketch, caption: string) => void;
   /**
    * Several lines at once (D-140): a list split into points with their sub-points — at the
    * bottom, right after a point (`after`), or as sub-points of a point (`parent`).
@@ -169,6 +173,8 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
   const [sending, setSending] = useState(false);
   // the one open sub-point, inside the one open point
   const [openSub, setOpenSub] = useState<{ point: string; sub: string } | null>(null);
+  // «Рисунок» (D-141): the pad over the screen — a new drawing (row null) or this point's
+  const [sketching, setSketching] = useState<{ row: Note | null } | null>(null);
 
   const branches = useMemo(() => branchesOf(rows), [rows]);
   const numbers = useMemo(() => numbersOf(branches), [branches]);
@@ -259,8 +265,9 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
 
   const handlersOf = (pointId: string): PointHandlers => {
     const point = rowById.get(pointId) as Note;
-    const demoteTo = phone.has(pointId) ? null : demotedPlace(rows, pointId, (above) => !phone.has(above));
-    const lightable = onWall && point.parent_id === null && point.text.trim() !== "" && !phone.has(pointId);
+    // a drawing stays a point: a sub-point has no room for its picture (D-141)
+    const demoteTo = phone.has(pointId) || isDrawn(point.sketch) ? null : demotedPlace(rows, pointId, (above) => !phone.has(above));
+    const lightable = onWall && point.parent_id === null && hasContent(point) && !phone.has(pointId);
     return {
       toggle: () => (handing ? pickFor(point) : accordion.toggle(pointId)),
       toggleSub: (subId) => {
@@ -280,6 +287,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
       writeAfter: (texts) => actions.writeMany(texts.map((text) => ({ text, children: [] })), { after: pointId }),
       aimAfter: () => actions.aim(`after:${pointId}`),
       move: phone.has(pointId) || point.parent_id !== null ? undefined : () => actions.move(point),
+      sketch: () => setSketching({ row: point }),
       place: (sub, position) => actions.edit(sub, { position }),
       aim: () => actions.aim(`sub:${pointId}`),
       demote: demoteTo
@@ -307,8 +315,23 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
 
   // the presenter steps through the points of the agenda that the wall shows
   const presenterPoints = branches
-    .filter((branch) => branch.point.parent_id === null && branch.point.text.trim() !== "")
-    .map((branch) => ({ id: branch.point.id, text: firstLine(branch.point.text), done: branch.point.done_at !== null }));
+    .filter((branch) => branch.point.parent_id === null && hasContent(branch.point))
+    .map((branch) => ({ id: branch.point.id, text: firstLine(pointLabel(branch.point.text, branch.point.sketch)), done: branch.point.done_at !== null }));
+
+  const saveSketch = (sketch: Sketch | null, caption: string) => {
+    const row = sketching?.row ?? null;
+    setSketching(null);
+    if (!row) {
+      if (sketch) actions.writeSketch(sketch, caption);
+      else if (caption) actions.write(caption, null);
+      return;
+    }
+    // the pad edits the first line; the rest of a point of several lines stays as it was
+    const [first = "", ...rest] = row.text.trim().split("\n");
+    const text = caption === first.trim() ? null : [caption, ...rest].join("\n").trim();
+    actions.edit(row, { sketch, ...(text === null ? {} : { text }) });
+    toast(sketch ? "Рисунок сохранён" : "Рисунок стёрт — пункт остался");
+  };
 
   const copyText = async () => {
     try {
@@ -454,6 +477,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
           writing={writing}
           onWrite={(text) => actions.write(text, null)}
           onSplit={(points) => actions.writeMany(points, {})}
+          onSketch={() => setSketching({ row: null })}
           onCapture={() => actions.aim(null)}
         />
       </div>
@@ -527,6 +551,16 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
       {sheets}
 
       <BoardMenu open={menu} onClose={() => setMenu(false)} title={board.title} items={menuItems} />
+
+      {sketching ? (
+        <SketchPad
+          initial={sketching.row ? sketchFrom(sketching.row.sketch) : null}
+          caption={sketching.row?.text.trim().split("\n")[0].trim() ?? ""}
+          editing={sketching.row !== null}
+          onClose={() => setSketching(null)}
+          onSave={saveSketch}
+        />
+      ) : null}
 
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="Удалить доску">
         <p className="text-[16px] leading-[22px] text-muted">

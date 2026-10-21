@@ -1,5 +1,6 @@
 import { splitBoards } from "@/lib/mindboard/list";
 import type { MindBoard } from "@/lib/mindboard/queries";
+import { hasContent, pointLabel } from "@/lib/mindboard/sketch";
 import { branchesOf } from "@/lib/mindboard/tree";
 import type { Note } from "@/lib/notes/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -29,8 +30,9 @@ export function presenterPoints(notes: readonly Note[], boardId: string): Presen
   const rows = notes.filter((note) => note.board_id === boardId && note.deleted_at === null);
   return branchesOf(rows)
     .map((branch) => branch.point)
-    .filter((point) => point.parent_id === null && words(point.text) !== "")
-    .map((point) => ({ id: point.id, text: words(point.text), done: point.done_at !== null }));
+    .filter((point) => point.parent_id === null && hasContent(point))
+    // a drawing without words steps as «Рисунок» (D-141)
+    .map((point) => ({ id: point.id, text: words(pointLabel(point.text, point.sketch)), done: point.done_at !== null }));
 }
 
 /**
@@ -122,7 +124,7 @@ export type BoardCount = { total: number; done: number };
 export function boardCounts(notes: readonly Note[]): Map<string, BoardCount> {
   const counts = new Map<string, BoardCount>();
   for (const note of notes) {
-    if (note.board_id === null || note.deleted_at !== null || note.parent_id !== null || words(note.text) === "") continue;
+    if (note.board_id === null || note.deleted_at !== null || note.parent_id !== null || !hasContent(note)) continue;
     const count = counts.get(note.board_id) ?? { total: 0, done: 0 };
     count.total += 1;
     if (note.done_at) count.done += 1;

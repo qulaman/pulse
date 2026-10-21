@@ -20,6 +20,7 @@ function row(overrides: Partial<Note> = {}): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: null,
     parent_id: null,
     board_id: "b-1",
     position: 1,
@@ -75,5 +76,16 @@ describe("wallNote", () => {
     expect(wallNote({ view: "map", items: items(12) })).toBeNull();
     expect(wallNote({ view: "list", items: items(30) })).toBeNull();
     expect(wallNote({ view: "list", items: [] })).toMatch(/Пока пусто/);
+  });
+});
+
+describe("a drawing on the wall (D-141)", () => {
+  it("is a point even without words, and carries its drawing", () => {
+    const sketch = { v: 1, strokes: [{ c: "accent", w: 2, p: [10, 10, 200, 200] }] };
+    const board = wallBoardOf(BOARD, [row({ id: "p1", text: "Склад", position: 1 }), row({ id: "p2", text: "", position: 2, sketch })], { view: "list", focus: "p2" }, () => null);
+    expect(board.items.map((item) => item.id)).toEqual(["p1", "p2"]);
+    expect(board.items[1].sketch?.strokes[0].c).toBe("accent");
+    expect(board.items[0].sketch).toBeNull();
+    expect(board.focus).toBe("p2");
   });
 });

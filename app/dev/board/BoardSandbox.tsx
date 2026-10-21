@@ -235,6 +235,7 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
       deleted_at: null,
       remind_at: null,
       reminded_at: null,
+      sketch: null,
       client_request_id: id,
       created_at: at,
       updated_at: at,
@@ -285,6 +286,11 @@ export function BoardSandbox({ which }: { which: BoardCase }) {
     rename: setTitle,
     deleteBoard: () => toast("Доска в корзине — в песочнице она остаётся"),
     aim,
+    writeSketch: (sketch, caption) => {
+      const id = add(caption, null, false);
+      edit(id, { sketch });
+      show({ tone: "ok", eyebrow: "Записал", headline: caption || "Рисунок", line: "Рисунок на доске" });
+    },
     writeMany: (points, at) => {
       if (at.parent) {
         for (const text of points.flatMap((point) => [point.text, ...point.children]).filter((line) => line.trim())) add(text, at.parent, false);

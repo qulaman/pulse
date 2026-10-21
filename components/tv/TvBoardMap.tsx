@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { memo, useMemo } from "react";
 
+import { mapText, wallText } from "@/lib/tv/board";
 import type { MapBranch, MapLayout, MapLeaf } from "@/lib/tv/boardMap";
 
 import { Badge, clampStyle, DIM, DONE_TEXT, EASE, FreshGlow, LitPlate, vh } from "./TvBoardParts";
@@ -192,7 +193,7 @@ const Branch = memo(function Branch({ branch, layout, lit, dim, fresh, still }: 
           className="relative min-w-0 flex-1 font-semibold tracking-[-0.015em] [overflow-wrap:anywhere] [text-wrap:pretty]"
           style={{ fontSize: vh(tier.size), lineHeight: vh(tier.lh), ...clampStyle(branch.lines), opacity: item.done ? DONE_TEXT + 0.1 : 1 }}
         >
-          {item.text}
+          {mapText(item)}
           {branch.tag ? (
             <span className="font-semibold" style={{ color: "var(--accent)" }}>
               {" "}
@@ -252,7 +253,7 @@ const Leaf = memo(function Leaf({
           color: leaf.leaf ? "color-mix(in srgb, var(--text) 86%, var(--text-muted))" : undefined,
         }}
       >
-        {leaf.leaf ? leaf.leaf.text : `+ ещё ${leaf.more}`}
+        {leaf.leaf ? wallText(leaf.leaf) : `+ ещё ${leaf.more}`}
         {leaf.tag ? (
           <span className="font-semibold" style={{ color: "var(--accent)" }}>
             {" "}

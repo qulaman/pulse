@@ -3,6 +3,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import type { TvState } from "@/lib/tv/queries";
 
 import type { MindBoard } from "./queries";
+import { hasContent, pointLabel } from "./sketch";
 
 /**
  * Pure arithmetic of the boards (D-102): which points a board holds and in what order,
@@ -163,7 +164,7 @@ export function openPoints(rows: readonly Note[]): Note[] {
   const ids = new Set(rows.map((row) => row.id));
   return rows
     .filter((row) => (row.parent_id === null || !ids.has(row.parent_id)) && row.deleted_at === null)
-    .filter((row) => row.text.trim() !== "" && row.done_at === null && row.converted_task_id === null)
+    .filter((row) => hasContent(row) && row.done_at === null && row.converted_task_id === null)
     .sort(byPlace);
 }
 
@@ -171,10 +172,10 @@ export function openPoints(rows: readonly Note[]): Note[] {
 export function previewOf(rows: readonly Note[], count = 2): string[] {
   const ids = new Set(rows.map((row) => row.id));
   return rows
-    .filter((row) => (row.parent_id === null || !ids.has(row.parent_id)) && row.deleted_at === null && row.text.trim() !== "")
+    .filter((row) => (row.parent_id === null || !ids.has(row.parent_id)) && row.deleted_at === null && hasContent(row))
     .sort(byPlace)
     .slice(0, count)
-    .map((row) => row.text.trim().split("\n")[0].trim());
+    .map((row) => pointLabel(row.text, row.sketch).split("\n")[0].trim());
 }
 
 /**
@@ -183,15 +184,17 @@ export function previewOf(rows: readonly Note[], count = 2): string[] {
  */
 export function boardText(title: string, rows: readonly Note[]): string {
   const ids = new Set(rows.map((row) => row.id));
-  const live = rows.filter((row) => row.deleted_at === null && row.text.trim() !== "");
+  const live = rows.filter((row) => row.deleted_at === null && hasContent(row));
   const top = live.filter((row) => row.parent_id === null || !ids.has(row.parent_id)).sort(byPlace);
   const lines = [title.trim(), ""];
   top.forEach((point, index) => {
-    const [head, ...rest] = point.text.trim().split("\n");
-    lines.push(`${index + 1}. ${point.done_at ? "✓ " : ""}${head.trim()}`);
+    const [head, ...rest] = pointLabel(point.text, point.sketch).split("\n");
+    // a drawing does not travel as text: the line says there is one
+    const drawn = point.sketch && point.text.trim() ? " (рисунок)" : "";
+    lines.push(`${index + 1}. ${point.done_at ? "✓ " : ""}${head.trim()}${drawn}`);
     for (const more of rest) if (more.trim()) lines.push(`   ${more.trim()}`);
     for (const sub of live.filter((row) => row.parent_id === point.id).sort(byPlace)) {
-      lines.push(`   – ${sub.done_at ? "✓ " : ""}${sub.text.trim().replace(/\s*\n\s*/g, " ")}`);
+      lines.push(`   – ${sub.done_at ? "✓ " : ""}${pointLabel(sub.text, sub.sketch).replace(/\s*\n\s*/g, " ")}`);
     }
   });
   return lines.join("\n").trim();

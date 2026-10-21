@@ -6,7 +6,23 @@ import type { TvState } from "@/lib/tv/queries";
  * without a login or the shared database. Times are relative to the moment the sandbox opens.
  */
 
-export const BOARD_CASES = ["empty", "few", "branches", "many", "long", "offline", "waits", "onwall", "recording"] as const;
+export const BOARD_CASES = ["empty", "few", "branches", "many", "long", "offline", "waits", "onwall", "recording", "sketch"] as const;
+
+/**
+ * A scheme of a warehouse drawn with a finger (D-141): walls, a gate, an arrow, a marked corner —
+ * on the 1600×900 grid of `lib/mindboard/sketch.ts`.
+ */
+export const SKETCH_FIXTURE = {
+  v: 1,
+  strokes: [
+    { c: "text", w: 1, p: [220, 160, 1380, 160, 1380, 760, 220, 760, 220, 160] },
+    { c: "text", w: 1, p: [700, 160, 700, 520] },
+    { c: "accent", w: 2, p: [260, 820, 520, 820, 700, 780] },
+    { c: "accent", w: 1, p: [640, 740, 700, 780, 650, 830] },
+    { c: "warn", w: 2, p: [1000, 300, 1260, 300, 1260, 640, 1000, 640, 1000, 300] },
+    { c: "text", w: 1, p: [380, 300, 520, 300, 520, 420, 380, 420, 380, 300] },
+  ],
+};
 export type BoardCase = (typeof BOARD_CASES)[number];
 
 export const COMPANY = "company";
@@ -51,6 +67,7 @@ function note(base: number, id: string, text: string, position: number, extra: P
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: null,
     client_request_id: `crid-${id}`,
     created_at: created,
     updated_at: created,
@@ -148,6 +165,18 @@ export function buildBoard(which: BoardCase, now: Date): BoardFixture {
         ],
         hearing: ["p6"],
         wall: which === "onwall" ? { onWall: true, spot: "p2" } : none.wall,
+      };
+    case "sketch":
+      return {
+        ...none,
+        title: "Новый склад",
+        rows: [
+          note(base, "p1", "Аренда до конца года", 1),
+          note(base, "p2", "", 2, { sketch: SKETCH_FIXTURE }),
+          note(base, "p3", "Ворота — с южной стороны", 3, { sketch: SKETCH_FIXTURE }),
+          note(base, "p4", "Охрана с 1 ноября", 4),
+        ],
+        wall: { onWall: true, spot: "p2" },
       };
     case "many":
       return {

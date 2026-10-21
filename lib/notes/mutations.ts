@@ -21,6 +21,8 @@ import {
   settleEdit,
   type NoteFields,
 } from "./pending";
+import type { Json } from "@/lib/supabase/types";
+
 import { noteKeys, type Note } from "./queries";
 
 /**
@@ -54,6 +56,8 @@ type NewNote = {
   position?: number | null;
   /** A sub-point of a board (D-121). */
   parent_id?: string | null;
+  /** A drawing of a board point (D-141, `lib/mindboard/sketch.ts`). */
+  sketch?: Json | null;
 };
 
 /**
@@ -237,6 +241,7 @@ export function useCreateNote(me: Me | undefined) {
         boardId: row.board_id ?? null,
         position: row.position ?? null,
         parentId: row.parent_id ?? null,
+        sketch: row.sketch ?? null,
       });
       await queryClient.cancelQueries({ queryKey: keyOf(me.userId) });
       upsertCached(queryClient, me.userId, {
@@ -256,6 +261,7 @@ export function useCreateNote(me: Me | undefined) {
         deleted_at: null,
         remind_at: null,
         reminded_at: null,
+        sketch: null,
         created_at: now,
         updated_at: now,
         ...row,

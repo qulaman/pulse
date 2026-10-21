@@ -1,3 +1,4 @@
+import { pointLabel, sketchFrom, type Sketch } from "@/lib/mindboard/sketch";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import type { BoardView } from "./state";
@@ -19,6 +20,8 @@ export type TvBoardLeaf = {
   assignee: string | null;
   /** Поручение сдано и принято. */
   handed_done: boolean;
+  /** A drawing of the point (D-141); null — none (a base older than the client sends none). */
+  sketch?: Sketch | null;
 };
 
 /** Пункт на стене и его подпункты по порядку (D-121: один уровень). */
@@ -57,6 +60,7 @@ export function boardFrom(data: unknown): TvBoard {
     created_at: row.created_at ?? new Date(0).toISOString(),
     assignee: row.assignee ?? null,
     handed_done: row.handed_done === true,
+    sketch: sketchFrom(row.sketch),
   });
   const items = (Array.isArray(raw.items) ? raw.items : []).map((row) => ({
     ...leaf(row),
@@ -75,6 +79,21 @@ export function boardFrom(data: unknown): TvBoard {
       items,
     },
   };
+}
+
+/** What the wall writes for a point: its words, or «Рисунок» for a drawing without them (D-141). */
+export function wallText(item: Pick<TvBoardLeaf, "text" | "sketch">): string {
+  return pointLabel(item.text, item.sketch);
+}
+
+/**
+ * On the map a drawing says it is one — the map has no room for the picture itself; the
+ * presenter opens it over the whole wall. A word, not a glyph: the wall's font has no pen and
+ * the TV draws an emoji in its place.
+ */
+export function mapText(item: Pick<TvBoardLeaf, "text" | "sketch">): string {
+  if (!item.sketch) return item.text;
+  return item.text.trim() ? `${item.text.trim()} · рисунок` : "Рисунок";
 }
 
 /** Страница стоит на стене 20 секунд. */

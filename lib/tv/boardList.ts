@@ -1,4 +1,4 @@
-import { tagOf, type TvBoardItem, type TvBoardLeaf } from "./board";
+import { tagOf, wallText, type TvBoardItem, type TvBoardLeaf } from "./board";
 import { textLines } from "./boardText";
 
 /**
@@ -55,6 +55,13 @@ export const LIST_TIERS: Record<ListTier["key"], ListTier> = {
 /** Промежуток между двумя колонками. */
 export const COLUMN_GAP = 5;
 
+/**
+ * The picture of a point with a drawing (D-141), under its words: tall enough to make out a
+ * scheme from the door, small enough for the list — the whole drawing opens when the presenter
+ * lights the point. Its height in vh by the size of the list; the width is 16:9 of it.
+ */
+export const THUMB_H: Record<ListTier["key"], number> = { xl: 20, l: 17, m: 14, s: 11, xs: 9.5 };
+
 /** Какие раскладки пробовать, от лучшей: одна колонка крупно, потом две, мельчая. */
 const CANDIDATES: readonly (readonly [1 | 2, ListTier["key"]])[] = [
   [1, "xl"],
@@ -83,6 +90,8 @@ export type ListRow = {
   children: ListLeaf[];
   /** Подпунктов не влезло — «+ ещё 3». */
   more: number;
+  /** The picture of the drawing under the words, vh; 0 — no drawing (D-141). */
+  thumb: number;
   height: number;
 };
 
@@ -108,12 +117,12 @@ export function textWidths(tier: ListTier, width: number): { point: number; leaf
 /** Текст подпункта с его пометкой — они в одной строке. */
 function leafText(leaf: TvBoardLeaf): string {
   const tag = tagOf(leaf);
-  return tag ? `${leaf.text} ${tag}` : leaf.text;
+  return tag ? `${wallText(leaf)} ${tag}` : wallText(leaf);
 }
 
 /** Высота ветки, если показать `shown` подпунктов из `children`. */
-function rowHeight(tier: ListTier, lines: number, tag: string | null, children: readonly ListLeaf[], more: number): number {
-  const text = textTop(tier) + lines * tier.lh + (tag ? tier.tagTop + tier.tagLh : 0);
+function rowHeight(tier: ListTier, lines: number, tag: string | null, children: readonly ListLeaf[], more: number, thumb = 0): number {
+  const text = textTop(tier) + lines * tier.lh + (tag ? tier.tagTop + tier.tagLh : 0) + (thumb > 0 ? tier.subTop + thumb : 0);
   let height = tier.padY * 2 + Math.max(tier.badge, text);
   const rows = children.length + (more > 0 ? 1 : 0);
   if (rows > 0) {
@@ -131,15 +140,17 @@ export function rowsAt(items: readonly TvBoardItem[], tier: ListTier, width: num
   const widths = textWidths(tier, width);
   return items.map((item, index) => {
     const tag = tagOf(item);
-    const lines = textLines(item.text, widths.point, tier.size, tier.lines, "point").lines;
+    const lines = textLines(wallText(item), widths.point, tier.size, tier.lines, "point").lines;
+    // a drawing never runs wider than the words' room
+    const thumb = item.sketch ? Math.min(THUMB_H[tier.key], (widths.point * 9) / 16) : 0;
     const all = item.children.map((leaf) => ({ leaf, lines: textLines(leafText(leaf), widths.leaf, tier.sub, tier.subLines, "leaf").lines, tag: tagOf(leaf) }));
     let shown = all.length;
-    let height = rowHeight(tier, lines, tag, all, 0);
+    let height = rowHeight(tier, lines, tag, all, 0, thumb);
     while (height > cap && shown > 0) {
       shown -= 1;
-      height = rowHeight(tier, lines, tag, all.slice(0, shown), all.length - shown);
+      height = rowHeight(tier, lines, tag, all.slice(0, shown), all.length - shown, thumb);
     }
-    return { item, n: index + 1, lines, tag, children: all.slice(0, shown), more: all.length - shown, height };
+    return { item, n: index + 1, lines, tag, children: all.slice(0, shown), more: all.length - shown, thumb, height };
   });
 }
 

@@ -803,6 +803,7 @@ export type Database = {
           raw_transcript: string | null
           remind_at: string | null
           reminded_at: string | null
+          sketch: Json | null
           text: string
           updated_at: string
           user_id: string
@@ -826,6 +827,7 @@ export type Database = {
           raw_transcript?: string | null
           remind_at?: string | null
           reminded_at?: string | null
+          sketch?: Json | null
           text: string
           updated_at?: string
           user_id: string
@@ -849,6 +851,7 @@ export type Database = {
           raw_transcript?: string | null
           remind_at?: string | null
           reminded_at?: string | null
+          sketch?: Json | null
           text?: string
           updated_at?: string
           user_id?: string

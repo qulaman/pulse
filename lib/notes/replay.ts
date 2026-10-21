@@ -78,6 +78,7 @@ export async function deliverCreate(me: Me, entry: PendingCreate): Promise<Note>
     board_id: entry.boardId ?? null,
     position: entry.position ?? null,
     parent_id: entry.parentId ?? null,
+    sketch: entry.sketch ?? null,
   });
   await dropCreate(entry.id);
   return note;

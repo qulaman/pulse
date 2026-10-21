@@ -316,6 +316,20 @@ export default function BoardPage() {
       haptic(10);
       if (parentId === null) show({ tone: "ok", eyebrow: "Записал", headline: firstLine(text), line: "Новый пункт на доске" });
     },
+    // a drawing is a point like any other (D-141): it waits on the phone without network and lands once
+    writeSketch: (sketch, caption) => {
+      create.mutate({
+        id: crypto.randomUUID(),
+        text: caption,
+        client_request_id: crypto.randomUUID(),
+        board_id: board.id,
+        position: nextPlace(null),
+        parent_id: null,
+        sketch,
+      });
+      haptic(10);
+      show({ tone: "ok", eyebrow: "Записал", headline: caption || "Рисунок", line: onWall ? "Рисунок на доске — и на стене" : "Рисунок на доске" });
+    },
     writeMany: (points: SplitPoint[], at) => {
       // a pasted list under one point: every line of it is a sub-point there
       if (at.parent) {

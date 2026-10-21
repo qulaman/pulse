@@ -33,6 +33,7 @@ function note(overrides: Partial<Note> = {}): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: null,
     parent_id: null,
     board_id: null,
     position: null,

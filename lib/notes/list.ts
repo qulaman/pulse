@@ -21,6 +21,7 @@ export function phoneRow(entry: PendingCreate): Note {
     deleted_at: null,
     remind_at: null,
     reminded_at: null,
+    sketch: entry.sketch ?? null,
     board_id: entry.boardId ?? null,
     position: entry.position ?? null,
     parent_id: entry.parentId ?? null,

@@ -2,6 +2,7 @@ import type { Note } from "@/lib/notes/queries";
 
 import { positionBetween } from "./list";
 import type { Wait } from "./offline";
+import { hasContent } from "./sketch";
 import { branchesOf, nextPlaceIn, type Branch } from "./tree";
 
 /**
@@ -18,9 +19,10 @@ type Placed = Pick<Note, "id" | "parent_id" | "position" | "created_at">;
  * in the order of the board. A point still without words (being heard, or not heard) has no
  * number yet — the wall does not show it, and «пункт 3» must mean the same line on both.
  */
-export function numbersOf<T extends Pick<Note, "id" | "parent_id" | "text">>(branches: readonly Branch<T>[]): Map<string, number> {
+export function numbersOf<T extends Pick<Note, "id" | "parent_id" | "text"> & { sketch?: unknown }>(branches: readonly Branch<T>[]): Map<string, number> {
   const numbers = new Map<string, number>();
-  for (const { point } of branches) if (point.text.trim()) numbers.set(point.id, numbers.size + 1);
+  // a drawing without words is a point too (D-141)
+  for (const { point } of branches) if (hasContent(point)) numbers.set(point.id, numbers.size + 1);
   return numbers;
 }
 
