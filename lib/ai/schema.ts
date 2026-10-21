@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { TimeRefSchema } from "./timeref";
+
 /**
  * Single source of truth for the parser output contract (docs/AI.md §3).
  * TS types are inferred from the zod schemas and ENTITIES_JSON_SCHEMA is generated
@@ -34,19 +36,34 @@ export const AnnouncementEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
+/**
+ * Times the model names symbolically (TimeRef, lib/ai/timeref.ts); the ISO fields of the app
+ * form below are computed from them by code — the model does no date arithmetic (task 026).
+ */
 const ModelTaskEntitySchema = z.strictObject({
   kind: z.literal("task"),
   ...assigneeFields,
   group_id: z.string().nullable(), // same for copies born from one multi-assignee phrase
   title: z.string(),
   body: z.string().nullable(),
+  deadline: TimeRefSchema.nullable(),
+  priority: PrioritySchema,
+  scheduled_send: TimeRefSchema.nullable(), // only on explicit "отправь утром/в понедельник"
+  source_span: z.string(),
+});
+
+const taskFields = {
+  ...assigneeFields,
+  group_id: z.string().nullable(),
+  title: z.string(),
+  body: z.string().nullable(),
   deadline_iso: z.string().nullable(), // ISO 8601, explicit +05:00; server converts to UTC
   deadline_confidence: z.number().nullable(),
   deadline_source_text: z.string().nullable(), // e.g. "завтра до обеда" — chip on /confirm
   priority: PrioritySchema,
-  scheduled_send_at: z.string().nullable(), // only on explicit "отправь утром/в понедельник"
+  scheduled_send_at: z.string().nullable(),
   source_span: z.string(),
-});
+};
 
 const ModelPointsEntitySchema = z.strictObject({
   kind: z.literal("points"),
@@ -82,11 +99,16 @@ const ModelEventEntitySchema = z.strictObject({
   kind: z.literal("event"),
   title: z.string(), // «Планёрка», «Встреча с Альфой» — без даты и имён
   location: z.string(), // «в офисе», «у Альфы»; "" — не сказано
-  starts_at_iso: z.string().nullable(), // ISO 8601, explicit +05:00; null — времени нет вовсе
-  time_confidence: z.number(), // 0 — времени нет; < 0.8 — жёлтый чип, дата без времени = 0.5
-  time_source_text: z.string(), // «в пятницу», «завтра в десять»; "" — не сказано
+  starts_at: TimeRefSchema.nullable(), // null — ни даты, ни времени
   participant_names: z.array(z.string()), // roster full_name copied verbatim (D-56)
   everyone: z.boolean(), // «всем», «вся команда»
+  source_span: z.string(),
+});
+
+const ModelReminderEntitySchema = z.strictObject({
+  kind: z.literal("reminder"),
+  text: z.string(),
+  remind_at: TimeRefSchema.nullable(),
   source_span: z.string(),
 });
 
@@ -134,7 +156,7 @@ export const EventEntitySchema = z.strictObject({
   source_span: z.string(),
 });
 
-export const TaskEntitySchema = ModelTaskEntitySchema.extend(assigneeId);
+export const TaskEntitySchema = z.strictObject({ kind: z.literal("task"), ...taskFields, ...assigneeId });
 export const PointsEntitySchema = ModelPointsEntitySchema.extend(assigneeId);
 export const RecurrenceEntitySchema = ModelRecurrenceEntitySchema.extend(assigneeId);
 export const DelegationEntitySchema = ModelDelegationEntitySchema.extend(assigneeId);
@@ -174,7 +196,7 @@ export const ModelEntitySchema = z.discriminatedUnion("kind", [
   AnnouncementEntitySchema,
   ModelTaskEntitySchema,
   ModelPointsEntitySchema,
-  ReminderEntitySchema,
+  ModelReminderEntitySchema,
   NoteEntitySchema,
   ModelEventEntitySchema,
   ModelRecurrenceEntitySchema,
@@ -182,29 +204,7 @@ export const ModelEntitySchema = z.discriminatedUnion("kind", [
 ]);
 export const ModelParseResultSchema = z.strictObject({ entities: z.array(ModelEntitySchema) });
 export type ModelEntity = z.infer<typeof ModelEntitySchema>;
-
-/** A model entity becomes an app entity once the server owns the id (null until matched). */
-export function withAssigneeId(entity: ModelEntity): Entity {
-  if ("assignee_name" in entity) return { ...entity, assignee_id: null };
-  // an event carries a list of people, not one assignee — the ids are filled the same way,
-  // and the model's "" / 0 become the nulls the card and the RPC speak in
-  if ("participant_names" in entity) {
-    return {
-      ...entity,
-      body: null, // the agenda is typed on the card, never guessed
-      location: blank(entity.location),
-      ends_at_iso: null,
-      time_source_text: blank(entity.time_source_text),
-      time_confidence: entity.time_confidence > 0 ? entity.time_confidence : null,
-      remind_before_min: null, // default 30 in the DB; the director changes it on the card
-      participant_queries: entity.participant_names,
-      participant_ids: [],
-    };
-  }
-  return entity;
-}
-
-const blank = (value: string): string | null => (value.trim() === "" ? null : value);
+export type ModelParseResult = z.infer<typeof ModelParseResultSchema>;
 
 export type AnnouncementEntity = z.infer<typeof AnnouncementEntitySchema>;
 export type TaskEntity = z.infer<typeof TaskEntitySchema>;
@@ -227,6 +227,9 @@ type JsonSchemaNode = Record<string, unknown>;
  * (confirmed on the prototype). This schema — not the SDK's zodOutputFormat() — is what
  * goes to the API: the SDK helper turns z.literal("task") into a plain string, the model
  * then mixes fields of different kinds (live failure r-024, 2026-09-07).
+ *
+ * A nullable enum is written as one `enum` that lists null among its values — no anyOf: the
+ * API caps union parameters at 16, and TimeRef alone has three nullable enums (task 026).
  */
 function harden(node: unknown): unknown {
   if (Array.isArray(node)) return node.map(harden);
@@ -255,6 +258,13 @@ function harden(node: unknown): unknown {
     return { anyOf: [...variants, { type: "null" }] };
   }
 
+  if (Array.isArray(out.anyOf) && out.anyOf.length === 2) {
+    const [value, empty] = out.anyOf as JsonSchemaNode[];
+    if (empty.type === "null" && Object.keys(empty).length === 1 && Array.isArray(value.enum)) {
+      return { enum: [...value.enum, null] };
+    }
+  }
+
   if (out.type === "object" && out.properties && typeof out.properties === "object") {
     out.additionalProperties = false;
     out.required = Object.keys(out.properties as JsonSchemaNode);
@@ -271,4 +281,14 @@ function hardenMap(value: unknown): unknown {
   return out;
 }
 
-export const ENTITIES_JSON_SCHEMA = harden(z.toJSONSchema(ModelParseResultSchema)) as JsonSchemaNode;
+// TimeRef appears four times (deadline, scheduled_send, starts_at, remind_at): one $defs entry
+// referenced by $ref keeps the grammar the API compiles to a single copy of it.
+const SHARED_DEFS = z.registry<{ id: string }>();
+SHARED_DEFS.add(TimeRefSchema, { id: "TimeRef" });
+
+/** The JSON Schema the API (and JSON mode, in the prompt) gets for a model-side zod schema. */
+export function modelJsonSchema(schema: z.ZodType): JsonSchemaNode {
+  return harden(z.toJSONSchema(schema, { metadata: SHARED_DEFS })) as JsonSchemaNode;
+}
+
+export const ENTITIES_JSON_SCHEMA = modelJsonSchema(ModelParseResultSchema);

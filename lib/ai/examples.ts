@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 
-import type { ParseResult } from "./schema";
+import type { ModelParseResult } from "./schema";
+import type { TimeRef } from "./timeref";
 
 /**
  * Few-shot pairs П1–П12 (docs/AI.md §4), mapped onto the single demo roster
@@ -10,8 +11,16 @@ import type { ParseResult } from "./schema";
  * Nothing here may vary between requests — these messages are cached.
  * The examples teach the FORMAT, not a client's world: counterparties are the neutral
  * «Альфа», never a real partner of client №1 (code is client-agnostic, V-02).
+ * Answers are in the model's form: names, not ids (D-56), times as TimeRefs — what was said,
+ * nothing computed (task 026).
  */
-export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
+
+/** A TimeRef as the model writes it: the words and what they name, no arithmetic. */
+function ref(text: string, said: Partial<Omit<TimeRef, "text" | "confidence">>, confidence = 0.95): TimeRef {
+  return { text, day: null, weekday: null, date: null, time: null, part: null, ...said, confidence };
+}
+
+export const FEW_SHOT: { user: string; assistant: ModelParseResult }[] = [
   // П1. Одиночная задача, явный дедлайн.
   {
     user: "Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам",
@@ -20,17 +29,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Марат"],
-          assignee_id: null,
           assignee_name: "Марат Оспанов",
           assignee_confidence: 0.98,
           group_id: null,
           title: "Подготовить КП по Альфе",
           body: null,
-          deadline_iso: "2026-08-14T15:00:00+05:00",
-          deadline_confidence: 0.95,
-          deadline_source_text: "к пятнице к трём часам",
+          deadline: ref("к пятнице к трём часам", { day: "weekday", weekday: 5, time: "15:00" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span:
             "Марат, подготовь коммерческое предложение по Альфе к пятнице к трём часам",
         },
@@ -49,55 +55,41 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "event",
           title: "Общее собрание",
-          body: "Не опаздывать",
           location: "в офисе",
-          starts_at_iso: "2026-08-14T10:00:00+05:00",
-          ends_at_iso: null,
-          time_confidence: 0.95,
-          time_source_text: "завтра в десять",
-          participant_queries: [],
+          starts_at: ref("завтра в десять", { day: "tomorrow", time: "10:00" }),
           participant_names: [],
-          participant_ids: [],
           everyone: true,
-          remind_before_min: null,
           source_span: "всем: завтра в десять общее собрание в офисе, не опаздывать",
         },
         {
           kind: "task",
           assignee_queries: ["Айгуль"],
-          assignee_id: null,
           assignee_name: "Айгуль Сапарова",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Подготовить акт сверки по Альфе",
           body: null,
-          deadline_iso: "2026-08-14T13:00:00+05:00",
-          deadline_confidence: 0.7,
-          deadline_source_text: "завтра до обеда",
+          deadline: ref("завтра до обеда", { day: "tomorrow", part: "before_lunch" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Айгуль, подготовь акт сверки по Альфе завтра до обеда",
         },
         {
           kind: "task",
           assignee_queries: ["Сакен"],
-          assignee_id: null,
           assignee_name: "Сәкен Жумабаев",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Закрыть наряды по третьему объекту",
           body: null,
-          deadline_iso: "2026-08-13T18:00:00+05:00",
-          deadline_confidence: 0.7,
-          deadline_source_text: "сегодня до вечера",
+          deadline: ref("сегодня до вечера", { day: "today", part: "evening" }),
           priority: "high",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Сакен, срочно закрой наряды по третьему объекту сегодня до вечера",
         },
         {
           kind: "points",
           assignee_queries: ["Ерлану Б."],
-          assignee_id: null,
           assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.97,
           amount: 10,
@@ -115,23 +107,19 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["марат"],
-          assignee_id: null,
           assignee_name: "Марат Оспанов",
           assignee_confidence: 0.95,
           group_id: null,
           title: "КП по Альфе",
           body: null,
-          deadline_iso: "2026-08-14T13:00:00+05:00",
-          deadline_confidence: 0.7,
-          deadline_source_text: "завтра до обеда",
+          deadline: ref("завтра до обеда", { day: "tomorrow", part: "before_lunch" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "марат кп альфа завтра до обеда",
         },
         {
           kind: "points",
           assignee_queries: ["ерлану б"],
-          assignee_id: null,
           assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.95,
           amount: 10,
@@ -149,17 +137,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: [],
-          assignee_id: null,
           assignee_name: null,
           assignee_confidence: 0,
           group_id: null,
           title: "Заказать щебень на третий объект",
           body: null,
-          deadline_iso: "2026-08-14T18:00:00+05:00",
-          deadline_confidence: 0.6,
-          deadline_source_text: "до конца недели",
+          deadline: ref("до конца недели", { part: "end_of_week" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Надо заказать щебень на третий объект до конца недели",
         },
       ],
@@ -173,17 +158,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Айгуль"],
-          assignee_id: null,
           assignee_name: "Айгуль Сапарова",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Закрыть отчёты по командировкам",
           body: null,
-          deadline_iso: "2026-08-14T18:00:00+05:00",
-          deadline_confidence: 0.5,
-          deadline_source_text: "на неделе",
+          deadline: ref("на неделе", { part: "this_week" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Айгуль пусть на неделе закроет отчёты по командировкам",
         },
       ],
@@ -212,33 +194,27 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Сәкенге"],
-          assignee_id: null,
           assignee_name: "Сәкен Жумабаев",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Отправить фотоотчёт по объекту",
           body: null,
-          deadline_iso: "2026-08-13T18:00:00+05:00",
-          deadline_confidence: 0.7,
-          deadline_source_text: "бүгін кешке",
+          deadline: ref("бүгін кешке", { day: "today", part: "evening" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Сәкенге айт, объект бойынша фотоотчёт жіберсін бүгін кешке",
         },
         {
           kind: "task",
           assignee_queries: ["Маратқа"],
-          assignee_id: null,
           assignee_name: "Марат Оспанов",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Перезвонить по тендеру",
           body: null,
-          deadline_iso: null,
-          deadline_confidence: null,
-          deadline_source_text: null,
+          deadline: null,
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Маратқа скажи, пусть перезвонит по тендеру",
         },
       ],
@@ -252,34 +228,28 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Ерлану Б."],
-          assignee_id: null,
           assignee_name: "Ерлан Байжанов",
           assignee_confidence: 0.97,
           group_id: "g1",
           title: "Подготовить площадку к приезду комиссии",
           body: null,
-          deadline_iso: "2026-08-17T09:00:00+05:00",
-          deadline_confidence: 0.6,
-          deadline_source_text: "к понедельнику",
+          deadline: ref("к понедельнику", { day: "weekday", weekday: 1 }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span:
             "Ерлану Б. и Марату подготовить площадку к приезду комиссии к понедельнику",
         },
         {
           kind: "task",
           assignee_queries: ["Марату"],
-          assignee_id: null,
           assignee_name: "Марат Оспанов",
           assignee_confidence: 0.97,
           group_id: "g1",
           title: "Подготовить площадку к приезду комиссии",
           body: null,
-          deadline_iso: "2026-08-17T09:00:00+05:00",
-          deadline_confidence: 0.6,
-          deadline_source_text: "к понедельнику",
+          deadline: ref("к понедельнику", { day: "weekday", weekday: 1 }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span:
             "Ерлану Б. и Марату подготовить площадку к приезду комиссии к понедельнику",
         },
@@ -296,49 +266,40 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Тимур"],
-          assignee_id: null,
           assignee_name: "Тимур Салимов",
           assignee_confidence: 0.97,
           group_id: null,
           title: "Отогнать машину на мойку",
           body: null,
-          deadline_iso: "2026-08-13T18:00:00+05:00",
-          deadline_confidence: 0.7,
-          deadline_source_text: "к вечеру",
+          deadline: ref("к вечеру", { part: "evening" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Тимур, отгони мою машину на мойку к вечеру",
         },
         {
           kind: "task",
           assignee_queries: ["Жандос"],
-          assignee_id: null,
           assignee_name: "Жандос Ермеков",
           assignee_confidence: 0.95,
           group_id: null,
           title: "Принести кофе",
           body: null,
-          deadline_iso: null,
-          deadline_confidence: null,
-          deadline_source_text: null,
+          deadline: null,
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Жандос кофе",
         },
         {
           kind: "task",
           assignee_queries: [],
-          assignee_id: null,
           assignee_name: null,
           assignee_confidence: 0,
           group_id: null,
           title: "Сходить за сигаретами",
           body: null,
-          deadline_iso: null,
-          deadline_confidence: null,
-          deadline_source_text: null,
+          deadline: null,
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "кто-нибудь сходите за сигаретами",
         },
       ],
@@ -370,17 +331,14 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "task",
           assignee_queries: ["Марат"],
-          assignee_id: null,
           assignee_name: "Марат Оспанов",
           assignee_confidence: 0.98,
           group_id: null,
           title: "Позвонить Альфе",
           body: null,
-          deadline_iso: "2026-08-13T18:00:00+05:00",
-          deadline_confidence: 0.9,
-          deadline_source_text: "сегодня до шести",
+          deadline: ref("сегодня до шести", { day: "today", time: "18:00" }),
           priority: "normal",
-          scheduled_send_at: null,
+          scheduled_send: null,
           source_span: "Марат, позвони Альфе сегодня до шести",
         },
       ],
@@ -394,17 +352,10 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
         {
           kind: "event",
           title: "Встреча с Альфой",
-          body: null,
           location: "у них в офисе",
-          starts_at_iso: "2026-08-20T15:00:00+05:00",
-          ends_at_iso: null,
-          time_confidence: 0.9,
-          time_source_text: "в четверг в три",
-          participant_queries: ["Марат", "Айгуль"],
+          starts_at: ref("в четверг в три", { day: "weekday", weekday: 4, time: "15:00" }),
           participant_names: ["Марат Оспанов", "Айгуль Сапарова"],
-          participant_ids: [],
           everyone: false,
-          remind_before_min: 60,
           source_span:
             "Встреча с Альфой в четверг в три у них в офисе, идут Марат и Айгуль. Напомни за час",
         },
@@ -412,22 +363,6 @@ export const FEW_SHOT: { user: string; assistant: ParseResult }[] = [
     },
   },
 ];
-
-/** The model's form of an event: nothing unsaid is null, it is "" or 0 (D-78, schema.ts). */
-function toModelShape(entity: ParseResult["entities"][number]): unknown {
-  if (entity.kind !== "event") return entity;
-  return {
-    kind: entity.kind,
-    title: entity.title,
-    location: entity.location ?? "",
-    starts_at_iso: entity.starts_at_iso,
-    time_confidence: entity.time_confidence ?? 0,
-    time_source_text: entity.time_source_text ?? "",
-    participant_names: entity.participant_names,
-    everyone: entity.everyone,
-    source_span: entity.source_span,
-  };
-}
 
 /** Context line shared by every few-shot user turn (docs/AI.md §4). */
 export const FEW_SHOT_CONTEXT = "Сейчас: четверг, 13.08.2026 16:32 (+05:00). Источник: voice.";
@@ -443,12 +378,7 @@ export function fewShotMessages(): Anthropic.MessageParam[] {
       role: "user",
       content: `${FEW_SHOT_CONTEXT}\n<input>\n${pair.user}\n</input>`,
     });
-    // ids are the server's fields, not the model's: they never appear in an example,
-    // and an event is shown in the model's form — "" and 0 instead of null (schema.ts)
-    const shown = { entities: pair.assistant.entities.map(toModelShape) };
-    const text = JSON.stringify(shown, (key, value) =>
-      key === "assignee_id" || key === "participant_ids" ? undefined : value,
-    );
+    const text = JSON.stringify(pair.assistant);
     messages.push({
       role: "assistant",
       content:

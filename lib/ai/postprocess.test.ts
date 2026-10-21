@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { postprocess } from "./postprocess";
+import { fromModelEntity, postprocess } from "./postprocess";
 import type { Entity, EventEntity, PointsEntity, TaskEntity } from "./schema";
 import type { RosterUser } from "../matchName";
 
@@ -151,5 +151,68 @@ describe("postprocess", () => {
     expect(entity.kind === "task" && entity.assignee_id).toBeNull();
     expect(entity.assignee?.status).toBe("ambiguous");
     expect(entity.blocked).toBe("assignee_unmatched");
+  });
+});
+
+describe("fromModelEntity: the model's TimeRefs become the app's ISO fields (task 026)", () => {
+  const NOW = new Date("2026-08-13T16:32:00+05:00");
+  const said = { weekday: null, date: null, time: null, part: null, confidence: 0.95 } as const;
+
+  it("a task: deadline, its confidence and words, and a delayed send", () => {
+    const entity = fromModelEntity(
+      {
+        kind: "task",
+        assignee_queries: ["Марат"],
+        assignee_name: "Марат Оспанов",
+        assignee_confidence: 0.98,
+        group_id: null,
+        title: "КП",
+        body: null,
+        deadline: { ...said, text: "завтра до обеда", day: "tomorrow", part: "before_lunch" },
+        priority: "normal",
+        scheduled_send: { ...said, text: "утром отправь", day: "tomorrow", part: "morning" },
+        source_span: "Марат КП завтра до обеда, утром отправь",
+      },
+      NOW,
+    );
+    expect(entity).toMatchObject({
+      assignee_id: null,
+      deadline_iso: "2026-08-14T13:00:00+05:00",
+      deadline_confidence: 0.7,
+      deadline_source_text: "завтра до обеда",
+      scheduled_send_at: "2026-08-14T09:00:00+05:00",
+    });
+    expect(entity).not.toHaveProperty("deadline");
+  });
+
+  it("an event: the model's \"\" become null, a day without a time is 09:00 at 0.5", () => {
+    const entity = fromModelEntity(
+      {
+        kind: "event",
+        title: "Корпоратив",
+        location: "",
+        starts_at: { ...said, text: "в пятницу", day: "weekday", weekday: 5 },
+        participant_names: [],
+        everyone: true,
+        source_span: "В пятницу корпоратив",
+      },
+      NOW,
+    );
+    expect(entity).toMatchObject({
+      location: null,
+      starts_at_iso: "2026-08-14T09:00:00+05:00",
+      time_confidence: 0.5,
+      time_source_text: "в пятницу",
+      participant_ids: [],
+    });
+  });
+
+  it("a reminder without a time keeps null", () => {
+    expect(fromModelEntity({ kind: "reminder", text: "Позвонить в банк", remind_at: null, source_span: "напомни" }, NOW)).toEqual({
+      kind: "reminder",
+      text: "Позвонить в банк",
+      remind_at_iso: null,
+      source_span: "напомни",
+    });
   });
 });

@@ -5,7 +5,8 @@ import { callDeepSeek, isDeepSeekModel, toChatMessages } from "./deepseek";
 import { ParseError, type ParseErrorCode } from "./errors";
 import { fewShotMessages } from "./examples";
 import { buildSystemBlocks, buildUserMessage, type ParseSource } from "./prompt";
-import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, withAssigneeId, type Entity } from "./schema";
+import { fromModelEntity } from "./postprocess";
+import { ENTITIES_JSON_SCHEMA, ModelParseResultSchema, type Entity } from "./schema";
 import type { RosterUser } from "../matchName";
 
 export { ParseError, type ParseErrorCode };
@@ -145,8 +146,11 @@ function thinkingFor(model: string): Anthropic.ThinkingConfigParam | undefined {
   return model.includes("haiku-4-5") ? undefined : { type: "disabled" };
 }
 
-/** The typed boundary shared by both providers: the API (or JSON mode) gives text, zod gives entities. */
-function entitiesFromText(model: string, text: string): Entity[] {
+/**
+ * The typed boundary shared by both providers: the API (or JSON mode) gives text, zod gives
+ * entities, and code turns the model's TimeRefs into instants (task 026).
+ */
+function entitiesFromText(model: string, text: string, input: ParseInput): Entity[] {
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -161,7 +165,7 @@ function entitiesFromText(model: string, text: string): Entity[] {
       { cause: parsed.error },
     );
   }
-  return parsed.data.entities.map(withAssigneeId);
+  return parsed.data.entities.map((entity) => fromModelEntity(entity, input.now, input.conventions));
 }
 
 function requestMessages(input: ParseInput): Anthropic.MessageParam[] {
@@ -199,7 +203,7 @@ async function callDeepSeekModel(model: string, input: ParseInput, maxTokens: nu
     throw new ParseError("parse_refused", `${model}: модель отказалась разбирать транскрипт`);
   }
   return {
-    entities: entitiesFromText(model, result.text),
+    entities: entitiesFromText(model, result.text, input),
     usage: result.usage,
     reasoningTokens: result.reasoningTokens,
     raw: result.raw,
@@ -240,7 +244,7 @@ async function callModel(
   }
   const text = message.content.find((block) => block.type === "text")?.text ?? "";
   return {
-    entities: entitiesFromText(model, text),
+    entities: entitiesFromText(model, text, input),
     usage: readUsage(message.usage),
     reasoningTokens: 0,
     raw: message,

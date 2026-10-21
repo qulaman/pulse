@@ -1,7 +1,5 @@
 /**
- * Asia/Aqtobe clock helpers for the prompt and the UI. The company's time conventions
- * («до обеда» = 13:00) are data the model applies itself (lib/ai/conventions.ts, D-15);
- * the regex resolver that once duplicated them here was never wired in and is gone.
+ * Asia/Aqtobe clock helpers for the prompt, the time resolver (lib/ai/timeref.ts) and the UI.
  * Asia/Aqtobe is a fixed +05:00 all year — no DST, so no date library is needed.
  */
 
@@ -78,25 +76,24 @@ export function weekdayRu(date: Date): string {
   return WEEKDAYS_RU[toWall(date).getUTCDay()];
 }
 
-/**
- * "пт 14.08, сб 15.08, …" for the next `days` days — handed to the model so weekday
- * arithmetic is a lookup, not a computation (live failures a-003/a-012, 2026-09-07).
- */
-export function upcomingDaysRu(now: Date, days = 7): string {
-  const parts: string[] = [];
-  for (let i = 1; i <= days; i++) {
-    const w = toWall(atAqtobe(now, i, 0, 0));
-    parts.push(`${WEEKDAYS_SHORT_RU[w.getUTCDay()]} ${pad(w.getUTCDate())}.${pad(w.getUTCMonth() + 1)}`);
-  }
-  return parts.join(", ");
-}
-
 /** Builds an instant from Aqtobe wall-clock fields, shifting the day by `dayShift`. */
-function atAqtobe(now: Date, dayShift: number, hours: number, minutes: number): Date {
+export function atAqtobe(now: Date, dayShift: number, hours: number, minutes: number): Date {
   const w = toWall(now);
   return fromWall(
     new Date(
       Date.UTC(w.getUTCFullYear(), w.getUTCMonth(), w.getUTCDate() + dayShift, hours, minutes, 0, 0),
     ),
   );
+}
+
+/** The instant of an Aqtobe calendar date and time; null when the date does not exist (31.02). */
+export function aqtobeDateAt(year: number, month: number, day: number, hours: number, minutes: number): Date | null {
+  const wall = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+  if (wall.getUTCFullYear() !== year || wall.getUTCMonth() !== month - 1 || wall.getUTCDate() !== day) return null;
+  return fromWall(wall);
+}
+
+/** ISO weekday on the Aqtobe wall clock: 1 — Monday … 7 — Sunday. */
+export function aqtobeIsoWeekday(date: Date): number {
+  return toWall(date).getUTCDay() || 7;
 }

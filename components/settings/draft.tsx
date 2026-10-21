@@ -27,7 +27,7 @@ type Draft = {
   server: CompanySettings;
   draft: CompanySettings;
   update: (patch: Partial<CompanySettings>) => void;
-  /** The conventions as they will be saved: empty rows are scratch space. */
+  /** The conventions as they will be saved: one row per fixed key (task 026). */
   conventions: CompanySettings["conventions"];
   dirty: Record<SectionKey, boolean>;
   save: (patch: SettingsPatch) => void;
@@ -72,7 +72,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
 
   let value: Draft | null = null;
   if (draft && server) {
-    const conventions = draft.conventions.filter((row) => row.phrase.trim() && row.meaning.trim());
+    const conventions = draft.conventions;
     value = {
       server,
       draft,

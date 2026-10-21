@@ -74,6 +74,27 @@ describe("ENTITIES_JSON_SCHEMA: discriminator", () => {
   });
 });
 
+describe("ENTITIES_JSON_SCHEMA: time is the model's words, not its arithmetic (task 026)", () => {
+  it("(е) carries no ISO field and one shared TimeRef definition", () => {
+    const text = JSON.stringify(ENTITIES_JSON_SCHEMA);
+    for (const field of ["deadline_iso", "starts_at_iso", "remind_at_iso", "scheduled_send_at", "time_confidence", "deadline_confidence"]) {
+      expect(text).not.toContain(`"${field}"`);
+    }
+    expect(Object.keys(ENTITIES_JSON_SCHEMA.$defs as Node)).toEqual(["TimeRef"]);
+    expect(text.match(/"\$ref":"#\/\$defs\/TimeRef"/g)).toHaveLength(4);
+  });
+
+  it("(ж) a nullable enum is one enum with null, and union parameters stay within the API's 16", () => {
+    const timeRef = (ENTITIES_JSON_SCHEMA.$defs as Record<string, Node>).TimeRef;
+    expect((timeRef.properties as Record<string, Node>).day.enum).toContain(null);
+    let unions = 0;
+    walk(ENTITIES_JSON_SCHEMA, (node) => {
+      if (Array.isArray(node.anyOf) && (node.anyOf as Node[]).some((v) => v.type === "null")) unions++;
+    });
+    expect(unions).toBeLessThanOrEqual(16);
+  });
+});
+
 describe("ParseResultSchema", () => {
   it("(в) accepts a task with a null deadline", () => {
     expect(ParseResultSchema.parse({ entities: [TASK] })).toEqual({ entities: [TASK] });

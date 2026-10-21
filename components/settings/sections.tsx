@@ -251,6 +251,23 @@ export function DictionarySection() {
   );
 }
 
+/** The fixed keys of «Слова о сроках» (task 026), in the order the server keeps them. */
+const CONVENTION_LABEL: Record<string, string> = {
+  morning: "Утро",
+  before_lunch: "До обеда",
+  lunch: "Обед",
+  after_lunch: "После обеда",
+  evening: "Вечер",
+  end_of_day: "Конец дня",
+  end_of_week: "Конец недели — пятница",
+  this_week: "На неделе — пятница",
+  day_default: "День без времени",
+  weekday_default: "День недели без времени",
+};
+
+/** Below 0.8 the deadline is a yellow chip on the confirmation screen. */
+const CONFIDENCE_STEPS = [0.5, 0.6, 0.7, 0.8, 0.9, 1];
+
 export function ConventionsSection() {
   const { draft, server, update, conventions, dirty, save, saving } = useDraft();
   const updateConvention = (index: number, patch: Partial<CompanySettings["conventions"][number]>) =>
@@ -260,51 +277,42 @@ export function ConventionsSection() {
       icon={<ClockIcon />}
       title="Слова о сроках"
       dirty={dirty.conventions}
-      summary={conventions.length ? plural(conventions.length, "правило", "правила", "правил") : "нет правил"}
-      hint="Что значит «до обеда» или «к вечеру» именно у вас. Сверху — как говорите, под ним — во сколько это."
+      summary={plural(conventions.length, "правило", "правила", "правил")}
+      hint="Что значит «до обеда» или «к вечеру» именно у вас. Слова читает модель, время ставит система. Уверенность ниже 0.8 — срок придёт на проверку жёлтым."
     >
-      <div className="flex flex-col gap-3">
-        {draft.conventions.map((row, index) => (
-          // Two lines per row: a phone-width screen cannot fit both texts side by side.
-          <div key={index} className="grid grid-cols-[1fr_44px] gap-x-2 gap-y-1">
-            <input
-              className={FIELD}
-              aria-label="Как говорите"
-              placeholder="до обеда"
-              value={row.phrase}
-              onChange={(e) => updateConvention(index, { phrase: e.target.value })}
-            />
-            <button
-              type="button"
-              aria-label="Убрать строку"
-              className="min-h-[44px] min-w-[44px] text-[20px] leading-none text-muted"
-              onClick={() => update({ conventions: draft.conventions.filter((_, i) => i !== index) })}
-            >
-              ×
-            </button>
-            <div className="col-span-2 flex items-center gap-2 pl-3">
-              <span aria-hidden className="text-[16px] text-muted">
-                =
-              </span>
+      <div className="flex flex-col gap-4">
+        {draft.conventions.map((row, index) => {
+          // a phone's offline copy (D-127) may hold rows from before the keys
+          const label = CONVENTION_LABEL[row.key] ?? row.phrase;
+          const steps = [...new Set([...CONFIDENCE_STEPS, row.confidence])].sort((a, b) => a - b);
+          return (
+            <div key={row.key ?? index} className="flex flex-col gap-2">
+              <span className="text-[14px] font-medium leading-[18px] text-muted">{label}</span>
               <input
                 className={FIELD}
-                aria-label="Означает"
-                placeholder="13:00 названного дня"
-                value={row.meaning}
-                onChange={(e) => updateConvention(index, { meaning: e.target.value })}
+                aria-label={`${label}: как говорите`}
+                placeholder="как говорите, через «/»"
+                value={row.phrase}
+                onChange={(e) => updateConvention(index, { phrase: e.target.value })}
               />
+              <div className="grid grid-cols-2 gap-2">
+                <TimeField label={`${label}: время`} value={row.time ?? null} onChange={(time) => updateConvention(index, { time })} />
+                <select
+                  className={FIELD}
+                  aria-label={`${label}: уверенность`}
+                  value={String(row.confidence)}
+                  onChange={(e) => updateConvention(index, { confidence: Number(e.target.value) })}
+                >
+                  {steps.map((step) => (
+                    <option key={step} value={String(step)}>
+                      {step < 0.8 ? `${step} · проверить` : `${step} · уверенно`}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3">
-        <Button
-          variant="secondary"
-          block
-          onClick={() => update({ conventions: [...draft.conventions, { phrase: "", meaning: "", confidence: 0.7 }] })}
-        >
-          Добавить слово
-        </Button>
+          );
+        })}
       </div>
       {dirty.conventions ? (
         <SectionActions
