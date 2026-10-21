@@ -3,7 +3,8 @@
  *   pnpm eval:parser [--no-escalate] [--filter <prefix>] [--limit N] [--no-gate] [--base <file>]
  *
  * Gates: assignee accuracy >= 97%, entity F1 >= 90%. Exit code 1 below either,
- * unless --no-gate. Every run writes tests/ai/results/YYYY-MM-DD_HHmm.json and
+ * unless --no-gate. The deadline share has no gate (the owner's call) — below 90% it warns.
+ * Every run writes tests/ai/results/YYYY-MM-DD_HHmm.json and
  * diffs against the previous run, or against `--base` (a file in tests/ai/results).
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -18,6 +19,8 @@ import { passesGates, summarize, type CaseResult } from "../../lib/ai/evals/scor
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
 const RESULTS_DIR = join(HERE, "results");
+// Not a gate (task 026): a run under it still passes, the warning is for the reader.
+const DEADLINE_WARNING = 0.9;
 
 function parseArgs(argv: string[]) {
   const out = { escalate: true, filter: "", limit: 0, gate: true, demoIds: false, base: "" };
@@ -104,7 +107,7 @@ async function main(): Promise<void> {
   console.log(`| имя исполнителя от модели — из ростера | ${metrics.idValid === null ? "—" : pct(metrics.idValid)} |`);
   console.log(`| исполнитель без чипа «проверь» | ${metrics.autoOk === null ? "—" : pct(metrics.autoOk)} |`);
   console.log(`| entity F1 | ${pct(f1)} (гейт 90%), P ${pct(precision)} / R ${pct(recall)} |`);
-  console.log(`| deadline accuracy | ${pct(deadline)} |`);
+  console.log(`| deadline accuracy | ${pct(deadline)} (без гейта, предупреждение ниже ${pct(DEADLINE_WARNING)}) |`);
   console.log(`| полнота мульти-разбиения | ${pct(split)} |`);
   console.log(`| query/command accuracy | ${pct(query)} |`);
   console.log(`| эскалаций | ${metrics.escalated} |`);
@@ -145,6 +148,10 @@ async function main(): Promise<void> {
     "utf8",
   );
   console.log(`\nрезультат: ${outFile}`);
+
+  if (deadline < DEADLINE_WARNING) {
+    console.warn(`ПРЕДУПРЕЖДЕНИЕ: сроки ${pct(deadline)} — ниже ${pct(DEADLINE_WARNING)}. Гейта на сроки нет, решает владелец.`);
+  }
 
   if (args.gate && !passesGates(metrics)) {
     console.error("ГЕЙТ КРАСНЫЙ: assignee < 97% или F1 < 90%.");
