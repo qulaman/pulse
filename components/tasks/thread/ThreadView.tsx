@@ -7,6 +7,7 @@ import { receiptLine, useThreadReceipt } from "@/lib/tasks/receipts";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { fetchEarlierMessages, isPendingMessage, prependMessages, THREAD_PAGE, type TaskMessage } from "@/lib/tasks/queries";
 import { dayLabel, messageState, startsNewDay, withoutPassedRevoke } from "@/lib/tasks/thread";
+import { useDockSpace } from "@/components/ui/dock";
 import { useVisualViewport } from "@/lib/ui/useVisualViewport";
 import { Composer } from "./Composer";
 import { DaySeparator } from "./DaySeparator";
@@ -39,6 +40,10 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  // the composer docked over the tab bar says how tall it is (--dock-space): the thread ends above
+  // it — the last line used to sit under the field — and the bottom toasts stand over it (D-143)
+  const dock = useRef<HTMLDivElement>(null);
+  useDockSpace(dock, !compact && !closedNote);
   const queryClient = useQueryClient();
   const offsetBottom = useVisualViewport();
 
@@ -103,7 +108,11 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
 
   return (
     <>
-      <section className={compact ? "no-bar flex flex-1 flex-col overflow-y-auto px-1 pb-2" : "mt-4 pb-28"} data-testid="thread">
+      <section
+        className={compact ? "no-bar flex flex-1 flex-col overflow-y-auto px-1 pb-2" : "mt-4"}
+        style={compact || closedNote ? undefined : { paddingBottom: "calc(var(--dock-space, 0px) + var(--tabbar-space) + 12px)" }}
+        data-testid="thread"
+      >
         {rows.length >= THREAD_PAGE && hasMore ? (
           <button
             type="button"
@@ -161,7 +170,12 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
       </section>
 
       {closedNote ? (
-        <p className="mt-2 px-1 pb-4 text-center text-[13px] leading-4 text-muted" data-testid="thread-closed">
+        <p
+          className="mt-2 px-1 text-center text-[13px] leading-4 text-muted"
+          // the last line of the screen: it clears the tab bar itself
+          style={compact ? undefined : { paddingBottom: "calc(var(--tabbar-space) + 16px)" }}
+          data-testid="thread-closed"
+        >
           {closedNote}
         </p>
       ) : compact ? (
@@ -170,6 +184,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
         </div>
       ) : (
         <div
+          ref={dock}
           className="above-tabbar fixed inset-x-0 z-20 border-t border-border bg-bg px-4 pb-3 pt-3"
           // above the tab bar (D-112), and above the keyboard when it is out (D-60: nothing hides the field)
           style={{ bottom: `calc(${offsetBottom}px + var(--tabbar-space))` }}

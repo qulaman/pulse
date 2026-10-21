@@ -46,7 +46,9 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
   // the whole ledger summed by the database — the history above is only its last rows (D-126)
   const total = useBalance(userId);
   const balance = total.data ?? 0;
-  const rating = useRating("all", balance > 0);
+  // the week, as «Рейтинг» opens: «5-е место из 5» for all time sat next to «Вы на 2 месте» there
+  // (test balances of a million made «all time» meaningless) — the place says its period (D-143)
+  const rating = useRating("week", balance > 0);
   const myRow = (rating.data ?? []).find((row) => row.user_id === userId);
   // handovers in time in a row — counted by the database on «Принято» (И-69, D-133)
   const streak = usePerson(userId).data?.streak_count ?? 0;
@@ -69,8 +71,10 @@ export function PointsCard({ userId, enabled }: { userId: string; enabled: boole
           <p className="mt-0.5 text-[13px] leading-4 text-muted">
             {total.isLoading
               ? " "
-              : myRow
-                ? `${myRow.rank}-е место из ${(rating.data ?? []).length}`
+              : myRow && myRow.points > 0
+                ? `${myRow.rank}-е место за неделю`
+                : myRow
+                  ? "за неделю очков пока нет"
                 : balance > 0
                   ? "за закрытые в срок задачи и поощрения"
                   : "Первые придут за закрытые задачи"}

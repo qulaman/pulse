@@ -3,6 +3,7 @@
 import { haptic } from "@/lib/haptics";
 import { useReactionPrices, useReactToTask, useTaskReactions } from "@/lib/points/game";
 import { priceLabel, REACTION_CODES, REACTION_GLYPH, REACTION_LABEL, type ReactionCode } from "@/lib/points/reactions";
+import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
  * The director's reaction to a task (D-133, И-68): seven faces in one row, the price under the
@@ -32,7 +33,8 @@ export function ReactionBar({ taskId, pointsEnabled, className = "" }: { taskId:
               key={code}
               type="button"
               aria-pressed={lit}
-              aria-label={`${REACTION_LABEL[code]}${price ? `, ${price} очков` : ""}`}
+              // «+1 очко», «+10 очков» (D-143)
+              aria-label={`${REACTION_LABEL[code]}${price ? `, ${price} ${pluralRu(Math.abs(Number(prices[code]) || 0), ["очко", "очка", "очков"])}` : ""}`}
               data-reaction={code}
               onClick={() => press(code)}
               className="flex min-h-[48px] min-w-0 flex-1 flex-col items-center justify-center rounded-[12px] border transition-[transform,background-color,border-color] duration-[120ms] active:scale-[0.92]"

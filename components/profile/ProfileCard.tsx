@@ -6,6 +6,7 @@ import { Chip } from "@/components/ui/Chip";
 import { aqtobeDay } from "@/lib/ai/time";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Availability, type Role } from "@/lib/people/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
+import { pluralRu } from "@/lib/tasks/status-text";
 
 type Props =
   | { userId: string; fullName: string; role: Role; pending?: false }
@@ -218,7 +219,8 @@ export function ProfileCard({ userId, fullName, role, pending = false }: Props) 
           {role === "director" ? (
             <>
               <Stat value={stat?.people ?? null} label="в команде" />
-              <Stat value={stat?.sent30 ?? null} label="задач за 30 дн." />
+              {/* «4 задачи», not «4 задач» (D-143) */}
+              <Stat value={stat?.sent30 ?? null} label={`${pluralRu(stat?.sent30 ?? 0, ["задача", "задачи", "задач"])} за 30 дн.`} />
               <Stat value={stat?.open ?? null} label="в работе у команды" />
             </>
           ) : (

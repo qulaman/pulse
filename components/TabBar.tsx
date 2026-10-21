@@ -184,8 +184,21 @@ export function backTarget(role: TabRole, pathname: string): string | null {
  */
 function useTabBadges(role: TabRole): Record<string, number> {
   const me = useMe();
-  const fresh = useFreshTaskCount(role !== "director" ? me.data?.userId : undefined);
-  const inbox = useDirectorInbox(me.data, role === "director");
+  // the counts are asked for once the screen under the bar has hydrated: asked at once, the board
+  // landed before a streamed screen hydrated, and that screen (Пульс, a task's screen through its
+  // placeholderData) drew data the server never had — React threw the page away (D-143)
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    let gone = false;
+    void afterHydration().then(() => {
+      if (!gone) setSettled(true);
+    });
+    return () => {
+      gone = true;
+    };
+  }, []);
+  const fresh = useFreshTaskCount(role !== "director" && settled ? me.data?.userId : undefined);
+  const inbox = useDirectorInbox(me.data, role === "director" && settled);
   if (role !== "director") {
     const count = fresh.data ?? 0;
     return count > 0 ? { "/tasks": count } : {};

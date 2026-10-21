@@ -124,6 +124,8 @@ export type CalendarScreen = {
   strip: DayStrip;
   legend: { key: string; label: string; count: number; tone: Tone }[];
   nearest: { id: string; title: string; when: string; tone: Tone } | null;
+  /** The meeting the big line is about — a tap on the line opens it (D-143): «Ваш ответ» → the invitation. */
+  focusId?: string | null;
 };
 
 const place = (event: CalendarEvent) => (event.location ? ` · ${event.location}` : "");
@@ -195,6 +197,7 @@ export function calendarScreen(events: readonly CalendarEvent[], meId: string, n
       ...base,
       tone: "warn",
       eyebrow: "Ваш ответ",
+      focusId: first.id,
       value: unanswered.length,
       label: pluralRu(unanswered.length, ["приглашение ждёт ответа", "приглашения ждут ответа", "приглашений ждут ответа"]),
       detail: `${first.title} · ${humanAqtobe(new Date(first.starts_at), now)}`,

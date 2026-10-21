@@ -97,7 +97,9 @@ function offlinePage() {
     "button{margin-top:22px;min-height:48px;border:0;border-radius:14px;padding:0 22px;font:600 16px/20px system-ui,sans-serif;background:#2ED3B7;color:#0B0F14}" +
     "</style></head><body><main><h1>Нет связи</h1>" +
     "<p>Этот экран ещё не открывался на телефоне. Он откроется, как только появится связь; открытые раньше — работают и так.</p>" +
-    '<button type="button" onclick="location.reload()">Повторить</button></main></body></html>';
+    '<button type="button" onclick="location.reload()">Повторить</button></main>' +
+    // the words promise it opens once the network is back: it does, without a tap (D-143)
+    '<script>addEventListener("online",function(){location.reload()})</script></body></html>';
   return new Response(html, { status: 503, headers: { "content-type": "text/html; charset=utf-8" } });
 }
 

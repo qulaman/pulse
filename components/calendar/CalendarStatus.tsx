@@ -35,7 +35,22 @@ export function CalendarStatus({ screen, onNearest }: { screen: CalendarScreen; 
         </span>
       </div>
 
-      <div className="mt-2 flex min-h-[52px] items-center gap-3.5">
+      {/* the big line names a meeting — «приглашение ждёт ответа» above all: a tap opens it, with
+          «Буду / Не смогу», instead of a scroll down to find its card (D-143) */}
+      <div
+        className={`mt-2 flex min-h-[52px] items-center gap-3.5 ${screen.focusId ? "-mx-2 cursor-pointer rounded-[14px] px-2 transition-colors duration-[120ms] active:bg-white/[0.04]" : ""}`}
+        role={screen.focusId ? "button" : undefined}
+        tabIndex={screen.focusId ? 0 : undefined}
+        onClick={screen.focusId ? () => onNearest(screen.focusId as string) : undefined}
+        onKeyDown={
+          screen.focusId
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") onNearest(screen.focusId as string);
+              }
+            : undefined
+        }
+        data-testid="calendar-focus"
+      >
         {screen.value !== null ? (
           <span className="nums shrink-0 text-[48px] font-bold leading-[48px] tracking-[-0.04em]" style={{ color: tone }}>
             {screen.value}

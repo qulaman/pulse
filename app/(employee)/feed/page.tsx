@@ -638,11 +638,14 @@ export default function FeedPage() {
                     <ResultCard key={e.id} errand={e} scene={sceneOf(e, catalogue.data ?? NO_ACTIONS)} onSkip={() => setSkipped((list) => [...list, e.id])} />
                   ))
               : null}
+            {/* with a panel open they wait under it: the tap on the face opens «Дела», and the cards
+                stood above the tasks and pushed them off the screen (D-142 on Пульс, D-143 here) —
+                moved by flex order, not by another slot, so they are not mounted anew */}
             {mode !== "idle" ? (
-              <>
+              <div className="flex flex-col gap-2 empty:hidden" style={{ order: mode === "panel" ? 1 : 0 }}>
                 <PushCard bubble />
                 <InstallHint bubble />
-              </>
+              </div>
             ) : null}
             {/* a panel folding away fades out where it stood; position only (a size animation squashed its cards) */}
             {/* the leaving panel is popped out absolutely, so it needs a positioned parent — this box,
