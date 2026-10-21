@@ -1,11 +1,8 @@
 "use client";
 
+import { shortName } from "@/lib/people/names";
 import { initialsOf } from "@/lib/people/queries";
 import type { PersonLoad } from "@/lib/tasks/overview";
-
-function firstName(full: string): string {
-  return full.trim().split(/\s+/)[0] ?? full;
-}
 
 /**
  * Who holds the director's work, as a strip of people you scroll sideways (Telegram's
@@ -47,7 +44,7 @@ export function PeopleStrip({
             key={person.id}
             active={active}
             onClick={() => onChange(active ? null : person.id)}
-            label={firstName(person.name)}
+            label={shortName(person.name)}
             count={person.open}
             aria={active ? `${person.name} — показать всех` : `Задачи: ${person.name}`}
           >

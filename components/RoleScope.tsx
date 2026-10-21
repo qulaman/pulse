@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
+import { setCompanyNames } from "@/lib/people/names";
+import { useRoster } from "@/lib/people/roster";
 import type { TabBarRole } from "@/lib/routes";
 import { taskKeys, type Me } from "@/lib/tasks/queries";
 
@@ -24,7 +26,21 @@ export function RoleScope({ role, me, children }: { role: TabBarRole; me?: Me; c
     if (me && queryClient.getQueryData(taskKeys.me()) === undefined) queryClient.setQueryData(taskKeys.me(), me);
     return null;
   });
-  return <RoleContext.Provider value={role}>{children}</RoleContext.Provider>;
+  return (
+    <RoleContext.Provider value={role}>
+      <NamesSync />
+      {children}
+    </RoleContext.Provider>
+  );
+}
+
+/** The company's names for telling namesakes apart on every screen (D-146, lib/people/names.ts). */
+function NamesSync() {
+  const roster = useRoster();
+  useEffect(() => {
+    if (roster.data) setCompanyNames(roster.data.map((person) => person.full_name));
+  }, [roster.data]);
+  return null;
 }
 
 export function useTabRole(): TabBarRole | null {

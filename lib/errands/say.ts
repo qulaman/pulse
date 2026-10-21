@@ -1,5 +1,5 @@
+import { shortName } from "@/lib/people/names";
 import type { Phrase } from "@/lib/pulse/board";
-import { firstNameOf } from "@/lib/text/normalize";
 
 import type { Errand } from "./queries";
 
@@ -22,7 +22,7 @@ export function describeErrandsForDirector(prev: readonly Errand[], next: readon
   for (const row of next) {
     const was = before.get(row.id);
     if (!was || was.status === row.status) continue;
-    const who = firstNameOf(row.claimed?.full_name ?? "");
+    const who = shortName(row.claimed?.full_name ?? "");
     const what = lower(row.label);
 
     if (row.status === "accepted") {
@@ -59,7 +59,7 @@ export function describeErrandsForSecretary(
     if (was.status === row.status) continue;
     if (row.status === "accepted" && row.claimed_by !== meId) {
       // без рода: «кофе уже взяли · Айгуль»
-      const who = firstNameOf(row.claimed?.full_name ?? "");
+      const who = shortName(row.claimed?.full_name ?? "");
       phrases.push({ text: who ? `${what} уже взяли · ${who}` : `${what} уже взяли`, tone: "muted", source: "errand" });
     }
   }

@@ -30,6 +30,7 @@ import { ErrandCards, ResultCard } from "@/components/secretary/ErrandCards";
 import { Sheet } from "@/components/ui/Sheet";
 import { DndLamp } from "@/components/secretary/DndLamp";
 import { SecretaryFace } from "@/components/secretary/SecretaryFace";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import { useDeepRest } from "@/lib/useDeepRest";
 import { useDeskFocus } from "@/components/secretary/useDeskFocus";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
@@ -116,6 +117,8 @@ const BAND_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
  * is one tap away instead of three.
  */
 export default function FeedPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const meId = me.data?.userId ?? "";
   const board = usePulseBoard(me.data); // the query and the socket ask for the person's own tasks
@@ -437,7 +440,7 @@ export default function FeedPage() {
           {guarded ? (
             <DndLamp
               since={guarded.accepted_at ?? guarded.created_at}
-              who={guarded.claimed_by !== meId ? firstNameOf(guarded.claimed?.full_name ?? "") || null : null}
+              who={guarded.claimed_by !== meId ? shortName(guarded.claimed?.full_name ?? "") || null : null}
               now={now}
             />
           ) : null}

@@ -11,7 +11,8 @@ import type { Me } from "@/lib/tasks/queries";
 /**
  * Витрина глазами того, кто копит очки: баланс, награды и свои заказы. Баланс здесь —
  * точная сумма транзакций (принцип 4), поэтому кнопка «Обменять» не может соврать.
- * Завхоз видит то же плюс очередь выдачи: он и сотрудник, и тот, кто выдаёт.
+ * Завхоз видит то же плюс очередь выдачи: он и сотрудник, и тот, кто выдаёт. Очередь у него —
+ * первой, под заголовком: выдача — его работа, витрина — его очки (D-146).
  */
 export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEnabled: boolean }) {
   const items = useShopItems();
@@ -33,6 +34,8 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Магазин" />
+
+      {role === "shopkeeper" ? <OrdersQueue orders={orders.data ?? []} meId={me?.userId} className="mt-4" /> : null}
 
       {!pointsEnabled ? (
         <p className="mt-3 text-[14px] leading-5" style={{ color: "var(--warn)" }}>
@@ -86,7 +89,6 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
 
       {/* заказы видны и при выключенных очках: сделанный заказ не должен исчезать с экрана */}
       {spender ? <MyOrders orders={mine} /> : null}
-      {role === "shopkeeper" ? <OrdersQueue orders={orders.data ?? []} meId={me?.userId} /> : null}
     </main>
   );
 }

@@ -7,8 +7,8 @@ import { Chip } from "@/components/ui/Chip";
 import { DECLINE_REASONS, useErrandActions, useErrandLink } from "@/lib/errands/mutations";
 import { isActive, waitedFor, type Errand } from "@/lib/errands/queries";
 import { atLine, etaLeftMin, etaLine, QUESTIONS, RESULTS, sceneOf, untilLine, type DeskScene } from "@/lib/errands/scene";
+import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
-import { firstNameOf } from "@/lib/text/normalize";
 
 /** «Принял · через …»: the promise, one tap, optional (D-99). */
 const ETAS = [
@@ -82,7 +82,7 @@ function ErrandCard({ errand, meId, now, scene }: { errand: Errand; meId: string
         style={{ background: alarm ? "var(--danger)" : taken ? "var(--ok)" : "var(--accent)" }}
       />
       <p className="pl-2 text-[13px] leading-4 text-muted">
-        {firstNameOf(errand.author?.full_name ?? "Директор")} · {waitedFor(errand, now)}
+        {shortName(errand.author?.full_name ?? "Директор")} · {waitedFor(errand, now)}
         {errand.until_at ? ` · ${untilLine(errand.until_at)}` : ""}
       </p>
       <p className="mt-0.5 pl-2 text-[17px] font-semibold leading-[22px]" style={alarm ? { color: "var(--danger)" } : undefined}>

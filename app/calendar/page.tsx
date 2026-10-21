@@ -7,6 +7,7 @@ import { CalendarOnWall } from "@/components/calendar/CalendarOnWall";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { useCalendarNav } from "@/components/calendar/useCalendarNav";
 import { useCalendar, useCalendarMonth, useEvent } from "@/lib/calendar/queries";
+import { useNamesKey } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import { useMe } from "@/lib/tasks/queries";
 
@@ -16,6 +17,8 @@ import { useMe } from "@/lib/tasks/queries";
  * turns to that meeting's day and its card opens by itself.
  */
 export default function CalendarPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const now = useNow();
   const nav = useCalendarNav();

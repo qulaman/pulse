@@ -1,5 +1,6 @@
+import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
-import { firstNameOf, normalize } from "@/lib/text/normalize";
+import { normalize } from "@/lib/text/normalize";
 
 import type { Errand } from "./queries";
 
@@ -429,6 +430,6 @@ export function dueFromWall(hm: string, now: Date): string | null {
 export function absenceLine(people: readonly { full_name: string; away_until?: string | null }[], now: Date): string | null {
   if (people.length === 0 || !people.every((person) => isAway(person, now))) return null;
   const back = people.map((person) => person.away_until as string).sort()[0];
-  if (people.length === 1) return `${firstNameOf(people[0].full_name)} не на месте ${untilLine(back)}`;
+  if (people.length === 1) return `${shortName(people[0].full_name)} не на месте ${untilLine(back)}`;
   return `никого нет на месте ${untilLine(back)}`;
 }

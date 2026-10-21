@@ -34,14 +34,14 @@ export function tabBarRole(role: Role | undefined): TabBarRole {
 
 /**
  * Landing route of a role. Shared by proxy.ts (edge) and the group layouts so a
- * role can never be bounced between two guards (shopkeeper has no group of its own).
- * The kiosk logs in once, on the wall, and must land on its screen — not on a profile
- * page it has no data for.
+ * role can never be bounced between two guards. The kiosk logs in once, on the wall,
+ * and must land on its screen — not on a profile page it has no data for.
  */
 export function homeForRole(role: Role | undefined): string {
   if (role === "director") return "/pulse";
-  // the secretary is an ordinary employee with a second set of cards (D-79)
-  if (role === "employee" || role === "manager" || role === "secretary") return "/feed";
+  // the secretary is an ordinary employee with a second set of cards (D-79); the shop keeper —
+  // one with the orders to hand out on top of «Магазин» (D-146): both get tasks like anyone
+  if (isTeamRole(role)) return "/feed";
   if (role === "tv") return "/tv";
   return "/profile";
 }

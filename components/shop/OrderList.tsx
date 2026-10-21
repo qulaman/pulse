@@ -78,7 +78,7 @@ export function MyOrders({ orders }: { orders: Order[] }) {
  * Очередь выдачи: директор и завхоз видят чужие заказы. Очки уже списаны при заказе
  * (hold-final, D-10), поэтому выдача — один тап и ни одной новой транзакции.
  */
-export function OrdersQueue({ orders, meId }: { orders: Order[]; meId?: string }) {
+export function OrdersQueue({ orders, meId, className = "mt-7" }: { orders: Order[]; meId?: string; className?: string }) {
   const setStatus = useSetOrderStatus();
   const cancel = useCancelOrder();
   // завхоз копит очки как все: его собственный заказ живёт в «Моих заказах» и проводит
@@ -89,7 +89,7 @@ export function OrdersQueue({ orders, meId }: { orders: Order[]; meId?: string }
   const busyId = setStatus.isPending ? setStatus.variables?.order.id : undefined;
 
   return (
-    <section className="mt-7">
+    <section className={className}>
       <h2 className="eyebrow px-1">Заказы сотрудников</h2>
       {open.length === 0 ? (
         <p className="mt-2 px-1 text-[14px] leading-5 text-muted">Невыданных заказов нет</p>

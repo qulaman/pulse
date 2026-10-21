@@ -18,9 +18,9 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
     if (error instanceof AuthError) redirect("/login");
     throw error;
   }
-  // the shop keeper and the kiosk have screens of their own; everybody else in the
-  // team shares this shell, the secretary included (D-79)
-  if (!isTeamRole(profile.role) || profile.role === "shopkeeper") redirect(homeForRole(profile.role));
+  // the whole team shares this shell — the secretary (D-79) and the shop keeper (D-146)
+  // included: a task can go to any of them; the kiosk has a screen of its own
+  if (!isTeamRole(profile.role)) redirect(homeForRole(profile.role));
   // the points under the name are behind the same switch as the points themselves (D-48);
   // read here, so the line is in the first paint or not there at all
   const { pointsEnabled } = await brand;

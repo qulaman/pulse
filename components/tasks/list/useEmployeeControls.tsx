@@ -8,6 +8,7 @@ import { AskSheet, CantSheet, ReportSheet } from "@/components/tasks/TaskSheets"
 import { SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { haptic } from "@/lib/haptics";
+import { shortName } from "@/lib/people/names";
 import { NOT_MINE, requestToast } from "@/lib/tasks/lifecycle";
 import { showHandedIn, type TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -16,8 +17,6 @@ import { TEXT } from "@/lib/tasks/status-text";
 import type { EmployeeAction } from "./EmployeeTaskCard";
 
 type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; words?: string } | null;
-
-const firstName = (full: string | null | undefined) => full?.trim().split(/\s+/)[0] ?? "";
 
 /**
  * What the employee's three buttons do, wherever a task shows them — a card of «Мои дела»
@@ -106,7 +105,7 @@ export function useEmployeeControls({
               reason: words ? `${NOT_MINE}. ${words}` : NOT_MINE,
               suggestAssigneeId: person.id,
             });
-            toast(`Вернул директору · предложил: ${firstName(person.full_name)}`);
+            toast(`Вернул директору · предложил: ${shortName(person.full_name)}`);
           }}
         />
       ) : null}

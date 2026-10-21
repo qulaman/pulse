@@ -3,11 +3,14 @@
 import { RatingList } from "@/components/rating/RatingList";
 import { ShopRow } from "@/components/rating/ShopRow";
 import { PageHead } from "@/components/ui/PageHead";
+import { useNamesKey } from "@/lib/people/names";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useMe } from "@/lib/tasks/queries";
 
 /** Рейтинг: who earned what this week or month; the director awards from here (D-48). */
 export default function RatingPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const pointsEnabled = usePointsEnabled();
 

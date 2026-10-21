@@ -1,9 +1,9 @@
 "use client";
 
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { useTaskMessages } from "@/lib/tasks/queries";
 import { CHAT_TYPES } from "@/lib/pulse/board";
-import { firstNameOf } from "@/lib/text/normalize";
 
 const TAIL = 3;
 
@@ -33,7 +33,7 @@ export function ThreadTail({ taskId, meId, enabled }: { taskId: string; meId: st
         return (
           <p key={message.id} className="text-[13px] leading-[17px]">
             <span className="text-muted">
-              {mine ? "Вы" : firstNameOf(message.sender?.full_name) || "—"} · <span className="nums">{humanAqtobe(new Date(message.created_at))}</span>
+              {mine ? "Вы" : shortName(message.sender?.full_name) || "—"} · <span className="nums">{humanAqtobe(new Date(message.created_at))}</span>
             </span>{" "}
             <span className={mine ? "text-muted" : "text-text"}>{wordsOf(message.type, message.content)}</span>
           </p>

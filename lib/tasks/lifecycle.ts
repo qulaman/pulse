@@ -1,4 +1,5 @@
 import { humanAqtobe, toAqtobeIso } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import type { Json } from "@/lib/supabase/types";
 
 import type { TaskStatus } from "./status-text";
@@ -199,10 +200,10 @@ export function handedInPartly(
   return (messages ?? []).some((message) => isPartialReport(message.meta) && new Date(message.created_at).getTime() >= since);
 }
 
-/** «Передана · Ерлан» — the old holder's and the director's word for a reassigned task. */
+/** «Передана · Ерлан» — the old holder's and the director's word for a reassigned task («Ерлан Д.» beside a namesake, D-146). */
 export function passedWord(name: string | null | undefined): string {
-  const first = name?.trim().split(/\s+/)[0];
-  return first ? `Передана · ${first}` : "Передана";
+  const who = shortName(name);
+  return who ? `Передана · ${who}` : "Передана";
 }
 
 /** A reassign keeps the deadline unless it is behind or less than an hour away — then it asks. */

@@ -11,6 +11,7 @@ import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
+import { shortName } from "@/lib/people/names";
 import { peopleQuery } from "@/lib/people/queries";
 import type { DeskAction } from "@/lib/tasks/desk";
 import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
@@ -32,10 +33,6 @@ const MORE_LABEL: Partial<Record<DeskAction, string>> = {
   nudge: "Напомнить",
   reissue: "Выдать снова",
 };
-
-function firstName(full: string | null | undefined): string {
-  return full?.trim().split(/\s+/)[0] ?? "";
-}
 
 /**
  * What the director's buttons do, wherever a task shows them — a card of «Задачи» or the
@@ -82,13 +79,13 @@ export function useDirectorControls({
 
   const byId = (id: string) => tasks.find((task) => task.id === id) ?? null;
   const named = (text: string, task: TaskWithPeople) => {
-    const who = firstName(task.assignee?.full_name);
+    const who = shortName(task.assignee?.full_name);
     return who ? `${text} · ${who}` : text;
   };
 
   // the same actions with a receipt in words: the card leaves under the thumb, the toast says where it
   // went. «Принято», «Снова отправлено», «Отозвано» and «Удалено» are the mutation's own, with
-  // «Отменить» (D-139); «Выдать снова» opens the new task from its toast.
+  // «Отменить» (D-139); «Выдать снова» and «Передать» open the new task from their toast (D-146).
   const actions: TaskActions = {
     ...base,
     transition: (input) => {
@@ -101,6 +98,7 @@ export function useDirectorControls({
       toast(input.deadlineIso ? `Срок: ${humanAqtobe(new Date(input.deadlineIso), now)}` : "Теперь без срока");
     },
     reissue: (input) => base.reissue({ ...input, onOpen: (id) => router.push(`/tasks/${id}`) }),
+    reassign: (input) => base.reassign({ ...input, onOpen: (id) => router.push(`/tasks/${id}`) }),
   };
 
   const press = (action: DeskAction, task: TaskWithPeople) => {
@@ -121,7 +119,7 @@ export function useDirectorControls({
         setSheet({ name: "extend", taskId: task.id });
         return;
       case "nudge":
-        actions.nudge({ taskId: task.id, name: firstName(task.assignee?.full_name) });
+        actions.nudge({ taskId: task.id, name: shortName(task.assignee?.full_name) });
         return;
       case "handoff": {
         const suggestion = suggestionOf(task.id);

@@ -4,7 +4,7 @@ import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-q
 
 import { toast } from "@/components/ui/Toast";
 import { isNetworkError, NetworkError } from "@/lib/net";
-import { firstNameOf } from "@/lib/people/roster";
+import { shortName } from "@/lib/people/names";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 
@@ -88,7 +88,7 @@ export function useAssignNote(me: { userId: string } | undefined) {
     mutationFn: sendAssign,
     onSuccess: (result, { note, person }) => {
       if (me && result.taskId) markHanded(queryClient, me.userId, note.id, result.taskId);
-      const who = firstNameOf(person.full_name);
+      const who = shortName(person.full_name);
       toast(result.scheduled ? `Поручено: ${who} · получит утром` : `Поручено: ${who}`);
     },
     onError: (error) => {
@@ -137,7 +137,7 @@ export function useAssignNotes(me: { userId: string } | undefined) {
       return { sent, failed, scheduled };
     },
     onSuccess: ({ sent, failed, scheduled }) => {
-      const names = [...new Set(sent.map((input) => firstNameOf(input.person.full_name)))].join(", ");
+      const names = [...new Set(sent.map((input) => shortName(input.person.full_name)))].join(", ");
       if (sent.length === 0) {
         toast("Не получилось поручить. Попробуйте ещё раз");
         return;

@@ -1,4 +1,5 @@
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { pluralRu, SHORT_STATUS, type TaskStatus } from "@/lib/tasks/status-text";
 import { firstNameOf, stem, tokens } from "@/lib/text/normalize";
 import { quoteTitle, type BriefTask } from "./briefing";
@@ -119,7 +120,7 @@ export function answer(input: AnswerInput): Answer {
   // 4. a person
   const person = findPerson(question, input.people);
   if (person) {
-    const name = firstNameOf(person.fullName);
+    const name = shortName(person.fullName);
     // by id when the task carries one — two Мараты are two people
     const theirs = (t: BriefTask) => (t.assigneeId ? t.assigneeId === person.id : t.assignee === name);
     const mine = input.open.filter(theirs);

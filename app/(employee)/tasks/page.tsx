@@ -3,6 +3,7 @@
 import { EmployeeTasksView } from "@/components/tasks/list/EmployeeTasksView";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { TasksSkeleton } from "@/components/ui/PageSkeletons";
+import { useNamesKey } from "@/lib/people/names";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
 
@@ -11,6 +12,8 @@ import { useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
  * the /dev sandbox draws the same view from fixtures.
  */
 export default function TasksPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const tasks = useMyTasks(me.data?.userId);
   const board = usePulseBoard(me.data);

@@ -1,5 +1,5 @@
 import type { Errand } from "@/lib/errands/queries";
-import { firstNameOf } from "@/lib/text/normalize";
+import { shortName } from "@/lib/people/names";
 
 export type ErrandTally = { name: string; taken: number; done: number; declined: number };
 
@@ -12,7 +12,7 @@ export function tallyByPerson(rows: readonly Errand[]): ErrandTally[] {
   const map = new Map<string, ErrandTally>();
   for (const row of rows) {
     if (!row.claimed_by) continue;
-    const name = firstNameOf(row.claimed?.full_name ?? "") || "Секретарь";
+    const name = shortName(row.claimed?.full_name ?? "") || "Секретарь";
     const tally = map.get(row.claimed_by) ?? { name, taken: 0, done: 0, declined: 0 };
     tally.taken += 1;
     if (row.status === "done") tally.done += 1;

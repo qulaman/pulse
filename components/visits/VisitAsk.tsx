@@ -5,11 +5,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { askSecretary } from "@/lib/errands/pending";
+import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import type { Visit, VisitAnswer } from "@/lib/visits/queries";
 import { awaitingDirector, waitedSince } from "@/lib/visits/text";
-import { firstNameOf } from "@/lib/text/normalize";
 
 /**
  * «К вам посетитель» на Пульсе директора (D-96): человек у стола секретаря ждёт ответа —
@@ -48,7 +48,7 @@ export function VisitAsk({
       {open.map((visit) => {
         const waiting = visit.status === "waiting";
         const busy = answer.isPending && answer.variables?.id === visit.id;
-        const who = firstNameOf(visit.author?.full_name ?? "");
+        const who = shortName(visit.author?.full_name ?? "");
         return (
           <article
             key={visit.id}

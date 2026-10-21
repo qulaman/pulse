@@ -1,4 +1,5 @@
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import type { Json } from "@/lib/supabase/types";
 import {
   handedInPartly,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/tasks/lifecycle";
 import type { TaskMessageRow, TaskRow, TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, pluralRu, verdict, type TaskStatus } from "@/lib/tasks/status-text";
-import { firstNameOf } from "@/lib/text/normalize";
+
 import { greeting, quietLine, quoteTitle, type BriefTask } from "./briefing";
 
 /**
@@ -382,9 +383,9 @@ export type BoardEventKind =
   // «Отменить» on the director's own tap (D-139): the board coming back is not news
   | "undone";
 
-/** The assignee as the director calls them — first name, nominative, never declined. */
+/** The assignee as the director calls them — first name, nominative, never declined; «Ерлан Б.» beside a namesake (D-146). */
 export function whoOf(task: Pick<BoardTask, "assignee">): string {
-  return firstNameOf(task.assignee?.full_name) || "Без исполнителя";
+  return shortName(task.assignee?.full_name) || "Без исполнителя";
 }
 
 const QUESTION_MAX = 80;
@@ -425,7 +426,7 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
         return { text: `${who}: задача ${title} сдана, ждёт приёмки`, tone: "ok", kind: "handed" };
       case "declined": {
         const reason = after.decline_reason ? `: ${lowerFirst(after.decline_reason.trim())}` : "";
-        const suggested = after.suggestion ? ` · предлагает: ${firstNameOf(after.suggestion.name)}` : "";
+        const suggested = after.suggestion ? ` · предлагает: ${shortName(after.suggestion.name)}` : "";
         return { text: `${who} не может ${title}${reason}${suggested}`, tone: "warn", kind: "declined" };
       }
       case "done":
@@ -443,7 +444,7 @@ export function describeChange(prev: BoardTask | undefined, next: BoardTask | un
     }
   }
   if (after.status === "declined" && after.decline_reason && after.decline_reason !== before.decline_reason) {
-    const suggested = after.suggestion ? ` · предлагает: ${firstNameOf(after.suggestion.name)}` : "";
+    const suggested = after.suggestion ? ` · предлагает: ${shortName(after.suggestion.name)}` : "";
     return { text: `${who} не может ${title}: ${lowerFirst(after.decline_reason.trim())}${suggested}`, tone: "warn", kind: "declined" };
   }
   if (after.time_request && after.time_request.id !== before.time_request?.id && after.time_request.senderId !== meId) {
@@ -500,7 +501,7 @@ export function toBriefTask(task: BoardTask): BriefTask {
     id: task.id,
     title: task.title,
     deadline: task.deadline,
-    assignee: task.assignee?.full_name ? firstNameOf(task.assignee.full_name) : null,
+    assignee: task.assignee?.full_name ? shortName(task.assignee.full_name) : null,
     assigneeId: task.assignee_id,
   };
 }

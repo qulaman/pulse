@@ -6,8 +6,8 @@ import { SecretaryMascot } from "@/components/secretary/SecretaryMascot";
 import { useErrandActions } from "@/lib/errands/mutations";
 import { useErrands, useSecretaryActions, useSecretarySetup } from "@/lib/errands/queries";
 import { sceneOf } from "@/lib/errands/scene";
+import { shortName } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
-import { firstNameOf } from "@/lib/text/normalize";
 
 const VIBRATED_KEY = "pulse.alarm.vibrated";
 
@@ -53,7 +53,7 @@ export function SecretaryAlarm({ meId }: { meId: string }) {
 
   if (!alarm) return null;
   const phone = setup.data?.securityPhone ?? "";
-  const who = firstNameOf(alarm.claimed?.full_name ?? "");
+  const who = shortName(alarm.claimed?.full_name ?? "");
 
   if (theirs || folded === alarm.id) {
     return (
@@ -93,7 +93,7 @@ export function SecretaryAlarm({ meId }: { meId: string }) {
           {mine ? "Охрана вызывается" : "ВЫЗОВИ ОХРАНУ!"}
         </p>
         <p className="mt-2 text-[15px] leading-5 text-white/85">
-          {firstNameOf(alarm.author?.full_name ?? "Директор")} · {seconds(alarm.created_at, now)}
+          {shortName(alarm.author?.full_name ?? "Директор")} · {seconds(alarm.created_at, now)}
         </p>
         {alarm.note ? <p className="mt-1 text-[17px] font-semibold leading-6 text-white">{alarm.note}</p> : null}
 

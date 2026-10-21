@@ -8,6 +8,7 @@ import { TaskOnWall } from "@/components/tasks/TaskOnWall";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { PageHead } from "@/components/ui/PageHead";
 import { TaskPageSkeleton } from "@/components/ui/PageSkeletons";
+import { useNamesKey } from "@/lib/people/names";
 import { clearTaskNotifications } from "@/lib/push/client";
 import { homeForRole } from "@/lib/routes";
 import { useTaskActions } from "@/lib/tasks/mutations";
@@ -19,6 +20,8 @@ import { useMe, useTaskThread } from "@/lib/tasks/queries";
  * thread (D-64 §4), in the language of «Задачи» (D-83).
  */
 export default function TaskThreadPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const router = useRouter();

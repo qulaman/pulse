@@ -8,11 +8,12 @@ import { ErrandCards } from "@/components/secretary/ErrandCards";
 import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { SecretarySkeleton } from "@/components/secretary/SecretarySkeleton";
+import { humanAqtobe } from "@/lib/ai/time";
 import { isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
 import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount } from "@/lib/errands/stats";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import { useMe } from "@/lib/tasks/queries";
-import { firstNameOf } from "@/lib/text/normalize";
 
 const STATUS_WORD: Record<string, string> = {
   sent: "ждёт",
@@ -29,6 +30,8 @@ const STATUS_WORD: Record<string, string> = {
  * шторкой поверх списка.
  */
 export default function SecretaryPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   return (
     <Suspense fallback={<SecretarySkeleton />}>
       <SecretaryScreen />
@@ -124,7 +127,7 @@ function SecretaryScreen() {
               {focused.note ? <p className="text-[16px] leading-[22px]">{focused.note}</p> : null}
               <p className="text-[14px] leading-[18px] text-muted">
                 {STATUS_WORD[focused.status]}
-                {focused.claimed?.full_name ? ` · ${firstNameOf(focused.claimed.full_name)}` : ""}
+                {focused.claimed?.full_name ? ` · ${shortName(focused.claimed.full_name)}` : ""}
                 {focused.decline_reason ? ` · ${focused.decline_reason}` : ""}
               </p>
             </div>
@@ -165,7 +168,7 @@ function DirectorStats({ rows }: { rows: readonly Errand[] }) {
 }
 
 function ErrandLine({ errand, now, onOpen }: { errand: Errand; now: Date; onOpen?: () => void }) {
-  const who = firstNameOf(errand.claimed?.full_name ?? "");
+  const who = shortName(errand.claimed?.full_name ?? "");
   const body = (
     <>
       <span className="text-[15px] leading-5">
@@ -174,7 +177,8 @@ function ErrandLine({ errand, now, onOpen }: { errand: Errand; now: Date; onOpen
       </span>
       <span className="shrink-0 text-[13px] leading-4 text-muted">
         {STATUS_WORD[errand.status]}
-        {who ? ` · ${who}` : ""} · {waitedFor(errand, now)}
+        {/* a live one — how long it waits; a closed one — when it was asked («600 ч» said nothing, D-146) */}
+        {who ? ` · ${who}` : ""} · {isActive(errand) ? waitedFor(errand, now) : humanAqtobe(new Date(errand.created_at), now)}
       </span>
     </>
   );

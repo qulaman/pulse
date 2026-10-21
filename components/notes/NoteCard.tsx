@@ -24,6 +24,7 @@ import {
 } from "@/lib/notes/list";
 import { useNoteSaveState } from "@/lib/notes/mutations";
 import type { Note } from "@/lib/notes/queries";
+import { shortName } from "@/lib/people/names";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, pluralRu, SHORT_STATUS } from "@/lib/tasks/status-text";
 import { holdUpdate } from "@/lib/update/client";
@@ -494,14 +495,10 @@ export function IconButton({ label, icon, onClick, disabled, danger, testId }: {
   );
 }
 
-function firstName(full: string | null | undefined): string {
-  return full?.trim().split(/\s+/)[0] ?? "";
-}
-
 /** A note that became something (D-81 §6): what it became, and how that is doing — a card like a task's, a tap to it. */
 export function ConvertedCard({ note, task, now, query }: { note: Note; task: TaskWithPeople | undefined; now: Date; query: string }) {
   const label = note.converted_task_id
-    ? ["Задача", firstName(task?.assignee?.full_name), task ? (isOverdue(task, now) ? "просрочена" : SHORT_STATUS[task.status]) : ""].filter(Boolean).join(" · ")
+    ? ["Задача", shortName(task?.assignee?.full_name), task ? (isOverdue(task, now) ? "просрочена" : SHORT_STATUS[task.status]) : ""].filter(Boolean).join(" · ")
     : "Объявление";
 
   const body = (

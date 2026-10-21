@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { PeoplePicker } from "@/components/people/PeoplePicker";
+import { shortName } from "@/lib/people/names";
 import { useRoster } from "@/lib/people/roster";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
@@ -93,7 +94,7 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
     if (everyone) return "Все сотрудники";
     if (ids.length === 0) return "Только вы";
     const names = ids.map(
-      (id) => roster.data?.find((person) => person.id === id)?.full_name.split(" ")[0] ?? "…",
+      (id) => shortName(roster.data?.find((person) => person.id === id)?.full_name) || "…",
     );
     return names.length > 2 ? `${names.slice(0, 2).join(", ")} +${names.length - 2}` : names.join(", ");
   })();

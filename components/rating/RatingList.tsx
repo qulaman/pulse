@@ -11,6 +11,7 @@ import { PeriodChips } from "@/components/rating/PeriodChips";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
+import { shortName } from "@/lib/people/names";
 import { initialsOf, usePeople } from "@/lib/people/queries";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
 
@@ -192,7 +193,7 @@ export function RatingList({
                     {ahead && ahead.points > me.points ? (
                       <>
                         {" "}
-                        · {ahead.display_name.split(/\s+/)[0]} впереди на{" "}
+                        · {shortName(ahead.display_name)} впереди на{" "}
                         <span className="nums font-semibold" style={{ color: "var(--gold)" }}>
                           {ahead.points - me.points}
                         </span>
@@ -202,7 +203,8 @@ export function RatingList({
                     ) : null}
                   </>
                 ) : (
-                  "Очков за период пока нет. Закрытая в срок задача — первые очки"
+                  // about the one who looks, not the list under it: the rest of the team may well have points
+                  "У вас очков за этот период пока нет. Закрытая в срок задача — первые очки"
                 )}
               </p>
             </div>

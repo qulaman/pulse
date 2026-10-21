@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { dequeue, enqueue, release } from "@/lib/outbox";
+import { shortName } from "@/lib/people/names";
 import type { BoardTask } from "@/lib/pulse/board";
 import { kickPush } from "@/lib/push/client";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -382,22 +383,29 @@ export type ReassignInput = {
   changeDeadline?: boolean;
   /** D-128: the director's word to the new person */
   note?: string;
+  /** The toast's «Открыть»: the old task's screen is left for the new one (D-146). */
+  onOpen?: (taskId: string) => void;
 };
 
 export function useReassign() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: ReassignInput) => {
-      await postJson(`/api/tasks/${input.taskId}/reassign`, {
+    mutationFn: async (input: ReassignInput): Promise<string | null> => {
+      const res = (await postJson(`/api/tasks/${input.taskId}/reassign`, {
         assignee_id: input.assigneeId,
         client_request_id: input.requestId,
         ...(input.changeDeadline ? { change_deadline: true, deadline_iso: input.deadlineIso ?? null } : {}),
         ...(input.note?.trim() ? { note: input.note.trim() } : {}),
-      });
+      })) as { result?: { new_task_id?: string | null } } | null;
+      return res?.result?.new_task_id ?? null;
     },
-    // no optimistic clone: the new task's id comes from the server, the lists refetch at once
-    onSuccess: (_data, input) => toast(`Передал: ${input.assigneeName}`),
+    // no optimistic clone: the new task's id comes from the server, the lists refetch at once;
+    // the old one's screen says «передана» — the toast leads to where the work went (D-146)
+    onSuccess: (newId, input) => {
+      const open = input.onOpen;
+      toast(`Передал: ${input.assigneeName}`, newId && open ? { action: { label: "Открыть", onClick: () => open(newId) }, lifetimeMs: 5_000 } : undefined);
+    },
     onError: (error) => toast(error instanceof Error ? error.message : GENERIC_ERROR),
     onSettled: (_data, _error, input) => invalidateTasks(queryClient, input.taskId),
   });
@@ -680,7 +688,7 @@ export function useReissue() {
       return { taskId: ids[0] ?? null, scheduled: res.result.scheduled === true };
     },
     onSuccess: (result, input) => {
-      const who = input.assigneeName.trim().split(/\s+/)[0] ?? input.assigneeName;
+      const who = shortName(input.assigneeName) || input.assigneeName;
       const text = result.scheduled ? `Выдал снова: ${who} · получит утром` : `Выдал снова: ${who}`;
       const id = result.taskId;
       const open = input.onOpen;

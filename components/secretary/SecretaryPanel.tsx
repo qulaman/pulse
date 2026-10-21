@@ -11,9 +11,9 @@ import { askSecretary, cancelAsked, usePendingErrands } from "@/lib/errands/pend
 import { useErrandActions, useErrandLink, useThankErrand } from "@/lib/errands/mutations";
 import { isActive, useErrandReceipt, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
 import { atLine, dueFromWall, dueSlots, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
+import { shortName } from "@/lib/people/names";
 import { receiptLine } from "@/lib/tasks/receipts";
 import type { SecretaryAction } from "@/lib/settings";
-import { firstNameOf } from "@/lib/text/normalize";
 
 /**
  * Кнопку держат две секунды — и просьба уходит сразу (D-101): случайное касание ничего не
@@ -456,7 +456,7 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
   // квитанция нужна, только пока никто не взялся: «принято» честнее любой галочки
   const receipt = useErrandReceipt(errand.id, errand.status === "sent");
   const line = errand.status === "sent" ? receiptLine(receipt.data, now) : null;
-  const who = firstNameOf(errand.claimed?.full_name ?? "");
+  const who = shortName(errand.claimed?.full_name ?? "");
   const eta = etaLine(etaLeftMin(errand, now));
   const stale = errand.status === "sent" && now.getTime() - new Date(errand.created_at).getTime() >= STALE_MS;
   const asking = errand.question && !errand.answer;
@@ -558,7 +558,7 @@ function ActiveErrand({ errand, now, compact = false }: { errand: Errand; now: D
  */
 function RecentRow({ errand, compact, thanks }: { errand: Errand; compact: boolean; thanks: boolean }) {
   const thank = useThankErrand();
-  const who = firstNameOf(errand.claimed?.full_name ?? "");
+  const who = shortName(errand.claimed?.full_name ?? "");
   return (
     <div className={`card-in card ${compact ? "px-3 py-1" : "px-4 py-3"}`} data-testid="errand-thank">
       <div className="flex items-center justify-between gap-3">

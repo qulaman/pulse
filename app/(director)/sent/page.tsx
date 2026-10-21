@@ -5,6 +5,7 @@ import { useState } from "react";
 import { DirectorTasksView } from "@/components/tasks/list/DirectorTasksView";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { SentSkeleton } from "@/components/ui/PageSkeletons";
+import { useNamesKey } from "@/lib/people/names";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useClosedPages, useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 
@@ -13,6 +14,8 @@ import { useClosedPages, useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/
  * `DirectorTasksView` — the /dev sandbox draws the same view from fixtures.
  */
 export default function SentPage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
   const board = usePulseBoard(me.data);

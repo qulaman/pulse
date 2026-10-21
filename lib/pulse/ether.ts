@@ -1,4 +1,4 @@
-import { firstNameOf } from "@/lib/text/normalize";
+import { shortName } from "@/lib/people/names";
 
 import type { Phrase } from "./board";
 import { quoteTitle } from "./briefing";
@@ -32,7 +32,7 @@ export function describeEther(prev: readonly EtherPost[], next: readonly EtherPo
       phrases.push(
         post.author_id === meId
           ? { text: `Объявление ушло всем: ${quote}`, tone: "ok", source: "ether" }
-          : { text: `${firstNameOf(post.author?.full_name) || "Объявление"}: ${quote}`, tone: "muted", source: "ether" },
+          : { text: `${shortName(post.author?.full_name) || "Объявление"}: ${quote}`, tone: "muted", source: "ether" },
       );
       continue;
     }
@@ -40,7 +40,7 @@ export function describeEther(prev: readonly EtherPost[], next: readonly EtherPo
     const seen = new Set(was.acks.map((ack) => ack.user_id));
     const fresh = post.acks.filter((ack) => !seen.has(ack.user_id) && ack.user_id !== meId);
     if (fresh.length === 1) {
-      const name = firstNameOf(fresh[0]!.user?.full_name) || "Сотрудник";
+      const name = shortName(fresh[0]!.user?.full_name) || "Сотрудник";
       phrases.push({ text: `${name} в курсе объявления ${quote}`, tone: "muted", source: "ether" });
     } else if (fresh.length > 1) {
       phrases.push({ text: `Объявление ${quote}: ознакомились ещё ${fresh.length}`, tone: "muted", source: "ether" });

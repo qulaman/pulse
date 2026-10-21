@@ -7,7 +7,7 @@ import { Mascot } from "@/components/brand/Mascot";
 import { SecretaryPanel } from "@/components/secretary/SecretaryPanel";
 import type { Errand, SecretaryPerson } from "@/lib/errands/queries";
 import { isAway, untilLine } from "@/lib/errands/scene";
-import { firstNameOf } from "@/lib/text/normalize";
+import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 
 /**
@@ -108,7 +108,7 @@ export function SecretaryCard({
                 ? secretaries.map((person, index) => (
                     <span key={person.id}>
                       {index > 0 ? ", " : ""}
-                      {firstNameOf(person.full_name)}
+                      {shortName(person.full_name)}
                       {isAway(person, now) ? (
                         <span style={{ color: "var(--warn)" }}> · не на месте {untilLine(person.away_until as string)}</span>
                       ) : null}

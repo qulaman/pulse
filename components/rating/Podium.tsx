@@ -1,6 +1,7 @@
 "use client";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { shortName } from "@/lib/people/names";
 import { initialsOf } from "@/lib/people/queries";
 import type { RatingRow } from "@/lib/points/queries";
 
@@ -51,7 +52,7 @@ export function Podium({ rows, onPick }: { rows: RatingRow[]; onPick?: (row: Rat
                   {MEDAL[row.rank - 1]}
                 </span>
               </span>
-              <span className="mt-4 w-full truncate text-center text-[13px] leading-4">{row.display_name.split(/\s+/)[0]}</span>
+              <span className="mt-4 w-full truncate text-center text-[13px] leading-4">{shortName(row.display_name)}</span>
               <span className="nums text-[16px] font-semibold leading-[22px]" style={{ color: "var(--gold)" }}>
                 {row.points}
               </span>

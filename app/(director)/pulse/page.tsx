@@ -28,6 +28,7 @@ import { useDirectorControls } from "@/components/tasks/list/useDirectorControls
 import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
 import { Button } from "@/components/ui/Button";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import { useComposeStore } from "@/lib/store/compose";
 import { useHydrated } from "@/lib/useHydrated";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
@@ -84,6 +85,8 @@ type Mode = "idle" | "ring" | "panel";
 const THROW_MS = 1200;
 const FACE = 128;
 const FACE_SMALL = 88;
+/** The cards band against the words' band while a phrase of several things waits (D-146). */
+const CROWDED_GROW = 8;
 /** Distance from the face's centre to the balls' centres. */
 const RING_RADIUS = 124;
 /** How long a thought hangs above the head before the face dozes off again. */
@@ -132,6 +135,8 @@ const DRINKS = new Set(["coffee", "tea", "water"]);
  * centres it (owner, 2026-09-17: the board of D-57 stays a reserve for /tv).
  */
 export default function PulsePage() {
+  // a namesake on screen gets the surname's initial once the roster has come (D-146)
+  useNamesKey();
   const me = useMe();
   const board = usePulseBoard(me.data);
   const since = useLastVisit();
@@ -388,7 +393,7 @@ export default function PulsePage() {
       open: rows.filter((t) => WORK_STATUSES.includes(t.status)).map((t) => ({ ...toBriefTask(t), status: t.status })),
       closed: (sent.data ?? [])
         .filter((t) => t.status === "done" || t.status === "declined" || t.status === "revoked")
-        .map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, assignee: t.assignee?.full_name ? firstNameOf(t.assignee.full_name) : null, assigneeId: t.assignee_id, status: t.status, closedAt: t.closed_at })),
+        .map((t) => ({ id: t.id, title: t.title, deadline: t.deadline, assignee: t.assignee?.full_name ? shortName(t.assignee.full_name) : null, assigneeId: t.assignee_id, status: t.status, closedAt: t.closed_at })),
       overdue: lanes.overdue.map(toBriefTask),
       declined: lanes.declined.map((t) => ({ ...toBriefTask(t), reason: t.decline_reason })),
       questions: lanes.question.map(toBriefTask),
@@ -614,7 +619,11 @@ export default function PulsePage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- team is derived from peopleRows
   }, [peopleRows, rows, now, meId]);
-  const faceSize = mode === "panel" ? FACE_SMALL : FACE;
+  // two cards and more do not fit under a face in the middle: a third card, «Отменить» and the
+  // send hint went below the tab bar while the top half stood empty. The face goes smaller and
+  // up, the cards band takes the screen (D-146); the words above keep room for their line.
+  const crowded = confirming && entities.length >= 2;
+  const faceSize = mode === "panel" || crowded ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
   // «Понял так: 2 задачи» — the assistant's own words, where its words always are
@@ -651,14 +660,14 @@ export default function PulsePage() {
     </>
   );
 
-
   return (
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, the assistant's words grow upwards above it and the cards downwards
-    // under it. The bands scroll inside themselves, so the page itself is always one screen
-    // — no scrollbar appearing and disappearing on a tap (D-60). `data-board` stops the shell
-    // growing with its content (globals.css); PulseSkeleton draws the same bands, so the face
-    // stands where the skeleton had it.
+    // under it — one exception: a phrase of several things lifts it, the cards band growing
+    // by a CSS transition (`crowded`, D-146). The bands scroll inside themselves, so the page
+    // itself is always one screen — no scrollbar appearing and disappearing on a tap (D-60).
+    // `data-board` stops the shell growing with its content (globals.css); PulseSkeleton draws
+    // the same bands, so the face stands where the skeleton had it.
     <main
       className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
       style={{ overscrollBehaviorY: "contain" }}
@@ -697,7 +706,8 @@ export default function PulsePage() {
         {/* the face, and the balls orbiting it (ring) or in a row under it (panel) */}
         <div className="relative flex shrink-0 flex-col items-center">
           {/* The box changes size with the mode, but its middle never moves (the bands around it are
-              equal), so it is not animated: a layout animation of it was a pure scale, and it squashed
+              equal; under a crowded phrase they glide by CSS, not by framer), so it is not animated:
+              a layout animation of it was a pure scale, and it squashed
               everything inside without a `layout` of its own — the team came in twice too big when
               the face fell asleep, a thought's text zoomed. The face animates its own size. */}
           <div className="relative flex items-center justify-center" style={{ width: box, height: box }}>
@@ -797,7 +807,7 @@ export default function PulsePage() {
                       }
                     }}
                     tone={errandRows.some((e) => e.status === "accepted") ? "var(--ok)" : "var(--warn)"}
-                    label={asking ? "Секретарь: убрать кнопки" : `Секретарь${secretaries.length ? `: ${secretaries.map((p) => firstNameOf(p.full_name)).join(", ")}` : ""} — попросить`}
+                    label={asking ? "Секретарь: убрать кнопки" : `Секретарь${secretaries.length ? `: ${secretaries.map((p) => shortName(p.full_name)).join(", ")}` : ""} — попросить`}
                     onTap={() => {
                       if (stage !== "idle") return;
                       if (!asking && restFace === "sleeping" && !picked) setWakeKey((key) => key + 1);
@@ -834,7 +844,7 @@ export default function PulsePage() {
               {asking ? (
                 <div key="secretary" className="absolute bottom-full left-1/2 z-30 mb-3 -translate-x-1/2">
                   <SecretaryCard
-                    names={secretaries.map((p) => firstNameOf(p.full_name)).join(", ") || "на месте"}
+                    names={secretaries.map((p) => shortName(p.full_name)).join(", ") || "на месте"}
                     actions={catalogue.data ?? []}
                     errands={errandRows}
                     now={now}
@@ -855,8 +865,9 @@ export default function PulsePage() {
             ) : null}
             <AnimatePresence>
               {/* a person's card is open: it says the same news and stands where the thought
-                  would, so the thought waits (D-118) */}
-              {thought && !reading ? (
+                  would, so the thought waits (D-118); a phrase in hand owns the face — a thought
+                  over it hid «Понял так: …» (D-146) */}
+              {thought && !reading && !phraseInHand ? (
                 <ThoughtBubble
                   key={thought.id}
                   text={thought.text}
@@ -873,7 +884,12 @@ export default function PulsePage() {
 
         {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
             so a ball walking down from the orbit is never clipped on its way in. */}
-        <div className="flex min-h-0 flex-1 flex-col" data-band="cards">
+        <div
+          className="flex min-h-0 flex-1 flex-col transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none"
+          style={{ flexGrow: crowded ? CROWDED_GROW : 1 }}
+          data-band="cards"
+          data-crowded={crowded ? "" : undefined}
+        >
           {mode === "panel" && !phraseInHand ? (
             <div className="mt-1 w-full shrink-0">
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />

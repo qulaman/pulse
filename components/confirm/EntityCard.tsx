@@ -316,6 +316,13 @@ export function EntityCard({
                 </Chip>
               ) : null}
 
+              {/* without a person on it the card read as a task nobody got (D-146) */}
+              {entity.kind === "reminder" ? (
+                <Chip tone="muted" interactive={false}>
+                  напоминание — придёт тебе
+                </Chip>
+              ) : null}
+
               {entity.kind === "note" ? (
                 <Chip tone="muted" interactive={false}>
                   заметка — видишь только ты

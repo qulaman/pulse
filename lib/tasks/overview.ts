@@ -1,4 +1,5 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 
 import { REASON_ORDER, reasonOf, type DeskReason } from "./desk";
 import { compareTasks, groupTasks, nearestDeadline, type Bucket, type Groupable } from "./grouping";
@@ -196,10 +197,6 @@ export type StatusScreen = {
   closedWeek: number;
 };
 
-function firstName(full: string | null | undefined): string {
-  return full?.trim().split(/\s+/)[0] ?? "";
-}
-
 function nearestOf<T extends ListTask>(tasks: readonly T[], now: Date, who: (task: T) => string): Nearest | null {
   const at = nearestDeadline([...tasks], now);
   if (!at) return null;
@@ -237,14 +234,14 @@ export function directorScreen<T extends ListTask>(
   const open = yours + unseen + working + scheduled;
   const segments: Segment[] = [
     { key: "overdue", label: pluralRu(overdue, ["просрочена", "просрочены", "просрочено"]), count: overdue, tone: "danger" as Tone },
-    { key: "waiting", label: "ждут решения", count: waiting, tone: "warn" as Tone },
+    { key: "waiting", label: pluralRu(waiting, ["ждёт решения", "ждут решения", "ждут решения"]), count: waiting, tone: "warn" as Tone },
     { key: "unseen", label: pluralRu(unseen, ["не принята", "не приняты", "не приняты"]), count: unseen, tone: "accent" as Tone },
     { key: "working", label: "в работе", count: working, tone: "ok" as Tone },
     { key: "scheduled", label: pluralRu(scheduled, ["отложена", "отложены", "отложено"]), count: scheduled, tone: "muted" as Tone },
   ].filter((segment) => segment.count > 0);
   const closedToday = closedTodayCount(tasks, now);
   const closedWeek = closedTodayCount(tasks, now, 7);
-  const nearest = nearestOf(tasks, now, (task) => firstName(task.assignee?.full_name));
+  const nearest = nearestOf(tasks, now, (task) => shortName(task.assignee?.full_name));
 
   if (yours > 0) {
     const parts: string[] = [];

@@ -26,4 +26,9 @@ describe("tabBarRole", () => {
   it("does not move the secretary's home: she still lands on her Лента", () => {
     expect(homeForRole("secretary")).toBe("/feed");
   });
+
+  it("lands the shop keeper on Лента too: a task can go to him (D-146)", () => {
+    expect(homeForRole("shopkeeper")).toBe("/feed");
+    expect(homeForRole("tv")).toBe("/tv");
+  });
 });

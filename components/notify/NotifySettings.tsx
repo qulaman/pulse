@@ -10,6 +10,7 @@ import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
+import { shortName } from "@/lib/people/names";
 import { useRoster } from "@/lib/people/roster";
 import {
   CATEGORY_HINT,
@@ -95,7 +96,7 @@ export function NotifySettings({ meId }: { meId: string }) {
     update((p) => ({ ...p, modes: { ...p.modes, [category]: mode } }));
 
   const vipNames = prefs.vip
-    .map((id) => roster.data?.find((person) => person.id === id)?.full_name.split(" ")[0])
+    .map((id) => shortName(roster.data?.find((person) => person.id === id)?.full_name))
     .filter(Boolean)
     .join(", ");
 

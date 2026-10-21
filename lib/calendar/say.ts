@@ -1,6 +1,6 @@
 import { humanAqtobe } from "@/lib/ai/time";
+import { shortName } from "@/lib/people/names";
 import { quoteTitleOf, type Phrase } from "@/lib/pulse/board";
-import { firstNameOf } from "@/lib/text/normalize";
 
 import { hhmm, nextEvent, peopleCount, ymdOfEvent } from "./agenda";
 import type { CalendarEvent } from "./queries";
@@ -75,7 +75,7 @@ export function describeCalendar(
     const seen = new Map(was.participants.map((p) => [p.user_id, p.status]));
     for (const person of event.participants) {
       if (person.user_id === meId || seen.get(person.user_id) === person.status) continue;
-      const name = firstNameOf(person.person?.full_name ?? "") || "Сотрудник";
+      const name = shortName(person.person?.full_name ?? "") || "Сотрудник";
       if (person.status === "going") {
         phrases.push({ text: `${name} будет на ${quote}`, tone: "ok", source: "calendar" });
       } else if (person.status === "declined") {

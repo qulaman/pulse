@@ -1,10 +1,10 @@
 "use client";
 
 import { Button } from "@/components/ui/Button";
+import { shortName } from "@/lib/people/names";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import type { Visit } from "@/lib/visits/queries";
 import { unreadMessages, waitedSince } from "@/lib/visits/text";
-import { firstNameOf } from "@/lib/text/normalize";
 
 /**
  * Сообщение секретаря на Пульсе директора (D-116): те же слова, что сейчас во всю стену в
@@ -21,7 +21,7 @@ export function MessageAsk({ visits, now }: { visits: readonly Visit[]; now: Dat
     <div className="flex flex-col gap-2" data-testid="message-ask">
       {open.map((message) => {
         const busy = answer.isPending && answer.variables?.id === message.id;
-        const who = firstNameOf(message.author?.full_name ?? "");
+        const who = shortName(message.author?.full_name ?? "");
         return (
           <article
             key={message.id}

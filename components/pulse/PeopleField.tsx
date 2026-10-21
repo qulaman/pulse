@@ -10,8 +10,9 @@ import { TOUCHES, type DreamId } from "@/components/pulse/DreamOrbit";
 import { haptic } from "@/lib/haptics";
 import type { Chase } from "@/lib/idle/flight";
 import { lookOf, wordOf, type CrewTask, type Look } from "@/lib/idle/look";
-import { addressOf, firstNameOf, initialsOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
+import { addressOf, initialsOf, RING_OUT, teamField, type Member, type Pick, type Seat } from "@/lib/idle/people";
 import { brushesOf, keyframesOfBrushes } from "@/lib/idle/wake";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import { useDeepRest } from "@/lib/useDeepRest";
 
 /** The trip up is three acts (D-74) and needs room to read; the way back is a calm float. */
@@ -268,7 +269,7 @@ export function PeopleField({
     if (!entry || !seat) return;
     const busy = entry.look.busy;
     haptic(busy ? [10] : [12, 24, 12]);
-    const pick: Pick = { id, name: firstNameOf(entry.member.fullName), address: addressOf(entry.member), x: seat.x, y: seat.y };
+    const pick: Pick = { id, name: shortName(entry.member.fullName), address: addressOf(entry.member), x: seat.x, y: seat.y };
     if (busy) {
       // the moment of gold is not a card: the task is already closed
       if (entry.look.ring === "done") return;
@@ -409,7 +410,9 @@ const Seated = memo(
     lifted: boolean;
     onTap: (id: string) => void;
   }) {
-    const name = firstNameOf(fullName);
+    // memoised: subscribed on its own, so a namesake gets the initial once the roster has come (D-146)
+    useNamesKey();
+    const name = shortName(fullName);
     const initials = initialsOf(fullName);
     const label = look.busy
       ? look.lead
