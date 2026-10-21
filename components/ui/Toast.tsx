@@ -171,7 +171,8 @@ export function ToastHost() {
       {low.length > 0 ? (
         <div
           className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
-          style={{ bottom: "calc(var(--tabbar-space) + 10px)" }}
+          // above a bar docked over the tab bar, if one is up (`useDockSpace`): never over its keys
+          style={{ bottom: "calc(var(--tabbar-space) + var(--dock-space, 0px) + 10px)" }}
           data-testid="toasts-low"
         >
           {low.map(item)}

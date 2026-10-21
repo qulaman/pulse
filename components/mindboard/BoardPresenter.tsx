@@ -2,10 +2,11 @@
 
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { Key, Lcd, LcdDim } from "@/components/ui/device/Device";
 import { Rocker, RockerArrow, RockerWord, rockerKey } from "@/components/ui/device/Rocker";
+import { useDockSpace } from "@/components/ui/dock";
 import { haptic } from "@/lib/haptics";
 import { boardOnWall } from "@/lib/mindboard/list";
 import { stepPoint } from "@/lib/mindboard/tree";
@@ -250,12 +251,16 @@ function PresenterCapsule({ boardId, points, now }: { boardId: string; points: r
   const draft = useIngestStore((state) => state.stage === "confirm");
   const shown = presenter.onWall && presenter.stage.kind !== "empty";
   const lift = reduce ? 0 : 14;
+  // the bottom toasts stand above the capsule, not over ◀ ▶ (D-142)
+  const dock = useRef<HTMLDivElement>(null);
+  useDockSpace(dock, shown);
 
   return (
     <AnimatePresence>
       {shown ? (
         <motion.div
           key="presenter"
+          ref={dock}
           className={`above-tabbar ${p.dock}`}
           style={{ bottom: `calc(var(--tabbar-space) + ${8 + (draft ? DRAFT_PILL : 0)}px)` }}
           initial={{ opacity: 0, y: lift }}
