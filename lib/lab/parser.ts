@@ -25,7 +25,7 @@ export interface ParserLabState {
     /** System + roster + examples, by Claude's count; null when the count did not answer. */
     tokens: number | null;
   };
-  /** The corpus a save is checked on (`tests/ai/parser_evals.jsonl`), in file order. */
+  /** The corpus a save is checked on (`tests/ai/parser_evals.jsonl`): the cases of the company's kinds, in file order. */
   corpus: { cases: { id: string; transcript: string }[] };
   gates: typeof PARSER_GATES;
 }

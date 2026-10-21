@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import type { ParserKind } from "../kinds/names";
 import type { RosterUser } from "../../matchName";
 import type { EvalCase, FixtureId } from "./score";
 
@@ -66,4 +67,15 @@ function readCorpus(root: string, options: { demoIds?: boolean }): Corpus {
     .digest("hex");
 
   return { cases, roster, fixtureId: (id) => back.get(id) ?? id, hash };
+}
+
+/**
+ * The cases a company's run is scored on (task 026, acceptance): those whose expected kinds
+ * are all among the kinds the company has on. A kind switched off is one the model never
+ * answers with, so a case expecting it would fail for the right reason — and keep the
+ * company's rules from ever passing the gates. A case expecting nothing stays.
+ */
+export function casesForKinds(cases: readonly EvalCase[], kinds: readonly ParserKind[]): EvalCase[] {
+  const on = new Set<string>(kinds);
+  return cases.filter((c) => c.expected.entities.every((e) => on.has(e.kind)));
 }

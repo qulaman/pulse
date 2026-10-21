@@ -5,7 +5,7 @@ import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { loadCorpus } from "@/lib/ai/evals/corpus";
+import { casesForKinds, loadCorpus } from "@/lib/ai/evals/corpus";
 import { passesGates } from "@/lib/ai/evals/score";
 import { collectRun, evalSecret, runFingerprint } from "@/lib/ai/evals/stamp";
 import { fewShotMessages } from "@/lib/ai/examples";
@@ -95,7 +95,8 @@ export const GET = withAuth(["director", "secretary"], async ({ profile }) => {
       examples,
       tokens: await countPromptTokens(settings.parser.model, system, messages),
     },
-    corpus: { cases: corpus.cases.map((c) => ({ id: c.id, transcript: c.transcript })) },
+    // the cases of the company's kinds: a kind switched off is not what its rules are checked on
+    corpus: { cases: casesForKinds(corpus.cases, kinds).map((c) => ({ id: c.id, transcript: c.transcript })) },
     gates: PARSER_GATES,
   };
   return apiOk(body);
@@ -151,7 +152,7 @@ export const PUT = withAuth<z.infer<typeof SaveSchema>>(
         evalSecret(),
         profile.companyId,
         fingerprint,
-        corpus.cases.map((c) => c.id),
+        casesForKinds(corpus.cases, settings.parser.kinds).map((c) => c.id),
         body.pieces,
       );
       if (!run.ok) return apiError(422, `eval_${run.reason}`, RUN_PROBLEM[run.reason]);
