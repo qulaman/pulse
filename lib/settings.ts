@@ -245,7 +245,8 @@ export const CompanySettingsSchema = z.object({
    * prompt, the times to the resolver (task 026). Old `phrase/meaning` rows are converted,
    * unknown ones dropped — never a failed parse of the whole settings.
    */
-  conventions: z.unknown().transform(normalizeConventions),
+  // optional(): a transform alone makes the key required, and a missing key would drop every section
+  conventions: z.unknown().optional().transform(normalizeConventions),
   /** Name-matcher thresholds (D-16, docs/AI.md §5) — tuned per company from the gate, no UI. */
   matching: MatchingSettingsSchema.prefault({}),
   /** Points off during the pilot (D-40(в)); the director switches them on (D-48). */
