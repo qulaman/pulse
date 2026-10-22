@@ -28,6 +28,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { firstNameOf } from "@/lib/text/normalize";
 import { stageOf, type TvBoardData } from "@/lib/tv/board";
 import type { PresenterPoint } from "@/lib/tv/presenter";
+import { fitHeight } from "@/lib/ui/fitHeight";
 
 import { BoardMenu, type BoardMenuItem } from "./BoardMenu";
 import { openWords } from "./carry";
@@ -36,6 +37,9 @@ import { HandOutBar } from "./HandOutBar";
 import { PointCard, type PointHandlers, type RowLook } from "./PointCard";
 import { SketchPad } from "./SketchPad";
 import { WallPreview } from "./WallPreview";
+
+/** A smooth scroll of the browser is done by then: the title is in sight when its keyboard comes. */
+const FOCUS_AFTER_GLIDE_MS = 420;
 
 const WORDS: RecorderWords = {
   placeholder: "Написать пункт…",
@@ -412,7 +416,8 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
   // every tick on the board, sub-points too: what «Снять все отметки» will take off
   const ticks = rows.filter((row) => row.done_at !== null && !phone.has(row.id)).length;
   const menuItems: BoardMenuItem[] = [
-    { key: "rename", label: "Переименовать", icon: "pencil", run: () => setRenaming(true) },
+    // after the menu has gone: the title's keyboard and its scroll are not for a sheet still sliding down
+    { key: "rename", label: "Переименовать", icon: "pencil", sheet: true, run: () => setRenaming(true) },
     { key: "pin", label: board.pinned_at ? "Открепить" : "Закрепить сверху", icon: "pin", run: () => actions.pin(!board.pinned_at) },
     ...(handable.size > 0 ? [{ key: "hand", label: "Раздать поручения", detail: "кому какой пункт — и одним тапом", icon: "task" as const, run: startHanding }] : []),
     ...(open.length > 0 ? [{ key: "copy", label: "Новая доска из открытых", detail: `${openWords(open.length)} — на следующую встречу`, icon: "stack" as const, run: actions.copyOpen }] : []),
@@ -720,9 +725,27 @@ function BoardTitle({
   useLayoutEffect(() => {
     const node = field.current;
     if (!node) return;
-    node.style.height = "auto";
-    node.style.height = `${node.scrollHeight}px`;
+    fitHeight(node);
   }, [draft, editing]);
+
+  // The field takes focus without a jump of its own: a title in sight is focused where it stands
+  // (a tap on it — still the gesture, so an iPhone raises its keyboard); one scrolled out of sight
+  // («Переименовать» far down a board) glides in first and takes the keyboard once it arrived.
+  // `autoFocus` threw the whole board to the top under the closing menu.
+  useLayoutEffect(() => {
+    if (!editing) return;
+    const node = field.current;
+    if (!node) return;
+    const box = node.getBoundingClientRect();
+    if (box.top >= 0 && box.bottom <= window.innerHeight) {
+      node.focus({ preventScroll: true });
+      return;
+    }
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    node.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+    const timer = setTimeout(() => node.focus({ preventScroll: true }), still ? 0 : FOCUS_AFTER_GLIDE_MS);
+    return () => clearTimeout(timer);
+  }, [editing]);
 
   const done = () => {
     onEditing(false);
@@ -735,7 +758,6 @@ function BoardTitle({
     return (
       <textarea
         ref={field}
-        autoFocus
         rows={1}
         value={draft}
         maxLength={120}

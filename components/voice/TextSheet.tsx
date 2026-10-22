@@ -27,7 +27,10 @@ export function TextSheet({ open, onClose }: { open: boolean; onClose: () => voi
       const request = consumePrefill();
       setPin(request.pin);
       if (request.prefill) setValue(request.prefill);
-      fieldRef.current?.focus();
+      // focused while the pull is still the gesture — only then does an iPhone raise its keyboard,
+      // a focus at the slide's end would cost a tap on the field (принцип 1). No scroll of its
+      // own: the sheet stands on the keyboard by itself (Sheet, lib/ui/keyboard.ts)
+      fieldRef.current?.focus({ preventScroll: true });
     }, 0);
     return () => clearTimeout(timer);
   }, [open, consumePrefill]);

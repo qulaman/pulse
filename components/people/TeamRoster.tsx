@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Chip } from "@/components/ui/Chip";
 import { canEditPerson, type Who } from "@/lib/people/access";
 import type { Health } from "@/lib/push/health";
 import { AVAILABILITY_LABEL, ROLE_LABEL, initialsOf, type Person, type Role } from "@/lib/people/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { useSearchHold } from "@/lib/ui/searchHold";
 
 /** Filter chips in the order of the role picker; a chip shows only when someone holds the role. */
 const ROLE_CHIPS: { role: Role; label: string }[] = [
@@ -89,6 +90,8 @@ function Line({ person, editable, me, push }: { person: Person; editable: boolea
  */
 export function TeamRoster({ people, me, push }: { people: Person[]; me: Who | null; push?: Map<string, Health> }) {
   const [query, setQuery] = useState("");
+  const searchField = useRef<HTMLInputElement>(null);
+  const holdSearch = useSearchHold(searchField, query);
   const [role, setRole] = useState<Role | null>(null);
   const [showInactive, setShowInactive] = useState(false);
   const q = normalise(query);
@@ -116,9 +119,13 @@ export function TeamRoster({ people, me, push }: { people: Person[]; me: Who | n
           </svg>
         </span>
         <input
+          ref={searchField}
           type="search"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            holdSearch(e.target.value);
+            setQuery(e.target.value);
+          }}
           placeholder="Имя, должность или как зовут в речи"
           aria-label="Поиск по сотрудникам"
           className="min-h-[44px] w-full field pl-10 pr-10 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"

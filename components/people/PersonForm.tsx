@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { PasswordField } from "@/components/people/PasswordField";
 import { RolePicker } from "@/components/people/RolePicker";
@@ -15,6 +15,7 @@ import {
   type PersonPatch,
   type Role,
 } from "@/lib/people/queries";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 const FIELD =
   "min-h-[48px] w-full field px-3 text-[16px] leading-[22px] text-text outline-none focus:border-accent";
@@ -179,6 +180,10 @@ export function PersonForm({
 
   const person = draft.role !== "tv";
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline);
+  // «Сохранить» comes with the first letter — on the keyboard while one is out, never over the
+  // field being typed in (D-112)
+  const saveBar = useRef<HTMLDivElement>(null);
+  useKeyboardDock(saveBar, dirty && mode !== "create");
   // A new person signs in with a one-time code (D-135); an email and a password are only for
   // a password login — a computer, a habit — and open on request.
   const [withEmail, setWithEmail] = useState(false);
@@ -327,6 +332,7 @@ export function PersonForm({
           {dirty ? (
             <motion.div
               key="save-bar"
+              ref={saveBar}
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 16 }}

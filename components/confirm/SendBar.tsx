@@ -1,9 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { useDeliveryWindow } from "@/lib/points/queries";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
 
 type Props = {
@@ -30,9 +31,13 @@ export function SendBar({ sendable, total, sending, onSend, onReset, onFixFirst 
   const window = useDeliveryWindow().data;
   const quietHours = hydrated && !isWithinDeliveryWindow(new Date(), window);
   const opensAt = window?.from ?? `0${WINDOW_OPEN_HOUR}:00`;
+  // on the keyboard while a card's title is being typed, and never over that title (D-112)
+  const bar = useRef<HTMLDivElement>(null);
+  useKeyboardDock(bar);
 
   return (
     <div
+      ref={bar}
       className="above-tabbar sticky z-20 border-t border-border bg-bg/95 px-4 pt-3 backdrop-blur"
       // sticks above the floating tab bar, not under it — the bar covered the hint line (D-112)
       style={{ bottom: "var(--tabbar-space)", paddingBottom: 12 }}

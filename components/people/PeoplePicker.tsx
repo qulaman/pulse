@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Button } from "@/components/ui/Button";
@@ -70,6 +70,15 @@ export function PeoplePicker(props: PeoplePickerProps) {
 function PickerBody(props: PeoplePickerProps) {
   const roster = useRoster();
   const [query, setQuery] = useState("");
+  // The sheet stands on the bottom edge (or the keyboard) and is as tall as what it holds: a list
+  // narrowed by every letter pulled its top — the field with it — down and back up under the
+  // finger. From the first letter the list keeps the height it had; the sheet stays put.
+  const list = useRef<HTMLDivElement>(null);
+  const [held, setHeld] = useState<number | null>(null);
+  const search = (next: string) => {
+    if (held === null && next.trim() && list.current) setHeld(list.current.offsetHeight);
+    setQuery(next);
+  };
   const many = props.mode === "many";
   const [ids, setIds] = useState<string[]>(() => (props.mode === "many" ? [...props.selectedIds] : []));
   const [all, setAll] = useState(() => (props.mode === "many" ? Boolean(props.everyone) : false));
@@ -133,7 +142,7 @@ function PickerBody(props: PeoplePickerProps) {
           <input
             type="search"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => search(event.target.value)}
             placeholder="Имя или должность"
             aria-label="Найти человека"
             data-testid="people-picker-search"
@@ -166,7 +175,7 @@ function PickerBody(props: PeoplePickerProps) {
         </button>
       ) : null}
 
-      <div className="no-bar -mx-1 max-h-[52vh] overflow-y-auto px-1">
+      <div ref={list} className="no-bar -mx-1 max-h-[52vh] overflow-y-auto px-1" style={held === null ? undefined : { minHeight: held }}>
         {roster.isLoading ? <p className="px-2 py-3 text-[14px] text-muted">Загружаю людей…</p> : null}
         {roster.isError ? <p className="px-2 py-3 text-[14px] text-danger">Не смог загрузить список — проверьте связь</p> : null}
 

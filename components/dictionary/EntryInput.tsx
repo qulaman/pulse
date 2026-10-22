@@ -3,6 +3,7 @@
 import { useLayoutEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/Button";
+import { fitHeight } from "@/lib/ui/fitHeight";
 
 /** Four lines of 22px plus the field's padding and edge: past that the field scrolls. */
 const MAX_HEIGHT = 4 * 22 + 22;
@@ -45,8 +46,7 @@ export function EntryInput({
       node.style.height = "";
       return;
     }
-    node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight + 2, MAX_HEIGHT)}px`;
+    fitHeight(node, MAX_HEIGHT, 2);
   }, [value]);
 
   return (

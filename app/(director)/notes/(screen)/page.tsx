@@ -38,6 +38,7 @@ import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useTvState } from "@/lib/tv/queries";
 import { boardLive } from "@/lib/tv/state";
+import { useSearchHold } from "@/lib/ui/searchHold";
 
 /** A receipt stays on the screen long enough to be read over the shoulder of a thought. */
 const RECEIPT_MS = 4_000;
@@ -105,6 +106,7 @@ export default function NotesPage() {
   const [boarding, setBoarding] = useState<Note | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const searchField = useRef<HTMLInputElement>(null);
+  const holdSearch = useSearchHold(searchField, query);
 
   const receiptTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flash = useCallback((next: Receipt) => {
@@ -442,7 +444,10 @@ export default function NotesPage() {
               ref={searchField}
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                holdSearch(event.target.value);
+                setQuery(event.target.value);
+              }}
               placeholder={filter === "trash" ? "Найти в корзине" : filter === "converted" ? "Найти в деле" : filter === "boards" ? "Найти доску" : "Найти в заметках"}
               aria-label="Поиск по заметкам"
               className="min-h-[42px] min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted"

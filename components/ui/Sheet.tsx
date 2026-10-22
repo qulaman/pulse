@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 
 import { fromNextFrame } from "@/components/ui/motion";
+import { onKeyboard, readKeyboard, useFieldGuard, type Keyboard } from "@/lib/ui/keyboard";
 
 type Props = {
   open: boolean;
@@ -20,6 +21,9 @@ export const SHEET_CLOSE_MS = CLOSE_MS;
 /** If the slide never reports its end (a hidden tab runs no animations), this is when it counts as done. */
 const GRACE_MS = 600;
 
+/** Sheets up right now: a sheet opened from a sheet (people from a meeting) must not unlock the page when it closes. */
+let openSheets = 0;
+
 /** The first `data-autofocus` field, once per opening (the slide's end or the grace timer, whichever comes first). */
 function focusFirstField(dialog: HTMLElement | null, done: { current: boolean }) {
   if (done.current) return;
@@ -35,6 +39,12 @@ function focusFirstField(dialog: HTMLElement | null, done: { current: boolean })
  * whole viewport. Both ends of the slide are its own `animationend`, not a timer: on a
  * busy phone the closing render alone can outlast a timer, and the sheet would vanish
  * before its first frame down.
+ *
+ * With the keyboard out the sheet stands on it, no taller than what is left in sight: the window
+ * does not shrink for the keyboard, so a sheet at the window's bottom kept its lower part — the
+ * field's «Отправить» — under the keys. `--kb` / `--kb-vh` on the layer come from the visual
+ * viewport (lib/ui/keyboard.ts); a field under a sticky part of the sheet marked
+ * `data-keyboard-cover` (a form's button) scrolls up from under it once the keyboard settled.
  */
 export function Sheet({ open, onClose, title, children }: Props) {
   // stays mounted through the closing slide, then unmounts
@@ -43,6 +53,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
   const phase: "closed" | "open" | "closing" = !mounted ? "closed" : open ? "open" : "closing";
   const dialogRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLButtonElement>(null);
+  const layerRef = useRef<HTMLDivElement>(null);
   const focused = useRef(false);
 
   // the render that opens (or closes) a sheet is often the heaviest of the tap: the slide
@@ -67,12 +78,33 @@ export function Sheet({ open, onClose, title, children }: Props) {
     return () => window.removeEventListener("keydown", onKey);
   }, [phase, onClose]);
 
-  // scroll lock: an attribute, so two sheets in a row never fight over inline styles
+  // scroll lock: an attribute, so two sheets in a row never fight over inline styles; counted,
+  // so the inner one of two nested sheets leaves the page locked for the outer one
+  const present = phase !== "closed";
   useEffect(() => {
-    if (phase === "closed") return;
+    if (!present) return;
+    openSheets += 1;
     document.body.setAttribute("data-sheet-open", "");
-    return () => document.body.removeAttribute("data-sheet-open");
-  }, [phase]);
+    return () => {
+      openSheets -= 1;
+      if (openSheets === 0) document.body.removeAttribute("data-sheet-open");
+    };
+  }, [present]);
+
+  // on the keyboard, written in the viewport's own event like the docked bars
+  useLayoutEffect(() => {
+    const layer = layerRef.current;
+    if (!present || !layer) return;
+    const place = ({ up, gap, height }: Keyboard) => {
+      layer.style.setProperty("--kb", `${up ? gap : 0}px`);
+      layer.style.setProperty("--kb-vh", up ? `${window.innerHeight - height}px` : "100dvh");
+      // the keyboard covers the home indicator: its inset would only lift the sheet off the keys
+      layer.style.setProperty("--kb-safe", up ? "0px" : "env(safe-area-inset-bottom)");
+    };
+    place(readKeyboard());
+    return onKeyboard(place);
+  }, [present]);
+  useFieldGuard(present);
 
   useEffect(() => {
     if (phase !== "open") return;
@@ -88,8 +120,9 @@ export function Sheet({ open, onClose, title, children }: Props) {
   // would sit under the FAB no matter its z-index.
   return createPortal(
     <div
+      ref={layerRef}
       className="fixed inset-0 z-50 flex items-end justify-center"
-      style={{ touchAction: "none", pointerEvents: closing ? "none" : "auto" }}
+      style={{ touchAction: "none", pointerEvents: closing ? "none" : "auto", bottom: "var(--kb, 0px)" }}
     >
       <button
         ref={overlayRef}
@@ -111,9 +144,9 @@ export function Sheet({ open, onClose, title, children }: Props) {
         aria-label={title}
         className="no-bar relative w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[20px] border-t border-border bg-surface px-4 pt-4"
         style={{
-          maxHeight: "88dvh",
+          maxHeight: "min(88dvh, calc(var(--kb-vh, 100dvh) - 12px))",
           touchAction: "pan-y",
-          paddingBottom: "calc(16px + env(safe-area-inset-bottom))",
+          paddingBottom: "calc(16px + var(--kb-safe, env(safe-area-inset-bottom)))",
           boxShadow: "var(--shadow-raised)",
           animation: closing
             ? `sheet-down ${CLOSE_MS}ms var(--ease-in) both`

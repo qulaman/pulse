@@ -8,6 +8,7 @@ import { splitCounts, splitLabel, splitList, type SplitPoint } from "@/lib/mindb
 import type { Dictation, Receipt } from "@/lib/notes/dictation";
 import type { NotesHero } from "@/lib/notes/list";
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { fitHeight } from "@/lib/ui/fitHeight";
 
 import { NoteIcon } from "./icons";
 import css from "./notes.module.css";
@@ -129,8 +130,7 @@ export function NotesRecorder({ hero, idle, words = NOTE_WORDS, receipt, dictati
   useEffect(() => {
     const node = field.current;
     if (!node) return;
-    node.style.height = "auto";
-    node.style.height = `${Math.min(node.scrollHeight, 118)}px`;
+    fitHeight(node, 118);
   }, [draft]);
 
   // «Удалить запись» needs a second tap within three seconds — the recording is gone for good

@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { useDockSpace } from "@/components/ui/dock";
 import { IngestOverlay } from "@/components/voice/IngestOverlay";
 import { TextSheet } from "@/components/voice/TextSheet";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { useComposeStore } from "@/lib/store/compose";
 import { isCountable, useIngestStore } from "@/lib/store/ingest";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 /**
  * What the director's screens share around the input (docs/FRONTEND.md "FAB"). The floating
@@ -35,11 +37,17 @@ export function DirectorFab() {
   const count = entities.filter((entity) => isCountable(entity, pointsEnabled)).length;
   // nothing parsed out of the words: the draft is a «не разобрал», not «0 сущностей»
   const unparsed = entities.length === 0;
+  // the bottom toasts stand above the pill, not over it (D-142); the pill itself lands on the
+  // keyboard while one is out (D-112)
+  const pill = useRef<HTMLDivElement>(null);
+  useDockSpace(pill, draft);
+  useKeyboardDock(pill, draft);
 
   return (
     <>
       {onConfirm ? null : draft ? (
         <div
+          ref={pill}
           className="above-tabbar fixed inset-x-0 z-30 flex justify-center px-4"
           style={{ bottom: "calc(var(--tabbar-space) + 8px)" }}
         >

@@ -5,6 +5,7 @@ import { useRef } from "react";
 
 import { useDockSpace } from "@/components/ui/dock";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 import p from "./presenter.module.css";
 
@@ -37,6 +38,8 @@ export function HandOutBar({
   // the bottom toasts stand above the bar, not over «Поручить» (D-142)
   const dock = useRef<HTMLDivElement>(null);
   useDockSpace(dock);
+  // and on the keyboard while one is out (D-112)
+  useKeyboardDock(dock);
   return (
     <motion.div
       ref={dock}

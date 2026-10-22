@@ -11,6 +11,7 @@ import { showKeptMedia } from "@/lib/media/show";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { useMe } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
+import { fitHeight } from "@/lib/ui/fitHeight";
 import { holdUpdate, useUpdateHold } from "@/lib/update/client";
 import { voiceApi } from "@/lib/voice/api";
 import { createRecorder, extForMime, MicUnavailableError, type Recorder } from "@/lib/voice/recorder";
@@ -114,13 +115,14 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   useEffect(() => stopTicking, []);
 
   // the row grows with the words instead of handing them a native scrollbar and a resize
-  // grip — neither belongs in this design; past five lines the text scrolls with no bar
+  // grip — neither belongs in this design; past five lines the text scrolls with no bar.
+  // `fitHeight`: in a sheet the thread scrolls right above the field, and a field shrunk to
+  // measure it let WebKit clamp that scroll on every letter
   useEffect(() => {
     const el = field.current;
     if (!el) return;
-    el.style.height = "auto";
     const frame = el.offsetHeight - el.clientHeight; // borders: height is border-box
-    el.style.height = `${Math.min(el.scrollHeight + frame, MAX_FIELD_PX)}px`;
+    fitHeight(el, MAX_FIELD_PX, frame);
   }, [draft]);
 
   const sendText = () => {

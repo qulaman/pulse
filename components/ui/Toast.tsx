@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { create } from "zustand";
 
 import { fromNextFrame } from "@/components/ui/motion";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 type ToastAction = { label: string; onClick: () => void };
 
@@ -120,6 +121,10 @@ export function ToastHost() {
   const toasts = useToastStore((state) => state.toasts);
   const nodes = useRef(new Map<number, HTMLDivElement>());
   const tops = useRef(new Map<number, number>());
+  // the low toasts stand on the keyboard while one is out, like everything docked (D-112) —
+  // under it nobody would see «Отменить»; a toast covers no field, so no field guard
+  const lowStack = useRef<HTMLDivElement>(null);
+  useKeyboardDock(lowStack, toasts.some((toast) => toast.action), { cover: false });
 
   useLayoutEffect(() => {
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -170,7 +175,8 @@ export function ToastHost() {
       {/* «Отменить», «Открыть»: where the thumb is, just above the tab bar — not a reach to the top (D-142) */}
       {low.length > 0 ? (
         <div
-          className="pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
+          ref={lowStack}
+          className="above-tabbar pointer-events-none fixed inset-x-0 z-[60] flex flex-col items-center gap-2 px-4"
           // above a bar docked over the tab bar, if one is up (`useDockSpace`): never over its keys
           style={{ bottom: "calc(var(--tabbar-space) + var(--dock-space, 0px) + 10px)" }}
           data-testid="toasts-low"

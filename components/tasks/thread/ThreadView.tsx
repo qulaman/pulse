@@ -51,7 +51,7 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   useDockSpace(dock, !compact && !closedNote);
   // and it stands on the keyboard when the keyboard is out (D-60: nothing hides the field), the
   // thread's tail growing by the keyboard so its last word can still scroll up above the field
-  useKeyboardDock(dock, !compact && !closedNote, section);
+  useKeyboardDock(dock, !compact && !closedNote, { page: section });
   const queryClient = useQueryClient();
 
   const receipt = useThreadReceipt(taskId, isDirector, userId);
@@ -235,9 +235,9 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
         <div
           ref={dock}
           className="above-tabbar fixed inset-x-0 z-20 border-t border-border bg-bg px-4 pb-3 pt-3"
-          // above the tab bar (D-112); `--kb` lifts it onto the keyboard (useKeyboardDock), written
-          // outside React in the viewport's own event
-          style={{ bottom: "calc(var(--kb, 0px) + var(--tabbar-space))" }}
+          // above the tab bar (D-112); on the keyboard when it is out — `.above-tabbar` with this
+          // bar's own `--kb` (useKeyboardDock), written outside React in the viewport's own event
+          style={{ bottom: "var(--tabbar-space)" }}
         >
           <Composer taskId={taskId} companyId={companyId} actions={actions} onSent={scrollToEnd} />
         </div>

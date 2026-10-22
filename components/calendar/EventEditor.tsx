@@ -224,8 +224,10 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
         />
       </label>
 
-      {/* the button rides the bottom of the sheet: a long form never hides where it ends */}
+      {/* the button rides the bottom of the sheet: a long form never hides where it ends — and
+          never the field being typed in either (`data-keyboard-cover`, lib/ui/keyboard.ts) */}
       <div
+        data-keyboard-cover
         className="sticky bottom-0 z-[1] -mx-4 -mb-1 px-4 pb-1 pt-3"
         style={{ background: "linear-gradient(180deg, transparent, var(--surface) 30%)" }}
       >

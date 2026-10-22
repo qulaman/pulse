@@ -27,6 +27,7 @@ import type { Note } from "@/lib/notes/queries";
 import { shortName } from "@/lib/people/names";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, pluralRu, SHORT_STATUS } from "@/lib/tasks/status-text";
+import { fitHeight } from "@/lib/ui/fitHeight";
 import { holdUpdate } from "@/lib/update/client";
 
 import { NoteIcon } from "./icons";
@@ -93,8 +94,7 @@ export function NoteEditor({
   useLayoutEffect(() => {
     const node = area.current;
     if (!node) return;
-    node.style.height = "auto";
-    node.style.height = `${node.scrollHeight}px`;
+    fitHeight(node);
   }, [draft]);
 
   const save = (next: string) => {

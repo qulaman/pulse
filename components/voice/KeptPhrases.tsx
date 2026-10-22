@@ -8,12 +8,14 @@ import { create } from "zustand";
 import { useOnline } from "@/components/OfflineBanner";
 import { Mascot } from "@/components/brand/Mascot";
 import { entitiesSummary, pluralRu } from "@/components/confirm/format";
+import { useDockSpace } from "@/components/ui/dock";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { bindIngestOwner, useIngestStore } from "@/lib/store/ingest";
 import { useMe } from "@/lib/tasks/queries";
 import { voiceApi } from "@/lib/voice/api";
 import { dropPhrase, keepPhrase, keptView, listPhrases, patchPhrase, subscribeKept, wasParkedHere, type KeptPhrase } from "@/lib/voice/kept";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 import { replayRound, withPhraseLock } from "@/lib/voice/keptReplay";
 
 /** While something waits on the phone, a quiet retry on this beat — `online` events lie on a captive network. */
@@ -22,14 +24,21 @@ const RETRY_MS = 30_000;
 /** Whether the pill is up: Пульс keeps its gesture hint out of the pill's place. */
 export const useKeptPill = create<{ shown: boolean }>(() => ({ shown: false }));
 
+/**
+ * The last list read: a shell mounted by another layout draws the pill at once instead of
+ * blinking it out until IndexedDB answers. Empty on a fresh load, so hydration still matches.
+ */
+let lastRead: { userId: string; list: KeptPhrase[] } | null = null;
+
 /** The phrases this director's phone holds, live. */
 function usePhrases(userId: string | undefined): KeptPhrase[] {
-  const [phrases, setPhrases] = useState<KeptPhrase[]>([]);
+  const [phrases, setPhrases] = useState<KeptPhrase[]>(() => (userId && lastRead?.userId === userId ? lastRead.list : []));
   useEffect(() => {
     if (!userId) return;
     let alive = true;
     const read = async () => {
       const list = await listPhrases(userId);
+      lastRead = { userId, list };
       if (alive) setPhrases(list);
     };
     void read();
@@ -153,6 +162,10 @@ export function KeptPhrases() {
     useKeptPill.setState({ shown });
     return () => useKeptPill.setState({ shown: false });
   }, [shown]);
+  // the bottom toasts stand above the pill, not over it (D-142); on the keyboard while one is out (D-112)
+  const pill = useRef<HTMLDivElement>(null);
+  useDockSpace(pill, shown);
+  useKeyboardDock(pill, shown);
   if (!shown || !view) return null;
 
   const open = () => {
@@ -162,6 +175,7 @@ export function KeptPhrases() {
 
   return (
     <div
+      ref={pill}
       className="above-tabbar fixed inset-x-0 z-30 flex justify-center px-4"
       style={{ bottom: "calc(var(--tabbar-space) + 8px)" }}
       data-testid="kept-pill"

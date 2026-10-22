@@ -3009,8 +3009,10 @@ body:has(.page-sky:not([data-tone="none"])) .status-screen {
   transition: translate 420ms cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 html[data-tabbar="folded"] .above-tabbar { translate: 0 var(--tabbar-fold-drop); }
-/* the keyboard came up: land on it at once — sliding down to it would read as a lag */
-html[data-tabbar="away"] .above-tabbar { translate: 0 var(--tabbar-space); transition: none; }
+/* the keyboard came up: land on it at once — sliding down to it would read as a lag. The window
+   does not shrink for the keyboard, so the bar's own --kb (useKeyboardDock, lib/ui/keyboard.ts)
+   says how far above the window's bottom the keyboard's top stands */
+html[data-tabbar="away"] .above-tabbar { translate: 0 calc(var(--tabbar-space) - var(--kb, 0px)); transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .above-tabbar { transition: none; }
 }

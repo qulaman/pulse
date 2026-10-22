@@ -1,5 +1,9 @@
 "use client";
 
+import { useRef } from "react";
+
+import { useSearchHold } from "@/lib/ui/searchHold";
+
 /** The search line of the dictionary lists — the recipe of `TeamRoster`'s. */
 export function SearchField({
   value,
@@ -12,6 +16,9 @@ export function SearchField({
   placeholder: string;
   label: string;
 }) {
+  // a narrowed list must not shorten the page under the finger (useSearchHold)
+  const field = useRef<HTMLInputElement>(null);
+  const hold = useSearchHold(field, value);
   return (
     <label className="relative block">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" aria-hidden>
@@ -21,9 +28,13 @@ export function SearchField({
         </svg>
       </span>
       <input
+        ref={field}
         type="search"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          hold(e.target.value);
+          onChange(e.target.value);
+        }}
         placeholder={placeholder}
         aria-label={label}
         className="min-h-[44px] w-full field pl-10 pr-10 text-[16px] leading-[22px] outline-none transition-colors duration-[120ms] placeholder:text-muted focus:border-accent"

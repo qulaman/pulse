@@ -30,6 +30,7 @@ import {
 } from "@/lib/tasks/overview";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu } from "@/lib/tasks/status-text";
+import { useSearchHold } from "@/lib/ui/searchHold";
 
 import { DirectorTaskCard } from "./DirectorTaskCard";
 import { PeopleStrip } from "./PeopleStrip";
@@ -86,6 +87,7 @@ export function DirectorTasksView({
   const [searchOpen, setSearchOpen] = useState(false);
   const [purgeAsk, setPurgeAsk] = useState(false);
   const searchField = useRef<HTMLInputElement>(null);
+  const holdSearch = useSearchHold(searchField, query);
 
   // the board holds the company; only this director's tasks — only the author's answer closes a question
   const rows = useMemo(() => {
@@ -226,7 +228,10 @@ export function DirectorTasksView({
               ref={searchField}
               type="search"
               value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                holdSearch(event.target.value);
+                setQuery(event.target.value);
+              }}
               placeholder="Название, описание или имя"
               aria-label="Поиск по задачам"
               className="min-h-[42px] min-w-0 flex-1 bg-transparent text-[16px] outline-none placeholder:text-muted"

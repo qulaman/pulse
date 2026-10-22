@@ -27,6 +27,7 @@ import {
 } from "@/lib/tv/presenter";
 import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
 import { BOARD_VIEWS, boardPointOf, boardViewOf, type BoardView } from "@/lib/tv/state";
+import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 import p from "./presenter.module.css";
 
@@ -254,6 +255,8 @@ function PresenterCapsule({ boardId, points, now }: { boardId: string; points: r
   // the bottom toasts stand above the capsule, not over ◀ ▶ (D-142)
   const dock = useRef<HTMLDivElement>(null);
   useDockSpace(dock, shown);
+  // and on the keyboard while one is out (D-112)
+  useKeyboardDock(dock, shown);
 
   return (
     <AnimatePresence>
