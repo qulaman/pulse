@@ -2554,8 +2554,11 @@ h1 { letter-spacing: -0.025em; }
 .card-in:nth-child(6) { animation-delay: 200ms; }
 .skeleton { animation: shimmer 1.4s ease-in-out infinite; }
 
-/* Tap feedback everywhere a finger lands. */
-button, a[href] { -webkit-tap-highlight-color: transparent; }
+/* Tap feedback everywhere a finger lands — the app's own, never the system's grey flash. The
+   colour is inherited, so the root covers what is pressable without being a button: a
+   `role="button"` div, a toast that hides by a tap (React hangs an `onclick` on every element
+   with a click handler, and that is what iOS lights up). */
+html, button, a[href] { -webkit-tap-highlight-color: transparent; }
 
 @keyframes fab-pulse {
   0% { transform: scale(1); opacity: 0.7; }
@@ -2695,6 +2698,18 @@ select,
 .page-sky[data-tone="warn"] .page-sky-layer[data-tone="warn"],
 .page-sky[data-tone="danger"] .page-sky-layer[data-tone="danger"],
 .page-sky[data-tone="none"] .page-sky-layer[data-tone="none"] { opacity: 1; }
+/* a head mounted after another — the screen after its skeleton, a tab after a tab — is a new
+   sky: its first frame is the light that was up (PageHead's `data-from`), and the crossfade
+   above runs from there instead of the new colour switching on. `!important` only lets the
+   first frame win over the lit layer's own rule; it is never the style that stays */
+@starting-style {
+  .page-sky[data-from] .page-sky-layer { opacity: 0 !important; }
+  .page-sky[data-from="accent"] .page-sky-layer[data-tone="accent"],
+  .page-sky[data-from="ok"] .page-sky-layer[data-tone="ok"],
+  .page-sky[data-from="warn"] .page-sky-layer[data-tone="warn"],
+  .page-sky[data-from="danger"] .page-sky-layer[data-tone="danger"],
+  .page-sky[data-from="none"] .page-sky-layer[data-tone="none"] { opacity: 1 !important; }
+}
 /* film grain: a dark gradient on OLED bands into steps without it */
 .page-sky-grain {
   position: absolute;

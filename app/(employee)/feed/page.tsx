@@ -520,7 +520,8 @@ export default function FeedPage() {
             {/* the balls stay mounted while the face sleeps (shrunk into the head), so opening a
                 panel walks them down into the row instead of throwing them away (D-60) */}
             {mode !== "panel" ? <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} /> : null}
-            <AnimatePresence>
+            {/* one thought at a time: a new one comes once the old has left */}
+            <AnimatePresence mode="wait">
               {thought ? (
                 <ThoughtBubble
                   key={thought.id}
@@ -681,8 +682,11 @@ export default function FeedPage() {
                         <>
                           <p className="mt-1 px-1 text-[14px] leading-4 text-muted">На проверке у директора · {onReview.length}</p>
                           {onReview.map((task) => (
-                            <div key={task.id} className="card-in opacity-80">
-                              <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
+                            // dimmed inside: the fade-in's `both` would hold its own opacity over the class
+                            <div key={task.id} className="card-in">
+                              <div className="opacity-80">
+                                <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
+                              </div>
                             </div>
                           ))}
                         </>

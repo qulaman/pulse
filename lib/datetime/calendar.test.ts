@@ -14,6 +14,7 @@ import {
   parseHm,
   parseYmd,
   todayYmd,
+  weeksInMonth,
   ymdHmToAqtobeIso,
 } from "./calendar";
 
@@ -60,6 +61,13 @@ describe("the month grid", () => {
     expect(grid[0][1]).toBe("2026-09-01");
     expect(grid[4][2]).toBe("2026-09-30");
     expect(grid[5].every((cell) => cell === null)).toBe(true);
+  });
+
+  it("counts the weeks a month touches — the height of /calendar's grid", () => {
+    expect(weeksInMonth({ year: 2026, month: 10 })).toBe(5); // starts on a Thursday
+    expect(weeksInMonth({ year: 2026, month: 11 })).toBe(6); // starts on a Sunday
+    expect(weeksInMonth({ year: 2027, month: 2 })).toBe(4); // 28 days from a Monday
+    expect(weeksInMonth({ year: 2026, month: 2 })).toBe(5); // 28 days from a Sunday
   });
 
   it("holds every day of the month exactly once", () => {

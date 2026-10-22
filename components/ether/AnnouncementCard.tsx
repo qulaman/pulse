@@ -30,7 +30,8 @@ export function AnnouncementCard({
   item: Announcement;
   userId: string | undefined;
   isDirector: boolean;
-  teamSize: number;
+  /** Who could read it; unknown yet — the count alone, never «3/0». */
+  teamSize: number | undefined;
   onAck: (id: string) => void;
   acking: boolean;
   /** The director's «Удалить» — the announcement is gone for everybody. */
@@ -87,7 +88,8 @@ export function AnnouncementCard({
             className="nums text-[14px] leading-[18px] text-accent underline underline-offset-4"
             onClick={() => setWho(true)}
           >
-            Ознакомились {count}/{teamSize}
+            Ознакомились {count}
+            {teamSize === undefined ? null : `/${teamSize}`}
           </button>
         ) : (
           <span className="nums text-[13px] leading-4 text-muted">Ознакомились {count}</span>

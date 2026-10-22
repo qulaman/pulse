@@ -106,6 +106,14 @@ export function monthMatrix({ year, month }: Month): (Ymd | null)[][] {
   return [0, 1, 2, 3, 4, 5].map((row) => cells.slice(row * 7, row * 7 + 7));
 }
 
+/**
+ * The weeks a month touches, Monday first: 4 (a February that starts on a Monday), 5 or 6.
+ * /calendar's grid draws exactly these, and its skeleton is as tall as they are.
+ */
+export function weeksInMonth(month: Month): number {
+  return monthMatrix(month).filter((row) => row.some(Boolean)).length;
+}
+
 /** Days are plain strings in this shape, so string order is date order. */
 export function compareYmd(a: Ymd, b: Ymd): number {
   return a < b ? -1 : a > b ? 1 : 0;

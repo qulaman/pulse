@@ -9,6 +9,7 @@ import { backTarget } from "@/components/TabBar";
 import { tabBarRole } from "@/lib/routes";
 import type { Tone } from "@/lib/tasks/tone";
 import { useMe } from "@/lib/tasks/queries";
+import { useHydrated } from "@/lib/useHydrated";
 
 type Back = { label: string; href?: string; onClick?: () => void; testId?: string };
 type Light = "accent" | "ok" | "warn" | "danger" | "none";
@@ -22,6 +23,19 @@ function lightOf(tone: Tone | undefined): Light {
 
 // the server has no layout to measure: the fit waits for the browser
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/**
+ * The light that is up, across heads: a screen's skeleton and the screen are two heads, and
+ * the screen's sky came up lit at once — the grey light switched to amber instead of flowing
+ * into it. A head mounted later starts its sky from the light that was up and crossfades like
+ * a living one (`.page-sky[data-from]` in globals.css); after a screen with no head (Пульс),
+ * from the quiet sky.
+ */
+let skyLight: Light = "none";
+let skyHeads = 0;
+let skyGoneAt = Number.NEGATIVE_INFINITY;
+/** A head replaced in the same commit is still «up» for the one that takes its place. */
+const SKY_HANDOVER_MS = 100;
 
 /**
  * The head of every screen that has a title — «свет состояния» (D-117) in the bar grammar of
@@ -82,6 +96,12 @@ export function PageHead({
   const head = useRef<HTMLElement>(null);
   const [glass, setGlass] = useState(false);
   const [titled, setTitled] = useState(false);
+  // where this sky's light starts (`data-from`, a CSS @starting-style): the light that was up
+  // when the head came. A head that hydrates finds the server's sky painted — none.
+  const hydrated = useHydrated();
+  const [skyFrom] = useState<Light | undefined>(() =>
+    hydrated ? (skyHeads > 0 || performance.now() - skyGoneAt < SKY_HANDOVER_MS ? skyLight : "none") : undefined,
+  );
 
   const small = smallTitle ?? (typeof title === "string" ? title : undefined);
   const auto = useAutoBack(back === undefined);
@@ -89,6 +109,17 @@ export function PageHead({
   // a tab's root: no bar row at rest — the large title starts under the notch
   const compact = !bare && !way;
   const light = lightOf(tone);
+
+  useIsoLayoutEffect(() => {
+    skyHeads += 1;
+    return () => {
+      skyHeads -= 1;
+      skyGoneAt = performance.now();
+    };
+  }, []);
+  useEffect(() => {
+    skyLight = light;
+  }, [light]);
 
   // the D-113 thresholds: the fallback where scroll timelines are missing, and the state
   // under reduced motion
@@ -141,7 +172,7 @@ export function PageHead({
 
   return (
     <>
-      <div aria-hidden className="page-sky" data-tone={light}>
+      <div aria-hidden className="page-sky" data-tone={light} data-from={skyFrom}>
         {LIGHTS.map((key) => (
           <div key={key} className="page-sky-layer" data-tone={key} />
         ))}

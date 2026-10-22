@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -16,10 +16,14 @@ export function DisputesBlock() {
   const disputes = useOpenDisputes(true);
   const items = disputes.data ?? [];
   // a push «Оспаривает» opens /rating#disputes: the block arrives after the hash scroll, so it
-  // brings itself into view once
+  // brings itself into view once — not again each time Realtime empties and refills the list
+  // under a hash that is still in the address
   const arrived = items.length > 0;
+  const scrolled = useRef(false);
   useEffect(() => {
-    if (arrived && window.location.hash === "#disputes") document.getElementById("disputes")?.scrollIntoView({ block: "start" });
+    if (!arrived || scrolled.current || window.location.hash !== "#disputes") return;
+    scrolled.current = true;
+    document.getElementById("disputes")?.scrollIntoView({ block: "start" });
   }, [arrived]);
   if (items.length === 0) return null;
 

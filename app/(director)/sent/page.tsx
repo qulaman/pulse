@@ -6,6 +6,7 @@ import { DirectorTasksView } from "@/components/tasks/list/DirectorTasksView";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { SentSkeleton } from "@/components/ui/PageSkeletons";
 import { useNamesKey } from "@/lib/people/names";
+import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
 import { usePurgeClosed, useTaskActions } from "@/lib/tasks/mutations";
 import { useClosedPages, useMe, usePulseBoard, useSentTasks } from "@/lib/tasks/queries";
 
@@ -23,10 +24,13 @@ export default function SentPage() {
   const purge = usePurgeClosed();
   const now = useMinute();
   const pages = useClosedPages(me.data?.userId);
+  // «Повторы» stand between the people and the tabs: landing after the list, they pushed it
+  // down — the screen comes with them (warmed with the list, so this is no wait in the common case)
+  const rulesSettled = useRecurrenceRulesSettled();
   const [loadingMore, setLoadingMore] = useState(false);
 
   // isPending, not isLoading: a query enabled in this very render has not started fetching yet
-  if (me.isPending || tasks.isPending || board.isPending || !me.data) return <SentSkeleton />;
+  if (me.isPending || tasks.isPending || board.isPending || !rulesSettled || !me.data) return <SentSkeleton />;
 
   return (
     <DirectorTasksView

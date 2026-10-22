@@ -140,7 +140,7 @@ export function CalendarView({ nav, now, meId, isDirector, upcoming, events, loa
   // мин»): the server's second is not the phone's, so the server draws the bones and the
   // phone draws the rest — the data arrives on the phone anyway
   const hydrated = useSyncExternalStore(noSubscribe, () => true, () => false);
-  if (!hydrated) return <CalendarSkeleton />;
+  if (!hydrated) return <CalendarSkeleton month={nav.month} />;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">

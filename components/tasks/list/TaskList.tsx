@@ -53,6 +53,9 @@ export function useAccordion(ids: readonly string[], { scope, autoOpen }: { scop
     } else if (openId && !ids.includes(openId)) {
       const was = seen.ids.indexOf(openId);
       setOpenId(autoOpen && was >= 0 && ids.length > 0 ? ids[Math.min(was, ids.length - 1)] : null);
+      // the next card opens by itself — often because a Realtime change took the open one away:
+      // the tap that opened that one must not scroll the page to this one
+      setUserTouched(false);
     }
   }
 

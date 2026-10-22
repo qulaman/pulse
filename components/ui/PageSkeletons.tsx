@@ -18,6 +18,7 @@ import { Tabs } from "@/components/tasks/list/Tabs";
 import { HeadButtonBone } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { ADMIN_TABLES } from "@/lib/admin/tables";
+import { monthOf, weeksInMonth, type Month } from "@/lib/datetime/calendar";
 
 import {
   AnnouncementBone,
@@ -525,12 +526,17 @@ export function CalendarListBone() {
   );
 }
 
+/** MonthGrid's box without its weeks — the month's name, the weekdays, the grabber — and a week's row. */
+const GRID_CHROME = 98;
+const GRID_WEEK = 48;
+
 /**
  * /calendar before the phone takes over (D-94): the date and the title, the status screen,
- * the month of five weeks, the ribbon — each bone the box of its element (measured: head
- * 54, status 223, grid 338).
+ * the month as many weeks tall as it is (4–6, Monday first), the ribbon — each bone the box
+ * of its element (measured: head 54, status 223, grid 98 + 48 a week). The month is this
+ * one on the Aqtobe clock, as `useCalendarNav` opens it; the page passes its own.
  */
-export function CalendarSkeleton() {
+export function CalendarSkeleton({ month = monthOf(null) }: { month?: Month }) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead eyebrow={DATE_BONE} title="Календарь" />
@@ -549,8 +555,14 @@ export function CalendarSkeleton() {
       </SkeletonGroup>
       <SkeletonGroup className="mt-3">
         <div
-          className="h-[338px] rounded-[22px] border px-2 pt-1.5"
-          style={{ borderColor: "color-mix(in srgb, var(--border) 72%, transparent)", background: "var(--surface)" }}
+          className="rounded-[22px] border px-2 pt-1.5"
+          style={{
+            height: GRID_CHROME + weeksInMonth(month) * GRID_WEEK,
+            borderColor: "color-mix(in srgb, var(--border) 72%, transparent)",
+            background: "var(--surface)",
+          }}
+          // the server's clock and the phone's may stand on two sides of a month's last midnight
+          suppressHydrationWarning
         >
           <div className="flex h-11 items-center pl-2.5">
             <Bone h={22} w="40%" />

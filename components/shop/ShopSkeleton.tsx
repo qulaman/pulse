@@ -11,7 +11,8 @@ export function ShopSkeleton() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Магазин" />
       <SkeletonGroup grow className="mt-4 space-y-2">
-        <Bone h={92} className="rounded-[16px]" />
+        {/* the balance card of ShopFront: «Очки», the 44 px number, the line under it */}
+        <Bone h={110} className="rounded-[16px]" />
         {Array.from({ length: 4 }, (_, i) => (
           <Bone key={i} h={112} className="rounded-[16px]" />
         ))}

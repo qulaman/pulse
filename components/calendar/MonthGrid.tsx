@@ -8,10 +8,10 @@ import { shiftDay } from "@/lib/calendar/agenda";
 import {
   compareYmd,
   humanYmd,
-  monthMatrix,
   monthTitleRu,
   parseYmd,
   WEEKDAYS_SHORT_RU,
+  weeksInMonth,
   ymdOf,
   type Month,
   type Ymd,
@@ -41,7 +41,7 @@ const weekdayOf = (ymd: Ymd) => {
 
 /** The weeks of a month, Monday first, the edges filled with the neighbours' days. */
 function monthCells(month: Month): Cell[][] {
-  const weeks = monthMatrix(month).filter((row) => row.some(Boolean)).length;
+  const weeks = weeksInMonth(month);
   const first = ymdOf(month.year, month.month, 1);
   const start = shiftDay(first, -weekdayOf(first));
   return Array.from({ length: weeks }, (_, week) =>

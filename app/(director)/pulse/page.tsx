@@ -863,7 +863,8 @@ export default function PulsePage() {
             {mode !== "panel" && !phraseInHand ? (
               <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} />
             ) : null}
-            <AnimatePresence>
+            {/* one thought at a time: a new one comes once the old has left */}
+            <AnimatePresence mode="wait">
               {/* a person's card is open: it says the same news and stands where the thought
                   would, so the thought waits (D-118); a phrase in hand owns the face — a thought
                   over it hid «Понял так: …» (D-146) */}

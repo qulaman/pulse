@@ -8,6 +8,9 @@ import { PageHead } from "@/components/ui/PageHead";
 import { useBalance, useCreateOrder, useOrders, useShopItems, type ShopItem } from "@/lib/shop/queries";
 import type { Me } from "@/lib/tasks/queries";
 
+/** A line still loading keeps its room: a plain " " collapses, and the card grew on arrival. */
+const LOADING_LINE = " ";
+
 /**
  * Витрина глазами того, кто копит очки: баланс, награды и свои заказы. Баланс здесь —
  * точная сумма транзакций (принцип 4), поэтому кнопка «Обменять» не может соврать.
@@ -52,11 +55,11 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
               className="nums mt-0.5 text-[40px] font-bold leading-[44px]"
               style={{ color: "var(--gold)" }}
             >
-              {balance.isLoading ? " " : points}
+              {balance.isLoading ? LOADING_LINE : points}
             </p>
             <p className="mt-0.5 text-[13px] leading-4 text-muted">
               {balance.isLoading
-                ? " "
+                ? LOADING_LINE
                 : affordable > 0
                   ? `Хватает на ${affordable} из ${list.length}`
                   : "Копятся за закрытые в срок задачи"}

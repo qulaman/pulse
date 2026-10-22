@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
@@ -51,6 +51,24 @@ export function useRecurrenceRules(enabled = true) {
     channel: { table: "recurrence_rules" },
     enabled,
   });
+}
+
+/**
+ * The rules come with the list of «Задачи» before its first open (D-136, `warmSentTasks`):
+ * their row stands above the tabs, and landing after the list it pushed the list down.
+ */
+export function warmRecurrenceRules(client: QueryClient): Promise<void> {
+  return client.prefetchQuery({ queryKey: ruleKeys.list(), queryFn: fetchRules });
+}
+
+/**
+ * Whether the rules are in (or failed, or wait for the network): «Задачи» holds its skeleton
+ * till then, so «Повторы» is drawn with the list instead of shoving it down on arrival. The
+ * query of `useRecurrenceRules` without a socket of its own — the row listens.
+ */
+export function useRecurrenceRulesSettled(): boolean {
+  const query = useQuery({ queryKey: ruleKeys.list(), queryFn: fetchRules });
+  return !query.isPending || query.fetchStatus === "paused";
 }
 
 export type RulePatch = Partial<

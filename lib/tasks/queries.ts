@@ -26,6 +26,7 @@ import {
   useRealtimeListener,
   useRealtimeQuery,
 } from "@/lib/realtime/useRealtimeQuery";
+import { warmRecurrenceRules } from "@/lib/recurrence/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 import { isOverdue, type TaskStatus } from "./status-text";
@@ -257,7 +258,11 @@ async function fetchSentTasks(userId: string): Promise<TaskWithPeople[]> {
  * already fresh in the cache is left alone.
  */
 export function warmSentTasks(client: QueryClient, userId: string): Promise<void> {
-  return client.prefetchQuery({ queryKey: taskKeys.sent(userId), queryFn: () => fetchSentTasks(userId) });
+  return Promise.all([
+    client.prefetchQuery({ queryKey: taskKeys.sent(userId), queryFn: () => fetchSentTasks(userId) }),
+    // «Повторы» stand above the tabs of the same screen (D-148): the screen waits for them too
+    warmRecurrenceRules(client),
+  ]).then(() => undefined);
 }
 
 export function warmMyTasks(client: QueryClient, userId: string): Promise<void> {

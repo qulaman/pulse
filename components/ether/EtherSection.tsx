@@ -104,9 +104,10 @@ export function EtherSection({ variant }: Props) {
       item={item}
       userId={userId}
       isDirector={isDirector}
-      teamSize={team.data ?? 0}
+      teamSize={team.data}
       onAck={(id) => ack.mutate(id)}
-      acking={ack.isPending}
+      // only the card whose «Ознакомился» is on its way waits — the others stay pressable
+      acking={ack.isPending && ack.variables === item.id}
       onDelete={isDirector ? (id) => remove.mutate(id) : undefined}
       heldUntil={isDirector ? held.data?.[item.id] : null}
       onSendNow={isDirector ? (id) => sendNow.mutate(id) : undefined}
