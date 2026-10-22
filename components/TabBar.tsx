@@ -187,11 +187,23 @@ export function backTarget(role: TabRole, pathname: string, lab = false): string
 }
 
 /**
+ * The count the bars last showed on a tab, and whose it is. A tab in another layout mounts a
+ * new bar, which shows it while its own count is still on the way: the badge neither blinks
+ * out nor pops back — it pops only when the count really changes. Kept only once a count is
+ * known, after the screen hydrated: nothing is here for the first render on a fresh start,
+ * and that render still matches the server's HTML.
+ */
+const seenBadges = new Map<string, number>();
+let seenFor: string | undefined;
+
+type Badge = { count: number; pop: boolean };
+
+/**
  * What each role should not miss, as a count on its tab: the employee's tasks not yet
  * accepted on «Дела», everything waiting for the director on «Пульс». Live through the
  * same queries the screens use, so the number never disagrees with the list behind it.
  */
-function useTabBadges(role: TabRole): Record<string, number> {
+function useTabBadges(role: TabRole): Record<string, Badge> {
   const me = useMe();
   // the counts are asked for once the screen under the bar has hydrated: asked at once, the board
   // landed before a streamed screen hydrated, and that screen (Пульс, a task's screen through its
@@ -206,14 +218,22 @@ function useTabBadges(role: TabRole): Record<string, number> {
       gone = true;
     };
   }, []);
-  const fresh = useFreshTaskCount(role !== "director" && settled ? me.data?.userId : undefined);
+  const userId = me.data?.userId;
+  const fresh = useFreshTaskCount(role !== "director" && settled ? userId : undefined);
   const inbox = useDirectorInbox(me.data, role === "director" && settled);
-  if (role !== "director") {
-    const count = fresh.data ?? 0;
-    return count > 0 ? { "/tasks": count } : {};
-  }
-  const total = inboxCounts(inbox.data).total;
-  return total > 0 ? { "/pulse": total } : {};
+  const href = role === "director" ? "/pulse" : "/tasks";
+  // undefined — not known yet: not asked (still hydrating), or the answer is on its way
+  const count = role === "director" ? inbox.data && inboxCounts(inbox.data).total : fresh.data;
+  const seen = userId !== undefined && seenFor === userId ? seenBadges.get(href) : undefined;
+  useEffect(() => {
+    if (userId === undefined || count === undefined) return;
+    if (seenFor !== userId) seenBadges.clear();
+    seenFor = userId;
+    seenBadges.set(href, count);
+  });
+  const shown = count ?? seen ?? 0;
+  const pop = count !== undefined && seen !== undefined && count !== seen;
+  return shown > 0 ? { [href]: { count: shown, pop } } : {};
 }
 
 /** Scroll travel (px) that folds the bar, and back up that unfolds it; near the top it is always open. */
@@ -307,12 +327,11 @@ function useKeyboardAway(nav: RefObject<HTMLElement | null>, scrim: RefObject<HT
 }
 
 /**
- * Where the thumb stood last. A tab in another layout mounts a new bar, and the thumb
- * slides on from here instead of appearing in place; a count that changed pops once,
- * one that is merely re-mounted does not.
+ * Where the last bar's thumb was seen as it went, in columns — between two when it went
+ * mid-slide. A tab in another layout mounts a new bar, and its thumb slides on from here
+ * instead of appearing in place.
  */
-let lastIndex = -1;
-const seenBadges = new Map<string, number>();
+let thumbLeftAt: number | null = null;
 
 /**
  * The thumb's spring (stiffness 520, damping 38, mass 0.9) written out: the slide is the
@@ -334,30 +353,57 @@ export function stretchKeyframes(columns: number): Keyframe[] {
 }
 
 /**
- * Slides the thumb to `index` in whole columns (`--i`, a CSS transition) and stretches it on
- * the way. A bar mounted in another layout first stands where the last one stood (`from`, set
- * in its markup — the bar's own layout effects compute styles before this one runs), then slides.
+ * The column the thumb is seen on this very moment — between two mid-slide; without a box to
+ * measure, the column it is headed for.
  */
-function useThumb(thumb: RefObject<HTMLSpanElement | null>, index: number, from: number) {
+function columnOf(thumb: HTMLElement): number {
+  const style = getComputedStyle(thumb);
+  const width = parseFloat(style.width);
+  // `translateX(calc(var(--i) * 100%))`: the shift over the thumb's own width
+  if (width > 0 && style.transform !== "none") return new DOMMatrixReadOnly(style.transform).m41 / width;
+  return Number(thumb.style.getPropertyValue("--i")) || 0;
+}
+
+/**
+ * Slides the thumb to `index` in columns (`--i`, a CSS transition) and stretches it on the
+ * way. A new bar's thumb first stands where the last bar's was seen as it went, then slides
+ * on with the stretch the travel left asks for. A tab in another layout swaps the bars in one
+ * commit: the old bar's layout cleanup notes the place while its nodes are still on the page,
+ * before the new bar's layout effects run.
+ */
+function useThumb(thumb: RefObject<HTMLSpanElement | null>, index: number) {
   const shown = useRef<number | null>(null);
   const stretching = useRef<Animation | null>(null);
   useLayoutEffect(() => {
     const el = thumb.current;
-    if (!el || index < 0 || shown.current === index) return;
-    let start = shown.current;
-    if (start === null) {
-      start = Math.max(from, 0);
-      // the transition needs the starting column computed before the target replaces it
+    if (!el) return;
+    if (shown.current === null) {
+      // the first bar since the app started stands on its own tab
+      shown.current = thumbLeftAt ?? Math.max(index, 0);
+      // put there at once: the layout effects before this one have already computed the thumb
+      // on its markup column, and a slide from there would only be cancelled by the one below
+      el.style.setProperty("transition", "none");
+      el.style.setProperty("--i", String(shown.current));
+      // the slide needs the starting column computed before the target replaces it
       void getComputedStyle(el).transform;
+      el.style.removeProperty("transition");
     }
+    if (index < 0 || shown.current === index) return;
+    const travel = Math.abs(index - shown.current);
     shown.current = index;
     el.style.setProperty("--i", String(index));
-    const travel = Math.abs(index - start);
     const pad = el.firstElementChild;
-    if (!travel || !pad || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (!pad || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     stretching.current?.cancel();
     stretching.current = pad.animate(stretchKeyframes(travel), { duration: THUMB_MS, easing: "linear" });
-  }, [thumb, index, from]);
+  }, [thumb, index]);
+
+  useLayoutEffect(() => {
+    const el = thumb.current;
+    return () => {
+      if (el) thumbLeftAt = columnOf(el);
+    };
+  }, [thumb]);
 }
 
 /**
@@ -447,19 +493,13 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
   }
   const route = activeTab(role, pathname, lab);
   const index = tapped ?? route.index;
-  const [from] = useState(() => (lastIndex >= 0 ? lastIndex : index));
+  // the column the markup draws the thumb on: the server's HTML is seen before any script
+  // runs. From then on only useThumb moves it — React never writes `--i` again
+  const [drawnAt] = useState(index);
   const thumbRef = useRef<HTMLSpanElement>(null);
-  useThumb(thumbRef, index, from);
+  useThumb(thumbRef, index);
   useWarmTabs(tabs);
   useWarmTabData(role);
-
-  useEffect(() => {
-    if (index >= 0) lastIndex = index;
-  }, [index]);
-
-  useEffect(() => {
-    for (const tab of tabs) seenBadges.set(tab.href, badges[tab.href] ?? 0);
-  });
 
   useEffect(
     () => () => {
@@ -485,7 +525,7 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
           aria-hidden
           className={styles.thumb}
           data-off={index >= 0 ? undefined : ""}
-          style={{ "--i": Math.max(from, 0) } as CSSProperties}
+          style={{ "--i": Math.max(drawnAt, 0) } as CSSProperties}
         >
           <span className={styles.stretch}>
             <span className={styles.lamp} />
@@ -495,9 +535,8 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
         <ul className={styles.row}>
           {tabs.map((tab, i) => {
             const active = i === index;
-            const count = badges[tab.href] ?? 0;
-            const seen = seenBadges.get(tab.href);
-            const pop = seen !== undefined && seen !== count;
+            const badge = badges[tab.href];
+            const count = badge?.count ?? 0;
             return (
               <li key={tab.href} className="min-w-0">
                 <Link
@@ -523,7 +562,7 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
                   <span className={styles.icon}>
                     {tab.icon}
                     {count > 0 ? (
-                      <span key={count} className={`nums ${styles.badge} ${pop ? styles.badgePop : ""}`} aria-hidden>
+                      <span key={count} className={`nums ${styles.badge} ${badge?.pop ? styles.badgePop : ""}`} aria-hidden>
                         {count > 99 ? "99+" : count}
                       </span>
                     ) : null}
