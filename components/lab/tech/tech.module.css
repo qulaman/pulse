@@ -1,0 +1,82 @@
+/* «Технология» (/lab/tech): the motions CSS plays better than React. Transform and opacity
+   only; the root's data-paused stops them with the story; under reduced motion all stand still. */
+
+/* a step's progress segment: fills over the step's own duration, paused with the story */
+.fill {
+  transform-origin: left center;
+  animation: fill linear both;
+  will-change: transform;
+}
+@keyframes fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* the active node breathes: a ring of its tone grows and fades */
+.ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 1.5px solid var(--ring);
+  animation: ring 1.6s var(--ease-out) infinite;
+  pointer-events: none;
+}
+@keyframes ring {
+  from { transform: scale(1); opacity: 0.85; }
+  to { transform: scale(1.18, 1.5); opacity: 0; }
+}
+
+/* the packet: a dot of light with a soft halo */
+.packet {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 9999px;
+  background: var(--glow);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--glow) 22%, transparent), 0 0 18px 2px color-mix(in srgb, var(--glow) 55%, transparent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* the inspector's lines come in one after another, like a log being written */
+.line {
+  animation: line-in 260ms var(--ease-out) both;
+}
+@keyframes line-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* the employee's «Принял» is pressed once the step settles */
+.press {
+  animation: press 900ms var(--ease-out) 900ms both;
+}
+@keyframes press {
+  0% { transform: scale(1); }
+  35% { transform: scale(0.94); }
+  70% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+.root[data-paused] .fill,
+.root[data-paused] .ring,
+.root[data-paused] .line,
+.root[data-paused] .press {
+  animation-play-state: paused;
+}
+
+/* the RLS table: a row the policy hides steps back, its reason fades in */
+.row {
+  transition: opacity var(--t-effect) var(--ease-out);
+}
+.row[data-hidden] {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill, .ring, .line, .press { animation: none; }
+  .fill { transform: scaleX(1); }
+  .ring { opacity: 0; }
+  .row { transition: none; }
+}
