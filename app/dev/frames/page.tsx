@@ -154,7 +154,7 @@ const HOLDING: [MascotAct, MascotState][] = [
 
 /**
  * The director's board acts over the faces they also meet (tasks/020): on «Задачи» the card lies on
- * the clipboard and the pencil is put down; on the watchful face the props must clear its ear.
+ * the clipboard and the pencil is put down; on the watchful face the props must clear its light.
  */
 const BOARD_ON: [MascotAct, MascotState][] = [
   ["receive", "checking"],
@@ -168,7 +168,7 @@ const BOARD_ON: [MascotAct, MascotState][] = [
   ["tick", "alert"],
   ["puzzle", "alert"],
   ["clock", "alert"],
-  // the failures of the pipeline on the watchful face: its ear on the crown meets the arms
+  // the failures of the pipeline on the watchful face: the light over its head meets the arms
   ["ear", "alert"],
   ["nomic", "alert"],
   ["signal", "alert"],

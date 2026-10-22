@@ -49,8 +49,9 @@ import {
  *   happy        golden, squint and blush, a slow breath with sparks
  *   sleeping     eyes shut, the slowest breath, z-s drifting up — the screen before the first tap
  *                (what he dreams of is drawn outside the head: components/pulse/DreamOrbit.tsx)
- *   alert        «насторожен»: straightens up and holds still, the eyes sweep the room and
- *                stop at the edges — the director's face never gets angry, it watches
+ *   alert        «насторожен»: straightens up and holds still, the eyes sweep the room, stop at
+ *                the edges and go up to a small amber light over the head — the director's face
+ *                never gets angry, it watches
  *   calling      «обрати внимание!»: leans in, hops twice like a dog at the door, an «!»
  *                pops over its head — the employee has an order nobody has opened yet
  *   surprised    woken by a thought: a startle, wide eyes turned up to the bubble, a small round mouth
@@ -226,7 +227,8 @@ const COLOR: Record<MascotState, string> = {
   surprised: "var(--accent)",
   processing: "var(--accent)",
   calling: "var(--warn)",
-  alert: "var(--warn)",
+  // the body keeps its own colour: the amber is the light over the head alone (D-149)
+  alert: "var(--accent)",
   angry: "var(--danger)",
   nervous: "var(--warn)",
   bored: "color-mix(in srgb, var(--accent) 58%, var(--surface-2))",
@@ -365,7 +367,7 @@ const EYES: Record<MascotState, string> = {
   offering: "mascot-offer-eyes 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite",
   // it looks the person in the eye between the hops, not around the room
   calling: "mascot-attend 3.2s ease-in-out infinite",
-  alert: "mascot-scan 4.6s ease-in-out infinite",
+  alert: "mascot-beacon-look 4.6s ease-in-out infinite",
   thinking: "mascot-wander 2.6s ease-in-out infinite",
   speaking: "mascot-speak-look 2.2s ease-in-out infinite",
   happy: "none",
@@ -595,6 +597,50 @@ function CalendarPage() {
 }
 
 /**
+ * alert: where the light hangs — clear of the crown on the right and of the hat's pompom (D-149).
+ * At avatar size it grows and comes closer, the way the eyes grow there: at 3.6 it is two pixels.
+ */
+const BEACON = { x: 53, y: 3, r: 3.6 };
+const BEACON_SMALL = { x: 51, y: 6, r: 5.6 };
+/** Acts that put something right under the light — the tick, the crossed-out ear: it steps aside for them. */
+const BEACON_STEPS_ASIDE = new Set<MascotAct>(["tick", "nomic"]);
+
+/**
+ * alert: a small amber light over the head, like the light of a phone with something unread —
+ * «вас кое-что ждёт», with no feeling on the face (D-70, D-149). It breathes twice a cycle and lets
+ * a thin ring go with each breath; the second ring goes as the eyes go up to it. At avatar size only
+ * the light itself is drawn.
+ */
+function Beacon({ detailed }: { detailed: boolean }) {
+  const { x, y, r } = detailed ? BEACON : BEACON_SMALL;
+  const origin = `${x}px ${y}px`;
+  const breath = "2.3s ease-in-out 0.55s infinite";
+  const hi = r / BEACON.r;
+  return (
+    <g data-prop="beacon" style={{ transformOrigin: origin, animation: "mascot-beacon-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both" }}>
+      <g style={{ animation: detailed ? "mascot-beacon-float 4.6s ease-in-out infinite" : "none" }}>
+        {/* a thin pale ring, not a faint disc: amber at low opacity on the dark board turns brown */}
+        {detailed ? (
+          <circle
+            cx={x}
+            cy={y}
+            r={r}
+            fill="none"
+            stroke="color-mix(in srgb, var(--warn) 45%, #ffffff)"
+            strokeWidth="1.3"
+            // a hairline however far the ring has grown — scaled with it, it went thick and muddy
+            vectorEffect="non-scaling-stroke"
+            style={{ transformOrigin: origin, animation: "mascot-beacon-ping 2.3s cubic-bezier(0.2, 0, 0.3, 1) 0.55s infinite", opacity: 0 }}
+          />
+        ) : null}
+        <circle cx={x} cy={y} r={r} fill="var(--warn)" style={{ transformOrigin: origin, animation: detailed ? `mascot-beacon-glow ${breath}` : "none" }} />
+        <ellipse cx={x - 1.1 * hi} cy={y - 1.3 * hi} rx={1.3 * hi} ry={0.9 * hi} fill="#ffffff" opacity="0.5" />
+      </g>
+    </g>
+  );
+}
+
+/**
  * A motion group of a face big enough to be watched carries its pose across a change (Blend): a state
  * turned, an act started or cut, a look taken. An avatar has no mid-pose worth carrying and pays for
  * no wrappers.
@@ -686,6 +732,7 @@ export function Mascot({
   // the props of a held job and of an act are drawn for a face big enough to see them;
   // at avatar size the body motion alone still plays
   const acting = detailed ? act : null;
+  const beacon = state === "alert" && !(acting && BEACON_STEPS_ASIDE.has(acting));
   const lids = act ? ACT_LIDS[act] : undefined;
   const cheeks = squint || content;
   // the stack of orders in the hands (D-110); a held job of a ball keeps the hands for itself
@@ -1044,6 +1091,12 @@ export function Mascot({
         ) : null}
       </Linger>
 
+      {/* alert: the light over the head floats on its own, it does not ride the body (D-149); for
+          an act that draws right under it the light steps aside and comes back after */}
+      <Linger show={beacon} out={FADE_OUT}>
+        {beacon ? <Beacon detailed={detailed} /> : null}
+      </Linger>
+
       {/* the wind-up of a throw: the card in the hand behind the head, only its top over the crown
           — `sending`, and the employee's «Сдал» (under the body, so the head hides the rest) */}
       {state === "sending" && detailed ? (
@@ -1154,19 +1207,6 @@ export function Mascot({
                       {/* a proper ear: a rounded lobe standing out of the head, with a darker hollow */}
                       <path d="M52 16 C58 8 69 12 68 22 C67.5 29 61 33 55 31 C53 30 51.5 28 52 26 Z" fill={COLOR.listening} />
                       <path d="M56 19 C60 15.5 65.5 18.5 64.5 24 C64 27.5 60 29.5 57.5 27.5 C56 26.5 55.5 24.5 56.5 23 Z" fill="var(--bg)" opacity="0.26" />
-                    </g>
-                  </g>
-                ) : null}
-              </Linger>
-
-              {/* alert: one small ear up on the crown — the animal sign of «насторожился»,
-                  without a single angry line on the face (D-70) */}
-              <Linger show={state === "alert"} origin="20% 100%">
-                {state === "alert" ? (
-                  <g style={{ transformOrigin: "44px 12px", animation: "mascot-ear-up 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.15s both" }}>
-                    <g style={{ transformOrigin: "44px 12px", animation: "mascot-alert-ear 4.6s ease-in-out infinite" }}>
-                      <path d="M41 12 C42 2 50 -1 52 5 C53.5 10 50 15 46 15 C43.5 15 41.5 14 41 12 Z" fill={COLOR.alert} />
-                      <path d="M43.5 11 C44 5.5 48 3.5 49.5 7 C50.5 10 48.5 12.5 46 12.5 C44.5 12.5 43.6 12 43.5 11 Z" fill="var(--bg)" opacity="0.26" />
                     </g>
                   </g>
                 ) : null}

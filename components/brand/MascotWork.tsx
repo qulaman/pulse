@@ -804,7 +804,7 @@ export function BoardActOver({ act }: { act: string }) {
     case "tick":
       return <Tick at={{ x: 57, y: 13 }} timing="1.2s" />;
     case "puzzle":
-      // on the left, clear of the watchful ear on the crown (D-70)
+      // on the left, clear of the watchful light over the head on the right (D-149)
       return (
         <g style={{ transformOrigin: "11px -1px", animation: "mascot-act-puzzle-card 1.6s both", opacity: 0 }}>
           <g transform="translate(11 -1) rotate(-8)">
