@@ -90,7 +90,8 @@ title text not null, body text null, deadline timestamptz null, priority task_pr
 status task_status not null default 'sent',
 source ai_source null, source_audio_path text null, source_transcript text null,
 scheduled_send_at timestamptz null,    -- только при status='scheduled'
-recurrence_rule_id uuid null → recurrence_rules,
+recurrence_rule_id uuid null → recurrence_rules (set null), -- D-148: задача дня повтора
+recurrence_on date null,               -- её день; unique (recurrence_rule_id, recurrence_on)
 passed_to uuid null → profiles,       -- D-128: кому передана; ставит reassign_task на закрываемой копии
 accepted_at, completed_at, closed_at timestamptz null,   -- ставит только trg_task_status_guard
 created_at, updated_at timestamptz not null default now()   -- moddatetime
@@ -276,7 +277,7 @@ updated_by uuid null → profiles, updated_at   -- moddatetime
 `id, company_id, user_id, status inbox_status not null default 'recorded', audio_path text, transcript text null, entities jsonb null, client_request_id uuid null, recorded_at timestamptz null (когда директор отпустил лицо, по часам телефона — D-130; `created_at − recorded_at` = сколько фраза ждала на телефоне), created_at, updated_at`; `unique (company_id, client_request_id)` — одна строка на захват, NULL-ключи не сталкиваются (D-126). Заводит `/api/voice/upload-url` (`director_input`: сразу вставка, конфликт 23505 — ответ существующей строкой), дальше `transcribed` → `parsed` → `confirmed` (`confirm_voice_batch` по `payload.inbox_id`); `discarded` код не ставит. Черновики персистентны, датасет для evals собирается сам.
 
 ### recurrence_rules
-`id, company_id, author_id, assignee_id, title not null, body null, priority task_priority, rrule text not null, is_active bool default true, next_run_at timestamptz null`, без `created_at`. Пишет `confirm_voice_batch` (сущность `recurrence`, `next_run_at = now`). Исполнителя, который порождает задачи по правилу, нет.
+`id, company_id, author_id, assignee_id null` (у серии встреч исполнителя нет; у задачи — обязателен, check), `target text 'task' | 'event', title, body, priority, every text 'day' | 'workday' | 'week' | 'month', interval_n int 1..12, weekdays int[] (1 пн … 7 вс), month_day int 0..31 (31 — последний день), at_time time` (задача — срок дня, встреча — начало), `duration_min, location, remind_before_min, everyone, participant_ids uuid[]` (шаблон встречи), `source_audio_path, source_transcript` (фраза — у каждой задачи), `is_active, anchor_on date` (от него «раз в две недели»), `next_on date, next_run_at timestamptz, last_on date, stopped_reason text` ('assignee_inactive'), `rrule text null` (до D-148), `created_at, updated_at`. Пишет `confirm_voice_batch`; `next_on / next_run_at / anchor_on` держит триггер `recurrence_rules_schedule` (новое правило — ближайший день, чья задача ещё не выдана; правка расписания и возобновление — заново от «сейчас»; пауза — `null`; человек не меняет владельца и служебные поля; исполнитель — только своей компании); задачи и встречи по правилу выдаёт тик `recurrence_spawn` (D-148). Расчёт дат — `recurrence_falls_on / recurrence_in_phase / recurrence_next_on / recurrence_run_at` (зеркало `lib/recurrence/schedule.ts`). В Realtime.
 ### reminders
 `id, company_id, user_id, text not null, remind_at timestamptz null, sent bool not null default false, created_at`. **Выведена из оборота (D-95):** напоминание — заметка с `remind_at`; сюда больше никто не пишет, старые строки перенесены в `notes` (связь — `notes.client_request_id = reminders.id`).
 ### notes — заметки директора (D-75)
@@ -293,7 +294,8 @@ events: id, company_id, author_id, title not null, body null, location null,
         everyone bool not null default false,   -- только для показа: состав материализован строками
         reminded_at timestamptz null,           -- ставит events_due_reminders; перенос обнуляет
         cancelled_at timestamptz null, audio_path null, source_transcript null,
-        inbox_item_id uuid null → inbox_items (set null), created_at, updated_at
+        inbox_item_id uuid null → inbox_items (set null), created_at, updated_at,
+        recurrence_rule_id uuid null → recurrence_rules (set null), recurrence_on date null  -- D-148: встреча серии; unique (rule, day)
 event_participants: event_id → events on delete cascade, user_id → profiles on delete cascade,
         status text not null default 'invited' check (status in ('invited','going','declined')),
         reason text null, responded_at timestamptz null, created_at,
@@ -564,7 +566,7 @@ task_messages (task_id, created_at);  task_messages (company_id, seq desc);  tas
 task_messages (task_id, created_at desc) where meta->>'is_question' = 'true' or meta->>'decline_reason' = 'true';
 ai_logs (company_id, created_at);  ai_logs (company_id, client_request_id, kind);
 announcements (company_id, created_at desc);  inbox_items (company_id, user_id);
-recurrence_rules (next_run_at) where is_active;  reminders (remind_at) where not sent;
+recurrence_rules (next_run_at) where is_active;  recurrence_rules (company_id, created_at desc);  tasks/events (recurrence_rule_id, recurrence_on) unique where recurrence_rule_id is not null;  reminders (remind_at) where not sent;
 point_transactions (company_id, user_id, created_at);
 task_reactions (company_id, updated_at desc);  task_reactions (author_id);           -- D-133
 point_disputes (company_id, status, created_at desc);  point_disputes (user_id);  point_disputes (resolved_by);  point_disputes (refund_id);
@@ -612,7 +614,7 @@ notification_deliveries_created_idx (created_at);   -- самоочистка, D
 
 pg_cron и pg_net не подключены. Единственное расписание — Vercel cron `vercel.json` → `/api/push/sweep` (под `CRON_SECRET`, BACKEND §10); сейчас `0 3 * * *` — раз в сутки (проект на Vercel Hobby), минутный тик — открытый вопрос В-8 (D-125). Локально тот же свип раз в минуту зовёт `pnpm dev:tick`. Один вызов по порядку: `publish_due_scheduled()` — выпуск `scheduled → sent` (D-114, наряд 017), `events_due_reminders()`, `errands_due_escalation()`, `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()`, «Скоро срок» `deadline_reminders_due()` (D-128), `team_channel_alerts_due()`, `director_day_summaries_due()` («Итог дня»), `director_digests_due()` (сводки, D-114), `notification_deliveries_purge()` (D-114 §10), `tv_events_prune()` (D-126), затем рассылка outbox.
 
-Исполнителя нет у: `recurrence_rules` (записываются, не исполняются), чистки аудио (D-18). Авто-очки и серия — не тик, а триггер на переходе задачи (D-133). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`.
+Исполнителя нет у: чистки аудио (D-18). Повторы исполняет `recurrence_spawn` (D-148). Авто-очки и серия — не тик, а триггер на переходе задачи (D-133). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`.
 
 ## Миграции — дисциплина
 
@@ -668,6 +670,7 @@ pg_cron и pg_net не подключены. Единственное распи
 | `034_mind_board_v2.test.sql` | доска v2 (D-121): подпункты одного уровня, корзина веткой, ведущий с пульта, вид стены |
 | `044_mind_board_v3.test.sql` | доски v3 (D-140): закрепить и завершить — только автор, ветка едет за пунктом на другую доску, «Новая доска из открытых» (что берёт, повтор, чужая/удалённая), срок на стене и «+30 мин» |
 | `045_board_sketch.test.sql` | пункт-рисунок (D-141): рисунок только у строки доски, с линиями, небольшой; стена видит и подсвечивает рисунок без слов; копия переносит рисунок; чужая компания не видит |
+| `047_recurrence_live.test.sql` | повторы (D-148): подтверждение пишет правило полями; первый день — ближайший понедельник, чья задача ещё не выдана; тик до и в момент; задача дня — обычная, с голосом и пушем; повтор тика без дубля; проспанный день не выдаётся; пауза очищает, смена дня считает заново; чужой автор и исполнитель другой компании — отказ; сотрудник читает, но не меняет; компания B не видит; уволенный исполнитель останавливает правило; серия встреч: следующая — с теми же людьми, приглашение только к первой |
 | `035_tv_wall_v4.test.sql` | стена v4: заставка «Рейтинг» и её период пультом, круг выключается выбором руками и снимает доску; пятёрка без шестого, награды без штрафов и магазина, гостю скрыто, без очков — нет; одно дело: отказ не встаёт, ставший отказом снимается (D-123) |
 | `036_push_words.test.sql` | слова пушей (D-125): имя другой стороны и срок, пока он впереди; просьба без комментария называет автора; посетитель без имени — вопрос директору; `push_when()` говорит как `humanAqtobe()` |
 | `037_send_now.test.sql` | «Отправить сейчас» (D-129): отложенная задача и её слова уходят сразу, свои отложенные пуши директора остаются, отложенное объявление — так же; кнопка только у директора |
