@@ -416,8 +416,8 @@ export default function PulsePage() {
     if (stage === "question") resetIngest();
   };
 
-  // A change on the board is a thought: it pops above the head, the face wakes up surprised
-  // at it, and after a while the thought is gone and the face dozes off again. The opening
+  // A change on the board is a thought: it pops above the head, the face wakes up and reads it
+  // (`processing`, D-65), and after a while the thought is gone and the face dozes off again. The opening
   // line (the summary on a tap) is speech, under the face. Both answer to the same line.
 
   const [expiredThought, setExpiredThought] = useState<string | null>(null);

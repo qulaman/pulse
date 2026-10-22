@@ -46,8 +46,9 @@ export function MascotScene({ scene, level = 0 }: { scene: Scene; level?: number
     );
   }
 
-  // saving / transcribing / parsing: the blob does the work, the strip says where the phrase is
-  const activeIndex = STEPS.findIndex((s) => s.key === scene);
+  // saving / transcribing / parsing: the blob does the work, the strip says where the phrase is;
+  // while it throws the card (`sending`) all three are behind it — not found, they all read undone
+  const activeIndex = scene === "sending" ? STEPS.length : STEPS.findIndex((s) => s.key === scene);
   return (
     <div className="flex flex-col items-center">
       <Mascot state={scene} size={112} />

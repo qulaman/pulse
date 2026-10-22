@@ -110,22 +110,10 @@ const STATES: StateEntry[] = [
     keys: "mascot-lean · mascot-call · mascot-call-mark · mascot-badge",
   },
   {
-    state: "surprised",
-    title: "Удивлён",
-    note: "Разбужен мыслью: прыжок назад, широкие глаза вверх, маленький круглый рот, дальше настороженное дыхание",
-    keys: "mascot-startle · mascot-alert · mascot-look-up",
-  },
-  {
     state: "processing",
     title: "Обрабатывает",
     note: "Подключается к хранилищу, глаза бегут глифами как терминал, затем фиксация, прыжок и галочка нового статуса (D-65)",
     keys: "mascot-process · mascot-code-look · mascot-glyph · mascot-eye-return · mascot-store · mascot-data-bit · mascot-check-pop · mascot-shadow-process",
-  },
-  {
-    state: "angry",
-    title: "Злится",
-    note: "Нахмуренные брови, короткий тяжёлый толчок корпусом и упрямый взгляд исподлобья.",
-    keys: "mascot-angry-pose · mascot-angry · mascot-angry-look",
   },
   {
     state: "nervous",
@@ -134,23 +122,11 @@ const STATES: StateEntry[] = [
     keys: "mascot-nervous · mascot-nervous-look · mascot-sweat · mascot-letter-bob",
   },
   {
-    state: "bored",
-    title: "Скучает",
-    note: "Вялое дыхание, полуприкрытые глаза и долгий взгляд в сторону — заняться нечем.",
-    keys: "mascot-bored · mascot-bored-look",
-  },
-  {
     state: "panicking",
     title: "Паникует",
     note: "Частая дрожь, широко раскрытые глаза и две торопливые капли пота. У сотрудника в руках стопка, верхняя карточка горит — часы срока пульсируют (D-110).",
     keys: "mascot-panic-pose · mascot-panic · mascot-panic-look · mascot-sweat · mascot-hot",
     carry: { count: 2, hot: true },
-  },
-  {
-    state: "swearing",
-    title: "Ругается",
-    note: "Сердитая мимика, рубленый ритм и облачко с нейтральными символами вместо брани.",
-    keys: "mascot-angry-pose · mascot-swear · mascot-swear-look · mascot-swear-cloud",
   },
   {
     state: "checking",

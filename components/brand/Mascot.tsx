@@ -31,7 +31,7 @@ import {
 
 /**
  * The assistant character «Капля» (D-45, docs/DESIGN.md §3): one soft blob, two eyes.
- * Director-facing states only in the pilot. Each state is its own choreography — a
+ * The director's, the employee's and the wall's faces. Each state is its own choreography — a
  * one-shot pose on entry (lean in, wind up), a looping body motion, the eyes as a pair,
  * and a small prop around the blob — so the director reads what the assistant is doing
  * at a glance, without a caption:
@@ -54,7 +54,6 @@ import {
  *                never gets angry, it watches
  *   calling      «обрати внимание!»: leans in, hops twice like a dog at the door, an «!»
  *                pops over its head — the employee has an order nobody has opened yet
- *   surprised    woken by a thought: a startle, wide eyes turned up to the bubble, a small round mouth
  *   processing   reads the data and reports: plugs into the store, the eyes run glyphs,
  *                then a hop and the tick of the new status (D-65)
  * What the face does while a ball of Пульс is open (D-82) — the ball's own job, done by hand:
@@ -93,15 +92,11 @@ export type MascotState =
   | "speaking"
   | "happy"
   | "sleeping"
-  | "surprised"
   | "processing"
   | "calling"
   | "alert"
-  | "angry"
   | "nervous"
-  | "bored"
   | "panicking"
-  | "swearing"
   | "checking"
   | "chatting"
   | "announcing"
@@ -224,16 +219,12 @@ const COLOR: Record<MascotState, string> = {
   speaking: "var(--accent)",
   happy: "var(--gold)",
   sleeping: SLEEP_COLOR,
-  surprised: "var(--accent)",
   processing: "var(--accent)",
   calling: "var(--warn)",
   // the body keeps its own colour: the amber is the light over the head alone (D-149)
   alert: "var(--accent)",
-  angry: "var(--danger)",
   nervous: "var(--warn)",
-  bored: "color-mix(in srgb, var(--accent) 58%, var(--surface-2))",
   panicking: "var(--danger)",
-  swearing: "var(--danger)",
   checking: "var(--accent)",
   chatting: "var(--accent)",
   announcing: "var(--accent)",
@@ -278,16 +269,12 @@ const POSE: Record<MascotState, string> = {
   speaking: SETTLE,
   happy: SETTLE,
   sleeping: SETTLE,
-  surprised: "mascot-startle 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   calling: "mascot-lean 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   alert: "mascot-alert-pose 0.5s cubic-bezier(0.34, 1.35, 0.64, 1) both",
   // the whole take lives in the pose: read, lock, hop, report
   processing: "mascot-process 1.9s both",
-  angry: "mascot-angry-pose 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   nervous: SETTLE,
-  bored: SETTLE,
   panicking: "mascot-panic-pose 0.36s cubic-bezier(0.34, 1.4, 0.64, 1) both",
-  swearing: "mascot-angry-pose 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   // leans over the clipboard it has just taken out
   checking: "mascot-check-pose 0.5s cubic-bezier(0.34, 1.4, 0.64, 1) both",
   chatting: SETTLE,
@@ -317,16 +304,12 @@ const BODY: Record<MascotState, string> = {
   speaking: "mascot-talk 1.1s ease-in-out infinite",
   happy: "mascot-happy 3.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
   sleeping: "mascot-sleep 7s ease-in-out infinite",
-  surprised: "mascot-alert 2.8s ease-in-out infinite",
   // under the take the body keeps breathing, so the face is alive once the report is done
   processing: "mascot-idle 5.8s cubic-bezier(0.45, 0, 0.55, 1) infinite",
   calling: "mascot-call 1.9s cubic-bezier(0.3, 0, 0.2, 1) infinite",
   alert: "mascot-alert 4.6s ease-in-out infinite",
-  angry: "mascot-angry 0.82s ease-in-out infinite",
   nervous: "mascot-nervous 1.35s ease-in-out infinite",
-  bored: "mascot-bored 4.4s ease-in-out infinite",
   panicking: "mascot-panic 1.92s ease-in-out infinite",
-  swearing: "mascot-swear 0.72s ease-in-out infinite",
   checking: "mascot-check 3.6s ease-in-out infinite",
   chatting: "mascot-chat 3.2s ease-in-out infinite",
   announcing: "mascot-announce 1.4s ease-in-out infinite",
@@ -372,13 +355,9 @@ const EYES: Record<MascotState, string> = {
   speaking: "mascot-speak-look 2.2s ease-in-out infinite",
   happy: "none",
   sleeping: "none",
-  surprised: "mascot-look-up 2.4s ease-in-out infinite",
   processing: "mascot-code-look 1.9s both",
-  angry: "mascot-angry-look 0.82s ease-in-out infinite",
   nervous: "mascot-nervous-look 1.35s ease-in-out infinite",
-  bored: "mascot-bored-look 4.4s ease-in-out infinite",
   panicking: "mascot-panic-look 1.92s ease-in-out infinite",
-  swearing: "mascot-swear-look 0.72s ease-in-out infinite",
   checking: "mascot-check-look 3.6s infinite",
   chatting: "mascot-chat-look 3.2s infinite",
   announcing: "mascot-announce-look 1.4s ease-in-out infinite",
@@ -641,6 +620,35 @@ function Beacon({ detailed }: { detailed: boolean }) {
 }
 
 /**
+ * The holiday wear steps aside for whatever comes to its place and is back after it (D-119): the New
+ * Year hat leaves the crown to a card, a coin or a heart over the head; the Nauryz tulip at the left
+ * temple leaves it to a raised left hand, the clock, the «?», the envelope and the calendar.
+ */
+const WEAR_ASIDE: Record<MascotSeason, { states: ReadonlySet<MascotState>; acts: ReadonlySet<MascotAct> }> = {
+  new_year: {
+    states: new Set(["calling"]),
+    acts: new Set(["catch", "insist", "boomerang", "shrug", "nod", "poof", "handover", "coin", "heart", "puzzle", "ear"]),
+  },
+  nauryz: {
+    states: new Set(["nervous", "scheduling"]),
+    acts: new Set(["wave", "raise", "signal", "clock", "relief", "scratch", "letter", "read", "puzzle", "ear"]),
+  },
+};
+
+/** nervous / panicking: the pale blue of sweat — decor, not a status colour; it reads on teal, amber and red alike. */
+const SWEAT = "#C4E6FF";
+
+/** A drop of sweat on the skin, its tip at (x, y): swells out, runs down the temple, gone. */
+function SweatDrop({ x, y, timing }: { x: number; y: number; timing: string }) {
+  return (
+    <g style={{ transformOrigin: `${x}px ${y + 5}px`, animation: `mascot-sweat ${timing}` }}>
+      <path d={`M${x} ${y} C${x + 3.6} ${y + 4.6} ${x + 3.8} ${y + 9} ${x} ${y + 9} C${x - 3.8} ${y + 9} ${x - 3.6} ${y + 4.6} ${x} ${y} Z`} fill={SWEAT} />
+      <ellipse cx={x - 1.2} cy={y + 6.2} rx="0.9" ry="1.3" fill="#ffffff" opacity="0.7" />
+    </g>
+  );
+}
+
+/**
  * A motion group of a face big enough to be watched carries its pose across a change (Blend): a state
  * turned, an act started or cut, a look taken. An avatar has no mid-pose worth carrying and pays for
  * no wrappers.
@@ -690,10 +698,7 @@ export function Mascot({
   const talking = state === "speaking";
   const lidded = state === "saving"; // eyes half-closed while tucking the note away
   const asleep = state === "sleeping"; // eyes shut, a slow breath, small z-s drifting up
-  const startled = state === "surprised"; // woken by a thought: wide eyes up at it, a small round mouth
-  const angry = state === "angry" || state === "swearing";
   const anxious = state === "nervous" || state === "panicking";
-  const bored = state === "bored";
   const content = state === "serving"; // a cup in the hands: the eyes soften, a small smile
   const shouting = state === "announcing";
   const clamped = Math.min(1, Math.max(0, level));
@@ -707,9 +712,9 @@ export function Mascot({
   // alone, so the whole cast grows or shrinks together and no state has to be re-tuned.
   const calling = state === "calling"; // «обрати внимание!»: wide eyes and an «!» over the head
   const watchful = state === "alert"; // «насторожен»: the director's face watches, never scowls
-  const open = asleep ? 0.19 : bored ? 0.4 : squint ? 0.42 : lidded ? 0.61 : content ? 0.72 : wide || startled || anxious || calling ? 1.16 : watchful || shouting ? 1.08 : 1;
+  const open = asleep ? 0.19 : squint ? 0.42 : lidded ? 0.61 : content ? 0.72 : wide || anxious || calling ? 1.16 : watchful || shouting ? 1.08 : 1;
   // a closing eye also shortens: at this size a full-width slit reads as a bar across the face
-  const widen = wide ? 1.06 : startled || anxious || calling ? 1.1 : asleep ? 0.8 : squint ? 0.85 : lidded || bored || content ? 0.92 : 1;
+  const widen = wide ? 1.06 : anxious || calling ? 1.1 : asleep ? 0.8 : squint ? 0.85 : lidded || content ? 0.92 : 1;
   // the eye is drawn once at EYE_RX/EYE_RY and reshaped by scale — a compositor-only change
   const eyeShape = `scale(${widen}, ${open})`;
   // a held look: the eyes travel to the side (a springy saccade, not a slide) and the head
@@ -733,6 +738,7 @@ export function Mascot({
   // at avatar size the body motion alone still plays
   const acting = detailed ? act : null;
   const beacon = state === "alert" && !(acting && BEACON_STEPS_ASIDE.has(acting));
+  const wear = season != null && detailed && !WEAR_ASIDE[season].states.has(state) && !(acting && WEAR_ASIDE[season].acts.has(acting));
   const lids = act ? ACT_LIDS[act] : undefined;
   const cheeks = squint || content;
   // the stack of orders in the hands (D-110); a held job of a ball keeps the hands for itself
@@ -760,9 +766,7 @@ export function Mascot({
           : state === "calm" || state === "awaiting"
             ? "mascot-shadow-idle 5.8s ease-in-out infinite"
             // the one-shots big enough for the ground to answer them
-            : state === "surprised"
-              ? "mascot-shadow-startle 0.55s cubic-bezier(0.34, 1.4, 0.64, 1) both"
-              : state === "processing"
+            : state === "processing"
                 ? "mascot-shadow-process 1.9s both"
                 : state === "celebrating"
                   ? "mascot-shadow-cheer 0.9s both"
@@ -922,25 +926,6 @@ export function Mascot({
         ) : null}
       </Linger>
 
-      {/* nervous and panicking: sweat flicks away from the head at different tempos */}
-      <Linger show={anxious} out={FADE_OUT}>
-        {anxious ? (
-          <g fill="var(--surface)" stroke={COLOR[state]} strokeWidth="1.25">
-            <path d="M54 17 C57 21 57 24 54 24 C51 24 51 21 54 17 Z" style={{ transformOrigin: "54px 21px", animation: `mascot-sweat ${state === "panicking" ? "1.92s" : "5.4s"} ease-out infinite` }} />
-            {state === "panicking" ? <path d="M9 25 C12 29 12 32 9 32 C6 32 6 29 9 25 Z" style={{ transformOrigin: "9px 29px", animation: "mascot-sweat 1.92s ease-out 0.18s infinite" }} /> : null}
-          </g>
-        ) : null}
-      </Linger>
-
-      {/* swearing: the cloud keeps the reaction expressive without putting words in the UI */}
-      {state === "swearing" ? (
-        <g style={{ transformOrigin: "49px 10px", animation: "mascot-swear-cloud 0.72s ease-in-out infinite" }}>
-          <path d="M42 11 C41 6 45 3 49 5 C52 1 58 4 57 8 C61 10 59 15 55 15 L45 15 C41 15 39 13 42 11 Z" fill="var(--surface)" stroke={COLOR.swearing} strokeWidth="1.2" />
-          <path d="M45 15 L43 18 L48 15" fill="var(--surface)" stroke={COLOR.swearing} strokeWidth="1.2" strokeLinejoin="round" />
-          <text x="44.2" y="12.2" fill={COLOR.swearing} fontSize="7" fontWeight="800">!#</text>
-        </g>
-      ) : null}
-
       {/* saving: a note sinks into the head and is gone — tucked away safely */}
       <Linger show={state === "saving"} out={FADE_OUT}>
         {state === "saving" ? (
@@ -1091,12 +1076,6 @@ export function Mascot({
         ) : null}
       </Linger>
 
-      {/* alert: the light over the head floats on its own, it does not ride the body (D-149); for
-          an act that draws right under it the light steps aside and comes back after */}
-      <Linger show={beacon} out={FADE_OUT}>
-        {beacon ? <Beacon detailed={detailed} /> : null}
-      </Linger>
-
       {/* the wind-up of a throw: the card in the hand behind the head, only its top over the crown
           — `sending`, and the employee's «Сдал» (under the body, so the head hides the rest) */}
       {state === "sending" && detailed ? (
@@ -1125,6 +1104,12 @@ export function Mascot({
             act cut short (the face got busy) goes back to rest from where it was, not in one frame */}
         <Carry on={detailed} k={actBody} origin="32px 58px">
         <g style={{ transformOrigin: "32px 58px", animation: actBody }}>
+          {/* alert: the light over the head (D-149). It goes where an act takes the head — up on tiptoe,
+              out to peek, over to the ear — but not with the breath, so it hangs in the air instead of
+              sitting on the crown; for an act that draws right under it the light steps aside */}
+          <Linger show={beacon} out={FADE_OUT}>
+            {beacon ? <Beacon detailed={detailed} /> : null}
+          </Linger>
           {/* pose: one-shot on entry — it starts from the pose the last state left (the lean to the ear) */}
           <Carry on={detailed} k={POSE[state]} origin="32px 52px">
           <g style={{ transformOrigin: "32px 52px", animation: POSE[state] }}>
@@ -1198,6 +1183,18 @@ export function Mascot({
                 style={{ transformOrigin: "24px 18px", animation: detailed ? "mascot-glint 7.3s ease-in-out infinite" : "none" }}
               />
 
+              {/* nervous and panicking: a drop of sweat runs down the temple at different tempos. On the
+                  skin, in front of the head and riding it: drawn behind the body, only its outlined tip
+                  stuck out past the edge and read as a small ear */}
+              <Linger show={anxious} out={FADE_OUT}>
+                {anxious ? (
+                  <g>
+                    <SweatDrop x={51} y={12} timing={`${state === "panicking" ? "1.92s" : "5.4s"} ease-out infinite`} />
+                    {state === "panicking" ? <SweatDrop x={13} y={19} timing="1.92s ease-out 0.18s infinite" /> : null}
+                  </g>
+                ) : null}
+              </Linger>
+
               {/* listening: the ear pricks up on the right and twitches now and then; tuned — the
                   same ear, turned to the word to everyone (D-110) */}
               <Linger show={state === "listening" || state === "tuned"} origin="0% 80%">
@@ -1213,7 +1210,14 @@ export function Mascot({
               </Linger>
 
               {/* a holiday on the crown, riding the body (D-119) */}
-              {season && detailed ? <SeasonWear season={season} /> : null}
+              <Linger show={wear} out={FADE_OUT}>
+                {wear && season ? (
+                  // put back on with a small spring after it stepped aside, instead of blinking in
+                  <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-wear-in 0.4s cubic-bezier(0.34, 1.5, 0.64, 1) both" }}>
+                    <SeasonWear season={season} />
+                  </g>
+                ) : null}
+              </Linger>
 
               {/* happy, celebrating and serving: a soft blush under the eyes */}
               {cheeks ? (
@@ -1380,19 +1384,6 @@ export function Mascot({
                       // a tiny smile when happy, celebrating or carrying a cup — no mouth in every other state
                       <path d="M26 43 Q32 48 38 43" fill="none" stroke="var(--bg)" strokeWidth="2.2" strokeLinecap="round" />
                     ) : null}
-                    {startled ? (
-                      // a small «o»: the face has just noticed something
-                      <ellipse cx="32" cy="46.5" rx="2.6" ry="3" />
-                    ) : null}
-                    {angry ? (
-                      <>
-                        {/* the brows sit just above the enlarged lid — on it they merge with the eye into one dark visor */}
-                        <path d="M17.6 23.4 L29.4 27.6" fill="none" stroke="var(--bg)" strokeWidth="2.4" strokeLinecap="round" />
-                        <path d="M46.4 23.4 L34.6 27.6" fill="none" stroke="var(--bg)" strokeWidth="2.4" strokeLinecap="round" />
-                        <path d="M27 45 Q32 42 37 45" fill="none" stroke="var(--bg)" strokeWidth="2" strokeLinecap="round" />
-                      </>
-                    ) : null}
-                    {bored ? <path d="M27 45 Q32 43.8 37 45" fill="none" stroke="var(--bg)" strokeWidth="1.7" strokeLinecap="round" /> : null}
                     {talking ? (
                       // speaking: the mouth opens and closes in the rhythm of a phrase (scale only)
                       <ellipse
@@ -1568,11 +1559,12 @@ export function Mascot({
         />
       ) : null}
 
-      {/* whistle: a tune — three notes float up and away from the pursed mouth */}
+      {/* whistle: a tune — three notes leave the pursed mouth sideways, under the right eye, and only
+          rise once they are past the cheek (started at the eye, they were drawn over it) */}
       {acting === "whistle" ? (
         <g fill="var(--text)" stroke="var(--text)" opacity="0.85">
           {[0, 1, 2].map((note) => (
-            <g key={note} transform={`translate(${40 + note * 3} ${40 - note * 2})`}>
+            <g key={note} transform={`translate(${39 + note * 0.8} ${48.5 - note * 0.6})`}>
               <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: `mascot-act-note 1.4s ease-out ${(0.2 + note * 0.55).toFixed(2)}s both`, opacity: 0 }}>
                 <ellipse cx="0" cy="0" rx="2.3" ry="1.7" transform="rotate(-22)" stroke="none" />
                 <path d="M2 -0.6 V-8.4 L5.6 -6.8" fill="none" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />

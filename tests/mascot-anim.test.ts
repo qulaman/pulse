@@ -21,8 +21,8 @@ const DECLARED = [...CSS.matchAll(/@keyframes\s+([\w-]+)/g)].map((match) => matc
 /** Every state, checked for exhaustiveness by the type. */
 const STATES: Record<MascotState, true> = {
   calm: true, listening: true, saving: true, transcribing: true, parsing: true, sending: true, offering: true,
-  thinking: true, speaking: true, happy: true, sleeping: true, surprised: true, processing: true, calling: true,
-  alert: true, angry: true, nervous: true, bored: true, panicking: true, swearing: true, checking: true,
+  thinking: true, speaking: true, happy: true, sleeping: true, processing: true, calling: true,
+  alert: true, nervous: true, panicking: true, checking: true,
   chatting: true, announcing: true, scheduling: true, serving: true, celebrating: true, working: true,
   awaiting: true, tuned: true,
 };

@@ -65,7 +65,8 @@ export function RoomBack({ daypart, clockAct, still = false }: { daypart: Daypar
     daypart === "night"
       ? "color-mix(in srgb, var(--accent-2) 10%, var(--bg))"
       : daypart === "evening"
-        ? "color-mix(in srgb, var(--warn) 24%, var(--bg))"
+        ? // a dusk violet under the amber sun: amber mixed into the dark background was plain mud brown
+          "color-mix(in srgb, #7A5CC8 32%, var(--bg))"
         : "color-mix(in srgb, var(--accent) 16%, var(--bg))";
   return (
     <g style={{ animation: "smc-fade-in 0.5s ease-out both" }}>
@@ -85,7 +86,7 @@ export function RoomBack({ daypart, clockAct, still = false }: { daypart: Daypar
         </g>
       ) : daypart === "evening" ? (
         <g>
-          <circle cx="74" cy="15" r="5" fill="var(--warn)" fillOpacity="0.9" />
+          <circle cx="74" cy="15" r="5" fill="var(--warn)" />
           <rect x="62.6" y="15" width="22.8" height="2.4" fill={sky} />
         </g>
       ) : (
@@ -373,14 +374,23 @@ export function ShutDoor() {
   );
 }
 
-/** «вызови охрану» (D-99): a police light on the crown, its beams turning, the dome blinking. */
+/**
+ * «вызови охрану» (D-99): the turning beams of the police light on the crown. Drawn behind the body:
+ * a beam turned down goes behind the head instead of smearing red across the face.
+ */
+export function SirenBeams() {
+  return (
+    <g style={{ transformOrigin: "32px 0px", animation: "smc-spin 0.9s linear infinite" }}>
+      <path d="M32 0 L12 -9 L12 -3 Z" fill="var(--danger)" fillOpacity="0.4" />
+      <path d="M32 0 L52 9 L52 3 Z" fill="var(--danger)" fillOpacity="0.4" />
+    </g>
+  );
+}
+
+/** «вызови охрану» (D-99): the police light itself on the crown, the dome blinking (its beams — SirenBeams). */
 export function Siren() {
   return (
     <g>
-      <g style={{ transformOrigin: "32px 0px", animation: "smc-spin 0.9s linear infinite" }}>
-        <path d="M32 0 L12 -9 L12 -3 Z" fill="var(--danger)" fillOpacity="0.4" />
-        <path d="M32 0 L52 9 L52 3 Z" fill="var(--danger)" fillOpacity="0.4" />
-      </g>
       <rect x="25.5" y="0.6" width="13" height="3.4" rx="1.2" fill={GEAR} />
       <path d="M27.4 1 Q27.4 -6.4 32 -6.4 Q36.6 -6.4 36.6 1 Z" fill="var(--danger)" style={{ animation: "smc-light 0.5s steps(1) infinite" }} />
       <ellipse cx="30.4" cy="-3" rx="1.1" ry="1.7" fill="#ffffff" fillOpacity="0.6" />

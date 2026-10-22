@@ -42,15 +42,11 @@ const LOOP_MS: Record<MascotState, number> = {
   speaking: 1100,
   happy: 3800,
   sleeping: 7000,
-  surprised: 2800,
   processing: 1900,
   calling: 1900,
   alert: 4600,
-  angry: 820,
   nervous: 1350,
-  bored: 4400,
   panicking: 480,
-  swearing: 720,
   checking: 3600,
   chatting: 3200,
   announcing: 1400,
@@ -183,6 +179,7 @@ function dropActs(size: number): Row[] {
     h: size * 1.7,
     draw: () => <Mascot state={on} size={size} act={act} carry={{ count: 2 }} />,
   }));
+  const worn = wornRows(size);
   const board = BOARD_ON.map(([act, on]) => ({
     key: `act-${act}-${on}`,
     label: `${act} · ${on}`,
@@ -200,7 +197,34 @@ function dropActs(size: number): Row[] {
     w: size * 1.7,
     h: size * 1.7,
     draw: () => <Mascot state={ACT_ON[act].on} size={size} act={act} carry={ACT_ON[act].carry ?? null} />,
-  })), ...board];
+  })), ...board, ...worn];
+}
+
+/**
+ * The holiday wear meeting what comes to its place (WEAR_ASIDE in Mascot.tsx): the hat must leave the
+ * crown to the card over the head, the tulip the temple to the raised hand and the envelope. Last in
+ * the set, so the rows above keep their pixels.
+ */
+const WORN: [MascotSeason, MascotState, MascotAct | null][] = [
+  ["new_year", "calling", null],
+  ["new_year", "calling", "catch"],
+  ["new_year", "happy", "coin"],
+  ["new_year", "calm", "puzzle"],
+  ["nauryz", "nervous", null],
+  ["nauryz", "calm", "wave"],
+  ["nauryz", "working", "raise"],
+  ["nauryz", "calm", "scratch"],
+];
+
+function wornRows(size: number): Row[] {
+  return WORN.map(([season, on, act]) => ({
+    key: `worn-${season}-${on}${act ? `-${act}` : ""}`,
+    label: `${act ? `${act} · ` : ""}${on} · ${season}`,
+    dur: act ? ACT_MS[act] : LOOP_MS[on],
+    w: size * 1.7,
+    h: size * 1.7,
+    draw: () => <Mascot state={on} size={size} act={act} carry={CARRY[on] ?? null} season={season} />,
+  }));
 }
 
 type SecCell = {
