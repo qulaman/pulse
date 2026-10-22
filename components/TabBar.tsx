@@ -12,7 +12,7 @@ import { warmNotes } from "@/lib/notes/queries";
 import { afterHydration } from "@/lib/offline/persist";
 import type { TabBarRole } from "@/lib/routes";
 import { inboxCounts, useDirectorInbox, useFreshTaskCount, useMe, warmMyTasks, warmSentTasks } from "@/lib/tasks/queries";
-import { useVisualViewport } from "@/lib/ui/useVisualViewport";
+import { onKeyboard, readKeyboard, type Keyboard } from "@/lib/ui/keyboard";
 
 import styles from "./TabBar.module.css";
 
@@ -284,12 +284,26 @@ function useFold(nav: RefObject<HTMLElement | null>, pathname: string) {
 }
 
 /**
- * The on-screen keyboard is up (the visual viewport lost its bottom to it). The capsule
- * steps away and what docks above it lands on the keyboard instead of floating a bar's
- * height over it (D-112) — the keyboard leaves little enough room as it is.
+ * The on-screen keyboard is up. The capsule steps away and what docks above it lands on the
+ * keyboard instead of floating a bar's height over it (D-112) — the keyboard leaves little
+ * enough room as it is. Written in the viewport's own event, in the same frame as the docked
+ * bar's own offset (lib/ui/keyboard.ts): no frame of a bar's height hanging over the keyboard,
+ * and no React render on the way.
  */
-function useKeyboardUp(): boolean {
-  return useVisualViewport() > 0;
+function useKeyboardAway(nav: RefObject<HTMLElement | null>, scrim: RefObject<HTMLElement | null>) {
+  useLayoutEffect(() => {
+    const node = nav.current;
+    if (!node) return;
+    const set = ({ up }: Keyboard) => {
+      if (node.hasAttribute("data-away") === up) return;
+      node.toggleAttribute("data-away", up);
+      scrim.current?.toggleAttribute("data-away", up);
+      syncDocked(node);
+    };
+    set(readKeyboard());
+    syncDocked(node);
+    return onKeyboard(set);
+  }, [nav, scrim]);
 }
 
 /**
@@ -417,8 +431,9 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
   const pathname = usePathname();
   const badges = useTabBadges(role);
   const nav = useRef<HTMLElement>(null);
+  const scrim = useRef<HTMLDivElement>(null);
   useFold(nav, pathname);
-  const away = useKeyboardUp();
+  useKeyboardAway(nav, scrim);
   const tabs = tabsOf(role, lab);
 
   // the thumb answers the tap, not the network: it leaves before the next screen arrives.
@@ -446,11 +461,6 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
     for (const tab of tabs) seenBadges.set(tab.href, badges[tab.href] ?? 0);
   });
 
-  // before paint, in the same commit as the composer's own keyboard offset: no frame of it
-  // hanging a bar's height over the keyboard
-  useLayoutEffect(() => {
-    if (nav.current) syncDocked(nav.current);
-  }, [away]);
   useEffect(
     () => () => {
       delete document.documentElement.dataset.tabbar;
@@ -462,12 +472,12 @@ export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) 
     <>
       {/* the capsule floats; this keeps its room at the end of the page so nothing ends under it */}
       <div aria-hidden className={styles.spacer} />
-      <div aria-hidden className={styles.scrim} data-away={away ? "" : undefined} />
+      {/* `data-away` on both is the keyboard's, set outside React (useKeyboardAway) */}
+      <div ref={scrim} aria-hidden className={styles.scrim} />
       <nav
         ref={nav}
         aria-label="Основная навигация"
         className={styles.capsule}
-        data-away={away ? "" : undefined}
         style={{ "--n": tabs.length } as CSSProperties}
       >
         <span
