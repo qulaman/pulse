@@ -265,6 +265,8 @@ export const CompanySettingsSchema = z.object({
   mascot_seasons: z.boolean().default(true),
   /** The employee's face worries over their own work — calling, panicking, nervous (D-133, В-5). */
   mascot_telegraph: z.boolean().default(true),
+  /** «Лаб» on the whole team's bar while the company tests the product (D-150); off at release. */
+  lab_for_all: z.boolean().default(false),
   points_rules: PointsRulesSchema.prefault({}),
   ether_events: EtherEventsSchema.prefault({}),
   delivery_window: DeliveryWindowSchema.prefault({}),
@@ -295,6 +297,7 @@ export const SettingsPatchSchema = z
     rating_mode: z.enum(["top5", "full"]),
     mascot_seasons: z.boolean(),
     mascot_telegraph: z.boolean(),
+    lab_for_all: z.boolean(),
     // a section arrives whole: the screen sends everything it shows
     points_rules: PointsRulesSchema,
     ether_events: EtherEventsSchema,

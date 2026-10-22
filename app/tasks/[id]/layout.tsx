@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { RoleScope } from "@/components/RoleScope";
 import { TabBar } from "@/components/TabBar";
 import { AuthError, getSessionProfile } from "@/lib/auth";
-import { tabBarRole } from "@/lib/routes";
+import { tabScope } from "@/lib/lab/access";
 
 /**
  * The thread is shared by both roles, so it lives outside the (employee) and
@@ -21,10 +21,11 @@ export default async function TaskThreadLayout({ children }: { children: React.R
     throw error;
   }
 
+  const scope = await tabScope(profile);
   return (
     <div className="flex min-h-dvh flex-col">
-      <RoleScope role={tabBarRole(profile.role)} me={profile}>{children}</RoleScope>
-      <TabBar role={tabBarRole(profile.role)} />
+      <RoleScope {...scope} me={profile}>{children}</RoleScope>
+      <TabBar {...scope} />
     </div>
   );
 }

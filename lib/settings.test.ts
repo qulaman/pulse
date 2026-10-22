@@ -90,6 +90,18 @@ describe("points rules, Эфир and the telegraph (D-133)", () => {
   });
 });
 
+describe("the lab for the whole team (D-150)", () => {
+  it("is closed for a fresh company and keeps what the company stored", () => {
+    expect(parseCompanySettings({}).lab_for_all).toBe(false);
+    expect(parseCompanySettings({ lab_for_all: true }).lab_for_all).toBe(true);
+  });
+
+  it("the patch takes the switch alone and refuses anything but a boolean", () => {
+    expect(SettingsPatchSchema.safeParse({ lab_for_all: true }).success).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ lab_for_all: "yes" }).success).toBe(false);
+  });
+});
+
 describe("secretary settings (D-79)", () => {
   it("gives a fresh company the seven default buttons (D-87: «не беспокоить», the guest; D-99: «охрана»)", () => {
     const settings = parseCompanySettings({});

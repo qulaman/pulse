@@ -16,6 +16,8 @@ export type Brand = {
   customAccent: boolean;
   /** `settings.points_enabled` (D-48): the shell draws the points line from the same read. */
   pointsEnabled: boolean;
+  /** `settings.lab_for_all` (D-150): the team's bar carries «Лаб» — read here for the first paint. */
+  labForAll: boolean;
 };
 
 const FALLBACK: Brand = {
@@ -26,6 +28,7 @@ const FALLBACK: Brand = {
   accent: effectiveAccent(null).accent,
   customAccent: false,
   pointsEnabled: false,
+  labForAll: false,
 };
 
 type CompanyRow = { id: string; name: string; settings: unknown };
@@ -92,5 +95,6 @@ function brandOf(data: CompanyRow): Brand {
     accent,
     customAccent: custom,
     pointsEnabled: settings.points_enabled,
+    labForAll: settings.lab_for_all,
   };
 }

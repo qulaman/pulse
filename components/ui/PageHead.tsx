@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
-import { useTabRole } from "@/components/RoleScope";
+import { useLabTab, useTabRole } from "@/components/RoleScope";
 import { backTarget } from "@/components/TabBar";
 import { tabBarRole } from "@/lib/routes";
 import type { Tone } from "@/lib/tasks/tone";
@@ -236,12 +236,13 @@ function FitTitle({ children }: { children: string }) {
  */
 function useAutoBack(wanted: boolean): Back | undefined {
   const scoped = useTabRole();
+  const lab = useLabTab();
   const me = useMe();
   const path = usePathname();
   const router = useRouter();
   const role = scoped ?? (me.data ? tabBarRole(me.data.role) : null);
   if (!wanted || !role) return undefined;
-  const target = backTarget(role, path);
+  const target = backTarget(role, path, lab);
   if (!target) return undefined;
   return {
     label: "Назад",

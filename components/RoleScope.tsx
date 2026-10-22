@@ -9,6 +9,8 @@ import type { TabBarRole } from "@/lib/routes";
 import { taskKeys, type Me } from "@/lib/tasks/queries";
 
 const RoleContext = createContext<TabBarRole | null>(null);
+// the team's bar carries «Лаб» while the company tests (D-150): «Назад» must know it is a tab
+const LabContext = createContext(false);
 
 /**
  * The tab bar's role for the screens under a layout, known on the server: the screen head
@@ -20,7 +22,7 @@ const RoleContext = createContext<TabBarRole | null>(null);
  * waiting for /api/me (D-126). Seeded while rendering, on the server and on the client
  * alike, so both render the same first frame; a value already cached stays.
  */
-export function RoleScope({ role, me, children }: { role: TabBarRole; me?: Me; children: ReactNode }) {
+export function RoleScope({ role, lab = false, me, children }: { role: TabBarRole; lab?: boolean; me?: Me; children: ReactNode }) {
   const queryClient = useQueryClient();
   useState(() => {
     if (me && queryClient.getQueryData(taskKeys.me()) === undefined) queryClient.setQueryData(taskKeys.me(), me);
@@ -28,8 +30,10 @@ export function RoleScope({ role, me, children }: { role: TabBarRole; me?: Me; c
   });
   return (
     <RoleContext.Provider value={role}>
-      <NamesSync />
-      {children}
+      <LabContext.Provider value={lab}>
+        <NamesSync />
+        {children}
+      </LabContext.Provider>
     </RoleContext.Provider>
   );
 }
@@ -45,4 +49,9 @@ function NamesSync() {
 
 export function useTabRole(): TabBarRole | null {
   return useContext(RoleContext);
+}
+
+/** Whether the layout's team bar carries «Лаб» (D-150); false outside a layout. */
+export function useLabTab(): boolean {
+  return useContext(LabContext);
 }

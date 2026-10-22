@@ -33,6 +33,7 @@ export const PATCH = withAuth<SettingsPatch>(
     if (body.rating_mode) patch.rating_mode = body.rating_mode;
     if (body.mascot_seasons !== undefined) patch.mascot_seasons = body.mascot_seasons;
     if (body.mascot_telegraph !== undefined) patch.mascot_telegraph = body.mascot_telegraph;
+    if (body.lab_for_all !== undefined) patch.lab_for_all = body.lab_for_all;
     if (body.points_rules) patch.points_rules = body.points_rules;
     if (body.ether_events) patch.ether_events = body.ether_events;
 

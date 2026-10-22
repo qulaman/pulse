@@ -99,7 +99,10 @@ const ICONS = {
   ),
 };
 
-/** The lab (D-63): the model bench and the unit costs — the director's and the secretary's bars only. */
+/**
+ * The lab (D-63): the model bench and the unit costs — on the director's and the secretary's
+ * bars; on the team's too while the company tests the product (D-150, `tabsOf`).
+ */
 const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
 /** «Календарь» (D-78): one screen for every role, so both bars carry the same tab. */
@@ -156,9 +159,14 @@ const SECTIONS: Record<TabRole, Record<string, string>> = {
   secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings", "/secretary": "/settings" },
 };
 
+/** The role's tabs; `lab` — the company is testing, so the team's bar carries «Лаб» too (D-150). */
+function tabsOf(role: TabRole, lab: boolean): Tab[] {
+  return lab && role === "employee" ? [...TABS.employee, LAB_TAB] : TABS[role];
+}
+
 /** The lit tab and whether the screen is that tab's own (`page`) or lives inside it. */
-function activeTab(role: TabRole, pathname: string): { index: number; own: boolean } {
-  const tabs = TABS[role];
+function activeTab(role: TabRole, pathname: string, lab: boolean): { index: number; own: boolean } {
+  const tabs = tabsOf(role, lab);
   const within = (base: string) => pathname === base || pathname.startsWith(`${base}/`);
   const own = tabs.findIndex((tab) => within(tab.href));
   if (own >= 0) return { index: own, own: true };
@@ -171,10 +179,10 @@ function activeTab(role: TabRole, pathname: string): { index: number; own: boole
  * way back; anywhere else — the tab the screen lives in (the one the bar lights), or the
  * first tab, the home screen, when it lives in none.
  */
-export function backTarget(role: TabRole, pathname: string): string | null {
-  const tabs = TABS[role];
+export function backTarget(role: TabRole, pathname: string, lab = false): string | null {
+  const tabs = tabsOf(role, lab);
   if (tabs.some((tab) => tab.href === pathname)) return null;
-  const { index } = activeTab(role, pathname);
+  const { index } = activeTab(role, pathname, lab);
   return tabs[index >= 0 ? index : 0].href;
 }
 
@@ -405,13 +413,13 @@ function useWarmTabData(role: TabRole) {
  * assistive tech — eight tabs never truncate to «Кале…». Scrolling down folds the capsule.
  * Everything that docks above the bar sits at `--tabbar-space` and wears `.above-tabbar`.
  */
-export function TabBar({ role }: { role: TabRole }) {
+export function TabBar({ role, lab = false }: { role: TabRole; lab?: boolean }) {
   const pathname = usePathname();
   const badges = useTabBadges(role);
   const nav = useRef<HTMLElement>(null);
   useFold(nav, pathname);
   const away = useKeyboardUp();
-  const tabs = TABS[role];
+  const tabs = tabsOf(role, lab);
 
   // the thumb answers the tap, not the network: it leaves before the next screen arrives.
   // The tap is forgotten once the route moves — back from «Дела» to «Лента» in the same
@@ -422,7 +430,7 @@ export function TabBar({ role }: { role: TabRole }) {
     setTappedOn(pathname);
     setTapped(null);
   }
-  const route = activeTab(role, pathname);
+  const route = activeTab(role, pathname, lab);
   const index = tapped ?? route.index;
   const [from] = useState(() => (lastIndex >= 0 ? lastIndex : index));
   const thumbRef = useRef<HTMLSpanElement>(null);
