@@ -70,3 +70,46 @@ describe("parser eval scoring (docs/AI.md §6)", () => {
     expect(summarize([good, broken]).assignee).toBe(0.5);
   });
 });
+
+describe("repeating orders in the corpus (D-148)", () => {
+  const rule = (overrides: Record<string, unknown> = {}) =>
+    ({
+      kind: "recurrence",
+      assignee_queries: ["Марат"],
+      assignee_id: MARAT,
+      assignee_name: "Марат Оспанов",
+      assignee_confidence: 0.95,
+      title: "Сводка",
+      every: "week",
+      interval: 1,
+      weekdays: [1],
+      month_day: 0,
+      due_time: "18:00",
+      source_span: "Марат, каждый понедельник сводка",
+      assignee: { status: "matched", user_id: MARAT, candidates: [], flag: "ok" },
+      ...overrides,
+    }) as PostprocessedEntity;
+  const weekly: EvalCase = {
+    ...CASE,
+    expected: { entities: [{ kind: "recurrence", assignee_id: "u-003", every: "week", weekdays: [1], due_time: "18:00" }] },
+  };
+
+  it("checks the step, the days and the hour the case names", () => {
+    expect(scoreCase(weekly, [rule()], fixtureId).ok).toBe(true);
+    const wrong = scoreCase(weekly, [rule({ weekdays: [2], due_time: "13:00" })], fixtureId);
+    expect(wrong.failures).toEqual(["recurrence: due_time ожидался 18:00, получен 13:00", "recurrence: weekdays ожидались [1], получены [2]"]);
+  });
+
+  it("a one-off heard as a repeat is a miss, not a silent pass", () => {
+    const score = scoreCase(CASE, [rule()], fixtureId);
+    expect(score.ok).toBe(false);
+    expect(score.failures).toContain("task: не найдена (recurrence)");
+  });
+
+  it("`also` lets a phrase that reads both ways pass either way", () => {
+    const either: EvalCase = { ...CASE, expected: { entities: [{ kind: "task", also: ["recurrence"], assignee_id: "u-003" }] } };
+    expect(scoreCase(either, [rule()], fixtureId).ok).toBe(true);
+    expect(scoreCase(either, [task()], fixtureId).ok).toBe(true);
+  });
+});
+

@@ -1,4 +1,5 @@
 import type { BoardTask } from "@/lib/pulse/board";
+import type { Rule } from "@/lib/recurrence/queries";
 import type { TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 
@@ -41,6 +42,8 @@ type Fixture = {
   nudged?: number;
   /** D-128: reassigned to this person */
   passedTo?: Who;
+  /** D-148: made by this repeating order (RULES) */
+  rule?: string;
 };
 
 /** Now-relative, so the sandbox always has something overdue, due today and due tomorrow. */
@@ -57,7 +60,7 @@ const FIXTURES: Fixture[] = [
     last: { from: "employee", text: "Готово, файл в треде. Цены проверил с Айгуль", hoursAgo: 1, unread: true },
     audio: true,
   },
-  { title: "Акт сверки с «Актобе-Энерго»", who: "aigul", status: "pending_review", deadline: -20, created: -50, accepted: -48, completed: -3 },
+  { title: "Акт сверки с «Актобе-Энерго»", who: "aigul", status: "pending_review", deadline: -20, created: -50, accepted: -48, completed: -3, rule: "rule-1" },
   {
     title: "Забрать арматуру со склада на Жубанова",
     who: "erlan",
@@ -147,7 +150,8 @@ export function build(): { tasks: TaskWithPeople[]; board: BoardTask[] } {
       source_audio_path: f.audio ? "company/director/fixture.webm" : null,
       source_transcript: f.audio ? `${PEOPLE[f.who].split(" ")[0]}, ${f.title.toLowerCase()} к вечеру` : null,
       scheduled_send_at: at(f.scheduled),
-      recurrence_rule_id: null,
+      recurrence_rule_id: f.rule ?? null,
+      recurrence_on: null,
       accepted_at: at(f.accepted),
       completed_at: at(f.completed),
       closed_at: at(f.closed),
@@ -238,3 +242,40 @@ export function messagesFor(task: TaskWithPeople, board: BoardTask | undefined):
   }
   return rows.sort((a, b) => (a.created_at < b.created_at ? -1 : 1)).map((row, index) => ({ ...row, seq: index + 1 }));
 }
+
+const ymdIn = (days: number) => new Date(Date.now() + days * 86_400_000 + 5 * HOUR).toISOString().slice(0, 10);
+
+/** D-148: the company's repeating orders and a meeting series, as «Повторы» shows them. */
+export function rules(): Rule[] {
+  const base = {
+    company_id: "company",
+    author_id: DIRECTOR.id,
+    body: null,
+    priority: "normal" as const,
+    rrule: null,
+    interval_n: 1,
+    month_day: 0,
+    weekdays: [] as number[],
+    duration_min: null,
+    location: null,
+    remind_before_min: 30,
+    everyone: false,
+    participant_ids: [] as string[],
+    source_audio_path: null,
+    source_transcript: null,
+    anchor_on: ymdIn(-14),
+    last_on: ymdIn(-7),
+    next_run_at: null,
+    stopped_reason: null,
+    created_at: at(-400) as string,
+    updated_at: at(-2) as string,
+  };
+  return [
+    { ...base, id: "rule-1", target: "task", title: "Акт сверки с «Актобе-Энерго»", assignee_id: "u-aigul", assignee: { full_name: PEOPLE.aigul }, every: "week", weekdays: [1], at_time: "18:00:00", is_active: true, next_on: ymdIn(4) },
+    { ...base, id: "rule-2", target: "task", title: "Сводка продаж за день", assignee_id: "u-marat", assignee: { full_name: PEOPLE.marat }, every: "workday", at_time: "09:00:00", is_active: true, next_on: ymdIn(1) },
+    { ...base, id: "rule-3", target: "task", title: "Отчёт по зарплате", assignee_id: "u-dana", assignee: { full_name: PEOPLE.dana }, every: "month", month_day: 5, at_time: "18:00:00", is_active: false, next_on: null },
+    { ...base, id: "rule-4", target: "task", title: "Проверка склада", assignee_id: "u-erlan", assignee: { full_name: PEOPLE.erlan }, every: "week", weekdays: [2, 4], interval_n: 2, at_time: "10:00:00", is_active: false, stopped_reason: "assignee_inactive", next_on: null },
+    { ...base, id: "rule-5", target: "event", title: "Планёрка", assignee_id: null, assignee: null, every: "week", weekdays: [3], at_time: "10:00:00", location: "в офисе", everyone: true, is_active: true, next_on: ymdIn(6) },
+  ];
+}
+

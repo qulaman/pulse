@@ -49,7 +49,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const assignees = [
       ...new Set(
         confirmed
-          .filter((entity) => entity.kind === "task")
+          .filter((entity) => entity.kind === "task" || entity.kind === "recurrence")
           .map((entity) => (entity as { assignee_id?: unknown }).assignee_id)
           .filter((id): id is string => typeof id === "string" && id.length > 0),
       ),

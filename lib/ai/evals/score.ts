@@ -10,11 +10,21 @@ import { PARSER_GATES } from "../rules";
 
 export interface ExpectedEntity {
   kind: string;
+  /** Another kind that reads the phrase as fairly (a booking beside a weekly meeting: once or every time). */
+  also?: string[];
   id?: string;
   assignee_id?: string | null;
   deadline_iso?: string | null;
   amount?: number;
   group_with?: string;
+  /** A repeating order (D-148): the step and days the phrase named, the deadline of each day. */
+  every?: string;
+  weekdays?: number[];
+  month_day?: number;
+  interval?: number;
+  due_time?: string;
+  /** A meeting series (D-148): "none" for a single meeting. */
+  repeat?: string;
 }
 
 export interface EvalCase {
@@ -68,12 +78,11 @@ function pair(
   const pairs: { exp: ExpectedEntity; pred: PostprocessedEntity }[] = [];
 
   for (const exp of expected) {
+    const kindOk = (p: PostprocessedEntity) => p.kind === exp.kind || (exp.also?.includes(p.kind) ?? false);
     let index = free.findIndex(
-      (p) =>
-        p.kind === exp.kind &&
-        (exp.assignee_id === undefined || assigneeIdOf(p, fixtureId) === exp.assignee_id),
+      (p) => kindOk(p) && (exp.assignee_id === undefined || assigneeIdOf(p, fixtureId) === exp.assignee_id),
     );
-    if (index === -1) index = free.findIndex((p) => p.kind === exp.kind);
+    if (index === -1) index = free.findIndex(kindOk);
     if (index === -1) continue;
     pairs.push({ exp, pred: free[index] });
     free.splice(index, 1);
@@ -87,6 +96,29 @@ function deadlineOf(entity: PostprocessedEntity): string | null {
   // a meeting's moment lives in its own field, and expected.deadline_iso checks it (D-78)
   if (entity.kind === "event") return entity.starts_at_iso;
   return null;
+}
+
+/** What a repeating order or a meeting series got wrong of what the case names (D-148). */
+function ruleFailures(exp: ExpectedEntity, pred: PostprocessedEntity): string[] {
+  const out: string[] = [];
+  if (pred.kind === "recurrence") {
+    const checks: [keyof ExpectedEntity, unknown][] = [
+      ["every", pred.every],
+      ["interval", pred.interval],
+      ["month_day", pred.month_day],
+      ["due_time", pred.due_time],
+    ];
+    for (const [field, actual] of checks) {
+      if (exp[field] !== undefined && exp[field] !== actual) out.push(`recurrence: ${field} ожидался ${exp[field]}, получен ${actual}`);
+    }
+    if (exp.weekdays !== undefined && exp.weekdays.join(",") !== pred.weekdays.join(",")) {
+      out.push(`recurrence: weekdays ожидались [${exp.weekdays}], получены [${pred.weekdays}]`);
+    }
+  }
+  if (pred.kind === "event" && exp.repeat !== undefined && exp.repeat !== pred.repeat) {
+    out.push(`event: repeat ожидался ${exp.repeat}, получен ${pred.repeat}`);
+  }
+  return out;
 }
 
 function within30Min(a: string, b: string): boolean {
@@ -105,6 +137,11 @@ export type CaseScore = Omit<
 export function scoreCase(c: EvalCase, predicted: PostprocessedEntity[], fixtureId: FixtureId): CaseScore {
   const failures: string[] = [];
   const pairs = pair(c.expected.entities, predicted, fixtureId);
+  // an expected entity nothing of its kind answered is a miss even when the count agrees —
+  // «в понедельник» heard as a repeating order used to pass with the F1 alone showing it (D-148)
+  for (const exp of c.expected.entities) {
+    if (!pairs.some((p) => p.exp === exp)) failures.push(`${exp.kind}: не найдена (${predicted.map((e) => e.kind).join(", ") || "ничего"})`);
+  }
 
   let entityHits = 0;
   let assigneeChecked = 0;
@@ -137,6 +174,8 @@ export function scoreCase(c: EvalCase, predicted: PostprocessedEntity[], fixture
       const actual = pred.kind === "points" ? pred.amount : null;
       if (actual !== exp.amount) failures.push(`points: amount ожидался ${exp.amount}, получен ${actual}`);
     }
+
+    failures.push(...ruleFailures(exp, pred));
   }
 
   const countOk = predicted.length === c.expected.entities.length;

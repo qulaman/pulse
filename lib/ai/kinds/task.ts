@@ -91,6 +91,7 @@ export const taskKind: KindModule = {
             starts_at: spokenTime("завтра в десять", { day: "tomorrow", time: "10:00" }),
             participant_names: [],
             everyone: true,
+            repeat: "none",
             source_span: "всем: завтра в десять общее собрание в офисе, не опаздывать",
           },
           {

@@ -10,7 +10,7 @@ import type { BoardTask } from "@/lib/pulse/board";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 
-import { build, DIRECTOR } from "./fixtures";
+import { build, DIRECTOR, rules } from "./fixtures";
 
 /**
  * The real «Задачи» and «Мои дела» views on fixtures. The actions change the fixtures in
@@ -19,6 +19,8 @@ import { build, DIRECTOR } from "./fixtures";
  */
 export function Sandbox({ role, empty }: { role: "director" | "employee"; empty: boolean }) {
   const initial = useMemo(() => (empty ? { tasks: [], board: [] } : build()), [empty]);
+  // «Повторы» (D-148): the company's rules are fixtures here, not a query
+  const [ruleList] = useState(() => (empty ? [] : rules()));
   const [tasks, setTasks] = useState<TaskWithPeople[]>(initial.tasks);
   const [board, setBoard] = useState<BoardTask[]>(initial.board);
   const now = useMemo(() => new Date(), []);
@@ -132,6 +134,7 @@ export function Sandbox({ role, empty }: { role: "director" | "employee"; empty:
         <DirectorTasksView
           meId={DIRECTOR.id}
           companyId="company"
+          rules={ruleList}
           tasks={tasks}
           board={board}
           actions={actions}

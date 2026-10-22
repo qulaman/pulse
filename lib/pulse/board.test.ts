@@ -52,6 +52,7 @@ function row(
     passed_to: null,
     priority: "normal",
     recurrence_rule_id: null,
+    recurrence_on: null,
     scheduled_send_at: null,
     source: null,
     source_audio_path: null,

@@ -325,6 +325,8 @@ export function CardHead({
     priority?: string | null;
     closed_at: string | null;
     updated_at: string;
+    /** Made by a repeating order (D-148): the row says «повтор». */
+    recurrence_rule_id?: string | null;
   };
   now: Date;
   open: boolean;
@@ -392,6 +394,15 @@ export function CardHead({
               <span className="inline-flex shrink-0 items-center gap-1 text-warn">
                 <Icon name="question" size={13} />
                 {TEXT.question}
+              </span>
+            </>
+          ) : null}
+          {task.recurrence_rule_id && !question ? (
+            <>
+              <Sep />
+              <span className="inline-flex shrink-0 items-center gap-1" data-testid="task-repeat-mark">
+                <Icon name="repeat" size={13} />
+                повтор
               </span>
             </>
           ) : null}

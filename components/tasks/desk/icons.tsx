@@ -22,7 +22,8 @@ export type IconName =
   | "bell"
   | "open"
   | "left"
-  | "right";
+  | "right"
+  | "repeat";
 
 const PATHS: Record<IconName, ReactNode> = {
   clock: (
@@ -32,6 +33,15 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   check: <path d="M5 12.5l4.5 4.5L19 7.5" />,
+  // a repeating order (D-148): the same loop the confirm card draws
+  repeat: (
+    <>
+      <path d="M4 12a8 8 0 0 1 13.5-5.8" />
+      <polyline points="18,3 18,7 14,7" />
+      <path d="M20 12a8 8 0 0 1-13.5 5.8" />
+      <polyline points="6,21 6,17 10,17" />
+    </>
+  ),
   question: (
     <>
       <path d="M9 9.5a3 3 0 1 1 4.5 2.6c-1 .6-1.5 1.2-1.5 2.4" />

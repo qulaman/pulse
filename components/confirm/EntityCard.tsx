@@ -6,9 +6,11 @@ import { Chip, type ChipTone } from "@/components/ui/Chip";
 import { formatDeadline } from "@/components/confirm/format";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { WhenSheet } from "@/components/confirm/WhenSheet";
+import { EventRepeatSheet, firstLine, repeatLine, RepeatSheet } from "@/components/recurrence/RepeatSheet";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
 import { shortNames } from "@/lib/people/aliases";
+import { EVENT_REPEAT_LABEL } from "@/lib/recurrence/schedule";
 import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
 
 const ICON_STROKE = {
@@ -145,6 +147,7 @@ export function EntityCard({
   const inputRef = useRef<HTMLInputElement>(null);
   const [whenOpen, setWhenOpen] = useState(false);
   const [whoOpen, setWhoOpen] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(false);
 
   useEffect(() => {
     if (editing) inputRef.current?.focus();
@@ -240,6 +243,7 @@ export function EntityCard({
           ) : collapsed ? (
             <p className="mt-1 truncate text-[13px] leading-4 text-muted">
               {chip ? <span style={{ color: TONE_COLOR[chip.tone] }}>{chip.label}</span> : null}
+              {entity.kind === "recurrence" ? `${chip ? " · " : ""}${repeatLine(entity)}` : null}
               {deadline ? (chip ? " · " : "") : null}
               {deadline
                 ? deadline.iso
@@ -307,6 +311,11 @@ export function EntityCard({
                   <Chip tone={entity.location ? "neutral" : "muted"} onClick={() => startEditing("location")}>
                     {entity.location || "Место?"}
                   </Chip>
+
+                  {/* a series (D-148): the next meeting is made as this one begins */}
+                  <Chip tone={entity.repeat !== "none" ? "neutral" : "muted"} onClick={() => setRepeatOpen(true)}>
+                    {entity.repeat !== "none" ? `↻ ${EVENT_REPEAT_LABEL[entity.repeat].toLowerCase()}` : "Без повтора"}
+                  </Chip>
                 </>
               ) : null}
 
@@ -330,9 +339,17 @@ export function EntityCard({
               ) : null}
 
               {entity.kind === "recurrence" ? (
-                <Chip tone="neutral" interactive={false}>
-                  {entity.rrule}
-                </Chip>
+                <>
+                  {/* the rule in words, not RRULE (D-148): a tap changes the days and the hour */}
+                  <Chip tone="neutral" className="!whitespace-normal text-left" onClick={() => setRepeatOpen(true)}>
+                    ↻ {repeatLine(entity)}
+                  </Chip>
+                  {firstLine(entity) ? (
+                    <Chip tone="muted" interactive={false}>
+                      {firstLine(entity)}
+                    </Chip>
+                  ) : null}
+                </>
               ) : null}
 
               {entity.kind === "query" ? (
@@ -391,6 +408,12 @@ export function EntityCard({
                   } as EntityPatch)
                 }
               />
+              <EventRepeatSheet
+                open={repeatOpen}
+                onClose={() => setRepeatOpen(false)}
+                value={entity.repeat}
+                onPick={(repeat) => onPatch({ repeat } as EntityPatch)}
+              />
               <PeoplePicker
                 mode="many"
                 open={whoOpen}
@@ -405,6 +428,17 @@ export function EntityCard({
                 }
               />
             </>
+          ) : null}
+
+          {entity.kind === "recurrence" ? (
+            <RepeatSheet
+              open={repeatOpen}
+              onClose={() => setRepeatOpen(false)}
+              value={entity}
+              onDone={({ every, interval, weekdays, month_day, due_time }) =>
+                onPatch({ every, interval, weekdays, month_day, due_time } as EntityPatch)
+              }
+            />
           ) : null}
 
           {hasAssignee(entity) && entity.assignee?.status !== "matched" && !collapsed ? (

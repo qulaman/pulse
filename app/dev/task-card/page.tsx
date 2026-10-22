@@ -62,6 +62,7 @@ function fixture(status: TaskStatus, index: number): TaskWithPeople {
       index % 2 === 0 ? "Марат, подготовь КП для Казхрома к завтрашнему вечеру" : null,
     scheduled_send_at: null,
     recurrence_rule_id: null,
+    recurrence_on: null,
     accepted_at: null,
     completed_at: null,
     closed_at: null,

@@ -1,9 +1,10 @@
 import { resolveMatchingConfig, type MatchingConfig } from "./config";
-import { DEFAULT_CONVENTIONS, type Convention } from "./conventions";
+import { conventionFor, DEFAULT_CONVENTIONS, type Convention, type TimePart } from "./conventions";
 import type { ParseSource } from "./prompt";
 import type { Entity, ModelEntity } from "./schema";
-import { resolveTimeRef } from "./timeref";
+import { daytime, resolveTimeRef } from "./timeref";
 import { matchName, type AssigneeMatch, type RosterUser } from "../matchName";
+import { normalizeRule, parseClock } from "../recurrence/schedule";
 
 export type BlockedReason = "points_blocked" | "assignee_unmatched" | "time_missing";
 
@@ -63,12 +64,33 @@ export function fromModelEntity(
       const { remind_at, ...rest } = entity;
       return { ...rest, remind_at_iso: resolveTimeRef(remind_at, now, conventions, "reminder")?.iso ?? null };
     }
+    case "recurrence": {
+      const { time, part, ...rest } = entity;
+      return { ...rest, ...normalizeRule(rest), assignee_id: null, due_time: repeatingDue(time, part, conventions) };
+    }
     case "points":
-    case "recurrence":
       return { ...entity, assignee_id: null };
     default:
       return entity;
   }
+}
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * The deadline on each day of a repeating order (D-148): a named clock time as the TimeRef reads
+ * it («к пяти» — 17:00), a part of the day by the company's conventions, nothing said — the end
+ * of the working day (`day_default`, D-52).
+ */
+export function repeatingDue(time: string, part: string, conventions: readonly Convention[]): string {
+  const named = parseClock(time);
+  const said = part ? (part as TimePart) : null;
+  const row = said ? conventionFor(conventions, said) : null;
+  if (named) {
+    const clock = daytime(named, said);
+    return `${pad(clock.hours)}:${pad(clock.minutes)}`;
+  }
+  return (row ?? conventionFor(conventions, "day_default")).time;
 }
 
 function isValidIso(value: string): boolean {
@@ -179,7 +201,7 @@ export function postprocess(
       withAssignee.assignee_id = assignee.status === "matched" ? assignee.user_id : null;
       if (
         assignee.status !== "matched" &&
-        (entity.kind === "task" || entity.kind === "points") &&
+        (entity.kind === "task" || entity.kind === "points" || entity.kind === "recurrence") &&
         entity.blocked === undefined
       ) {
         entity.blocked = "assignee_unmatched";

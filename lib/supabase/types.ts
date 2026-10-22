@@ -470,6 +470,8 @@ export type Database = {
           id: string
           inbox_item_id: string | null
           location: string | null
+          recurrence_on: string | null
+          recurrence_rule_id: string | null
           remind_before_min: number
           reminded_at: string | null
           source_transcript: string | null
@@ -489,6 +491,8 @@ export type Database = {
           id?: string
           inbox_item_id?: string | null
           location?: string | null
+          recurrence_on?: string | null
+          recurrence_rule_id?: string | null
           remind_before_min?: number
           reminded_at?: string | null
           source_transcript?: string | null
@@ -508,6 +512,8 @@ export type Database = {
           id?: string
           inbox_item_id?: string | null
           location?: string | null
+          recurrence_on?: string | null
+          recurrence_rule_id?: string | null
           remind_before_min?: number
           reminded_at?: string | null
           source_transcript?: string | null
@@ -535,6 +541,13 @@ export type Database = {
             columns: ["inbox_item_id"]
             isOneToOne: false
             referencedRelation: "inbox_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_recurrence_rule_id_fkey"
+            columns: ["recurrence_rule_id"]
+            isOneToOne: false
+            referencedRelation: "recurrence_rules"
             referencedColumns: ["id"]
           },
         ]
@@ -1407,40 +1420,97 @@ export type Database = {
       }
       recurrence_rules: {
         Row: {
-          assignee_id: string
+          anchor_on: string | null
+          assignee_id: string | null
+          at_time: string
           author_id: string
           body: string | null
           company_id: string
+          created_at: string
+          duration_min: number | null
+          every: string
+          everyone: boolean
           id: string
+          interval_n: number
           is_active: boolean
+          last_on: string | null
+          location: string | null
+          month_day: number
+          next_on: string | null
           next_run_at: string | null
+          participant_ids: string[]
           priority: Database["public"]["Enums"]["task_priority"]
-          rrule: string
+          remind_before_min: number
+          rrule: string | null
+          source_audio_path: string | null
+          source_transcript: string | null
+          stopped_reason: string | null
+          target: string
           title: string
+          updated_at: string
+          weekdays: number[]
         }
         Insert: {
-          assignee_id: string
+          anchor_on?: string | null
+          assignee_id?: string | null
+          at_time?: string
           author_id: string
           body?: string | null
           company_id: string
+          created_at?: string
+          duration_min?: number | null
+          every?: string
+          everyone?: boolean
           id?: string
+          interval_n?: number
           is_active?: boolean
+          last_on?: string | null
+          location?: string | null
+          month_day?: number
+          next_on?: string | null
           next_run_at?: string | null
+          participant_ids?: string[]
           priority?: Database["public"]["Enums"]["task_priority"]
-          rrule: string
+          remind_before_min?: number
+          rrule?: string | null
+          source_audio_path?: string | null
+          source_transcript?: string | null
+          stopped_reason?: string | null
+          target?: string
           title: string
+          updated_at?: string
+          weekdays?: number[]
         }
         Update: {
-          assignee_id?: string
+          anchor_on?: string | null
+          assignee_id?: string | null
+          at_time?: string
           author_id?: string
           body?: string | null
           company_id?: string
+          created_at?: string
+          duration_min?: number | null
+          every?: string
+          everyone?: boolean
           id?: string
+          interval_n?: number
           is_active?: boolean
+          last_on?: string | null
+          location?: string | null
+          month_day?: number
+          next_on?: string | null
           next_run_at?: string | null
+          participant_ids?: string[]
           priority?: Database["public"]["Enums"]["task_priority"]
-          rrule?: string
+          remind_before_min?: number
+          rrule?: string | null
+          source_audio_path?: string | null
+          source_transcript?: string | null
+          stopped_reason?: string | null
+          target?: string
           title?: string
+          updated_at?: string
+          weekdays?: number[]
         }
         Relationships: [
           {
@@ -1736,6 +1806,7 @@ export type Database = {
           parent_task_id: string | null
           passed_to: string | null
           priority: Database["public"]["Enums"]["task_priority"]
+          recurrence_on: string | null
           recurrence_rule_id: string | null
           scheduled_send_at: string | null
           source: Database["public"]["Enums"]["ai_source"] | null
@@ -1760,6 +1831,7 @@ export type Database = {
           parent_task_id?: string | null
           passed_to?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_on?: string | null
           recurrence_rule_id?: string | null
           scheduled_send_at?: string | null
           source?: Database["public"]["Enums"]["ai_source"] | null
@@ -1784,6 +1856,7 @@ export type Database = {
           parent_task_id?: string | null
           passed_to?: string | null
           priority?: Database["public"]["Enums"]["task_priority"]
+          recurrence_on?: string | null
           recurrence_rule_id?: string | null
           scheduled_send_at?: string | null
           source?: Database["public"]["Enums"]["ai_source"] | null
@@ -2312,6 +2385,8 @@ export type Database = {
           id: string
           inbox_item_id: string | null
           location: string | null
+          recurrence_on: string | null
+          recurrence_rule_id: string | null
           remind_before_min: number
           reminded_at: string | null
           source_transcript: string | null
@@ -2484,6 +2559,7 @@ export type Database = {
         }
         Returns: Json
       }
+      recurrence_spawn: { Args: { p_now?: string }; Returns: number }
       redeem_login_code: {
         Args: {
           p_code_hash: string

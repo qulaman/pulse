@@ -61,6 +61,7 @@ function event(overrides: Partial<EventEntity> = {}): EventEntity {
     participant_ids: [],
     everyone: false,
     remind_before_min: null,
+    repeat: "none",
     source_span: "завтра в десять планёрка, Марат и Айгуль",
     ...overrides,
   };
@@ -194,6 +195,7 @@ describe("fromModelEntity: the model's TimeRefs become the app's ISO fields (tas
         starts_at: { ...said, text: "в пятницу", day: "weekday", weekday: 5 },
         participant_names: [],
         everyone: true,
+        repeat: "none",
         source_span: "В пятницу корпоратив",
       },
       NOW,
@@ -214,5 +216,51 @@ describe("fromModelEntity: the model's TimeRefs become the app's ISO fields (tas
       remind_at_iso: null,
       source_span: "напомни",
     });
+  });
+});
+
+describe("a repeating order (D-148): the model names the rule, code fixes the hour", () => {
+  const NOW = new Date("2026-08-13T16:32:00+05:00");
+  const said = {
+    kind: "recurrence" as const,
+    assignee_queries: ["Айгуль"],
+    assignee_name: "Айгуль Сапарова",
+    assignee_confidence: 0.95,
+    title: "Отчёт по ПЗТМ",
+    every: "week" as const,
+    interval: 1,
+    weekdays: [1 as const],
+    month_day: 0,
+    time: "",
+    part: "" as const,
+    source_span: "Каждый понедельник Айгуль отчёт по ПЗТМ",
+  };
+
+  it("nothing said about the hour — the end of the working day", () => {
+    const entity = fromModelEntity(said, NOW);
+    expect(entity).toMatchObject({ every: "week", weekdays: [1], interval: 1, month_day: 0, due_time: "18:00", assignee_id: null });
+    expect(entity).not.toHaveProperty("time");
+    expect(entity).not.toHaveProperty("part");
+  });
+
+  it("a named hour is a working hour, a part of the day is the company's", () => {
+    expect(fromModelEntity({ ...said, time: "5:00" }, NOW)).toMatchObject({ due_time: "17:00" });
+    expect(fromModelEntity({ ...said, time: "09:30", part: "morning" }, NOW)).toMatchObject({ due_time: "09:30" });
+    expect(fromModelEntity({ ...said, part: "before_lunch" }, NOW)).toMatchObject({ due_time: "13:00" });
+    const own = [{ key: "before_lunch" as const, phrase: "до обеда", time: "12:00", day: "same" as const, confidence: 0.7 }];
+    expect(fromModelEntity({ ...said, part: "before_lunch" }, NOW, own)).toMatchObject({ due_time: "12:00" });
+  });
+
+  it("a rule the model left half-said is made whole", () => {
+    expect(fromModelEntity({ ...said, weekdays: [], interval: 0 }, NOW)).toMatchObject({ weekdays: [1], interval: 1 });
+    expect(fromModelEntity({ ...said, every: "month", weekdays: [3 as never], month_day: 0 }, NOW)).toMatchObject({ weekdays: [], month_day: 1 });
+  });
+
+  it("is matched like a task and blocked without a person", () => {
+    const [matched] = postprocess([fromModelEntity(said, NOW)], ROSTER, "voice");
+    expect(matched).toMatchObject({ assignee_id: "u-005" });
+    expect(matched.blocked).toBeUndefined();
+    const [nobody] = postprocess([fromModelEntity({ ...said, assignee_queries: [], assignee_name: null, assignee_confidence: 0 }, NOW)], ROSTER, "voice");
+    expect(nobody.blocked).toBe("assignee_unmatched");
   });
 });

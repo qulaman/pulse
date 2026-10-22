@@ -106,6 +106,47 @@ const FIXTURE: PostprocessedEntity[] = [
   },
 ];
 
+/** D-148: a repeating order and a weekly meeting, as «каждый понедельник …» comes back. */
+const REPEATS: PostprocessedEntity[] = [
+  {
+    kind: "recurrence",
+    assignee_queries: ["Марат"],
+    assignee_id: MARAT,
+    assignee_name: "Марат Абдулов",
+    assignee_confidence: 0.95,
+    title: "Отчёт по продажам",
+    every: "week",
+    interval: 1,
+    weekdays: [1],
+    month_day: 0,
+    due_time: "18:00",
+    source_span: "Каждый понедельник Марат отчёт по продажам",
+    assignee: {
+      status: "matched",
+      user_id: MARAT,
+      candidates: [{ user_id: MARAT, full_name: "Марат Абдулов", score: 1 }],
+      flag: "ok",
+    },
+  },
+  {
+    kind: "event",
+    title: "Планёрка",
+    body: null,
+    location: "в офисе",
+    starts_at_iso: "2026-10-28T10:00:00+05:00",
+    ends_at_iso: null,
+    time_confidence: 0.95,
+    time_source_text: "каждую среду в десять",
+    participant_queries: [],
+    participant_names: [],
+    participant_ids: [],
+    everyone: true,
+    remind_before_min: null,
+    repeat: "week",
+    source_span: "каждую среду в десять планёрка, всем",
+  },
+];
+
 export default function DevConfirmPage() {
   const loadFixture = () =>
     useIngestStore.setState({
@@ -119,6 +160,18 @@ export default function DevConfirmPage() {
         "Динаре согласовать смету к пятнице, в пятницу общий сбор, плюс десять Марату",
       entities: FIXTURE,
       parsedEntities: FIXTURE,
+    });
+
+  const loadRepeats = () =>
+    useIngestStore.setState({
+      stage: "confirm",
+      error: null,
+      retryFrom: null,
+      source: "voice",
+      clientRequestId: crypto.randomUUID(),
+      transcript: "Каждый понедельник Марат отчёт по продажам, и каждую среду в десять планёрка, всем",
+      entities: REPEATS,
+      parsedEntities: REPEATS,
     });
 
   const showSttError = () =>
@@ -135,6 +188,9 @@ export default function DevConfirmPage() {
       <div className="flex flex-wrap gap-2 border-b border-border px-4 py-3">
         <Button variant="secondary" onClick={loadFixture}>
           Загрузить фикстуру
+        </Button>
+        <Button variant="secondary" onClick={loadRepeats}>
+          Повторы
         </Button>
         <Button variant="secondary" onClick={showSttError}>
           Ошибка: stt_failed

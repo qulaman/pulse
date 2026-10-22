@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import type { KindModule } from "./fields";
+import { EVENT_REPEATS } from "../../recurrence/schedule";
 import { spokenTime, TimeRefSchema } from "../timeref";
 
 /**
@@ -27,6 +28,7 @@ export const ModelEventEntitySchema = z.strictObject({
   starts_at: TimeRefSchema.nullable(), // null — ни даты, ни времени
   participant_names: z.array(z.string()), // roster full_name copied verbatim (D-56)
   everyone: z.boolean(), // «всем», «вся команда»
+  repeat: z.enum(EVENT_REPEATS), // «каждый понедельник планёрка» — "week" (D-148); once — "none"
   source_span: z.string(),
 });
 
@@ -42,8 +44,14 @@ const section = `## event — мероприятие с датой и време
 - starts_at — когда (TimeRef, раздел «Время»). Дата без времени («в пятницу
   корпоратив») — только день; ни даты, ни времени — null.
 - Повестку и время напоминания директор ставит сам на экране — не выдумывай.
-- Поручение вокруг мероприятия («Марат, подготовь зал») — отдельный task. «Каждый
-  понедельник планёрка» → recurrence. «Напомни мне позвонить …» — reminder, не event.`;
+- repeat — регулярная встреча: «каждый день» — "day", «по будням» — "workday", «каждый
+  понедельник», «еженедельно», «по средам» — "week", «раз в две недели» — "biweek",
+  «каждый месяц», «пятого числа каждого месяца» — "month"; один раз — "none". starts_at —
+  ближайшая такая встреча («каждый понедельник в девять» — day "weekday", weekday 1,
+  time "09:00").
+- Поручение вокруг мероприятия («Марат, подготовь зал») — отдельный task; то же к каждой
+  встрече («готовь цифры к каждой планёрке») — recurrence. «Напомни мне позвонить …» —
+  reminder, не event.`;
 
 export const eventKind: KindModule = {
   kind: "event",
@@ -63,6 +71,7 @@ export const eventKind: KindModule = {
             starts_at: spokenTime("в четверг в три", { day: "weekday", weekday: 4, time: "15:00" }),
             participant_names: ["Марат Оспанов", "Айгуль Сапарова"],
             everyone: false,
+            repeat: "none",
             source_span:
               "Встреча с Альфой в четверг в три у них в офисе, идут Марат и Айгуль. Напомни за час",
           },

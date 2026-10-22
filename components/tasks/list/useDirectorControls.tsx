@@ -4,15 +4,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { Fragment, useState, type ReactNode } from "react";
 
+import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AnswerSheet } from "@/components/tasks/desk/AnswerSheet";
 import { DirectorSheets, type DirectorSheetName, type PassTo } from "@/components/tasks/desk/DirectorSheets";
 import { Icon } from "@/components/tasks/desk/icons";
+import { Button } from "@/components/ui/Button";
 import { Sheet, SHEET_CLOSE_MS } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { haptic } from "@/lib/haptics";
 import { shortName } from "@/lib/people/names";
 import { peopleQuery } from "@/lib/people/queries";
+import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import type { DeskAction } from "@/lib/tasks/desk";
 import { reassignNeedsDeadline, type Suggestion, type TimeRequest } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
@@ -78,6 +81,9 @@ export function useDirectorControls({
   const queryClient = useQueryClient();
 
   const byId = (id: string) => tasks.find((task) => task.id === id) ?? null;
+  // a task made by a repeating order carries the rule's switch in «Все действия» (D-148)
+  const rules = useRecurrenceRules(tasks.some((task) => task.recurrence_rule_id));
+  const updateRule = useUpdateRule();
   const named = (text: string, task: TaskWithPeople) => {
     const who = shortName(task.assignee?.full_name);
     return who ? `${text} · ${who}` : text;
@@ -216,6 +222,7 @@ export function useDirectorControls({
     ? { request: Boolean(requestOf(sheetTask.id)), suggestion: Boolean(sheetTask.status === "declined" && suggestionOf(sheetTask.id)) }
     : {};
   const choices: DeskAction[] = sheetTask ? [...allActionsFor(sheetTask, flags), ...(onThread ? (["open"] as const) : [])] : [];
+  const sheetRule = sheetTask?.recurrence_rule_id ? (rules.data?.find((rule) => rule.id === sheetTask.recurrence_rule_id) ?? null) : null;
 
   const sheets = sheetTask ? (
     <Fragment key={opening.n}>
@@ -287,6 +294,33 @@ export function useDirectorControls({
             );
           })}
         </div>
+        {sheetRule ? (
+          <div className="mt-3 rounded-[14px] border border-border/70 px-3 py-2.5" data-testid="more-repeat">
+            <p className="flex items-center gap-1.5 text-[14px] leading-[19px]">
+              <Icon name="repeat" size={14} />
+              <span className="min-w-0">
+                {ruleLine(sheetRule)}
+                <span className="text-muted"> · {ruleState(sheetRule).text}</span>
+              </span>
+            </p>
+            <Button
+              variant={sheetRule.is_active ? "danger" : "secondary"}
+              size="sm"
+              block
+              className="mt-2"
+              onClick={() => {
+                setSheet(null);
+                updateRule.mutate({
+                  id: sheetRule.id,
+                  patch: { is_active: !sheetRule.is_active },
+                  toast: sheetRule.is_active ? "Повтор остановлен. Эта задача остаётся" : "Повтор снова работает",
+                });
+              }}
+            >
+              {sheetRule.is_active ? "Остановить повтор" : "Возобновить повтор"}
+            </Button>
+          </div>
+        ) : null}
       </Sheet>
     </Fragment>
   ) : null;

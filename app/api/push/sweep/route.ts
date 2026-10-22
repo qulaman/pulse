@@ -7,6 +7,7 @@ export const maxDuration = 60;
 
 type Service = ReturnType<typeof createServiceSupabase>;
 type Tick =
+  | "recurrence_spawn"
   | "publish_due_scheduled"
   | "events_due_reminders"
   | "errands_due_escalation"
@@ -44,7 +45,10 @@ export async function POST(req: Request) {
   if (!secret || given !== secret) return apiError(401, "unauthorized", "Нет доступа");
   try {
     const service = createServiceSupabase();
-    // first the tasks held for the delivery window (D-38, tasks/017): their «task_sent» rows
+    // the repeating orders make this day's tasks and the series their next meeting (D-148) —
+    // before the publishing, so a task made for the window goes out with this very sweep
+    const repeated = await tick(service, "recurrence_spawn");
+    // then the tasks held for the delivery window (D-38, tasks/017): their «task_sent» rows
     // then go out with this very sweep, not a minute later
     const published = await tick(service, "publish_due_scheduled");
     const reminders = await tick(service, "events_due_reminders"); // D-78
@@ -70,6 +74,7 @@ export async function POST(req: Request) {
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
+      repeated,
       published,
       reminders,
       escalations,

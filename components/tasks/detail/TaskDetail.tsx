@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { ReactionBadge, ReactionBar } from "@/components/points/ReactionBar";
+import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { DeliveryStatus } from "@/components/tasks/DeliveryStatus";
 import { Icon } from "@/components/tasks/desk/icons";
@@ -21,6 +22,7 @@ import { formatAqtobe, humanAqtobe } from "@/lib/ai/time";
 import { useReactionPrices, useTaskReactions } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
+import { useRecurrenceRules } from "@/lib/recurrence/queries";
 import { QuickAnswers } from "@/components/tasks/desk/QuickAnswers";
 import type { DeskAction } from "@/lib/tasks/desk";
 import {
@@ -113,6 +115,8 @@ export function TaskDetail({
     afterRemove: onBack,
   });
   const employee = useEmployeeControls({ actions: base, companyId: me.companyId, tasks: [task] });
+  const rules = useRecurrenceRules(Boolean(task.recurrence_rule_id));
+  const rule = task.recurrence_rule_id ? (rules.data?.find((row) => row.id === task.recurrence_rule_id) ?? null) : null;
   const actions = isDirector ? director.actions : base;
 
   // the stage, as this reader needs it: the director's move by its name, else the state
@@ -331,6 +335,17 @@ export function TaskDetail({
               {task.deadline ? formatAqtobe(new Date(task.deadline)) : urgentNow ? "срочно, без времени" : "без срока"}
             </span>
           </Fact>
+          {/* made by a repeating order (D-148): when it comes again; the director stops it in «⋯» */}
+          {rule ? (
+            // the rule's line wraps: «раз в две недели по вторникам и четвергам» does not fit a cell
+            <div className="col-span-2 min-w-0" data-testid="task-repeat">
+              <dt className="text-[12px] leading-4 text-muted">Повторяется</dt>
+              <dd className="mt-0.5 text-[14px] leading-[19px]">
+                {ruleLine(rule)}
+                <span className="text-muted"> · {ruleState(rule).text}</span>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </section>
 

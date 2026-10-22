@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
+import { RecurrenceSection } from "@/components/recurrence/RecurrenceSection";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { HeadButton } from "@/components/ui/HeadButton";
@@ -12,6 +13,7 @@ import { useTaskReactions } from "@/lib/points/game";
 import { usePointsEnabled } from "@/lib/points/queries";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import type { BoardTask } from "@/lib/pulse/board";
+import type { Rule } from "@/lib/recurrence/queries";
 import type { DeskReason } from "@/lib/tasks/desk";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import {
@@ -56,6 +58,7 @@ export function DirectorTasksView({
   onPurge,
   purging: purgePending = false,
   closedPages,
+  rules,
 }: {
   meId: string;
   companyId: string;
@@ -72,6 +75,8 @@ export function DirectorTasksView({
    * next page. Absent — the list holds all of them (the /dev sandbox).
    */
   closedPages?: { total: number | undefined; loading: boolean; onMore: () => void };
+  /** «Повторы» (D-148) of the /dev sandbox; absent — the company's, from the server. */
+  rules?: readonly Rule[];
 }) {
   // the director's own reactions (D-133): gold on the card, the row of seven once it is handed in
   const reactions = useTaskReactions();
@@ -195,6 +200,9 @@ export function DirectorTasksView({
       </div>
 
       <PeopleStrip people={people} value={personId} onChange={setPersonId} />
+
+      {/* the repeating orders (D-148): one line while there are any, the list by a tap */}
+      <RecurrenceSection personId={personId} rules={rules} />
 
       <Tabs
         className="mt-2"

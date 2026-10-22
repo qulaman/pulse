@@ -26,7 +26,7 @@ describe("kind modules (task 026)", () => {
         expect(() => ModelParseResultSchema.parse(pair.assistant)).not.toThrow();
       }
     }
-    expect(FEW_SHOT).toHaveLength(12);
+    expect(FEW_SHOT).toHaveLength(13);
   });
 
   it("normalizeKinds keeps the order, always keeps task and drops unknown names", () => {

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 
 import { EventEditor } from "@/components/calendar/EventEditor";
+import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Face } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
@@ -12,6 +13,7 @@ import { useDeleteEvent, useRespondEvent } from "@/lib/calendar/mutations";
 import { toneAhead, whenAhead } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { humanYmd } from "@/lib/datetime/calendar";
+import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import { TONE_VAR } from "@/lib/tasks/tone";
 
 /** Причины «Не смогу» — те же чипы, что у задачи: короткие и правдивые. */
@@ -47,6 +49,10 @@ type Props = {
 export function EventDetails({ event, meId, isDirector, now, onSaved, onDeleted, variant = "sheet" }: Props) {
   const respond = useRespondEvent(meId);
   const remove = useDeleteEvent();
+  // a meeting of a series (D-148): how it repeats, and the director's switch
+  const rules = useRecurrenceRules(Boolean(event.recurrence_rule_id));
+  const updateRule = useUpdateRule();
+  const rule = event.recurrence_rule_id ? (rules.data?.find((row) => row.id === event.recurrence_rule_id) ?? null) : null;
 
   const [declining, setDeclining] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -93,6 +99,33 @@ export function EventDetails({ event, meId, isDirector, now, onSaved, onDeleted,
 
       {event.body ? <p className="whitespace-pre-line text-[15px] leading-[21px]">{event.body}</p> : null}
       {event.audio_path ? <AudioOriginal path={event.audio_path} /> : null}
+
+      {rule ? (
+        <div className="flex items-start gap-2.5 text-[15px] leading-[21px]" data-testid="event-repeat">
+          <span className="mt-0.5 shrink-0 text-muted">
+            <RepeatIcon />
+          </span>
+          <span className="min-w-0 flex-1">
+            {ruleLine(rule)}
+            <span className="text-muted"> · {ruleState(rule).text}</span>
+          </span>
+          {isDirector ? (
+            <button
+              type="button"
+              className="shrink-0 text-[14px] font-semibold text-accent"
+              onClick={() =>
+                updateRule.mutate({
+                  id: rule.id,
+                  patch: { is_active: !rule.is_active },
+                  toast: rule.is_active ? "Повтор остановлен. Эта встреча остаётся" : "Повтор снова работает",
+                })
+              }
+            >
+              {rule.is_active ? "Остановить" : "Возобновить"}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
@@ -271,6 +304,17 @@ export function PinIcon({ size = 17 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden {...STROKE}>
       <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
       <circle cx="12" cy="10" r="2.3" />
+    </svg>
+  );
+}
+
+function RepeatIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden {...STROKE}>
+      <path d="M4 12a8 8 0 0 1 13.5-5.8" />
+      <polyline points="18,3 18,7 14,7" />
+      <path d="M20 12a8 8 0 0 1-13.5 5.8" />
+      <polyline points="6,21 6,17 10,17" />
     </svg>
   );
 }

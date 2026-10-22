@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, type QueryClient, type QueryKey } from "@t
 
 import { toast } from "@/components/ui/Toast";
 import { kickPush } from "@/lib/push/client";
+import type { EventRepeat } from "@/lib/recurrence/schedule";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 import { calendarKeys, type CalendarEvent } from "./queries";
@@ -100,6 +101,8 @@ export type EventDraft = {
   everyone: boolean;
   /** Without the author — the author is always in, the server keeps them. */
   participant_ids: string[];
+  /** A new meeting may become a series (D-148); an edit never changes it. */
+  repeat?: EventRepeat;
 };
 
 /** What the server says no to, in words — the form stays open with the text still in it. */
@@ -208,6 +211,7 @@ export function useCreateEvent() {
             participant_ids: draft.participant_ids,
             everyone: draft.everyone,
             remind_before_min: draft.remind_before_min,
+            repeat: draft.repeat ?? "none",
             source_span: draft.title,
           },
         ],

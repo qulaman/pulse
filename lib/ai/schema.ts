@@ -12,6 +12,7 @@ import { ModelReminderEntitySchema } from "./kinds/reminder";
 import { ModelTaskEntitySchema } from "./kinds/task";
 import { kindModules } from "./kinds";
 import { TimeRefSchema } from "./timeref";
+import { EVENT_REPEATS, REPEAT_EVERY } from "../recurrence/schedule";
 
 /**
  * Single source of truth for the parser output contract (docs/AI.md §3).
@@ -76,12 +77,31 @@ export const EventEntitySchema = z.strictObject({
   participant_ids: z.array(z.string()),
   everyone: z.boolean(),
   remind_before_min: z.number().nullable(),
+  // D-148: a series — the next meeting is made as this one begins; a draft kept before it is "none"
+  repeat: z.enum(EVENT_REPEATS).default("none"),
+  source_span: z.string(),
+});
+
+/**
+ * The app's repeating order (D-148): the model's rule, normalised, with the deadline of each
+ * day resolved from the words to a clock time on the company's conventions — code, not the
+ * model, decides what «до обеда» means (D-15).
+ */
+export const RecurrenceEntitySchema = z.strictObject({
+  kind: z.literal("recurrence"),
+  ...assigneeFields,
+  ...assigneeId,
+  title: z.string(),
+  every: z.enum(REPEAT_EVERY),
+  interval: z.number(),
+  weekdays: z.array(z.number()),
+  month_day: z.number(),
+  due_time: z.string(), // "HH:MM", Asia/Aqtobe — the deadline on every day of the rule
   source_span: z.string(),
 });
 
 export const TaskEntitySchema = z.strictObject({ kind: z.literal("task"), ...taskFields, ...assigneeId });
 export const PointsEntitySchema = ModelPointsEntitySchema.extend(assigneeId);
-export const RecurrenceEntitySchema = ModelRecurrenceEntitySchema.extend(assigneeId);
 export const DelegationEntitySchema = ModelDelegationEntitySchema.extend(assigneeId);
 
 export const EntitySchema = z.discriminatedUnion("kind", [

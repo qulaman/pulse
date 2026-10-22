@@ -23,6 +23,7 @@ import {
   type TrySide,
 } from "@/lib/lab/parser";
 import { pct, usd, whenAqtobe } from "@/lib/lab/format";
+import { describeRule, EVENT_REPEAT_LABEL } from "@/lib/recurrence/schedule";
 import type { ParserRulesVersion } from "@/lib/settings";
 // labels only — lib/settings.ts itself would bring zod into this page (D-126)
 import { PARSER_MODEL_SHORT, PARSER_MODELS } from "@/lib/settings-plain";
@@ -119,10 +120,11 @@ function gist(entity: PostprocessedEntity): string {
     case "event": {
       const at = when(entity.starts_at_iso);
       const people = entity.everyone ? "всем" : entity.participant_names.join(", ");
-      return [entity.title, at, people || null, entity.location || null].filter(Boolean).join(" · ");
+      const repeat = entity.repeat !== "none" ? EVENT_REPEAT_LABEL[entity.repeat].toLowerCase() : null;
+      return [entity.title, at, people || null, entity.location || null, repeat].filter(Boolean).join(" · ");
     }
     case "recurrence":
-      return `${entity.title} · ${entity.rrule}`;
+      return `${entity.title} · ${describeRule(entity)} · к ${entity.due_time}`;
     case "delegation":
       return entity.title;
     case "query":

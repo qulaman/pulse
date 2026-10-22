@@ -28,7 +28,7 @@ export const assigneeFields = {
  * (+05:00), источник voice (FEW_SHOT_CONTEXT); the roster is tests/stt/roster.json.
  */
 export interface FewShotPair {
-  /** Its number П1–П12 (docs/AI.md §4): the model sees the pairs in this order, whatever kind owns them. */
+  /** Its number П1–П13 (docs/AI.md §4): the model sees the pairs in this order, whatever kind owns them. */
   n: number;
   user: string;
   assistant: ModelParseResult;

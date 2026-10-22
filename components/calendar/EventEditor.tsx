@@ -16,6 +16,7 @@ import { defaultStartHm, endIsBeforeStart, shiftEnd } from "@/lib/calendar/agend
 import { useCreateEvent, useEditEvent, type EventDraft } from "@/lib/calendar/mutations";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { aqtobeIsoToYmdHm, todayYmd, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
+import { EVENT_REPEAT_LABEL, EVENT_REPEATS, type EventRepeat } from "@/lib/recurrence/schedule";
 
 type Props = {
   open: boolean;
@@ -75,6 +76,8 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
   const [body, setBody] = useState(event?.body ?? "");
   const [remind, setRemind] = useState(event?.remind_before_min ?? 30);
   const [everyone, setEveryone] = useState(event?.everyone ?? false);
+  // a series is chosen when the meeting is born; an existing meeting keeps what it has (D-148)
+  const [repeat, setRepeat] = useState<EventRepeat>("none");
   const [ids, setIds] = useState<string[]>(() =>
     (event?.participants ?? []).map((person) => person.user_id).filter((id) => id !== authorId),
   );
@@ -111,6 +114,7 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
       remind_before_min: remind,
       everyone,
       participant_ids: everyone ? [] : ids,
+      repeat: event ? "none" : repeat,
     };
     // the form stays up until the server has it: a failure leaves every word in place
     const done = (id?: string | null) => {
@@ -178,6 +182,19 @@ function EditorBody({ event, day, meId, now: nowProp, onClose, onSaved }: Omit<P
           <Row icon={<PeopleIcon />} title="Участники" value={who} onClick={() => setWhoOpen(true)} />
         </RowGroup>
       </div>
+
+      {event ? null : (
+        <div className="flex flex-col gap-1.5">
+          <span className={LABEL}>Повторять</span>
+          <div className="flex flex-wrap gap-2">
+            {EVENT_REPEATS.map((option) => (
+              <Chip key={option} tone={option === repeat ? "accent" : "neutral"} aria-pressed={option === repeat} onClick={() => setRepeat(option)}>
+                {option === "none" ? "Нет" : EVENT_REPEAT_LABEL[option]}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <span className={LABEL}>Напомнить</span>

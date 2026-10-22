@@ -5,7 +5,7 @@ import type { FewShotPair } from "./kinds/fields";
 import { PARSER_KINDS, type ParserKind } from "./kinds/names";
 
 /**
- * Few-shot pairs П1–П12 (docs/AI.md §4) — each lives in the module of the kind it teaches
+ * Few-shot pairs П1–П13 (docs/AI.md §4) — each lives in the module of the kind it teaches
  * (lib/ai/kinds, task 026) and is mapped onto the single demo roster tests/stt/roster.json:
  * Айгуль → u-005, Ерлан → u-001 (spoken as «Ерлану Б.», otherwise the two Erlans are
  * ambiguous), Марат → u-003, Сакен → u-004, Тимур → u-009, Жандос → u-010.
@@ -18,7 +18,7 @@ import { PARSER_KINDS, type ParserKind } from "./kinds/names";
  */
 
 /**
- * The pairs of the kinds that are on, in the fixed order of their numbers П1–П12 — the order
+ * The pairs of the kinds that are on, in the fixed order of their numbers П1–П13 — the order
  * the evals were measured on (the order of the kinds put П6 last and moved r-016-mini, task
  * 026). A pair is shown only while every kind in its answer is on: an example of a
  * switched-off kind would teach the model an answer its schema refuses.

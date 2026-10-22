@@ -71,7 +71,7 @@ function parseClock(value: string | null): Clock | null {
  * A named hour is a working hour: «в три» is 15:00, «до шести» 18:00 (eval a-007) — an hour
  * 1–7 with no part of the day is the afternoon, and an afternoon part moves any morning hour.
  */
-function daytime(clock: Clock, part: TimePart | null): Clock {
+export function daytime(clock: Clock, part: TimePart | null): Clock {
   if (clock.hours >= 1 && clock.hours <= 11 && part !== null && AFTERNOON_PARTS.has(part)) {
     return { ...clock, hours: clock.hours + 12 };
   }
