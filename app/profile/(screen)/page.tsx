@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { InstallHint } from "@/components/InstallHint";
+import { ReportIcon } from "@/components/daily-report/icons";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { HapticsRow } from "@/components/profile/HapticsRow";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
@@ -16,7 +17,7 @@ import { SignOutRow } from "@/components/profile/SignOutRow";
 import { VersionRow } from "@/components/profile/VersionRow";
 import { GearIcon, SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
-import { canManageTeam } from "@/lib/routes";
+import { canManageTeam, isTeamRole } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { BUILD, versionLabel } from "@/lib/version";
 
@@ -53,6 +54,8 @@ export default async function ProfilePage() {
       <AfterPoints userId={director ? null : profile.userId}>
         <h2 className="eyebrow mt-6 px-1">Личное</h2>
         <RowGroup className="mt-2">
+          {/* the person's own daily reports, today's form on top (D-152) */}
+          {isTeamRole(profile.role) ? <Row icon={<ReportIcon />} title="Мои отчёты" value="за день" href="/report" /> : null}
           <PasswordRow />
           <OtherDeviceRow userId={profile.userId} fullName={profile.fullName} />
           <SignOutOthersRow userId={profile.userId} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
 import { Icon } from "@/components/tasks/desk/icons";
@@ -37,6 +37,7 @@ export function EmployeeTasksView({
   board,
   actions,
   now,
+  report,
 }: {
   meId: string;
   companyId: string;
@@ -46,6 +47,8 @@ export function EmployeeTasksView({
   board: readonly BoardTask[];
   actions: TaskActions;
   now: Date;
+  /** The «Отчёт за день» row under the status screen (D-152); the sandbox draws none. */
+  report?: ReactNode;
 }) {
   // the director's reactions (D-133): a gold outline and a badge on the card
   const reactions = useTaskReactions();
@@ -94,6 +97,7 @@ export function EmployeeTasksView({
       <div className="mt-3">
         <StatusScreen screen={screen} now={now} onNearest={showNearest} />
       </div>
+      {report}
 
       <Tabs
         className="mt-2"

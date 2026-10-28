@@ -209,6 +209,69 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_reports: {
+        Row: {
+          arrived_at: string | null
+          client_request_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          left_at: string | null
+          report_date: string
+          status: string
+          submitted_at: string | null
+          summary: string | null
+          tasks: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          arrived_at?: string | null
+          client_request_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          left_at?: string | null
+          report_date: string
+          status: string
+          submitted_at?: string | null
+          summary?: string | null
+          tasks?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          arrived_at?: string | null
+          client_request_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          left_at?: string | null
+          report_date?: string
+          status?: string
+          submitted_at?: string | null
+          summary?: string | null
+          tasks?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_reports_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       errands: {
         Row: {
           accepted_at: string | null
@@ -1212,6 +1275,7 @@ export type Database = {
           amount: number
           company_id: string
           created_at: string
+          daily_report_id: string | null
           id: string
           order_id: string | null
           quiet: boolean
@@ -1226,6 +1290,7 @@ export type Database = {
           amount: number
           company_id: string
           created_at?: string
+          daily_report_id?: string | null
           id?: string
           order_id?: string | null
           quiet?: boolean
@@ -1240,6 +1305,7 @@ export type Database = {
           amount?: number
           company_id?: string
           created_at?: string
+          daily_report_id?: string | null
           id?: string
           order_id?: string | null
           quiet?: boolean
@@ -1262,6 +1328,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_transactions_daily_report_id_fkey"
+            columns: ["daily_report_id"]
+            isOneToOne: false
+            referencedRelation: "daily_reports"
             referencedColumns: ["id"]
           },
           {
@@ -2347,6 +2420,8 @@ export type Database = {
         Args: { p_kind: string; p_meta: Json }
         Returns: string
       }
+      daily_report_reminders_due: { Args: { p_now?: string }; Returns: number }
+      daily_reports_due_missed: { Args: { p_now?: string }; Returns: number }
       director_day_summaries_due: { Args: { p_now?: string }; Returns: number }
       director_digest_slot: {
         Args: { p_at: string; p_prefs: Json }
@@ -2640,6 +2715,19 @@ export type Database = {
         Returns: Json
       }
       subordinates: { Args: { mgr: string }; Returns: string[] }
+      my_daily_report: { Args: { p_date?: string }; Returns: Json }
+      my_daily_report_history: { Args: { p_limit?: number }; Returns: Json }
+      submit_daily_report: {
+        Args: {
+          client_request_id?: string
+          p_arrived_at: string
+          p_left_at: string
+          p_summary: string
+        }
+        Returns: Json
+      }
+      team_daily_report_day: { Args: { p_date?: string }; Returns: Json }
+      team_daily_report_period: { Args: { p_from: string; p_to: string }; Returns: Json }
       team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
       team_role: {
         Args: { r: Database["public"]["Enums"]["user_role"] }

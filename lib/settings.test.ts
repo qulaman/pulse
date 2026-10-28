@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   activeParserRules,
+  mergeDailyReport,
   parseCompanySettings,
   secretaryActionCode,
   SecretarySettingsSchema,
@@ -87,6 +88,55 @@ describe("points rules, Эфир and the telegraph (D-133)", () => {
     expect(SettingsPatchSchema.safeParse({ points_rules: { reactions: { fire: 20 } } }).success).toBe(true);
     expect(SettingsPatchSchema.safeParse({ points_rules: { reactions: { fire: -1 } } }).success).toBe(false);
     expect(SettingsPatchSchema.safeParse({ ether_events: { merch: false, praise: true }, mascot_telegraph: false }).success).toBe(true);
+  });
+});
+
+describe("the daily report (D-152)", () => {
+  const today = "2026-10-28";
+
+  it("a fresh company has it on, Monday to Friday, reminded at 18:00, +1 / −10, fines not started", () => {
+    const settings = parseCompanySettings({});
+    expect(settings.daily_report).toEqual({
+      enabled: true,
+      workdays: [1, 2, 3, 4, 5],
+      work_start: "09:00",
+      remind_at: "18:00",
+      started_on: null,
+      checked_on: null,
+    });
+    expect(settings.points_rules).toMatchObject({ daily_report: 1, daily_report_missed: 10 });
+  });
+
+  it("keeps what a company stored and fills the rest", () => {
+    const settings = parseCompanySettings({ daily_report: { workdays: [6, 1, 2, 2], started_on: "2026-10-27" } });
+    expect(settings.daily_report).toMatchObject({ enabled: true, workdays: [1, 2, 6], started_on: "2026-10-27" });
+  });
+
+  it("a broken section is the defaults, never the whole settings back to defaults", () => {
+    const settings = parseCompanySettings({ daily_report: { workdays: "weekdays" }, points_enabled: true });
+    expect(settings.daily_report.workdays).toEqual([1, 2, 3, 4, 5]);
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("the patch takes the module's keys, refuses a bad day or clock, drops `started_on`", () => {
+    expect(SettingsPatchSchema.safeParse({ daily_report: { enabled: false } }).success).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ daily_report: { workdays: [0] } }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ daily_report: { workdays: [] } }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ daily_report: { remind_at: "24:00" } }).success).toBe(false);
+    const parsed = SettingsPatchSchema.parse({ daily_report: { remind_at: "17:30", started_on: "2020-01-01", checked_on: "2020-01-01" } });
+    expect(parsed.daily_report).toEqual({ remind_at: "17:30" });
+    // a missing key stays as stored: no defaults in the patch
+    expect(SettingsPatchSchema.parse({ daily_report: { enabled: true } }).daily_report).toEqual({ enabled: true });
+    expect(SettingsPatchSchema.safeParse({ points_rules: { daily_report_missed: -10 } }).success).toBe(false);
+  });
+
+  it("switching it on starts the fines today; any other edit keeps the start; the tick's mark is never lost", () => {
+    const off = { ...parseCompanySettings({}).daily_report, enabled: false, started_on: "2026-09-01", checked_on: "2026-10-27" };
+    expect(mergeDailyReport(off, { enabled: true }, today)).toMatchObject({ enabled: true, started_on: today, checked_on: "2026-10-27" });
+    const on = { ...off, enabled: true };
+    expect(mergeDailyReport(on, { enabled: true, remind_at: "17:00" }, today)).toMatchObject({ remind_at: "17:00", started_on: "2026-09-01" });
+    expect(mergeDailyReport(on, { enabled: false }, today)).toMatchObject({ enabled: false, started_on: "2026-09-01" });
+    expect(mergeDailyReport(off, { workdays: [1, 2, 3] }, today)).toMatchObject({ enabled: false, started_on: "2026-09-01" });
   });
 });
 

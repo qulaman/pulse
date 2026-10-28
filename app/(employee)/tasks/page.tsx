@@ -1,5 +1,6 @@
 "use client";
 
+import { ReportEntryRow } from "@/components/daily-report/ReportEntryRow";
 import { EmployeeTasksView } from "@/components/tasks/list/EmployeeTasksView";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { TasksSkeleton } from "@/components/ui/PageSkeletons";
@@ -31,6 +32,7 @@ export default function TasksPage() {
       board={board.data ?? []}
       actions={actions}
       now={now}
+      report={<ReportEntryRow />}
     />
   );
 }

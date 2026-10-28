@@ -41,6 +41,8 @@ const RULES: Record<string, Rule> = {
   deadline_kept: { ttl: 24 * HOUR, urgency: "high" },
   task_nudge: { ttl: 12 * HOUR, urgency: "high" },
   deadline_soon: { ttl: 1 * HOUR, urgency: "high" },
+  // D-152: «Сдайте отчёт за день» — worth it while the evening lasts, not the next morning
+  daily_report_remind: { ttl: 4 * HOUR, urgency: "high" },
   // the director's side of a task
   pending_review: { ttl: 24 * HOUR, urgency: "high" },
   declined: { ttl: 24 * HOUR, urgency: "high" },

@@ -1,7 +1,8 @@
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { todayYmd } from "@/lib/datetime/calendar";
 import { loadCompanySettings } from "@/lib/roster";
-import { parseCompanySettings, SettingsPatchSchema, type SettingsPatch } from "@/lib/settings";
+import { mergeDailyReport, parseCompanySettings, SettingsPatchSchema, type SettingsPatch } from "@/lib/settings";
 import type { Json } from "@/lib/supabase/types";
 
 /** Director or secretary (D-104) reads the effective settings (defaults applied). */
@@ -36,6 +37,8 @@ export const PATCH = withAuth<SettingsPatch>(
     if (body.lab_for_all !== undefined) patch.lab_for_all = body.lab_for_all;
     if (body.points_rules) patch.points_rules = body.points_rules;
     if (body.ether_events) patch.ether_events = body.ether_events;
+    // D-152: `started_on` / `checked_on` are the server's — switching the module on starts the fines today
+    if (body.daily_report) patch.daily_report = mergeDailyReport(current.daily_report, body.daily_report, todayYmd());
 
     const supabase = await userSupabase(req);
     const { data, error } = await supabase.rpc("update_company_settings", { patch: patch as Json });

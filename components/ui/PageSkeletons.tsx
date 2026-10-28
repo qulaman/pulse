@@ -10,6 +10,7 @@
  */
 import { DataTable } from "@/components/admin/DataTable";
 import { TableChips } from "@/components/admin/tables";
+import { ReportEntryRowBone } from "@/components/daily-report/Skeletons";
 import { Mascot } from "@/components/brand/Mascot";
 import { PeriodChips } from "@/components/rating/PeriodChips";
 import { ShopRow } from "@/components/rating/ShopRow";
@@ -155,6 +156,8 @@ function CardsSkeleton({ title, director }: { title: string; director: boolean }
         <CardColumnBone className="mt-[9px]" />
       ) : (
         <>
+          {/* «Отчёт за день» under the status screen (D-152) */}
+          <ReportEntryRowBone />
           <Tabs id="mine" pending value="new" className="mt-2" items={MINE_TABS} />
           <CardColumnBone />
         </>

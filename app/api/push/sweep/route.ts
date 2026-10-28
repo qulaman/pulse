@@ -7,6 +7,7 @@ export const maxDuration = 60;
 
 type Service = ReturnType<typeof createServiceSupabase>;
 type Tick =
+  | "daily_reports_due_missed"
   | "recurrence_spawn"
   | "publish_due_scheduled"
   | "events_due_reminders"
@@ -19,6 +20,7 @@ type Tick =
   | "unseen_task_alerts_due"
   | "overdue_alerts_due"
   | "deadline_reminders_due"
+  | "daily_report_reminders_due"
   | "director_day_summaries_due"
   | "director_digests_due"
   | "team_channel_alerts_due"
@@ -45,6 +47,9 @@ export async function POST(req: Request) {
   if (!secret || given !== secret) return apiError(401, "unauthorized", "Нет доступа");
   try {
     const service = createServiceSupabase();
+    // yesterday's daily reports not sent become «не сдан» (and the minus with points on, D-152);
+    // first, so the day's book is closed before anything else of the morning
+    const dailyMissed = await tick(service, "daily_reports_due_missed");
     // the repeating orders make this day's tasks and the series their next meeting (D-148) —
     // before the publishing, so a task made for the window goes out with this very sweep
     const repeated = await tick(service, "recurrence_spawn");
@@ -63,6 +68,7 @@ export async function POST(req: Request) {
     const unseen = await tick(service, "unseen_task_alerts_due");
     const overdue = await tick(service, "overdue_alerts_due");
     const deadlineSoon = await tick(service, "deadline_reminders_due"); // «Скоро срок» to the employee, D-128
+    const dailyReminders = await tick(service, "daily_report_reminders_due"); // «Сдайте отчёт за день», D-152
     const team = await tick(service, "team_channel_alerts_due"); // «уведомления не доходят»
     const summaries = await tick(service, "director_day_summaries_due");
     const digests = await tick(service, "director_digests_due");
@@ -85,6 +91,8 @@ export async function POST(req: Request) {
       unseen,
       overdue,
       deadline_soon: deadlineSoon,
+      daily_missed: dailyMissed,
+      daily_reminders: dailyReminders,
       team,
       summaries,
       tv_pruned: tvPruned,

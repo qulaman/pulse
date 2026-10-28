@@ -21,7 +21,12 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary" | "mascot";
+export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary" | "mascot" | "daily_report";
+
+/** The keys of the daily report the screen edits; `started_on` and `checked_on` are the server's (D-152). */
+function reportKeys(section: CompanySettings["daily_report"]) {
+  return { enabled: section.enabled, workdays: section.workdays, work_start: section.work_start, remind_at: section.remind_at };
+}
 
 type Draft = {
   server: CompanySettings;
@@ -62,6 +67,8 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
       if (patch.mascot_telegraph !== undefined) void queryClient.invalidateQueries({ queryKey: ["company", "mascot_telegraph"] });
       // the secretary's buttons and their scenes are read by Пульс and the secretary's screen (D-97)
       if (patch.secretary !== undefined) void queryClient.invalidateQueries({ queryKey: ["company"] });
+      // the report screens read the module's switch, days and points through their RPCs (D-152)
+      if (patch.daily_report !== undefined || patch.points_rules !== undefined) void queryClient.invalidateQueries({ queryKey: ["daily-report"] });
       toast("Сохранил настройки");
     },
     onError: () => toast("Не получилось сохранить. Попробуй ещё раз"),
@@ -90,6 +97,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         window: !same(draft.delivery_window, server.delivery_window),
         secretary: !same(draft.secretary, server.secretary),
         mascot: draft.mascot_seasons !== server.mascot_seasons || draft.mascot_telegraph !== server.mascot_telegraph,
+        daily_report: !same(reportKeys(draft.daily_report), reportKeys(server.daily_report)),
       },
       save: (patch) => save.mutate(patch),
       saving: (key) => save.isPending && save.variables?.[key] !== undefined,

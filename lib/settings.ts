@@ -224,7 +224,62 @@ export const PointsRulesSchema = z.object({
   late_on: z.boolean().default(false),
   late: z.number().int().min(0).max(1000).default(5),
   reactions: ReactionPricesSchema.prefault({}),
+  /** D-152: a daily report sent for a working day, and one not sent — stored positive, written as a minus (like `late`). */
+  daily_report: z.number().int().min(0).max(1000).default(1),
+  daily_report_missed: z.number().int().min(0).max(1000).default(10),
 });
+
+/** "HH:MM" on the Aqtobe wall clock. */
+const ClockSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+
+/** ISO weekdays (1 — Monday … 7 — Sunday), each once, in order. */
+const WorkdaysSchema = z
+  .array(z.number().int().min(1).max(7))
+  .min(1)
+  .max(7)
+  .transform((days) => [...new Set(days)].sort((a, b) => a - b));
+
+/**
+ * D-152: the daily report. The database reads the same keys with the same defaults
+ * (`daily_report_*()`, migration 20261028120000). Written by the server only, never by the screen:
+ * `started_on` — the first day a missing report is fined (the first morning tick, or switching the
+ * module on); `checked_on` — the last day the morning tick closed (kept here, or a settings save
+ * would make the tick look at closed days again).
+ */
+export const DailyReportSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  workdays: WorkdaysSchema.default([1, 2, 3, 4, 5]),
+  work_start: ClockSchema.default("09:00"),
+  remind_at: ClockSchema.default("18:00"),
+  started_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+  checked_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
+});
+
+export type DailyReportSettings = z.infer<typeof DailyReportSettingsSchema>;
+
+const DAILY_REPORT_DEFAULTS: DailyReportSettings = DailyReportSettingsSchema.parse({});
+
+/** The PATCH shape: no defaults (a missing key stays untouched), no server keys — a sent `started_on` / `checked_on` is dropped. */
+export const DailyReportPatchSchema = z
+  .object({
+    enabled: z.boolean(),
+    workdays: WorkdaysSchema,
+    work_start: ClockSchema,
+    remind_at: ClockSchema,
+  })
+  .partial();
+
+export type DailyReportPatch = z.infer<typeof DailyReportPatchSchema>;
+
+/**
+ * The stored section after a PATCH (D-152 §7): the edited keys over the current ones; switching
+ * the module on starts the fines from `today` — the days it was off are never fined backwards.
+ */
+export function mergeDailyReport(current: DailyReportSettings, patch: DailyReportPatch, today: string): DailyReportSettings {
+  const next: DailyReportSettings = { ...current, ...patch };
+  if (!current.enabled && next.enabled) next.started_on = today;
+  return next;
+}
 
 /** D-133 (И-46): which good news goes public on Эфир. */
 export const EtherEventsSchema = z.object({
@@ -274,6 +329,8 @@ export const CompanySettingsSchema = z.object({
   secretary: SecretarySettingsSchema.prefault({}),
   /** «Словарь» (D-111): lessons hidden with «×» on «Из ваших записей», `${personId}:${form}`. */
   dictionary: DictionarySettingsSchema.prefault({}),
+  /** The daily report (D-152); a broken section reads as the defaults, never the whole settings. */
+  daily_report: DailyReportSettingsSchema.prefault({}).catch(DAILY_REPORT_DEFAULTS),
 });
 
 export type CompanySettings = z.infer<typeof CompanySettingsSchema>;
@@ -304,6 +361,7 @@ export const SettingsPatchSchema = z
     delivery_window: DeliveryWindowSchema.partial(),
     secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,
+    daily_report: DailyReportPatchSchema,
   })
   .partial()
   .strict();

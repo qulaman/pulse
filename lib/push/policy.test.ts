@@ -25,6 +25,8 @@ describe("transportFor — the fixed policy (D-114)", () => {
     expect(transportFor({ event_kind: "visit_arrived", meta: {} }).ttl).toBe(1_200);
     expect(transportFor({ event_kind: "visit_message", meta: {} }).ttl).toBe(1_800);
     expect(transportFor({ event_kind: "event_reminder", meta: {} }).ttl).toBe(3_600);
+    // D-152: the evening's «сдайте отчёт» is not news the next morning
+    expect(transportFor({ event_kind: "daily_report_remind", meta: {} })).toEqual({ ttl: 14_400, urgency: "high", silent: false });
   });
 
   it("keeps the alarm loud and short-lived, whatever the director chose", () => {

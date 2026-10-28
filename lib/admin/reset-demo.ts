@@ -15,6 +15,7 @@ import type { Database } from "@/lib/supabase/types";
 const ACTIVITY_TABLES = [
   "task_messages",
   "point_transactions",
+  "daily_reports", // after their points: point_transactions.daily_report_id (D-152)
   "announcements", // announcement_acks cascade
   "tasks", // notification_deliveries of tasks cascade
   "notes", // converted_* of a deleted task are nulled, the note itself goes here

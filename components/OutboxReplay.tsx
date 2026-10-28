@@ -47,6 +47,9 @@ export function OutboxReplay() {
       void queryClient.invalidateQueries({ queryKey: ["settings"] });
       void queryClient.invalidateQueries({ queryKey: ["people"] });
       void queryClient.invalidateQueries({ queryKey: ["dictionary"] });
+      // and «Сдать отчёт» (D-152): the day, the history and the director's «Отчёты» read it again
+      // (dailyReportKeys.root — spelled out so the app shell does not pull the module's queries in)
+      void queryClient.invalidateQueries({ queryKey: ["daily-report"] });
       if (sent > 0) toast(sent === 1 ? "Отправил то, что ждало связи" : `Отправил ${sent}, что ждало связи`);
       // the server refused a tap made without network (the task moved on meanwhile): the person
       // hears it in the server's words instead of finding the tap silently gone (D-130)

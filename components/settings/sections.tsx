@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 
+import { ReportIcon } from "@/components/daily-report/icons";
 import { ScenePicker } from "@/components/secretary/ScenePicker";
 import { useDraft } from "@/components/settings/draft";
 import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
+import { Chip } from "@/components/ui/Chip";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
@@ -573,6 +575,17 @@ export function PointsSection() {
               ) : null}
             </div>
 
+            {/* D-152: the daily report pays and fines by itself — on working days only */}
+            <div className="flex flex-col gap-3" data-testid="report-rules">
+              <p className="text-[14px] font-medium leading-[18px] text-muted">За отчёт за день</p>
+              <RuleRow label="+ за сданный" hint="первая сдача за рабочий день">
+                <PointsInput label="Очков за сданный отчёт" value={rules.daily_report} onChange={(v) => setRules({ daily_report: v })} />
+              </RuleRow>
+              <RuleRow label="− за несданный" hint="утром за прошедший день; не в отпуске и не на больничном, можно оспорить">
+                <PointsInput label="Очков штрафа за несданный отчёт" value={rules.daily_report_missed} onChange={(v) => setRules({ daily_report_missed: v })} />
+              </RuleRow>
+            </div>
+
             {/* D-133 (И-68): a reaction of the director to a task pays its price */}
             <div className="flex flex-col gap-2" data-testid="reaction-prices">
               <p className="text-[14px] font-medium leading-[18px] text-muted">Реакция директора на задачу</p>
@@ -696,6 +709,104 @@ export function WindowSection() {
           pending={saving("delivery_window")}
           onSave={() => save({ delivery_window: draft.delivery_window })}
           onReset={() => update({ delivery_window: server.delivery_window })}
+        />
+      ) : null}
+    </Disclosure>
+  );
+}
+
+const WEEKDAYS: { day: number; label: string }[] = [
+  { day: 1, label: "пн" },
+  { day: 2, label: "вт" },
+  { day: 3, label: "ср" },
+  { day: 4, label: "чт" },
+  { day: 5, label: "пт" },
+  { day: 6, label: "сб" },
+  { day: 7, label: "вс" },
+];
+
+/** «пн–пт», «пн–сб», «пн, ср, пт»: a run of days said as a range. */
+function workdaysText(days: readonly number[]): string {
+  const sorted = [...days].sort((a, b) => a - b);
+  const label = (day: number) => WEEKDAYS[day - 1]?.label ?? "";
+  const run = sorted.every((day, i) => i === 0 || day === sorted[i - 1] + 1);
+  if (sorted.length >= 3 && run) return `${label(sorted[0])}–${label(sorted[sorted.length - 1])}`;
+  return sorted.map(label).join(", ");
+}
+
+/**
+ * The daily report (D-152): on or off, which days are working ones (only they pay +1 and fine a
+ * missing report), when the day starts (the form's «Пришёл») and when the reminder goes. Turning
+ * it on starts the fines from today — the server does that; the points live with the other rules.
+ * `started_on` and `checked_on` are the server's: never shown, never sent.
+ */
+export function DailyReportSection() {
+  const { draft, server, update, dirty, save, saving } = useDraft();
+  const report = draft.daily_report;
+  const set = (patch: Partial<CompanySettings["daily_report"]>) => update({ daily_report: { ...report, ...patch } });
+  const toggleDay = (day: number) => {
+    const has = report.workdays.includes(day);
+    // a week without a working day would be a module that is on and never asks
+    if (has && report.workdays.length === 1) return;
+    set({ workdays: has ? report.workdays.filter((d) => d !== day) : [...report.workdays, day].sort((a, b) => a - b) });
+  };
+  const rules = draft.points_rules;
+  return (
+    <Disclosure
+      icon={<ReportIcon />}
+      title="Ежедневный отчёт"
+      dirty={dirty.daily_report}
+      summary={report.enabled ? `${workdaysText(report.workdays)} · напомню в ${report.remind_at}` : "выключен"}
+      hint="В конце дня сотрудник пишет, когда пришёл и ушёл и чем занимался; задачи дня попадают в отчёт сами. Читать — в «Отчёты»."
+    >
+      <div className="flex flex-col gap-4">
+        <Toggle
+          label="Отчёты включены"
+          hint={server.daily_report.enabled ? "Выключите — ни напоминаний, ни очков, ни штрафов" : "Штрафы начнутся с сегодняшнего дня, не задним числом"}
+          checked={report.enabled}
+          onChange={(v) => set({ enabled: v })}
+        />
+        {report.enabled ? (
+          <>
+            <div className="flex flex-col gap-2">
+              <p className="text-[14px] font-medium leading-[18px] text-muted">Рабочие дни</p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Рабочие дни">
+                {WEEKDAYS.map(({ day, label }) => {
+                  const on = report.workdays.includes(day);
+                  return (
+                    <Chip key={day} tone={on ? "accent" : "neutral"} aria-pressed={on} onClick={() => toggleDay(day)} className="min-w-[42px] justify-center">
+                      {label}
+                    </Chip>
+                  );
+                })}
+              </div>
+              <p className="text-[13px] leading-4 text-muted">В другие дни отчёт сдать можно — без очков и без штрафа</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="День начинается">
+                <TimeField label="День начинается в" value={report.work_start} step={15} onChange={(work_start) => set({ work_start })} />
+              </Field>
+              <Field label="Напомнить в">
+                <TimeField label="Напомнить про отчёт в" value={report.remind_at} step={15} onChange={(remind_at) => set({ remind_at })} />
+              </Field>
+            </div>
+            <p className="text-[13px] leading-[18px] text-muted">
+              {draft.points_enabled
+                ? `Очки: +${rules.daily_report} за сданный, −${rules.daily_report_missed} за несданный — в «Очки и рейтинг».`
+                : "Очки выключены: отчёты без +1 и без штрафа."}
+            </p>
+          </>
+        ) : null}
+      </div>
+      {dirty.daily_report ? (
+        <SectionActions
+          pending={saving("daily_report")}
+          onSave={() =>
+            save({
+              daily_report: { enabled: report.enabled, workdays: report.workdays, work_start: report.work_start, remind_at: report.remind_at },
+            })
+          }
+          onReset={() => update({ daily_report: server.daily_report })}
         />
       ) : null}
     </Disclosure>

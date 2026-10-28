@@ -9,6 +9,7 @@ import { CompanyForm } from "@/components/settings/CompanyForm";
 import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
 import { DirtyDot, SETTINGS_TAB_META, SETTINGS_THUMB, SettingsTiles } from "@/components/settings/SettingsTiles";
+import { ReportsIcon } from "@/components/daily-report/icons";
 import {
   BookIcon,
   CalendarIcon,
@@ -22,6 +23,7 @@ import {
 } from "@/components/settings/icons";
 import {
   ConventionsSection,
+  DailyReportSection,
   DictionarySection,
   MascotSection,
   ParserSection,
@@ -280,11 +282,14 @@ function TeamPanel({ director }: { director: boolean }) {
   return (
     <>
       <div className="flex flex-col gap-2">
-        <SettingsReady bones={1}>
+        <SettingsReady bones={director ? 2 : 1}>
           <PointsSection />
+          {/* the daily report is the director's policy (D-152): days, reminder, the module switch */}
+          {director ? <DailyReportSection /> : null}
         </SettingsReady>
         <RowGroup>
           {director ? <Row icon={<LoadIcon />} title="Загрузка команды" value="кто чем занят" href="/people" /> : null}
+          {director ? <Row icon={<ReportsIcon />} title="Отчёты" value="кто что сделал за день" href="/reports" /> : null}
           <Row icon={<PodiumIcon />} title="Рейтинг" value="очки и динамика" href="/rating" />
           <Row icon={<GiftIcon />} title="Магазин" value="награды и выдача" href="/shop" />
           {/* how the director calls people lives with the words of the dictionary (D-111) */}

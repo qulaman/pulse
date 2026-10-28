@@ -151,12 +151,14 @@ const SECTIONS: Record<TabRole, Record<string, string>> = {
     "/shop": "/settings",
     "/rating": "/settings",
     "/admin": "/settings",
+    "/reports": "/settings",
     "/secretary": "/settings",
     "/ether": "/pulse",
     "/confirm": "/pulse",
   },
-  employee: { "/ether": "/feed", "/shop": "/rating" },
-  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings", "/secretary": "/settings" },
+  // the daily report (D-152) lives in «Дела»
+  employee: { "/ether": "/feed", "/shop": "/rating", "/report": "/tasks" },
+  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings", "/secretary": "/settings", "/report": "/tasks" },
 };
 
 /** The role's tabs; `lab` — the company is testing, so the team's bar carries «Лаб» too (D-150). */
