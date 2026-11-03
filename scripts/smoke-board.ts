@@ -4,6 +4,7 @@
  * land on the board as a recoloured tile — no reload, no refetch on the hot path.
  * Measures the latency from the employee's call to the painted tile.
  *   pnpm smoke:board            (against http://localhost:3000, APP_URL to override)
+ *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
  * Talks to the dev project with the demo accounts; creates its own task («Board smoke …»)
  * and touches nothing else. Refuses to run while somebody else is active on dev
  * (FORCE=1 overrides). Screenshots land in SHOTS_DIR (default ./.smoke-ui/board).
@@ -21,6 +22,7 @@ const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "board")
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
 const PASSWORD = "demo1234";
 /** What «мгновенно» means here: the employee's call is answered and the tile has changed within this. */
 const LATENCY_LIMIT_MS = Number(process.env.BOARD_LATENCY_MS ?? "1500");
@@ -92,7 +94,7 @@ async function main() {
   await guardActivity();
   // the same person as in the browser: only the task author's reply closes a question (trigger 3)
   const director = await signIn("test@demo.local", "1");
-  const marat = await signIn("marat@demo.local");
+  const employee = await signIn(EMPLOYEE);
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   // a tablet width: the board (tiles in lanes) is what this smoke reads; the phone gets the deck (D-60)
@@ -121,7 +123,7 @@ async function main() {
       payload: {
         source: "typed",
         transcript: title,
-        confirmed_entities: [{ kind: "task", assignee_id: marat.userId, group_id: null, title, body: null, deadline_iso: null, priority: "normal", scheduled_send_at: null }],
+        confirmed_entities: [{ kind: "task", assignee_id: employee.userId, group_id: null, title, body: null, deadline_iso: null, priority: "normal", scheduled_send_at: null }],
         was_edited: false,
         edit_fields: [],
         force_now: true,
@@ -144,8 +146,8 @@ async function main() {
 
     // ---- accepted: patched from the payload, the assistant comments ---------------------
     const t1 = Date.now();
-    const accepted = await marat.supabase.rpc("transition_task", { task_id: taskId, to_status: "accepted", payload: {}, client_request_id: randomUUID() });
-    record("марат: принял", !accepted.error, accepted.error?.message ?? "ok");
+    const accepted = await employee.supabase.rpc("transition_task", { task_id: taskId, to_status: "accepted", payload: {}, client_request_id: randomUUID() });
+    record("сотрудник: принял", !accepted.error, accepted.error?.message ?? "ok");
     const acceptedIn = await until(page, taskId, "data-status", "accepted", t1);
     record("плитка перекрасилась в «в работе» без запроса", acceptedIn !== null && acceptedIn <= LATENCY_LIMIT_MS, acceptedIn === null ? "timeout" : `${acceptedIn} ms (limit ${LATENCY_LIMIT_MS})`);
     await page.waitForTimeout(300);
@@ -154,15 +156,15 @@ async function main() {
 
     // ---- a question: the tile moves to the question lane with quick answers --------------
     const t2 = Date.now();
-    const asked = await marat.supabase.from("task_messages").insert({
+    const asked = await employee.supabase.from("task_messages").insert({
       task_id: taskId,
       company_id: (await director.supabase.from("tasks").select("company_id").eq("id", taskId).single()).data?.company_id,
-      sender_id: marat.userId,
+      sender_id: employee.userId,
       type: "text",
       content: `Какой формат? ${stamp}`,
       meta: { is_question: true },
     });
-    record("марат: спросил", !asked.error, asked.error?.message ?? "ok");
+    record("сотрудник: спросил", !asked.error, asked.error?.message ?? "ok");
     const questionIn = await until(page, taskId, "data-lane", "question", t2);
     record("плитка переехала в «вопрос» с чипами ответа", questionIn !== null && questionIn <= LATENCY_LIMIT_MS, questionIn === null ? "timeout" : `${questionIn} ms`);
     await page.screenshot({ path: join(SHOTS, "b2-question.png") });
@@ -176,8 +178,8 @@ async function main() {
 
     // ---- handed in: the review lane with «Принято» on the tile --------------------------
     const t4 = Date.now();
-    const done = await marat.supabase.rpc("transition_task", { task_id: taskId, to_status: "pending_review", payload: {}, client_request_id: randomUUID() });
-    record("марат: сдал", !done.error, done.error?.message ?? "ok");
+    const done = await employee.supabase.rpc("transition_task", { task_id: taskId, to_status: "pending_review", payload: {}, client_request_id: randomUUID() });
+    record("сотрудник: сдал", !done.error, done.error?.message ?? "ok");
     const reviewIn = await until(page, taskId, "data-lane", "review", t4);
     record("плитка переехала в «на приёмке»", reviewIn !== null && reviewIn <= LATENCY_LIMIT_MS, reviewIn === null ? "timeout" : `${reviewIn} ms`);
     await page.screenshot({ path: join(SHOTS, "b3-review.png") });

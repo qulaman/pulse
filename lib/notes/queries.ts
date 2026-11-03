@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
+import { useRealtimeListener, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 
@@ -73,12 +73,40 @@ export function warmNotes(client: QueryClient, userId: string): Promise<void> {
 }
 
 /**
+ * A note deleted for good — «Удалить навсегда» or the bin's purge (`notes_purge_trash`), here or
+ * on another device — leaves the cache at once. Realtime delivers no DELETE to a filtered channel
+ * and `useNotes` listens on `user_id=eq.<me>`, so this channel has no filter and takes DELETE only:
+ * the event carries the id alone, and an id that is not in the list changes nothing.
+ */
+function useNoteDeletes(userId: string | undefined) {
+  const queryClient = useQueryClient();
+  useRealtimeListener<Note>(
+    { table: "notes", event: "DELETE" },
+    (payload) => {
+      const id = (payload.old as Partial<Note> | undefined)?.id;
+      if (!id || !userId) return;
+      const key = noteKeys.mine(userId);
+      if (!queryClient.getQueryData<Note[]>(key)?.some((note) => note.id === id)) return;
+      queryClient.setQueryData<Note[]>(key, (rows) => (rows ?? []).filter((note) => note.id !== id));
+      void queryClient.invalidateQueries({ queryKey: noteKeys.count(userId) });
+    },
+    // nothing to catch up on: a delete missed while the socket was down is dropped by the
+    // snapshot `useNotes` takes on resubscribe
+    () => {},
+    "note-deletes",
+    Boolean(userId),
+  );
+}
+
+/**
  * The director's own notes, live — the feed, «В деле» and the bin in one cache: a soft
  * delete moves a row to the bin and «Вернуть» moves it back, both as an UPDATE (D-81).
  * The Realtime filter narrows the socket to this author and RLS narrows it again on
- * the server — a note is private to whoever wrote it (D-75 §3).
+ * the server — a note is private to whoever wrote it (D-75 §3). Deletes for good come on
+ * their own unfiltered channel (`useNoteDeletes`).
  */
 export function useNotes(userId: string | undefined) {
+  useNoteDeletes(userId);
   return useRealtimeQuery<Note[], Note>({
     queryKey: noteKeys.mine(userId ?? ""),
     queryFn: () => fetchNotes(userId as string),

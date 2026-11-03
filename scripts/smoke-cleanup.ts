@@ -6,6 +6,7 @@
  * (FORCE=1 overrides). The reset wipes the whole company's activity: never run it with
  * RESET=1 while the owner is testing.
  *   pnpm smoke:cleanup            (against http://localhost:3000, APP_URL to override)
+ *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { mkdirSync } from "node:fs";
@@ -20,6 +21,7 @@ const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "cleanup
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
 
 if (!SUPABASE_URL || !ANON_KEY) {
   console.error("NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are missing in .env.local");
@@ -85,7 +87,7 @@ async function createTask(director: Session, assigneeId: string, title: string):
 async function main() {
   await guardActivity();
   const director = await signIn("test@demo.local", "1");
-  const marat = await signIn("marat@demo.local", "demo1234");
+  const employee = await signIn(EMPLOYEE, "demo1234");
   const stamp = Date.now().toString(36);
 
   const browser = await chromium.launch({ channel: "chrome", headless: true });
@@ -96,7 +98,7 @@ async function main() {
     await login(page, "test@demo.local", "1");
 
     // ---- delete one order from its page ---------------------------------------------
-    const doomed = await createTask(director, marat.userId, `Cleanup smoke delete ${stamp}`);
+    const doomed = await createTask(director, employee.userId, `Cleanup smoke delete ${stamp}`);
     await page.goto(`${APP_URL}/tasks/${doomed}`, { waitUntil: "networkidle" });
     // an open task keeps «Удалить» under «Все действия» (D-87)
     await page.getByRole("button", { name: "Все действия" }).click();
@@ -111,7 +113,7 @@ async function main() {
     record("«Удалить» на карточке: задача исчезла из базы", stillThere === null, `left the page for ${new URL(page.url()).pathname}`);
 
     // ---- purge the closed stack on «Задачи» --------------------------------------------
-    const closed = await Promise.all([1, 2].map((n) => createTask(director, marat.userId, `Cleanup smoke closed ${n} ${stamp}`)));
+    const closed = await Promise.all([1, 2].map((n) => createTask(director, employee.userId, `Cleanup smoke closed ${n} ${stamp}`)));
     for (const id of closed) {
       const revoked = await director.supabase.rpc("revoke_task", { task_id: id, client_request_id: randomUUID() });
       if (revoked.error) throw new Error(`revoke_task: ${revoked.error.message}`);
@@ -136,7 +138,7 @@ async function main() {
     const visible = await resetButton.isVisible().catch(() => false);
     record("настройки: раздел «Демо» с кнопкой обнуления виден (NEXT_PUBLIC_DEMO_MODE=1)", visible);
     if (visible && process.env.RESET === "1") {
-      await createTask(director, marat.userId, `Cleanup smoke reset ${stamp}`);
+      await createTask(director, employee.userId, `Cleanup smoke reset ${stamp}`);
       await resetButton.click();
       const dialog = page.getByRole("dialog");
       await dialog.waitFor({ timeout: 5_000 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { onlineManager, useMutationState, useQueryClient } from "@tanstack/react-query";
+import { notifyManager, onlineManager, useMutationState, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { humanAqtobe } from "@/lib/ai/time";
@@ -23,7 +23,8 @@ export function useOnline(): boolean {
 function useLatestFetch(): number | null {
   const queryClient = useQueryClient();
   return useSyncExternalStore(
-    (onChange) => queryClient.getQueryCache().subscribe(onChange),
+    // scheduled: a cache write in another component's render (RoleScope seeds `me`) reaches us after it
+    (onChange) => queryClient.getQueryCache().subscribe(() => notifyManager.schedule(onChange)),
     () => latestFetch(queryClient),
     () => null,
   );

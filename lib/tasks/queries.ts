@@ -269,8 +269,12 @@ export function warmMyTasks(client: QueryClient, userId: string): Promise<void> 
   return client.prefetchQuery({ queryKey: taskKeys.mine(userId), queryFn: () => fetchMyTasks(userId) });
 }
 
-/** Everything the director sent, newest first — «Отправленные». Scheduled ones included (author sees them). */
+/**
+ * Everything the director sent, newest first — «Отправленные». Scheduled ones included (author
+ * sees them). Deletes come on their own unfiltered channel (`useTaskDeletes`).
+ */
 export function useSentTasks(userId: string | undefined) {
+  useTaskDeletes(Boolean(userId));
   return useRealtimeQuery<TaskWithPeople[], TaskRow>({
     queryKey: taskKeys.sent(userId ?? ""),
     queryFn: () => fetchSentTasks(userId as string),

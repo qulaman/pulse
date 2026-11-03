@@ -4,6 +4,7 @@
  * sheet slides in and out. Every layout-shift entry counts, including the ones a
  * browser would forgive right after a tap: that is exactly where the jank lives.
  *   pnpm smoke:jank            (against http://localhost:3000, APP_URL to override)
+ *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
  * Screenshots land in SHOTS_DIR (default ./.smoke-ui).
  */
 import { chromium, type Page } from "playwright";
@@ -12,6 +13,7 @@ import { join } from "node:path";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
+const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
 /** Cumulative shift allowed per interaction; 0.05 is well under the "good" CLS bar of 0.1. */
 const LIMIT = Number(process.env.JANK_LIMIT ?? "0.05");
 const SETTLE_MS = 1_500;
@@ -187,7 +189,7 @@ async function main() {
   await employee.addInitScript(COLLECTOR);
   const epage = await employee.newPage();
   lastPage = epage;
-  await login(epage, "marat@demo.local", "demo1234");
+  await login(epage, EMPLOYEE, "demo1234");
   await epage.goto(`${APP_URL}/tasks`, { waitUntil: "networkidle" });
   await epage.waitForTimeout(SETTLE_MS);
   await epage.screenshot({ path: join(SHOTS, "j4-tasks.png") });

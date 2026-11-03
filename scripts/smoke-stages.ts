@@ -18,6 +18,7 @@
  *   pnpm smoke:stages                        (against http://localhost:3000, APP_URL to override)
  *   ROLE=director|employee|secretary|all     (default all)   ROUTES=/pulse,/sent  (filter)
  *   SCENARIOS=nav,cold   SHEETS=1 (a sheet per route: stages side by side + red/cyan overlay)
+ *   SECRETARY=marat@demo.local (default) — any demo secretary with the demo password
  * Read-only: signs in with the demo accounts and navigates; held requests are released,
  * never failed. Screenshots land in SHOTS_DIR (default ./.smoke-ui/stages).
  */
@@ -36,6 +37,7 @@ const ROLE = process.env.ROLE ?? "all";
 const ONLY = process.env.ROUTES?.split(",").filter(Boolean) ?? null;
 const SCENARIOS = (process.env.SCENARIOS ?? "nav,cold").split(",");
 const SHEETS = process.env.SHEETS === "1";
+const SECRETARY = process.env.SECRETARY ?? "marat@demo.local";
 /** px a block may drift between stages: rounding, never a visible jump. */
 const TOLERANCE = 2;
 
@@ -69,7 +71,7 @@ const ACCOUNTS: Account[] = [
   },
   {
     role: "secretary",
-    email: "marat@demo.local",
+    email: SECRETARY,
     password: "demo1234",
     // «Команда» sends the secretary to the roster in «Настройки» (D-104): a redirect, not a screen
     routes: () => ["/feed", "/secretary", "/settings", "/rating", "/profile"],
