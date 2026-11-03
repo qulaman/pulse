@@ -32,6 +32,7 @@ import {
   SttSection,
   WindowSection,
 } from "@/components/settings/sections";
+import { VoiceRetentionSection } from "@/components/settings/VoiceRetentionSection";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 import { Button } from "@/components/ui/Button";
 import { TeamListBone } from "@/components/ui/PageSkeletons";
@@ -100,8 +101,8 @@ function TabsBody({ initialTab, director }: { initialTab: SettingsTab; director:
   const dirty: Record<SettingsTab, boolean> = {
     company: companyDirty || !!sections.window,
     app: !!(sections.secretary || sections.mascot),
-    team: !!sections.points,
-    ai: !!(sections.stt || sections.parser || sections.conventions),
+    team: !!(sections.points || sections.daily_report),
+    ai: !!(sections.stt || sections.parser || sections.conventions || sections.voice_retention),
   };
 
   const top = useHeaderHeight();
@@ -323,15 +324,16 @@ function TeamPanel({ director }: { director: boolean }) {
   );
 }
 
-/** How a voice becomes work: hearing it, reading it, the company's words and deadlines. */
+/** How a voice becomes work: hearing it, reading it, the company's words and deadlines — and how long the recording stays. */
 function AiPanel() {
   return (
-    <SettingsReady bones={4}>
+    <SettingsReady bones={5}>
       <div className="flex flex-col gap-2">
         <SttSection />
         <ParserSection />
         <DictionarySection />
         <ConventionsSection />
+        <VoiceRetentionSection />
       </div>
     </SettingsReady>
   );

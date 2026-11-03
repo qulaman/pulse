@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { KeepChip, useRecordings } from "@/components/lab/KeepChip";
 import { Button } from "@/components/ui/Button";
 import { SectionBone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
@@ -11,6 +12,7 @@ import type { LabCall, LabResponse, LabRow } from "@/lib/lab/rows";
 import type { CompanySettings } from "@/lib/settings";
 // labels only — lib/settings.ts itself would bring zod into this page (D-126)
 import { PARSER_MODEL_LABEL, PARSER_MODELS, STT_PROVIDER_LABEL, STT_PROVIDERS } from "@/lib/settings-plain";
+import { useMe } from "@/lib/tasks/queries";
 
 type LabSettings = LabResponse["settings"];
 
@@ -282,6 +284,10 @@ function SummaryCard({ rows }: { rows: LabRow[] }) {
 }
 
 function RowsTable({ rows }: { rows: LabRow[] }) {
+  // «В корпус» is the director's (D-155 §3): the rows heard by STT, linked to their recording
+  const me = useMe();
+  const crids = rows.flatMap((row) => (row.stt && row.client_request_id ? [row.client_request_id] : []));
+  const recordings = useRecordings(crids, me.data?.role === "director").data;
   return (
     <section className="card p-4">
       <h2 className="text-[19px] font-semibold leading-6">Расходы по распознаваниям</h2>
@@ -325,6 +331,11 @@ function RowsTable({ rows }: { rows: LabRow[] }) {
                   row.parse.calls.map((call, i) => <CallLine key={i} call={call} />)
                 )}
               </div>
+              {row.client_request_id && recordings?.get(row.client_request_id) ? (
+                <div className="mt-2">
+                  <KeepChip crids={crids} crid={row.client_request_id} recording={recordings.get(row.client_request_id)!} />
+                </div>
+              ) : null}
             </li>
           ))}
         </ul>

@@ -1,6 +1,7 @@
 import { apiError, apiOk } from "@/lib/api/respond";
 import { sweepDeliveries } from "@/lib/push/send";
 import { createServiceSupabase } from "@/lib/supabase/service";
+import { purgeVoice } from "@/lib/voice/retention";
 
 /** One tick may drain a long queue (an announcement to the whole company); the platform allows a minute. */
 export const maxDuration = 60;
@@ -77,6 +78,9 @@ export async function POST(req: Request) {
     // the wall's feed lives on its last month (tv_events_prune, 30 days by default); the
     // function existed since D-76 but nothing called it, so the table only grew (D-126)
     const tvPruned = await tick(service, "tv_events_prune");
+    // voice files past their term (D-155 §3): removed through Storage, then their paths cleared;
+    // a failure is logged inside and the sweep goes on — what stayed comes again next time
+    const voicePurged = await purgeVoice(service);
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
@@ -96,6 +100,7 @@ export async function POST(req: Request) {
       team,
       summaries,
       tv_pruned: tvPruned,
+      voice_purged: voicePurged,
       digests,
       purged,
     });

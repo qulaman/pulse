@@ -107,7 +107,8 @@ export function MessageRow({ message, mine, onRetry }: { message: TaskMessage; m
           </p>
         ) : null}
         {message.type === "photo" && message.file_path && state === "sent" ? <PhotoMessage messageId={message.id} /> : null}
-        {message.type === "voice" && state === "sent" ? (
+        {/* no file — the recording was purged after its term (D-155 §3): no player to fail on tap */}
+        {message.type === "voice" && message.file_path && state === "sent" ? (
           <VoiceMessage messageId={message.id} durationMs={durationOf(message)} />
         ) : null}
 
