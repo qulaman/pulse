@@ -13,7 +13,7 @@ import {
   formProblem,
   hmOf,
   isoAt,
-  pointsText,
+  pointsHint,
   SUMMARY_MAX,
   timeOf,
 } from "@/lib/daily-report/format";
@@ -80,6 +80,8 @@ export function MyReportView({
 }) {
   const state = dayState(day);
   const past = history?.filter((report) => report.report_date !== day.date);
+  // D-155 §1: before the first report handed in, a miss is not fined — the form says so
+  const handedInBefore = past ? past.some((report) => report.status === "submitted") : undefined;
 
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
@@ -91,7 +93,7 @@ export function MyReportView({
       />
 
       {day.enabled ? (
-        <ReportForm key={day.date} day={day} onSubmit={onSubmit} waiting={waiting} pop={pop} />
+        <ReportForm key={day.date} day={day} handedInBefore={handedInBefore} onSubmit={onSubmit} waiting={waiting} pop={pop} />
       ) : (
         <div className="card-in mt-3 flex flex-col items-center rounded-[20px] border border-border/70 px-6 py-9 text-center" data-testid="reports-off">
           <Mascot state="calm" size={56} />
@@ -108,11 +110,14 @@ export function MyReportView({
 
 function ReportForm({
   day,
+  handedInBefore,
   onSubmit,
   waiting,
   pop,
 }: {
   day: MyDailyReportDay;
+  /** A report handed in on an earlier day; undefined while the past days load. */
+  handedInBefore: boolean | undefined;
   onSubmit: (input: SubmitDailyReportInput) => void;
   waiting: boolean;
   pop: Pop | null;
@@ -141,7 +146,10 @@ function ReportForm({
   const arrivedIso = arrived ? isoAt(day.date, arrived) : null;
   const leftIso = left ? isoAt(day.date, left) : null;
   const length = durationText(arrivedIso, leftIso);
-  const problem = formProblem(arrivedIso, leftIso, summary);
+  // D-155 §7: the day's tasks are the report already — the words may stay empty then
+  const hasTasks = day.tasks.length > 0;
+  const problem = formProblem(arrivedIso, leftIso, summary, hasTasks);
+  const wordsMissing = !summary.trim() && !hasTasks;
   const dirty =
     !saved || (saved.summary ?? "").trim() !== summary.trim() || hmOf(saved.arrived_at) !== arrived || hmOf(saved.left_at) !== left;
 
@@ -163,7 +171,7 @@ function ReportForm({
   const submit = () => {
     setTried(true);
     if (problem || !arrivedIso || !leftIso) {
-      if (arrivedIso && leftIso && !summary.trim()) field.current?.focus();
+      if (arrivedIso && leftIso && wordsMissing) field.current?.focus();
       return;
     }
     onSubmit({ arrived_at: arrivedIso, left_at: leftIso, summary: summary.trim(), client_request_id: crypto.randomUUID() });
@@ -212,6 +220,12 @@ function ReportForm({
 
       <label htmlFor="report-summary" className="eyebrow mt-6 block px-1">
         Чем занимался
+        {hasTasks ? (
+          <span className="font-normal normal-case tracking-normal text-muted" data-testid="report-summary-optional">
+            {" "}
+            · необязательно — задачи дня уже в отчёте
+          </span>
+        ) : null}
       </label>
       <textarea
         id="report-summary"
@@ -224,8 +238,8 @@ function ReportForm({
         }}
         placeholder="Пара строк: что сделано, где были, что мешало"
         autoCapitalize="sentences"
-        aria-invalid={tried && !summary.trim() ? true : undefined}
-        className={`${FIELD} mt-2 resize-none ${tried && !summary.trim() ? "border-danger" : ""}`}
+        aria-invalid={tried && wordsMissing ? true : undefined}
+        className={`${FIELD} mt-2 resize-none ${tried && wordsMissing ? "border-danger" : ""}`}
         data-testid="report-summary"
       />
       {summary.length > SUMMARY_MAX - 500 ? (
@@ -260,10 +274,12 @@ function ReportForm({
           {dirty ? "Сохраню поверх сданного — очки второй раз не начисляются" : "Можно поправить до конца дня"}
         </p>
       ) : day.workday && day.points.enabled ? (
-        <p className="nums mt-2 px-1 text-center text-[13px] leading-[18px] text-muted">
-          {[day.points.reward ? `${pointsText(day.points.reward)} за сданный` : "", day.points.penalty ? `${pointsText(-day.points.penalty)}, если не сдать до конца дня` : ""]
-            .filter(Boolean)
-            .join(" · ")}
+        <p className="nums mt-2 px-1 text-center text-[13px] leading-[18px] text-muted" data-testid="report-points-hint">
+          {pointsHint(day, handedInBefore).map((line) => (
+            <span key={line} className="block">
+              {line}
+            </span>
+          ))}
         </p>
       ) : null}
     </>

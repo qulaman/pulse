@@ -16,6 +16,7 @@ import {
   lengthText,
   periodOf,
   personDayLine,
+  pointsHint,
   pointsText,
   rangeText,
   taskMeta,
@@ -43,6 +44,7 @@ const day = (patch: Partial<MyDailyReportDay> = {}): MyDailyReportDay => ({
   date: "2026-10-28",
   today: true,
   workday: true,
+  holiday: false,
   enabled: true,
   report: null,
   tasks: [],
@@ -115,6 +117,23 @@ describe("the employee's day", () => {
     expect(entryState(day({ workday: false })).text).toBe("выходной");
   });
 
+  it("names a company holiday where it names a day off (D-155 §7)", () => {
+    const holiday = day({ workday: false, holiday: true });
+    expect(dayState(holiday)).toEqual({ tone: "none", text: "Праздник — отчёт сегодня не нужен" });
+    expect(entryState(holiday)).toEqual({ tone: "muted", text: "праздник" });
+    // a report handed in on the holiday still says when it went
+    expect(dayState({ ...holiday, report: report({ points: 0 }) }).text).toBe("Сдан в 18:04");
+  });
+
+  it("promises a minus only where the miss costs one (D-155 §1)", () => {
+    expect(pointsHint(day(), true)).toEqual(["+1 за сданный · −10, если не сдать до конца дня"]);
+    const first = day({ points: { enabled: true, reward: 1, penalty: 0 } });
+    expect(pointsHint(first, false)).toEqual(["+1 за сданный", "Пока не сдан первый отчёт, пропуск не штрафуется"]);
+    // the past days still loading, or a company without a fine: nothing about a minus
+    expect(pointsHint(first, undefined)).toEqual(["+1 за сданный"]);
+    expect(pointsHint(first, true)).toEqual(["+1 за сданный"]);
+  });
+
   it("points and lines of a past day", () => {
     expect(pointsText(1)).toBe("+1");
     expect(pointsText(-10)).toBe("−10");
@@ -122,6 +141,8 @@ describe("the employee's day", () => {
     const tasks = [1, 2, 3].map((i) => ({ id: `t${i}`, title: "x", status: "done" as const, completed_at: null, closed_at: null, on_time: true }));
     expect(historyLine(report({ tasks }))).toBe("сдан · 8 ч 40 мин · 3 задачи · +1");
     expect(historyLine(report({ status: "missed", points: -10, arrived_at: null, left_at: null }))).toBe("не сдан · −10");
+    // a minus given back — by «Оспорить» or by the D-155 refund — nets the day to 0
+    expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null }))).toBe("не сдан");
   });
 
   it("says a task's state and its deadline", () => {
@@ -138,6 +159,16 @@ describe("the employee's day", () => {
     expect(formProblem(b, a, "Сверка")).toBe("«Ушёл» должно быть позже «Пришёл»");
     expect(formProblem(a, b, "   ")).toBe("Напишите, чем занимались");
     expect(formProblem(a, b, "x".repeat(4001))).toBe("Слишком длинно: до 4000 знаков");
+  });
+
+  it("asks for words only on a day without tasks (D-155 §7)", () => {
+    const a = "2026-10-28T09:00:00+05:00";
+    const b = "2026-10-28T18:00:00+05:00";
+    expect(formProblem(a, b, "   ", true)).toBeNull();
+    expect(formProblem(a, b, "", false)).toBe("Напишите, чем занимались");
+    // the times and the length still count with tasks
+    expect(formProblem(b, a, "", true)).toBe("«Ушёл» должно быть позже «Пришёл»");
+    expect(formProblem(a, b, "x".repeat(4001), true)).toBe("Слишком длинно: до 4000 знаков");
   });
 
   it("finds our codes in the database's words", () => {

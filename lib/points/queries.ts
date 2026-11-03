@@ -59,6 +59,10 @@ export type PointRow = {
   reason: string;
   source: string;
   created_at: string;
+  /** The automatic rule (`daily_report_missed`, `daily_report_missed_refund`, …); null for the rest. */
+  rule_code?: string | null;
+  /** The daily report a rule row is for (D-152): a minus and its refund share it (D-155 §1). */
+  daily_report_id?: string | null;
 };
 
 /**
@@ -100,7 +104,7 @@ export function usePointHistory(userId: string | undefined) {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase
         .from("point_transactions")
-        .select("id, amount, reason, source, created_at")
+        .select("id, amount, reason, source, created_at, rule_code, daily_report_id")
         .eq("user_id", userId as string)
         .order("created_at", { ascending: false })
         .limit(50);

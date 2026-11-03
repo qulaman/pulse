@@ -165,16 +165,36 @@ export function dayState(day: MyDailyReportDay): { tone: DayTone; text: string }
     const points = pointsText(report.points);
     return { tone: "ok", text: [`Сдан в ${timeOf(report.submitted_at)}`, points].filter(Boolean).join(" · ") };
   }
+  // a company holiday (D-155 §7) is a day off too, said by its name
+  if (day.holiday) return { tone: "none", text: "Праздник — отчёт сегодня не нужен" };
   if (!day.workday) return { tone: "none", text: "Выходной — можно сдать, без очков" };
   // today is not over: a calm «to do», not an alarm
   return { tone: "accent", text: "Не сдан" };
 }
 
-/** The same state in two words for the row in «Дела»: «сдан ✓» / «не сдан» / «выходной». */
+/** The same state in two words for the row in «Дела»: «сдан ✓» / «не сдан» / «выходной» / «праздник». */
 export function entryState(day: MyDailyReportDay): { tone: "ok" | "accent" | "muted"; text: string } {
   if (day.report?.status === "submitted") return { tone: "ok", text: `сдан в ${timeOf(day.report.submitted_at)}` };
+  if (day.holiday) return { tone: "muted", text: "праздник" };
   if (!day.workday) return { tone: "muted", text: "выходной" };
   return { tone: "accent", text: "не сдан" };
+}
+
+/**
+ * What the form says under the button on a working day before the first submit: «+1 за сданный ·
+ * −10, если не сдать до конца дня». A miss that costs this person nothing (D-155 §1: no report
+ * before today) promises no minus — before the first report the line says so instead.
+ * `handedInBefore` — a report handed in on an earlier day; undefined while the past days load.
+ */
+export function pointsHint(day: MyDailyReportDay, handedInBefore: boolean | undefined): string[] {
+  const promise = [
+    day.points.reward ? `${pointsText(day.points.reward)} за сданный` : "",
+    day.points.penalty ? `${pointsText(-day.points.penalty)}, если не сдать до конца дня` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const soft = !day.points.penalty && handedInBefore === false ? "Пока не сдан первый отчёт, пропуск не штрафуется" : "";
+  return [promise, soft].filter(Boolean);
 }
 
 /** The longest «Чем занимался» the database keeps. */
@@ -183,12 +203,13 @@ export const SUMMARY_MAX = 4000;
 /**
  * What stops the form from going, in the words the person needs — checked on the phone so the
  * common slips never cost a round trip; the database checks the same (`DailyReportError`).
+ * `hasTasks` — the day has tasks: they are the report already, the words may stay empty (D-155 §7).
  */
-export function formProblem(arrived: string | null, left: string | null, summary: string): string | null {
+export function formProblem(arrived: string | null, left: string | null, summary: string, hasTasks = false): string | null {
   if (!arrived || !left) return "Укажите, когда пришли и ушли";
   const minutes = minutesBetween(arrived, left);
   if (minutes === null || minutes <= 0) return "«Ушёл» должно быть позже «Пришёл»";
-  if (!summary.trim()) return "Напишите, чем занимались";
+  if (!summary.trim() && !hasTasks) return "Напишите, чем занимались";
   if (summary.trim().length > SUMMARY_MAX) return `Слишком длинно: до ${SUMMARY_MAX} знаков`;
   return null;
 }

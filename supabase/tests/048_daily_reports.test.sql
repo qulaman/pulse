@@ -228,8 +228,9 @@ select results_eq(
   $$select (d ->> 'today')::boolean, (d -> 'report' ->> 'points')::int,
            (d -> 'points' ->> 'reward')::int, (d -> 'points' ->> 'penalty')::int
       from (select my_daily_report()::jsonb as d) x$$,
-  $$values (true, 1, 1, 10)$$,
-  'the person''s screen: today, the report brought +1, the rules are 1 and 10'
+  -- D-155 п.1: no report before today, so a miss would cost this person nothing yet
+  $$values (true, 1, 1, 0)$$,
+  'the person''s screen: today, the report brought +1, the reward is 1, no fine before the first report'
 );
 
 set local role postgres;
@@ -487,12 +488,12 @@ select results_eq(
   $$select today, 'missed'::text from d152$$,
   'a working day without a report is written as missed'
 );
-select results_eq(
-  $$select pt.amount, pt.source::text, pt.rule_code, pt.reason
-      from point_transactions pt join daily_reports r on r.id = pt.daily_report_id
-     where r.user_id = '10000000-0000-0000-0000-000000000005'$$,
-  $$select -10, 'auto_rule'::text, 'daily_report_missed'::text, 'не сдан отчёт за ' || to_char(today, 'DD.MM') from d152$$,
-  'and costs −10, by the rule, with the day in the reason'
+-- D-155 п.1: Ерлан Б. has never handed in a report — the day is missed, the minus is not taken
+select is(
+  (select count(*)::int from point_transactions pt join daily_reports r on r.id = pt.daily_report_id
+    where r.user_id = '10000000-0000-0000-0000-000000000005'),
+  0,
+  'and costs nothing: no fine before the first report handed in'
 );
 select results_eq(
   $$select status, (select count(*)::int from point_transactions pt
@@ -527,11 +528,12 @@ select is(
   'the tick again: nothing more'
 );
 set local role postgres;
+-- D-155 п.1: still no minus for one who never handed in
 select is(
   (select count(*)::int from point_transactions pt join daily_reports r on r.id = pt.daily_report_id
     where r.user_id = '10000000-0000-0000-0000-000000000005'),
-  1,
-  'still one −10'
+  0,
+  'still no minus'
 );
 
 set local role authenticated;
@@ -540,8 +542,9 @@ select results_eq(
   $$select e ->> 'status', (e ->> 'points')::int
       from jsonb_array_elements(my_daily_report_history()::jsonb) e, d152
      where (e ->> 'report_date')::date = d152.today$$,
-  $$values ('missed'::text, -10)$$,
-  'the person''s history: not handed in, −10'
+  -- D-155 п.1: missed, without a minus
+  $$values ('missed'::text, 0)$$,
+  'the person''s history: not handed in, no minus'
 );
 
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
@@ -556,8 +559,9 @@ select results_eq(
   $$select (r ->> 'submitted')::int, (r ->> 'missed')::int, (r ->> 'points')::int
       from jsonb_array_elements(team_daily_report_period((select today - 6 from d152), (select today from d152))::jsonb -> 'rows') r
      where r ->> 'user_id' = '10000000-0000-0000-0000-000000000005'$$,
-  $$values (0, 1, -10)$$,
-  'the period: the one who does not — one missed, −10'
+  -- D-155 п.1: one missed, no minus before the first report
+  $$values (0, 1, 0)$$,
+  'the period: the one who does not — one missed, no minus'
 );
 
 -- ---------------------------------------------------------------------------

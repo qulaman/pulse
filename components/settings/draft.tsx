@@ -21,11 +21,26 @@ async function patchSettings(patch: SettingsPatch): Promise<CompanySettings> {
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export type SectionKey = "stt" | "parser" | "conventions" | "points" | "window" | "secretary" | "mascot" | "daily_report";
+export type SectionKey =
+  | "stt"
+  | "parser"
+  | "conventions"
+  | "points"
+  | "window"
+  | "secretary"
+  | "mascot"
+  | "daily_report"
+  | "voice_retention";
 
 /** The keys of the daily report the screen edits; `started_on` and `checked_on` are the server's (D-152). */
 function reportKeys(section: CompanySettings["daily_report"]) {
-  return { enabled: section.enabled, workdays: section.workdays, work_start: section.work_start, remind_at: section.remind_at };
+  return {
+    enabled: section.enabled,
+    workdays: section.workdays,
+    holidays: section.holidays,
+    work_start: section.work_start,
+    remind_at: section.remind_at,
+  };
 }
 
 type Draft = {
@@ -98,6 +113,7 @@ export function SettingsDraftProvider({ children }: { children: ReactNode }) {
         secretary: !same(draft.secretary, server.secretary),
         mascot: draft.mascot_seasons !== server.mascot_seasons || draft.mascot_telegraph !== server.mascot_telegraph,
         daily_report: !same(reportKeys(draft.daily_report), reportKeys(server.daily_report)),
+        voice_retention: !same(draft.voice_retention, server.voice_retention),
       },
       save: (patch) => save.mutate(patch),
       saving: (key) => save.isPending && save.variables?.[key] !== undefined,

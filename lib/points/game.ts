@@ -206,7 +206,13 @@ export function useDisputePoints(userId: string | undefined) {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "";
-      toast(message.includes("already_disputed") ? "Это начисление уже оспорено" : "Не получилось отправить. Попробуй ещё раз");
+      toast(
+        message.includes("already_disputed")
+          ? "Это начисление уже оспорено"
+          : message.includes("already_refunded")
+            ? "Этот минус уже вернули"
+            : "Не получилось отправить. Попробуй ещё раз",
+      );
     },
   });
 }

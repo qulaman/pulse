@@ -33,7 +33,10 @@ export type DailyReport = {
   tasks: DailyReportTask[];
   submitted_at: string | null;
   updated_at: string;
-  /** Points this report brought: +reward, −penalty or 0 (points off, a day off); net of a refund by «Оспорить». */
+  /**
+   * Points this report brought: +reward, −penalty or 0 (points off, a day off); net of a refund by
+   * «Оспорить» and of a minus given back because no report came before it (D-155 §1).
+   */
   points: number;
 };
 
@@ -42,8 +45,10 @@ export type MyDailyReportDay = {
   date: string;
   /** Only today's report can be submitted or edited. */
   today: boolean;
-  /** A working day by `settings.daily_report.workdays`; points only on these. */
+  /** A working day by `settings.daily_report.workdays` and not a holiday; points only on these. */
   workday: boolean;
+  /** The day is in `settings.daily_report.holidays` (D-155 §7): no report is due, no points. */
+  holiday: boolean;
   /** `settings.daily_report.enabled` — off: the screen says so and the form is hidden. */
   enabled: boolean;
   report: DailyReport | null;
@@ -51,6 +56,10 @@ export type MyDailyReportDay = {
   tasks: DailyReportTask[];
   /** Prefill: arrival — the last report's time of day or `work_start`; leaving — now. */
   suggest: { arrived_at: string; left_at: string };
+  /**
+   * `penalty` — what a miss costs this person: 0 until they have handed in a report before this
+   * day (D-155 §1), else the company's rule.
+   */
   points: { enabled: boolean; reward: number; penalty: number };
 };
 

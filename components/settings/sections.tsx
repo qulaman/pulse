@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { ReportIcon } from "@/components/daily-report/icons";
 import { ScenePicker } from "@/components/secretary/ScenePicker";
@@ -8,9 +9,12 @@ import { useDraft } from "@/components/settings/draft";
 import { BookIcon, ClockIcon, CupIcon, MicIcon, MoonIcon, ParseIcon, StarIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
+import { DateField } from "@/components/ui/datetime/DateField";
 import { TimeField } from "@/components/ui/datetime/TimeField";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
+import { kzFixedHolidays } from "@/lib/daily-report/holidays";
+import { parseYmd, todayYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 import { usePeople } from "@/lib/people/queries";
 import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
@@ -113,7 +117,8 @@ function RuleRow({ label, hint, children }: { label: string; hint?: string; chil
  * the director saves next to the field instead of hunting for one button under six
  * sections — and a half-edited section never rides along with another one's save.
  */
-function SectionActions({ pending, onSave, onReset }: { pending: boolean; onSave: () => void; onReset: () => void }) {
+/** «Сохранить» / «Отменить» under a section's edits; exported for the sections that live in their own file. */
+export function SectionActions({ pending, onSave, onReset }: { pending: boolean; onSave: () => void; onReset: () => void }) {
   return (
     <div className="card-in mt-4 flex gap-2">
       <Button block loading={pending} onClick={onSave}>
@@ -581,7 +586,7 @@ export function PointsSection() {
               <RuleRow label="+ за сданный" hint="первая сдача за рабочий день">
                 <PointsInput label="Очков за сданный отчёт" value={rules.daily_report} onChange={(v) => setRules({ daily_report: v })} />
               </RuleRow>
-              <RuleRow label="− за несданный" hint="утром за прошедший день; не в отпуске и не на больничном, можно оспорить">
+              <RuleRow label="− за несданный" hint="утром за прошедший день, тем, кто уже сдал хотя бы один отчёт; не в отпуске и не на больничном, можно оспорить">
                 <PointsInput label="Очков штрафа за несданный отчёт" value={rules.daily_report_missed} onChange={(v) => setRules({ daily_report_missed: v })} />
               </RuleRow>
             </div>
@@ -734,11 +739,93 @@ function workdaysText(days: readonly number[]): string {
   return sorted.map(label).join(", ");
 }
 
+const HOLIDAY_MONTHS = ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"] as const;
+
+/** «21 мар, сб» — a holiday chip; another year than this one is written out. */
+function holidayLabel(ymd: Ymd, thisYear: number): string {
+  const parts = parseYmd(ymd);
+  if (!parts) return ymd;
+  const weekday = WEEKDAYS_SHORT_RU[(new Date(Date.UTC(parts.year, parts.month - 1, parts.day)).getUTCDay() + 6) % 7];
+  const date = `${parts.day} ${HOLIDAY_MONTHS[parts.month - 1]}${parts.year === thisYear ? "" : ` ${parts.year}`}`;
+  return `${date}, ${weekday}`;
+}
+
+/**
+ * The company's holidays (D-155 §7): no report is due on them — no +1, no reminder, no fine. Only
+ * the days from today on are chips with «×»; the past ones stay in the list (the director's
+ * «Период» counts past days by them) and are only counted. «+ Праздники Казахстана» adds the
+ * fixed-date ones of this year — from 1 November of the next one too — without repeats.
+ */
+function HolidaysField({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Ymd[]) => void }) {
+  const [picked, setPicked] = useState<Ymd | null>(null);
+  const today = todayYmd();
+  const year = Number(today.slice(0, 4));
+  const years = today.slice(5) >= "11-01" ? [year, year + 1] : [year];
+  const upcoming = days.filter((day) => day >= today);
+  const past = days.length - upcoming.length;
+  const add = (more: readonly Ymd[]) => onChange([...new Set([...days, ...more])].sort());
+
+  return (
+    <div className="flex flex-col gap-2" data-testid="report-holidays">
+      <p className="text-[14px] font-medium leading-[18px] text-muted">Праздники</p>
+      {upcoming.length ? (
+        <div className="flex flex-wrap gap-1.5">
+          {upcoming.map((day) => {
+            const label = holidayLabel(day, year);
+            return (
+              <Chip key={day} interactive={false} className="!pr-1">
+                {label}
+                <button
+                  type="button"
+                  aria-label={`Убрать праздник ${label}`}
+                  onClick={() => onChange(days.filter((d) => d !== day))}
+                  className="-my-1 flex h-7 w-7 items-center justify-center rounded-full text-[15px] leading-none text-muted active:scale-[0.92]"
+                >
+                  ×
+                </button>
+              </Chip>
+            );
+          })}
+        </div>
+      ) : null}
+      {past ? <p className="text-[13px] leading-4 text-muted">и ещё {plural(past, "прошедшая", "прошедшие", "прошедших")}</p> : null}
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <DateField value={picked} onChange={setPicked} min={today} label="Дата праздника" placeholder="Выбрать дату" />
+        </div>
+        <Button
+          variant="secondary"
+          disabled={!picked}
+          onClick={() => {
+            if (!picked) return;
+            add([picked]);
+            setPicked(null);
+          }}
+        >
+          Добавить
+        </Button>
+      </div>
+      <div className="flex flex-wrap gap-x-2">
+        {years.map((y) => {
+          const kz = kzFixedHolidays(y);
+          return (
+            <Button key={y} variant="ghost" size="sm" className="!px-0" disabled={kz.every((day) => days.includes(day))} onClick={() => add(kz)}>
+              + Праздники Казахстана {y}
+            </Button>
+          );
+        })}
+      </div>
+      <p className="text-[13px] leading-4 text-muted">Курбан айт и переносы выходных добавьте сами</p>
+    </div>
+  );
+}
+
 /**
  * The daily report (D-152): on or off, which days are working ones (only they pay +1 and fine a
- * missing report), when the day starts (the form's «Пришёл») and when the reminder goes. Turning
- * it on starts the fines from today — the server does that; the points live with the other rules.
- * `started_on` and `checked_on` are the server's: never shown, never sent.
+ * missing report), the company's holidays (D-155 §7), when the day starts (the form's «Пришёл»)
+ * and when the reminder goes. Turning it on starts the fines from today — the server does that;
+ * the points live with the other rules. `started_on` and `checked_on` are the server's: never
+ * shown, never sent.
  */
 export function DailyReportSection() {
   const { draft, server, update, dirty, save, saving } = useDraft();
@@ -762,7 +849,11 @@ export function DailyReportSection() {
       <div className="flex flex-col gap-4">
         <Toggle
           label="Отчёты включены"
-          hint={server.daily_report.enabled ? "Выключите — ни напоминаний, ни очков, ни штрафов" : "Штрафы начнутся с сегодняшнего дня, не задним числом"}
+          hint={
+            server.daily_report.enabled
+              ? "Выключите — ни напоминаний, ни очков, ни штрафов"
+              : "Штрафы начнутся с сегодняшнего дня, не задним числом; штрафуем только тех, кто уже сдал хотя бы один отчёт"
+          }
           checked={report.enabled}
           onChange={(v) => set({ enabled: v })}
         />
@@ -782,6 +873,7 @@ export function DailyReportSection() {
               </div>
               <p className="text-[13px] leading-4 text-muted">В другие дни отчёт сдать можно — без очков и без штрафа</p>
             </div>
+            <HolidaysField days={report.holidays} onChange={(holidays) => set({ holidays })} />
             <div className="grid grid-cols-2 gap-3">
               <Field label="День начинается">
                 <TimeField label="День начинается в" value={report.work_start} step={15} onChange={(work_start) => set({ work_start })} />
@@ -792,7 +884,7 @@ export function DailyReportSection() {
             </div>
             <p className="text-[13px] leading-[18px] text-muted">
               {draft.points_enabled
-                ? `Очки: +${rules.daily_report} за сданный, −${rules.daily_report_missed} за несданный — в «Очки и рейтинг».`
+                ? `Очки: +${rules.daily_report} за сданный, −${rules.daily_report_missed} за несданный — штрафуем только тех, кто уже сдал хотя бы один отчёт. Цифры — в «Очки и рейтинг».`
                 : "Очки выключены: отчёты без +1 и без штрафа."}
             </p>
           </>
@@ -803,7 +895,13 @@ export function DailyReportSection() {
           pending={saving("daily_report")}
           onSave={() =>
             save({
-              daily_report: { enabled: report.enabled, workdays: report.workdays, work_start: report.work_start, remind_at: report.remind_at },
+              daily_report: {
+                enabled: report.enabled,
+                workdays: report.workdays,
+                holidays: report.holidays,
+                work_start: report.work_start,
+                remind_at: report.remind_at,
+              },
             })
           }
           onReset={() => update({ daily_report: server.daily_report })}

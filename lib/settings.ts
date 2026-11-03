@@ -239,16 +239,35 @@ const WorkdaysSchema = z
   .max(7)
   .transform((days) => [...new Set(days)].sort((a, b) => a - b));
 
+/** A real calendar day as "YYYY-MM-DD" (2026-02-30 is refused). */
+const DaySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((day) => {
+    // zod runs the refine after a failed regex too: a non-date must not throw here
+    const time = Date.parse(`${day}T00:00:00Z`);
+    return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === day;
+  });
+
+/** The company's holidays (D-155 §7): days off whatever the weekday, each once, in order. */
+const HolidaysSchema = z
+  .array(DaySchema)
+  // past days stay (the period counts them): ~14 a year for decades
+  .max(400)
+  .transform((days) => [...new Set(days)].sort());
+
 /**
  * D-152: the daily report. The database reads the same keys with the same defaults
  * (`daily_report_*()`, migration 20261028120000). Written by the server only, never by the screen:
  * `started_on` — the first day a missing report is fined (the first morning tick, or switching the
  * module on); `checked_on` — the last day the morning tick closed (kept here, or a settings save
- * would make the tick look at closed days again).
+ * would make the tick look at closed days again). `holidays` — no report is due on them (D-155 §7);
+ * a broken list reads as none, never as a broken section.
  */
 export const DailyReportSettingsSchema = z.object({
   enabled: z.boolean().default(true),
   workdays: WorkdaysSchema.default([1, 2, 3, 4, 5]),
+  holidays: HolidaysSchema.default([]).catch([]),
   work_start: ClockSchema.default("09:00"),
   remind_at: ClockSchema.default("18:00"),
   started_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
@@ -264,6 +283,7 @@ export const DailyReportPatchSchema = z
   .object({
     enabled: z.boolean(),
     workdays: WorkdaysSchema,
+    holidays: HolidaysSchema,
     work_start: ClockSchema,
     remind_at: ClockSchema,
   })
@@ -280,6 +300,18 @@ export function mergeDailyReport(current: DailyReportSettings, patch: DailyRepor
   if (!current.enabled && next.enabled) next.started_on = today;
   return next;
 }
+
+/**
+ * D-155 §3 (D-18): how long a voice recording is kept — `closed_days` after what it belongs to is
+ * closed, `orphan_days` for a recording nothing came of. The sweep reads the same keys with the same
+ * defaults (`voice_retention_*()`, tasks/027); transcripts and texts are kept for good.
+ */
+export const VoiceRetentionSchema = z.object({
+  closed_days: z.number().int().min(7).max(3650).default(90),
+  orphan_days: z.number().int().min(7).max(3650).default(30),
+});
+
+export type VoiceRetention = z.infer<typeof VoiceRetentionSchema>;
 
 /** D-133 (И-46): which good news goes public on Эфир. */
 export const EtherEventsSchema = z.object({
@@ -331,6 +363,8 @@ export const CompanySettingsSchema = z.object({
   dictionary: DictionarySettingsSchema.prefault({}),
   /** The daily report (D-152); a broken section reads as the defaults, never the whole settings. */
   daily_report: DailyReportSettingsSchema.prefault({}).catch(DAILY_REPORT_DEFAULTS),
+  /** How long voice recordings are kept (D-155 §3); a broken section reads as the defaults. */
+  voice_retention: VoiceRetentionSchema.prefault({}).catch({ closed_days: 90, orphan_days: 30 }),
 });
 
 export type CompanySettings = z.infer<typeof CompanySettingsSchema>;
@@ -358,6 +392,7 @@ export const SettingsPatchSchema = z
     // a section arrives whole: the screen sends everything it shows
     points_rules: PointsRulesSchema,
     ether_events: EtherEventsSchema,
+    voice_retention: VoiceRetentionSchema,
     delivery_window: DeliveryWindowSchema.partial(),
     secretary: SecretarySettingsSchema.partial(),
     brand: BrandPatchSchema,

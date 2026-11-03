@@ -85,16 +85,20 @@ export function PointsSheet({
                 <p className="mt-2 text-[14px] leading-[18px] text-muted">Очков пока не было</p>
               ) : (
                 <ul className="no-bar mt-2 max-h-[40vh] space-y-1.5 overflow-y-auto">
-                  {(history.data ?? []).slice(0, 30).map((line) => (
-                    <HistoryLine
-                      key={line.id}
-                      line={line}
-                      dispute={disputes.data?.[line.id]}
-                      canDispute={row.is_me && isDisputable(line)}
-                      onDispute={(text) => dispute.mutate({ transactionId: line.id, text })}
-                      sending={dispute.isPending}
-                    />
-                  ))}
+                  {(history.data ?? []).slice(0, 30).map((line) => {
+                    const back = givenBack(line, history.data ?? []);
+                    return (
+                      <HistoryLine
+                        key={line.id}
+                        line={line}
+                        dispute={disputes.data?.[line.id]}
+                        refunded={back}
+                        canDispute={row.is_me && isDisputable(line) && !back}
+                        onDispute={(text) => dispute.mutate({ transactionId: line.id, text })}
+                        sending={dispute.isPending}
+                      />
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -112,6 +116,17 @@ function isDisputable(line: PointRow): boolean {
   return line.amount < 0 && line.source !== "shop_hold" && line.source !== "shop_release";
 }
 
+/**
+ * A daily-report minus given back because no report came before it (D-155 §1): its refund row
+ * shares the report. It reads as a refund by «Оспорить» does, and it is not disputed again —
+ * the database refuses that too (`already_refunded`). The refund is newer than its minus, so a
+ * minus in the history has its refund there as well.
+ */
+function givenBack(line: PointRow, history: readonly PointRow[]): boolean {
+  if (line.amount >= 0 || !line.daily_report_id) return false;
+  return history.some((other) => other.rule_code === "daily_report_missed_refund" && other.daily_report_id === line.daily_report_id);
+}
+
 const DISPUTE_WORD: Record<MyDispute["status"], string> = {
   open: "оспорено · ждёт ответа",
   refunded: "вернули",
@@ -126,12 +141,15 @@ const DISPUTE_WORD: Record<MyDispute["status"], string> = {
 function HistoryLine({
   line,
   dispute,
+  refunded,
   canDispute,
   onDispute,
   sending,
 }: {
   line: PointRow;
   dispute: MyDispute | undefined;
+  /** Given back without a dispute (D-155 §1): said as «вернули», like a refunded dispute. */
+  refunded: boolean;
   canDispute: boolean;
   onDispute: (text: string) => void;
   sending: boolean;
@@ -154,6 +172,10 @@ function HistoryLine({
         <p className="mt-1 text-[12px] leading-4" style={{ color: dispute.status === "refunded" ? "var(--ok)" : "var(--text-muted)" }} data-testid="dispute-state">
           {DISPUTE_WORD[dispute.status]}
           {dispute.answer ? ` · «${dispute.answer}»` : ""}
+        </p>
+      ) : refunded ? (
+        <p className="mt-1 text-[12px] leading-4" style={{ color: "var(--ok)" }} data-testid="dispute-state">
+          {DISPUTE_WORD.refunded}
         </p>
       ) : canDispute && !editing ? (
         <button

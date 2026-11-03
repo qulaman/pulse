@@ -99,6 +99,7 @@ describe("the daily report (D-152)", () => {
     expect(settings.daily_report).toEqual({
       enabled: true,
       workdays: [1, 2, 3, 4, 5],
+      holidays: [],
       work_start: "09:00",
       remind_at: "18:00",
       started_on: null,
@@ -137,6 +138,31 @@ describe("the daily report (D-152)", () => {
     expect(mergeDailyReport(on, { enabled: true, remind_at: "17:00" }, today)).toMatchObject({ remind_at: "17:00", started_on: "2026-09-01" });
     expect(mergeDailyReport(on, { enabled: false }, today)).toMatchObject({ enabled: false, started_on: "2026-09-01" });
     expect(mergeDailyReport(off, { workdays: [1, 2, 3] }, today)).toMatchObject({ enabled: false, started_on: "2026-09-01" });
+  });
+
+  it("holidays (D-155 §7): real days, each once, in order; a broken list is none, the section survives", () => {
+    const stored = parseCompanySettings({ daily_report: { holidays: ["2027-03-22", "2027-01-01", "2027-03-22"], started_on: "2026-10-29" } });
+    expect(stored.daily_report).toMatchObject({ holidays: ["2027-01-01", "2027-03-22"], started_on: "2026-10-29" });
+    const broken = parseCompanySettings({ daily_report: { holidays: ["2027-02-30"], started_on: "2026-10-29" } });
+    expect(broken.daily_report).toMatchObject({ holidays: [], started_on: "2026-10-29" });
+    expect(SettingsPatchSchema.parse({ daily_report: { holidays: ["2027-05-09", "2027-05-01"] } }).daily_report).toEqual({ holidays: ["2027-05-01", "2027-05-09"] });
+    expect(SettingsPatchSchema.safeParse({ daily_report: { holidays: ["9 мая"] } }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ daily_report: { holidays: ["2027-02-30"] } }).success).toBe(false);
+  });
+});
+
+describe("voice retention (D-155 §3)", () => {
+  it("keeps a recording 90 days after its item closed, 30 when nothing came of it", () => {
+    expect(parseCompanySettings({}).voice_retention).toEqual({ closed_days: 90, orphan_days: 30 });
+    expect(parseCompanySettings({ voice_retention: { closed_days: 180 } }).voice_retention).toEqual({ closed_days: 180, orphan_days: 30 });
+  });
+
+  it("a broken section is the defaults; the patch refuses less than a week", () => {
+    const settings = parseCompanySettings({ voice_retention: { closed_days: "forever" }, points_enabled: true });
+    expect(settings.voice_retention).toEqual({ closed_days: 90, orphan_days: 30 });
+    expect(settings.points_enabled).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ voice_retention: { closed_days: 365, orphan_days: 30 } }).success).toBe(true);
+    expect(SettingsPatchSchema.safeParse({ voice_retention: { closed_days: 1, orphan_days: 30 } }).success).toBe(false);
   });
 });
 
