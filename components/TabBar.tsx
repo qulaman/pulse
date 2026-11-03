@@ -100,8 +100,9 @@ const ICONS = {
 };
 
 /**
- * The lab (D-63): the model bench and the unit costs — on the director's and the secretary's
- * bars; on the team's too while the company tests the product (D-150, `tabsOf`).
+ * The lab (D-63): the model bench and the unit costs — the director's and the secretary's live on
+ * the desk now (D-153, `ADMIN_TABS_ON_PHONE`); on the team's bar while the company tests the
+ * product (D-150, `tabsOf`).
  */
 const LAB_TAB: Tab = { href: "/lab", label: "Лаб", icon: ICONS.lab };
 
@@ -116,6 +117,17 @@ const EMPLOYEE_TABS: Tab[] = [
   { href: "/profile", label: "Профиль", icon: ICONS.profile },
 ];
 
+/**
+ * «Настройки» and «Лаб» on the director's and the secretary's phone bars. Their work moved to the
+ * computer (D-153 §11): the pages stay and open from «Профиль». `true` brings both tabs back.
+ */
+const ADMIN_TABS_ON_PHONE = false;
+
+const SETTINGS_TAB: Tab = { href: "/settings", label: "Настройки", icon: ICONS.settings };
+
+/** The admin screens a phone bar leaves to the desk light the tab they open from — «Профиль» (D-153). */
+const ADMIN_HOME = ADMIN_TABS_ON_PHONE ? "/settings" : "/profile";
+
 const TABS: Record<TabRole, Tab[]> = {
   // D-59: four tabs each — the announcements live inside Пульс and Лента, the team inside Настройки
   director: [
@@ -124,41 +136,52 @@ const TABS: Record<TabRole, Tab[]> = {
     CALENDAR_TAB,
     { href: "/notes", label: "Заметки", icon: ICONS.notes },
     { href: "/screen", label: "Экран", icon: ICONS.screen },
-    { href: "/settings", label: "Настройки", icon: ICONS.settings },
+    ...(ADMIN_TABS_ON_PHONE ? [SETTINGS_TAB] : []),
     { href: "/profile", label: "Профиль", icon: ICONS.profile },
-    LAB_TAB,
+    ...(ADMIN_TABS_ON_PHONE ? [LAB_TAB] : []),
   ],
   employee: EMPLOYEE_TABS,
-  // D-104: the secretary runs the settings and the roster — the employee's bar plus «Настройки»
+  // D-104: the secretary runs the settings and the roster — on the computer now (D-153), her bar is the employee's
   secretary: [
     ...EMPLOYEE_TABS.slice(0, 4),
-    { href: "/settings", label: "Настройки", icon: ICONS.settings },
+    ...(ADMIN_TABS_ON_PHONE ? [SETTINGS_TAB] : []),
     ...EMPLOYEE_TABS.slice(4),
-    LAB_TAB,
+    ...(ADMIN_TABS_ON_PHONE ? [LAB_TAB] : []),
   ],
 };
 
 /**
  * A screen without a tab of its own lights the tab it is entered from, so the bar always
- * says where one is (D-112): a task opens from «Задачи», «Команда» lives in «Настройки»,
- * the announcements in Пульс and Лента, the shop behind «Рейтинг» (D-59, docs/FRONTEND.md).
+ * says where one is (D-112): a task opens from «Задачи», «Команда» lives in «Настройки»
+ * (in «Профиль» while «Настройки» is the desk's, D-153), the announcements in Пульс and Лента,
+ * the shop behind «Рейтинг» (D-59, docs/FRONTEND.md).
  */
 const SECTIONS: Record<TabRole, Record<string, string>> = {
   // «Данные», «Рейтинг», «Заявки» open from the director's «Настройки» rows too (D-113: «Назад» leads there)
   director: {
     "/tasks": "/sent",
-    "/people": "/settings",
-    "/shop": "/settings",
-    "/rating": "/settings",
-    "/admin": "/settings",
-    "/reports": "/settings",
-    "/secretary": "/settings",
+    "/people": ADMIN_HOME,
+    "/shop": ADMIN_HOME,
+    "/rating": ADMIN_HOME,
+    "/admin": ADMIN_HOME,
+    "/reports": ADMIN_HOME,
+    "/secretary": ADMIN_HOME,
+    "/settings": "/profile",
+    "/lab": "/profile",
     "/ether": "/pulse",
     "/confirm": "/pulse",
   },
   // the daily report (D-152) lives in «Дела»
   employee: { "/ether": "/feed", "/shop": "/rating", "/report": "/tasks" },
-  secretary: { "/ether": "/feed", "/shop": "/rating", "/people": "/settings", "/secretary": "/settings", "/report": "/tasks" },
+  secretary: {
+    "/ether": "/feed",
+    "/shop": "/rating",
+    "/people": ADMIN_HOME,
+    "/secretary": ADMIN_HOME,
+    "/settings": "/profile",
+    "/lab": "/profile",
+    "/report": "/tasks",
+  },
 };
 
 /** The role's tabs; `lab` — the company is testing, so the team's bar carries «Лаб» too (D-150). */

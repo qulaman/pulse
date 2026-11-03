@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { isDesktopUa, VIEW_COOKIE, wantsPhoneView } from "@/lib/desk/device";
+import { deskHomeFor, deskRouteFor, mayHaveDeskRoute } from "@/lib/desk/routes";
 import { getPublicEnv } from "@/lib/env.public";
-import { homeForRole } from "@/lib/routes";
+import { canManageTeam, homeForRole } from "@/lib/routes";
 import type { Database } from "@/lib/supabase/types";
 
 function isPublicPath(pathname: string): boolean {
@@ -75,10 +77,31 @@ export async function proxy(request: NextRequest) {
     if (!profile) {
       return pathname === "/login" ? response : redirectTo(request, response, "/login");
     }
-    return redirectTo(request, response, homeForRole(profile.role));
+    // a computer goes straight to the desk's home: one hop instead of two (D-153)
+    const desk = onDesk(request) && canManageTeam(profile.role);
+    return redirectTo(request, response, desk ? deskHomeFor(profile.role) : homeForRole(profile.role));
+  }
+
+  // The director and the secretary on a computer work on the desk (D-153): a phone address with a
+  // desk twin — a push opened on the computer, a bookmark — moves there. A phone pays nothing: the
+  // role is asked only for a desktop browser on such an address.
+  if (onDesk(request) && mayHaveDeskRoute(pathname)) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+    const target = profile ? deskRouteFor(pathname, request.nextUrl.search, profile.role) : null;
+    if (target) return redirectTo(request, response, target);
   }
 
   return response;
+}
+
+/** A desktop browser that has not asked for the phone screens («Телефонная версия», D-153). */
+function onDesk(request: NextRequest): boolean {
+  if (wantsPhoneView(request.cookies.get(VIEW_COOKIE)?.value)) return false;
+  return isDesktopUa(request.headers.get("user-agent"), request.headers.get("sec-ch-ua-mobile"));
 }
 
 /** The sign-in screen: `/login`, or a company's own address from a QR, `/c/<slug>` (D-135). */
@@ -86,11 +109,12 @@ function isSignInPath(pathname: string): boolean {
   return pathname === "/login" || /^\/c\/[^/]+\/?$/.test(pathname);
 }
 
-/** Redirect that keeps the refreshed auth cookies of `response`. */
-function redirectTo(request: NextRequest, response: NextResponse, pathname: string) {
+/** Redirect that keeps the refreshed auth cookies of `response`; `target` may carry its own query. */
+function redirectTo(request: NextRequest, response: NextResponse, target: string) {
   const url = request.nextUrl.clone();
-  url.pathname = pathname;
-  url.search = "";
+  const at = target.indexOf("?");
+  url.pathname = at < 0 ? target : target.slice(0, at);
+  url.search = at < 0 ? "" : target.slice(at);
   const redirect = NextResponse.redirect(url);
   for (const cookie of response.cookies.getAll()) {
     redirect.cookies.set(cookie);

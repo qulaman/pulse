@@ -121,6 +121,7 @@ export function Sheet({ open, onClose, title, children }: Props) {
   return createPortal(
     <div
       ref={layerRef}
+      data-sheet-layer=""
       className="fixed inset-0 z-50 flex items-end justify-center"
       style={{ touchAction: "none", pointerEvents: closing ? "none" : "auto", bottom: "var(--kb, 0px)" }}
     >
@@ -142,6 +143,9 @@ export function Sheet({ open, onClose, title, children }: Props) {
         role="dialog"
         aria-modal="true"
         aria-label={title}
+        // the desk draws the same sheet as a centred dialog with its own fade (globals.css, D-153)
+        data-sheet=""
+        data-closing={closing ? "" : undefined}
         className="no-bar relative w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[20px] border-t border-border bg-surface px-4 pt-4"
         style={{
           maxHeight: "min(88dvh, calc(var(--kb-vh, 100dvh) - 12px))",
@@ -154,11 +158,11 @@ export function Sheet({ open, onClose, title, children }: Props) {
         }}
         onAnimationEnd={(event) => {
           if (event.target !== event.currentTarget) return;
-          if (event.animationName === "sheet-down") setMounted(false);
-          else if (event.animationName === "sheet-up") focusFirstField(dialogRef.current, focused);
+          if (event.animationName === "sheet-down" || event.animationName === "desk-dialog-out") setMounted(false);
+          else if (event.animationName === "sheet-up" || event.animationName === "desk-dialog-in") focusFirstField(dialogRef.current, focused);
         }}
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+        <div data-sheet-grip="" className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
         {title ? <h2 className="mb-3 text-[19px] font-semibold leading-6">{title}</h2> : null}
         {children}
       </div>

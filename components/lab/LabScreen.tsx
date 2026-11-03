@@ -40,7 +40,8 @@ function Shelf() {
  * waiting (D-122). `admin` — the director and the secretary: the benches, and the switch that
  * opens the lab to the team while the company tests (D-150); the team gets the shelf alone.
  */
-export function LabScreen({ tab, admin = true }: { tab: LabTab; admin?: boolean }) {
+/** `bare` — the benches alone, for a screen with a frame of its own (the desk, D-153): no <main>, no head. */
+export function LabScreen({ tab, admin = true, bare = false }: { tab: LabTab; admin?: boolean; bare?: boolean }) {
   if (!admin) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
@@ -52,26 +53,30 @@ export function LabScreen({ tab, admin = true }: { tab: LabTab; admin?: boolean 
       </main>
     );
   }
+  const benches = (
+    <LabTabs
+      key={tab}
+      initialTab={tab}
+      panels={{
+        models: (
+          <>
+            <LabForAllRow />
+            <Shelf />
+            <div className="mt-4">
+              <LabPanel />
+            </div>
+          </>
+        ),
+        parser: <ParserPanel />,
+        costs: <CostReport />,
+      }}
+    />
+  );
+  if (bare) return benches;
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
       <PageHead title="Лаборатория" />
-      <LabTabs
-        key={tab}
-        initialTab={tab}
-        panels={{
-          models: (
-            <>
-              <LabForAllRow />
-              <Shelf />
-              <div className="mt-4">
-                <LabPanel />
-              </div>
-            </>
-          ),
-          parser: <ParserPanel />,
-          costs: <CostReport />,
-        }}
-      />
+      {benches}
     </main>
   );
 }

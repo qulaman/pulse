@@ -1,5 +1,7 @@
 "use client";
 
+import { keepPreviousData } from "@tanstack/react-query";
+
 import { humanAqtobe } from "@/lib/ai/time";
 import { whenHeld } from "@/lib/tasks/held";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
@@ -75,4 +77,39 @@ export function useThreadReceipt(taskId: string, enabled: boolean, meId: string 
     channel: { table: "notification_deliveries", filter: `task_id=eq.${taskId}` },
     enabled: enabled && Boolean(meId),
   });
+}
+
+/**
+ * The newest «task_sent» receipt of many tasks at once, by task id — the desk's table asks for
+ * every not yet accepted row with one query and one channel instead of one per row (D-153).
+ * Live: any change of a «task_sent» delivery takes a fresh read; the rows stay while it lands.
+ */
+export function useTaskReceipts(taskIds: readonly string[], enabled = true) {
+  const ids = [...taskIds].sort();
+  return useRealtimeQuery<Record<string, DeliveryRow>, DeliveryRow>({
+    queryKey: ["task-receipts", ids.join(",")],
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("notification_deliveries")
+        .select("*")
+        .in("task_id", ids)
+        .eq("event_kind", "task_sent")
+        .order("created_at", { ascending: false });
+      if (error) throw new Error(error.message);
+      return newestByTask((data ?? []) as DeliveryRow[]);
+    },
+    channel: { table: "notification_deliveries", filter: "event_kind=eq.task_sent" },
+    enabled: enabled && ids.length > 0,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The first row of each task in a newest-first list. Pure, for the test. */
+export function newestByTask(rows: readonly DeliveryRow[]): Record<string, DeliveryRow> {
+  const out: Record<string, DeliveryRow> = {};
+  for (const row of rows) {
+    if (row.task_id && !(row.task_id in out)) out[row.task_id] = row;
+  }
+  return out;
 }

@@ -9,19 +9,13 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { SecretarySkeleton } from "@/components/secretary/SecretarySkeleton";
 import { humanAqtobe } from "@/lib/ai/time";
-import { isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
+import { ERRAND_STATUS_WORD, isActive, useErrandHistory, waitedFor, type Errand } from "@/lib/errands/queries";
 import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount } from "@/lib/errands/stats";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import { useMe } from "@/lib/tasks/queries";
 
-const STATUS_WORD: Record<string, string> = {
-  sent: "ждёт",
-  accepted: "в работе",
-  done: "готово",
-  declined: "не смогли",
-  cancelled: "отменена",
-};
+const STATUS_WORD: Record<string, string> = ERRAND_STATUS_WORD;
 
 /**
  * /secretary — заявки одним списком. Директору: что происходит сейчас и что было за

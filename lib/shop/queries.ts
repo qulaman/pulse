@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
 import { kickPush } from "@/lib/push/client";
@@ -274,6 +274,8 @@ export function useCompanyLedger(enabled: boolean, limit = 200) {
   const query = useQuery({
     queryKey: [...shopKeys.ledger, limit],
     enabled,
+    // a longer page (the desk's «Показать ещё», D-153) keeps the rows on screen while it loads
+    placeholderData: keepPreviousData,
     queryFn: async (): Promise<LedgerRow[]> => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase

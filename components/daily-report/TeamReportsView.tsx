@@ -40,6 +40,7 @@ export function TeamReportsView({
   periodStale,
   periodFailed,
   onRetryPeriod,
+  bare = false,
 }: {
   tab: ReportsTab;
   onTab: (tab: ReportsTab) => void;
@@ -59,10 +60,11 @@ export function TeamReportsView({
   periodStale?: boolean;
   periodFailed?: boolean;
   onRetryPeriod?: () => void;
+  /** The view alone, for a screen with a frame of its own (the desk, D-153): no <main>, no head. */
+  bare?: boolean;
 }) {
-  return (
-    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead title="Отчёты" />
+  const view = (
+    <>
       <Segments id="reports-tab" label="Вид отчётов" items={TABS} value={tab} onChange={onTab} className="mt-3" />
       <div className="mt-4">
         {tab === "day" ? (
@@ -82,6 +84,13 @@ export function TeamReportsView({
           />
         )}
       </div>
+    </>
+  );
+  if (bare) return view;
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead title="Отчёты" />
+      {view}
     </main>
   );
 }

@@ -67,8 +67,8 @@ export function BoardPresenter({ boardId, points, now, variant }: Props) {
   );
 }
 
-/** Where the meeting is and the three commands, shared by both places. */
-function usePresenter(boardId: string, points: readonly PresenterPoint[], now: Date) {
+/** Where the meeting is and the three commands, shared by both places (and the desk's remote, D-153). */
+export function usePresenter(boardId: string, points: readonly PresenterPoint[], now: Date) {
   const queryClient = useQueryClient();
   const state = useTvState();
   const control = useTvBoardControl();
@@ -112,7 +112,7 @@ function usePresenter(boardId: string, points: readonly PresenterPoint[], now: D
 /* On the remote: a block of the device under its display                     */
 /* -------------------------------------------------------------------------- */
 
-const VIEW_LABEL: Record<BoardView, string> = { list: "Список", map: "Карта" };
+export const VIEW_LABEL: Record<BoardView, string> = { list: "Список", map: "Карта" };
 
 function PresenterDeck({ boardId, points, now }: { boardId: string; points: readonly PresenterPoint[]; now: Date }) {
   const presenter = usePresenter(boardId, points, now);

@@ -367,6 +367,20 @@ export function etaLine(left: number | null): string | null {
   return `опаздывает на ${-left} мин`;
 }
 
+/** «Отойти» (D-99): the secretary's four spans — the feed's sheet and the desk offer the same. */
+export const AWAY_SPANS = [
+  { label: "На 15 минут", min: 15 },
+  { label: "На 30 минут", min: 30 },
+  { label: "На час", min: 60 },
+  { label: "До конца дня", min: 0 },
+] as const;
+
+/** Until when a span takes her away; 0 — «до конца дня», 21:00 Aqtobe, the end of the delivery window (D-38). */
+export function awayUntil(min: number, now: number = Date.now()): string {
+  const until = min ? new Date(now + min * 60_000) : new Date(new Date(now + 5 * 3_600_000).toISOString().slice(0, 10) + "T16:00:00Z");
+  return until.toISOString();
+}
+
 /** Stepped away — «не на месте до 14:00»: requests go to a secretary who is there (D-99). */
 export function isAway(person: { away_until?: string | null }, now: Date): boolean {
   return Boolean(person.away_until) && new Date(person.away_until as string).getTime() > now.getTime();

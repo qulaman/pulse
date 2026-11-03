@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Errand } from "@/lib/errands/queries";
 import {
+  AWAY_SPANS,
+  awayUntil,
   absenceLine,
   askedDetails,
   atLine,
@@ -347,5 +349,22 @@ describe("requests for a time (D-106 §8)", () => {
   it("asked for a time, the line says it", () => {
     const taxi = errand({ id: "t", kind: "taxi", label: "Такси", status: "sent", due_at: "2026-09-23T13:00:00Z" });
     expect(deskLine(deskFocus([taxi], "s1", [], now), now)).toBe("Директор просит: такси · к 18:00");
+  });
+});
+
+describe("awayUntil (D-99): the secretary's spans, one copy for the feed and the desk", () => {
+  const at = Date.parse("2026-11-03T06:10:00Z"); // 11:10 in Aqtobe
+
+  it("adds the minutes of a span", () => {
+    expect(awayUntil(15, at)).toBe("2026-11-03T06:25:00.000Z");
+    expect(awayUntil(60, at)).toBe("2026-11-03T07:10:00.000Z");
+  });
+
+  it("takes «до конца дня» to 21:00 Aqtobe, the end of the delivery window", () => {
+    expect(awayUntil(0, at)).toBe("2026-11-03T16:00:00.000Z");
+  });
+
+  it("offers the phone's four spans", () => {
+    expect(AWAY_SPANS.map((span) => span.label)).toEqual(["На 15 минут", "На 30 минут", "На час", "До конца дня"]);
   });
 });

@@ -6,6 +6,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { HapticsRow } from "@/components/profile/HapticsRow";
 import { NotificationsRow } from "@/components/profile/NotificationsRow";
 import { AfterPoints } from "@/components/profile/AfterPoints";
+import { DeskRows } from "@/components/profile/DeskRows";
 import { OtherDeviceRow } from "@/components/profile/OtherDeviceRow";
 import { SignOutOthersRow } from "@/components/profile/SignOutOthersRow";
 import { PasswordRow } from "@/components/profile/PasswordRow";
@@ -15,7 +16,7 @@ import { PageHead } from "@/components/ui/PageHead";
 import { Row, RowGroup } from "@/components/ui/Row";
 import { SignOutRow } from "@/components/profile/SignOutRow";
 import { VersionRow } from "@/components/profile/VersionRow";
-import { GearIcon, SendIcon } from "@/components/profile/icons";
+import { SendIcon } from "@/components/profile/icons";
 import { getSessionProfile } from "@/lib/auth";
 import { canManageTeam, isTeamRole } from "@/lib/routes";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -64,14 +65,8 @@ export default async function ProfilePage() {
           <Row icon={<SendIcon />} title="Telegram" tone="muted" value="скоро" />
         </RowGroup>
 
-        {canManageTeam(profile.role) ? (
-          <>
-            <h2 className="eyebrow mt-6 px-1">Компания</h2>
-            <RowGroup className="mt-2">
-              <Row icon={<GearIcon />} title="Настройки" value={director ? "голос, разбор, очки" : "команда, роли, пароли"} href="/settings" />
-            </RowGroup>
-          </>
-        ) : null}
+        {/* the company's settings moved to the computer with «Настройки» off the bar (D-153) */}
+        {canManageTeam(profile.role) ? <DeskRows /> : null}
 
         <h2 className="eyebrow mt-6 px-1">Приложение</h2>
         <RowGroup className="mt-2">

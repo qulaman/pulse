@@ -68,3 +68,10 @@ export const PulseIcon = () => (
     <path d="M2.5 10.5h3.2l1.8-4.5 3 8.5 2-5.5 1.3 1.5h3.7" />
   </svg>
 );
+
+export const DesktopIcon = () => (
+  <svg {...stroke}>
+    <rect x="2.5" y="3.5" width="15" height="10" rx="1.6" />
+    <path d="M7.5 16.5h5M10 13.5v3" />
+  </svg>
+);

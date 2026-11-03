@@ -127,6 +127,15 @@ export function useSecretaries(enabled = true) {
   });
 }
 
+/** Состояние заявки одним словом — `/secretary` и десктоп (D-153) говорят одинаково. */
+export const ERRAND_STATUS_WORD: Record<ErrandStatus, string> = {
+  sent: "ждёт",
+  accepted: "в работе",
+  done: "готово",
+  declined: "не смогли",
+  cancelled: "отменена",
+};
+
 /** Сколько заявок ждут ответа: столько и стоит в шарике. */
 export function activeCount(rows: readonly Errand[] | undefined): number {
   return (rows ?? []).filter(isActive).length;

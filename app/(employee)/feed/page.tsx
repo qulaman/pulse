@@ -39,7 +39,7 @@ import { useSecretaryActs } from "@/components/secretary/useSecretaryActs";
 import { haptic } from "@/lib/haptics";
 import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
 import { useErrands, useSecretaries, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
-import { askedDetails, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
+import { askedDetails, AWAY_SPANS, awayUntil, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { useMascotTelegraph } from "@/lib/points/game";
 import { usePointsArrival, usePointsEnabled } from "@/lib/points/queries";
 import type { SecretaryAction } from "@/lib/settings";
@@ -774,22 +774,14 @@ export default function FeedPage() {
                 Я на месте
               </button>
             ) : null}
-            {[
-              { label: "На 15 минут", min: 15 },
-              { label: "На 30 минут", min: 30 },
-              { label: "На час", min: 60 },
-              { label: "До конца дня", min: 0 },
-            ].map((option) => (
+            {AWAY_SPANS.map((option) => (
               <button
                 key={option.label}
                 type="button"
                 className="min-h-[48px] rounded-[16px] border border-border bg-surface-2/70 text-[15px] font-semibold"
                 onClick={() => {
                   // «до конца дня» — until 21:00 Aqtobe, the end of the delivery window (D-38)
-                  const until = option.min
-                    ? new Date(Date.now() + option.min * 60_000)
-                    : new Date(new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10) + "T16:00:00Z");
-                  setAway.mutate(until.toISOString());
+                  setAway.mutate(awayUntil(option.min));
                   setPresenceOpen(false);
                 }}
               >
