@@ -53,7 +53,7 @@ desktop.ini
 # Исключение — локальная шпаргалка логинов и паролей dev-стенда, не коммитится никогда
 /LOGINS.pdf
 
-# STT gate: audio fixtures live in Storage (stt-fixtures bucket), run outputs are local
+# STT gate: audio fixtures are local only (no Storage copy yet), run outputs are local
 tests/stt/fixtures/
 tests/stt/results/
 

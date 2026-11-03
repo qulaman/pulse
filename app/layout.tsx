@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   applicationName: "Pulse",
   manifest: "/manifest.webmanifest",
   icons: { icon: "/icons/icon-192.png", apple: "/icons/apple-touch-icon.png" },
-  // iOS home-screen install: own window, dark status bar (no serwist yet — D-40 PWA core is next)
+  // iOS home-screen install: own window, dark status bar
   appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Pulse" },
   formatDetection: { telephone: false },
 };

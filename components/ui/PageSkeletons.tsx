@@ -325,26 +325,6 @@ export function SettingsSkeleton() {
   );
 }
 
-/** Пульт от телевизора: карточка «Сейчас на стене», поиск по людям и список. */
-export function ScreenSkeleton() {
-  return (
-    <main className={MAIN}>
-      <Title text="Экран в кабинете" />
-      <SkeletonGroup className="mt-4 card p-4">
-        <Bone h={26} w={200} />
-        <Bone h={16} w={120} className="mt-2" />
-      </SkeletonGroup>
-      <h2 className="eyebrow mt-6 px-1">Показать сотрудника</h2>
-      <SkeletonGroup className="mt-2">
-        <Bone h={44} className="rounded-[12px]" />
-      </SkeletonGroup>
-      <div className="mt-2">
-        <RowListBone count={4} />
-      </div>
-    </main>
-  );
-}
-
 /**
  * «Данные»: the page itself before its rows — the chips of the tables and the first table,
  * which draws its own head and grey rows while it loads (and starts loading right away).

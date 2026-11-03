@@ -23,7 +23,7 @@ export const LOAD_LABEL: Record<LoadColor, string> = {
 
 const OPEN: Database["public"]["Enums"]["task_status"][] = ["sent", "accepted", "in_progress", "rework", "pending_review"];
 
-/** docs/DATABASE.md v_employee_load rules, computed on the client until the view lands. */
+/** Load rules, computed on the client; a database view only if measurement asks for it (IDEAS И-98). */
 export function loadColor(load: Load | undefined, available: boolean, now = Date.now()): LoadColor {
   if (!available || !load || load.active === 0) return "gray";
   if (load.overdue > 0) return "red";

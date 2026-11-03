@@ -31,7 +31,7 @@ Evals парсера и few-shot уже шире корпуса: из корпу
 
 ## 3. Хранение фикстур
 
-- Аудио записывается по `tests/stt/RECORDING.md` и кладётся в `tests/stt/fixtures/` (каталог в `.gitignore`). Сейчас каталога нет — корпус не записан. `RECORDING.md` и комментарий в `.gitignore` называют мастер-копией Storage-бакет `stt-fixtures` — такого бакета нет ни в миграциях, ни в скриптах (IDEAS И-100).
+- Аудио записывается по `tests/stt/RECORDING.md` и кладётся в `tests/stt/fixtures/` (каталог в `.gitignore`). Сейчас каталога нет — корпус не записан. Аудио корпуса хранится только локально, копии в Storage нет.
 - В git: `tests/stt/corpus.jsonl` (тексты + эталонные имена) и `tests/stt/roster.json`; результаты прогонов `tests/stt/results/` — в `.gitignore`. Полный прогон `run.mjs` сам пишет `tests/stt/manifest.jsonl` (ещё не создавался) — по строке на файл:
 
 ```json
