@@ -86,7 +86,7 @@ export function SegmentTabs<V extends string>({
             aria-selected={active}
             data-testid={`seg-${item.value}`}
             onClick={() => onChange(item.value)}
-            className={`flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${
+            className={`desk-focus flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 outline-none transition-colors duration-[120ms] ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >

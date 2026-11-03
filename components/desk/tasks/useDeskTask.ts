@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 
 import { cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
-import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { latestDeclineReason, latestOpenQuestion } from "@/components/tasks/TaskThread";
+import { rowKeys, type RowKey } from "@/lib/desk/tasks";
 import type { BoardTask } from "@/lib/pulse/board";
 import { clearTaskNotifications } from "@/lib/push/client";
 import { useRecurrenceRules, type Rule } from "@/lib/recurrence/queries";
@@ -13,6 +13,8 @@ import { handedInPartly, isWorking, lastNudgeAt, latestSuggestion, latestTimeReq
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { reasonFor } from "@/lib/tasks/overview";
 import { useTaskThread, type Me, type TaskMessage, type TaskWithPeople } from "@/lib/tasks/queries";
+
+import { useDeskActs } from "./useDeskActs";
 
 /** What waits on a task besides its status — the board row's when there is one, else read from the thread. */
 export type Signals = {
@@ -43,11 +45,11 @@ function signalsOf(task: TaskWithPeople | undefined, row: BoardTask | undefined,
 }
 
 /**
- * One task as the desk works on it — in the right-hand panel of «Задачи» and on the stack of
- * «Разобрать» (tasks/022 A): the task and its thread live, what waits on it, the director's
- * keys (the phone's own, `cardKeysFor`) and the phone's controls with their sheets — which
- * are centred dialogs on the desk. The thread on screen is a thread read (D-61), as on the
- * task's phone screen. A task the controls hand out anew opens here, not on a phone screen.
+ * One task as the desk works on it — in the right-hand panel and on the stack of «Разобрать»
+ * (tasks/022 A, D-154 wave 3): the task and its thread live, what waits on it, the director's
+ * buttons (the phone card's own, `cardKeysFor`) and letters (`rowKeys`), and the desk's moves
+ * (`useDeskActs`: a date or a person in a popover, a word or a «sure?» in a small dialog). The
+ * thread on screen is a thread read (D-61), as on the task's phone screen.
  */
 export function useDeskTask({
   taskId,
@@ -56,6 +58,7 @@ export function useDeskTask({
   base,
   now,
   onOpenTask,
+  onReply,
   afterRemove,
 }: {
   taskId: string;
@@ -65,6 +68,8 @@ export function useDeskTask({
   now: Date;
   /** «Выдать снова» and «Передать» make a new task: its toast's «Открыть» lands here */
   onOpenTask: (id: string) => void;
+  /** «Ответить» (O, a question's «Ответить словами»): the caret into this task's answer field */
+  onReply: () => void;
   afterRemove?: () => void;
 }) {
   const { task, messages } = useTaskThread(taskId);
@@ -74,24 +79,17 @@ export function useDeskTask({
   const keys: DeskAction[] = data
     ? cardKeysFor(data, { question: Boolean(signals.question), request: Boolean(signals.request), suggestion: Boolean(signals.suggestion) }, now)
     : [];
+  const letters: RowKey[] = data ? rowKeys(data, { request: Boolean(signals.request) }) : [];
 
-  // the new task of «Выдать снова» / «Передать» opens in the desk's panel: the controls hand
-  // their own «/tasks/<id>» to `onOpen`, and this base puts the desk's in its place
-  const desk: TaskActions = {
-    ...base,
-    reissue: (input) => base.reissue({ ...input, onOpen: onOpenTask }),
-    reassign: (input) => base.reassign({ ...input, onOpen: onOpenTask }),
-  };
-  const controls = useDirectorControls({
-    base: desk,
-    companyId: me.companyId,
+  const acts = useDeskActs({
+    base,
     tasks: data ? [data] : [],
-    questionOf: () => signals.question,
-    requestOf: () => signals.request,
-    suggestionOf: () => signals.suggestion,
+    flagsOf: () => ({ question: signals.question, request: signals.request, suggestion: signals.suggestion }),
     now,
-    onThread: false,
-    afterRemove,
+    companyId: me.companyId,
+    onReply: () => onReply(),
+    onOpen: onOpenTask,
+    afterRemove: afterRemove ? () => afterRemove() : undefined,
   });
 
   const rules = useRecurrenceRules(Boolean(data?.recurrence_rule_id));
@@ -122,7 +120,8 @@ export function useDeskTask({
     signals,
     reason,
     keys,
-    controls,
+    letters,
+    acts,
     rule,
   };
 }

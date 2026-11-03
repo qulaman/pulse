@@ -24,9 +24,12 @@ type Props = {
   today: Ymd;
   now: Date;
   meId: string;
-  onOpen: (event: CalendarEvent) => void;
+  /** A meeting was clicked: its card opens beside `element`. */
+  onOpen: (event: CalendarEvent, element: HTMLElement) => void;
   month: Month;
   onDay: (ymd: Ymd) => void;
+  /** «+» of a day — a new meeting on it (the director's, today and later); null — none. */
+  onNew: ((ymd: Ymd) => void) | null;
   /** «Сроки задач» while the layer is on; null — off. */
   deadlines: Map<Ymd, DeadlineMark[]> | null;
 };
@@ -69,7 +72,7 @@ function MarkDots({ marks }: { marks: DeadlineMark[] }) {
  * in a cell and «+N»; a click on a day opens its week, a click on a meeting — the meeting. The
  * chips are quiet lines — colour only on what is on now or waits for an answer.
  */
-export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay, deadlines }: Props) {
+export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay, onNew, deadlines }: Props) {
   return (
     <div className="min-w-0 overflow-hidden rounded-[12px] border border-border" data-testid="desk-calendar-month">
       <div className="grid grid-cols-7 border-b border-border">
@@ -101,7 +104,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                   onDay(ymd);
                 }
               }}
-              className={`flex min-h-[116px] min-w-0 cursor-pointer flex-col gap-0.5 p-1.5 outline-none transition-colors duration-[120ms] hover:bg-surface-2/40 focus-visible:bg-surface-2/50 ${
+              className={`group/day flex min-h-[116px] min-w-0 cursor-pointer flex-col gap-0.5 p-1.5 outline-none transition-colors duration-[120ms] hover:bg-surface-2/40 focus-visible:bg-surface-2/50 ${
                 index % 7 > 0 ? "border-l border-border/70" : ""
               } ${index >= 7 ? "border-t border-border/70" : ""} ${isToday ? "bg-accent/[0.04]" : outside ? "bg-bg" : weekend ? "bg-surface/40" : ""}`}
             >
@@ -114,6 +117,22 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                   {parts.day}
                 </span>
                 {deadlines ? <MarkDots marks={deadlines.get(ymd) ?? []} /> : null}
+                {onNew && ymd >= today ? (
+                  <button
+                    type="button"
+                    aria-label={`Новое мероприятие на ${ymd}`}
+                    title="Новое мероприятие на этот день"
+                    tabIndex={-1}
+                    data-testid="desk-month-new"
+                    onClick={(click) => {
+                      click.stopPropagation();
+                      onNew(ymd);
+                    }}
+                    className={`${deadlines && (deadlines.get(ymd) ?? []).length > 0 ? "ml-1" : "ml-auto"} flex h-6 w-6 items-center justify-center rounded-[7px] text-[16px] leading-none text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-accent group-hover/day:opacity-100`}
+                  >
+                    +
+                  </button>
+                ) : null}
               </span>
               {events.slice(0, CELL_CHIPS).map((event) => {
                 const over = isOver(event, now);
@@ -127,7 +146,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                     title={`${timeRange(event)} · ${event.title}`}
                     onClick={(click) => {
                       click.stopPropagation();
-                      onOpen(event);
+                      onOpen(event, click.currentTarget);
                     }}
                     className={`flex min-w-0 items-center gap-1.5 rounded-[6px] px-1.5 py-[3px] text-left text-[12px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 ${
                       over || outside ? "text-muted" : ""

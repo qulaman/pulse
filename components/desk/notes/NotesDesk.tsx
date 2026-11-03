@@ -1,12 +1,15 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs } from "@/components/desk/ui/Toolbar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { BoardTrashCard } from "@/components/mindboard/BoardCards";
 import { Marked, TrashCard } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
@@ -15,7 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { binCards } from "@/lib/mindboard/branch";
 import { boardOnWall, defaultTitle, splitBoards, summariesOf, summaryLine, type BoardSummary } from "@/lib/mindboard/list";
-import { useCreateBoard, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
+import { useCreateBoard, useDeleteBoard, useFinishBoard, usePinBoard, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
 import {
   awaitsReminder,
@@ -31,13 +34,14 @@ import {
   whenRu,
   type NoteGroupKey,
 } from "@/lib/notes/list";
-import { useCreateNote, usePurgeNotes, useRestoreNote } from "@/lib/notes/mutations";
+import { useCreateNote, useDeleteNote, usePurgeNotes, useRestoreNote, useUpdateNote } from "@/lib/notes/mutations";
 import { useNoteCounts, useNotes, useNoteSearch, useOlderNotes, type Note } from "@/lib/notes/queries";
+import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useMe, type Me } from "@/lib/tasks/queries";
 import { useTvState, type TvState } from "@/lib/tv/queries";
 import { boardLive } from "@/lib/tv/state";
 
-import { BoardRowMenu } from "./BoardRowMenu";
+import { boardMenuItems, BoardRowMenu, RenameBoardDialog } from "./BoardRowMenu";
 import { PurgeDialog, type Purge } from "./PurgeDialog";
 
 /** The left column's views: the thoughts, the boards, what the notes became, the bin. */
@@ -69,6 +73,8 @@ type NotesDeskValue = {
   summaries: Map<string, BoardSummary>;
   tv: TvState | null;
   newNote: () => void;
+  /** The note to stand on once `id` leaves the list (deleted, moved): the next one, else the one before. */
+  neighbourOf: (id: string) => string | null;
 };
 
 const NotesDeskContext = createContext<NotesDeskValue | null>(null);
@@ -80,11 +86,14 @@ export function useNotesDesk(): NotesDeskValue {
 }
 
 /**
- * «Заметки» of the desk (D-153, D-75): the director's own thoughts and boards in two columns —
- * the list on the left (`?tab=notes|boards|converted|trash`, a search, the counts, «Показать
- * раньше», the bin), the chosen note (`?n`) or board (`/desk/notes/b/[id]`) on the right. The
- * list lives in the layout, so it keeps its place while the right column changes. Private to
- * the author (D-75 §3): the same caches and writes as the phone screen, nothing else.
+ * «Заметки» of the desk (D-153, D-75, wave 3): the director's own thoughts and boards in two
+ * columns, as a desktop notes app — the list on the left (`?tab=notes|boards|converted|trash`, a
+ * search, the counts, «Показать раньше», the bin), the chosen note (`?n`) or board
+ * (`/desk/notes/b/[id]`) on the right. The keyboard walks it: ↑/↓ through the list, Enter into
+ * the note or the board, N (or Alt+N) — a new one, Ctrl+F — the search, Delete — to the bin,
+ * P — pin, 1–4 — the tabs; a right click on a row has its menu. The list lives in the layout, so
+ * it keeps its place while the right column changes. Private to the author (D-75 §3): the same
+ * caches and writes as the phone screen, nothing else.
  */
 export function NotesDesk({ children }: { children: ReactNode }) {
   const me = useMe();
@@ -100,6 +109,14 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   const restoreBoard = useRestoreBoard(me.data);
   const purgeNotes = usePurgeNotes(me.data);
   const purgeBoards = usePurgeBoards(me.data);
+  const removeNote = useDeleteNote(me.data);
+  const updateNote = useUpdateNote(me.data);
+  const removeBoard = useDeleteBoard(me.data);
+  const pinBoard = usePinBoard(me.data);
+  const finishBoard = useFinishBoard(me.data);
+  const [renamingBoard, setRenamingBoard] = useState<MindBoard | null>(null);
+  const menu = useContextMenu();
+  const search = useRef<HTMLInputElement>(null);
   const now = useMinute();
   const router = useRouter();
   const pathname = usePathname();
@@ -115,12 +132,12 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   const cached = notes.data ?? EMPTY;
   const loadedLive = useMemo(() => cached.filter((note) => note.deleted_at === null && note.board_id === null).length, [cached]);
   const hasOlder = (counts.data?.live ?? 0) > loadedLive;
-  const search = useNoteSearch(userId, query, hasOlder);
+  const found = useNoteSearch(userId, query, hasOlder);
   const rows = useMemo(() => {
     const byId = new Map(cached.map((note) => [note.id, note]));
-    for (const hit of search.data ?? []) if (!byId.has(hit.id)) byId.set(hit.id, hit);
+    for (const hit of found.data ?? []) if (!byId.has(hit.id)) byId.set(hit.id, hit);
     return [...byId.values()];
-  }, [cached, search.data]);
+  }, [cached, found.data]);
 
   const tv = tvState.data ?? null;
   const wallBoardId = boardLive(tv, now) ? (tv?.board_id ?? null) : null;
@@ -207,6 +224,167 @@ export function NotesDesk({ children }: { children: ReactNode }) {
 
   const focused = useCallback(() => setFocusId(null), []);
 
+  // the notes in the order the list shows them: what ↑/↓ walk and where a deleted one hands over
+  const noteOrder = useMemo(
+    () => (tab === "notes" ? groupNotes(shown.notes, now).flatMap((group) => group.notes.map((note) => note.id)) : tab === "converted" ? shown.converted.map((note) => note.id) : []),
+    [tab, shown, now],
+  );
+  const boardOrder = useMemo(() => [...shown.live, ...shown.finished].map((board) => board.id), [shown]);
+  const neighbourOf = useCallback(
+    (id: string) => {
+      const at = noteOrder.indexOf(id);
+      if (at < 0) return null;
+      return noteOrder[at + 1] ?? noteOrder[at - 1] ?? null;
+    },
+    [noteOrder],
+  );
+  const noteById = useMemo(() => new Map(rows.map((note) => [note.id, note])), [rows]);
+  const boardById = useMemo(() => new Map((boards.data ?? []).map((board) => [board.id, board])), [boards.data]);
+  const openBoard = useCallback((id: string) => router.push(`/desk/notes/b/${id}`), [router]);
+
+  /** A thought to the bin: the toast brings it back; the list stands on the next one. */
+  const binNote = useCallback(
+    (note: Note) => {
+      if (note.id === selectedId) select(neighbourOf(note.id));
+      removeNote.mutate({ id: note.id });
+    },
+    [selectedId, select, neighbourOf, removeNote],
+  );
+  const binBoard = useCallback(
+    (board: MindBoard) => {
+      removeBoard.mutate({ id: board.id });
+      toast("Доска в корзине", { action: { label: "Вернуть", onClick: () => restoreBoard.mutate({ id: board.id }) } });
+      if (boardId === board.id) router.push("/desk/notes?tab=boards");
+    },
+    [removeBoard, restoreBoard, boardId, router],
+  );
+  const pinNote = useCallback(
+    (note: Note) => {
+      updateNote.mutate({ id: note.id, pinned: !note.pinned });
+      toast(note.pinned ? "Открепил" : "Закрепил сверху");
+    },
+    [updateNote],
+  );
+  const copyNote = async (note: Note) => {
+    try {
+      await navigator.clipboard.writeText(note.text);
+      toast("Скопировал");
+    } catch {
+      toast("Не получилось скопировать");
+    }
+  };
+
+  // the keys of the screen; the right column's own fields and the board's outline keep theirs
+  const keys = useRef<(event: KeyboardEvent) => boolean>(() => false);
+  useEffect(() => {
+    keys.current = (event) => {
+      const code = event.code;
+      const typing = isTypingTarget(event.target);
+      // Ctrl+F — the search; Alt+N — a new one: from anywhere, the editor included
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && code === "KeyF") {
+        search.current?.focus();
+        search.current?.select();
+        return true;
+      }
+      if (event.altKey && !event.ctrlKey && !event.metaKey && code === "KeyN") {
+        if (tab === "boards") newBoard();
+        else newNote();
+        return true;
+      }
+      if (typing || !isPlainKey(event)) return false;
+      // the plain keys belong to the list: from the list, or from nowhere in particular
+      const active = document.activeElement;
+      const fromList = !active || active === document.body || Boolean(active.closest("[data-notes-list]"));
+      if (code === "KeyN" && !event.shiftKey) {
+        if (tab === "boards") newBoard();
+        else newNote();
+        return true;
+      }
+      if (!fromList) return false;
+      if (code === "Digit1" || code === "Digit2" || code === "Digit3" || code === "Digit4") {
+        setTab(TABS[Number(code.slice(5)) - 1]);
+        return true;
+      }
+      if (tab === "boards") {
+        const current = boardFocus ?? boardId;
+        const at = current ? boardOrder.indexOf(current) : -1;
+        if (code === "ArrowDown" || code === "ArrowUp") {
+          if (boardOrder.length === 0) return false;
+          const next = code === "ArrowDown" ? Math.min(boardOrder.length - 1, at + 1) : Math.max(0, at < 0 ? 0 : at - 1);
+          setBoardFocus(boardOrder[next]);
+          return true;
+        }
+        if (code === "Enter" && current) {
+          openBoard(current);
+          return true;
+        }
+        const board = current ? boardById.get(current) : undefined;
+        // a whole board goes to the bin only from the list itself — never from a page with nothing focused
+        const inList = Boolean(active?.closest("[data-notes-list]"));
+        if ((code === "Delete" || code === "Backspace") && board && !board.deleted_at && (inList || !boardId)) {
+          binBoard(board);
+          return true;
+        }
+        return false;
+      }
+      if (tab !== "notes" && tab !== "converted") return false;
+      const at = selectedId ? noteOrder.indexOf(selectedId) : -1;
+      if (code === "ArrowDown" || code === "ArrowUp") {
+        if (noteOrder.length === 0) return false;
+        const next = code === "ArrowDown" ? Math.min(noteOrder.length - 1, at + 1) : Math.max(0, at < 0 ? 0 : at - 1);
+        select(noteOrder[next]);
+        return true;
+      }
+      const note = selectedId ? noteById.get(selectedId) : undefined;
+      if (!note) return false;
+      if (code === "Enter") {
+        document.querySelector<HTMLTextAreaElement>('[data-testid="desk-note"] [data-testid="note-editor"]')?.focus();
+        return true;
+      }
+      if ((code === "Delete" || code === "Backspace") && note.deleted_at === null) {
+        binNote(note);
+        return true;
+      }
+      if (code === "KeyP" && tab === "notes") {
+        pinNote(note);
+        return true;
+      }
+      return false;
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      if (document.body.hasAttribute("data-sheet-open") || document.body.hasAttribute("data-dialog-open")) return;
+      if (keys.current(event)) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useShortcuts("Заметки", [
+    { keys: ["↑", "↓"], label: tab === "boards" ? "По доскам" : "По заметкам" },
+    { keys: ["Enter"], label: tab === "boards" ? "Открыть доску" : "Писать в заметке" },
+    { keys: ["Esc"], label: "Из заметки — обратно к списку" },
+    { keys: ["N"], label: tab === "boards" ? "Новая доска" : "Новая заметка" },
+    { keys: ["Alt N"], label: "То же — даже из текста" },
+    { keys: ["Ctrl F"], label: "Поиск" },
+    { keys: ["Del"], label: tab === "boards" ? "Доску в корзину" : "Заметку в корзину" },
+    { keys: ["P"], label: "Закрепить или открепить" },
+    { keys: ["1", "2", "3", "4"], label: "Мысли · Доски · В деле · Корзина" },
+    { keys: ["Ctrl S"], label: "Сохранить сейчас (в заметке)" },
+  ]);
+
+  /** The menu of a note's row (a right click): what the keys do, with their keys. */
+  const noteMenu = (note: Note): MenuItem[] => [
+    { key: "open", label: "Писать", hint: "Enter", onSelect: () => select(note.id) },
+    ...(note.converted_task_id === null && note.converted_announcement_id === null
+      ? [{ key: "pin", label: note.pinned ? "Открепить" : "Закрепить сверху", hint: "P", onSelect: () => pinNote(note) }]
+      : []),
+    { key: "copy", label: "Скопировать текст", disabled: !note.text.trim(), onSelect: () => void copyNote(note) },
+    "separator",
+    { key: "bin", label: "В корзину", hint: "Del", danger: true, onSelect: () => binNote(note) },
+  ];
   const value: NotesDeskValue = {
     me: me.data,
     rows,
@@ -221,14 +399,23 @@ export function NotesDesk({ children }: { children: ReactNode }) {
     summaries,
     tv,
     newNote,
+    neighbourOf,
   };
 
   const noteColumns: Column<{ note: Note; group: NoteGroupKey }>[] = [
-    { key: "text", title: "Заметка", render: ({ note }) => <NoteLine note={note} now={now} query={query} /> },
+    {
+      key: "text",
+      title: "Заметка",
+      render: ({ note }) => (
+        <span className="block" onContextMenu={(event) => menu.open(event, noteMenu(note))}>
+          <NoteLine note={note} now={now} query={query} />
+        </span>
+      ),
+    },
     {
       key: "when",
       title: "",
-      width: "96px",
+      width: "112px",
       align: "right",
       render: ({ note, group }) => (
         // «В деле» says when the thought became something, the feed — when it was had
@@ -250,10 +437,14 @@ export function NotesDesk({ children }: { children: ReactNode }) {
     {
       key: "title",
       title: "Доска",
-      render: (board) => <BoardLine board={board} summary={summaries.get(board.id)} onWall={boardOnWall(tv, board.id, now)} query={query} />,
+      render: (board) => (
+        <span className="block" onContextMenu={(event) => menu.open(event, boardMenuItems(board, { pin: pinBoard, finish: finishBoard, onBin: binBoard, onRename: () => setRenamingBoard(board) }))}>
+          <BoardLine board={board} summary={summaries.get(board.id)} onWall={boardOnWall(tv, board.id, now)} query={query} />
+        </span>
+      ),
     },
-    { key: "when", title: "", width: "96px", align: "right", render: (board) => <span className="nums whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</span> },
-    { key: "menu", title: "", width: "44px", align: "center", render: (board) => <BoardRowMenu board={board} me={me.data} /> },
+    { key: "when", title: "", width: "104px", align: "right", render: (board) => <span className="nums whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</span> },
+    { key: "menu", title: "", width: "44px", align: "center", render: (board) => <BoardRowMenu board={board} me={me.data} onBin={binBoard} /> },
   ];
   const boardGroups: Group<MindBoard>[] = [
     { key: "live", title: shown.finished.length > 0 ? "В работе" : null, rows: shown.live },
@@ -282,13 +473,17 @@ export function NotesDesk({ children }: { children: ReactNode }) {
               title="Заметки"
               actions={
                 tab === "boards" ? (
-                  <Button size="sm" onClick={newBoard} disabled={!me.data} data-testid="desk-board-new">
-                    Новая доска
-                  </Button>
+                  <Tooltip label="Новая доска" keys={["N"]} side="bottom">
+                    <Button size="sm" onClick={newBoard} disabled={!me.data} data-testid="desk-board-new">
+                      Новая доска
+                    </Button>
+                  </Tooltip>
                 ) : (
-                  <Button size="sm" onClick={newNote} disabled={!me.data} data-testid="desk-note-new">
-                    Новая заметка
-                  </Button>
+                  <Tooltip label="Новая заметка" keys={["N"]} side="bottom">
+                    <Button size="sm" onClick={newNote} disabled={!me.data} data-testid="desk-note-new">
+                      Новая заметка
+                    </Button>
+                  </Tooltip>
                 )
               }
             />
@@ -304,6 +499,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
               ]}
             />
             <SearchField
+              ref={search}
               value={query}
               onChange={setQuery}
               width={360}
@@ -312,7 +508,8 @@ export function NotesDesk({ children }: { children: ReactNode }) {
             />
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6" data-testid="desk-notes-list">
+          {/* a list, not a table: the grid's column titles are not drawn here */}
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 [&_[role=grid]>[role=row]:first-child]:hidden" data-testid="desk-notes-list" data-notes-list="">
             {value.loading ? (
               <ListBones />
             ) : tab === "boards" ? (
@@ -325,8 +522,8 @@ export function NotesDesk({ children }: { children: ReactNode }) {
                 // the arrows only move the choice; a click or Enter opens the board — a board is a
                 // whole screen, opening one on every key press made the list stutter
                 onSelect={(board) => setBoardFocus(board.id)}
-                onRowClick={(board) => router.push(`/desk/notes/b/${board.id}`)}
-                onActivate={(board) => router.push(`/desk/notes/b/${board.id}`)}
+                onRowClick={(board) => openBoard(board.id)}
+                onActivate={(board) => openBoard(board.id)}
                 empty={empty}
               />
             ) : tab === "trash" ? (
@@ -391,7 +588,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
             {(tab === "notes" || tab === "converted") && hasOlder && !value.loading ? (
               needle ? (
                 <p className="mt-3 text-center text-[12px] leading-4 text-muted" data-testid="desk-notes-search-older">
-                  {search.isFetching ? "Ищу и в старых заметках…" : "Искал и в старых заметках"}
+                  {found.isFetching ? "Ищу и в старых заметках…" : "Искал и в старых заметках"}
                 </p>
               ) : (
                 <div className="mt-3">
@@ -409,6 +606,8 @@ export function NotesDesk({ children }: { children: ReactNode }) {
         </section>
       </div>
 
+      {menu.node}
+      {renamingBoard ? <RenameBoardDialog board={renamingBoard} me={me.data} open onClose={() => setRenamingBoard(null)} /> : null}
       <PurgeDialog
         purging={purging}
         onClose={() => setPurging(null)}

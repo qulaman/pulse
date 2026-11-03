@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
@@ -11,6 +11,8 @@ import { Kbd } from "@/components/desk/ui/Kbd";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { QuickErrands } from "@/components/desk/ui/QuickErrands";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
+import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { MessageAsk } from "@/components/visits/MessageAsk";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
@@ -18,8 +20,7 @@ import { VisitAsk } from "@/components/visits/VisitAsk";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
-import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
-import { useErrandActions, useErrandLink, useSetAway } from "@/lib/errands/mutations";
+import { useErrandLink, useSetAway } from "@/lib/errands/mutations";
 import { STALE_MS } from "@/lib/errands/pending";
 import {
   isActive,
@@ -29,8 +30,9 @@ import {
   useSecretaryActions,
   waitedFor,
   type Errand,
+  type ErrandStatus,
 } from "@/lib/errands/queries";
-import { absenceLine, atLine, AWAY_SPANS, awayUntil, deskFocus, etaLeftMin, etaLine, isAway, sceneOf, untilLine } from "@/lib/errands/scene";
+import { absenceLine, atLine, AWAY_SPANS, awayUntil, deskFocus, etaLeftMin, etaLine, isAway, isYesNo, sceneOf, untilLine } from "@/lib/errands/scene";
 import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount, type ErrandTally } from "@/lib/errands/stats";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
@@ -40,9 +42,10 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, reception, unreadMessages } from "@/lib/visits/text";
 
-import { DeskHero, HeroBone, HeroFacts } from "../team/Hero";
-import { ErrandCard, ErrandDetails, ThankButton } from "./ErrandCard";
-import { ETAS } from "./ErrandLink";
+import { DeskHero, HeroBone } from "../team/Hero";
+import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
+import { ErrandDetails, ThankButton } from "./ErrandCard";
+import { KeyCap, QueueList, WordField, resultsOf } from "./Queue";
 import { STATUS_TONE, STATUS_WORD, canThank, today } from "./words";
 
 const NO_ACTIONS: SecretaryAction[] = [];
@@ -51,13 +54,16 @@ const NO_ERRANDS: Errand[] = [];
 /** «Кофе» → «кофе» inside a sentence. */
 const lower = (text: string) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : text);
 
+const normalise = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
+
 /** A request in a table cell: the label, the note after it, the time it is needed by. */
 function What({ errand, now }: { errand: Errand; now: Date }) {
   return (
-    <span className="block truncate" title={[errand.label, errand.note].filter(Boolean).join(" · ")}>
+    <span className="block truncate" title={[errand.label, errand.note, errand.result ? `передано: ${errand.result}` : null].filter(Boolean).join(" · ")}>
       {errand.label}
       {errand.due_at ? <span style={{ color: "var(--accent)" }}> · {atLine(errand.due_at, now)}</span> : null}
       {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
+      {errand.result ? <span className="text-muted"> · «{errand.result}»</span> : null}
     </span>
   );
 }
@@ -72,15 +78,10 @@ function Word({ errand }: { errand: Errand }) {
       <span className="truncate">
         {asks ? <span style={{ color: "var(--accent)" }}>спрашивает</span> : STATUS_WORD[errand.status]}
         {who ? <span className="text-muted"> · {who}</span> : null}
+        {errand.decline_reason ? <span className="text-muted"> · {lower(errand.decline_reason)}</span> : null}
       </span>
     </span>
   );
-}
-
-/** A click on a row of a desk table: its key, or nothing. */
-function rowKeyOf(event: MouseEvent<HTMLElement>): string | null {
-  if ((event.target as HTMLElement).closest("button")) return null;
-  return (event.target as HTMLElement).closest<HTMLElement>("[data-row-key]")?.dataset.rowKey ?? null;
 }
 
 /* ---- the secretary ----------------------------------------------------------------------- */
@@ -95,135 +96,57 @@ function Presence({ meId, now }: { meId: string; now: Date }) {
   const others = list.filter((p) => p.id !== meId);
 
   return (
-    <section className="card flex flex-col gap-3 p-4" data-testid="desk-presence" data-away={away ? "1" : "0"}>
-      <p className="flex items-center gap-2 font-display text-[15px] font-semibold leading-5" style={{ color: away ? "var(--warn)" : undefined }}>
-        <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: away ? "var(--warn)" : "var(--ok)" }} />
-        {away && me?.away_until ? `Не на месте ${untilLine(me.away_until)}` : "На месте"}
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {away ? (
-          <Button size="sm" onClick={() => setAway.mutate(null)}>
-            Я на месте
-          </Button>
-        ) : null}
-        {AWAY_SPANS.map((span) => (
-          <Button key={span.label} size="sm" variant="secondary" onClick={() => setAway.mutate(awayUntil(span.min))}>
-            {span.label}
-          </Button>
-        ))}
-      </div>
-      <p className="text-[12px] leading-4 text-muted">Пока вас нет, просьбы директора уходят тем, кто на месте; если никого — ждут вас.</p>
-      {others.length > 0 ? (
-        <ul className="flex flex-col gap-1 border-t border-border/60 pt-2 text-[13px] leading-[18px]">
-          {others.map((person) => (
-            <li key={person.id} className="flex items-center justify-between gap-2">
-              <span className="truncate">{shortName(person.full_name)}</span>
-              <span className="shrink-0" style={{ color: isAway(person, now) ? "var(--warn)" : "var(--text-muted)" }}>
-                {isAway(person, now) ? `не на месте ${untilLine(person.away_until as string)}` : "на месте"}
-              </span>
-            </li>
+    <section className="flex flex-col gap-2" data-testid="desk-presence" data-away={away ? "1" : "0"}>
+      <SectionLabel className="px-1">Я</SectionLabel>
+      <div className="rounded-[12px] border border-border bg-surface/40">
+        <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+          <p className="flex min-w-0 flex-1 items-center gap-2 font-display text-[15px] font-semibold leading-5" style={{ color: away ? "var(--warn)" : undefined }}>
+            <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: away ? "var(--warn)" : "var(--ok)" }} />
+            {away && me?.away_until ? `Не на месте ${untilLine(me.away_until)}` : "На месте"}
+          </p>
+          {away ? (
+            <Button size="sm" onClick={() => setAway.mutate(null)}>
+              Я на месте
+            </Button>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-border/60 px-4 py-2.5">
+          <span className="mr-1 text-[12px] leading-4 text-muted">Отойти:</span>
+          {AWAY_SPANS.map((span) => (
+            <button
+              key={span.label}
+              type="button"
+              onClick={() => setAway.mutate(awayUntil(span.min))}
+              className="inline-flex h-7 items-center rounded-[8px] border border-border bg-surface-2/60 px-2 text-[12px] font-semibold leading-4 transition-colors hover:border-muted/50"
+            >
+              {span.label.replace(/^На /, "")}
+            </button>
           ))}
-        </ul>
-      ) : null}
+        </div>
+        <p className="border-t border-border/60 px-4 py-2 text-[12px] leading-4 text-muted">Пока вас нет, просьбы директора уходят тем, кто на месте; если никого — ждут вас.</p>
+        {others.length > 0 ? (
+          <ul className="flex flex-col gap-1 border-t border-border/60 px-4 py-2 text-[13px] leading-[18px]">
+            {others.map((person) => (
+              <li key={person.id} className="flex items-center justify-between gap-2">
+                <span className="truncate">{shortName(person.full_name)}</span>
+                <span className="shrink-0" style={{ color: isAway(person, now) ? "var(--warn)" : "var(--text-muted)" }}>
+                  {isAway(person, now) ? `не на месте ${untilLine(person.away_until as string)}` : "на месте"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </section>
   );
 }
 
-type Chosen = { id: string; index: number } | null;
-
 /**
- * The queue from the keyboard (D-154): the first request is chosen; ↑/↓ — another; Enter — its
- * next step («Принял», then «Готово»); 1–4 — «Будет: сейчас / 5 / 15 / 30 мин» once it is hers;
- * N — «Не могу» with its reasons. By the physical key, so a Russian layout works; never while a
- * field, a dialog or a button has the key (a focused button's Enter is the button's).
- */
-function useQueueKeys(queue: readonly Errand[], current: Errand | null, meId: string, catalogue: readonly SecretaryAction[], choose: (next: Chosen) => void, decline: (id: string) => void) {
-  const transition = useErrandActions();
-  const link = useErrandLink();
-  const latest = useRef({ queue, current, meId, catalogue, transition, link, choose, decline });
-  useLayoutEffect(() => {
-    latest.current = { queue, current, meId, catalogue, transition, link, choose, decline };
-  });
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || !isPlainKey(event) || isTypingTarget(event.target)) return;
-      if (document.body.hasAttribute("data-dialog-open") || document.body.hasAttribute("data-sheet-open")) return;
-      const { queue, current, meId, catalogue, transition, link, choose, decline } = latest.current;
-      if (!current) return;
-      const code = event.code;
-      const at = queue.indexOf(current);
-      if (code === "ArrowDown" || code === "ArrowUp") {
-        event.preventDefault();
-        const next = Math.max(0, Math.min(queue.length - 1, at + (code === "ArrowDown" ? 1 : -1)));
-        choose({ id: queue[next].id, index: next });
-        return;
-      }
-      const scene = sceneOf(current, catalogue);
-      const taken = current.status === "accepted" && current.claimed_by === meId;
-      if (code === "Enter" || code === "NumpadEnter") {
-        if ((event.target as Element | null)?.closest?.("button, a, [role=button], [role=dialog]")) return;
-        if (transition.isPending && transition.variables?.id === current.id) return;
-        if (current.status === "sent") {
-          event.preventDefault();
-          transition.mutate({ id: current.id, to: "accepted" });
-        } else if (taken) {
-          event.preventDefault();
-          transition.mutate({ id: current.id, to: "done" });
-        }
-        return;
-      }
-      const digit = /^(?:Digit|Numpad)([1-4])$/.exec(code);
-      if (digit && taken && !current.eta_at && scene !== "dnd" && scene !== "security") {
-        event.preventDefault();
-        if (!(link.isPending && link.variables?.id === current.id)) link.mutate({ fn: "errand_eta", id: current.id, min: ETAS[Number(digit[1]) - 1].min });
-        return;
-      }
-      if (code === "KeyN" && current.status === "sent" && scene !== "security") {
-        event.preventDefault();
-        decline(current.id);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-}
-
-/** The keys that do something for the chosen request — a hint never names a dead key. */
-function QueueKeys({ current, meId, catalogue }: { current: Errand; meId: string; catalogue: readonly SecretaryAction[] }) {
-  const scene = sceneOf(current, catalogue);
-  const taken = current.status === "accepted" && current.claimed_by === meId;
-  return (
-    <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
-      <span>
-        <Kbd>↑</Kbd> <Kbd>↓</Kbd> выбор
-      </span>
-      {current.status === "sent" ? (
-        <span>
-          <Kbd>Enter</Kbd> {scene === "security" ? "вызываю охрану" : "принял"}
-        </span>
-      ) : taken ? (
-        <span>
-          <Kbd>Enter</Kbd> готово
-        </span>
-      ) : null}
-      {taken && !current.eta_at && scene !== "dnd" && scene !== "security" ? (
-        <span>
-          <Kbd>1</Kbd>–<Kbd>4</Kbd> будет через
-        </span>
-      ) : null}
-      {current.status === "sent" && scene !== "security" ? (
-        <span>
-          <Kbd>N</Kbd> не могу
-        </span>
-      ) : null}
-    </p>
-  );
-}
-
-/**
- * The secretary's desk (tasks/022 B.4, D-154): the hero — how many wait for her and how many are
- * in her hands; the queue — the visitors still at her desk and the live requests, nobody's and
- * her own, worked from the keyboard; her presence and what was closed today on the right.
+ * The secretary's desk (tasks/022 B.4, D-154; wave 3): the hero — how many wait for her and how
+ * many are in her hands; the queue — the visitors still at her desk and the live requests,
+ * nobody's and her own, as one plane of records worked from the keyboard (QueueList); «Что
+ * передать директору?» after «Готово» stays at its top; her presence and what was closed today on
+ * the right.
  */
 function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: string | null; onOpen: (id: string) => void }) {
   const now = useNow(30_000);
@@ -232,6 +155,7 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
   const catalogue = useSecretaryActions();
   const rows = errands.data ?? NO_ERRANDS;
   const actions = catalogue.data ?? NO_ACTIONS;
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
 
   // the queue: nobody's and hers; somebody else's taken request goes out by itself (Realtime).
   // Her move first: the alarm, then what nobody has answered yet, then what is in her hands —
@@ -242,27 +166,26 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
       .filter((e) => isActive(e) && (e.status === "sent" || e.claimed_by === meId))
       .sort((a, b) => rank(a) - rank(b) || a.created_at.localeCompare(b.created_at));
   }, [rows, meId, actions]);
+  const results = resultsOf(rows, meId, now, actions, dismissed);
   const closedToday = rows.filter((e) => !isActive(e) && today(e.created_at, now));
   const guests = reception(visits.data ?? []);
   const waiting = queue.filter((e) => e.status === "sent").length;
   const mine = queue.length - waiting;
   const alarm = queue.some((e) => e.status === "sent" && sceneOf(e, actions) === "security");
 
-  // the request in hand from the keyboard: the chosen one, else the one now in its place, else the first
-  const [chosen, setChosen] = useState<Chosen>(null);
-  const at = chosen ? queue.findIndex((e) => e.id === chosen.id) : -1;
-  const current = at >= 0 ? queue[at] : (queue[Math.min(chosen?.index ?? 0, queue.length - 1)] ?? null);
-  const [declineFor, setDeclineFor] = useState<string | null>(null);
-  useQueueKeys(queue, current, meId, actions, setChosen, setDeclineFor);
-  const currentId = current?.id ?? null;
-  useEffect(() => {
-    if (!currentId) return;
-    document.querySelector(`[data-errand-id="${CSS.escape(currentId)}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [currentId]);
-
   const tone: Tone | null = alarm ? "danger" : waiting > 0 ? "accent" : mine > 0 ? "ok" : null;
   const closedLine = closedToday.length > 0 ? `закрыто сегодня ${closedToday.length}` : null;
   const guestsLine = guests.length > 0 ? `${guests.length} ${pluralRu(guests.length, ["посетитель", "посетителя", "посетителей"])} в приёмной` : null;
+
+  useShortcuts("Заявки", [
+    { keys: ["↑", "↓"], label: "Выбрать заявку" },
+    { keys: ["Enter"], label: "Принял / Готово" },
+    { keys: ["1", "4"], label: "«Будет через…» — когда заявка у вас" },
+    { keys: ["N"], label: "Не могу — причины (1–3)" },
+    { keys: ["Q"], label: "Уточнить у директора" },
+    { keys: ["1", "2"], label: "После «Готово»: что передать директору" },
+    { keys: ["Esc"], label: "«Не нужно» передавать / закрыть панель" },
+  ]);
 
   return (
     <DeskPage>
@@ -292,7 +215,7 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
       )}
       {/* two columns while the screen's own width allows — the panel takes 440 px of the window */}
       <div className="@container">
-        <div className="grid items-start gap-6 @min-[860px]:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid items-start gap-6 @min-[900px]:grid-cols-[minmax(0,1fr)_320px]">
           <section className="flex min-w-0 flex-col gap-2" data-testid="desk-errand-queue">
             <SectionLabel count={errands.isLoading ? undefined : queue.length + guests.length} className="px-1">
               Очередь
@@ -300,30 +223,23 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
             {guests.length > 0 ? <ReceptionCards visits={visits.data ?? []} now={now} /> : null}
             {errands.isLoading ? (
               <SkeletonGroup grow>
-                <Bone h={92} className="rounded-[16px]" />
+                <Bone h={56} className="rounded-[12px]" />
+                <Bone h={56} className="mt-px rounded-[12px]" />
               </SkeletonGroup>
-            ) : queue.length === 0 && guests.length === 0 ? (
-              <EmptyState tone="ok" title="Новая просьба встанет сюда сама" hint="С кнопками «Принял» и «Не могу» — и с клавиатуры: Enter принять, N не могу, ↑ ↓ выбор" />
-            ) : (
-              queue.map((errand) => (
-                <ErrandCard
-                  key={errand.id}
-                  errand={errand}
-                  meId={meId}
-                  now={now}
-                  catalogue={actions}
-                  selected={openId === errand.id}
-                  chosen={current?.id === errand.id}
-                  onOpen={() => {
-                    setChosen({ id: errand.id, index: queue.indexOf(errand) });
-                    onOpen(errand.id);
-                  }}
-                  declineOpen={declineFor === errand.id}
-                  onDeclineOpen={(open) => setDeclineFor(open ? errand.id : null)}
-                />
-              ))
-            )}
-            {current ? <QueueKeys current={current} meId={meId} catalogue={actions} /> : null}
+            ) : queue.length === 0 && results.length === 0 && guests.length === 0 ? (
+              <EmptyState tone="ok" title="Новая просьба встанет сюда сама" hint="И с клавиатуры: Enter — принял, N — не могу, Q — уточнить, ↑ ↓ — выбор" />
+            ) : queue.length > 0 || results.length > 0 ? (
+              <QueueList
+                queue={queue}
+                results={results}
+                meId={meId}
+                now={now}
+                catalogue={actions}
+                openId={openId}
+                onOpen={onOpen}
+                onDismiss={(id) => setDismissed((was) => new Set(was).add(id))}
+              />
+            ) : null}
           </section>
 
           <aside className="flex min-w-0 flex-col gap-6">
@@ -341,9 +257,12 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
                       <button
                         type="button"
                         onClick={() => onOpen(errand.id)}
-                        className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[13px] leading-[18px] transition-colors duration-[120ms] hover:bg-surface-2/50 ${openId === errand.id ? "bg-accent/5" : ""}`}
+                        className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[13px] leading-[18px] transition-colors duration-[120ms] hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${openId === errand.id ? "bg-accent/5" : ""}`}
                       >
-                        <span className="min-w-0 truncate">{errand.label}</span>
+                        <span className="min-w-0 truncate">
+                          {errand.label}
+                          {errand.result ? <span className="text-muted"> · «{errand.result}»</span> : null}
+                        </span>
                         <span className="shrink-0 text-muted">
                           {STATUS_WORD[errand.status]} · {humanAqtobe(new Date(errand.created_at), now).replace(/^сегодня /, "")}
                         </span>
@@ -363,7 +282,7 @@ function SecretaryErrands({ meId, openId, onOpen }: { meId: string; openId: stri
 
 /* ---- the director ------------------------------------------------------------------------ */
 
-type Moment = { tone: Tone | null; title: string; sub: string; answer?: string };
+type Moment = { tone: Tone | null; title: string; sub: string; asking?: Errand; nudge?: Errand };
 
 /**
  * What is going on at the secretary's desk, in one line for the director's hero: a question that
@@ -374,7 +293,7 @@ function momentOf(active: readonly Errand[], guests: number, catalogue: readonly
   const asking = active.find((e) => e.question && !e.answer);
   if (asking) {
     const who = shortName(asking.claimed?.full_name ?? "") || "Секретарь";
-    return { tone: "accent", title: `${who} спрашивает: «${asking.question}»`, sub: `${asking.label} · ответ — в один клик`, answer: asking.id };
+    return { tone: "accent", title: `${who} спрашивает: «${asking.question}»`, sub: `${asking.label} · ${waitedFor(asking, now)}`, asking };
   }
   if (guests > 0) return { tone: "accent", title: "Вас ждут у секретаря", sub: "Посетитель или сообщение — ответ ниже" };
   const focus = deskFocus(active, null, catalogue, now);
@@ -387,6 +306,7 @@ function momentOf(active: readonly Errand[], guests: number, catalogue: readonly
       sub: [`ждёт ${waitedFor(focus.errand, now)}`, "ещё никто не взял", focus.queue > 0 ? `ждут ещё ${focus.queue}` : null, taken > 0 ? `в работе ${taken}` : null]
         .filter(Boolean)
         .join(" · "),
+      nudge: stale ? focus.errand : undefined,
     };
   }
   if (focus.errand) {
@@ -405,11 +325,80 @@ function momentOf(active: readonly Errand[], guests: number, catalogue: readonly
   return { tone: null, title: "Секретарь свободен", sub: "Попросите в один клик — или строкой поручения сверху" };
 }
 
+/** The secretary's question answered right in the hero: «Да» / «Нет» (Y / N) for a yes-or-no one, or a word. */
+function HeroAnswer({ errand, onOpen }: { errand: Errand; onOpen: () => void }) {
+  const link = useErrandLink();
+  const busy = link.isPending && link.variables?.id === errand.id;
+  const answer = (text: string) => link.mutate({ fn: "errand_answer", id: errand.id, text });
+  return (
+    <div className="flex flex-wrap items-center gap-2" data-testid="desk-errands-answer">
+      {isYesNo(errand.question ?? "") ? (
+        <>
+          <Button size="sm" disabled={busy} onClick={() => answer("Да")} data-testid="desk-errands-yes">
+            Да
+            <KeyCap>Y</KeyCap>
+          </Button>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => answer("Нет")}>
+            Нет
+            <KeyCap muted>N</KeyCap>
+          </Button>
+        </>
+      ) : null}
+      <div className="w-[300px]">
+        <WordField placeholder="Ответить своими словами…" action="Ответить" busy={busy} onSend={answer} testId="desk-errands-answer-field" />
+      </div>
+      <Button size="sm" variant="ghost" onClick={onOpen}>
+        Подробнее
+      </Button>
+    </div>
+  );
+}
+
+type Show = "all" | Extract<ErrandStatus, "done" | "declined" | "cancelled">;
+const NOBODY = "__nobody";
+
+/** Thirty days in numbers: how many, how fast, what nobody took, and who did what. */
+function Stats({ rows, tally, average, unclaimed }: { rows: readonly Errand[]; tally: ErrandTally[]; average: number | null; unclaimed: number }) {
+  const tallyColumns: Column<ErrandTally>[] = [
+    { key: "name", title: "Кто", render: (t) => <span className="block truncate">{shortName(t.name)}</span> },
+    { key: "taken", title: "Взято", width: "60px", align: "right", sort: (a, b) => a.taken - b.taken, render: (t) => <span className="nums">{t.taken}</span> },
+    { key: "done", title: "Готово", width: "68px", align: "right", sort: (a, b) => a.done - b.done, render: (t) => <span className="nums">{t.done}</span> },
+    {
+      key: "declined",
+      title: "Отказ",
+      width: "64px",
+      align: "right",
+      sort: (a, b) => a.declined - b.declined,
+      render: (t) => <span className={`nums ${t.declined ? "" : "text-muted/60"}`} style={{ color: t.declined ? "var(--danger)" : undefined }}>{t.declined}</span>,
+    },
+  ];
+  const line = (label: string, value: string, tone?: Tone) => (
+    <div className="flex items-baseline justify-between gap-3 border-t border-border/60 px-4 py-2 first:border-t-0">
+      <dt className="text-[13px] leading-5 text-muted">{label}</dt>
+      <dd className="nums font-display text-[17px] font-semibold leading-6" style={tone ? { color: TONE_VAR[tone] } : value === "0" || value === "—" ? { color: "var(--text-muted)" } : undefined}>
+        {value}
+      </dd>
+    </div>
+  );
+  return (
+    <aside className="flex min-w-0 flex-col gap-2" data-testid="desk-errands-stats">
+      <SectionLabel className="px-1">За 30 дней</SectionLabel>
+      <dl className="rounded-[12px] border border-border bg-surface/40">
+        {line(pluralRu(rows.length, ["Заявка", "Заявки", "Заявок"]), String(rows.length))}
+        {line("Попросил → готово, в среднем", average === null ? "—" : humanMinutes(average))}
+        {line("Никто не взял", String(unclaimed), unclaimed > 0 ? "warn" : undefined)}
+      </dl>
+      {tally.length > 0 ? <DataGrid aria-label="Кто сколько взял" columns={tallyColumns} rows={tally} rowKey={(t) => t.name} empty={null} /> : null}
+    </aside>
+  );
+}
+
 /**
- * The director's errands (tasks/022 B.4, D-154): the hero — what is going on at the secretary's
- * desk now and the usual requests in one click each; then what waits (visitors, live requests),
- * thirty days in numbers — how fast, by whom, what nobody took — and the closed list with
- * «спасибо».
+ * The director's errands (tasks/022 B.4, D-154; wave 3): the hero — what is going on at the
+ * secretary's desk now, the secretary's question answered right there (Y / N or a word), «Напомнить
+ * ещё раз» for a request nobody took, and the usual requests in one click each; «Сейчас» — the
+ * visitors and the live requests; «История» — thirty days with filters by state, by who and by
+ * words, the numbers beside it. ↑/↓ walk the rows with the panel following, F — the search.
  */
 function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: string | null; onOpen: (id: string) => void }) {
   const { pointsEnabled } = useDeskScope();
@@ -418,6 +407,7 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
   const visits = useVisits();
   const catalogue = useSecretaryActions();
   const secretaries = useSecretaries();
+  const link = useErrandLink();
   const rows = history.data ?? NO_ERRANDS;
   const visitRows = visits.data ?? [];
   const active = rows.filter(isActive).sort((a, b) => a.created_at.localeCompare(b.created_at));
@@ -428,46 +418,69 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
   const guests = awaitingDirector(visitRows).length + unreadMessages(visitRows).length;
   const moment = momentOf(active, guests, catalogue.data ?? NO_ACTIONS, secretaries.data ?? [], now);
 
-  const select = (event: MouseEvent<HTMLElement>) => {
-    const key = rowKeyOf(event);
-    if (key) onOpen(key);
-  };
+  const [show, setShow] = useState<Show>("all");
+  const [who, setWho] = useState("");
+  const [query, setQuery] = useState("");
+  const search = useRef<HTMLInputElement>(null);
+  const takers = useMemo(() => [...new Set(closed.map((e) => e.claimed?.full_name).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b, "ru")), [closed]);
+  const countOf = (status: Show) => (status === "all" ? closed.length : closed.filter((e) => e.status === status).length);
+  const words = normalise(query);
+  const shownClosed = closed.filter(
+    (e) =>
+      (show === "all" || e.status === show) &&
+      (!who || (who === NOBODY ? !e.claimed_by : e.claimed?.full_name === who)) &&
+      (!words || normalise([e.label, e.note ?? "", e.result ?? "", e.claimed?.full_name ?? "", e.decline_reason ?? ""].join(" ")).includes(words)),
+  );
+  const narrowed = show !== "all" || Boolean(who) || Boolean(query);
+
+  useScreenKeys((event) => {
+    const arrow = arrowOf(event);
+    if (arrow) {
+      const keys = [...document.querySelectorAll<HTMLElement>('[data-testid="desk-errands-now"] [data-row-key], [data-testid="desk-errands-history"] [data-row-key]')].map((row) => row.dataset.rowKey ?? "");
+      const next = stepKey(keys, openId, arrow === "down");
+      if (next) onOpen(next);
+      return Boolean(next);
+    }
+    if (event.code === "KeyF") {
+      search.current?.focus();
+      return true;
+    }
+    const asking = moment.asking;
+    if (asking && isYesNo(asking.question ?? "") && (event.code === "KeyY" || event.code === "KeyN") && !onControl(event.target)) {
+      if (!(link.isPending && link.variables?.id === asking.id)) link.mutate({ fn: "errand_answer", id: asking.id, text: event.code === "KeyY" ? "Да" : "Нет" });
+      return true;
+    }
+    return false;
+  });
+  useShortcuts("Заявки", [
+    { keys: ["↑", "↓"], label: "Соседняя заявка в панели" },
+    { keys: ["F"], label: "Поиск по истории" },
+    { keys: ["Y", "N"], label: "Ответить секретарю «Да» / «Нет»" },
+    { keys: ["Ctrl K"], label: "Попросить строкой: «чай без сахара»" },
+  ]);
 
   const liveColumns: Column<Errand>[] = [
     { key: "what", title: "Что", render: (e) => <What errand={e} now={now} /> },
-    { key: "state", title: "Статус", width: "200px", render: (e) => <Word errand={e} /> },
+    { key: "state", title: "Статус", width: "minmax(160px,220px)", render: (e) => <Word errand={e} /> },
     { key: "waited", title: "Ждёт", width: "100px", align: "right", render: (e) => <span className="nums">{waitedFor(e, now)}</span> },
   ];
   const historyColumns: Column<Errand>[] = [
-    { key: "what", title: "Что", render: (e) => <What errand={e} now={now} /> },
-    { key: "state", title: "Статус", width: "200px", sort: (a, b) => a.status.localeCompare(b.status), render: (e) => <Word errand={e} /> },
+    { key: "what", title: "Что", sort: (a, b) => a.label.localeCompare(b.label, "ru"), render: (e) => <What errand={e} now={now} /> },
+    { key: "state", title: "Статус", width: "minmax(150px,220px)", sort: (a, b) => a.status.localeCompare(b.status), render: (e) => <Word errand={e} /> },
     {
       key: "at",
       title: "Когда",
-      width: "150px",
+      width: "128px",
       sort: (a, b) => a.created_at.localeCompare(b.created_at),
       render: (e) => <span className="nums text-muted">{humanAqtobe(new Date(e.created_at), now)}</span>,
     },
     {
       key: "thanks",
       title: "",
-      width: "120px",
+      width: "104px",
       align: "right",
       render: (e) =>
         canThank(e, now, pointsEnabled) ? <ThankButton errand={e} /> : e.thanked_at ? <span className="text-[13px] text-muted" title="Спасибо отправлено">♥</span> : null,
-    },
-  ];
-  const tallyColumns: Column<ErrandTally>[] = [
-    { key: "name", title: "Секретарь", render: (t) => t.name },
-    { key: "taken", title: "Взято", width: "96px", align: "right", sort: (a, b) => a.taken - b.taken, render: (t) => <span className="nums">{t.taken}</span> },
-    { key: "done", title: "Готово", width: "96px", align: "right", sort: (a, b) => a.done - b.done, render: (t) => <span className="nums">{t.done}</span> },
-    {
-      key: "declined",
-      title: "Отказ",
-      width: "96px",
-      align: "right",
-      sort: (a, b) => a.declined - b.declined,
-      render: (t) => <span className={`nums ${t.declined ? "" : "text-muted/60"}`} style={{ color: t.declined ? "var(--danger)" : undefined }}>{t.declined}</span>,
     },
   ];
 
@@ -483,19 +496,26 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
           title={moment.title}
           sub={moment.sub}
           aside={
-            moment.answer ? (
-              <Button size="sm" onClick={() => onOpen(moment.answer as string)} data-testid="desk-errands-answer">
-                Ответить
+            moment.nudge ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={link.isPending && link.variables?.id === moment.nudge.id}
+                onClick={() => moment.nudge && link.mutate({ fn: "errand_nudge", id: moment.nudge.id })}
+                data-testid="desk-errand-nudge"
+              >
+                Напомнить ещё раз
               </Button>
             ) : null
           }
         >
+          {moment.asking ? <HeroAnswer errand={moment.asking} onOpen={() => moment.asking && onOpen(moment.asking.id)} /> : null}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-border/60 pt-3" data-testid="desk-errands-quick">
             <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Попросить</span>
             <QuickErrands limit={5} />
             {/* the order line's errand matcher (D-79 §9): a short phrase of a catalogue button, no name in it */}
             <span className="ml-auto flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-              или строкой поручения: «чай без сахара» <Kbd>Ctrl K</Kbd>
+              или строкой: «чай без сахара» <Kbd>Ctrl K</Kbd>
             </span>
           </div>
         </DeskHero>
@@ -513,50 +533,86 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
             </div>
           ) : null}
           {active.length > 0 ? (
-            <div onClick={select}>
-              <DataGrid aria-label="Заявки сейчас" columns={liveColumns} rows={active} rowKey={(e) => e.id} selectedKey={openId} onSelect={(e) => onOpen(e.id)} empty={null} />
-            </div>
+            <DataGrid
+              aria-label="Заявки сейчас"
+              columns={liveColumns}
+              rows={active}
+              rowKey={(e) => e.id}
+              selectedKey={openId}
+              onSelect={(e) => onOpen(e.id)}
+              rowTone={(e) => (e.question && !e.answer ? "accent" : null)}
+              empty={null}
+            />
           ) : null}
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-3" data-testid="desk-errands-stats">
-        <SectionLabel className="px-1">За 30 дней</SectionLabel>
-        {history.isLoading ? null : (
-          <div className="flex flex-wrap items-start gap-6">
-            <HeroFacts
-              className="-ml-3"
-              facts={[
-                { key: "count", value: rows.length, label: pluralRu(rows.length, ["заявка", "заявки", "заявок"]) },
-                { key: "average", value: average ?? 0, text: average === null ? "—" : humanMinutes(average), label: "попросил → готово, в среднем" },
-                { key: "unclaimed", value: unclaimed, label: "никто не взял", tone: "warn" },
-              ]}
-            />
-            {tally.length > 0 ? (
-              <DataGrid aria-label="Кто сколько взял" columns={tallyColumns} rows={tally} rowKey={(t) => t.name} empty={null} className="min-w-[420px] max-w-[560px] flex-1" />
-            ) : null}
-          </div>
-        )}
-      </section>
-
-      <section className="flex flex-col gap-2" data-testid="desk-errands-history">
-        <SectionLabel count={history.isLoading ? undefined : closed.length} className="px-1">
-          Закрытые
-        </SectionLabel>
-        {history.isLoading ? null : (
-          <div onClick={select}>
-            <DataGrid
-              aria-label="Закрытые заявки"
-              columns={historyColumns}
-              rows={closed}
-              rowKey={(e) => e.id}
-              selectedKey={openId}
-              onSelect={(e) => onOpen(e.id)}
-              empty={<EmptyState title="Заявок ещё не было" hint="«Кофе», «Чай», «Не беспокоить» — в один клик сверху" />}
-            />
-          </div>
-        )}
-      </section>
+      <div className="@container">
+        <div className="grid items-start gap-6 @min-[980px]:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="flex min-w-0 flex-col gap-2" data-testid="desk-errands-history">
+            <SectionLabel count={history.isLoading ? undefined : closed.length} className="px-1">
+              История
+            </SectionLabel>
+            <Toolbar end={<span className="nums text-[13px] leading-4 text-muted">{history.isLoading ? " " : `${shownClosed.length} из ${closed.length}`}</span>}>
+              <SegmentTabs<Show>
+                aria-label="Чем закончилась"
+                value={show}
+                onChange={setShow}
+                items={[
+                  { value: "all", label: "Все", count: countOf("all") },
+                  { value: "done", label: "Готово", count: countOf("done") },
+                  { value: "declined", label: "Отказ", count: countOf("declined") },
+                  { value: "cancelled", label: "Отменено", count: countOf("cancelled") },
+                ]}
+              />
+              <Select aria-label="Кто" value={who} onChange={(event) => setWho(event.target.value)} className="w-[164px]" data-testid="desk-errands-who">
+                <option value="">Все секретари</option>
+                {takers.map((name) => (
+                  <option key={name} value={name}>
+                    {shortName(name)}
+                  </option>
+                ))}
+                <option value={NOBODY}>Никто не взял</option>
+              </Select>
+              <SearchField ref={search} value={query} onChange={setQuery} placeholder="Что просили  ·  F" width={200} aria-label="Поиск по заявкам" />
+            </Toolbar>
+            {history.isLoading ? null : (
+              <DataGrid
+                aria-label="Закрытые заявки"
+                columns={historyColumns}
+                rows={shownClosed}
+                rowKey={(e) => e.id}
+                selectedKey={openId}
+                onSelect={(e) => onOpen(e.id)}
+                empty={
+                  narrowed ? (
+                    <EmptyState
+                      title="Таких заявок не нашлось"
+                      hint="Фильтры — над таблицей"
+                      action={
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setShow("all");
+                            setWho("");
+                            setQuery("");
+                          }}
+                        >
+                          Показать все
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <EmptyState title="Заявок ещё не было" hint="«Кофе», «Чай», «Не беспокоить» — в один клик сверху" />
+                  )
+                }
+              />
+            )}
+          </section>
+          {history.isLoading ? null : <Stats rows={rows} tally={tally} average={average} unclaimed={unclaimed} />}
+        </div>
+      </div>
       <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} pointsOn={pointsEnabled} />
     </DeskPage>
   );

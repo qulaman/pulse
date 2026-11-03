@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import type { MenuItem } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { QuickErrands } from "@/components/desk/ui/QuickErrands";
@@ -41,19 +42,41 @@ export function WorkList({ children, testId }: { children: ReactNode; testId?: s
   );
 }
 
-/** One row of a work list: the whole row opens, its buttons are its own. */
-function WorkRow({ onOpen, children, chosen = false, testId, rowKey }: { onOpen: () => void; children: ReactNode; chosen?: boolean; testId?: string; rowKey?: string }) {
+/**
+ * One row of a work list: the whole row opens, its buttons are its own, a right click is its menu.
+ * `chosen` — open in the panel; `cursor` — under the keyboard's cursor (J/K), ringed like the
+ * table's chosen row.
+ */
+function WorkRow({
+  onOpen,
+  onMenu,
+  children,
+  chosen = false,
+  cursor = false,
+  testId,
+  rowKey,
+}: {
+  onOpen: () => void;
+  onMenu?: (event: MouseEvent) => void;
+  children: ReactNode;
+  chosen?: boolean;
+  cursor?: boolean;
+  testId?: string;
+  rowKey?: string;
+}) {
   return (
     <div
       role="button"
       tabIndex={0}
       data-testid={testId}
       data-row-key={rowKey}
+      data-cursor={cursor ? "" : undefined}
       aria-current={chosen ? "true" : undefined}
       onClick={(event) => {
         if ((event.target as Element).closest("button, a")) return;
         onOpen();
       }}
+      onContextMenu={onMenu}
       onKeyDown={(event) => {
         if (event.target !== event.currentTarget) return;
         if (event.key === "Enter" || event.key === " ") {
@@ -61,9 +84,9 @@ function WorkRow({ onOpen, children, chosen = false, testId, rowKey }: { onOpen:
           onOpen();
         }
       }}
-      className={`relative grid cursor-pointer items-center gap-x-4 border-b border-border/50 px-4 py-2.5 transition-colors duration-[120ms] last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
-        chosen ? "bg-accent/7" : "hover:bg-surface-2/55"
-      }`}
+      className={`group/row relative grid cursor-pointer items-center gap-x-4 border-b border-border/50 px-4 py-2 transition-colors duration-[120ms] last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
+        chosen || cursor ? "bg-accent/7" : "hover:bg-surface-2/55"
+      } ${cursor ? "shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_45%,transparent)]" : ""}`}
     >
       {children}
     </div>
@@ -79,19 +102,28 @@ export function Decisions({
   items,
   limit,
   openId,
+  cursorId,
   movesOf,
   onMove,
   onOpen,
-  onMore,
+  menuOf,
+  onMenu,
+  compact = false,
   now,
 }: {
   items: readonly DeskItem[];
   limit: number;
   openId: string | null;
+  /** the row under the keyboard's cursor: its letters show on its buttons */
+  cursorId: string | null;
   movesOf: (item: DeskItem) => Move[];
-  onMove: (move: Move, item: DeskItem) => void;
+  onMove: (move: Move, item: DeskItem, target: HTMLElement) => void;
   onOpen: (id: string) => void;
-  onMore: (item: DeskItem) => void;
+  /** the row's «⋯» and right click: everything the task allows */
+  menuOf: (item: DeskItem) => MenuItem[];
+  onMenu: (item: DeskItem, event: MouseEvent) => void;
+  /** the panel takes the room: a row's buttons come over its right end on hover, as in the table */
+  compact?: boolean;
   now: Date;
 }) {
   const shown = items.slice(0, limit);
@@ -114,9 +146,19 @@ export function Decisions({
       ) : (
         <WorkList testId="today-decisions-list">
           {shown.map((item) => (
-            <WorkRow key={item.task.id} rowKey={item.task.id} testId="today-decision" chosen={openId === item.task.id} onOpen={() => onOpen(item.task.id)}>
-              <div className="grid grid-cols-[164px_minmax(0,1fr)_auto_28px] items-center gap-x-4">
-                <PersonCell name={item.task.assignee?.full_name} ring={REASON_TONE[item.reason]} />
+            <WorkRow
+              key={item.task.id}
+              rowKey={item.task.id}
+              testId="today-decision"
+              chosen={openId === item.task.id}
+              cursor={cursorId === item.task.id}
+              onOpen={() => onOpen(item.task.id)}
+              onMenu={(event) => onMenu(item, event)}
+            >
+              <div className={`grid items-center gap-x-4 ${compact ? "grid-cols-[156px_minmax(0,1fr)_28px]" : "grid-cols-[156px_minmax(0,1fr)_auto_28px]"}`}>
+                <span data-act-for={item.task.id} data-act="reassign handoff">
+                  <PersonCell name={item.task.assignee?.full_name} ring={REASON_TONE[item.reason]} />
+                </span>
                 <span className="flex min-w-0 items-start gap-2.5">
                   <span className="mt-px shrink-0">
                     <StatusGlyph status={item.task.status} overdue={isOverdue(item.task, now)} size={18} />
@@ -128,8 +170,17 @@ export function Decisions({
                     <span className="truncate text-[13px] leading-[18px] text-muted">{decisionLine(item.reason, item.task, now)}</span>
                   </span>
                 </span>
-                <MoveRow moves={movesOf(item)} onPress={(move) => onMove(move, item)} />
-                <MoreButton onPress={() => onMore(item)} />
+                {compact ? (
+                  <span
+                    className="pointer-events-none absolute inset-y-0 right-12 hidden items-center pl-10 group-hover/row:pointer-events-auto group-hover/row:flex"
+                    style={{ background: "linear-gradient(90deg, transparent, color-mix(in srgb, var(--surface-2) 55%, color-mix(in srgb, var(--surface) 40%, var(--bg))) 36px)" }}
+                  >
+                    <MoveRow moves={movesOf(item)} onPress={(move, target) => onMove(move, item, target)} showKeys={cursorId === item.task.id} />
+                  </span>
+                ) : (
+                  <MoveRow moves={movesOf(item)} onPress={(move, target) => onMove(move, item, target)} showKeys={cursorId === item.task.id} />
+                )}
+                <MoreButton items={() => menuOf(item)} />
               </div>
             </WorkRow>
           ))}
@@ -148,16 +199,22 @@ export function Decisions({
 export function Overdue({
   items,
   openId,
+  cursorId,
   movesOf,
   onMove,
   onOpen,
+  menuOf,
+  onMenu,
   now,
 }: {
   items: readonly DeskItem[];
   openId: string | null;
+  cursorId: string | null;
   movesOf: (item: DeskItem) => Move[];
-  onMove: (move: Move, item: DeskItem) => void;
+  onMove: (move: Move, item: DeskItem, target: HTMLElement) => void;
   onOpen: (id: string) => void;
+  menuOf: (item: DeskItem) => MenuItem[];
+  onMenu: (item: DeskItem, event: MouseEvent) => void;
   now: Date;
 }) {
   if (items.length === 0) return null;
@@ -177,8 +234,16 @@ export function Overdue({
         {items.map((item) => {
           const [nudge] = movesOf(item);
           return (
-            <WorkRow key={item.task.id} rowKey={item.task.id} testId="today-overdue-row" chosen={openId === item.task.id} onOpen={() => onOpen(item.task.id)}>
-              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4">
+            <WorkRow
+              key={item.task.id}
+              rowKey={item.task.id}
+              testId="today-overdue-row"
+              chosen={openId === item.task.id}
+              cursor={cursorId === item.task.id}
+              onOpen={() => onOpen(item.task.id)}
+              onMenu={(event) => onMenu(item, event)}
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_28px] items-center gap-x-4">
                 <span className="flex min-w-0 items-center gap-2.5">
                   <StatusGlyph status={item.task.status} overdue size={18} />
                   <span className="truncate font-medium" title={item.task.title}>
@@ -186,10 +251,11 @@ export function Overdue({
                   </span>
                   <span className="shrink-0 text-[13px] text-muted">{shortName(item.task.assignee?.full_name)}</span>
                 </span>
-                <span className="nums whitespace-nowrap text-[13px] font-semibold" style={{ color: "var(--danger)" }}>
+                <span className="nums whitespace-nowrap text-[13px] font-semibold" style={{ color: "var(--danger)" }} data-act-for={item.task.id} data-act="extend retime">
                   {decisionLine("overdue", { ...item.task, nudged_at: null }, now)}
                 </span>
-                {nudge ? <MoveButton move={nudge} onPress={(move) => onMove(move, item)} /> : <span />}
+                {nudge ? <MoveButton move={nudge} onPress={(move, target) => onMove(move, item, target)} showKey={cursorId === item.task.id} /> : <span />}
+                <MoreButton items={() => menuOf(item)} />
               </div>
             </WorkRow>
           );

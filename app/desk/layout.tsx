@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { DeskShell } from "@/components/desk/DeskShell";
 import { AuthError, getSessionProfile, homeForRole } from "@/lib/auth";
 import { loadBrand } from "@/lib/brand";
+import { NAV_COOKIE, navFoldedFromCookie } from "@/lib/desk/frame";
 import { isDeskRole } from "@/lib/desk/routes";
 import { canManageTeam } from "@/lib/routes";
 
@@ -25,9 +27,11 @@ export default async function DeskLayout({ children }: { children: React.ReactNo
   if (!canManageTeam(profile.role) || !isDeskRole(profile.role)) redirect(homeForRole(profile.role));
   // the client's logo and the points switch, from the company row the root layout has read (D-126)
   const { name, logoUrl, pointsEnabled } = await loadBrand(profile.companyId);
+  // the navigation as this browser left it — folded to icons or wide (D-154 wave 3)
+  const navFolded = navFoldedFromCookie((await cookies()).get(NAV_COOKIE)?.value);
 
   return (
-    <DeskShell me={profile} role={profile.role} brand={{ name, logoUrl, pointsEnabled }}>
+    <DeskShell me={profile} role={profile.role} brand={{ name, logoUrl, pointsEnabled }} navFolded={navFolded}>
       {children}
     </DeskShell>
   );

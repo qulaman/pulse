@@ -6,18 +6,21 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { taggedActions, usePanelFlow, writeParams } from "@/components/desk/tasks/flow";
 import { MomentBar, type MomentCounter } from "@/components/desk/tasks/MomentBar";
-import { TaskPanel } from "@/components/desk/tasks/TaskPanel";
+import { deskLayerOpen, TaskPanel } from "@/components/desk/tasks/TaskPanel";
 import { DESK_NEW_TASK } from "@/components/desk/tasks/TasksScreen";
+import { useDeskActs } from "@/components/desk/tasks/useDeskActs";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
+import { Kbd } from "@/components/desk/ui/Kbd";
+import { useContextMenu } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { useMinute } from "@/components/tasks/list/TaskList";
-import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { useCalendar } from "@/lib/calendar/queries";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
-import { matchesDue, personNow, rowMoves, type Move } from "@/lib/desk/tasks";
+import { cursorStep, matchesDue, personNow, rowKeys, rowMoves, type Move } from "@/lib/desk/tasks";
 import { isActive, useErrands } from "@/lib/errands/queries";
 import { loadColor, useTeamLoads } from "@/lib/people/loads";
 import { useNamesKey } from "@/lib/people/names";
@@ -161,30 +164,37 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     },
     flow.mark,
   );
-  const controls = useDirectorControls({
+  const reply = (task: { id: string }) => {
+    setFocus(task.id);
+    openTask(task.id);
+  };
+  const acts = useDeskActs({
     base: deskActions,
-    companyId: me.companyId,
     tasks: board,
-    questionOf: (id) => boardById.get(id)?.question ?? null,
-    requestOf: (id) => boardById.get(id)?.time_request ?? null,
-    suggestionOf: (id) => boardById.get(id)?.suggestion ?? null,
+    flagsOf: (id) => ({ question: boardById.get(id)?.question ?? null, request: boardById.get(id)?.time_request ?? null, suggestion: boardById.get(id)?.suggestion ?? null }),
     now,
-    onThread: false,
+    companyId: me.companyId,
+    onReply: reply,
+    onOpen: openTask,
+    afterRemove: (id) => {
+      if (openId === id) closeTask();
+    },
   });
-  // the letters live in «Задачи»; here the buttons are the whole story
+  const context = useContextMenu();
+  const menuOf = (item: DeskItem) => acts.menu(item.task, { onOpenRow: () => openTask(item.task.id) });
+
+  /* ---- the keyboard's cursor over the decisions and the late ones (J/K), the panel following it when open ---- */
+  const [cursorRaw, setCursor] = useState<string | null>(null);
+  const cursor = openId && ids.includes(openId) ? openId : cursorRaw && ids.includes(cursorRaw) ? cursorRaw : null;
+  const itemOf = (id: string | null) => (id ? [...decisions, ...late].find((item) => item.task.id === id) : undefined);
+
+  // the row's moves: the letters show on the row under the cursor; the hint names them all
   const movesOf = (item: DeskItem): Move[] =>
-    rowMoves(item.task, item.reason, { request: item.task.time_request, suggestion: item.task.suggestion, nudgedAt: item.task.nudged_at }, now).map((move) => ({
-      ...move,
-      key: undefined,
-    }));
-  const onMove = (move: Move, item: DeskItem) => {
+    rowMoves(item.task, item.reason, { request: item.task.time_request, suggestion: item.task.suggestion, nudgedAt: item.task.nudged_at }, now);
+  const onMove = (move: Move, item: DeskItem, target?: HTMLElement) => {
     if (move.held) return;
-    if (move.action === "answer") {
-      setFocus(item.task.id);
-      openTask(item.task.id);
-      return;
-    }
-    controls.press(move.action, item.task);
+    setCursor(item.task.id);
+    acts.press(move.action, item.task, target ? { at: target } : undefined);
   };
 
   /* ---- the team now: trouble first ---- */
@@ -226,25 +236,76 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const mine = (errands.data ?? []).filter((errand) => errand.author_id === me.userId && isActive(errand)).slice(0, 4);
   const answer = (visit: Visit, value: VisitAnswer) => answerVisit.mutate({ id: visit.id, answer: value });
 
-  /* ---- Enter: to the stack, while something waits and nothing else holds the key ---- */
-  const latest = useRef({ queue: queue.length, openId });
+  /* ---- the keys of the screen: J/K the cursor, Enter opens it (or the stack), the row's letters ---- */
+  const latest = useRef({ queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask });
   useLayoutEffect(() => {
-    latest.current = { queue: queue.length, openId };
+    latest.current = { queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey) return;
-      if (event.code !== "Enter" && event.code !== "NumpadEnter") return;
-      if (isTypingTarget(event.target) || (event.target as HTMLElement | null)?.closest?.("button, a, [role=button], [role=grid]")) return;
-      const body = document.body;
-      if (body.hasAttribute("data-sheet-open") || body.hasAttribute("data-dialog-open")) return;
-      if (latest.current.openId || latest.current.queue === 0) return;
+      const target = event.target as HTMLElement | null;
+      if (isTypingTarget(target) || deskLayerOpen()) return;
+      // the panel's own keys are its own; the screen answers from itself or from nowhere
+      if (target && target !== document.body && !target.closest("#desk-main")) return;
+      const k = latest.current;
+      const step = event.code === "KeyJ" ? 1 : event.code === "KeyK" ? -1 : 0;
+      if (step !== 0) {
+        const next = cursorStep(k.ids, k.cursor, step);
+        if (!next) return;
+        event.preventDefault();
+        setCursor(next);
+        if (k.openId) k.openTask(next);
+        document.querySelector(`#desk-main [data-row-key="${CSS.escape(next)}"]`)?.scrollIntoView({ block: "nearest" });
+        return;
+      }
+      if (event.code === "Enter" || event.code === "NumpadEnter") {
+        // a focused button or link takes its own Enter
+        if (target?.closest?.("button, a, [role=button], [role=grid]")) return;
+        if (k.cursor && k.cursor !== k.openId) {
+          event.preventDefault();
+          k.openTask(k.cursor);
+          return;
+        }
+        if (k.openId || k.queue === 0) return;
+        event.preventDefault();
+        router.push("/desk/inbox");
+        return;
+      }
+      if (event.code === "Escape" && k.cursor && !k.openId) {
+        event.preventDefault();
+        setCursor(null);
+        return;
+      }
+      const item = k.itemOf(k.cursor);
+      if (!item) return;
+      if (event.code === "Period") {
+        event.preventDefault();
+        document.querySelector<HTMLElement>(`#desk-main [data-row-key="${CSS.escape(item.task.id)}"] [data-testid="desk-row-more"]`)?.click();
+        return;
+      }
+      const key = rowKeys(item.task, { request: Boolean(item.task.time_request) }).find((one) => one.code === event.code);
+      if (!key) return;
       event.preventDefault();
-      router.push("/desk/inbox");
+      if (key.action === "reply") k.reply(item.task);
+      else k.acts.press(key.action, item.task);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [router]);
+
+  useShortcuts("Сегодня", [
+    { keys: ["J", "K"], label: "По решениям и просрочкам — вниз, вверх" },
+    { keys: ["Enter"], label: "Открыть строку в панели (без строки — «Разобрать по одной»)" },
+    { keys: ["A"], label: "Принять сданную" },
+    { keys: ["R"], label: "На доработку" },
+    { keys: ["O"], label: "Ответить" },
+    { keys: ["N"], label: "Напомнить" },
+    { keys: ["D"], label: "Срок" },
+    { keys: ["T"], label: "Передать" },
+    { keys: ["."], label: "Все действия строки (или правый клик)" },
+    { keys: ["Esc"], label: "Убрать курсор, закрыть панель" },
+  ]);
 
   const calm = screen.value === null && screen.closedToday === 0;
   const reportDay = reports.data && reports.data.rows.some((row) => row.state !== "off") ? reports.data : null;
@@ -262,19 +323,63 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               items={decisions}
               limit={DECISIONS_SHOWN}
               openId={openId}
+              cursorId={cursor}
               movesOf={movesOf}
               onMove={onMove}
-              onOpen={openTask}
-              onMore={(item) => controls.more(item.task)}
+              onOpen={(id) => {
+                setCursor(id);
+                openTask(id);
+              }}
+              menuOf={menuOf}
+              onMenu={(item, event) => {
+                setCursor(item.task.id);
+                context.open(event, menuOf(item));
+              }}
+              compact={Boolean(openId)}
               now={now}
             />
+            {decisions.length + late.length > 0 ? (
+              <p className="-mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="today-keys-hint">
+                <span>
+                  <Kbd>J</Kbd> <Kbd>K</Kbd> по строкам
+                </span>
+                <span>
+                  <Kbd>Enter</Kbd> открыть
+                </span>
+                <span>
+                  <Kbd>A</Kbd> <Kbd>R</Kbd> <Kbd>O</Kbd> <Kbd>N</Kbd> <Kbd>D</Kbd> <Kbd>T</Kbd> действие строки
+                </span>
+                <span>
+                  <Kbd>.</Kbd> меню
+                </span>
+                <span>
+                  <Kbd>?</Kbd> все клавиши
+                </span>
+              </p>
+            ) : null}
             <TeamNow
               rows={teamRows.slice(0, TEAM_SHOWN)}
               total={teamRows.length}
               loading={people.isPending}
               onOpen={(id) => router.push(`/desk/tasks?who=${encodeURIComponent(id)}`)}
             />
-            <Overdue items={late} openId={openId} movesOf={movesOf} onMove={onMove} onOpen={openTask} now={now} />
+            <Overdue
+              items={late}
+              openId={openId}
+              cursorId={cursor}
+              movesOf={movesOf}
+              onMove={onMove}
+              onOpen={(id) => {
+                setCursor(id);
+                openTask(id);
+              }}
+              menuOf={menuOf}
+              onMenu={(item, event) => {
+                setCursor(item.task.id);
+                context.open(event, menuOf(item));
+              }}
+              now={now}
+            />
           </div>
 
           <div className="flex min-w-0 flex-col gap-5">
@@ -299,7 +404,8 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         </div>
       </div>
 
-      {controls.sheets}
+      {acts.node}
+      {context.node}
 
       {openId ? (
         <InPanel panelKey={`task:${openId}`} onClose={closeTask}>
@@ -316,6 +422,7 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
             next={flow.next}
             focusToken={focus === openId ? 1 : 0}
             onFocused={() => setFocus(null)}
+            bodyKeys={false}
           />
         </InPanel>
       ) : null}

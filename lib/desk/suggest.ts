@@ -7,7 +7,7 @@
 export type SuggestPerson = { id: string; full_name: string; position?: string | null; aliases?: string[] | null };
 
 /** ё → е, lower case: the way people type a name. */
-function fold(text: string): string {
+export function fold(text: string): string {
   return text.toLowerCase().replace(/ё/g, "е");
 }
 
@@ -21,7 +21,7 @@ export function wordAtCaret(text: string, caret: number): { start: number; word:
 }
 
 /** One typed word against one name word: a beginning, or the same stem in another case. */
-function fits(typed: string, word: string): boolean {
+export function fits(typed: string, word: string): boolean {
   if (word.startsWith(typed)) return true;
   if (typed.startsWith(word)) return word.length >= 3;
   // «Дине» — «Дина», «Ерлану» — «Ерлан»: all but the last letter agree

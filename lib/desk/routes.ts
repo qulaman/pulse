@@ -25,7 +25,8 @@ export function deskHomeFor(role: Role | undefined): string {
 
 export type DeskBadge = "tasks" | "errands" | "calendar";
 
-export type DeskNavItem = { href: string; label: string; badge?: DeskBadge };
+/** `key` — the letter after «G» that goes there (D-154 wave 3), matched by the physical key. */
+export type DeskNavItem = { href: string; label: string; badge?: DeskBadge; key?: string };
 
 /**
  * The side navigation by role. The secretary sees only her own tasks under RLS (`tasks_select`),
@@ -35,26 +36,40 @@ export type DeskNavItem = { href: string; label: string; badge?: DeskBadge };
 export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   // «Разобрать» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
-    { href: "/desk/today", label: "Сегодня" },
-    { href: "/desk/tasks", label: "Задачи", badge: "tasks" },
-    { href: "/desk/inbox", label: "Разобрать" },
-    { href: "/desk/team", label: "Команда" },
-    { href: "/desk/errands", label: "Заявки", badge: "errands" },
-    { href: "/desk/reports", label: "Отчёты" },
-    { href: "/desk/calendar", label: "Календарь", badge: "calendar" },
-    { href: "/desk/notes", label: "Заметки" },
-    { href: "/desk/screen", label: "Экран" },
-    { href: "/desk/settings", label: "Настройки" },
+    { href: "/desk/today", label: "Сегодня", key: "S" },
+    { href: "/desk/tasks", label: "Задачи", badge: "tasks", key: "T" },
+    { href: "/desk/inbox", label: "Разобрать", key: "I" },
+    { href: "/desk/team", label: "Команда", key: "K" },
+    { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
+    { href: "/desk/reports", label: "Отчёты", key: "O" },
+    { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
+    { href: "/desk/notes", label: "Заметки", key: "N" },
+    { href: "/desk/screen", label: "Экран", key: "E" },
+    { href: "/desk/settings", label: "Настройки", key: "H" },
   ],
   secretary: [
-    { href: "/desk/errands", label: "Заявки", badge: "errands" },
-    { href: "/desk/team", label: "Команда" },
-    { href: "/desk/calendar", label: "Календарь", badge: "calendar" },
-    { href: "/desk/settings", label: "Настройки" },
+    { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
+    { href: "/desk/team", label: "Команда", key: "K" },
+    { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
+    { href: "/desk/settings", label: "Настройки", key: "H" },
   ],
 };
 
 export const DESK_PROFILE = "/desk/profile";
+
+/** «G P» — the profile, at the foot of the navigation for both roles. */
+export const DESK_PROFILE_KEY = "P";
+
+/**
+ * Where «G» and then this physical key goes for the role (D-154 wave 3): `KeyT` → «Задачи».
+ * Null — the letter is no section of the role; the key is left to the screen.
+ */
+export function chordHref(code: string, role: DeskRole): string | null {
+  const match = /^Key([A-Z])$/.exec(code);
+  if (!match) return null;
+  if (match[1] === DESK_PROFILE_KEY) return DESK_PROFILE;
+  return DESK_NAV[role].find((item) => item.key === match[1])?.href ?? null;
+}
 
 /** Desk screens only the director has (D-153 §1); the secretary's direct address leads to her home. */
 const DIRECTOR_ONLY = [

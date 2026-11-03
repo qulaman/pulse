@@ -3,6 +3,8 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { dropLayer, isTopLayer, pushLayer } from "@/components/desk/ui/layers";
+
 const WIDTH = { sm: 420, md: 560, lg: 760 } as const;
 const OUT_MS = 120;
 
@@ -50,6 +52,7 @@ export function Dialog({
   useEffect(() => {
     if (!open) return;
     openDialogs += 1;
+    const layer = pushLayer();
     document.body.setAttribute("data-dialog-open", "");
     const before = document.activeElement as HTMLElement | null;
     const node = card.current;
@@ -58,6 +61,8 @@ export function Dialog({
     (first ?? node)?.focus({ preventScroll: true });
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        // a popover or a menu opened on top of this dialog takes its own Esc first
+        if (!isTopLayer(layer)) return;
         event.stopPropagation();
         closeRef.current();
         return;
@@ -78,6 +83,7 @@ export function Dialog({
     window.addEventListener("keydown", onKey, true);
     return () => {
       window.removeEventListener("keydown", onKey, true);
+      dropLayer(layer);
       openDialogs -= 1;
       if (openDialogs === 0) document.body.removeAttribute("data-dialog-open");
       before?.focus?.({ preventScroll: true });

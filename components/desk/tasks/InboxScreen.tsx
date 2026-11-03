@@ -6,10 +6,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Menu } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { TONE_VAR } from "@/components/desk/ui/tone";
-import { ReactionBar } from "@/components/points/ReactionBar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +22,7 @@ import { shortName, useNamesKey } from "@/lib/people/names";
 import { useTaskReactions } from "@/lib/points/game";
 import { isReactable, showsReactionBar } from "@/lib/points/reactions";
 import type { BoardTask } from "@/lib/pulse/board";
+import { answersFor } from "@/lib/tasks/answers";
 import { queueOf, type DeskAction, type DeskItem } from "@/lib/tasks/desk";
 import { nearestDeadline } from "@/lib/tasks/grouping";
 import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
@@ -27,15 +30,17 @@ import { REASON_TONE, REASON_WORD } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue } from "@/lib/tasks/status-text";
 
-import { enterMove, inPlaceOf, KEY_CAP, reasonHeadline, rowKeys, stackMoves, withSkipped, type Move } from "@/lib/desk/tasks";
-import { MoreButton, MoveRow } from "./RowMoves";
-import { focusReply, TaskFacts, TaskHead, TaskThreadPane } from "./TaskParts";
+import { enterMove, inPlaceOf, KEY_CAP, reasonHeadline, stackMoves, withSkipped, type Move } from "@/lib/desk/tasks";
+import { DeskComposer, DeskThread } from "./DeskThread";
+import { MoveRow } from "./RowMoves";
+import { deskLayerOpen } from "./TaskPanel";
+import { DeskReactions, focusReply, TaskFacts, TaskHead } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
 /**
  * Moves that finish the director's turn at once — the stack goes on to the next task by itself. A
  * move that may ask first (a new deadline for the colleague, a reason for the rework) is not here:
- * its dialog belongs to this card, and the card goes when the task leaves the queue.
+ * its popover or dialog belongs to this card, and the card goes when the task leaves the queue.
  */
 const DONE_AT_ONCE: ReadonlySet<DeskAction> = new Set<DeskAction>(["approve", "grant", "keep", "nudge", "insist"]);
 
@@ -64,9 +69,10 @@ export function InboxSkeleton() {
 /**
  * «Разобрать» (tasks/022 A п.6, D-154): everything waiting for the director as a stack, one task at
  * a time — why it waits as the headline, the card at the height of what it says, the reason's
- * buttons with their keys inside, the thread under it, the rest of the queue beside it. The queue
- * is the nav badge's own (`queueOf` of the board, `REASON_ORDER`); what is skipped goes to the end
- * of it for this visit.
+ * buttons with their keys inside, the thread under it with the answer field, the rest of the queue
+ * beside it. Made for the keyboard (wave 3): ←/→ or J/K walk, Enter presses the main move, the
+ * letters the others, digits answer a question, S skips, «.» opens everything else. The queue is
+ * the nav badge's own (`queueOf` of the board, `REASON_ORDER`); what is skipped goes to its end.
  */
 export function InboxScreen() {
   useNamesKey();
@@ -111,6 +117,22 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
     const next = ids[index + 1] ?? ids[index - 1] ?? null;
     setCurrent(next);
   };
+
+  useShortcuts("Разобрать", [
+    { keys: ["←", "→"], label: "Предыдущая, следующая (или K / J)" },
+    { keys: ["Enter"], label: "Главное действие карточки" },
+    { keys: ["A"], label: "Принять" },
+    { keys: ["R"], label: "На доработку" },
+    { keys: ["O"], label: "Ответить — курсор в поле" },
+    { keys: ["N"], label: "Напомнить" },
+    { keys: ["D"], label: "Срок" },
+    { keys: ["T"], label: "Передать" },
+    { keys: ["1…4"], label: "Быстрый ответ на вопрос" },
+    { keys: ["S"], label: "Пропустить — в конец очереди" },
+    { keys: ["."], label: "Все действия задачи" },
+    { keys: ["Enter"], label: "В поле ответа — отправить (Shift+Enter — новая строка)" },
+    { keys: ["Esc"], label: "Отпустить поле" },
+  ]);
 
   if (!item) {
     // the good kind of empty: what comes next is the nearest deadline still ahead
@@ -168,15 +190,21 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
               <span className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-[240ms] ease-out" style={{ width: `${((index + 1) / total) * 100}%` }} />
             </span>
             <span className="flex shrink-0 items-center gap-1">
-              <Button size="sm" variant="ghost" aria-label="Предыдущая" title="Предыдущая (←)" disabled={index === 0} onClick={() => go(-1)} className="!min-h-8 !px-2">
-                ←
-              </Button>
-              <Button size="sm" variant="ghost" aria-label="Следующая" title="Следующая (→)" disabled={index >= total - 1} onClick={() => go(1)} className="!min-h-8 !px-2">
-                →
-              </Button>
-              <Button size="sm" variant="ghost" title="Пропустить (S)" disabled={total < 2} onClick={skip} className="!min-h-8 gap-1.5 !px-2" data-testid="desk-inbox-skip">
-                Пропустить <Kbd>S</Kbd>
-              </Button>
+              <Tooltip label="Предыдущая" keys={["←"]}>
+                <Button size="sm" variant="ghost" aria-label="Предыдущая" disabled={index === 0} onClick={() => go(-1)} className="!min-h-8 !px-2">
+                  ←
+                </Button>
+              </Tooltip>
+              <Tooltip label="Следующая" keys={["→"]}>
+                <Button size="sm" variant="ghost" aria-label="Следующая" disabled={index >= total - 1} onClick={() => go(1)} className="!min-h-8 !px-2">
+                  →
+                </Button>
+              </Tooltip>
+              <Tooltip label="В конец очереди" keys={["S"]}>
+                <Button size="sm" variant="ghost" disabled={total < 2} onClick={skip} className="!min-h-8 gap-1.5 !px-2" data-testid="desk-inbox-skip">
+                  Пропустить <Kbd>S</Kbd>
+                </Button>
+              </Tooltip>
             </span>
           </div>
 
@@ -191,13 +219,13 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
 
 /** The rest of the queue beside the card: who and what, why — the one in hand marked, any one a click away. */
 function QueueAside({ order, current, now, onPick }: { order: readonly DeskItem[]; current: string | null; now: Date; onPick: (id: string) => void }) {
-  const LIMIT = 10;
+  const LIMIT = 12;
   const shown = order.slice(0, LIMIT);
   return (
     <aside className="sticky top-6 flex flex-col gap-2" data-testid="desk-inbox-queue">
       <SectionLabel count={order.length}>Очередь</SectionLabel>
       <ol className="flex flex-col">
-        {shown.map((item) => {
+        {shown.map((item, at) => {
           const on = item.task.id === current;
           return (
             <li key={item.task.id}>
@@ -205,18 +233,19 @@ function QueueAside({ order, current, now, onPick }: { order: readonly DeskItem[
                 type="button"
                 onClick={() => onPick(item.task.id)}
                 aria-current={on ? "true" : undefined}
-                className={`relative flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors duration-[120ms] ${on ? "bg-accent/8" : "hover:bg-surface-2/60"}`}
+                className={`relative flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${on ? "bg-accent/8" : "hover:bg-surface-2/60"}`}
               >
                 {on ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
                 <span className="mt-0.5 shrink-0">
                   <StatusGlyph status={item.task.status} overdue={isOverdue(item.task, now)} size={16} />
                 </span>
-                <span className="flex min-w-0 flex-col">
+                <span className="flex min-w-0 flex-1 flex-col">
                   <span className={`truncate text-[13px] leading-[18px] ${on ? "font-semibold text-text" : "text-text/90"}`}>{item.task.title}</span>
                   <span className="truncate text-[12px] leading-4 text-muted">
                     {shortName(item.task.assignee?.full_name)} · {REASON_WORD[item.reason]}
                   </span>
                 </span>
+                <span className="nums mt-0.5 shrink-0 text-[11px] leading-4 text-muted/60">{at + 1}</span>
               </button>
             </li>
           );
@@ -227,27 +256,57 @@ function QueueAside({ order, current, now, onPick }: { order: readonly DeskItem[
   );
 }
 
-/** The reason's buttons with their keys inside, «⋯», and the reaction row of D-133 under them. */
-function StackKeys({ desk, me, moves, onPress, pointsEnabled }: { desk: DeskTask; me: Me; moves: readonly Move[]; onPress: (move: Move) => void; pointsEnabled: boolean }) {
+/** The reason's buttons with their keys inside, «Ещё» with everything else, and the reaction row of D-133 under them. */
+function StackKeys({
+  desk,
+  me,
+  moves,
+  onPress,
+  pointsEnabled,
+}: {
+  desk: DeskTask;
+  me: Me;
+  moves: readonly Move[];
+  onPress: (move: Move, target: HTMLElement) => void;
+  pointsEnabled: boolean;
+}) {
   const task = desk.task as TaskWithPeople;
   const reactions = useTaskReactions();
   const reacted = Boolean(reactions.data?.[task.id]);
   const canReact = isReactable(task, me.userId) && showsReactionBar(task.status, reacted);
   const main = enterMove(moves);
+  const [menuAt, setMenuAt] = useState<HTMLElement | null>(null);
   return (
     <div data-testid="desk-task-keys">
       <div className="flex flex-wrap items-center gap-2">
-        <MoveRow moves={moves} onPress={onPress} size="md" />
+        <MoveRow moves={moves} onPress={onPress} size="md" fillMain />
         {main ? (
           <span className="flex items-center gap-1 text-[12px] leading-4 text-muted">
             <Kbd>Enter</Kbd> {main.label.charAt(0).toLowerCase() + main.label.slice(1)}
           </span>
         ) : null}
-        <span className="ml-auto">
-          <MoreButton onPress={() => desk.controls.more(task)} testId="desk-task-more" />
-        </span>
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={Boolean(menuAt)}
+          title="Все действия · ."
+          data-testid="desk-task-more"
+          data-desk-more={task.id}
+          onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
+          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-border bg-surface-2 px-3 font-display text-[14px] font-semibold leading-4 text-text transition-colors duration-[120ms] hover:border-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          Ещё
+          <span aria-hidden className="rounded-[4px] bg-bg/60 px-1.5 text-[12px] font-bold leading-[14px] text-muted">
+            .
+          </span>
+        </button>
+        <Menu open={Boolean(menuAt)} onClose={() => setMenuAt(null)} anchor={menuAt} items={desk.acts.menu(task)} align="end" width={280} label="Все действия" />
       </div>
-      {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
+      {canReact ? (
+        <div className="mt-3">
+          <DeskReactions taskId={task.id} pointsEnabled={pointsEnabled} />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -278,6 +337,8 @@ function InboxCard({
 }) {
   const router = useRouter();
   const { pointsEnabled } = useDeskScope();
+  const card = useRef<HTMLDivElement>(null);
+  const thread = useRef<HTMLDivElement>(null);
   const desk = useDeskTask({
     taskId: item.task.id,
     me,
@@ -285,46 +346,46 @@ function InboxCard({
     base,
     now,
     onOpenTask: (id) => router.push(`/desk/tasks?id=${encodeURIComponent(id)}`),
+    onReply: () => focusReply(thread.current),
   });
-  const thread = useRef<HTMLDivElement>(null);
   const task = desk.task;
   const moves = task
     ? stackMoves(task, item.reason, { request: desk.signals.request, suggestion: desk.signals.suggestion, nudgedAt: desk.signals.nudgedAt }, now)
     : [];
-  const keys = task ? rowKeys(task, { request: Boolean(desk.signals.request) }) : [];
+  const keys = desk.letters;
 
-  const press = (action: DeskAction | "reply") => {
+  const press = (action: DeskAction | "reply", target?: HTMLElement) => {
     if (!task) return;
     if (action === "answer" || action === "reply") {
       focusReply(thread.current);
       return;
     }
-    desk.controls.press(action, task);
+    desk.acts.press(action, task, { at: target, scope: card.current });
     if (DONE_AT_ONCE.has(action)) onDone();
   };
-  const pressMove = (move: Move) => {
-    if (!move.held) press(move.action);
+  const pressMove = (move: Move, target?: HTMLElement) => {
+    if (!move.held) press(move.action, target);
   };
 
   // the latest handlers for the window's listener, which is added once
-  const latest = useRef({ press, onPrev, onNext, onSkip, main: enterMove(moves), keys });
+  const latest = useRef({ press, onPrev, onNext, onSkip, main: enterMove(moves), keys, desk, now });
   useLayoutEffect(() => {
-    latest.current = { press, onPrev, onNext, onSkip, main: enterMove(moves), keys };
+    latest.current = { press, onPrev, onNext, onSkip, main: enterMove(moves), keys, desk, now };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey) return;
-      if (isTypingTarget(event.target)) return;
-      const body = document.body;
-      if (body.hasAttribute("data-sheet-open") || body.hasAttribute("data-dialog-open")) return;
+      if (isTypingTarget(event.target) || deskLayerOpen()) return;
       const k = latest.current;
       const onControl = (event.target as HTMLElement | null)?.closest?.("button, a, [role=button]");
       switch (event.code) {
         case "ArrowLeft":
+        case "KeyK":
           event.preventDefault();
           k.onPrev();
           return;
         case "ArrowRight":
+        case "KeyJ":
           event.preventDefault();
           k.onNext();
           return;
@@ -339,6 +400,21 @@ function InboxCard({
           event.preventDefault();
           k.onSkip();
           return;
+        case "Period": {
+          const current = k.desk.task;
+          if (!current) return;
+          event.preventDefault();
+          card.current?.querySelector<HTMLElement>(`[data-desk-more="${CSS.escape(current.id)}"]`)?.click();
+          return;
+        }
+      }
+      const digit = /^Digit([1-9])$/.exec(event.code);
+      if (digit && k.desk.task && k.desk.signals.question) {
+        const answer = answersFor(k.desk.signals.question, k.desk.task.deadline, k.now)[Number(digit[1]) - 1];
+        if (!answer) return;
+        event.preventDefault();
+        k.desk.acts.answer(k.desk.task, answer.text, answer.deadlineIso);
+        return;
       }
       const key = k.keys.find((one) => one.code === event.code);
       if (!key) return;
@@ -363,42 +439,65 @@ function InboxCard({
   return (
     <>
       <section
+        ref={card}
         className="card flex flex-col px-6 pb-5 pt-5"
         style={{ boxShadow: "var(--shadow-card), var(--shadow-raised)" }}
         data-testid="desk-inbox-card"
         data-task-id={task.id}
+        data-desk-task={task.id}
       >
         <p className="mb-4 flex items-center gap-2.5 font-display text-[20px] font-semibold leading-[26px] tracking-[-0.015em]" style={{ color: tone }} data-testid="desk-inbox-reason">
           <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone, boxShadow: `0 0 12px ${tone}` }} />
           <span className="min-w-0 [overflow-wrap:anywhere]">{headline}</span>
         </p>
-        <TaskHead desk={desk} now={now} large />
+        <TaskHead desk={desk} now={now} large scope={() => card.current} />
         <TaskFacts desk={desk} now={now} onWords={() => focusReply(thread.current)} />
         <div className="mt-5 border-t border-border/70 pt-4">
           <StackKeys desk={desk} me={me} moves={moves} onPress={pressMove} pointsEnabled={pointsEnabled} />
         </div>
       </section>
 
-      <section ref={thread} className="flex flex-col gap-2 [&_textarea]:!text-[14px] [&_textarea]:!leading-5" data-testid="desk-inbox-thread">
+      <section ref={thread} className="flex flex-col gap-2" data-testid="desk-inbox-thread">
         <SectionLabel>Переписка</SectionLabel>
-        <TaskThreadPane desk={desk} me={me} />
+        <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} actions={desk.acts.actions} />
+        {task.status === "revoked" ? (
+          <p className="text-[13px] leading-5 text-muted" data-testid="thread-closed">
+            Задача отозвана — переписка закрыта
+          </p>
+        ) : (
+          // the answer field rides at the window's foot while the thread scrolls
+          <div className="sticky bottom-0 z-[1] -mx-1 bg-bg px-1 pb-3 pt-2">
+            <DeskComposer taskId={task.id} me={me} actions={desk.acts.actions} placeholder={desk.signals.question ? "Ответить на вопрос…" : "Написать…"} />
+          </div>
+        )}
       </section>
 
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted">
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-inbox-hint">
         {keys.map((key) => (
           <span key={key.code}>
             <Kbd>{KEY_CAP[key.code]}</Kbd> {key.label}
           </span>
         ))}
+        {desk.signals.question ? (
+          <span>
+            <Kbd>1</Kbd>…<Kbd>{Math.min(9, answersFor(desk.signals.question, task.deadline, now).length)}</Kbd> быстрый ответ
+          </span>
+        ) : null}
         <span>
           <Kbd>S</Kbd> пропустить
         </span>
         <span>
           <Kbd>←</Kbd> <Kbd>→</Kbd> соседняя
         </span>
+        <span>
+          <Kbd>.</Kbd> все действия
+        </span>
+        <span>
+          <Kbd>?</Kbd> все клавиши
+        </span>
       </p>
 
-      {desk.controls.sheets}
+      {desk.acts.node}
     </>
   );
 }

@@ -3170,7 +3170,8 @@ html[data-surface="desk"] [data-sheet-layer] {
   bottom: 0 !important;
   padding: 24px;
 }
-html[data-surface="desk"] [data-sheet] {
+/* `data-sheet` on the drawing canvas names its paper (portrait/landscape), not a sheet: it stays full screen */
+html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"]) {
   /* a grid item shrinks to its content: the dialog keeps the sheet's own width */
   width: min(560px, calc(100vw - 48px));
   max-width: 560px;
@@ -3181,7 +3182,7 @@ html[data-surface="desk"] [data-sheet] {
   padding-bottom: 20px !important;
   animation: desk-dialog-in 160ms var(--ease-out) both !important;
 }
-html[data-surface="desk"] [data-sheet][data-closing] {
+html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"])[data-closing] {
   animation: desk-dialog-out 120ms var(--ease-in) both !important;
 }
 html[data-surface="desk"] [data-sheet-grip] {
@@ -3223,7 +3224,7 @@ html[data-surface="desk"] .desk-progress {
   to { transform: translateX(300%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"] [data-sheet],
+  html[data-surface="desk"] [data-sheet]:not([data-testid="sketch-pad"]),
   html[data-surface="desk"] .desk-dialog {
     animation-duration: 1ms !important;
   }
@@ -3267,4 +3268,60 @@ html[data-surface="desk"] .desk-command:focus-within {
   html[data-surface="desk"] .desk-light-layer {
     transition: none;
   }
+}
+
+/* ---- the desk's frame, third pass (D-154 wave 3) ----------------------------------------------
+   The navigation folds to icons (`[`): the toasts move with its edge. The right-hand panel's
+   left edge is a handle — a hairline of the accent under the mouse, while dragged and when
+   focused; while it is dragged the whole window is the resize cursor and nothing gets selected. */
+html[data-surface="desk"][data-desk-nav="icons"] [data-testid="toasts-low"] {
+  left: 64px;
+}
+html[data-surface="desk"][data-desk-panel] [data-testid="toasts-low"] {
+  right: var(--desk-panel-w, 440px);
+}
+html[data-surface="desk"] .desk-panel-edge-line {
+  background: transparent;
+  transition: background-color 120ms var(--ease-out);
+}
+html[data-surface="desk"] .desk-panel-edge:hover .desk-panel-edge-line,
+html[data-surface="desk"] .desk-panel-edge:focus-visible .desk-panel-edge-line,
+html[data-surface="desk"] .desk-panel-edge[data-active] .desk-panel-edge-line {
+  width: 2px;
+  left: 2px;
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+html[data-surface="desk"][data-desk-resizing],
+html[data-surface="desk"][data-desk-resizing] * {
+  cursor: col-resize !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+/* the keyboard's focus on the desk: one visible ring of the accent, never under the mouse */
+html[data-surface="desk"] .desk-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent);
+}
+/* a field of the confirm editor (components/desk/confirm): flat, a hairline, the accent when it has the caret */
+html[data-surface="desk"] .desk-input {
+  background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  transition: border-color 120ms var(--ease-out), background-color 120ms var(--ease-out);
+}
+html[data-surface="desk"] .desk-input:hover {
+  border-color: var(--border);
+}
+html[data-surface="desk"] .desk-input[data-tone="danger"] {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+html[data-surface="desk"] .desk-input[data-tone="warn"] {
+  border-color: color-mix(in srgb, var(--warn) 55%, transparent);
+}
+html[data-surface="desk"] .desk-input:focus,
+html[data-surface="desk"] .desk-input:focus-within,
+html[data-surface="desk"] .desk-input[aria-expanded="true"] {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  background: var(--surface-2);
 }

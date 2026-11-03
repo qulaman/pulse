@@ -7,11 +7,12 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
-import { ItemEditor } from "@/components/shop/ItemEditor";
+import { ItemDialog } from "@/components/desk/settings/points/ItemDialog";
+import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { isOpenOrder, ORDER_STATUS, pointsWord, recentDeliveries, takenCounts, takenLabel, waitingRu } from "@/lib/shop/format";
-import { useAllShopItems, useCancelOrder, useOrders, useSetOrderStatus, type Order, type ShopItem } from "@/lib/shop/queries";
+import { useAllShopItems, useCancelOrder, useOrders, useSaveShopItem, useSetOrderStatus, type Order, type ShopItem } from "@/lib/shop/queries";
 import { useMe } from "@/lib/tasks/queries";
 
 function SectionHead({ title, count, end }: { title: string; count?: number; end?: ReactNode }) {
@@ -49,8 +50,8 @@ const byTime = (field: "created_at" | "delivered_at") => (a: Order, b: Order) =>
 
 /**
  * «Магазин» of «Очки и магазин» (D-71, D-153): what waits to be handed out — the only thing the
- * director acts on today; the rewards, with an editor in a dialog (the phone's own, a upsert by an
- * id given in advance); who got what lately. Handing out writes no points: the price was held when
+ * director acts on today; the rewards, with the desk's editor in a dialog (an upsert by an id given
+ * in advance) and a right click to hide or show one; who got what lately. Handing out writes no points: the price was held when
  * the order was made and the hold is final (principle 4); a cancel gives exactly the hold back.
  */
 export function ShopDesk() {
@@ -61,6 +62,12 @@ export function ShopDesk() {
   const cancel = useCancelOrder();
   const [editing, setEditing] = useState<ShopItem | "new" | null>(null);
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const saveItem = useSaveShopItem(me?.companyId);
+  const menu = useContextMenu();
+  /** Shown or hidden from the row's menu: the same upsert as the editor's, every field as it is. */
+  const toggleShown = (item: ShopItem) =>
+    saveItem.mutate({ id: item.id, title: item.title, description: item.description, icon: item.icon, price: item.price, stock: item.stock, is_active: !item.is_active });
 
   const all = useMemo(() => orders.data ?? [], [orders.data]);
   // the director's own orders are not his to hand out (as on the phone)
@@ -141,7 +148,7 @@ export function ShopDesk() {
       width: "120px",
       align: "right",
       render: (item) => (
-        <Button size="sm" variant="secondary" onClick={() => setEditing(item)}>
+        <Button size="sm" variant="ghost" onClick={() => setEditing(item)} title="Изменить · Enter" className="opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100">
           Изменить
         </Button>
       ),
@@ -165,11 +172,26 @@ export function ShopDesk() {
     <div className="flex flex-col gap-6">
       <section className="flex flex-col gap-2" aria-label="Выдать">
         <SectionHead title="Выдать" count={waiting.length} />
+        <div
+          onContextMenu={(event) => {
+            const row = (event.target as Element).closest<HTMLElement>("[data-row-key]");
+            const order = row ? waiting.find((o) => o.id === row.dataset.rowKey) : undefined;
+            if (!order) return;
+            setSelectedOrder(order.id);
+            menu.open(event, [
+              { key: "deliver", label: "Выдал", onSelect: () => setStatus.mutate({ order, status: "delivered" }) },
+              "separator",
+              { key: "cancel", label: "Отменить заказ — очки вернутся", danger: true, onSelect: () => cancel.mutate(order) },
+            ]);
+          }}
+        >
         <DataGrid
           aria-label="Заказы к выдаче"
           columns={queueColumns}
           rows={waiting}
           rowKey={(order) => order.id}
+          selectedKey={selectedOrder}
+          onSelect={(order) => setSelectedOrder(order.id)}
           rowTone={(order) => (order.status === "pending" ? "warn" : "accent")}
           empty={
             <EmptyState
@@ -178,6 +200,7 @@ export function ShopDesk() {
             />
           }
         />
+        </div>
       </section>
 
       <section className="flex flex-col gap-2" aria-label="Награды">
@@ -190,6 +213,18 @@ export function ShopDesk() {
             </Button>
           }
         />
+        <div
+          onContextMenu={(event) => {
+            const row = (event.target as Element).closest<HTMLElement>("[data-row-key]");
+            const item = row ? list.find((i) => i.id === row.dataset.rowKey) : undefined;
+            if (!item) return;
+            setSelectedItem(item.id);
+            menu.open(event, [
+              { key: "edit", label: "Изменить…", hint: "Enter", onSelect: () => setEditing(item) },
+              { key: "shown", label: item.is_active ? "Скрыть с витрины" : "Показать на витрине", onSelect: () => toggleShown(item) },
+            ]);
+          }}
+        >
         <DataGrid
           aria-label="Награды магазина"
           columns={itemColumns}
@@ -206,6 +241,7 @@ export function ShopDesk() {
             />
           }
         />
+        </div>
       </section>
 
       {recent.length > 0 ? (
@@ -215,12 +251,8 @@ export function ShopDesk() {
         </section>
       ) : null}
 
-      <ItemEditor
-        key={editing === null ? "closed" : editing === "new" ? "new" : editing.id}
-        item={editing}
-        companyId={me?.companyId}
-        onClose={() => setEditing(null)}
-      />
+      {menu.node}
+      <ItemDialog item={editing} companyId={me?.companyId} onClose={() => setEditing(null)} />
     </div>
   );
 }

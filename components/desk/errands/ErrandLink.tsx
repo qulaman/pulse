@@ -10,7 +10,7 @@ import { isYesNo, QUESTIONS, RESULTS, sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 
-/** «Будет:» — the promise the phone's card offers once a request is taken (D-99); keys 1–4 on the desk. */
+/** «Будет:» — the promise the phone's card offers once a request is taken (D-99); keys 1–4 in the desk's queue. */
 export const ETAS = [
   { label: "Сейчас", min: 0 },
   { label: "5 мин", min: 5 },
@@ -50,7 +50,7 @@ function WordField({ placeholder, action, busy, onSend }: { placeholder: string;
  * once hers — «Будет: сейчас / 5 / 15 / 30 мин»; «Уточнить у директора» — a ready question of the
  * scene or a word of her own; done by her and nothing passed back yet — «Что передать директору?».
  */
-export function SecretaryLink({ errand, meId, catalogue, hints = false }: { errand: Errand; meId: string; catalogue: readonly SecretaryAction[]; hints?: boolean }) {
+export function SecretaryLink({ errand, meId, catalogue }: { errand: Errand; meId: string; catalogue: readonly SecretaryAction[] }) {
   const link = useErrandLink();
   const [asking, setAsking] = useState(false);
   const scene = sceneOf(errand, catalogue);
@@ -87,10 +87,9 @@ export function SecretaryLink({ errand, meId, catalogue, hints = false }: { erra
       {taken && !errand.eta_at && !guard && !alarm ? (
         <div className="flex flex-wrap items-center gap-2" data-testid="desk-errand-eta">
           <span className="text-[13px] leading-4 text-muted">Будет:</span>
-          {ETAS.map((option, index) => (
+          {ETAS.map((option) => (
             <Button key={option.min} size="sm" variant="secondary" disabled={busy} onClick={() => link.mutate({ fn: "errand_eta", id: errand.id, min: option.min })}>
               {option.label}
-              {hints ? <span className="nums ml-1.5 text-[11px] font-semibold text-muted">{index + 1}</span> : null}
             </Button>
           ))}
         </div>

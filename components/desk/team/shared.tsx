@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
@@ -35,6 +35,12 @@ export function matchesPerson(person: Person, query: string): boolean {
   if (!q) return true;
   const hay = normalise([person.full_name, person.position ?? "", ...person.aliases, ROLE_LABEL[person.role]].join(" "));
   return q.split(/\s+/).every((word) => hay.includes(word));
+}
+
+/** «Сотрудник · Снабженец» — the role, and the position when it says more than the role. */
+export function roleLine(person: Pick<Person, "role" | "position">): string {
+  const position = person.position && person.position.toLowerCase() !== ROLE_LABEL[person.role].toLowerCase() ? person.position : null;
+  return [ROLE_LABEL[person.role], position].filter(Boolean).join(" · ");
 }
 
 /** How the director addresses the person in an order: the first spoken form, else the first name (the phone card's rule). */
@@ -117,6 +123,24 @@ export function Block({ title, count, end, children, testId }: { title: string; 
       {children}
     </section>
   );
+}
+
+/**
+ * The width of a box, followed as the window or the panel changes it; 0 until measured. A
+ * callback ref: the box may come later than the screen (after its data has loaded). A table
+ * drops its least needed columns under a width of its own, not of the window — the right-hand
+ * panel takes 440 px of it.
+ */
+export function useBoxWidth(): [(node: HTMLDivElement | null) => void, number] {
+  const [node, setNode] = useState<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [node]);
+  return [setNode, width];
 }
 
 /** A desk table while its rows load: the head and 40-px rows, nothing moves when they come. */

@@ -1,28 +1,44 @@
 /**
- * Role D of tasks/022 and the second wave of D-154: /desk/calendar (the week of hours, the line of
- * now, the layer of deadlines on and off, the month), /desk/notes, /desk/screen. The run's one write
- * lives here — a note made and deleted (private, no push), skipped when `ctx.quiet`. The wall is
+ * Role D of tasks/022, the second wave of D-154 and the third (mouse and keyboard): /desk/calendar
+ * (the week of hours, the line of now, the layer of deadlines, the month, the meeting's card beside
+ * its block, the quick card of a slot, the desk form, the keys), /desk/notes (the list's keys, the
+ * page editor, the board as an outline), /desk/screen. The run's one write lives here — a note made
+ * and deleted (private, no push), skipped when `ctx.quiet`. No meeting is made or changed (the
+ * cards are opened and closed with Esc, nothing typed), no line of a board is typed, the wall is
  * looked at only, with its remote cut off in the browser while it is.
  */
 import type { Page } from "playwright";
 
 import { open, record, skip, type Ctx } from "./shared";
 
-/** A phone sheet drawn as the desk's dialog: in the middle of the window, clear of its edges. */
-async function centred(page: Page): Promise<{ ok: boolean; detail: string }> {
-  const sheet = page.locator("[data-sheet]");
-  const shown = await sheet.waitFor({ timeout: 6_000 }).then(() => true, () => false);
+/** A desk dialog: in the middle of the window, clear of its edges. */
+async function centred(page: Page, testId: string): Promise<{ ok: boolean; detail: string }> {
+  const form = page.getByTestId(testId);
+  const shown = await form.waitFor({ timeout: 6_000 }).then(() => true, () => false);
   if (!shown) return { ok: false, detail: "диалог не открылся" };
   await page.waitForTimeout(400);
-  const box = await sheet.boundingBox();
+  const box = await page.locator(".desk-dialog").filter({ has: form }).boundingBox();
   const viewport = page.viewportSize();
   const ok = Boolean(box && viewport && box.y > 20 && box.y + box.height < viewport.height - 20 && Math.abs(box.x + box.width / 2 - viewport.width / 2) < 4);
   return { ok, detail: box ? `x=${Math.round(box.x)} y=${Math.round(box.y)} w=${Math.round(box.width)} h=${Math.round(box.height)}` : "нет" };
 }
 
-async function closeSheet(page: Page): Promise<boolean> {
+/** Esc, and the thing is gone. */
+async function escapes(page: Page, testId: string): Promise<boolean> {
   await page.keyboard.press("Escape");
-  return page.locator("[data-sheet]").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+  return page.getByTestId(testId).waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+}
+
+/** The «?» help lists a group of this screen's keys. */
+async function helpLists(page: Page, title: string): Promise<boolean> {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+  await page.keyboard.press("Shift+Slash");
+  const help = page.getByTestId("desk-shortcuts");
+  const shown = await help.waitFor({ timeout: 4_000 }).then(() => true, () => false);
+  const listed = shown ? (await help.getByRole("heading", { name: title, exact: true }).count()) > 0 : false;
+  await page.keyboard.press("Escape");
+  await help.waitFor({ state: "detached", timeout: 4_000 }).catch(() => undefined);
+  return listed;
 }
 
 /** The search of the address, for a record's detail. */
@@ -115,29 +131,85 @@ export async function checkCalendar(ctx: Ctx) {
     record("календарь: «Сроки задач» выключаются снова", new URL(page.url()).searchParams.get("deadlines") === null && (await deadlineCount(page)) === 0, search(page));
   }
 
-  // «Новое мероприятие» — the phone's form as a centred dialog; Esc closes it, nothing is made
+  // W and M — the views by the keys (the address keeps them)
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+  await page.keyboard.press("KeyM");
+  const byM = await page.getByTestId("desk-calendar-month").waitFor({ timeout: 10_000 }).then(() => true, () => false);
+  await page.keyboard.press("KeyW");
+  const byW = await week.waitFor({ timeout: 10_000 }).then(() => true, () => false);
+  record("календарь: клавиши M и W — месяц и неделя", byM && byW && new URL(page.url()).searchParams.get("view") === null, search(page));
+
+  // «Новое мероприятие» (and N) — the desk's own form, a centred dialog; Esc closes it, nothing is made
   const add = page.getByTestId("desk-event-new");
   if (await add.count()) {
     await add.click();
-    const dialog = await centred(page);
-    record("календарь: «Новое мероприятие» — диалог по центру", dialog.ok, dialog.detail);
+    const dialog = await centred(page, "desk-event-form");
+    const titled = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
+    record("календарь: «Новое мероприятие» — настольная форма по центру, курсор в названии", dialog.ok && titled === "desk-event-title", `${dialog.detail} · фокус ${titled}`);
     await ctx.shot("calendar-new-event");
-    record("календарь: Esc закрывает диалог", await closeSheet(page));
+    record("календарь: Esc закрывает форму", await escapes(page, "desk-event-form"));
+    await page.keyboard.press("KeyN");
+    const byN = await page.getByTestId("desk-event-form").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    record("календарь: клавиша N открывает форму", byN && (await escapes(page, "desk-event-form")));
   } else {
     record("календарь: «Новое мероприятие» у директора", false, "кнопки нет");
   }
 
-  // a meeting opens in the same dialog — looked at, not answered
+  // a meeting opens as a card beside its block, the grid in sight — looked at, not answered
   const event = page.getByTestId("desk-event").first();
   if (await event.count()) {
     await event.click();
-    const dialog = await centred(page);
-    record("календарь: мероприятие открывается диалогом", dialog.ok, dialog.detail);
+    const card = page.getByTestId("desk-event-card");
+    const shown = await card.waitFor({ timeout: 6_000 }).then(() => true, () => false);
+    await page.waitForTimeout(300);
+    const cardBox = await card.boundingBox();
+    const blockBox = await event.boundingBox();
+    const beside = Boolean(cardBox && blockBox && (cardBox.x >= blockBox.x + blockBox.width - 1 || cardBox.x + cardBox.width <= blockBox.x + 1));
+    record("календарь: мероприятие — карточка рядом с блоком, сетка видна", shown && beside, cardBox && blockBox ? `карточка x=${Math.round(cardBox.x)}, блок ${Math.round(blockBox.x)}–${Math.round(blockBox.x + blockBox.width)}` : "нет");
     await ctx.shot("calendar-event");
-    await closeSheet(page);
+    record("календарь: Esc закрывает карточку", await escapes(page, "desk-event-card"));
   } else {
-    skip("календарь: мероприятие открывается диалогом", "на этой неделе мероприятий нет");
+    skip("календарь: мероприятие — карточка рядом с блоком", "на этой неделе мероприятий нет");
   }
+
+  // a click on an empty stretch of a day ahead: the block of the new meeting and the quick card;
+  // Esc lets it go — nothing is typed, nothing is made
+  const days = page.getByTestId("desk-week-day");
+  const ymds = await days.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label") ?? ""));
+  const today = new Date(Date.now() + 5 * 3_600_000).toISOString().slice(0, 10);
+  const ahead = ymds.findIndex((ymd) => ymd > today);
+  if (ahead >= 0) {
+    const column = days.nth(ahead);
+    const box = await column.boundingBox();
+    // the first empty half-hour from the top of the day: no meeting, no deadline under the click
+    const spot = box
+      ? await column.evaluate((node, height) => {
+          const taken = [...node.querySelectorAll("[data-testid=desk-event], [data-testid=desk-deadline]")].map((el) => {
+            const rect = el.getBoundingClientRect();
+            return [rect.top - node.getBoundingClientRect().top, rect.bottom - node.getBoundingClientRect().top];
+          });
+          for (let y = 12; y < height - 12; y += 24) if (!taken.some(([top, bottom]) => y > top - 4 && y < bottom + 4)) return y;
+          return null;
+        }, box.height)
+      : null;
+    if (box && spot !== null) {
+      await page.mouse.click(box.x + box.width / 2, box.y + spot);
+      const quick = page.getByTestId("desk-quick-create");
+      const shown = await quick.waitFor({ timeout: 5_000 }).then(() => true, () => false);
+      const ghost = await page.getByTestId("desk-slot-ghost").count();
+      const focus = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
+      record("календарь: клик по пустому часу — блок и быстрая карточка, курсор в названии", shown && ghost === 1 && focus === "desk-quick-title", `блок ${ghost}, фокус ${focus}`);
+      await ctx.shot("calendar-quick");
+      const gone = await escapes(page, "desk-quick-create");
+      record("календарь: Esc отпускает новое мероприятие — блока нет", gone && (await page.getByTestId("desk-slot-ghost").count()) === 0);
+    } else {
+      skip("календарь: клик по пустому часу", "свободного места в дне нет");
+    }
+  } else {
+    skip("календарь: клик по пустому часу", "на этой неделе нет дней впереди");
+  }
+
+  record("календарь: клавиши в справке «?»", await helpLists(page, "Календарь"));
 }
 
 export async function checkNotes(ctx: Ctx) {
@@ -181,18 +253,49 @@ export async function checkNotes(ctx: Ctx) {
     }
   }
 
-  // the boards: the list, and the first one opened on the right — looked at only
+  // the keys of the list: ↓ chooses a note, Ctrl+F — the search; nothing is written
+  await open(page, "/desk/notes");
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+  const before = new URL(page.url()).searchParams.get("n");
+  await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(400);
+  const chosen = new URL(page.url()).searchParams.get("n");
+  if ((await list.getByTestId("desk-row").count()) > 0) record("заметки: ↓ выбирает заметку в списке", chosen !== null && chosen !== before, search(page));
+  else skip("заметки: ↓ выбирает заметку", "мыслей нет");
+  await page.keyboard.press("Control+KeyF");
+  const searching = await page.evaluate(() => (document.activeElement as HTMLInputElement | null)?.type === "search");
+  record("заметки: Ctrl+F — поиск", searching);
+  await page.keyboard.press("Escape");
+  record("заметки: клавиши в справке «?»", await helpLists(page, "Заметки"));
+
+  // the boards: the list, and the first one opened on the right as an outline — looked at, walked, not typed in
   await page.getByTestId("seg-boards").click();
   const rows = list.getByTestId("desk-row");
   await page.waitForTimeout(800);
   if ((await rows.count()) > 0) {
     await rows.first().click();
     await page.waitForURL((url) => url.pathname.startsWith("/desk/notes/b/"), { timeout: 15_000 });
-    const board = await page.getByTestId("desk-board").locator("main").waitFor({ timeout: 15_000 }).then(() => true, () => false);
-    const width = board ? ((await page.getByTestId("desk-board").locator("main").boundingBox())?.width ?? 0) : 0;
-    record("заметки: доска открывается справа, шире телефона", board && width > 600, `ширина ${Math.round(width)}`);
-    await page.waitForTimeout(800);
+    const outline = page.getByTestId("desk-outline");
+    const shown = await outline.waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    const width = shown ? ((await page.getByTestId("desk-board").boundingBox())?.width ?? 0) : 0;
+    const lines = shown ? await outline.getByTestId("desk-outline-line").count() : 0;
+    record("заметки: доска — настольный редактор пунктов справа", shown && width > 600, `ширина ${Math.round(width)}, строк ${lines}`);
+    await page.waitForTimeout(600);
     await ctx.shot("notes-board");
+    if (lines >= 2) {
+      // a click into a line and ↓ — the caret walks to the next line; Esc lets it go, nothing changed
+      const fields = outline.locator("[data-testid=desk-outline-line] textarea");
+      await fields.first().click();
+      await page.keyboard.press("End");
+      const first = await page.evaluate(() => document.activeElement?.getAttribute("data-line"));
+      await page.keyboard.press("ArrowDown");
+      const second = await page.evaluate(() => document.activeElement?.getAttribute("data-line"));
+      record("заметки: доска — ↓ переводит курсор на следующую строку", Boolean(first && second && first !== second), `${first?.slice(0, 8)} → ${second?.slice(0, 8)}`);
+      await page.keyboard.press("Escape");
+    } else {
+      skip("заметки: доска — ↓ по строкам", "на доске меньше двух строк");
+    }
+    record("заметки: клавиши доски в справке «?»", await helpLists(page, "Доска"));
   } else {
     skip("заметки: доска открывается справа", "досок нет");
   }
@@ -241,7 +344,8 @@ export async function checkScreen(ctx: Ctx) {
 
     // the scenes and the round — one row of segments, not a grid of equal keys; looked at, not pressed
     const scenes = page.getByTestId("desk-screen-scenes");
-    const labels = await scenes.getByRole("tab").allInnerTexts();
+    // each segment carries its key («Часы 2»): the words without it
+    const labels = (await scenes.getByRole("tab").allInnerTexts()).map((text) => text.replace(/\s*\d+\s*$/, "").trim());
     const chosen = await scenes.getByRole("tab", { selected: true }).count();
     record("экран: заставки — сегменты с «По кругу», выбрана одна", labels.length >= 5 && labels.includes("По кругу") && chosen === 1, labels.join(" | "));
 
@@ -258,6 +362,10 @@ export async function checkScreen(ctx: Ctx) {
     );
     const listed = await page.getByTestId("desk-screen-pick").locator("button, li").count();
     record("экран: список «Показать на стене» не пуст", listed > 0, `строк ${listed}`);
+
+    // the keys of the remote are said, not pressed: the digits on the scenes and the help
+    const hinted = (await scenes.innerText()).includes("клавиши 1–");
+    record("экран: у заставок — их клавиши, в справке «?» — «Экран»", hinted && (await helpLists(page, "Экран")));
 
     await page.waitForTimeout(2500);
     await ctx.shot("screen");

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { PointsSheet } from "@/components/rating/PointsSheet";
@@ -35,11 +36,27 @@ function Points({ value, bold = false }: { value: number; bold?: boolean }) {
  * principle 4), the points of the period, the place, the share of tasks closed in time.
  * «Начислить» on a row; Enter or a double click opens the person's lines (`PointsSheet`).
  */
-export function BalancesTable({ period, canAward, onAward }: { period: RatingPeriod; canAward: boolean; onAward: (userId: string) => void }) {
+export function BalancesTable({
+  period,
+  canAward,
+  selected,
+  onSelect,
+  onAward,
+  onHistory,
+}: {
+  period: RatingPeriod;
+  canAward: boolean;
+  /** The chosen person: the screen's N gives to them. */
+  selected: string | null;
+  onSelect: (userId: string) => void;
+  onAward: (userId: string) => void;
+  /** «История» narrowed to the person. */
+  onHistory: (userId: string) => void;
+}) {
   const rating = useRating(period);
   const balances = useTeamBalances(true);
   const people = usePeople();
-  const [selected, setSelected] = useState<string | null>(null);
+  const menu = useContextMenu();
   const [opened, setOpened] = useState<RatingRow | null>(null);
 
   const lines = useMemo<Line[]>(() => {
@@ -102,8 +119,16 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
       width: "128px",
       align: "right",
       render: (line) => (
-        // a quiet word on every row — the loud «Начислить» is the screen's own, by the title
-        <Button size="sm" variant="ghost" disabled={!canAward} onClick={() => onAward(line.row.user_id)} data-testid="points-award-row" className="hover:bg-surface-2">
+        // the row's own «Начислить» shows under the mouse and on the chosen row only — not a column of the same word
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={!canAward}
+          onClick={() => onAward(line.row.user_id)}
+          data-testid="points-award-row"
+          title="Начислить · N"
+          className="opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+        >
           Начислить
         </Button>
       ),
@@ -114,13 +139,26 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
 
   return (
     <>
+      <div
+        onContextMenu={(event) => {
+          const row = (event.target as Element).closest<HTMLElement>("[data-row-key]");
+          const line = row ? lines.find((item) => item.row.user_id === row.dataset.rowKey) : undefined;
+          if (!line) return;
+          onSelect(line.row.user_id);
+          menu.open(event, [
+            { key: "award", label: "Начислить…", hint: "N", disabled: !canAward, onSelect: () => onAward(line.row.user_id) },
+            { key: "lines", label: "Строки очков", hint: "Enter", onSelect: () => setOpened(line.row) },
+            { key: "history", label: "История человека", onSelect: () => onHistory(line.row.user_id) },
+          ]);
+        }}
+      >
       <DataGrid
         aria-label="Балансы команды"
         columns={columns}
         rows={lines}
         rowKey={(line) => line.row.user_id}
         selectedKey={selected}
-        onSelect={(line) => setSelected(line.row.user_id)}
+        onSelect={(line) => onSelect(line.row.user_id)}
         onActivate={(line) => setOpened(line.row)}
         empty={
           loading ? (
@@ -132,6 +170,8 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
           )
         }
       />
+      </div>
+      {menu.node}
       <PointsSheet
         row={opened}
         canRead

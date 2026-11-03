@@ -22,7 +22,8 @@ type Props = {
   upcoming: readonly CalendarEvent[];
   now: Date;
   meId: string;
-  onOpen: (event: CalendarEvent) => void;
+  /** A meeting was clicked: its card opens beside `element`. */
+  onOpen: (event: CalendarEvent, element: HTMLElement) => void;
 };
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -47,7 +48,7 @@ export function CalendarAside({ upcoming, now, meId, onOpen }: Props) {
         {next ? (
           <button
             type="button"
-            onClick={() => onOpen(next)}
+            onClick={(click) => onOpen(next, click.currentTarget)}
             data-testid="desk-calendar-next"
             className="card relative flex w-full flex-col gap-0.5 overflow-hidden py-3 pl-4 pr-3.5 text-left transition-[border-color] duration-[120ms] hover:border-muted/50"
             style={running || soon ? { borderColor: `color-mix(in srgb, var(--${running ? "accent" : "warn"}) 50%, var(--border))` } : undefined}
@@ -93,7 +94,7 @@ export function CalendarAside({ upcoming, now, meId, onOpen }: Props) {
                     <li key={event.id}>
                       <button
                         type="button"
-                        onClick={() => onOpen(event)}
+                        onClick={(click) => onOpen(event, click.currentTarget)}
                         className="-mx-1.5 flex w-[calc(100%+12px)] items-baseline gap-2 rounded-[8px] px-1.5 py-1 text-left transition-colors duration-[120ms] hover:bg-surface-2/70"
                       >
                         <span className="nums w-10 shrink-0 text-[13px] leading-[18px] text-muted">{hhmm(event.starts_at)}</span>
@@ -112,7 +113,7 @@ export function CalendarAside({ upcoming, now, meId, onOpen }: Props) {
 }
 
 /** An invitation still without this person's answer: «Буду», or «Не смогу» with a reason. */
-function Invitation({ event, now, meId, onOpen }: { event: CalendarEvent; now: Date; meId: string; onOpen: (event: CalendarEvent) => void }) {
+function Invitation({ event, now, meId, onOpen }: { event: CalendarEvent; now: Date; meId: string; onOpen: (event: CalendarEvent, element: HTMLElement) => void }) {
   const respond = useRespondEvent(meId);
   const [declining, setDeclining] = useState(false);
   const going = event.participants.filter((p) => p.status === "going").length;
@@ -124,7 +125,7 @@ function Invitation({ event, now, meId, onOpen }: { event: CalendarEvent; now: D
 
   return (
     <div className="card px-3.5 py-2.5" data-testid="desk-invitation">
-      <button type="button" onClick={() => onOpen(event)} className="flex w-full flex-col text-left">
+      <button type="button" onClick={(click) => onOpen(event, click.currentTarget)} className="flex w-full flex-col text-left">
         <span className="nums text-[12px] font-semibold leading-4 text-muted">{capitalize(whenAhead(event, now))}</span>
         <span className="text-[14px] font-medium leading-5 [overflow-wrap:anywhere]">{event.title}</span>
         <span className="text-[12px] leading-4 text-muted">

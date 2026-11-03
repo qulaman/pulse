@@ -3,13 +3,15 @@
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DeskPresenter } from "@/components/desk/screen/DeskPresenter";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { Tone } from "@/components/desk/ui/tone";
 import { ejectReceipt } from "@/components/mindboard/carry";
 import { EXTEND_MINUTES } from "@/components/mindboard/WallSheet";
@@ -18,6 +20,7 @@ import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { splitBoards } from "@/lib/mindboard/list";
+import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useBoards } from "@/lib/mindboard/queries";
 import { useNotes } from "@/lib/notes/queries";
 import { usePeople } from "@/lib/people/queries";
@@ -88,8 +91,10 @@ type Pick = "people" | "task" | "board";
  * now with the row of scenes and «По кругу», the board's presenter while a board is up, the
  * secretary's visitor and messages. On the right: how the clock, the calendar and the rating
  * look and the guest, then «Показать на стене» — a person, an order or a board. The service keys
- * («Перезапустить», «Подключить экран») sit by the title. No queue: without network a command
- * says so (D-76 §3).
+ * («Перезапустить», «Подключить экран») sit by the title. The keyboard is a remote too (wave 3):
+ * 1–6 — the scenes and «По кругу», E — the ether back, Ctrl+F — the search of «Показать», and
+ * while a board is up ←/→ (or a presentation clicker's PageUp/PageDown) lead the meeting. No
+ * queue: without network a command says so (D-76 §3).
  */
 export function DeskScreen() {
   const now = useTick();
@@ -159,6 +164,51 @@ export function DeskScreen() {
     }
     if (round || scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
   };
+  // the row of scenes in its order: what the digits pick
+  const sceneOrder: SceneKey[] = [...sceneKeys, "round"];
+
+  // the remote's keys, by the physical key: a digit — a scene (the wall changes at once, as a click
+  // on the segment does), E — the ether back, Ctrl+F — the search of «Показать на стене»
+  const keys = useRef<(event: KeyboardEvent) => boolean>(() => false);
+  useEffect(() => {
+    keys.current = (event) => {
+      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === "KeyF") {
+        const field = document.querySelector<HTMLInputElement>("[data-testid=desk-screen-pick] input[type=search]");
+        if (!field) return false;
+        field.focus();
+        field.select();
+        return true;
+      }
+      if (!isPlainKey(event) || event.shiftKey || isTypingTarget(event.target) || loading) return false;
+      const digit = /^Digit([1-9])$/.exec(event.code);
+      if (digit) {
+        const value = sceneOrder[Number(digit[1]) - 1];
+        if (!value) return false;
+        pickScene(value);
+        return true;
+      }
+      if (event.code === "KeyE" && mode !== "ether") {
+        show({ mode: "ether" }, "Вернул эфир");
+        return true;
+      }
+      return false;
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.repeat) return;
+      if (document.body.hasAttribute("data-sheet-open") || document.body.hasAttribute("data-dialog-open")) return;
+      if (keys.current(event)) event.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useShortcuts("Экран", [
+    { keys: sceneOrder.length > 1 ? ["1", "…", String(sceneOrder.length)] : ["1"], label: `Заставка: ${sceneOrder.map((value) => (value === "round" ? "по кругу" : SCENE_LABEL[value].toLowerCase())).join(", ")}` },
+    { keys: ["E"], label: "Вернуть эфир" },
+    { keys: ["Ctrl F"], label: "Найти, что показать на стене" },
+  ]);
 
   return (
     <DeskPage>
@@ -167,9 +217,11 @@ export function DeskScreen() {
         light={loading ? null : RECEIPT_LIGHT[receipt.tone]}
         actions={
           <>
-            <Button size="sm" variant="ghost" onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload" title="Стена загрузится заново — если завис или не обновился">
-              Перезапустить
-            </Button>
+            <Tooltip label="Стена загрузится заново — если зависла или не обновилась" side="bottom">
+              <Button size="sm" variant="ghost" onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload">
+                Перезапустить
+              </Button>
+            </Tooltip>
             <Button size="sm" variant="secondary" onClick={() => setConnecting(true)} data-testid="desk-screen-connect">
               Подключить экран
             </Button>
@@ -225,9 +277,11 @@ export function DeskScreen() {
                   </Button>
                 ) : null}
                 {mode !== "ether" ? (
-                  <Button size="sm" variant="secondary" onClick={() => show({ mode: "ether" }, "Вернул эфир")} data-testid="desk-screen-ether">
-                    Вернуть эфир
-                  </Button>
+                  <Tooltip label="Вернуть эфир" keys={["E"]} side="bottom">
+                    <Button size="sm" variant="secondary" onClick={() => show({ mode: "ether" }, "Вернул эфир")} data-testid="desk-screen-ether">
+                      Вернуть эфир
+                    </Button>
+                  </Tooltip>
                 ) : null}
               </div>
             </div>
@@ -236,8 +290,9 @@ export function DeskScreen() {
                 aria-label="Заставка на стене"
                 value={sceneValue}
                 onChange={pickScene}
-                items={[...sceneKeys.map((value) => ({ value, label: SCENE_LABEL[value] })), { value: "round" as const, label: "По кругу" }]}
+                items={sceneOrder.map((value, index) => ({ value, label: <KeyLabel label={value === "round" ? "По кругу" : SCENE_LABEL[value]} hint={String(index + 1)} /> }))}
               />
+              <span className="ml-auto text-[12px] leading-4 text-muted">клавиши 1–{sceneOrder.length} — сразу на стену</span>
             </div>
           </section>
 
@@ -399,5 +454,15 @@ export function DeskScreen() {
 
       <ConnectDialog open={connecting} onClose={() => setConnecting(false)} screens={screens} />
     </DeskPage>
+  );
+}
+
+/** A segment's word with its key, quiet until hovered — the mouse teaches the keyboard. */
+function KeyLabel({ label, hint }: { label: string; hint: string }) {
+  return (
+    <span className="group/key inline-flex items-center gap-1.5">
+      {label}
+      <span className="nums text-[10px] font-semibold text-muted/60 transition-colors duration-[120ms] group-hover/key:text-muted">{hint}</span>
+    </span>
   );
 }

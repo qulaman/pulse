@@ -3,25 +3,42 @@ import { describe, expect, it } from "vitest";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 
 import {
+  ACT_LABEL,
+  bulkPlan,
+  cursorStep,
+  deadlinePresets,
   decisionLine,
   deliveryLine,
   enterMove,
   firstChanged,
+  fitColumn,
   groupChoices,
   groupOf,
   inPlaceOf,
+  isDangerAction,
+  keyOfAction,
   latestLine,
   matchesDue,
   matchesStatus,
+  opensRun,
   parseTab,
+  parseTimeInput,
   personNow,
+  pickedInOrder,
+  pickRange,
   reasonHeadline,
   rowKeys,
   rowMoves,
+  shiftYmd,
   stackMoves,
   stageOf,
+  stepHm,
   tableSections,
+  togglePick,
   underTitle,
+  wallIso,
+  wallYmd,
+  weekdayOf,
   withSkipped,
 } from "./tasks";
 
@@ -346,5 +363,105 @@ describe("the stack's buttons", () => {
     const moves = stackMoves(taken, "overdue", { nudgedAt: at("2026-11-03T06:50:00Z") }, NOW);
     expect(moves[0].held).toBe(true);
     expect(enterMove(moves)?.action).toBe("extend");
+  });
+});
+
+describe("the desk's own hand (wave 3)", () => {
+  it("a menu names a move a little longer, and its letter only where it works", () => {
+    expect(ACT_LABEL.reassign).toBe("Передать…");
+    expect(ACT_LABEL.approve).toBe("Принять");
+    const review = rowKeys({ status: "pending_review" });
+    expect(keyOfAction("approve", review)).toBe("A");
+    expect(keyOfAction("answer", review)).toBe("O");
+    expect(keyOfAction("nudge", review)).toBeUndefined();
+    expect(isDangerAction("remove") && isDangerAction("cancel") && !isDangerAction("extend")).toBe(true);
+  });
+
+  it("bulk: a reminder to work in hand not reminded within half an hour, a date to what is open, a revoke to what is not closed", () => {
+    const rows = [
+      { id: "a", status: "accepted" as const, nudged_at: null },
+      { id: "b", status: "sent" as const, nudged_at: at("2026-11-03T06:50:00Z") },
+      { id: "r", status: "accepted" as const, time_request: { proposed: at("2026-11-04T05:00:00Z") } },
+      { id: "c", status: "pending_review" as const },
+      { id: "d", status: "scheduled" as const },
+      { id: "e", status: "declined" as const },
+      { id: "f", status: "done" as const },
+    ];
+    const plan = bulkPlan(rows, NOW);
+    expect(plan.nudge.map((row) => row.id)).toEqual(["a"]);
+    expect(plan.extend.map((row) => row.id)).toEqual(["a", "b", "r", "d"]);
+    expect(plan.revoke.map((row) => row.id)).toEqual(["a", "b", "r", "c", "d", "e"]);
+  });
+
+  it("marks: a range either way, a toggle, the table's order", () => {
+    const ids = ["a", "b", "c", "d"];
+    expect(pickRange(ids, "b", "d")).toEqual(["b", "c", "d"]);
+    expect(pickRange(ids, "d", "b")).toEqual(["b", "c", "d"]);
+    expect(pickRange(ids, null, "c")).toEqual(["c"]);
+    expect(pickRange(ids, "gone", "c")).toEqual(["c"]);
+    expect(pickRange(ids, "a", "gone")).toEqual([]);
+    expect([...togglePick(new Set(["a"]), "a")]).toEqual([]);
+    expect([...togglePick(new Set(["a"]), "b")]).toEqual(["a", "b"]);
+    expect(pickedInOrder(ids, new Set(["d", "a", "x"]))).toEqual(["a", "d"]);
+  });
+
+  it("a column as wide as its longest word, within its bounds", () => {
+    expect(fitColumn(["Ерлан С.", "Айгуль"], { min: 100, max: 200, extra: 40 })).toBe("100px");
+    expect(fitColumn(["сегодня 18:00", "вчера 19:41"], { min: 80, max: 160 })).toBe("120px");
+    expect(fitColumn(["x".repeat(80)], { min: 80, max: 160 })).toBe("160px");
+  });
+
+  it("the cursor of a list walks and stays at the ends", () => {
+    const ids = ["a", "b", "c"];
+    expect(cursorStep(ids, null, 1)).toBe("a");
+    expect(cursorStep(ids, null, -1)).toBe("c");
+    expect(cursorStep(ids, "b", 1)).toBe("c");
+    expect(cursorStep(ids, "c", 1)).toBe("c");
+    expect(cursorStep(ids, "a", -1)).toBe("a");
+    expect(cursorStep([], "a", 1)).toBeNull();
+  });
+
+  it("the picker's days on the Aqtobe wall clock", () => {
+    expect(wallYmd(NOW)).toBe("2026-11-03");
+    expect(wallYmd(new Date("2026-11-03T19:30:00Z"))).toBe("2026-11-04");
+    expect(shiftYmd("2026-10-31", 1)).toBe("2026-11-01");
+    expect(shiftYmd("2026-03-01", -1)).toBe("2026-02-28");
+    expect(weekdayOf("2026-11-03")).toBe(1);
+    expect(wallIso("2026-11-04", "09:00")).toBe("2026-11-04T09:00:00+05:00");
+  });
+
+  it("presets: today's evening while an hour is left, the week's end, a week ahead, none", () => {
+    // Tuesday noon
+    expect(deadlinePresets(NOW).map((p) => p.label)).toEqual(["Сегодня 18:00", "Завтра 9:00", "Завтра 13:00", "В пятницу 18:00", "Через неделю", "Без срока"]);
+    expect(deadlinePresets(NOW).find((p) => p.label === "В пятницу 18:00")?.iso).toBe("2026-11-06T18:00:00+05:00");
+    // Tuesday 17:30 — no evening left; Saturday — Monday 9:00 comes instead of Friday
+    expect(deadlinePresets(new Date("2026-11-03T12:30:00Z"))[0].label).toBe("Завтра 9:00");
+    const saturday = deadlinePresets(new Date("2026-11-07T07:00:00Z"));
+    expect(saturday.find((p) => p.label === "В понедельник 9:00")?.iso).toBe("2026-11-09T09:00:00+05:00");
+    expect(deadlinePresets(NOW, { none: false }).some((p) => p.iso === null)).toBe(false);
+  });
+
+  it("the time box reads what a person types and steps by a quarter", () => {
+    expect(parseTimeInput("9")).toBe("09:00");
+    expect(parseTimeInput("930")).toBe("09:30");
+    expect(parseTimeInput("18.30")).toBe("18:30");
+    expect(parseTimeInput("18 3")).toBe("18:30");
+    expect(parseTimeInput("1800")).toBe("18:00");
+    expect(parseTimeInput("25:00")).toBeNull();
+    expect(parseTimeInput("завтра")).toBeNull();
+    expect(stepHm("18:00", 15)).toBe("18:15");
+    expect(stepHm("00:00", -15)).toBe("23:45");
+    expect(stepHm("23:50", 15)).toBe("00:05");
+  });
+
+  it("a thread's word opens with its name after a pause, a new person, a new day or a line of history", () => {
+    const word = (sender: string, iso: string, type = "text") => ({ sender_id: sender, created_at: at(iso), type });
+    expect(opensRun(undefined, word("a", "2026-11-03T06:00:00Z"))).toBe(true);
+    expect(opensRun(word("a", "2026-11-03T06:00:00Z"), word("a", "2026-11-03T06:03:00Z"))).toBe(false);
+    expect(opensRun(word("a", "2026-11-03T06:00:00Z"), word("a", "2026-11-03T06:06:00Z"))).toBe(true);
+    expect(opensRun(word("a", "2026-11-03T06:00:00Z"), word("b", "2026-11-03T06:01:00Z"))).toBe(true);
+    expect(opensRun(word("a", "2026-11-03T06:00:00Z", "status_change"), word("a", "2026-11-03T06:01:00Z"))).toBe(true);
+    // 23:58 and 00:01 in Aqtobe: two days
+    expect(opensRun(word("a", "2026-11-03T18:58:00Z"), word("a", "2026-11-03T19:01:00Z"))).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
 import { Avatar } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
@@ -31,6 +32,10 @@ import type { Ymd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
 
 import { DeskHero, HeroBone } from "../team/Hero";
+import { useBoxWidth } from "../team/shared";
+
+/** Below this width of the table the column steps aside — «Чем занимался» first: the panel says it whole. */
+const ROOM: Partial<Record<string, number>> = { summary: 860, hours: 640 };
 
 /** Who the director reads first on the desk: those who owe the report, then the rest (D-154). */
 const DESK_ORDER: TeamDayState[] = ["missed", "pending", "submitted", "away", "off"];
@@ -71,9 +76,11 @@ export function DayStepper({ date, today, onDate }: { date: Ymd; today: Ymd; onD
       {isToday ? (
         <span className="ml-1 text-[13px] font-semibold leading-4 text-accent">сегодня</span>
       ) : (
-        <Button size="sm" variant="ghost" onClick={() => onDate(today)}>
-          К сегодня
-        </Button>
+        <Tooltip label="К сегодня" keys={["T"]}>
+          <Button size="sm" variant="ghost" onClick={() => onDate(today)}>
+            К сегодня
+          </Button>
+        </Tooltip>
       )}
     </div>
   );
@@ -284,7 +291,13 @@ export function DayView({
   stale,
   failed,
   onRetry,
+  filter,
+  filters,
+  narrowed,
+  onClear,
+  selectedId,
   openId,
+  onSelect,
   onOpen,
   onClose,
   pointsOn,
@@ -293,18 +306,28 @@ export function DayView({
   stale: boolean;
   failed: boolean;
   onRetry: () => void;
+  /** Who of the day's people the filters above let through. */
+  filter: (row: TeamDayRow) => boolean;
+  /** The people's filters over the table (who, the words). */
+  filters: ReactNode;
+  narrowed: boolean;
+  onClear: () => void;
+  selectedId: string | null;
   openId: string | null;
+  onSelect: (id: string) => void;
   onOpen: (id: string) => void;
   onClose: () => void;
   pointsOn: boolean;
 }) {
+  const [box, width] = useBoxWidth();
   if (!day) return failed ? <LoadFailed onRetry={onRetry} /> : <DayBone />;
 
+  const shown = day.rows.filter(filter);
   const groups: Group<TeamDayRow>[] = DESK_ORDER.map((state) => ({
     key: state,
     title: STATE_TITLE[state],
     tone: GROUP_TONE[state],
-    rows: day.rows.filter((row) => row.state === state),
+    rows: shown.filter((row) => row.state === state),
   }));
   const open = openId ? (day.rows.find((row) => row.user_id === openId) ?? null) : null;
 
@@ -370,16 +393,34 @@ export function DayView({
   return (
     <div className="flex flex-col gap-5 transition-opacity duration-[150ms]" style={{ opacity: stale ? 0.55 : 1 }} aria-busy={stale || undefined} data-testid="desk-reports-day">
       <DayHero day={day} />
-      <DataGrid
-        aria-label="Отчёты за день"
-        columns={columns}
-        groups={groups}
-        rowKey={(row) => row.user_id}
-        selectedKey={openId}
-        onSelect={(row) => onOpen(row.user_id)}
-        onRowClick={(row) => onOpen(row.user_id)}
-        empty={<EmptyState title="В команде пока никого" hint="Отчёты сдают сотрудники — появятся, когда в команде будут люди" />}
-      />
+      {filters}
+      <div ref={box}>
+        <DataGrid
+          aria-label="Отчёты за день"
+          columns={columns.filter((column) => width === 0 || width >= (ROOM[column.key] ?? 0))}
+          groups={groups}
+          rowKey={(row) => row.user_id}
+          selectedKey={selectedId}
+          onSelect={(row) => onSelect(row.user_id)}
+          onActivate={(row) => onOpen(row.user_id)}
+          onRowClick={(row) => onOpen(row.user_id)}
+          empty={
+            narrowed ? (
+              <EmptyState
+                title="Никого не нашлось"
+                hint="Поиск — по имени и должности; «Без отчёта» и «Сдали» — над таблицей"
+                action={
+                  <Button size="sm" variant="secondary" onClick={onClear}>
+                    Показать всех
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState title="В команде пока никого" hint="Отчёты сдают сотрудники — появятся, когда в команде будут люди" />
+            )
+          }
+        />
+      </div>
       {openId ? (
         <InPanel panelKey={`report:${openId}`} onClose={onClose}>
           {open ? <ReportPanel row={open} /> : <p className="pr-8 text-[14px] leading-5 text-muted">Этого человека нет в отчётах за этот день.</p>}

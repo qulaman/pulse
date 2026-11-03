@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DESK_NAV, deskAllows, deskHomeFor, deskNavActive, deskRouteFor, mayHaveDeskRoute } from "./routes";
+import { chordHref, DESK_NAV, deskAllows, deskHomeFor, deskNavActive, deskRouteFor, mayHaveDeskRoute } from "./routes";
 
 describe("deskHomeFor (D-153)", () => {
   it("sends the director to tasks and the secretary to the errands", () => {
@@ -137,5 +137,28 @@ describe("deskAllows and the navigation", () => {
     expect(deskNavActive("/desk/settings/lab", "director")).toBe("/desk/settings");
     expect(deskNavActive("/desk/profile", "secretary")).toBe("/desk/profile");
     expect(deskNavActive("/desk", "director")).toBeNull();
+  });
+});
+
+describe("chordHref (D-154 wave 3)", () => {
+  it("goes to the role's section by the letter after G", () => {
+    expect(chordHref("KeyT", "director")).toBe("/desk/tasks");
+    expect(chordHref("KeyS", "director")).toBe("/desk/today");
+    expect(chordHref("KeyH", "secretary")).toBe("/desk/settings");
+    expect(chordHref("KeyP", "secretary")).toBe("/desk/profile");
+  });
+
+  it("leaves a letter the role has no section for to the screen", () => {
+    expect(chordHref("KeyT", "secretary")).toBeNull();
+    expect(chordHref("KeyQ", "director")).toBeNull();
+    expect(chordHref("Digit1", "director")).toBeNull();
+  });
+
+  it("gives every section of a role its own letter", () => {
+    for (const role of ["director", "secretary"] as const) {
+      const keys = DESK_NAV[role].map((item) => item.key);
+      expect(keys.every(Boolean)).toBe(true);
+      expect(new Set([...keys, "P"]).size).toBe(keys.length + 1);
+    }
   });
 });

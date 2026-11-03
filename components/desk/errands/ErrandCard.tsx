@@ -1,6 +1,6 @@
 "use client";
 
-import type { MouseEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { TONE_VAR } from "@/components/desk/ui/tone";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -52,70 +52,6 @@ function ErrandBody({ errand, now, catalogue, big = false }: { errand: Errand; n
         </p>
       ) : null}
     </>
-  );
-}
-
-/**
- * A request in the secretary's queue (tasks/022 B.4): the card of the phone, a row high on a
- * monitor, with the same buttons. A click on the card (not on a button) opens it in the panel.
- */
-export function ErrandCard({
-  errand,
-  meId,
-  now,
-  catalogue,
-  selected,
-  chosen = false,
-  onOpen,
-  declineOpen,
-  onDeclineOpen,
-}: {
-  errand: Errand;
-  meId: string;
-  now: Date;
-  catalogue: readonly SecretaryAction[];
-  /** Open in the panel. */
-  selected: boolean;
-  /** The queue's keyboard is on it: ringed, its buttons show their keys. */
-  chosen?: boolean;
-  onOpen: () => void;
-  declineOpen?: boolean;
-  onDeclineOpen?: (open: boolean) => void;
-}) {
-  const alarm = sceneOf(errand, catalogue) === "security";
-  const taken = errand.status === "accepted" && errand.claimed_by === meId;
-  const rail = alarm ? "var(--danger)" : taken ? "var(--ok)" : "var(--accent)";
-  const open = (event: MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest("button, a, input, [role=dialog]")) return;
-    onOpen();
-  };
-  return (
-    <article
-      className={`card-in card relative cursor-pointer overflow-hidden px-4 py-3 transition-[border-color,box-shadow] duration-[120ms] hover:border-muted/50 ${selected || chosen ? "border-accent/60" : ""}`}
-      style={{
-        ...(alarm ? { borderColor: "color-mix(in srgb, var(--danger) 65%, var(--border))", background: "color-mix(in srgb, var(--danger) 10%, var(--surface))" } : null),
-        ...(chosen ? { boxShadow: "var(--shadow-card), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)" } : null),
-      }}
-      onClick={open}
-      data-testid="desk-errand-card"
-      data-status={errand.status}
-      data-chosen={chosen ? "" : undefined}
-      data-errand-id={errand.id}
-    >
-      <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: rail }} />
-      <div className="flex items-start gap-4 pl-1">
-        <div className="min-w-0 flex-1">
-          <ErrandBody errand={errand} now={now} catalogue={catalogue} />
-          {/* «Будет:», «Уточнить у директора» — the phone card's second layer (D-99) */}
-          <div className="mt-2 empty:hidden">
-            <SecretaryLink errand={errand} meId={meId} catalogue={catalogue} hints={chosen} />
-          </div>
-        </div>
-        <div className="shrink-0 pt-0.5">
-          <ErrandActions errand={errand} meId={meId} catalogue={catalogue} hints={chosen} declineOpen={declineOpen} onDeclineOpen={onDeclineOpen} />
-        </div>
-      </div>
-    </article>
   );
 }
 

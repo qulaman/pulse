@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 
 import { TONE_VAR } from "@/components/desk/ui/tone";
 import { hhmm, isOver, myStatus, timeRange } from "@/lib/calendar/agenda";
@@ -12,6 +12,7 @@ import { shortName } from "@/lib/people/names";
 import { initialsOf } from "@/lib/people/queries";
 
 import type { DeadlineMark } from "./deadlines";
+import { hmAt, minutesAt, SNAP_MIN, slotOf, type Slot } from "./slots";
 import { HOUR_PX, hourRange, layoutDay, stackTops, wallOf, yOf, type Placed } from "./week";
 
 /** Faces on a meeting before «+N». */
@@ -34,10 +35,37 @@ type Props = {
   today: Ymd;
   now: Date;
   meId: string;
-  onOpen: (event: CalendarEvent) => void;
+  /** A meeting's block was clicked (or Enter on it): the card opens beside `element`. */
+  onOpen: (event: CalendarEvent, element: HTMLElement) => void;
   /** «Сроки задач» while the layer is on; null — off. */
   deadlines: Map<Ymd, DeadlineMark[]> | null;
+  /**
+   * The director's mouse makes meetings (wave 3): a click or a drag over an empty stretch hands
+   * the slot here with the box it stands in on screen; null — the grid only shows.
+   */
+  onSlot: ((slot: Slot, box: { left: number; right: number; top: number }) => void) | null;
+  /** The meeting being made — drawn where it will stand, with its title as typed. */
+  ghost: { slot: Slot; title: string } | null;
 };
+
+/** A press that moved less than this is a click. */
+const DRAG_PX = 4;
+
+/** The earliest minute of `ymd` a new meeting may start at: today — the next quarter, a past day — never. */
+function earliest(ymd: Ymd, now: Date): number | null {
+  const clock = wallOf(now.getTime());
+  if (ymd < clock.ymd) return null;
+  if (ymd > clock.ymd) return 0;
+  return Math.ceil(clock.minutes / SNAP_MIN) * SNAP_MIN;
+}
+
+/** A slot moved to start no earlier than `first`, its length kept within the day; null — nothing of it is ahead. */
+function ahead(slot: Slot, first: number | null): Slot | null {
+  if (first === null) return null;
+  if (slot.start >= first) return slot;
+  if (first + SNAP_MIN > 24 * 60) return null;
+  return { ...slot, start: first, end: Math.min(24 * 60, first + (slot.end - slot.start)) };
+}
 
 /**
  * The week as hours (D-154): a column a day under its date, the hours 08:00–20:00 down the left
@@ -46,7 +74,7 @@ type Props = {
  * lasts, with the rail of its moment; meetings that overlap stand side by side. An empty week
  * still shows its hours — the structure of the days to fill.
  */
-export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines }: Props) {
+export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, onSlot, ghost }: Props) {
   const events = days.flatMap((ymd) => byDay.get(ymd) ?? []);
   const marks = deadlines ? days.flatMap((ymd) => deadlines.get(ymd) ?? []) : [];
   const { from, to } = hourRange(
@@ -59,6 +87,81 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines }: 
   const clock = wallOf(now.getTime());
   const nowShown = days.includes(clock.ymd) && clock.minutes >= from * 60 && clock.minutes <= to * 60;
   const nowY = nowShown ? yOf(clock.minutes, from) : null;
+
+  // a press on an empty stretch of a day: where it went down, where the mouse is now
+  const [drag, setDrag] = useState<{ ymd: Ymd; down: number; at: number; moved: boolean; y0: number } | null>(null);
+  // the half-hour under a resting mouse: «+ 14:30» says a click makes a meeting there
+  const [hover, setHover] = useState<{ ymd: Ymd; minutes: number } | null>(null);
+  const dragRef = useRef(drag);
+  const slotRef = useRef(onSlot);
+  const fromRef = useRef(from);
+  useEffect(() => {
+    dragRef.current = drag;
+    slotRef.current = onSlot;
+    fromRef.current = from;
+  });
+  const dragging = drag !== null;
+
+  useEffect(() => {
+    if (!dragging) return;
+    const columnOf = (ymd: Ymd) => body.current?.querySelector<HTMLElement>(`[data-testid=desk-week-day][aria-label="${ymd}"]`) ?? null;
+    const move = (event: MouseEvent) => {
+      const current = dragRef.current;
+      const column = current ? columnOf(current.ymd) : null;
+      if (!current || !column) return;
+      const moved = current.moved || Math.abs(event.clientY - current.y0) > DRAG_PX;
+      setDrag({ ...current, at: minutesAt(event.clientY - column.getBoundingClientRect().top, fromRef.current), moved });
+    };
+    const up = () => {
+      const current = dragRef.current;
+      setDrag(null);
+      const column = current ? columnOf(current.ymd) : null;
+      if (!current || !column || !slotRef.current) return;
+      const slot = ahead(slotOf(current.ymd, current.down, current.at, current.moved), earliest(current.ymd, new Date()));
+      if (!slot) return;
+      const rect = column.getBoundingClientRect();
+      slotRef.current(slot, { left: rect.left, right: rect.right, top: rect.top + yOf(slot.start, fromRef.current) });
+    };
+    const esc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDrag(null);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    window.addEventListener("keydown", esc);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      window.removeEventListener("keydown", esc);
+    };
+  }, [dragging]);
+
+  /** The minutes under the mouse in a column, from its own box. */
+  const minutesIn = (event: ReactMouseEvent<HTMLElement>, step = SNAP_MIN) => minutesAt(event.clientY - event.currentTarget.getBoundingClientRect().top, from, step);
+  const onEmpty = (event: ReactMouseEvent<HTMLElement>) => !(event.target as Element).closest("[data-testid=desk-event], [data-testid=desk-deadline]");
+
+  const pressDay = (ymd: Ymd) => (event: ReactMouseEvent<HTMLElement>) => {
+    if (!onSlot || event.button !== 0 || !onEmpty(event) || earliest(ymd, now) === null) return;
+    // a drag paints a stretch, not a selection of the page's text
+    event.preventDefault();
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    const minutes = minutesIn(event);
+    setHover(null);
+    setDrag({ ymd, down: minutes, at: minutes, moved: false, y0: event.clientY });
+  };
+  const hoverDay = (ymd: Ymd) => (event: ReactMouseEvent<HTMLElement>) => {
+    if (!onSlot || drag || ghost) return;
+    const first = earliest(ymd, now);
+    const minutes = minutesIn(event, 30);
+    if (!onEmpty(event) || first === null || minutes + 30 <= first) {
+      if (hover) setHover(null);
+      return;
+    }
+    if (hover?.ymd !== ymd || hover.minutes !== minutes) setHover({ ymd, minutes });
+  };
+
+  // what is drawn as the new meeting: the press in progress, or the one waiting for its title
+  const pressed = drag ? ahead(slotOf(drag.ymd, drag.down, drag.at, drag.moved), earliest(drag.ymd, now)) : null;
+  const drawn: { slot: Slot; title: string } | null = drag ? (pressed ? { slot: pressed, title: "" } : null) : ghost;
 
   // the first look finds now: a line below the fold (an evening on a short screen) is brought into view, once
   const body = useRef<HTMLDivElement>(null);
@@ -113,6 +216,12 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines }: 
             nowY={ymd === clock.ymd ? nowY : null}
             meId={meId}
             onOpen={onOpen}
+            creating={Boolean(onSlot)}
+            onPress={pressDay(ymd)}
+            onHover={hoverDay(ymd)}
+            onLeave={() => setHover(null)}
+            hover={hover?.ymd === ymd && !drag ? hover.minutes : null}
+            ghost={drawn?.slot.ymd === ymd ? drawn : null}
           />
         ))}
       </div>
@@ -148,6 +257,12 @@ function DayColumn({
   nowY,
   meId,
   onOpen,
+  creating,
+  onPress,
+  onHover,
+  onLeave,
+  hover,
+  ghost,
 }: {
   ymd: Ymd;
   weekend: boolean;
@@ -158,7 +273,14 @@ function DayColumn({
   now: Date;
   nowY: number | null;
   meId: string;
-  onOpen: (event: CalendarEvent) => void;
+  onOpen: (event: CalendarEvent, element: HTMLElement) => void;
+  creating: boolean;
+  onPress: (event: ReactMouseEvent<HTMLElement>) => void;
+  onHover: (event: ReactMouseEvent<HTMLElement>) => void;
+  onLeave: () => void;
+  /** The half-hour under the resting mouse, in minutes; null — none here. */
+  hover: number | null;
+  ghost: { slot: Slot; title: string } | null;
 }) {
   const placed = layoutDay(events);
   // marks stack downwards when two deadlines share an hour
@@ -173,16 +295,30 @@ function DayColumn({
     <section
       aria-label={ymd}
       data-testid="desk-week-day"
-      className={`relative min-w-0 border-l border-border/70 ${isToday ? "bg-accent/[0.04]" : weekend ? "bg-surface/40" : ""}`}
+      className={`relative min-w-0 select-none border-l border-border/70 ${isToday ? "bg-accent/[0.04]" : weekend ? "bg-surface/40" : ""}`}
+      onMouseDown={creating ? onPress : undefined}
+      onMouseMove={creating ? onHover : undefined}
+      onMouseLeave={creating ? onLeave : undefined}
       style={{
         // the hour lines: one hairline at the top of every hour
         backgroundImage: "linear-gradient(to bottom, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px)",
         backgroundSize: `100% ${HOUR_PX}px`,
       }}
     >
+      {hover !== null ? (
+        <span
+          aria-hidden
+          className="nums pointer-events-none absolute inset-x-[3px] z-[5] flex items-start rounded-[7px] px-2 pt-1 text-[11px] font-semibold leading-4 text-accent/80"
+          style={{ top: yOf(hover, from) + 1, height: HOUR_PX / 2 - 2, background: "color-mix(in srgb, var(--accent) 7%, transparent)" }}
+          data-testid="desk-slot-hint"
+        >
+          + {hmAt(hover)}
+        </span>
+      ) : null}
       {placed.map((item) => (
         <HourEvent key={item.event.id} item={item} from={from} now={now} meId={meId} onOpen={onOpen} />
       ))}
+      {ghost ? <Ghost slot={ghost.slot} title={ghost.title} from={from} /> : null}
       {stacked.map(({ mark, top }) => (
         <DeadlineChip key={mark.id} mark={mark} top={top} />
       ))}
@@ -222,7 +358,7 @@ function Faces({ event }: { event: CalendarEvent }) {
 }
 
 /** A meeting on the grid: when, what, who — the rail in the colour of its moment. */
-function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: number; now: Date; meId: string; onOpen: (event: CalendarEvent) => void }) {
+function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: number; now: Date; meId: string; onOpen: (event: CalendarEvent, element: HTMLElement) => void }) {
   const { event } = item;
   const over = isOver(event, now);
   const running = isRunning(event, now);
@@ -246,7 +382,7 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
   return (
     <button
       type="button"
-      onClick={() => onOpen(event)}
+      onClick={(click) => onOpen(event, click.currentTarget)}
       data-testid="desk-event"
       data-event-id={event.id}
       title={`${timeRange(event)} · ${event.title}${event.location ? ` · ${event.location}` : ""}`}
@@ -279,6 +415,31 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
         </>
       )}
     </button>
+  );
+}
+
+/** The meeting being made: where it will stand, the title as it is typed, the time it takes. */
+function Ghost({ slot, title, from }: { slot: Slot; title: string; from: number }) {
+  const top = yOf(slot.start, from) + 1;
+  const height = Math.max(20, ((slot.end - slot.start) * HOUR_PX) / 60 - 2);
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-x-[3px] z-[25] flex flex-col overflow-hidden rounded-[8px] border px-2 py-1"
+      style={{
+        top,
+        height,
+        background: "color-mix(in srgb, var(--accent) 16%, var(--surface-2))",
+        borderColor: "color-mix(in srgb, var(--accent) 60%, transparent)",
+        boxShadow: "0 6px 18px -8px rgba(0,0,0,.6)",
+      }}
+      data-testid="desk-slot-ghost"
+    >
+      <span className="truncate text-[12px] font-semibold leading-4">{title.trim() || "Новое мероприятие"}</span>
+      <span className="nums truncate text-[11px] leading-4 text-text/70">
+        {hmAt(slot.start)}–{hmAt(slot.end)}
+      </span>
+    </div>
   );
 }
 

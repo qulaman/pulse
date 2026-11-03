@@ -631,3 +631,204 @@ export function personNow(
   }
   return { ring: null, line: "свободен", rank: 4 };
 }
+
+/* -------------------------------------------------------------------------- */
+/* The desk's own hand on a task: menus, many rows at once, the pickers (wave 3) */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A move's name in a desk menu — a little longer than a button's, «…» when it asks something
+ * first (a date, a person, a word, a confirmation). The phone's «Действия» say the same.
+ */
+export const ACT_LABEL: Record<DeskAction, string> = {
+  approve: "Принять",
+  rework: "На доработку…",
+  answer: "Ответить",
+  insist: "Настоять",
+  reassign: "Передать…",
+  cancel: "Отменить задачу…",
+  extend: "Изменить срок…",
+  revoke: "Отозвать…",
+  sendNow: "Отправить сейчас",
+  open: "Открыть",
+  remove: "Удалить насовсем…",
+  grant: "Согласовать срок",
+  retime: "Назначить другой срок…",
+  keep: "Оставить прежний срок",
+  handoff: "Передать предложенному",
+  nudge: "Напомнить",
+  reissue: "Выдать снова…",
+};
+
+/** The letter a move answers to in the table, the panel and the stack — shown in a menu only when it works on that row. */
+export function keyOfAction(action: DeskAction | "reply", keys: readonly RowKey[]): string | undefined {
+  const wanted = action === "answer" ? "reply" : action;
+  const key = keys.find((one) => one.action === wanted);
+  return key ? KEY_CAP[key.code] : undefined;
+}
+
+/** Moves that take a task back or away: red in a menu, asked twice. */
+export function isDangerAction(action: DeskAction): boolean {
+  return action === "revoke" || action === "cancel" || action === "remove";
+}
+
+type Bulky = { id: string; status: TaskStatus; nudged_at?: string | null; time_request?: unknown };
+
+/** What the bar over many marked rows can do to each of them (принцип 3: «Принять» is never in bulk). */
+export type BulkPlan<T> = { nudge: T[]; extend: T[]; revoke: T[] };
+
+/**
+ * The marked rows each bulk move applies to — the same rule as one row's «⋯»: a reminder to work
+ * in hand whose last one is older than half an hour and whose holder does not ask for time (a
+ * request is answered, not reminded about — D-128), a new date to work in hand or held for the
+ * morning, «Отозвать» to anything not closed yet (a refusal's «Отменить» is the same revoke).
+ */
+export function bulkPlan<T extends Bulky>(tasks: readonly T[], now: Date = new Date()): BulkPlan<T> {
+  return {
+    nudge: tasks.filter((task) => IN_HAND.includes(task.status) && !task.time_request && canNudgeAgain(task.nudged_at ?? null, now)),
+    extend: tasks.filter((task) => IN_HAND.includes(task.status) || task.status === "scheduled"),
+    revoke: tasks.filter((task) => task.status !== "done" && task.status !== "revoked"),
+  };
+}
+
+/** The rows between two of them in the table's order, both ends in — a Shift-click. */
+export function pickRange(ids: readonly string[], from: string | null, to: string): string[] {
+  const end = ids.indexOf(to);
+  if (end < 0) return [];
+  const start = from ? ids.indexOf(from) : -1;
+  if (start < 0) return [to];
+  const [a, b] = start <= end ? [start, end] : [end, start];
+  return ids.slice(a, b + 1);
+}
+
+/** One row in or out of the marked set — a Ctrl-click or X. */
+export function togglePick(picked: ReadonlySet<string>, id: string): Set<string> {
+  const next = new Set(picked);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** The marked rows still on screen, in the table's order — a row that left the table leaves the mark too. */
+export function pickedInOrder(ids: readonly string[], picked: ReadonlySet<string>): string[] {
+  return ids.filter((id) => picked.has(id));
+}
+
+/**
+ * A column as wide as its longest word (D-154 wave 3): every row of the desk's grid is a grid of
+ * its own, so `auto` would size each row apart and break the columns — the width is reckoned
+ * from the words instead. 14 px Inter averages about 7.4 px a letter.
+ */
+export function fitColumn(texts: readonly string[], { min, max, extra = 24, perChar = 7.4 }: { min: number; max: number; extra?: number; perChar?: number }): string {
+  const longest = texts.reduce((most, text) => Math.max(most, text.length), 0);
+  return `${Math.round(Math.min(max, Math.max(min, longest * perChar + extra)))}px`;
+}
+
+/** The next row under the cursor of a list (J/K): stays at the ends, the first one when none is held. */
+export function cursorStep(ids: readonly string[], current: string | null, delta: 1 | -1): string | null {
+  if (ids.length === 0) return null;
+  const at = current ? ids.indexOf(current) : -1;
+  if (at < 0) return delta > 0 ? ids[0] : ids[ids.length - 1];
+  return ids[Math.min(ids.length - 1, Math.max(0, at + delta))];
+}
+
+/* ---- dates of the deadline picker (Aqtobe wall clock, +05:00) ---- */
+
+const AQTOBE_MS = 5 * 3_600_000;
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** «2026-11-03» moved by whole days. */
+export function shiftYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const moved = new Date(Date.UTC(y, m - 1, d + days));
+  return `${moved.getUTCFullYear()}-${pad2(moved.getUTCMonth() + 1)}-${pad2(moved.getUTCDate())}`;
+}
+
+/** Today on the Aqtobe wall clock. */
+export function wallYmd(now: Date = new Date()): string {
+  const wall = new Date(now.getTime() + AQTOBE_MS);
+  return `${wall.getUTCFullYear()}-${pad2(wall.getUTCMonth() + 1)}-${pad2(wall.getUTCDate())}`;
+}
+
+/** Monday 0 … Sunday 6 of a day. */
+export function weekdayOf(ymd: string): number {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+}
+
+/** The instant a wall day and time name, with the offset written out — what the deadline routes take. */
+export function wallIso(ymd: string, hm: string): string {
+  return `${ymd}T${hm}:00+05:00`;
+}
+
+export type DeadlinePreset = { label: string; iso: string | null };
+
+/**
+ * The deadline picker's quick choices (digits 1…6): the phone's three (D-51) — today 18:00 while
+ * the working day still has an hour left, tomorrow 9:00 and 13:00 — the week's end (Friday 18:00,
+ * or Monday 9:00 from Friday on), a week ahead, and «без срока».
+ */
+export function deadlinePresets(now: Date = new Date(), { none = true }: { none?: boolean } = {}): DeadlinePreset[] {
+  const today = wallYmd(now);
+  const presets: DeadlinePreset[] = [];
+  const evening = wallIso(today, "18:00");
+  if (new Date(evening).getTime() - now.getTime() > 60 * 60_000) presets.push({ label: "Сегодня 18:00", iso: evening });
+  presets.push({ label: "Завтра 9:00", iso: wallIso(shiftYmd(today, 1), "09:00") });
+  presets.push({ label: "Завтра 13:00", iso: wallIso(shiftYmd(today, 1), "13:00") });
+  const weekday = weekdayOf(today);
+  if (weekday <= 3) presets.push({ label: "В пятницу 18:00", iso: wallIso(shiftYmd(today, 4 - weekday), "18:00") });
+  else presets.push({ label: "В понедельник 9:00", iso: wallIso(shiftYmd(today, 7 - weekday), "09:00") });
+  presets.push({ label: "Через неделю", iso: wallIso(shiftYmd(today, 7), "18:00") });
+  if (none) presets.push({ label: "Без срока", iso: null });
+  return presets;
+}
+
+/**
+ * What a person types into the time box, as «HH:MM»: «9» → 09:00, «930» → 09:30, «18.30» → 18:30,
+ * «18 30» → 18:30. Null — not a time.
+ */
+export function parseTimeInput(text: string): string | null {
+  const typed = text.trim().replace(/[.\s,-]+/g, ":");
+  let hours: number;
+  let minutes: number;
+  const parts = /^(\d{1,2})(?::(\d{1,2}))?$/.exec(typed);
+  if (parts) {
+    hours = Number(parts[1]);
+    minutes = parts[2] === undefined ? 0 : Number(parts[2].padEnd(2, "0"));
+  } else if (/^\d{3,4}$/.test(typed)) {
+    hours = Number(typed.slice(0, typed.length - 2));
+    minutes = Number(typed.slice(-2));
+  } else {
+    return null;
+  }
+  if (hours > 23 || minutes > 59) return null;
+  return `${pad2(hours)}:${pad2(minutes)}`;
+}
+
+/** The time box's ↑/↓: a quarter of an hour, around the clock. */
+export function stepHm(hm: string, minutes: number): string {
+  const [h, m] = hm.split(":").map(Number);
+  const total = (((h * 60 + m + minutes) % 1440) + 1440) % 1440;
+  return `${pad2(Math.floor(total / 60))}:${pad2(total % 60)}`;
+}
+
+/* ---- the thread at the desk's density ---- */
+
+type Spoken = { sender_id: string; created_at: string; type: string };
+
+/** A word of the same person within this long of the last one hangs under it, without its own name. */
+export const THREAD_RUN_MS = 5 * 60_000;
+
+/**
+ * Whether a message of the thread opens with its sender's name and time (the desk's dense feed,
+ * as a messenger on a computer does): a new person, a pause of five minutes, a new Aqtobe day or
+ * a line of history between them — yes; the same person's next word — no.
+ */
+export function opensRun(previous: Spoken | undefined, current: Spoken): boolean {
+  if (!previous) return true;
+  const said = (message: Spoken) => message.type !== "status_change" && message.type !== "system";
+  if (!said(previous) || !said(current)) return true;
+  if (previous.sender_id !== current.sender_id) return true;
+  if (aqtobeDay(new Date(previous.created_at)) !== aqtobeDay(new Date(current.created_at))) return true;
+  return new Date(current.created_at).getTime() - new Date(previous.created_at).getTime() > THREAD_RUN_MS;
+}

@@ -4,12 +4,13 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { EventEditor } from "@/components/calendar/EventEditor";
-import { EventSheet } from "@/components/calendar/EventSheet";
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
+import type { Anchor } from "@/components/desk/ui/Popover";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { Tone } from "@/components/desk/ui/tone";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
@@ -30,11 +31,33 @@ import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { CalendarAside } from "./CalendarAside";
 import { MonthGrid } from "./CalendarGrids";
 import { deadlineMarks, loudest, markCount } from "./deadlines";
+import { EventCard } from "./EventCard";
+import { EventForm, type EventSeed } from "./EventForm";
+import { QuickCreate } from "./QuickCreate";
 import { daysOf, monthTitle, weekTitle, type CalendarView } from "./range";
+import { besideAnchor, type Slot } from "./slots";
 import { eventsByDay } from "./week";
 import { WeekHours } from "./WeekHours";
 
 const EMPTY: CalendarEvent[] = [];
+/** The width of the meeting's card and of the quick card — where they stand beside a block. */
+const CARD_W = 384;
+const QUICK_W = 360;
+/** What the cards may grow to (the people's list opened in the quick one): they stand where that fits. */
+const CARD_H = 380;
+const QUICK_H = 420;
+
+/** The open meeting's card: which meeting, where it stands, and whether it is asking «Удалить?». */
+type CardState = { id: string; anchor: Anchor; confirming: boolean };
+/** The full form: a meeting to change, or a new one from what is known of it. */
+type FormState = { event: CalendarEvent | null; seed: EventSeed | null };
+/** A meeting being made with the mouse: its slot on the grid, the card beside it, the title so far. */
+type QuickState = { slot: Slot; anchor: { x: number; y: number }; title: string };
+
+/** Where a card stands beside an element of the screen. */
+function besideOf(element: HTMLElement, width: number, height: number): { x: number; y: number } {
+  return besideAnchor(element.getBoundingClientRect(), width, { width: window.innerWidth, height: window.innerHeight }, height);
+}
 
 /**
  * The moment in one sentence under the title (D-154) — the phone's status screen (D-100) said in
@@ -53,12 +76,15 @@ function stateLine(screen: CalendarScreen, running: boolean): { text: string; to
 }
 
 /**
- * «Календарь» of the desk (D-153, D-154): «‹ сегодня ›» and «Неделя | Месяц» over the grid — a
- * week of hours or the month's weeks, `?view` and `?d` in the address — and «Ближайшее» beside
- * it. «Сроки задач» (`?deadlines=1`, the key D) lays the director's open orders over the days.
- * A meeting opens in the phone's own sheet, drawn as a dialog here; the director makes a new one
- * in the phone's form. `?e=<id>` (a push opened on a computer) turns to that meeting's day and
- * opens it. The light of the screen is the nearest meeting's: on now, or about to start.
+ * «Календарь» of the desk (D-153, D-154, wave 3): «‹ сегодня ›» and «Неделя | Месяц» over the
+ * grid — a week of hours or the month's weeks, `?view` and `?d` in the address — and «Ближайшее»
+ * beside it. «Сроки задач» (`?deadlines=1`, the key D) lays the director's open orders over the
+ * days. Made for a mouse and a keyboard: a meeting opens as a card beside its block (the grid
+ * stays in sight), a click or a drag over an empty stretch of the week makes a new one with a
+ * quick card (title, people, Enter), N opens the full desk form, E edits the open meeting and
+ * Delete asks to delete it; W/M, ←/→, T and D move the view. `?e=<id>` (a push opened on a
+ * computer) turns to that meeting's day and opens its card. The light of the screen is the
+ * nearest meeting's: on now, or about to start.
  */
 export function DeskCalendar() {
   // a namesake gets the surname's initial once the roster has come (D-146)
@@ -138,11 +164,16 @@ export function DeskCalendar() {
   const soon = !running && screen.tone === "warn" && !screen.focusId;
   const light: Tone | null = running ? "accent" : soon ? "warn" : null;
 
-  // the open meeting, by id: it stays open (and live) when an edit carries it off the screen
-  const [openId, setOpenId] = useState<string | null>(() => params.get("e"));
+  // the open meeting, by id: its card stays open (and live) when an edit carries it off the screen
+  const [card, setCard] = useState<CardState | null>(() => {
+    const linked = params.get("e");
+    return linked ? { id: linked, anchor: null, confirming: false } : null;
+  });
+  const openId = card?.id ?? null;
   const known = openId ? (events.find((event) => event.id === openId) ?? upcoming.data?.find((event) => event.id === openId) ?? null) : null;
   const opened = useEvent(openId, known);
-  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<FormState | null>(null);
+  const [quick, setQuick] = useState<QuickState | null>(null);
 
   // a push's `?e`: the grid turns to that meeting's day once it is read, and the address lets it go
   const deepLink = params.get("e");
@@ -151,9 +182,36 @@ export function DeskCalendar() {
     // `go` drops `?e` from the address: the next render has nothing to follow
     if (linked) go({ d: ymdOfEvent(linked) });
   });
+  // a card opened without a block under the hand (the push): beside the block once the grid shows
+  // it, else at the top of the screen
+  const unplaced = card !== null && card.anchor === null && opened.data ? card.id : null;
+  useEffect(() => {
+    if (!unplaced) return;
+    const frame = requestAnimationFrame(() => {
+      const block = document.querySelector<HTMLElement>(`#desk-main [data-testid=desk-event][data-event-id="${unplaced}"]`);
+      const anchor = block ? besideOf(block, CARD_W, CARD_H) : { x: Math.max(16, window.innerWidth / 2 - CARD_W / 2), y: 120 };
+      setCard((current) => (current && current.id === unplaced ? { ...current, anchor } : current));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [unplaced, deepLink]);
 
-  const open = (event: CalendarEvent) => setOpenId(event.id);
+  const open = (event: CalendarEvent, element: HTMLElement) => {
+    setQuick(null);
+    setCard({ id: event.id, anchor: besideOf(element, CARD_W, CARD_H), confirming: false });
+  };
   const follow = (startsAt: string) => go({ d: ymdOfEvent({ starts_at: startsAt }) });
+  // a new meeting is made for a day ahead: from a past day the form starts at today
+  const newDay = compareYmd(day, today) < 0 ? today : day;
+  const newMeeting = (seed: EventSeed = { day: newDay }) => {
+    setCard(null);
+    setQuick(null);
+    setForm({ event: null, seed });
+  };
+  const editOpen = () => {
+    if (!opened.data) return;
+    setForm({ event: opened.data, seed: null });
+    setCard(null);
+  };
 
   const step = (delta: -1 | 1) => {
     if (view === "week") return go({ d: shiftDay(day, delta * 7) });
@@ -164,34 +222,66 @@ export function DeskCalendar() {
   };
 
   const toggleDeadlines = () => go({ deadlines: !showDeadlines });
+  const setView = (next: CalendarView) => {
+    if (next !== view) go({ view: next }, true);
+  };
 
-  // ←/→ — the previous or next week (month), T — today, D — the deadlines; by the physical key, so a Russian layout works
-  const stepRef = useRef(step);
-  const todayRef = useRef(() => go({ d: today }));
-  const deadlinesRef = useRef<(() => void) | null>(null);
+  // the keys of the screen, by the physical key so a Russian layout works: ←/→ — the previous or
+  // next week (month), T — today, W/M — the view, D — the deadlines, N — a new meeting, E — edit
+  // the open one, Delete — delete it (asked once more in its card)
+  const keys = useRef<(event: KeyboardEvent) => boolean>(() => false);
   useEffect(() => {
-    stepRef.current = step;
-    todayRef.current = () => go({ d: today });
-    deadlinesRef.current = isDirector ? toggleDeadlines : null;
+    keys.current = (event) => {
+      const code = event.code;
+      if (code === "ArrowLeft" || code === "ArrowRight") {
+        setCard(null);
+        setQuick(null);
+        step(code === "ArrowLeft" ? -1 : 1);
+      } else if (code === "KeyT") go({ d: today });
+      else if (code === "KeyW") setView("week");
+      else if (code === "KeyM") setView("month");
+      else if (code === "KeyD" && isDirector) toggleDeadlines();
+      else if (code === "KeyN" && isDirector) newMeeting();
+      else if (code === "KeyE" && isDirector && card && opened.data) editOpen();
+      else if ((code === "Delete" || code === "Backspace") && isDirector) {
+        if (card && opened.data) setCard({ ...card, confirming: true });
+        else {
+          // a block with the focus (Tab reached it): its card opens asking
+          const focused = document.activeElement as HTMLElement | null;
+          const id = focused?.getAttribute("data-testid") === "desk-event" ? focused.getAttribute("data-event-id") : null;
+          if (!id || !focused) return false;
+          setCard({ id, anchor: besideOf(focused, CARD_W, CARD_H), confirming: true });
+        }
+      } else return false;
+      return true;
+    };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !isPlainKey(event) || event.shiftKey || isTypingTarget(event.target)) return;
       if (document.body.hasAttribute("data-sheet-open") || document.body.hasAttribute("data-dialog-open")) return;
-      if (event.code === "ArrowLeft" || event.code === "ArrowRight") {
-        event.preventDefault();
-        stepRef.current(event.code === "ArrowLeft" ? -1 : 1);
-      } else if (event.code === "KeyT") {
-        event.preventDefault();
-        todayRef.current();
-      } else if (event.code === "KeyD" && deadlinesRef.current) {
-        event.preventDefault();
-        deadlinesRef.current();
-      }
+      if (keys.current(event)) event.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+
+  useShortcuts("Календарь", [
+    { keys: ["←", "→"], label: view === "week" ? "Прошлая и следующая неделя" : "Прошлый и следующий месяц" },
+    { keys: ["T"], label: "Сегодня" },
+    { keys: ["W"], label: "Неделя" },
+    { keys: ["M"], label: "Месяц" },
+    ...(isDirector
+      ? [
+          { keys: ["N"], label: "Новое мероприятие" },
+          { keys: ["D"], label: "Сроки задач на календаре" },
+          { keys: ["E"], label: "Изменить открытое мероприятие" },
+          { keys: ["Del"], label: "Удалить открытое мероприятие" },
+        ]
+      : []),
+    { keys: ["Tab", "Enter"], label: "К мероприятию и открыть его" },
+    { keys: ["Esc"], label: "Закрыть карточку" },
+  ]);
 
   const loading = (head.isLoading && !head.data) || (tail.isLoading && !tail.data);
   const title = view === "week" ? weekTitle(first, last) : monthTitle(month);
@@ -206,9 +296,11 @@ export function DeskCalendar() {
           isDirector ? (
             <>
               <CalendarOnWallButton />
-              <Button size="sm" onClick={() => setCreating(true)} data-testid="desk-event-new">
-                Новое мероприятие
-              </Button>
+              <Tooltip label="Новое мероприятие" keys={["N"]} side="bottom">
+                <Button size="sm" onClick={() => newMeeting()} data-testid="desk-event-new">
+                  Новое мероприятие
+                </Button>
+              </Tooltip>
             </>
           ) : null
         }
@@ -219,25 +311,25 @@ export function DeskCalendar() {
           <>
             {isDirector ? <DeadlinesToggle on={showDeadlines} count={marksShown} tone={marksTone} onToggle={toggleDeadlines} /> : null}
             <SegmentTabs<CalendarView>
-            aria-label="Вид календаря"
-            value={view}
-            onChange={(next) => {
-              if (next !== view) go({ view: next }, true);
-            }}
-            items={[
-              { value: "week", label: "Неделя" },
-              { value: "month", label: "Месяц" },
-            ]}
+              aria-label="Вид календаря"
+              value={view}
+              onChange={setView}
+              items={[
+                { value: "week", label: <KeyLabel label="Неделя" hint="W" /> },
+                { value: "month", label: <KeyLabel label="Месяц" hint="M" /> },
+              ]}
             />
           </>
         }
       >
         <div className="flex items-center gap-1">
-          <ArrowButton label={view === "week" ? "Прошлая неделя" : "Прошлый месяц"} onClick={() => step(-1)} back />
-          <Button size="sm" variant="secondary" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
-            Сегодня
-          </Button>
-          <ArrowButton label={view === "week" ? "Следующая неделя" : "Следующий месяц"} onClick={() => step(1)} />
+          <ArrowButton label={view === "week" ? "Прошлая неделя" : "Прошлый месяц"} hint="←" onClick={() => step(-1)} back />
+          <Tooltip label="Сегодня" keys={["T"]} side="bottom">
+            <Button size="sm" variant="secondary" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
+              Сегодня
+            </Button>
+          </Tooltip>
+          <ArrowButton label={view === "week" ? "Следующая неделя" : "Следующий месяц"} hint="→" onClick={() => step(1)} />
         </div>
         <h2 className="ml-2 font-display text-[17px] font-semibold leading-6" data-testid="desk-calendar-title">
           {title}
@@ -249,7 +341,24 @@ export function DeskCalendar() {
         {loading ? (
           <Bone h={view === "week" ? 628 : 640} className="!rounded-[12px]" />
         ) : view === "week" ? (
-          <WeekHours days={days} byDay={byDay} today={today} now={now} meId={meId} onOpen={open} deadlines={showDeadlines ? marks : null} />
+          <WeekHours
+            days={days}
+            byDay={byDay}
+            today={today}
+            now={now}
+            meId={meId}
+            onOpen={open}
+            deadlines={showDeadlines ? marks : null}
+            onSlot={
+              isDirector
+                ? (slot, box) => {
+                    setCard(null);
+                    setQuick({ slot, anchor: besideAnchor(box, QUICK_W, { width: window.innerWidth, height: window.innerHeight }, QUICK_H), title: "" });
+                  }
+                : null
+            }
+            ghost={quick ? { slot: quick.slot, title: quick.title } : null}
+          />
         ) : (
           <MonthGrid
             days={days}
@@ -260,25 +369,47 @@ export function DeskCalendar() {
             onOpen={open}
             month={month}
             onDay={(ymd) => go({ d: ymd, view: "week" }, true)}
+            onNew={isDirector ? (ymd) => newMeeting({ day: ymd }) : null}
             deadlines={showDeadlines ? marks : null}
           />
         )}
         <CalendarAside upcoming={upcoming.data ?? EMPTY} now={now} meId={meId} onOpen={open} />
       </div>
 
-      <EventSheet event={opened.data ?? null} onClose={() => setOpenId(null)} meId={meId} isDirector={isDirector} onSaved={follow} />
+      <EventCard
+        event={card && card.anchor ? (opened.data ?? null) : null}
+        anchor={card?.anchor ?? null}
+        onClose={() => setCard(null)}
+        meId={meId}
+        isDirector={isDirector}
+        now={now}
+        onEdit={editOpen}
+        confirming={card?.confirming ?? false}
+        onConfirming={(on) => setCard((current) => (current ? { ...current, confirming: on } : current))}
+      />
 
       {isDirector ? (
-        <EventEditor
-          open={creating}
-          onClose={() => setCreating(false)}
-          event={null}
-          // a meeting is made for a day ahead: from a past day the form starts at today
-          day={compareYmd(day, today) < 0 ? today : day}
-          meId={meId}
-          now={now}
-          onSaved={follow}
-        />
+        <>
+          <QuickCreate
+            slot={quick?.slot ?? null}
+            anchor={quick?.anchor ?? null}
+            meId={meId}
+            now={now}
+            onClose={() => setQuick(null)}
+            onTitle={(title) => setQuick((current) => (current ? { ...current, title } : current))}
+            onMore={(seed) => newMeeting(seed)}
+            onCreated={follow}
+          />
+          <EventForm
+            open={form !== null}
+            onClose={() => setForm(null)}
+            event={form?.event ?? null}
+            seed={form?.seed ?? null}
+            meId={meId}
+            now={now}
+            onSaved={follow}
+          />
+        </>
       ) : null}
     </DeskPage>
   );
@@ -312,19 +443,30 @@ function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: nu
   );
 }
 
-function ArrowButton({ label, onClick, back = false }: { label: string; onClick: () => void; back?: boolean }) {
+function ArrowButton({ label, hint, onClick, back = false }: { label: string; hint: string; onClick: () => void; back?: boolean }) {
   return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="flex h-9 w-9 items-center justify-center rounded-[10px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d={back ? "m15 6-6 6 6 6" : "m9 6 6 6-6 6"} />
-      </svg>
-    </button>
+    <Tooltip label={label} keys={[hint]} side="bottom">
+      <button
+        type="button"
+        aria-label={label}
+        onClick={onClick}
+        className="flex h-9 w-9 items-center justify-center rounded-[10px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d={back ? "m15 6-6 6 6 6" : "m9 6 6 6-6 6"} />
+        </svg>
+      </button>
+    </Tooltip>
+  );
+}
+
+/** A segment's word with its key, quiet until hovered — the mouse teaches the keyboard. */
+function KeyLabel({ label, hint }: { label: string; hint: string }) {
+  return (
+    <span className="group/key inline-flex items-center gap-1.5">
+      {label}
+      <span className="nums text-[10px] font-semibold text-muted/60 transition-colors duration-[120ms] group-hover/key:text-muted">{hint}</span>
+    </span>
   );
 }
 

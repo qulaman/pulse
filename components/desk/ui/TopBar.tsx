@@ -1,82 +1,86 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { CommandLine } from "@/components/desk/CommandLine";
+import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Avatar } from "@/components/desk/ui/PersonCell";
+import { openShortcuts } from "@/components/desk/ui/Shortcuts";
 import { useSettled } from "@/components/desk/ui/SideNav";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { goPhoneView } from "@/lib/desk/device";
-import type { DeskRole } from "@/lib/desk/routes";
+import { DESK_PROFILE, type DeskRole } from "@/lib/desk/routes";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { ROLE_LABEL } from "@/lib/people/queries";
 import { homeForRole } from "@/lib/routes";
 import { useVisits } from "@/lib/visits/queries";
 
 /**
- * Who is signed in, as a circle with a menu (D-154): the name and the role, «Профиль», «Телефонная
- * версия». It used to be a line of small words in the corner; the corner is the order line's now.
+ * Who is signed in, as a circle with a menu (D-154): the name and the role, «Профиль», «Клавиши»,
+ * the fold of the navigation, «Телефонная версия» — each with the key that does the same
+ * (the desk's `Menu`: ↑/↓, Enter, Esc).
  */
-function MeMenu({ fullName, role }: { fullName: string; role: DeskRole }) {
+function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; role: DeskRole; folded: boolean; onToggleNav?: () => void }) {
   useNamesKey();
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const away = (event: MouseEvent) => {
-      if (!box.current?.contains(event.target as Node)) setOpen(false);
-    };
-    const esc = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    window.addEventListener("keydown", esc, true);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      window.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
+  const router = useRouter();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const items: MenuItem[] = [
+    { key: "profile", label: "Профиль", hint: "G P", onSelect: () => router.push(DESK_PROFILE) },
+    { key: "keys", label: "Клавиши", hint: "?", onSelect: openShortcuts },
+    ...(onToggleNav ? [{ key: "fold", label: folded ? "Развернуть навигацию" : "Свернуть навигацию", hint: "[", onSelect: onToggleNav }] : []),
+    "separator",
+    { key: "phone", label: <span data-testid="phone-view">Телефонная версия</span>, onSelect: () => goPhoneView(homeForRole(role)) },
+  ];
 
   return (
-    <div ref={box} className="relative shrink-0">
+    <div className="relative shrink-0">
       <button
         type="button"
         aria-label={`${fullName}, ${ROLE_LABEL[role].toLowerCase()}`}
-        aria-expanded={open}
+        aria-expanded={Boolean(anchor)}
         aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors duration-[120ms] hover:bg-surface-2"
+        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+        className="desk-focus flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition-colors duration-[120ms] hover:bg-surface-2"
         data-testid="desk-me"
       >
         <Avatar name={fullName} size={32} />
         <span className="hidden max-w-[140px] truncate text-[13px] font-medium leading-4 xl:block">{shortName(fullName)}</span>
       </button>
-      {open ? (
-        <div role="menu" className="absolute right-0 top-[calc(100%+6px)] z-40 w-[240px] overflow-hidden rounded-[12px] border border-border bg-surface py-1" style={{ boxShadow: "var(--shadow-raised)" }}>
-          <div className="px-3.5 pb-2 pt-1.5">
+      <Menu
+        open={Boolean(anchor)}
+        onClose={() => setAnchor(null)}
+        anchor={anchor}
+        align="end"
+        width={260}
+        label="Аккаунт"
+        items={items}
+        header={
+          <>
             <p className="truncate text-[14px] font-semibold leading-5">{fullName}</p>
             <p className="text-[12px] leading-4 text-muted">{ROLE_LABEL[role]}</p>
-          </div>
-          <div className="border-t border-border/70 pt-1">
-            <Link href="/desk/profile" role="menuitem" onClick={() => setOpen(false)} className="block px-3.5 py-2 text-[14px] leading-5 hover:bg-surface-2">
-              Профиль
-            </Link>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => goPhoneView(homeForRole(role))}
-              className="block w-full px-3.5 py-2 text-left text-[14px] leading-5 hover:bg-surface-2"
-              data-testid="phone-view"
-            >
-              Телефонная версия
-            </button>
-          </div>
-        </div>
-      ) : null}
+          </>
+        }
+      />
     </div>
+  );
+}
+
+/** «?» in the corner: the help with every key, for a hand on the mouse. */
+function KeysButton() {
+  return (
+    <Tooltip label="Клавиши" keys={["?"]} side="bottom">
+      <button
+        type="button"
+        aria-label="Клавиши"
+        onClick={openShortcuts}
+        data-testid="desk-keys"
+        className="desk-focus flex h-8 w-8 items-center justify-center rounded-full border border-border text-[14px] font-semibold leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+      >
+        ?
+      </button>
+    </Tooltip>
   );
 }
 
@@ -103,12 +107,14 @@ function SecretaryCalls() {
  * calls to the director in its place (В-11 а: she gives no orders); on the right — who is signed
  * in, with the way to the profile and back to the phone screens.
  */
-export function TopBar({ fullName, role }: { fullName: string; role: DeskRole }) {
+export function TopBar({ fullName, role, folded = false, onToggleNav }: { fullName: string; role: DeskRole; folded?: boolean; onToggleNav?: () => void }) {
   return (
     <header className="flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
       {role === "director" ? <CommandLine /> : <SecretaryCalls />}
-      <div className="ml-auto" />
-      <MeMenu fullName={fullName} role={role} />
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        <KeysButton />
+        <MeMenu fullName={fullName} role={role} folded={folded} onToggleNav={onToggleNav} />
+      </div>
     </header>
   );
 }

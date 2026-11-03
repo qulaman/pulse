@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
@@ -9,23 +9,25 @@ import { InPanel, useDeskPanel } from "@/components/desk/ui/DeskPanel";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { RecurrenceSection } from "@/components/recurrence/RecurrenceSection";
 import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { useMinute } from "@/components/tasks/list/TaskList";
-import { useDirectorControls } from "@/components/tasks/list/useDirectorControls";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
-import { isPlainKey } from "@/lib/desk/keys";
+import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { hasUnread, HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
-import { queueOf, type DeskReason } from "@/lib/tasks/desk";
+import { queueOf, REASON_ORDER, type DeskReason } from "@/lib/tasks/desk";
 import { usePurgeClosed, useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import {
   closedAtOf,
@@ -43,9 +45,12 @@ import { useTaskReceipts } from "@/lib/tasks/receipts";
 import { deadlineLabel, isOverdue, pluralRu, TEXT } from "@/lib/tasks/status-text";
 
 import {
+  bulkPlan,
+  deliveryLine,
   DUE_FILTERS,
   DUE_LABEL,
   firstChanged,
+  fitColumn,
   groupChoices,
   groupOf,
   inPlaceOf,
@@ -56,13 +61,17 @@ import {
   parseDue,
   parseStatus,
   parseTab,
+  pickedInOrder,
+  pickRange,
   rowKeys,
   rowMoves,
   rowSignature,
   stageOf,
   STATUS_FILTERS,
   statusFilterLabel,
+  TABS,
   tableSections,
+  togglePick,
   underTitle,
   type DueFilter,
   type Move,
@@ -72,7 +81,8 @@ import { taggedActions, writeParams } from "./flow";
 import { MomentBar, type MomentCounter } from "./MomentBar";
 import { MoreButton, MoveRow } from "./RowMoves";
 import { DeliveryCell } from "./TaskParts";
-import { TaskPanel, type PanelNext } from "./TaskPanel";
+import { deskLayerOpen, TaskPanel, type PanelNext } from "./TaskPanel";
+import { useDeskActs } from "./useDeskActs";
 
 const GLOW_MS = 1300;
 
@@ -88,8 +98,8 @@ export function TasksSkeleton() {
         <Bone h={138} className="!rounded-[16px]" />
         <Bone h={36} w="72%" />
         <div className="flex flex-col gap-1">
-          {Array.from({ length: 8 }, (_, index) => (
-            <Bone key={index} h={44} />
+          {Array.from({ length: 10 }, (_, index) => (
+            <Bone key={index} h={36} />
           ))}
         </div>
       </SkeletonGroup>
@@ -101,7 +111,9 @@ export function TasksSkeleton() {
  * «Задачи» of the desk (tasks/022 A, D-154): the director's dashboard over the same data and
  * actions as the phone's «Задачи» (D-83) — the moment as one hero, the three piles as a table
  * grouped by reason, person or deadline, the row's two moves under the hand, filters, and the
- * task in the right-hand panel that goes on to the next one after the director's move.
+ * task in the right-hand panel that goes on to the next one after the director's move. Wave 3:
+ * rows of 40 px with columns as wide as their words, a right click for a row's menu, rows marked
+ * with Ctrl/Shift and X for a reminder, a new date or a recall in bulk (never «Принять», принцип 3).
  */
 export function TasksScreen() {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)
@@ -127,6 +139,14 @@ export function TasksScreen() {
 
 type Tile = "yours" | "working" | "today" | "overdue" | "held";
 
+/** The rows of the table as the eye sees them — sorted by a column, folded groups left out. */
+function rowsOnScreen(box: HTMLElement | null): string[] {
+  if (!box) return [];
+  return [...box.querySelectorAll<HTMLElement>('[data-testid="desk-row"]')].map((row) => row.dataset.rowKey ?? "").filter(Boolean);
+}
+
+const STAGE_ORDER = (task: TaskWithPeople, reason: DeskReason | null) => (reason ? REASON_ORDER.indexOf(reason) : 10 + ["sent", "accepted", "in_progress", "rework", "pending_review", "scheduled", "done", "revoked", "declined"].indexOf(task.status));
+
 function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[]; board: readonly BoardTask[] }) {
   const actions = useTaskActions(me);
   const purge = usePurgeClosed();
@@ -136,6 +156,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const { pointsEnabled } = useDeskScope();
   const panel = useDeskPanel();
   const params = useSearchParams();
+  const context = useContextMenu();
 
   const openId = params.get("id");
   const who = params.get("who");
@@ -214,6 +235,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
 
   const sections: Section<TaskWithPeople>[] = useMemo(() => tableSections(tab, group, piles[tab], reasons, now), [tab, group, piles, reasons, now]);
   const ids = useMemo(() => sections.flatMap((section) => section.tasks.map((task) => task.id)), [sections]);
+  const byId = useMemo(() => new Map(all.map((task) => [task.id, task])), [all]);
 
   /* ---- groups fold away (DataGrid's own folding: ↑/↓ step over a folded group) ---- */
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -238,6 +260,43 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const panelNext: PanelNext | null =
     openId && gone && !advance ? { id: acted === openId ? null : inPlace, onGo: () => inPlace && openTask(inPlace) } : null;
 
+  /* ---- the marked rows (Ctrl/Shift-click, X, Shift+↑/↓, Ctrl+A): kept while they stay in the table ---- */
+  const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set());
+  const [pickFrom, setPickFrom] = useState<string | null>(null);
+  const marked = useMemo(() => pickedInOrder(ids, picked), [ids, picked]);
+  const markedTasks = useMemo(() => marked.map((id) => byId.get(id)).filter((task): task is TaskWithPeople => Boolean(task)), [marked, byId]);
+  const plan = useMemo(
+    () => bulkPlan(markedTasks.map((task) => ({ ...task, nudged_at: rows.get(task.id)?.nudged_at ?? null, time_request: rows.get(task.id)?.time_request ?? null })), now),
+    [markedTasks, rows, now],
+  );
+  const unpick = () => {
+    setPicked(new Set());
+    setPickFrom(null);
+  };
+  const pickOne = (id: string) => {
+    setPicked((was) => togglePick(was, id));
+    setPickFrom(id);
+  };
+  const pickTo = (id: string) => {
+    const range = pickRange(rowsOnScreen(gridBox.current), pickFrom ?? focusKey, id);
+    setPicked((was) => new Set([...was, ...range]));
+    setPickFrom(id);
+  };
+
+  // Esc takes the marks off wherever the caret is (the bar's buttons, the page) — before the panel closes
+  const hasPicks = picked.size > 0;
+  useEffect(() => {
+    if (!hasPicks) return;
+    const onKey = (event: globalThis.KeyboardEvent) => {
+      if (event.defaultPrevented || event.key !== "Escape" || isTypingTarget(event.target) || deskLayerOpen()) return;
+      event.preventDefault();
+      setPicked(new Set());
+      setPickFrom(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hasPicks]);
+
   /* ---- a row changed under the eyes (Realtime, or the director's own move): it glows once ---- */
   const signatures = useMemo(() => new Map(all.map((task) => [task.id, rowSignature(task, rows.get(task.id))])), [all, rows]);
   const [seen, setSeen] = useState(signatures);
@@ -261,7 +320,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     gridBox.current?.querySelector<HTMLElement>('[role="grid"]')?.focus({ preventScroll: true });
   }, [openId, tab]);
 
-  /* ---- the phone's controls for a row: «⋯», the row's moves, the letters — their sheets are the desk's dialogs ---- */
+  /* ---- the director's moves: the desk's own (a popover from the cell, a small dialog), not the phone's sheets ---- */
   const deskActions: TaskActions = taggedActions(
     {
       ...actions,
@@ -270,48 +329,156 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     },
     setActed,
   );
-  const controls = useDirectorControls({
+  const reply = (task: TaskWithPeople) => {
+    setSelected(task.id);
+    setFocus(task.id);
+    openTask(task.id);
+  };
+  const acts = useDeskActs({
     base: deskActions,
-    companyId: me.companyId,
     tasks: all,
-    questionOf: (id) => rows.get(id)?.question ?? null,
-    requestOf: (id) => rows.get(id)?.time_request ?? null,
-    suggestionOf: (id) => rows.get(id)?.suggestion ?? null,
+    flagsOf: (id) => ({ question: rows.get(id)?.question ?? null, request: rows.get(id)?.time_request ?? null, suggestion: rows.get(id)?.suggestion ?? null }),
     now,
-    onThread: false,
+    companyId: me.companyId,
+    onReply: reply,
+    onOpen: openTask,
+    afterRemove: (id) => {
+      if (openId === id) closeTask();
+    },
   });
 
   const choose = (id: string) => {
     setSelected(id);
     if (openId && openId !== id) openTask(id);
   };
-  const reply = (task: TaskWithPeople) => {
-    setSelected(task.id);
-    setFocus(task.id);
-    openTask(task.id);
-  };
-  const pressMove = (move: Move, task: TaskWithPeople) => {
+  const pressMove = (move: Move, task: TaskWithPeople, target?: HTMLElement) => {
     if (move.held) return;
     setSelected(task.id);
-    if (move.action === "answer") reply(task);
-    else controls.press(move.action, task);
+    acts.press(move.action, task, target ? { at: target } : undefined);
   };
   const movesOf = (task: TaskWithPeople) => {
     const row = rows.get(task.id);
     return rowMoves(task, reasons.get(task.id) ?? null, { request: row?.time_request, suggestion: row?.suggestion, nudgedAt: row?.nudged_at }, now);
   };
   const keysOf = (task: TaskWithPeople) => rowKeys(task, { request: Boolean(rows.get(task.id)?.time_request) });
+  const rowMenu = (task: TaskWithPeople): MenuItem[] =>
+    acts.menu(task, {
+      onOpenRow: () => openTask(task.id),
+      extra: [{ key: "pick", label: picked.has(task.id) ? "Снять отметку" : "Отметить", hint: "X", onSelect: () => pickOne(task.id) }],
+    });
+
+  /* ---- many rows: the bar's moves, and the same as a right click on a marked row ---- */
+  const bulkAnchor = (name: string) => gridBox.current?.ownerDocument.querySelector<HTMLElement>(`[data-bulk="${name}"]`) ?? null;
+  const bulkItems = (at: { x: number; y: number }): MenuItem[] => [
+    { key: "b-nudge", label: `Напомнить · ${plan.nudge.length}`, disabled: plan.nudge.length === 0, onSelect: () => bulkNudge() },
+    { key: "b-extend", label: `Перенести срок… · ${plan.extend.length}`, disabled: plan.extend.length === 0, onSelect: () => acts.bulk.extend(plan.extend, at, unpick) },
+    "separator",
+    { key: "b-revoke", label: `Отозвать… · ${plan.revoke.length}`, danger: true, disabled: plan.revoke.length === 0, onSelect: () => acts.bulk.revoke(plan.revoke, unpick) },
+    "separator",
+    { key: "b-clear", label: "Снять отметки", hint: "Esc", onSelect: unpick },
+  ];
+  const bulkNudge = () => {
+    acts.bulk.nudge(plan.nudge);
+    unpick();
+  };
 
   const onKey = (event: KeyboardEvent<HTMLDivElement>, row: TaskWithPeople | null) => {
+    // Ctrl/Cmd+A — every row in sight is marked
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.code === "KeyA") {
+      event.preventDefault();
+      setPicked(new Set(rowsOnScreen(gridBox.current)));
+      return true;
+    }
     if (!isPlainKey(event)) return false;
+    if (event.code === "Escape" && picked.size > 0) {
+      // the marks go first; the panel closes on the next Esc
+      event.preventDefault();
+      unpick();
+      return true;
+    }
+    const order = rowsOnScreen(gridBox.current);
+    const step = event.code === "ArrowDown" || event.code === "KeyJ" ? 1 : event.code === "ArrowUp" || event.code === "KeyK" ? -1 : 0;
+    if (step !== 0 && (event.shiftKey || event.code === "KeyJ" || event.code === "KeyK")) {
+      event.preventDefault();
+      const here = row ? order.indexOf(row.id) : -1;
+      const next = order[here < 0 ? 0 : Math.min(order.length - 1, Math.max(0, here + step))];
+      if (!next) return true;
+      if (event.shiftKey) {
+        // Shift+↑/↓ marks as it goes, from the row in hand
+        setPicked((was) => new Set([...was, ...(row ? [row.id] : []), next]));
+        setPickFrom(next);
+      }
+      choose(next);
+      return true;
+    }
+    if (event.shiftKey) return false;
+    if (/^Digit[1-3]$/.test(event.code)) {
+      event.preventDefault();
+      setTab(TABS[Number(event.code.slice(5)) - 1]);
+      return true;
+    }
     if (!row) return false;
+    if (event.code === "KeyX") {
+      event.preventDefault();
+      pickOne(row.id);
+      return true;
+    }
+    if (event.code === "Period") {
+      event.preventDefault();
+      gridBox.current?.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(row.id)}"] [data-testid="desk-row-more"]`)?.click();
+      return true;
+    }
     const key = keysOf(row).find((one) => one.code === event.code);
     if (!key) return false;
     event.preventDefault();
     if (key.action === "reply") reply(row);
-    else controls.press(key.action, row);
+    else acts.press(key.action, row);
     return true;
   };
+
+  /* ---- the mouse: Ctrl/Shift-click marks, a right click is the row's menu ---- */
+  const rowOf = (target: EventTarget) => (target as Element).closest?.<HTMLElement>('[data-testid="desk-row"]') ?? null;
+  const onGridMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    // Shift-click marks a range — not a stretch of selected text
+    if (event.shiftKey && rowOf(event.target)) event.preventDefault();
+  };
+  const onGridClick = (event: MouseEvent<HTMLDivElement>) => {
+    const el = rowOf(event.target);
+    const id = el?.dataset.rowKey;
+    if (!id || (event.target as Element).closest("button, a, input, select, textarea, label")) return;
+    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.shiftKey) pickTo(id);
+    else pickOne(id);
+    setSelected(id);
+  };
+  const onGridMenu = (event: MouseEvent<HTMLDivElement>) => {
+    const id = rowOf(event.target)?.dataset.rowKey;
+    const task = id ? byId.get(id) : undefined;
+    if (!task) return;
+    setSelected(task.id);
+    if (picked.size > 1 && picked.has(task.id)) context.open(event, bulkItems({ x: event.clientX, y: event.clientY }));
+    else context.open(event, rowMenu(task));
+  };
+
+  useShortcuts("Задачи", [
+    { keys: ["↑", "↓"], label: "Выбрать строку (или J / K)" },
+    { keys: ["Enter"], label: "Открыть в панели" },
+    { keys: ["A"], label: "Принять сданную" },
+    { keys: ["R"], label: "На доработку" },
+    { keys: ["O"], label: "Ответить — курсор в поле переписки" },
+    { keys: ["N"], label: "Напомнить" },
+    { keys: ["D"], label: "Срок — выбор даты" },
+    { keys: ["T"], label: "Передать другому" },
+    { keys: ["."], label: "Все действия строки (или правый клик)" },
+    { keys: ["X"], label: "Отметить строку" },
+    { keys: ["Shift ↑↓"], label: "Отмечать подряд" },
+    { keys: ["Ctrl A"], label: "Отметить все строки" },
+    { keys: ["Esc"], label: "Снять отметки, затем закрыть панель" },
+    { keys: ["1", "2", "3"], label: "Вкладки: ждут вас · в работе · закрытые" },
+    { keys: ["1…6"], label: "В выборе срока — быстрые варианты" },
+  ]);
 
   /* ---- the tool bar ---- */
   const loads = useMemo(() => peopleLoad(all, reasons), [all, reasons]);
@@ -361,23 +528,83 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     writeParams({ status: null, due: null });
   };
 
-  /* ---- the table ---- */
+  /* ---- the table: 40 px rows, columns as wide as their words ---- */
   const panelOpen = panel.isOpen;
+  const shown = piles[tab];
   // grouped by the person, the group's head names them: the column would only repeat it
   const byPerson = group === "person";
+  const closedRow = (task: TaskWithPeople) => task.status === "done" || task.status === "revoked";
+  const dueText = (task: TaskWithPeople) =>
+    closedRow(task) ? humanAqtobe(new Date(closedAtOf(task)), now) : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text;
+  const widths = {
+    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 120, max: 190, extra: 24 + 24 + 10 }),
+    due: fitColumn(shown.map(dueText), { min: 92, max: 160 }),
+    stage: fitColumn(shown.map((task) => stageOf(task, reasons.get(task.id) ?? null, now).text), { min: 88, max: 150 }),
+    // never narrower than its own head («ДОСТАВКА» in capitals)
+    delivery: fitColumn(
+      shown.map((task) => (task.status === "sent" ? (deliveryLine(task, receipts.data?.[task.id] ?? null, now)?.text ?? "") : "—")),
+      { min: 104, max: 200 },
+    ),
+  };
+  // a column with nothing to say on this tab is not drawn: history has no receipts, no waiting words
+  const showDelivery = !panelOpen && shown.some((task) => task.status === "sent" || task.status === "scheduled");
+  const showLast = !panelOpen && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
+  const anyPicked = picked.size > 0;
   const columns: Column<TaskWithPeople>[] = [
+    {
+      key: "pick",
+      title: (
+        <span className="sr-only">Отметка</span>
+      ),
+      width: "34px",
+      render: (task) => {
+        const on = picked.has(task.id);
+        return (
+          <>
+            {/* a marked row is tinted whole — the cell reaches over the row (it is the positioned parent) */}
+            {on ? <span aria-hidden className="pointer-events-none absolute inset-0 bg-accent/[0.07]" /> : null}
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              aria-label={on ? "Снять отметку" : "Отметить"}
+              title={`${on ? "Снять отметку" : "Отметить"} · X`}
+              data-testid="desk-row-pick"
+              onClick={(event) => {
+                event.stopPropagation();
+                pickOne(task.id);
+                setSelected(task.id);
+              }}
+              className={`relative -ml-1 flex h-5 w-5 items-center justify-center rounded-[5px] border transition-opacity duration-[120ms] ${
+                on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/50 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`
+              }`}
+            >
+              {on ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="m5 12.5 4.5 4.5L19 7.5" />
+                </svg>
+              ) : null}
+            </button>
+          </>
+        );
+      },
+    },
     ...(byPerson
       ? []
       : ([
           {
             key: "who",
             title: "Кто",
-            width: panelOpen ? "150px" : "176px",
+            width: widths.who,
             sort: (a, b) => (a.assignee?.full_name ?? "").localeCompare(b.assignee?.full_name ?? "", "ru"),
             render: (task) => {
               // the ring is the director's move: the tone of the reason the task waits (D-154)
               const reason = reasons.get(task.id);
-              return <PersonCell name={task.assignee?.full_name} muted={task.status === "done" || task.status === "revoked"} ring={reason ? REASON_TONE[reason] : null} />;
+              return (
+                <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
+                  <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} ring={reason ? REASON_TONE[reason] : null} />
+                </span>
+              );
             },
           },
         ] satisfies Column<TaskWithPeople>[])),
@@ -389,26 +616,22 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         const row = rows.get(task.id);
         const under = underTitle(task, row, me.userId, now);
         const unread = row ? hasUnread(row, me.userId) : false;
-        const closed = task.status === "done" || task.status === "revoked";
         return (
-          <span className="flex min-w-0 items-start gap-2.5">
-            <span className="mt-px shrink-0" data-testid="desk-glyph">
-              <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={18} />
+          // one line: the title, then the thread's newest word in grey — a row stays 40 px
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span className="shrink-0" data-testid="desk-glyph" title={stageOf(task, reasons.get(task.id) ?? null, now).text}>
+              <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={16} />
             </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className={`truncate font-medium ${closed ? "text-text/70" : ""}`} title={task.title}>
-                  {task.title}
-                </span>
-                {task.recurrence_rule_id ? (
-                  <span className="shrink-0 text-muted" title="Повторяется">
-                    <Icon name="repeat" size={13} />
-                  </span>
-                ) : null}
-                {unread ? <span aria-label="новое сообщение" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /> : null}
+            <span className="flex min-w-0 items-baseline gap-2" title={under ? `${task.title}\n${under}` : task.title}>
+              <span className={`min-w-0 shrink truncate font-medium ${closedRow(task) ? "text-text/70" : ""}`}>{task.title}</span>
+              {under ? <span className="min-w-0 max-w-[45%] shrink-[2] truncate text-[13px] text-muted">{under}</span> : null}
+            </span>
+            {task.recurrence_rule_id ? (
+              <span className="shrink-0 text-muted" title="Повторяется">
+                <Icon name="repeat" size={13} />
               </span>
-              {under ? <span className="truncate text-[12px] leading-4 text-muted">{under}</span> : null}
-            </span>
+            ) : null}
+            {unread ? <span aria-label="новое сообщение" title="Новое сообщение" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /> : null}
           </span>
         );
       },
@@ -416,18 +639,19 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     {
       key: "due",
       title: "Срок",
-      width: panelOpen ? "124px" : "132px",
+      width: widths.due,
       sort: (a, b) => (a.deadline ?? "9").localeCompare(b.deadline ?? "9"),
       render: (task) => {
         // history says when it closed; a refusal keeps its deadline — the director still decides it
-        const closed = task.status === "done" || task.status === "revoked";
-        if (closed) return <span className="nums block truncate whitespace-nowrap text-[13px] text-muted">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>;
-        if (!task.deadline && task.priority === "high") return <span className="text-[13px] font-medium text-warn">{TEXT.urgent}</span>;
+        if (closedRow(task)) return <span className="nums block truncate whitespace-nowrap text-[13px] text-muted">{dueText(task)}</span>;
+        if (!task.deadline && task.priority === "high") return <span className="text-[13px] font-medium text-warn" data-act-for={task.id} data-act="extend retime">{TEXT.urgent}</span>;
         const label = deadlineLabel(task, now);
         return (
           <span
             className={`nums block truncate whitespace-nowrap text-[13px] ${label.overdue ? "font-semibold" : label.none ? "text-muted" : ""}`}
             style={label.overdue ? { color: "var(--danger)" } : undefined}
+            data-act-for={task.id}
+            data-act="extend retime"
           >
             {label.text}
           </span>
@@ -437,18 +661,21 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     {
       key: "stage",
       title: "Стадия",
-      width: panelOpen ? "112px" : "136px",
-      // the stage in words, neutral: the ring at the title already says it in colour (D-154)
+      width: widths.stage,
+      sort: (a, b) => STAGE_ORDER(a, reasons.get(a.id) ?? null) - STAGE_ORDER(b, reasons.get(b.id) ?? null),
+      // the stage in words, neutral: the ring at the name already says it in colour (D-154)
       render: (task) => (
         <span className="block truncate text-[13px] text-text/80" data-testid="desk-stage">
           {stageOf(task, reasons.get(task.id) ?? null, now).text}
         </span>
       ),
     },
-    ...(panelOpen
+    ...(showDelivery
+      ? ([{ key: "delivery", title: "Доставка", width: widths.delivery, render: (task) => <DeliveryCell task={task} receipt={receipts.data?.[task.id]} now={now} /> }] satisfies Column<TaskWithPeople>[])
+      : []),
+    ...(!showLast
       ? []
       : ([
-          { key: "delivery", title: "Доставка", width: "168px", render: (task) => <DeliveryCell task={task} receipt={receipts.data?.[task.id]} now={now} /> },
           {
             key: "last",
             title: "Последнее",
@@ -468,7 +695,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     {
       key: "more",
       title: "",
-      width: "48px",
+      width: "44px",
       align: "right",
       render: (task) => {
         const moves = movesOf(task);
@@ -478,7 +705,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               // the row's two moves under the hand: over the row's right end while it is hovered or
               // chosen (with the panel open the panel holds the chosen row's moves)
               <span
-                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-12 hidden items-center pl-10 pr-1 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex [.desk-row:hover_&]:[--fill:var(--fill-hover)] ${
+                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-11 hidden items-center pl-10 pr-1 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex [.desk-row:hover_&]:[--fill:var(--fill-hover)] ${
                   panelOpen
                     ? ""
                     : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex [.desk-row.desk-row[aria-selected=true]_&]:[--fill:var(--fill-chosen)]"
@@ -489,14 +716,14 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
                   background: "linear-gradient(90deg, transparent, var(--fill) 36px)",
                 }}
               >
-                <MoveRow moves={moves} onPress={(move) => pressMove(move, task)} />
+                <MoveRow moves={moves} onPress={(move, target) => pressMove(move, task, target)} />
               </span>
             ) : null}
             <MoreButton
-              onPress={() => {
+              items={() => {
                 // the row's own menu: the row is the chosen one, the panel stays as it is
                 setSelected(task.id);
-                controls.more(task);
+                return rowMenu(task);
               }}
             />
           </span>
@@ -645,7 +872,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         <SearchField value={query} onChange={setQuery} placeholder="Поиск по задачам" width={176} />
       </Toolbar>
 
-      <div ref={gridBox} data-desk-tasks="">
+      <div ref={gridBox} data-desk-tasks="" onMouseDownCapture={onGridMouseDown} onClickCapture={onGridClick} onContextMenu={onGridMenu}>
         <DataGrid<TaskWithPeople>
           aria-label="Задачи"
           columns={columns}
@@ -662,7 +889,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         />
       </div>
 
-      {ids.length > 0 ? (
+      {ids.length > 0 && !anyPicked ? (
         // the letters of the chosen row only — a hint never names a key that does nothing here
         <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
           <span>
@@ -676,12 +903,57 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               <Kbd>{KEY_CAP[key.code]}</Kbd> {key.label}
             </span>
           ))}
+          <span>
+            <Kbd>X</Kbd> отметить
+          </span>
+          <span>
+            <Kbd>.</Kbd> все действия
+          </span>
           {openId ? (
             <span>
               <Kbd>Esc</Kbd> закрыть
             </span>
           ) : null}
+          <span>
+            <Kbd>?</Kbd> все клавиши
+          </span>
         </p>
+      ) : null}
+
+      {anyPicked ? (
+        // the marked rows' bar stands at the screen's foot while the table scrolls (принцип 3: no «Принять» here)
+        <div className="sticky bottom-4 z-20 flex justify-center" data-testid="desk-bulk-bar">
+          <div className="flex items-center gap-1.5 rounded-[14px] border border-border bg-surface px-2 py-1.5" style={{ boxShadow: "var(--shadow-raised)" }}>
+            <span className="nums px-2 text-[13px] font-semibold leading-4">
+              {marked.length} {pluralRu(marked.length, ["отмечена", "отмечены", "отмечено"])}
+            </span>
+            <span aria-hidden className="h-5 w-px bg-border" />
+            <Tooltip label="Тем, кому не напоминали последние полчаса">
+              <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-text" disabled={plan.nudge.length === 0} onClick={bulkNudge} data-bulk="nudge">
+                Напомнить <span className="nums text-muted">{plan.nudge.length}</span>
+              </Button>
+            </Tooltip>
+            <Tooltip label="Один новый срок всем, кто в работе">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="!min-h-8 !px-2.5 !text-text"
+                disabled={plan.extend.length === 0}
+                onClick={() => acts.bulk.extend(plan.extend, bulkAnchor("extend"), unpick)}
+                data-bulk="extend"
+              >
+                Перенести срок <span className="nums text-muted">{plan.extend.length}</span>
+              </Button>
+            </Tooltip>
+            <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-danger" disabled={plan.revoke.length === 0} onClick={() => acts.bulk.revoke(plan.revoke, unpick)} data-bulk="revoke">
+              Отозвать <span className="nums opacity-70">{plan.revoke.length}</span>
+            </Button>
+            <span aria-hidden className="h-5 w-px bg-border" />
+            <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5" onClick={unpick} data-testid="desk-bulk-clear">
+              Снять <Kbd>Esc</Kbd>
+            </Button>
+          </div>
+        </div>
       ) : null}
 
       {tab === "closed" && moreClosed ? (
@@ -700,7 +972,8 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         </div>
       ) : null}
 
-      {controls.sheets}
+      {acts.node}
+      {context.node}
 
       <Dialog open={purgeAsk} onClose={() => setPurgeAsk(false)} title="Очистить закрытые" width="sm">
         <p className="text-[14px] leading-5 text-muted">

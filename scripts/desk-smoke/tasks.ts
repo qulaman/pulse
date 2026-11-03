@@ -1,9 +1,11 @@
 /**
- * Role A of tasks/022 and the second wave of D-154: /desk/today, /desk/tasks and /desk/inbox. Read
- * only — nothing is accepted, sent, reminded or taken back, no visitor is answered, no request goes
- * to the secretary. Opening a task (the panel, «Разобрать») moves the director's read cursor, as
- * the phone's task screen does, and the smoke director may be the owner's own account: only a row
- * with no unread message is opened, and «Разобрать» is left alone while the table shows unread ones.
+ * Role A of tasks/022 and the second and third waves of D-154: /desk/today, /desk/tasks and
+ * /desk/inbox. Read only — nothing is accepted, sent, reminded or taken back, no visitor is
+ * answered, no request goes to the secretary; a menu, a picker or the marks' bar is opened, looked
+ * at and closed with Esc. Opening a task (the panel, «Разобрать») moves the director's read cursor,
+ * as the phone's task screen does, and the smoke director may be the owner's own account: only a
+ * row with no unread message is opened, and «Разобрать» is left alone while the table shows unread
+ * ones.
  */
 import type { Page } from "playwright";
 
@@ -45,6 +47,30 @@ async function checkToday(ctx: Ctx) {
   const people = await page.getByTestId("today-person").count();
   if (people > 0) record("сегодня: «Команда сейчас» — люди", true, `людей ${people}`);
   else skip("сегодня: «Команда сейчас» — люди", "в команде никого");
+  const lateRows = await page.getByTestId("today-overdue-row").count();
+  if (decisions + lateRows > 0) {
+    // J — the keyboard's cursor on the first row, nothing opens; Esc takes it off
+    await page.locator("#desk-main h1").click();
+    await page.keyboard.press("KeyJ");
+    await page.waitForTimeout(200);
+    const cursor = await page.locator("#desk-main [data-cursor]").count();
+    const stillShut = (await page.getByTestId("desk-panel").count()) === 0;
+    await ctx.shot("today-cursor");
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(200);
+    const gone = (await page.locator("#desk-main [data-cursor]").count()) === 0;
+    record("сегодня: J — курсор по решениям, Esc — снят, ничего не открыто", cursor === 1 && stillShut && gone, `курсор ${cursor}`);
+    // a right click is the row's menu — looked at, closed
+    await page.locator('#desk-main [data-row-key]').first().click({ button: "right", position: { x: 220, y: 12 } });
+    const menu = page.getByTestId("desk-menu");
+    const opened = await menu.waitFor({ timeout: 3_000 }).then(() => true, () => false);
+    const items = opened ? await menu.getByRole("menuitem").count() : 0;
+    await page.keyboard.press("Escape");
+    const closed = await menu.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+    record("сегодня: правый клик по решению — меню, Esc закрывает", opened && items > 0 && closed, `пунктов ${items}`);
+  } else {
+    skip("сегодня: J — курсор по решениям", "решений и просрочек нет");
+  }
   await ctx.shot("today");
   await fullShot(page, ctx, "today-full");
 }
@@ -163,7 +189,7 @@ export async function checkTasks(ctx: Ctx) {
     await page.keyboard.press("KeyO");
     await page.getByTestId("desk-task-panel").waitFor({ timeout: 15_000 }).catch(() => undefined);
     await page.waitForTimeout(1200);
-    const inReply = await page.evaluate(() => Boolean(document.activeElement?.closest('[data-testid="desk-task-panel"] [data-testid="composer"]')));
+    const inReply = await page.evaluate(() => Boolean(document.activeElement?.closest('[data-testid="desk-task-panel"] [data-testid="desk-composer"]')));
     const replyOpen = await page.getByTestId("thread-closed").count();
     record("задачи: O — панель и курсор в поле ответа", inReply || replyOpen > 0, inReply ? "" : "переписка закрыта");
     await page.keyboard.press("Escape");
@@ -171,16 +197,65 @@ export async function checkTasks(ctx: Ctx) {
     const shut = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
     record("задачи: Esc, Esc — поле отпущено, панель закрыта", shut);
 
-    // a row's «⋯» — the phone's «Действия», a centred dialog here; looked at and closed, nothing pressed
+    // a row's «⋯» — the desk's menu under the button (D-154 wave 3); looked at and closed, nothing pressed
     await rows.first().getByTestId("desk-row-more").click();
-    const sheet = page.locator("[data-sheet]");
-    const asked = await sheet.waitFor({ timeout: 5_000 }).then(() => true, () => false);
-    const moves = asked ? await sheet.locator('[data-testid^="more-"]').count() : 0;
-    record("задачи: «⋯» строки — диалог действий", asked && moves > 0, `действий ${moves}`);
-    await page.waitForTimeout(300);
+    const menu = page.getByTestId("desk-menu");
+    const asked = await menu.waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    const moves = asked ? await menu.getByRole("menuitem").count() : 0;
+    const sheets = await page.locator("[data-sheet]").count();
+    record("задачи: «⋯» строки — меню действий, не шторка", asked && moves > 0 && sheets === 0, `пунктов ${moves}`);
+    await page.waitForTimeout(200);
     await ctx.shot("tasks-row-more");
     await page.keyboard.press("Escape");
-    await sheet.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+    await menu.waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+
+    // a right click on a row is the same menu at the cursor
+    await rows.first().click({ button: "right", position: { x: 360, y: 12 } });
+    const atCursor = await menu.waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    await page.keyboard.press("Escape");
+    const shutMenu = await menu.waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+    record("задачи: правый клик по строке — меню, Esc закрывает", atCursor && shutMenu);
+
+    // X marks the chosen row: the bar of many rows comes, Esc takes the marks off (nothing pressed)
+    await page.locator('[role="grid"]').focus();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("KeyX");
+    const bar = page.getByTestId("desk-bulk-bar");
+    const barCame = await bar.waitFor({ timeout: 3_000 }).then(() => true, () => false);
+    const marks = await page.locator('[data-testid="desk-row-pick"][aria-checked="true"]').count();
+    await ctx.shot("tasks-marked");
+    await page.keyboard.press("Escape");
+    const barGone = await bar.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+    record("задачи: X — отметка и полоса действий, Esc снимает", barCame && marks === 1 && barGone, `отмечено ${marks}`);
+
+    // D on a row in hand — the deadline picker hangs from its cell; Esc closes it, nothing is set.
+    // The hint names the chosen row's letters: walk down to a row whose deadline can change
+    for (let step = 0; step < 12; step += 1) {
+      const words = (await page.getByTestId("desk-keys-hint").textContent().catch(() => "")) ?? "";
+      if (/D\s*(срок|другой срок)/.test(words)) break;
+      await page.keyboard.press("ArrowDown");
+      await page.waitForTimeout(80);
+    }
+    await page.keyboard.press("KeyD");
+    const picker = page.getByTestId("desk-deadline-picker");
+    if (await picker.waitFor({ timeout: 1_500 }).then(() => true, () => false)) {
+      const presets = await page.getByTestId("deadline-preset").count();
+      await ctx.shot("tasks-deadline");
+      await page.keyboard.press("Escape");
+      const pickerGone = await picker.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+      record("задачи: D — выбор срока поповером, Esc закрывает", presets > 0 && pickerGone, `вариантов ${presets}`);
+    } else {
+      skip("задачи: D — выбор срока", "у выбранной строки срок не меняется (сдана или закрыта)");
+    }
+
+    // «?» — the help lists this screen's keys
+    await page.keyboard.press("Shift+Slash");
+    const help = page.getByTestId("desk-shortcuts");
+    const helpCame = await help.waitFor({ timeout: 3_000 }).then(() => true, () => false);
+    const listed = helpCame ? ((await help.textContent()) ?? "") : "";
+    await page.keyboard.press("Escape");
+    await help.waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
+    record("задачи: «?» — справка с клавишами таблицы", helpCame && listed.includes("Отметить строку") && listed.includes("Передать другому"), "");
 
     // a search narrows the table; cleared, the rows come back
     const search = page.getByRole("searchbox", { name: "Поиск по задачам" });
@@ -234,6 +309,12 @@ export async function checkTasks(ctx: Ctx) {
     const second = await card.getAttribute("data-task-id");
     const position = (await page.getByTestId("desk-inbox-progress").innerText()).replace(/\s+/g, " ");
     record("разобрать: → — следующая задача", second !== first && position.startsWith("2 из"), position.slice(0, 12));
+    await page.keyboard.press("KeyK");
+    await page.waitForTimeout(400);
+    const back = await card.getAttribute("data-task-id");
+    record("разобрать: K — обратно, как ←", back === first, "");
+    await page.keyboard.press("KeyJ");
+    await page.waitForTimeout(300);
     await page.keyboard.press("ArrowLeft");
     await page.waitForTimeout(300);
     await page.keyboard.press("KeyS");

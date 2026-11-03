@@ -1,12 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { IdentityCard } from "@/components/desk/ui/IdentityCard";
+import { ProfileDesk } from "@/app/desk/profile/ProfileDesk";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
-import { PhoneViewRow } from "@/components/desk/ui/PhoneViewRow";
-import { NotificationsRow } from "@/components/profile/NotificationsRow";
-import { SignOutOthersRow } from "@/components/profile/SignOutOthersRow";
-import { SignOutRow } from "@/components/profile/SignOutRow";
-import { RowGroup } from "@/components/ui/Row";
 import { getSessionProfile } from "@/lib/auth";
 import { loadBrand } from "@/lib/brand";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -19,28 +14,22 @@ async function signOut() {
 }
 
 /**
- * The desk's profile (D-153): who is signed in, the director's notification rules (the phone's
- * screen — the only one there is, it opens as it is), signing out elsewhere and here, and the
- * way back to the phone screens on this computer.
+ * The desk's profile (D-153, D-154 wave 3): who is signed in, the account, this computer's
+ * notifications and the director's rules, how this computer shows the desk, the sessions and
+ * signing out — a computer's account page (`ProfileDesk`), not the phone's rows.
  */
 export default async function DeskProfilePage() {
   const profile = await getSessionProfile();
-  const director = profile.role === "director";
   const brand = await loadBrand(profile.companyId);
+  // the address the person signs in with on a computer: from the verified session, no extra read
+  const supabase = await createServerSupabase();
+  const { data } = await supabase.auth.getClaims();
+  const email = typeof data?.claims.email === "string" && data.claims.email ? data.claims.email : null;
 
   return (
     <DeskPage width="narrow">
       <PageTitle title="Профиль" />
-      <IdentityCard fullName={profile.fullName} role={profile.role} company={brand.name} />
-
-      <RowGroup>
-        {/* this computer's push: the director's rules, the secretary's one switch (D-154) */}
-        <NotificationsRow director={director} />
-        <SignOutOthersRow userId={profile.userId} />
-        <PhoneViewRow role={profile.role} />
-      </RowGroup>
-
-      <SignOutRow action={signOut} userId={profile.userId} />
+      <ProfileDesk userId={profile.userId} fullName={profile.fullName} role={profile.role} company={brand.name} email={email} signOut={signOut} />
     </DeskPage>
   );
 }
