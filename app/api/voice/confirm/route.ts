@@ -82,6 +82,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       if (error.message.includes("assignee_required")) {
         return apiError(400, "assignee_required", "Не понял, кому задача — выбери исполнителя");
       }
+      if (error.message.includes("assignee_inactive")) {
+        return apiError(400, "assignee_inactive", "Этот сотрудник больше не работает — выбери другого");
+      }
       if (error.message.includes("event_time_required")) {
         return apiError(400, "event_time_required", "Не понял, когда мероприятие — выбери время");
       }

@@ -1,12 +1,18 @@
 /**
- * Seed a client instance from its questionnaire (docs/SETUP.md §5, step 3; V-02).
+ * Seed a client company from its questionnaire (docs/SETUP.md §5; D-134).
  *   pnpm seed:client scripts/client.example.json [--dry-run] [--undo]
  *
  * Target = the Supabase project in .env.local (NEXT_PUBLIC_SUPABASE_URL +
- * SUPABASE_SERVICE_ROLE_KEY) — point .env.local at the client's fresh project first.
+ * SUPABASE_SERVICE_ROLE_KEY) — the shared database of all clients: the client is one more
+ * company in it, not a new project. A separate instance is a delivery option (D-134): the
+ * same script, with .env.local pointed at that client's own project. Until D-134 п. 6 lands,
+ * a database that already holds another company still needs SEED_CLIENT_ALLOW_MULTI=1 (the
+ * V-02 guard in seed()).
  * Idempotent: an existing auth user (by email) or company (by name) is reused, profiles
- * are upserted, so a failed run is simply re-run. `--undo` removes exactly what the
- * questionnaire describes (profiles, auth users, the company) — for a retry from zero.
+ * are upserted, so a failed run is simply re-run. A company without shop items gets the
+ * starter shop of 20260917160000_shop.sql. `--undo` removes exactly what the questionnaire
+ * describes (profiles, auth users, the company's shop items, the company) — for a retry
+ * from zero.
  * Passwords not given in the file are generated and printed ONCE; nothing is written
  * to disk.
  */
@@ -21,6 +27,15 @@ import { suggestAliases } from "../lib/people/aliases";
 import { CompanySettingsSchema, SettingsPatchSchema } from "../lib/settings";
 
 const ROLES = ["director", "manager", "employee", "shopkeeper"] as const;
+
+// The starter shop (D-71): the rows 20260917160000_shop.sql gave the companies of its day, word
+// for word — a default of a new company, the director changes prices and items in the shop itself.
+const STARTER_SHOP = [
+  { title: "Брендовая куртка", description: "Тёплая куртка с логотипом компании", icon: "🧥", price: 200, stock: null, sort: 10 },
+  { title: "Брендовая безрукавка", description: "Жилет с логотипом компании", icon: "🦺", price: 500, stock: null, sort: 20 },
+  { title: "День отгула", description: "Оплачиваемый выходной по согласованию", icon: "🏖️", price: 1000, stock: null, sort: 30 },
+  { title: "Премия 50 000 ₸", description: "Разовая премия к зарплате", icon: "💰", price: 2000, stock: null, sort: 40 },
+];
 
 const PersonSchema = z.object({
   full_name: z.string().trim().min(2).max(120),
@@ -105,6 +120,13 @@ async function seed(supabase: SupabaseClient, q: Questionnaire, people: Plan[], 
   console.log(`компания: ${existing ? `есть (${existing.id})` : "создать"} — «${q.company_name}»`);
   console.log(`люди: ${people.length} (директор, ${q.employees.length} сотрудников${q.tv ? ", киоск" : ""})`);
   for (const p of people) console.log(`  ${p.role.padEnd(10)} ${p.full_name.padEnd(28)} ${p.email.padEnd(30)} алиасы: ${p.aliases.join(", ") || "—"}`);
+  let shopEmpty = true;
+  if (existing) {
+    const shop = await supabase.from("shop_items").select("id", { count: "exact", head: true }).eq("company_id", existing.id);
+    if (shop.error) throw new Error(`shop_items read failed: ${shop.error.message}`);
+    shopEmpty = (shop.count ?? 0) === 0;
+  }
+  console.log(shopEmpty ? `витрина: ${STARTER_SHOP.length} товара (будут созданы)` : "витрина: уже есть, не трогаю");
   if (dryRun) return;
 
   // the slug is the company's address in a sign-in link, `/c/<slug>` (D-135)
@@ -116,6 +138,11 @@ async function seed(supabase: SupabaseClient, q: Questionnaire, people: Plan[], 
   } else {
     const updated = await supabase.from("companies").update({ settings, slug: q.slug }).eq("id", companyId);
     if (updated.error) throw new Error(`company settings update failed: ${updated.error.message}`);
+  }
+  if (shopEmpty) {
+    const shop = await supabase.from("shop_items").insert(STARTER_SHOP.map((item) => ({ ...item, company_id: companyId })));
+    if (shop.error) throw new Error(`starter shop insert failed: ${shop.error.message}`);
+    console.log(`витрина: ${STARTER_SHOP.length} товара созданы`);
   }
 
   const ids = new Map<string, string>();
@@ -182,6 +209,14 @@ async function undo(supabase: SupabaseClient, q: Questionnaire, people: Plan[]):
     if (user.error) throw new Error(`deleteUser ${p.email} failed: ${user.error.message}`);
     console.log(`удалён ${p.email}`);
   }
+  // shop_items.company_id has no cascade: the company's items go first
+  const found = await supabase.from("companies").select("id").eq("name", q.company_name);
+  if (found.error) throw new Error(`companies read failed: ${found.error.message}`);
+  const companyIds = (found.data ?? []).map((c) => c.id);
+  if (companyIds.length) {
+    const shop = await supabase.from("shop_items").delete().in("company_id", companyIds);
+    if (shop.error) throw new Error(`shop_items delete failed: ${shop.error.message}`);
+  }
   const company = await supabase.from("companies").delete().eq("name", q.company_name);
   if (company.error) throw new Error(`company delete failed: ${company.error.message}`);
   console.log(`удалена компания «${q.company_name}»`);
@@ -198,7 +233,10 @@ async function main(): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
-    console.error("NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY не заданы — .env.local должен смотреть на проект клиента");
+    console.error(
+      "NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY не заданы — .env.local должен смотреть на общую базу клиентов " +
+        "(или на проект отдельного инстанса, если клиенту поставляется свой)",
+    );
     process.exit(2);
   }
 

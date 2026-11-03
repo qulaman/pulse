@@ -11,6 +11,12 @@ select throws_ok(
   'employee cannot edit company settings'
 );
 
+-- the flag is pinned per step: award_points honours it too (IDEAS И-89), and the seed leaves it off
+set local role postgres;
+update companies set settings = settings || '{"points_enabled": true}'::jsonb
+ where id = (select company_id from profiles where id = '10000000-0000-0000-0000-000000000001');
+set local role authenticated;
+
 -- director awards +10 to Марат with a reason
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is(
@@ -45,6 +51,10 @@ select is(
 );
 
 -- points stay skipped in confirm while the flag is off …
+set local role postgres;
+update companies set settings = settings || '{"points_enabled": false}'::jsonb
+ where id = (select company_id from profiles where id = '10000000-0000-0000-0000-000000000001');
+set local role authenticated;
 set local request.jwt.claims = '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}';
 select is(
   (select (confirm_voice_batch(

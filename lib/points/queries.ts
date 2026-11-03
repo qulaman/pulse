@@ -170,7 +170,13 @@ export function useAwardPoints() {
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "";
-      toast(message.includes("reason_required") ? "Снятие очков — только с причиной" : "Не получилось начислить");
+      toast(
+        message.includes("reason_required")
+          ? "Снятие очков — только с причиной"
+          : message.includes("points_disabled")
+            ? "Очки в компании выключены"
+            : "Не получилось начислить",
+      );
     },
   });
 }
