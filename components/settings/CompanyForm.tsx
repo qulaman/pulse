@@ -6,6 +6,7 @@ import { BuildingIcon } from "@/components/settings/icons";
 import { Button } from "@/components/ui/Button";
 import { Disclosure } from "@/components/ui/Disclosure";
 import { SettingsSectionsBone } from "@/components/ui/Skeleton";
+import { StillLogo } from "@/components/ui/StillLogo";
 import { toast } from "@/components/ui/Toast";
 import { APP_BG, contrastRatio, DEFAULT_ACCENT, MIN_ACCENT_CONTRAST, parseHex } from "@/lib/brand-color";
 
@@ -136,8 +137,7 @@ export function CompanyForm({ onDirtyChange }: { onDirtyChange?: (dirty: boolean
       {/* header preview */}
       <div className="flex items-center gap-3 rounded-[12px] border border-border bg-bg px-3 py-2">
         {company.brand.logo_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
-          <img src={company.brand.logo_url} alt="" className="h-7 max-w-[120px] object-contain" />
+          <StillLogo src={company.brand.logo_url} className="h-7 max-w-[120px] object-contain" />
         ) : (
           <span className="flex h-7 w-7 items-center justify-center rounded-[8px] bg-surface-2 text-[12px] font-semibold text-muted">
             {name.trim().slice(0, 1).toUpperCase() || "?"}

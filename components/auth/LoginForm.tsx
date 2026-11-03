@@ -7,6 +7,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Arrival, type ArrivalBrand } from "@/components/auth/Arrival";
 import { Mascot } from "@/components/brand/Mascot";
 import { PulseMark } from "@/components/brand/PulseMark";
+import { StillLogo } from "@/components/ui/StillLogo";
 import { formatCode, normalizeCode } from "@/lib/login-code/code";
 import { deviceId, signInPlace, type SignInPlace } from "@/lib/login-code/device";
 import { wipeOffline } from "@/lib/offline/persist";
@@ -66,10 +67,7 @@ export function LoginForm({ brand }: { brand: LoginBrand }) {
         <div className="min-w-0">
           {branded ? (
             <div className="mb-3 flex items-center gap-3">
-              {brand.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
-                <img src={brand.logoUrl} alt="" className="h-9 max-w-[140px] object-contain" />
-              ) : null}
+              {brand.logoUrl ? <StillLogo src={brand.logoUrl} className="h-9 max-w-[140px] object-contain" /> : null}
               <span className="font-display text-[19px] font-bold leading-6 tracking-[-0.02em]">{brand.name}</span>
             </div>
           ) : null}

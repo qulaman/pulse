@@ -1,6 +1,7 @@
 "use client";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import { StillLogo } from "@/components/ui/StillLogo";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { TvEventRow } from "@/lib/tv/queries";
 import type { ClockStyle } from "@/lib/tv/state";
@@ -36,10 +37,7 @@ export function TvClock({
     <div className="flex items-center gap-[2.4vh]">
       <PulseMark size="tv" />
       <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
-      {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
-        <img src={logoUrl} alt="" className="h-[8vh] w-auto object-contain" />
-      ) : null}
+      {logoUrl ? <StillLogo src={logoUrl} className="h-[8vh] w-auto object-contain" /> : null}
     </div>
   );
 

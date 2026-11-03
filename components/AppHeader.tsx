@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { HeaderPoints } from "@/components/HeaderPoints";
 import { HomeOnly } from "@/components/HomeOnly";
+import { StillLogo } from "@/components/ui/StillLogo";
 import { loadBrand } from "@/lib/brand";
 import { firstNameOf } from "@/lib/text/normalize";
 
@@ -34,8 +35,7 @@ export async function AppHeader({ fullName, companyId, pointsFor }: { fullName: 
           {branded ? (
             <div className="flex min-w-0 items-center gap-2.5">
               {brand.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
-                <img src={brand.logoUrl} alt="" className="h-7 max-w-[110px] shrink-0 object-contain" />
+                <StillLogo src={brand.logoUrl} className="h-7 max-w-[110px] shrink-0 object-contain" />
               ) : (
                 <PulseMark />
               )}

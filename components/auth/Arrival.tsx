@@ -4,6 +4,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import { StillLogo } from "@/components/ui/StillLogo";
 
 export type ArrivalBrand = { name: string; logoUrl: string | null; accent: string };
 
@@ -62,10 +63,7 @@ export function Arrival({ from, to, onDone }: { from: { name: string }; to: Arri
         animate={{ scale: 1, opacity: 1, y: 0 }}
         transition={{ delay: sameBrand ? 0 : 0.18, duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
       >
-        {to.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element -- client logo from the public bucket
-          <img src={to.logoUrl} alt="" className="h-16 max-w-[220px] object-contain" />
-        ) : null}
+        {to.logoUrl ? <StillLogo src={to.logoUrl} className="h-16 max-w-[220px] object-contain" /> : null}
         <span className="font-display text-[26px] font-bold leading-8 tracking-[-0.02em]" style={{ color: to.logoUrl ? undefined : "var(--arrival)" }}>
           {to.name}
         </span>
