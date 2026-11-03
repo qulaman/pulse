@@ -4,7 +4,9 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { ItemEditor } from "@/components/shop/ItemEditor";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -14,20 +16,16 @@ import { useMe } from "@/lib/tasks/queries";
 
 function SectionHead({ title, count, end }: { title: string; count?: number; end?: ReactNode }) {
   return (
-    <div className="flex min-h-9 items-center justify-between gap-3">
-      <h2 className="flex items-baseline gap-2 font-display text-[16px] font-semibold leading-[22px]">
-        {title}
-        {count !== undefined ? <span className="nums text-[13px] font-medium text-muted">{count}</span> : null}
-      </h2>
-      {end}
-    </div>
+    <SectionLabel count={count} action={end} className="min-h-9">
+      {title}
+    </SectionLabel>
   );
 }
 
 function Price({ value }: { value: number }) {
   return (
     <span className="whitespace-nowrap">
-      <span className="nums font-semibold">{value}</span> <span className="text-muted">{pointsWord(value)}</span>
+      <Num value={value} className="font-semibold" /> <span className="text-muted">{pointsWord(value)}</span>
     </span>
   );
 }
@@ -121,7 +119,7 @@ export function ShopDesk() {
       width: "120px",
       align: "right",
       sort: (a, b) => (a.stock ?? Number.POSITIVE_INFINITY) - (b.stock ?? Number.POSITIVE_INFINITY),
-      render: (item) => (item.stock === null ? <span className="text-muted">без счёта</span> : <span className="nums">{item.stock} шт.</span>),
+      render: (item) => (item.stock === null ? <span className="text-muted">без счёта</span> : <span><Num value={item.stock} /> шт.</span>),
     },
     {
       key: "taken",
@@ -134,8 +132,8 @@ export function ShopDesk() {
       key: "shown",
       title: "Витрина",
       width: "110px",
-      render: (item) =>
-        item.is_active ? <span style={{ color: "var(--ok)" }}>видна</span> : <span className="text-muted">скрыта</span>,
+      // shown is the usual state — a plain word; hidden is the one worth noticing, quiet like its row
+      render: (item) => (item.is_active ? <span>видна</span> : <span className="text-muted">скрыта</span>),
     },
     {
       key: "edit",

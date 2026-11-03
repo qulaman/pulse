@@ -110,7 +110,13 @@ export function InPanel({ panelKey, onClose, children }: { panelKey: string; onC
  */
 export function DeskPanelColumn({ node, onClose, setHost }: { node: ReactNode; onClose: () => void; setHost: (el: HTMLElement | null) => void }) {
   return (
-    <aside aria-label="Панель" data-testid="desk-panel" className="relative flex min-h-0 flex-col border-l border-border bg-surface">
+    <aside
+      aria-label="Панель"
+      data-testid="desk-panel"
+      // raised over the screen it details: a soft shadow to the left, the table stays a flat plane (D-154)
+      className="relative z-10 flex min-h-0 flex-col border-l border-border bg-surface"
+      style={{ boxShadow: "-12px 0 32px rgba(0, 0, 0, 0.35)" }}
+    >
       <button
         type="button"
         aria-label="Закрыть панель"

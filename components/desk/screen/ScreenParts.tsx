@@ -5,6 +5,7 @@ import { useMemo, useState, type ReactNode } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SearchField } from "@/components/desk/ui/Toolbar";
 import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { Button } from "@/components/ui/Button";
@@ -25,39 +26,49 @@ const ON_WALL = new Set(["sent", "accepted", "in_progress", "rework", "pending_r
 
 const lower = (text: string) => text.toLowerCase().replace(/ё/g, "е");
 
-/** A block of the panel: a quiet title over its controls. */
+/** A block of the panel: the section's label over its controls. */
 export function Section({ title, children, testId, end }: { title: string; children: ReactNode; testId?: string; end?: ReactNode }) {
   return (
-    <section className="card flex flex-col gap-2.5 px-4 py-3.5" data-testid={testId}>
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="eyebrow">{title}</h2>
-        {end}
-      </div>
+    <section className="card flex flex-col gap-3 px-4 pb-4 pt-3.5" data-testid={testId}>
+      <SectionLabel action={end}>{title}</SectionLabel>
       {children}
     </section>
   );
 }
 
-/** A key of the panel: lit while what it names is on the wall. */
-export function Key({
-  on = false,
-  children,
-  onClick,
-  disabled,
-  testId,
-  label,
-}: {
-  on?: boolean;
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  testId?: string;
-  label?: string;
-}) {
+/** A setting of the wall: its name on the left, its control on the right. */
+export function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <Button size="sm" variant={on ? "primary" : "secondary"} aria-pressed={on} aria-label={label} disabled={disabled} onClick={onClick} data-testid={testId} className="w-full">
-      {children}
-    </Button>
+    <div className="flex min-h-9 items-center justify-between gap-3">
+      <span className="min-w-0">
+        <span className="block text-[14px] leading-5">{label}</span>
+        {hint ? <span className="block truncate text-[12px] leading-4 text-muted">{hint}</span> : null}
+      </span>
+      <span className="shrink-0">{children}</span>
+    </div>
+  );
+}
+
+/** An on/off of the wall — the guest in the office: a track and a knob, the accent while it is on. */
+export function Switch({ on, onToggle, label, testId, disabled }: { on: boolean; onToggle: () => void; label: string; testId?: string; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onToggle}
+      data-testid={testId}
+      className="relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-[160ms] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35 disabled:opacity-40"
+      style={{ background: on ? "var(--accent)" : "var(--surface-2)", boxShadow: on ? "none" : "inset 0 0 0 1px var(--border)" }}
+    >
+      <span
+        aria-hidden
+        className="absolute top-[3px] h-4 w-4 rounded-full transition-[left] duration-[160ms]"
+        style={{ left: on ? 19 : 3, background: on ? "var(--bg)" : "var(--text-muted)" }}
+      />
+    </button>
   );
 }
 

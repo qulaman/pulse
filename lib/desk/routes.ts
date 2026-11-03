@@ -13,9 +13,9 @@ export function isDeskRole(role: Role | undefined): role is DeskRole {
   return role === "director" || role === "secretary";
 }
 
-/** The desk's home of each role: the director sorts tasks, the secretary runs the errands. */
+/** The desk's home of each role: the director's day at a glance (D-154), the secretary's errands. */
 export const DESK_HOME: Record<DeskRole, string> = {
-  director: "/desk/tasks",
+  director: "/desk/today",
   secretary: "/desk/errands",
 };
 
@@ -23,7 +23,7 @@ export function deskHomeFor(role: Role | undefined): string {
   return role === "secretary" ? DESK_HOME.secretary : DESK_HOME.director;
 }
 
-export type DeskBadge = "tasks" | "inbox" | "errands" | "calendar";
+export type DeskBadge = "tasks" | "errands" | "calendar";
 
 export type DeskNavItem = { href: string; label: string; badge?: DeskBadge };
 
@@ -33,9 +33,11 @@ export type DeskNavItem = { href: string; label: string; badge?: DeskBadge };
  * «Профиль» stands apart at the bottom of the bar — it is not in these lists.
  */
 export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
+  // «Разобрать» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
+    { href: "/desk/today", label: "Сегодня" },
     { href: "/desk/tasks", label: "Задачи", badge: "tasks" },
-    { href: "/desk/inbox", label: "Разобрать", badge: "inbox" },
+    { href: "/desk/inbox", label: "Разобрать" },
     { href: "/desk/team", label: "Команда" },
     { href: "/desk/errands", label: "Заявки", badge: "errands" },
     { href: "/desk/reports", label: "Отчёты" },
@@ -56,6 +58,7 @@ export const DESK_PROFILE = "/desk/profile";
 
 /** Desk screens only the director has (D-153 §1); the secretary's direct address leads to her home. */
 const DIRECTOR_ONLY = [
+  "/desk/today",
   "/desk/tasks",
   "/desk/inbox",
   "/desk/reports",
@@ -114,9 +117,11 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
   const none = new URLSearchParams();
 
   switch (path) {
+    // Пульс and an unsent draft open on the director's day; «Задачи» on the tasks dashboard
     case "/pulse":
-    case "/sent":
     case "/confirm":
+      return director ? DESK_HOME.director : null;
+    case "/sent":
       return director ? "/desk/tasks" : null;
     case "/people":
       return "/desk/team";

@@ -55,8 +55,9 @@ export const peopleQuery = {
   },
 };
 
-export function usePeople() {
-  return useQuery(peopleQuery);
+/** `enabled` — false keeps the list unasked until a part needs it (the desk's order line, D-154). */
+export function usePeople(enabled = true) {
+  return useQuery({ ...peopleQuery, enabled });
 }
 
 export type PersonMessage = Database["public"]["Tables"]["task_messages"]["Row"] & {

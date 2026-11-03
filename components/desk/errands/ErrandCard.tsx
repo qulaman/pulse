@@ -65,14 +65,22 @@ export function ErrandCard({
   now,
   catalogue,
   selected,
+  chosen = false,
   onOpen,
+  declineOpen,
+  onDeclineOpen,
 }: {
   errand: Errand;
   meId: string;
   now: Date;
   catalogue: readonly SecretaryAction[];
+  /** Open in the panel. */
   selected: boolean;
+  /** The queue's keyboard is on it: ringed, its buttons show their keys. */
+  chosen?: boolean;
   onOpen: () => void;
+  declineOpen?: boolean;
+  onDeclineOpen?: (open: boolean) => void;
 }) {
   const alarm = sceneOf(errand, catalogue) === "security";
   const taken = errand.status === "accepted" && errand.claimed_by === meId;
@@ -83,11 +91,16 @@ export function ErrandCard({
   };
   return (
     <article
-      className={`card-in card relative cursor-pointer overflow-hidden px-4 py-3 transition-[border-color] duration-[120ms] hover:border-muted/50 ${selected ? "border-accent/60" : ""}`}
-      style={alarm ? { borderColor: "color-mix(in srgb, var(--danger) 65%, var(--border))", background: "color-mix(in srgb, var(--danger) 10%, var(--surface))" } : undefined}
+      className={`card-in card relative cursor-pointer overflow-hidden px-4 py-3 transition-[border-color,box-shadow] duration-[120ms] hover:border-muted/50 ${selected || chosen ? "border-accent/60" : ""}`}
+      style={{
+        ...(alarm ? { borderColor: "color-mix(in srgb, var(--danger) 65%, var(--border))", background: "color-mix(in srgb, var(--danger) 10%, var(--surface))" } : null),
+        ...(chosen ? { boxShadow: "var(--shadow-card), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent)" } : null),
+      }}
       onClick={open}
       data-testid="desk-errand-card"
       data-status={errand.status}
+      data-chosen={chosen ? "" : undefined}
+      data-errand-id={errand.id}
     >
       <span aria-hidden className="absolute inset-y-3 left-0 w-[3px] rounded-r-full" style={{ background: rail }} />
       <div className="flex items-start gap-4 pl-1">
@@ -95,11 +108,11 @@ export function ErrandCard({
           <ErrandBody errand={errand} now={now} catalogue={catalogue} />
           {/* «Будет:», «Уточнить у директора» — the phone card's second layer (D-99) */}
           <div className="mt-2 empty:hidden">
-            <SecretaryLink errand={errand} meId={meId} catalogue={catalogue} />
+            <SecretaryLink errand={errand} meId={meId} catalogue={catalogue} hints={chosen} />
           </div>
         </div>
         <div className="shrink-0 pt-0.5">
-          <ErrandActions errand={errand} meId={meId} catalogue={catalogue} />
+          <ErrandActions errand={errand} meId={meId} catalogue={catalogue} hints={chosen} declineOpen={declineOpen} onDeclineOpen={onDeclineOpen} />
         </div>
       </div>
     </article>

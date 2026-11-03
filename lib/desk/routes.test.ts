@@ -4,7 +4,7 @@ import { DESK_NAV, deskAllows, deskHomeFor, deskNavActive, deskRouteFor, mayHave
 
 describe("deskHomeFor (D-153)", () => {
   it("sends the director to tasks and the secretary to the errands", () => {
-    expect(deskHomeFor("director")).toBe("/desk/tasks");
+    expect(deskHomeFor("director")).toBe("/desk/today");
     expect(deskHomeFor("secretary")).toBe("/desk/errands");
   });
 });
@@ -12,10 +12,10 @@ describe("deskHomeFor (D-153)", () => {
 describe("deskRouteFor — the director", () => {
   const to = (path: string, search = "") => deskRouteFor(path, search, "director");
 
-  it("takes Пульс, «Задачи» and the confirm screen to the tasks dashboard", () => {
-    expect(to("/pulse")).toBe("/desk/tasks");
+  it("takes Пульс and a draft to the director's day, «Задачи» to the dashboard (D-154)", () => {
+    expect(to("/pulse")).toBe("/desk/today");
+    expect(to("/confirm")).toBe("/desk/today");
     expect(to("/sent")).toBe("/desk/tasks");
-    expect(to("/confirm")).toBe("/desk/tasks");
   });
 
   it("opens a task in the panel", () => {
@@ -66,6 +66,7 @@ describe("deskRouteFor — the director", () => {
 
   it("ignores a trailing slash", () => {
     expect(to("/sent/")).toBe("/desk/tasks");
+    expect(to("/pulse/")).toBe("/desk/today");
   });
 });
 
@@ -117,7 +118,7 @@ describe("mayHaveDeskRoute", () => {
 
 describe("deskAllows and the navigation", () => {
   it("keeps the secretary off the director's desk screens", () => {
-    for (const path of ["/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/screen", "/desk/settings/data", "/desk/settings/points"]) {
+    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/screen", "/desk/settings/data", "/desk/settings/points"]) {
       expect(deskAllows(path, "secretary")).toBe(false);
       expect(deskAllows(path, "director")).toBe(true);
     }

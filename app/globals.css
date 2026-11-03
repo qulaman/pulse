@@ -3232,3 +3232,39 @@ html[data-surface="desk"] .desk-progress {
     animation: none;
   }
 }
+
+/* ---- the desk's language, second pass (D-154) ------------------------------------------------
+   The light of a screen's state (components/desk/ui/Light.tsx): the phone's sky in a quiet
+   register — a 2 px line of the tone along the top, fading to the right, and one soft glow behind
+   the hero. A layer per tone; a change of state crossfades in 900 ms. */
+html[data-surface="desk"] .desk-light-layer {
+  opacity: 0;
+  transition: opacity 900ms var(--ease-out);
+  background:
+    linear-gradient(90deg, var(--light) 0%, transparent 78%) top left / 100% 2px no-repeat,
+    radial-gradient(620px 280px at 12% -60px, color-mix(in srgb, var(--light) 12%, transparent), transparent 72%);
+}
+html[data-surface="desk"] .desk-light-layer[data-on] {
+  opacity: 1;
+}
+/* a mouse needs no glow under the finger: the main button is a flat fill with its hairline of light */
+html[data-surface="desk"] .btn-primary {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .22);
+}
+html[data-surface="desk"] .btn-primary:hover {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3), 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+/* the order line is the product's signature, not a search field */
+html[data-surface="desk"] .desk-command {
+  background: color-mix(in srgb, var(--surface-2) 92%, var(--accent));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--border));
+}
+html[data-surface="desk"] .desk-command:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 75%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] .desk-light-layer {
+    transition: none;
+  }
+}

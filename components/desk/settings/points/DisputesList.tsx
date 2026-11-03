@@ -3,9 +3,11 @@
 import { useState } from "react";
 
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
+import { formatNum, pointsTone } from "@/lib/desk/format";
 import { useOpenDisputes, useResolveDispute, type OpenDispute } from "@/lib/points/game";
 
 function DisputeCard({ item }: { item: OpenDispute }) {
@@ -21,9 +23,7 @@ function DisputeCard({ item }: { item: OpenDispute }) {
         <span className="nums shrink-0 text-[12px] leading-4 text-muted">{humanAqtobe(new Date(item.created_at))}</span>
       </div>
       <p className="text-[14px] leading-5 text-muted">
-        <span className="nums font-semibold" style={{ color: "var(--danger)" }}>
-          {amount}
-        </span>{" "}
+        <Num value={amount} signed tone={pointsTone(amount)} className="font-semibold" />{" "}
         {item.tx?.reason ?? ""}
       </p>
       <p className="text-[14px] leading-5">«{item.text}»</p>
@@ -37,7 +37,7 @@ function DisputeCard({ item }: { item: OpenDispute }) {
           className="field h-9 min-w-0 flex-1 px-3 text-[14px] leading-5 outline-none focus:border-accent"
         />
         <Button size="sm" disabled={busy} onClick={() => resolve.mutate({ id: item.id, refund: true, answer: answer.trim() })} data-testid="dispute-refund">
-          Вернуть {Math.abs(amount)}
+          Вернуть {formatNum(Math.abs(amount))}
         </Button>
         <Button
           size="sm"

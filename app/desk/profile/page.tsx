@@ -34,7 +34,8 @@ export default async function DeskProfilePage() {
       <IdentityCard fullName={profile.fullName} role={profile.role} company={brand.name} />
 
       <RowGroup>
-        {director ? <NotificationsRow director /> : null}
+        {/* this computer's push: the director's rules, the secretary's one switch (D-154) */}
+        <NotificationsRow director={director} />
         <SignOutOthersRow userId={profile.userId} />
         <PhoneViewRow role={profile.role} />
       </RowGroup>

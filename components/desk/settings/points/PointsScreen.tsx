@@ -9,8 +9,8 @@ import { BalancesTable, PERIOD_LABEL } from "@/components/desk/settings/points/B
 import { DisputesList } from "@/components/desk/settings/points/DisputesList";
 import { LedgerTable } from "@/components/desk/settings/points/LedgerTable";
 import { ShopDesk } from "@/components/desk/settings/points/ShopDesk";
+import { PointsHero } from "@/components/desk/settings/points/PointsHero";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
-import { StatTile } from "@/components/desk/ui/StatTile";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { usePeople } from "@/lib/people/queries";
@@ -33,7 +33,8 @@ function viewOf(param: string | null, hash: string): View {
 const PERIODS: RatingPeriod[] = ["week", "month", "all"];
 
 /**
- * «Очки и магазин» (D-153 §5): the director's desk for the points game — the totals on top, then
+ * «Очки и магазин» (D-153 §5, D-154): the director's desk for the points game — one hero on top
+ * (the points on hands, what waits for him: orders to hand out, disputes — the screen's light), then
  * the team's balances with «Начислить», the disputes, the company's ledger and the shop with its
  * queue to hand out. The rating's mode and the rules are a settings section (`PointsSection`,
  * the «Сотрудники» tab) — linked, not repeated. Balances are sums of the ledger (principle 4).
@@ -99,9 +100,10 @@ export function PointsScreen() {
     ) : null;
 
   return (
-    <div className="flex w-full max-w-[1100px] flex-col gap-4">
+    <div className="flex w-full max-w-[1100px] flex-col gap-5">
       <PageTitle
         title="Очки и магазин"
+        light={disputeCount > 0 || waiting > 0 ? "warn" : null}
         state={enabled.isPending || on ? null : { text: "Очки выключены — начислять нельзя, магазин работает", tone: "warn" }}
         actions={
           <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award">
@@ -116,13 +118,7 @@ export function PointsScreen() {
         </Link>
       </p>
 
-      <div className="flex flex-wrap gap-3">
-        <StatTile label="На руках у людей" value={summary.data?.onHands ?? "—"} />
-        <StatTile label="Роздано за 30 дней" value={summary.data?.earned30 ?? "—"} />
-        <StatTile label="Унесено в магазин" value={summary.data?.spent ?? "—"} />
-        <StatTile label="Ждут выдачи" value={waiting} tone="warn" onClick={() => setView("shop")} active={view === "shop"} />
-        <StatTile label="Оспаривают" value={disputeCount} tone="warn" onClick={() => setView("disputes")} active={view === "disputes"} />
-      </div>
+      <PointsHero summary={summary.data} waiting={waiting} disputes={disputeCount} onShop={() => setView("shop")} onDisputes={() => setView("disputes")} />
 
       <Toolbar end={tools}>
         <SegmentTabs

@@ -21,6 +21,7 @@ import {
   WindowSection,
 } from "@/components/settings/sections";
 import { SETTINGS_TAB_META } from "@/components/settings/SettingsTiles";
+import { VoiceRetentionSection } from "@/components/settings/VoiceRetentionSection";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 
 /** A line under a tab's sections: where the rest of it lives on the desk. */
@@ -99,6 +100,8 @@ function AiPanel() {
         <ParserSection />
         <DictionarySection />
         <ConventionsSection />
+        {/* how long recordings and transcripts are kept (D-155, tasks/027) — as on the phone's tab */}
+        <VoiceRetentionSection />
       </div>
     </SettingsReady>
   );

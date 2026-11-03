@@ -45,11 +45,17 @@ export function ToneLine({ line, testId, className = "", children }: { line: Lin
 /**
  * «Доставка» of a table row (принцип 8): the push receipt of a task not yet taken comes from the
  * table's one query for all such rows (`useTaskReceipts`); after «Принял» — when it was taken.
+ * Neutral words: a row carries two colours at most — its stage ring and a missed deadline (D-154).
  */
 export function DeliveryCell({ task, receipt, now }: { task: TaskWithPeople; receipt: DeliveryRow | undefined; now: Date }) {
-  const line = deliveryLine(task, receipt ?? null, now);
-  if (!line) return <span className="text-muted">—</span>;
-  return <ToneLine line={line} className="text-[13px]" testId="desk-delivery" />;
+  // the receipt matters until the task is taken (principle 8); after «Принял» it is only noise in a row
+  const line = task.status === "sent" || task.status === "scheduled" ? deliveryLine(task, receipt ?? null, now) : null;
+  if (!line) return <span className="text-muted/60">—</span>;
+  return (
+    <span className="block truncate text-[13px] text-text/80" title={line.text} data-testid="desk-delivery">
+      {line.text}
+    </span>
+  );
 }
 
 /**
@@ -77,7 +83,8 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
 
 /**
  * The head of a task on the desk: who and the stage, the title, «срок» and the repeat, the
- * receipt, the four steps across, and how much time is left. `large` — the stack of «Разобрать».
+ * receipt, the four steps across, and how much time is left. `large` — the stack of «Разобрать»,
+ * whose headline already says the stage and the time: the head leaves both to it.
  */
 export function TaskHead({ desk, now, large = false }: { desk: DeskTask; now: Date; large?: boolean }) {
   const task = desk.task as TaskWithPeople;
@@ -93,9 +100,11 @@ export function TaskHead({ desk, now, large = false }: { desk: DeskTask; now: Da
         <div className="min-w-0 flex-1">
           <PersonCell name={task.assignee?.full_name} />
         </div>
-        <span className="shrink-0 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.08em]" style={{ color: TONE_VAR[stage.tone] }} data-testid="desk-task-stage">
-          {stage.text}
-        </span>
+        {large ? null : (
+          <span className="shrink-0 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.08em]" style={{ color: TONE_VAR[stage.tone] }} data-testid="desk-task-stage">
+            {stage.text}
+          </span>
+        )}
       </div>
       <h2 className={`mt-3 font-display font-bold tracking-[-0.01em] ${large ? "text-[24px] leading-[30px]" : "text-[18px] leading-6"}`}>{task.title}</h2>
       <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] leading-5 text-muted">
@@ -124,9 +133,11 @@ export function TaskHead({ desk, now, large = false }: { desk: DeskTask; now: Da
       <div className="mt-3">
         <Stepper steps={stepsOf(task, now, { declinedAt: desk.signals.declinedAt })} now={now} deadline={task.deadline} />
       </div>
-      <p className="mt-2 text-[12px] font-semibold leading-4" style={{ color: TONE_VAR[left.tone] }}>
-        {left.text}
-      </p>
+      {large ? null : (
+        <p className="mt-2 text-[12px] font-semibold leading-4" style={{ color: TONE_VAR[left.tone] }}>
+          {left.text}
+        </p>
+      )}
     </header>
   );
 }

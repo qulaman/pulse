@@ -1,5 +1,6 @@
 /**
- * Role C of tasks/022: /desk/settings and its screens. Nothing is saved: an edit made to see the
+ * Role C of tasks/022 (and the second wave of D-154 — the navigation's mark, the points' hero and
+ * figures): /desk/settings and its screens. Nothing is saved: an edit made to see the
  * «unsaved» dot is taken back with the section's own «Отменить», the demo reset and «Начислить»
  * dialogs are opened and closed, the lab compares nothing and the shop hands nothing out.
  */
@@ -62,6 +63,14 @@ async function tabs(ctx: Ctx) {
     );
     // the navigation's highlight crossfades for 120 ms
     await page.waitForTimeout(300);
+    if (tab === "company") {
+      // the chosen item as the side navigation marks its section: a 2 px line of the accent at the left, no accent fill (D-154)
+      const marked = await nav.locator('[aria-current="page"]').evaluate((node) => {
+        const line = [...node.querySelectorAll("span")].find((span) => span.getBoundingClientRect().width === 2);
+        return { line: Boolean(line), fill: getComputedStyle(node).backgroundColor };
+      });
+      record("настройки: выбранный пункт — линия акцента 2 px, без заливки акцентом", marked.line && !/46,\s*211,\s*183/.test(marked.fill), `${marked.fill}`);
+    }
     await ctx.shot(`settings-${tab}`);
     if (tab === "company") await demoReset(ctx);
     if (tab === "app") await unsavedDot(ctx);
@@ -194,6 +203,20 @@ async function points(ctx: Ctx) {
     .then(() => true, () => false);
   const rows = shown ? await grid.getByTestId("desk-row").count() : 0;
   record("очки: таблица балансов", rows > 0, `строк ${rows}`);
+
+  // one hero instead of five equal tiles: the points on hands large, what waits — orders, disputes — beside it
+  const hero = page.getByTestId("points-hero");
+  const heroText = (await hero.isVisible()) ? await hero.innerText() : "";
+  const tiles = await page.locator("#desk-main").getByTestId("stat-tile").count();
+  record(
+    "очки: сводка — герой «На руках у команды», выдача и споры рядом, без плиток",
+    /на руках у команды/i.test(heroText) && (await page.getByTestId("points-hero-shop").count()) === 1 && (await page.getByTestId("points-hero-disputes").count()) === 1 && tiles === 0,
+    heroText.split("\n").slice(0, 3).join(" · "),
+  );
+  // numbers apart by thousands and a real minus: no «1000880», no hyphen in front of a figure (D-154)
+  const figures = `${heroText}\n${shown ? await grid.innerText() : ""}`;
+  const raw = figures.match(/\d{4,}|(?:^|[\s(])-\d/gm) ?? [];
+  record("очки: числа с разрядами и настоящим «−»", raw.length === 0, raw.slice(0, 4).join(" "));
   await ctx.shot("settings-points");
 
   // «Начислить» opens its dialog — closed without a word typed, nothing awarded
@@ -224,6 +247,24 @@ async function points(ctx: Ctx) {
     if (await mark.first().waitFor({ timeout: 15_000 }).then(() => true, () => false)) seen.push(view);
     await page.waitForTimeout(600);
     await ctx.shot(`settings-points-${view}`);
+    if (view === "history") {
+      // the ledger's sums: a plus in gold, a minus quiet with «−» — never a hyphen, never the alarm's red
+      const sums = await main.getByRole("grid", { name: "История очков" }).locator(".nums").evaluateAll((nodes) =>
+        nodes
+          .map((node) => ({ text: node.textContent ?? "", color: getComputedStyle(node).color }))
+          .filter((item) => /^[+−]?\d/.test(item.text.trim())),
+      );
+      const danger = await page.evaluate(() => {
+        const probe = document.createElement("span");
+        probe.style.color = "var(--danger)";
+        document.body.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      });
+      const bad = sums.filter((item) => item.text.includes("-") || item.color === danger);
+      record("очки: история — минусы приглушённые с «−»", sums.length === 0 || bad.length === 0, `сумм ${sums.length}, не так ${bad.length}`);
+    }
   }
   record("очки: «Споры», «История», «Магазин» открываются", seen.length === views.length, `${seen.join(", ")} · ${APP_URL}`);
 }

@@ -1,7 +1,7 @@
 /**
  * The desk of the director and the secretary (D-153, tasks/022) in a real browser — system
  * Chrome via Playwright — against the dev database and a running app.
- *   1. Director, desktop 1440×900: signs in and lands on /desk/tasks; every desk screen opens
+ *   1. Director, desktop 1440×900: signs in and lands on /desk/today (D-154); every desk screen opens
  *      with no page error and no console error; screenshots of each; the order line parses a
  *      phrase into the panel and is CANCELLED — never sent (sending wakes the team's phones);
  *      a phone sheet opens as a centred dialog; «Телефонная версия» keeps /pulse a phone screen.
@@ -94,7 +94,7 @@ async function checkShell(ctx: Ctx) {
   await open(page, "/desk/profile");
   await ctx.shot("profile");
   const nav = await page.getByRole("navigation", { name: "Разделы" }).getByRole("link").count();
-  record("боковая навигация директора: девять разделов и профиль", nav === 10, `ссылок ${nav}`);
+  record("боковая навигация директора: десять разделов и профиль", nav === 11, `ссылок ${nav}`);
 
   // a phone sheet inside the desk is a centred dialog: «Выйти на других устройствах» — opened, looked at, closed
   await page.getByRole("button", { name: "Выйти на других устройствах" }).click();
@@ -139,6 +139,7 @@ async function checkShell(ctx: Ctx) {
     [`/secretary?e=${nobody}`, `/desk/errands?e=${nobody}`],
     [`/calendar?e=${nobody}`, `/desk/calendar?e=${nobody}`],
     [`/notes?n=${nobody}`, `/desk/notes?n=${nobody}`],
+    ["/pulse", "/desk/today"],
     ["/rating", "/desk/settings/points"],
     ["/shop", "/desk/settings/points?view=shop"],
   ] as const) {
@@ -160,8 +161,9 @@ async function checkShell(ctx: Ctx) {
   await ctx.shot("narrow");
   await page.setViewportSize({ width: 1440, height: 900 });
 
-  // «Телефонная версия»: the cookie, /pulse as a phone screen, no move back
+  // «Телефонная версия» (in the menu of the circle «я», D-154): the cookie, /pulse as a phone screen, no move back
   await open(page, "/desk/profile");
+  await page.getByTestId("desk-me").click();
   await page.getByTestId("phone-view").click();
   await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 20_000 });
   const cookie = (await page.context().cookies()).find((c) => c.name === "pulse_view");
@@ -272,7 +274,7 @@ async function runSafari() {
     watch(page, "safari");
     await login(page, DIRECTOR.email, DIRECTOR.password);
     await page.waitForURL((url) => url.pathname.startsWith("/desk"), { timeout: 20_000 }).catch(() => {});
-    record("WebKit, Mac без подсказки — директор на /desk/tasks", new URL(page.url()).pathname === "/desk/tasks", page.url());
+    record("WebKit, Mac без подсказки — директор на /desk/today", new URL(page.url()).pathname === "/desk/today", page.url());
     // the first screen's reads finish before moving on: WebKit reports a fetch cut by a navigation as an error
     await page.locator("#desk-main").waitFor({ timeout: 20_000 });
     await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
@@ -331,8 +333,8 @@ async function main() {
     const page = await context.newPage();
     watch(page, "director");
     await login(page, DIRECTOR.email, DIRECTOR.password);
-    await page.waitForURL((url) => url.pathname === "/desk/tasks", { timeout: 20_000 }).catch(() => {});
-    record("директор на компьютере после входа — /desk/tasks", new URL(page.url()).pathname === "/desk/tasks", page.url());
+    await page.waitForURL((url) => url.pathname === "/desk/today", { timeout: 20_000 }).catch(() => {});
+    record("директор на компьютере после входа — «Сегодня» /desk/today", new URL(page.url()).pathname === "/desk/today", page.url());
     await page.goto(`${APP_URL}/sent`, { waitUntil: "load" });
     await page.waitForURL((url) => url.pathname === "/desk/tasks", { timeout: 15_000 }).catch(() => {});
     record("телефонный адрес /sent на компьютере → /desk/tasks", new URL(page.url()).pathname === "/desk/tasks", page.url());

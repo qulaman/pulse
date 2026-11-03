@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
+import { pointsTone } from "@/lib/desk/format";
 import { ROLE_LABEL, usePeople } from "@/lib/people/queries";
 import { useRating, useTeamBalances, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
 
@@ -14,20 +16,17 @@ export const PERIOD_LABEL: Record<RatingPeriod, string> = { week: "Неделя"
 
 const PERIOD_COLUMN: Record<RatingPeriod, string> = { week: "За неделю", month: "За месяц", all: "За всё время" };
 
+/** The change against the period before — none for «всё время», which has no period before it. */
+const DELTA_COLUMN: Record<RatingPeriod, string | null> = { week: "Динамика", month: "Динамика", all: null };
+
 type Line = { row: RatingRow; sub: string | null; balance: number | null };
 
 const byName = (a: Line, b: Line) => a.row.display_name.localeCompare(b.row.display_name, "ru");
 const nums = (value: number | null) => value ?? Number.NEGATIVE_INFINITY;
 
-function Delta({ value }: { value: number }) {
-  if (value === 0) return <span className="text-muted">—</span>;
-  const up = value > 0;
-  return (
-    <span className="nums" style={{ color: up ? "var(--ok)" : "var(--danger)" }}>
-      {up ? "↑" : "↓"}
-      {Math.abs(value)}
-    </span>
-  );
+/** Points of a period, or their change: a gain in the reward's gold, a loss and nothing quiet, with a real «−» (D-154). */
+function Points({ value, bold = false }: { value: number; bold?: boolean }) {
+  return <Num value={value} signed tone={pointsTone(value)} className={bold ? "font-semibold" : ""} />;
 }
 
 /**
@@ -65,7 +64,8 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
       width: "120px",
       align: "right",
       sort: (a, b) => nums(a.balance) - nums(b.balance),
-      render: (line) => <span className="nums font-semibold">{line.balance ?? "—"}</span>,
+      // a balance is what a person holds, not news: plain figures, a debt quiet with its «−»
+      render: (line) => (line.balance === null ? <span className="text-muted">—</span> : <Num value={line.balance} tone={line.balance < 0 ? "muted" : null} className="font-semibold" />),
     },
     {
       key: "period",
@@ -73,24 +73,28 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
       width: "140px",
       align: "right",
       sort: (a, b) => a.row.points - b.row.points,
-      render: (line) => <span className="nums">{line.row.points}</span>,
+      render: (line) => <Points value={line.row.points} />,
     },
-    { key: "rank", title: "Место", width: "88px", align: "right", sort: (a, b) => a.row.rank - b.row.rank, render: (line) => <span className="nums">{line.row.rank}</span> },
-    {
-      key: "delta",
-      title: "Динамика",
-      width: "120px",
-      align: "right",
-      sort: (a, b) => a.row.delta_vs_prev - b.row.delta_vs_prev,
-      render: (line) => <Delta value={line.row.delta_vs_prev} />,
-    },
+    { key: "rank", title: "Место", width: "88px", align: "right", sort: (a, b) => a.row.rank - b.row.rank, render: (line) => <span className="nums text-muted">{line.row.rank}</span> },
+    ...(DELTA_COLUMN[period]
+      ? [
+          {
+            key: "delta",
+            title: DELTA_COLUMN[period],
+            width: "120px",
+            align: "right",
+            sort: (a, b) => a.row.delta_vs_prev - b.row.delta_vs_prev,
+            render: (line) => <Points value={line.row.delta_vs_prev} />,
+          } satisfies Column<Line>,
+        ]
+      : []),
     {
       key: "on_time",
       title: "В срок",
       width: "96px",
       align: "right",
       sort: (a, b) => (a.row.on_time_pct ?? -1) - (b.row.on_time_pct ?? -1),
-      render: (line) => (line.row.on_time_pct !== null ? <span className="nums">{line.row.on_time_pct}%</span> : <span className="text-muted">—</span>),
+      render: (line) => (line.row.on_time_pct !== null ? <span className="nums">{line.row.on_time_pct}%</span> : <span className="text-muted/60">—</span>),
     },
     {
       key: "award",
@@ -98,7 +102,8 @@ export function BalancesTable({ period, canAward, onAward }: { period: RatingPer
       width: "128px",
       align: "right",
       render: (line) => (
-        <Button size="sm" variant="secondary" disabled={!canAward} onClick={() => onAward(line.row.user_id)} data-testid="points-award-row">
+        // a quiet word on every row — the loud «Начислить» is the screen's own, by the title
+        <Button size="sm" variant="ghost" disabled={!canAward} onClick={() => onAward(line.row.user_id)} data-testid="points-award-row" className="hover:bg-surface-2">
           Начислить
         </Button>
       ),

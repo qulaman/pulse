@@ -6,6 +6,7 @@ import { createContext, useContext, useState, type MouseEvent, type ReactNode } 
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DeskLinks, goDesk } from "@/components/desk/ui/DeskLinks";
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SettingsDraftProvider, useDirtySections } from "@/components/settings/draft";
 import { BookIcon, GiftIcon, TableIcon } from "@/components/settings/icons";
 import { DirtyDot, SETTINGS_TAB_META } from "@/components/settings/SettingsTiles";
@@ -49,10 +50,12 @@ function NavItem({
       aria-current={active ? "page" : undefined}
       data-testid={testId}
       data-dirty={dirty ? "" : undefined}
-      className={`flex h-9 items-center gap-2.5 rounded-[10px] px-2.5 text-[14px] font-medium leading-5 transition-colors duration-[120ms] [&_svg]:h-[18px] [&_svg]:w-[18px] ${
-        active ? "bg-accent/12 text-text" : "text-muted hover:bg-surface-2 hover:text-text"
+      // the chosen screen as the side navigation marks its section: a line of the accent at the left edge, no accent fill (D-154)
+      className={`relative flex h-9 items-center gap-2.5 rounded-[10px] px-3 text-[14px] font-medium leading-5 transition-colors duration-[120ms] [&_svg]:h-[18px] [&_svg]:w-[18px] ${
+        active ? "bg-surface-2/60 text-text" : "text-muted hover:bg-surface-2/60 hover:text-text"
       }`}
     >
+      {active ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
       <span className={`shrink-0 ${active ? "text-accent" : ""}`}>{icon}</span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {dirty ? <DirtyDot /> : null}
@@ -79,14 +82,14 @@ function SettingsNav({ companyDirty }: { companyDirty: boolean }) {
     company: companyDirty || !!sections.window,
     app: !!(sections.secretary || sections.mascot),
     team: !!(sections.points || sections.daily_report),
-    ai: !!(sections.stt || sections.parser || sections.conventions),
+    ai: !!(sections.stt || sections.parser || sections.conventions || sections.voice_retention),
   };
   const onTabs = pathname === "/desk/settings";
   const current = onTabs ? parseSettingsTab(params.get("tab") ?? undefined) : null;
 
   return (
     <nav aria-label="Разделы настроек" data-testid="settings-subnav" className="sticky top-5 w-[208px] shrink-0 self-start">
-      <p className="eyebrow px-2.5 pb-2">Настройки</p>
+      <SectionLabel className="px-3 pb-2">Настройки</SectionLabel>
       <div className="flex flex-col gap-0.5">
         {SETTINGS_TABS.map((key) => (
           <NavItem
@@ -106,7 +109,7 @@ function SettingsNav({ companyDirty }: { companyDirty: boolean }) {
           />
         ))}
       </div>
-      <div className="my-3 border-t border-border" />
+      <SectionLabel className="mt-5 px-3 pb-2">Ещё</SectionLabel>
       <div className="flex flex-col gap-0.5">
         <NavItem
           href="/desk/settings/dictionary"
@@ -143,7 +146,7 @@ export function SettingsFrame({ children }: { children: ReactNode }) {
   return (
     <SettingsDraftProvider>
       <CompanyDirtyContext.Provider value={setCompanyDirty}>
-        <div className="flex w-full gap-6 px-6 pb-10 pt-5">
+        <div className="flex w-full max-w-[1328px] gap-6 px-6 pb-12 pt-6">
           <SettingsNav companyDirty={companyDirty} />
           <DeskLinks className="min-w-0 flex-1">{children}</DeskLinks>
         </div>

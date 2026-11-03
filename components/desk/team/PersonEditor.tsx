@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { PasswordField } from "@/components/people/PasswordField";
 import { RolePicker } from "@/components/people/RolePicker";
@@ -192,7 +193,7 @@ export function PersonEditor({
       </div>
 
       <div className="flex flex-col gap-2">
-        <h3 className="eyebrow px-1">Роль</h3>
+        <SectionLabel className="px-1">Роль</SectionLabel>
         {/* the phone's picker, its 64-px rows at the desk's height */}
         <div className="[&_[role=radio]]:min-h-[52px] [&_[role=radio]]:py-2">
           <RolePicker

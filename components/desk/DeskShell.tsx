@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { DeskScope } from "@/components/desk/DeskScope";
 import { DeskLinks } from "@/components/desk/ui/DeskLinks";
 import { DeskPanelColumn, DeskPanelProvider, useDeskPanelState } from "@/components/desk/ui/DeskPanel";
-import { SideNav, type DeskBrand } from "@/components/desk/ui/SideNav";
+import { SideNav, useDeskBadges, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
 import { goPhoneView } from "@/lib/desk/device";
 import { isCommandKey, focusCommandLine, isTypingTarget } from "@/lib/desk/keys";
@@ -61,6 +61,25 @@ function useDeskKeys(director: boolean, panel: { isOpen: boolean; close: () => v
   }, [director]);
 }
 
+/**
+ * The browser tab says what waits (D-154): «(3) Pulse» — the director's decisions and visitors,
+ * the secretary's requests nobody has taken. A desk behind the accounting program still calls;
+ * the push of this computer (Профиль → Уведомления) rings for the rest.
+ */
+function DeskTitle({ role }: { role: DeskRole }) {
+  const { counts } = useDeskBadges(role);
+  const pathname = usePathname();
+  const waiting = (role === "director" ? (counts.tasks ?? 0) : 0) + (counts.errands ?? 0);
+  useEffect(() => {
+    // after the route's own title is set (it says «Pulse» again on every screen)
+    const timer = setTimeout(() => {
+      document.title = waiting > 0 ? `(${waiting > 99 ? "99+" : waiting}) Pulse` : "Pulse";
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [waiting, pathname]);
+  return null;
+}
+
 /** A desktop window narrower than the desk is meant for: it still works, and says where it is easier (В-11 в). */
 function NarrowHint({ role }: { role: DeskRole }) {
   return (
@@ -106,7 +125,8 @@ export function DeskShell({ me, role, brand, children }: { me: Me; role: DeskRol
           <SideNav role={role} brand={brand} />
           <div className="flex min-h-0 min-w-0 flex-col">
             <TopBar fullName={me.fullName} role={role} />
-            <main id="desk-main" className="relative min-h-0 flex-1 overflow-y-auto">
+            {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen */}
+            <main id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
               {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
             </main>
           </div>
@@ -117,6 +137,7 @@ export function DeskShell({ me, role, brand, children }: { me: Me; role: DeskRol
           ) : null}
         </div>
         {narrow ? <NarrowHint role={role} /> : null}
+        <DeskTitle role={role} />
       </DeskScope>
     </DeskPanelProvider>
   );

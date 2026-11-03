@@ -4,9 +4,11 @@ import { useMemo, useState } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
+import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
+import { pointsTone } from "@/lib/desk/format";
 import { useCompanyLedger, type LedgerRow } from "@/lib/shop/queries";
 
 /**
@@ -63,11 +65,8 @@ export function LedgerTable({ who, search }: { who: string; search: string }) {
       width: "100px",
       align: "right",
       sort: (a, b) => a.amount - b.amount,
-      render: (row) => (
-        <span className="nums font-semibold" style={{ color: row.amount > 0 ? "var(--ok)" : row.amount < 0 ? "var(--danger)" : undefined }}>
-          {row.amount > 0 ? `+${row.amount}` : row.amount}
-        </span>
-      ),
+      // a plus is the reward's gold; a minus — a fine, a shop order — is quiet with a real «−», never an alarm (D-154)
+      render: (row) => <Num value={row.amount} signed tone={pointsTone(row.amount)} className="font-semibold" />,
     },
     {
       key: "reason",

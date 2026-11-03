@@ -15,7 +15,8 @@ export type Column<T> = {
   render: (row: T) => ReactNode;
 };
 
-export type Group<T> = { key: string; title: ReactNode; tone?: Tone; rows: T[] };
+/** `onToggle` makes the title a button that folds the group; a folded group's rows are not drawn and ↑/↓ step over them. */
+export type Group<T> = { key: string; title: ReactNode; tone?: Tone; rows: T[]; collapsed?: boolean; onToggle?: () => void };
 
 type Props<T> = {
   columns: Column<T>[];
@@ -76,7 +77,7 @@ export function DataGrid<T>({
     if (!sort || !compare) return all;
     return all.map((group) => ({ ...group, rows: [...group.rows].sort((a, b) => compare(a, b) * sort.dir) }));
   }, [groups, rows, columns, sort]);
-  const flat = useMemo(() => shownGroups.flatMap((group) => group.rows), [shownGroups]);
+  const flat = useMemo(() => shownGroups.flatMap((group) => (group.collapsed ? [] : group.rows)), [shownGroups]);
 
   // the glow plays once per change, then the row is plain again
   const [glow, setGlow] = useState<string | null>(null);
@@ -115,7 +116,7 @@ export function DataGrid<T>({
     }
   };
 
-  if (flat.length === 0) {
+  if (shownGroups.every((group) => group.rows.length === 0)) {
     return <div className={className}>{empty}</div>;
   }
 
@@ -125,11 +126,11 @@ export function DataGrid<T>({
       aria-label={aria["aria-label"]}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className={`desk-grid rounded-[12px] border border-border outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${className}`}
+      className={`desk-grid rounded-[12px] border border-border bg-surface/40 outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${className}`}
     >
       <div
         role="row"
-        className="sticky top-0 z-[1] grid border-b border-border bg-surface-2/95 backdrop-blur-sm"
+        className="sticky top-0 z-[1] grid rounded-t-[12px] border-b border-border bg-surface/95 backdrop-blur-sm"
         style={{ gridTemplateColumns: template }}
       >
         {columns.map((column) => {
@@ -137,8 +138,9 @@ export function DataGrid<T>({
           const head = (
             <span className={`flex items-center gap-1 ${column.align === "right" ? "justify-end" : column.align === "center" ? "justify-center" : ""}`}>
               {column.title}
+              {/* the arrow speaks for the sorted column only; the others show theirs on hover */}
               {column.sort ? (
-                <span aria-hidden className={`text-[10px] ${sorted ? "text-accent" : "text-muted/40"}`}>
+                <span aria-hidden className={`text-[10px] transition-opacity duration-[120ms] ${sorted ? "text-accent" : "text-muted opacity-0 group-hover:opacity-60"}`}>
                   {sorted === -1 ? "▼" : "▲"}
                 </span>
               ) : null}
@@ -154,7 +156,7 @@ export function DataGrid<T>({
               {column.sort ? (
                 <button
                   type="button"
-                  className="w-full text-left uppercase transition-colors duration-[120ms] hover:text-text"
+                  className="group w-full text-left uppercase transition-colors duration-[120ms] hover:text-text"
                   onClick={() =>
                     setSort((prev) => (prev?.key === column.key ? (prev.dir === 1 ? { key: column.key, dir: -1 } : null) : { key: column.key, dir: 1 }))
                   }
@@ -174,12 +176,31 @@ export function DataGrid<T>({
             <Fragment key={group.key}>
               {group.title ? (
                 <div role="row" className="flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3">
-                  {group.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
-                  <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{group.title}</span>
+                  {group.onToggle ? (
+                    <button
+                      type="button"
+                      aria-expanded={!group.collapsed}
+                      title={group.collapsed ? "Развернуть" : "Свернуть"}
+                      onClick={group.onToggle}
+                      data-testid="desk-group-toggle"
+                      className="-my-1 -ml-1 inline-flex items-center gap-2 rounded-[6px] py-1 pl-1 pr-1.5 text-muted transition-colors duration-[120ms] hover:text-text"
+                    >
+                      <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition-transform duration-[120ms] ${group.collapsed ? "-rotate-90" : ""}`}>
+                        <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      {group.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
+                      <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em]">{group.title}</span>
+                    </button>
+                  ) : (
+                    <>
+                      {group.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
+                      <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{group.title}</span>
+                    </>
+                  )}
                   <span className="nums text-[12px] leading-4 text-muted/70">{group.rows.length}</span>
                 </div>
               ) : null}
-              {group.rows.map((row) => {
+              {(group.collapsed ? [] : group.rows).map((row) => {
                 const key = rowKey(row);
                 const selected = key === selectedKey;
                 const tone = rowTone?.(row);
