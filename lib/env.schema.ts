@@ -39,6 +39,10 @@ export const serverEnvSchema = z.object({
   INTERNAL_FN_SECRET: optional,
   CRON_SECRET: optional,
 
+  // The developers' console (D-157): its own host, and the app's address for sign-in links from it
+  OPS_HOST: optional,
+  OPS_APP_ORIGIN: z.url().optional(),
+
   // Observability
   SENTRY_DSN: optional,
   NEXT_PUBLIC_SENTRY_DSN: optional,

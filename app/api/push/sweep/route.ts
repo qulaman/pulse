@@ -1,4 +1,5 @@
 import { apiError, apiOk } from "@/lib/api/respond";
+import { drainStorage } from "@/lib/ops/db";
 import { sweepDeliveries } from "@/lib/push/send";
 import { createServiceSupabase } from "@/lib/supabase/service";
 import { purgeVoice } from "@/lib/voice/retention";
@@ -6,7 +7,10 @@ import { purgeVoice } from "@/lib/voice/retention";
 /** One tick may drain a long queue (an announcement to the whole company); the platform allows a minute. */
 export const maxDuration = 60;
 
-type Service = ReturnType<typeof createServiceSupabase>;
+/** A hand on the sweep's minute: the queue itself gets the 40 seconds of `sweepDeliveries`. */
+const OPS_DRAIN_MS = 5_000;
+
+type Service =ReturnType<typeof createServiceSupabase>;
 type Tick =
   | "daily_reports_due_missed"
   | "recurrence_spawn"
@@ -81,6 +85,8 @@ export async function POST(req: Request) {
     // voice files past their term (D-155 §3): removed through Storage, then their paths cleared;
     // a failure is logged inside and the sweep goes on — what stayed comes again next time
     const voicePurged = await purgeVoice(service);
+    // files of wiped and removed companies (D-157); the same rule: logged, and the rest come again
+    const opsFiles = await drainStorage(service, OPS_DRAIN_MS);
     // the rows just queued go out on this very tick, not on the next one
     return apiOk({
       ...(await sweepDeliveries({ budgetMs: 40_000 })),
@@ -101,6 +107,7 @@ export async function POST(req: Request) {
       summaries,
       tv_pruned: tvPruned,
       voice_purged: voicePurged,
+      ops_files: opsFiles,
       digests,
       purged,
     });

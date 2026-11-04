@@ -6,6 +6,7 @@ import { MascotPower } from "@/components/brand/MascotPower";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { OutboxReplay } from "@/components/OutboxReplay";
 import { MediaReplay } from "@/components/MediaReplay";
+import { NotOnOps } from "@/components/NotOnOps";
 import { SessionWatch } from "@/components/auth/SessionWatch";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { PushSync } from "@/components/push/PushSync";
@@ -61,21 +62,24 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <QueryProvider>
           {children}
           <ToastHost />
-          <OfflineBanner />
-          {/* the phone knows whether it runs the server's build, and updates with one tap (D-115) */}
-          <AppUpdate />
-          <OutboxReplay />
-          {/* a voice message, a photo or a report with a photo kept without network goes by itself (D-130) */}
-          <MediaReplay />
-          <MascotPower />
-          {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}
-          <SecretaryAlarmGate />
-          {/* a request to the secretary kept without network goes by itself (D-106) */}
-          <ErrandReplay />
-          {/* the push channel re-registers itself and the icon keeps its number (D-114) */}
-          <PushSync />
-          {/* a sign-in taken away (all devices, a fired person) lands on the sign-in screen (D-135) */}
-          <SessionWatch />
+          {/* a company's day, not the developers' console (D-157) */}
+          <NotOnOps>
+            <OfflineBanner />
+            {/* the phone knows whether it runs the server's build, and updates with one tap (D-115) */}
+            <AppUpdate />
+            <OutboxReplay />
+            {/* a voice message, a photo or a report with a photo kept without network goes by itself (D-130) */}
+            <MediaReplay />
+            <MascotPower />
+            {/* «вызови охрану!» reaches a secretary on any screen (D-99) */}
+            <SecretaryAlarmGate />
+            {/* a request to the secretary kept without network goes by itself (D-106) */}
+            <ErrandReplay />
+            {/* the push channel re-registers itself and the icon keeps its number (D-114) */}
+            <PushSync />
+            {/* a sign-in taken away (all devices, a fired person) lands on the sign-in screen (D-135) */}
+            <SessionWatch />
+          </NotOnOps>
           {/* every tap ticks — one listener, no button codes it (D-147) */}
           <TapHaptics />
         </QueryProvider>

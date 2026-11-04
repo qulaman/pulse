@@ -97,7 +97,6 @@ async function tabs(ctx: Ctx) {
       record("настройки: выбранный пункт — линия акцента 2 px, без заливки акцентом", marked.line && !/46,\s*211,\s*183/.test(marked.fill), `${marked.fill}`);
     }
     await ctx.shot(`settings-${tab}`);
-    if (tab === "company") await demoReset(ctx);
     if (tab === "app") await unsaved(ctx);
   }
 
@@ -122,30 +121,6 @@ async function tabs(ctx: Ctx) {
   await page.getByTestId("desk-settings-panel-ai").getByTestId("settings-dictionary").click();
   await page.waitForURL((url) => url.pathname === "/desk/settings/dictionary", { timeout: 15_000 }).catch(() => {});
   record("настройки: «Открыть словарь» ведёт в десктопный словарь", new URL(page.url()).pathname === "/desk/settings/dictionary", page.url());
-}
-
-/** «Обнулить демо-базу»: at the foot of «Компания», its dialog opened and closed — never confirmed. */
-async function demoReset(ctx: Ctx) {
-  const { page } = ctx;
-  const panel = page.getByTestId("desk-settings-panel-company");
-  const button = panel.getByRole("button", { name: "Обнулить…" });
-  if ((await button.count()) === 0) {
-    record("настройки: «Обнулить демо-базу» внизу «Компании»", true, "не демо-сборка — строки нет");
-    return;
-  }
-  await button.scrollIntoViewIfNeeded();
-  await button.click();
-  const dialog = page.getByRole("dialog", { name: "Обнулить демо-базу" });
-  await dialog.waitFor({ timeout: 5_000 });
-  await page.waitForTimeout(300);
-  const locked = await page.getByRole("button", { name: "Стереть всё" }).isDisabled();
-  const box = await dialog.boundingBox();
-  const viewport = page.viewportSize();
-  const centred = Boolean(box && viewport && Math.abs(box.x + box.width / 2 - viewport.width / 2) < 4);
-  record("настройки: «Обнулить демо-базу» — диалог по центру, без слова не стирает", locked && centred, box ? `x=${Math.round(box.x)} w=${Math.round(box.width)}` : "нет");
-  await ctx.shot("settings-demo-reset");
-  await page.keyboard.press("Escape");
-  await dialog.waitFor({ state: "detached", timeout: 5_000 });
 }
 
 /** An edit lights the tab's dot, the row's accent line and the one save bar; «Отменить» takes it all back. */

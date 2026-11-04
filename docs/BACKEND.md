@@ -57,7 +57,6 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/tasks/:id/nudge` | POST | director | `{client_request_id}` → `nudge_task` (D-128); ответ `{too_soon, last_at, deliver_after}` — второй тап в течение 30 мин пуша не шлёт |
 | `/api/tasks/:id/delete` | POST | director | → `delete_task` (D-58) |
 | `/api/tasks/purge` | POST | director | → `purge_closed_tasks` (D-58) |
-| `/api/admin/reset-demo` | POST | director + `DEMO_RESET_ENABLED=1` на инстансе | `{confirm: "ОБНУЛИТЬ"}`; активность компании стирается, люди и настройки остаются (D-58, G.20a); иначе `403 demo_reset_disabled` |
 | `/api/errands` | POST | director | `{kind, note?, client_request_id, audio_path?, source_transcript?, inbox_item_id?, until_min?, due_at?}` → вставка `errands` под RLS; `label` берётся из `settings.secretary.actions`, неизвестный код — `400 unknown_kind`; `kind: "free"` — просьба своими словами (надпись — первые слова, D-99 §8); `urgent` сервер ставит сам по сцене `security`; `until_min` → `until_at`; `due_at` (ISO, минута — сутки вперёд, иначе `400 bad_due`) → «к 18:00» (D-106 §8); дубль ключа → `{errand, duplicate: true}` — строка первой просьбы (D-79, D-99, D-106 §2) |
 | `/api/visits` | POST | secretary | `{note?, client_request_id, kind?: 'visitor' \| 'message'}` → RPC `announce_visit`; пуш `visit_arrived` / `visit_message` директорам сразу (D-96, D-116); у сообщения `note` обязателен |
 | `/api/visits/:id/answer` | POST | director | `{answer: 'invited' \| 'wait' \| 'declined' \| 'read'}` → RPC `answer_visit`; «invited» включает гостя на час; `read` — «Понятно» на сообщение (D-116); пуш `visit_answered` автору сразу (D-96) |
@@ -96,6 +95,10 @@ userSupabase(req)                              // клиент с JWT вызыв
 | `/api/me` | GET | любая сессия | `{profile}` |
 | `/api/health` | GET | публичный | liveness `{ok, version, time}`, без БД |
 | `/api/version` | GET | публичный | сборка сервера `{id, sha, at, compat}` — с ней телефон сверяет свою (D-115); `no-store`, без БД |
+
+### Консоль разработчиков (D-157)
+
+`/api/ops/*` — вне компаний, контракт в `lib/ops/contract.ts` и `tasks/029-ops-console.md`. Обёртка `withOps` (`lib/ops/handler.ts`), а не `withAuth`: хост, `Origin` обязателен на записи, клиент на cookie консоли, zod, затем билет. Граница — в базе: чтения `ops_*` идут под JWT разработчика и начинаются с `ops.assert`, запись `ops_*` доступна только service role и гасит билет `ops_ticket`. Коды ошибок базы в ответы переводит `lib/ops/guard.ts`: `ops_denied` — 401, `ops_fresh_required` — 428. Клиент `opsFetch` на 428 сам спрашивает код и повторяет запрос с тем же `client_request_id`. Доступ выдаёт `pnpm ops:grant <email> [--revoke] [--reset-mfa]`.
 
 ## 2. Голосовой конвейер
 
@@ -375,7 +378,7 @@ pg_cron, pg_net и Edge Functions не подключены (G.20c). Единс�
 | `QUERY_MODEL` | — | объявлена в `.env.example`, код не читает |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Vercel | отдельные пары dev/prod; без ключей воркер не шлёт ничего |
 | `CRON_SECRET` | Vercel | Bearer минутного тика §10 |
-| `DEMO_RESET_ENABLED` / `NEXT_PUBLIC_DEMO_MODE` | только dev/демо | серверный замок и видимость кнопки «Обнулить демо-базу» (D-58); прод клиента их не ставит |
+| `OPS_HOST` / `OPS_APP_ORIGIN` | необязательны | хост консоли: с ним `/ops` и `/api/ops` отвечают только там; адрес приложения для ссылок входа из консоли (D-157) |
 | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` / `INTERNAL_FN_SECRET` / `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | — | объявлены в `.env.example`, код не использует (Telegram, Edge Functions и Sentry нет) |
 
 ## 12. Наблюдаемость

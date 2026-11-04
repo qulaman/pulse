@@ -23,19 +23,11 @@ import { resolve } from "node:path";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
+import { STARTER_SHOP } from "../lib/company/starter";
 import { suggestAliases } from "../lib/people/aliases";
 import { CompanySettingsSchema, SettingsPatchSchema } from "../lib/settings";
 
 const ROLES = ["director", "manager", "employee", "shopkeeper"] as const;
-
-// The starter shop (D-71): the rows 20260917160000_shop.sql gave the companies of its day, word
-// for word — a default of a new company, the director changes prices and items in the shop itself.
-const STARTER_SHOP = [
-  { title: "Брендовая куртка", description: "Тёплая куртка с логотипом компании", icon: "🧥", price: 200, stock: null, sort: 10 },
-  { title: "Брендовая безрукавка", description: "Жилет с логотипом компании", icon: "🦺", price: 500, stock: null, sort: 20 },
-  { title: "День отгула", description: "Оплачиваемый выходной по согласованию", icon: "🏖️", price: 1000, stock: null, sort: 30 },
-  { title: "Премия 50 000 ₸", description: "Разовая премия к зарплате", icon: "💰", price: 2000, stock: null, sort: 40 },
-];
 
 const PersonSchema = z.object({
   full_name: z.string().trim().min(2).max(120),

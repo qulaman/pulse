@@ -6,7 +6,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 
 import { TeamRoster } from "@/components/people/TeamRoster";
 import { CompanyForm } from "@/components/settings/CompanyForm";
-import { DemoReset } from "@/components/settings/DemoReset";
 import { SettingsDraftProvider, SettingsReady, useDirtySections } from "@/components/settings/draft";
 import { DirtyDot, SETTINGS_TAB_META, SETTINGS_THUMB, SettingsTiles } from "@/components/settings/SettingsTiles";
 import { ReportsIcon } from "@/components/daily-report/icons";
@@ -252,16 +251,6 @@ function AppPanel({ director }: { director: boolean }) {
           <MascotSection />
         </SettingsReady>
       </div>
-
-      {/* a demo instance only: the value is inlined at build time, a client's prod never sets it */}
-      {director && process.env.NEXT_PUBLIC_DEMO_MODE === "1" ? (
-        <>
-          <h2 className="eyebrow mt-6 px-1">Демо</h2>
-          <div className="mt-2">
-            <DemoReset />
-          </div>
-        </>
-      ) : null}
     </>
   );
 }

@@ -4,6 +4,8 @@ import { createServerClient } from "@supabase/ssr";
 import { isDesktopUa, VIEW_COOKIE, wantsPhoneView } from "@/lib/desk/device";
 import { deskHomeFor, deskRouteFor, mayHaveDeskRoute } from "@/lib/desk/routes";
 import { getPublicEnv } from "@/lib/env.public";
+import { isOpsHost, requestHost } from "@/lib/ops/guard";
+import { isOpsPath } from "@/lib/ops/paths";
 import { canManageTeam, homeForRole } from "@/lib/routes";
 import type { Database } from "@/lib/supabase/types";
 
@@ -27,7 +29,20 @@ function isPublicPath(pathname: string): boolean {
  * docs/FRONTEND.md "Навигация и роутинг".
  */
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // The console lives outside every company (D-157): its own session, its own sign-in.
+  if (isOpsPath(pathname)) {
+    const { opsProxy } = await import("@/lib/ops/proxy");
+    return opsProxy(request);
+  }
+
   let response = NextResponse.next({ request });
+
+  // The console's own address serves nothing but the console (only with OPS_HOST set).
+  if (process.env.OPS_HOST && isOpsHost(process.env.OPS_HOST, requestHost(request.headers))) {
+    return redirectTo(request, response, "/ops");
+  }
 
   const env = getPublicEnv();
   const supabase = createServerClient<Database>(
@@ -58,8 +73,6 @@ export async function proxy(request: NextRequest) {
   // to pay an Auth round trip for it (D-126).
   const { data } = await supabase.auth.getClaims();
   const userId = data?.claims.sub;
-
-  const { pathname } = request.nextUrl;
 
   if (!userId) {
     if (isPublicPath(pathname)) return response;

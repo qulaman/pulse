@@ -640,6 +640,10 @@ pg_cron и pg_net не подключены. Единственное распи
 
 Чистка голоса — шаг свипа, не SQL-тик (ниже, «Срок хранения голоса»). Повторы исполняет `recurrence_spawn` (D-148). Авто-очки и серия — не тик, а триггер на переходе задачи (D-133). Просрочка колонкой не помечается (вычислимое свойство, см. «Общие правила»), директору о ней говорит `overdue_alerts_due()`; «У кого канал мёртв» — не еженедельная проверка, а всегда: `push_health()` и `team_channel_alerts_due()` (D-114). Существующие шаги тика идемпотентны отметкой в самой строке — `events.reminded_at`, `errands.escalated_at`, `errands.due_reminded_at`, `notes.reminded_at`; отчёт — строкой `daily_reports`, уникальным ключом очков и `settings.daily_report.checked_on` (закрытый день не перепроверяется), его напоминание — `meta.date` доставки (D-152).
 
+## Схема `ops` — консоль разработчиков (D-157)
+
+Вне PostgREST, RLS включён, политик и грантов нет. `ops.operators` — кто разработчик; `ops.tickets` — одноразовые билеты на запись, 60 секунд; `ops.audit` — append-only журнал без FK, триггеры запрещают UPDATE, DELETE, TRUNCATE; `ops.company_requests` — заготовленные id для повтора создания; `ops.storage_queue` — файлы на снятие после коммита; `ops.exports` — выгрузки. `ops.assert(p_fresh_seconds)` — проверка разработчика, `ops.take` — погашение билета и тишина `pulse.ops_quiet`, `ops.log` — запись в журнал. Функции `public.ops_*`: чтения и `ops_ticket` — `authenticated`, запись — только `service_role`; права проверяет мета-тест в `supabase/tests/052_ops_console.test.sql`.
+
 ## Миграции — дисциплина
 
 - Имя: `YYYYMMDDHHMMSS_описание.sql`. **Одна миграция = одна фича.** Правка старых миграций запрещена; откат — новой миграцией. `create or replace function` в новой миграции несёт тело функции целиком.

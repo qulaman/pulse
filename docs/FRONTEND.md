@@ -47,6 +47,7 @@
 | `/settings` | director, secretary | `app/settings/layout.tsx` → `AdminShell`: директору — `DirectorShell` (как в группе), секретарю — её таб-бар (D-104) |
 | `/notes` | director | layout группы; лента заметок автора — только свои под RLS (D-75); `?tab=boards` — вкладка «Доски» |
 | `/notes/b/[id]` | director | layout группы; доска: пункты и подпункты голосом, «на стену», ведущий (D-102, D-121) |
+| `/ops`, `/ops/new`, `/ops/c/[id]`, `/ops/log`, `/ops/operators`, `/ops/login` | разработчик (`ops.operators`, вне компаний) | своя сессия и рамка, только компьютер; глобальные монтирования продукта здесь не работают (`components/NotOnOps.tsx`), данные не попадают в офлайн-копию (D-157) |
 | `/admin` | director | layout группы; таблицы компании только на чтение под RLS директора |
 | `/people`, `/people/[id]` | director (секретаря уводит: в «Сотрудники» и в редактор) | `app/people/layout.tsx` → `AdminShell`; страница проверяет роль сама (D-104) |
 | `/people/new`, `/people/[id]/edit` | director, secretary | `AdminShell` (`canManageTeam`); создание логина — `POST /api/people`, правка карточки — update `profiles` под RLS, вход — `/api/people/[id]/login-code` (D-135), `/api/people/[id]/password`, `/api/people/[id]/login` (D-104) |

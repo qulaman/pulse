@@ -1,10 +1,8 @@
 /**
  * Cleanup smoke in a real browser (system Chrome via Playwright): the director deletes
- * one order from its page, purges the closed ones on «Задачи», and — only with RESET=1 —
- * zeroes the demo database from Settings. Uses the demo accounts on dev and creates its
- * own «Cleanup smoke …» tasks; refuses to run while somebody else is active on dev
- * (FORCE=1 overrides). The reset wipes the whole company's activity: never run it with
- * RESET=1 while the owner is testing.
+ * one order from its page and purges the closed ones on «Задачи». Uses the demo accounts on
+ * dev and creates its own «Cleanup smoke …» tasks; refuses to run while somebody else is active
+ * on dev (FORCE=1 overrides).
  *   pnpm smoke:cleanup            (against http://localhost:3000, APP_URL to override)
  *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
  */
@@ -131,32 +129,6 @@ async function main() {
     const { count: closedLeft } = await director.supabase.from("tasks").select("id", { count: "exact", head: true }).in("status", ["done", "declined", "revoked"]);
     record("«Очистить закрытые»: закрытых задач не осталось", (closedLeft ?? 0) === 0, `${label.trim()} → closed left ${closedLeft ?? 0}`);
     await page.screenshot({ path: join(SHOTS, "c3-purged.png") });
-
-    // ---- the reset button (RESET=1 only: it wipes the whole company's activity) --------
-    await page.goto(`${APP_URL}/settings?tab=app`, { waitUntil: "networkidle" });
-    const resetButton = page.getByRole("button", { name: /^Обнулить/ });
-    const visible = await resetButton.isVisible().catch(() => false);
-    record("настройки: раздел «Демо» с кнопкой обнуления виден (NEXT_PUBLIC_DEMO_MODE=1)", visible);
-    if (visible && process.env.RESET === "1") {
-      await createTask(director, employee.userId, `Cleanup smoke reset ${stamp}`);
-      await resetButton.click();
-      const dialog = page.getByRole("dialog");
-      await dialog.waitFor({ timeout: 5_000 });
-      const wipe = dialog.getByRole("button", { name: "Стереть всё" });
-      record("обнуление: кнопка заперта, пока слово не введено", await wipe.isDisabled());
-      await dialog.getByLabel("Слово подтверждения").fill("обнулить");
-      await page.screenshot({ path: join(SHOTS, "c4-reset-sheet.png") });
-      await wipe.click();
-      await page.getByText(/^Стёр: /).waitFor({ timeout: 20_000 });
-      await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 10_000 });
-      const { count: tasksLeft } = await director.supabase.from("tasks").select("id", { count: "exact", head: true });
-      const { count: peopleLeft } = await director.supabase.from("profiles").select("id", { count: "exact", head: true });
-      record("обнуление: задач нет, люди на месте", (tasksLeft ?? 0) === 0 && (peopleLeft ?? 0) > 0, `tasks ${tasksLeft ?? 0}, people ${peopleLeft ?? 0}`);
-      await page.locator('[data-testid="assistant-line"]').first().waitFor({ timeout: 15_000 });
-      await page.screenshot({ path: join(SHOTS, "c5-after-reset.png") });
-    } else {
-      record("обнуление не запускалось (RESET=1 не задан)", true);
-    }
   } catch (error) {
     await page.screenshot({ path: join(SHOTS, "cX-failure.png") }).catch(() => undefined);
     record("smoke:cleanup", false, error instanceof Error ? error.message : String(error));

@@ -37,11 +37,13 @@ function isBuildFile(url) {
   return url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname === "/favicon.ico";
 }
 
-/** Screens worth keeping: the app's own pages — not the API, not the sign-in, not the sandboxes. */
+/** Screens worth keeping: the app's own pages — not the API, not the sign-in, not the sandboxes, not the console (D-157). */
 function isKeptScreen(url) {
   return (
     !url.pathname.startsWith("/api/") &&
     !url.pathname.startsWith("/dev") &&
+    url.pathname !== "/ops" &&
+    !url.pathname.startsWith("/ops/") &&
     url.pathname !== "/login" &&
     !url.pathname.startsWith("/c/") // a company's sign-in screen (D-135)
   );

@@ -146,7 +146,7 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   };
   const onTabs = pathname === "/desk/settings";
   const current = onTabs ? parseSettingsTab(params.get("tab") ?? undefined) : null;
-  const results = query.trim() ? searchSettings(query, { director, demo: process.env.NEXT_PUBLIC_DEMO_MODE === "1" }) : null;
+  const results = query.trim() ? searchSettings(query, { director }) : null;
 
   const pick = (entry: SettingEntry) => {
     setQuery("");

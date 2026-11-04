@@ -107,31 +107,6 @@ export function useCompanyTable(spec: TableSpec, page: number, size: number) {
   });
 }
 
-/* ---- the demo instance starts over (the phone's DemoReset, same route) --------------------- */
-
-/** The word that must be typed before the demo base is erased. */
-export const DEMO_RESET_WORD = "ОБНУЛИТЬ";
-
-/**
- * «Обнулить демо-базу»: every task, message, award and log of the company is gone, people and
- * settings stay. Rendered only on a demo build; the server refuses without DEMO_RESET_ENABLED=1.
- */
-export function useResetDemo() {
-  return useMutation({
-    mutationFn: async (): Promise<string> => {
-      const res = await fetch("/api/admin/reset-demo", {
-        method: "POST",
-        credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ confirm: DEMO_RESET_WORD }),
-      });
-      const body = (await res.json().catch(() => null)) as { message_ru?: string; error?: { message_ru?: string } } | null;
-      if (!res.ok) throw new Error(body?.error?.message_ru ?? "Не получилось обнулить");
-      return body?.message_ru ?? "Обнулил";
-    },
-  });
-}
-
 /* ---- «Лаборатория» (D-63): the model bench, the same route and cache entry as the phone's ---- */
 
 export type LabSettings = LabResponse["settings"];

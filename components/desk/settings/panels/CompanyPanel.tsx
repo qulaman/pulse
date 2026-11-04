@@ -3,7 +3,6 @@
 import { useRef, useState, type DragEvent } from "react";
 
 import { accentVerdict, normalAccent, useBrandDraft } from "@/components/desk/settings/brand";
-import { DemoResetButton } from "@/components/desk/settings/panels/DemoResetButton";
 import { SettingRow, SettingsGroup, TextInput, TimeInput } from "@/components/desk/settings/form";
 import { useDraft } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
@@ -94,7 +93,7 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
 
 /**
  * «Компания» on the desk: the company's card — name, tagline, logo, accent (D-44), with the
- * header as it will look — then the quiet hours of delivery, and the demo reset at the very end.
+ * header as it will look — then the quiet hours of delivery.
  */
 export function CompanyPanel({ director }: { director: boolean }) {
   const brand = useBrandDraft();
@@ -173,14 +172,6 @@ export function CompanyPanel({ director }: { director: boolean }) {
         </SettingRow>
       </SettingsGroup>
 
-      {/* a demo instance only: the value is inlined at build time, a client's prod never sets it */}
-      {director && process.env.NEXT_PUBLIC_DEMO_MODE === "1" ? (
-        <SettingsGroup id="demo" title="Демо">
-          <SettingRow id="demo-reset" label="Обнулить демо-базу" hint="Сотрёт все задачи, переписку, объявления, начисления, логи разбора и загруженные файлы компании. Люди и настройки останутся">
-            <DemoResetButton />
-          </SettingRow>
-        </SettingsGroup>
-      ) : null}
     </div>
   );
 }

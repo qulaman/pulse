@@ -62,6 +62,7 @@
   /shop                 # магазин (D-71)
   /tv                   # ТВ-режим (kiosk, D-76)
   /lab                  # лаборатория моделей и полка маскота /lab/mascot (D-63)
+  /ops                  # консоль разработчиков вне компаний: свой вход, реестр, журнал (D-157)
   /api                  # route handlers (voice, push, tasks, people, settings, company, errands, visits, lab...)
   /dev                  # страницы-песочницы компонентов (только dev)
 /components

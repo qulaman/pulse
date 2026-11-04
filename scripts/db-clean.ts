@@ -47,7 +47,12 @@ async function main() {
   console.log("wiping activity tables…");
   // children first — FKs without cascade
   await wipe("task_messages");
+  // both hold point_transactions without a cascade: they go before the points
+  await wipe("point_disputes");
+  await wipe("ether_events");
   await wipe("point_transactions");
+  // after the points: point_transactions.daily_report_id (D-152)
+  await wipe("daily_reports");
   await wipe("announcement_acks", "announcement_id");
   await wipe("announcements");
   await wipe("tasks");

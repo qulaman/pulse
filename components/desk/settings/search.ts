@@ -14,7 +14,6 @@ export type SettingEntry = {
   href?: string;
   words?: string;
   director?: boolean;
-  demo?: boolean;
 };
 
 export const SETTINGS_INDEX: SettingEntry[] = [
@@ -24,7 +23,6 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "brand-logo", tab: "company", place: "Компания", title: "Логотип", words: "лого картинка файл бренд" },
   { id: "brand-accent", tab: "company", place: "Компания", title: "Акцентный цвет", words: "цвет бренд акцент контраст" },
   { id: "window-hours", tab: "company", place: "Компания", title: "Тихие часы — когда доставлять уведомления", words: "пуш ночь утро уведомления доставка окно" },
-  { id: "demo-reset", tab: "company", place: "Компания", title: "Обнулить демо-базу", words: "стереть сбросить демо", director: true, demo: true },
   // Программа
   { id: "secretary-buttons", tab: "app", place: "Программа", title: "Кнопки секретаря", words: "кофе чай охрана врач заявки зайди" },
   { id: "secretary-phone", tab: "app", place: "Программа", title: "Телефон охраны", words: "тревога позвонить" },
@@ -67,10 +65,10 @@ export const SETTINGS_INDEX: SettingEntry[] = [
 const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").replace(/[«»"]/g, "");
 
 /** The entries a query finds — every word of it somewhere in the title, the place or the words; titles first. */
-export function searchSettings(query: string, options: { director: boolean; demo: boolean }): SettingEntry[] {
+export function searchSettings(query: string, options: { director: boolean }): SettingEntry[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
-  const allowed = SETTINGS_INDEX.filter((entry) => (!entry.director || options.director) && (!entry.demo || options.demo));
+  const allowed = SETTINGS_INDEX.filter((entry) => !entry.director || options.director);
   const scored = allowed
     .map((entry) => {
       const title = fold(entry.title);

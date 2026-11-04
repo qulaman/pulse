@@ -120,8 +120,9 @@ export const GET = withAuth("any", async ({ req, profile, params }) => {
     .limit(1)
     .maybeSingle();
 
+  // a code from the developers' console has no issuer among the people (D-157)
   let issuer: string | null = null;
-  if (last) {
+  if (last?.issued_by) {
     const { data } = await service.from("profiles").select("full_name").eq("id", last.issued_by).maybeSingle();
     issuer = data?.full_name ?? null;
   }
