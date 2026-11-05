@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 
 import { FormRow, INPUT } from "@/components/desk/team/fields";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -22,26 +22,32 @@ const OPEN_LINK = "btn-primary inline-flex h-9 items-center rounded-[11px] px-4 
 
 type Errors = Partial<Record<"name" | "slug" | "director" | "email" | "reason" | "form", string>>;
 
+/** The form's order, top to bottom. */
+const FIELD_OF = { name: "ops-name", slug: "ops-slug", director: "ops-director", email: "ops-email", reason: "ops-reason" } as const;
+
 function Group({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-2">
       <SectionLabel>{title}</SectionLabel>
-      <div className="rounded-[12px] border border-border bg-surface/40">{children}</div>
+      <div className="ops-box border">{children}</div>
     </section>
   );
 }
 
 /** After the press: the company stands, and the director's code is on screen this one time. */
 function Created({ name, created }: { name: string; created: CreateCompanyAnswer }) {
+  useEffect(() => {
+    document.getElementById("desk-main")?.scrollTo({ top: 0 });
+  }, []);
   return (
     <DeskPage width="narrow">
       <PageTitle title={name} state={{ text: `Компания создана, адрес /c/${created.slug}`, tone: "ok" }} light="ok" />
       {created.login ? (
-        <div className="rounded-[12px] border border-border bg-surface/40 px-5 py-4">
+        <div className="ops-box border px-4 py-4">
           <CodeShow login={created.login} />
         </div>
       ) : (
-        <EmptyState title="Код уже показывали" hint="Этот запрос уже выполнен, а код выдаётся один раз. Новый код директору выдаётся в разделе «Люди»." />
+        <EmptyState title="Код уже показывали" hint="Этот запрос уже выполнен, а код выдаётся один раз. Новый код: открой компанию, кнопка «Выдать код директору»." />
       )}
       <div>
         <Link href={`/ops/c/${created.company_id}`} className={OPEN_LINK} data-testid="ops-open-company">
@@ -72,6 +78,13 @@ export function NewCompany() {
   const create = useCreateCompany();
   const attemptId = useAttemptId();
   const slug = slugTyped ?? suggestSlug(name);
+  const form = useRef<HTMLFormElement>(null);
+
+  // the first thing to fix may be above the fold: the caret goes to it
+  useEffect(() => {
+    const first = (Object.keys(FIELD_OF) as (keyof typeof FIELD_OF)[]).find((key) => errors[key]);
+    if (first) form.current?.querySelector<HTMLElement>(`#${FIELD_OF[first]}`)?.focus();
+  }, [errors]);
 
   const check = (): Errors => {
     const found: Errors = {};
@@ -112,12 +125,22 @@ export function NewCompany() {
     }
   };
 
+  // the reason is the last field and most often one line: Ctrl+Enter from anywhere, Enter from it
+  const onKeyDown = (event: KeyboardEvent<HTMLFormElement>) => {
+    if (event.code !== "Enter" && event.code !== "NumpadEnter") return;
+    const inReason = (event.target as HTMLElement).id === "ops-reason" && !event.shiftKey;
+    if (event.ctrlKey || event.metaKey || inReason) {
+      event.preventDefault();
+      event.currentTarget.requestSubmit();
+    }
+  };
+
   if (created) return <Created name={created.name} created={created.answer} />;
 
   return (
     <DeskPage width="narrow">
       <PageTitle title="Новая компания" />
-      <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-5" noValidate data-testid="ops-new-company">
+      <form ref={form} onSubmit={(event) => void submit(event)} onKeyDown={onKeyDown} className="flex flex-col gap-5" noValidate data-testid="ops-new-company">
         <Group title="Компания">
           <FormRow label="Название" htmlFor="ops-name" error={errors.name}>
             <input id="ops-name" className={INPUT} value={name} autoFocus autoComplete="off" maxLength={120} onChange={(event) => setName(event.target.value)} data-testid="ops-new-name" />

@@ -7,6 +7,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { CodeForm } from "@/components/ops/login/CodeForm";
 import { authPost } from "@/components/ops/login/authPost";
 import { failureText } from "@/components/ops/shell/failure";
+import { takeReturnPath } from "@/components/ops/shell/returnPath";
 import { copyText } from "@/components/people/copy";
 import { QrCode } from "@/components/people/QrCode";
 import { Button } from "@/components/ui/Button";
@@ -19,14 +20,12 @@ const LABEL = "text-[13px] font-medium leading-5 text-muted";
 /** The sign-in's card: the mark over one step at a time; `wide` holds the QR beside its key. */
 export function LoginCard({ wide = false, children }: { wide?: boolean; children: ReactNode }) {
   return (
-    <div className={`flex w-full flex-col gap-6 ${wide ? "max-w-[560px]" : "max-w-[380px]"}`}>
-      <div className="flex items-center gap-3">
+    <div className={`flex w-full flex-col gap-4 ${wide ? "max-w-[560px]" : "max-w-[360px]"}`}>
+      <div className="flex items-center gap-2 px-0.5">
         <PulseMark />
-        <span className="eyebrow">Консоль</span>
+        <span className="ops-tag">Консоль</span>
       </div>
-      <div className="rounded-[16px] border border-border bg-surface p-5" style={{ boxShadow: "var(--shadow-raised)" }}>
-        {children}
-      </div>
+      <div className="rounded-[8px] border border-border bg-surface p-5">{children}</div>
     </div>
   );
 }
@@ -44,8 +43,8 @@ function LoginPage({ wide, children }: { wide?: boolean; children: ReactNode }) 
 function StepTitle({ title, hint }: { title: string; hint: string }) {
   return (
     <div className="mb-4">
-      <h1 className="font-display text-[20px] font-bold leading-[26px] tracking-[-0.02em]">{title}</h1>
-      <p className="mt-1 text-[14px] leading-5 text-muted">{hint}</p>
+      <h1 className="font-display text-[18px] font-bold leading-6 tracking-[-0.02em]">{title}</h1>
+      <p className="mt-1 text-[13px] leading-[18px] text-muted">{hint}</p>
     </div>
   );
 }
@@ -170,7 +169,7 @@ const CONSOLE_HOME = "/ops";
 
 /** A full load, not a route change: the router may still hold the redirect that brought us here. */
 function enterConsole() {
-  window.location.replace(CONSOLE_HOME);
+  window.location.replace(takeReturnPath(CONSOLE_HOME));
 }
 
 /**

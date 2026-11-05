@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 
-import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { TableBones } from "@/components/ops/shell/Bones";
 
 /** A field of a dialog: the words over the control, an error and a hint under it. */
 export function Field({ label, hint, error, children }: { label: ReactNode; hint?: ReactNode; error?: string | null; children: ReactNode }) {
@@ -42,11 +42,11 @@ export function Choice<V extends string>({
         return (
           <label
             key={item.value}
-            className={`flex cursor-pointer items-start gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-[120ms] ${on ? "border-accent/60 bg-surface-2/50" : "border-border hover:border-muted/50"}`}
+            className={`flex cursor-pointer items-start gap-2.5 rounded-[6px] border px-3 py-2 ${on ? "border-accent/60 bg-accent/5" : "border-border hover:border-muted/50"}`}
           >
-            <input type="radio" name={name} checked={on} onChange={() => onChange(item.value)} className="mt-[3px] h-3.5 w-3.5 shrink-0 accent-[var(--accent)]" />
+            <input type="radio" name={name} checked={on} onChange={() => onChange(item.value)} className="mt-[3px] h-3.5 w-3.5 shrink-0" />
             <span className="min-w-0">
-              <span className="block text-[14px] font-medium leading-5">{item.title}</span>
+              <span className="block text-[13px] font-medium leading-5">{item.title}</span>
               {item.hint ? <span className="block text-[12px] leading-4 text-muted">{item.hint}</span> : null}
             </span>
           </label>
@@ -59,9 +59,9 @@ export function Choice<V extends string>({
 /** Label and value side by side: a card read as facts. */
 export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 border-t border-border/60 px-4 py-2 first:border-t-0">
+    <div className="grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 border-t border-border/60 px-3 py-1.5 first:border-t-0">
       <dt className="text-[13px] leading-5 text-muted">{label}</dt>
-      <dd className="min-w-0 whitespace-pre-wrap break-words text-[14px] leading-5">{children}</dd>
+      <dd className="min-w-0 whitespace-pre-wrap break-words text-[13px] leading-5">{children}</dd>
     </div>
   );
 }
@@ -69,8 +69,10 @@ export function Fact({ label, children }: { label: string; children: ReactNode }
 /** A short list of what an action does: «Исчезнет» and «Останется» stand side by side. */
 export function Outcome({ title, tone, children }: { title: string; tone?: "danger"; children: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-[10px] border border-border bg-surface/40 px-3 py-2">
-      <p className={`text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] ${tone === "danger" ? "text-danger" : "text-muted"}`}>{title}</p>
+    <div className={`min-w-0 rounded-[6px] border border-border px-3 py-2 ${tone === "danger" ? "ops-outcome-danger" : ""}`}>
+      <p className="ops-label" style={tone === "danger" ? { color: "var(--danger)" } : undefined}>
+        {title}
+      </p>
       <ul className="no-bar mt-1.5 max-h-[220px] space-y-1 overflow-y-auto text-[13px] leading-[18px] text-text">{children}</ul>
     </div>
   );
@@ -87,12 +89,7 @@ export function OutcomeLine({ children, count }: { children: ReactNode; count?: 
 
 /** A panel of the card while its data lands. */
 export function PanelBones() {
-  return (
-    <SkeletonGroup grow>
-      <Bone h={36} w={320} className="rounded-[11px]" />
-      <Bone h={320} className="mt-4 rounded-[12px]" />
-    </SkeletonGroup>
-  );
+  return <TableBones rows={8} />;
 }
 
 /** A value taken once, when a dialog mounts: the id of one press, the same for each repeat of it. */

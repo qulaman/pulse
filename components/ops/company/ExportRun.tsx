@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CopyButton } from "@/components/desk/team/fields";
 import { Dialog } from "@/components/desk/ui/Dialog";
@@ -33,7 +33,7 @@ function RunningBody({ progress, onCancel }: { progress: ExportProgress | null; 
       ? `Таблицы: ${progress.tablesDone} из ${progress.tablesTotal}`
       : progress.stage === "files"
         ? `Файлы: ${formatNum(progress.filesDone)}`
-        : "Записываю манифест…";
+        : "Записываю опись…";
   return (
     <div className="flex flex-col gap-4" data-testid="ops-export-run">
       <p className="flex items-center gap-2 text-[14px] leading-5">
@@ -64,7 +64,7 @@ function DoneBody({ folder, result, onClose }: { folder: string; result: ExportR
         <OutcomeLine count={bytesText(result.totals.bytes)}>Объём файлов</OutcomeLine>
       </Outcome>
       <div className="flex flex-col gap-1">
-        <p className="text-[13px] font-medium leading-5 text-muted">Контрольная сумма манифеста</p>
+        <p className="text-[13px] font-medium leading-5 text-muted">Контрольная сумма описи</p>
         <div className="flex min-w-0 items-center gap-1">
           <span className="min-w-0 select-all break-all font-mono text-[12px] leading-4" data-testid="ops-export-sha">
             {result.sha256}
@@ -74,7 +74,8 @@ function DoneBody({ folder, result, onClose }: { folder: string; result: ExportR
       </div>
       <p className="text-[13px] leading-[18px] text-muted">С этого момента удаление компании открыто на 24 часа.</p>
       <div className="flex justify-end">
-        <Button size="sm" onClick={onClose} data-autofocus>
+        {/* this dialog opened on the run: its first focus is long spent */}
+        <Button size="sm" onClick={onClose} autoFocus>
           Готово
         </Button>
       </div>
@@ -90,7 +91,7 @@ function StoppedBody({ text, tone, onClose }: { text: string; tone?: "danger"; o
       </p>
       <p className="text-[13px] leading-[18px] text-muted">Что успело записаться, осталось в папке. Такая выгрузка не считается: удаление компании по ней не откроется.</p>
       <div className="flex justify-end">
-        <Button size="sm" onClick={onClose} data-autofocus>
+        <Button size="sm" onClick={onClose} autoFocus>
           Закрыть
         </Button>
       </div>
@@ -110,6 +111,15 @@ export function ExportRun({ card, folder, onClose }: { card: CompanyCard; folder
   const controller = useRef<AbortController | null>(null);
   // the action dialog closes itself after its submit, and that must not end the run it started
   const started = useRef(false);
+  const running = phase.kind === "run";
+
+  // a closed tab ends the run half-way: the browser asks first
+  useEffect(() => {
+    if (!running) return;
+    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", ask);
+    return () => window.removeEventListener("beforeunload", ask);
+  }, [running]);
 
   const run = async (answer: ExportStartAnswer) => {
     const control = new AbortController();
@@ -150,7 +160,6 @@ export function ExportRun({ card, folder, onClose }: { card: CompanyCard; folder
     );
   }
 
-  const running = phase.kind === "run";
   return (
     <Dialog open title={phase.kind === "done" ? "Выгрузка готова" : running ? "Выгрузка" : "Выгрузка не закончена"} width="sm" onClose={() => (running ? undefined : onClose())}>
       {phase.kind === "run" ? <RunningBody progress={phase.progress} onCancel={() => controller.current?.abort()} /> : null}

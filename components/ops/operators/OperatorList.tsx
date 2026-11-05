@@ -3,9 +3,9 @@
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
+import { TableBones } from "@/components/ops/shell/Bones";
 import { OpsFailure } from "@/components/ops/shell/failure";
 import { When } from "@/components/ops/shell/When";
-import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { whenAqtobe } from "@/lib/lab/format";
 import type { OperatorRow } from "@/lib/ops/contract";
 import { useOperators } from "@/lib/ops/queries";
@@ -16,7 +16,7 @@ const COLUMNS: Column<OperatorRow>[] = [
     title: "Почта",
     sort: (a, b) => (a.email ?? "").localeCompare(b.email ?? ""),
     render: (row) => (
-      <span className="block truncate font-medium" title={row.email ?? undefined}>
+      <span className="ops-data block truncate" title={row.email ?? undefined}>
         {row.email ?? "Без почты"}
       </span>
     ),
@@ -40,7 +40,10 @@ const COLUMNS: Column<OperatorRow>[] = [
       row.revoked_at ? (
         <span className="whitespace-nowrap text-[13px] text-muted">Отозван {whenAqtobe(row.revoked_at)}</span>
       ) : (
-        <span className="text-[13px] font-medium text-ok">Действует</span>
+        <span className="inline-flex items-center gap-1.5 text-[13px]">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-ok" />
+          Действует
+        </span>
       ),
   },
 ];
@@ -53,9 +56,7 @@ export function OperatorsView({ rows, loading, error, onRetry }: { rows: Operato
       {!rows && error ? (
         <OpsFailure error={error} onRetry={onRetry} />
       ) : loading ? (
-        <SkeletonGroup grow>
-          <Bone h={220} className="rounded-[12px]" />
-        </SkeletonGroup>
+        <TableBones rows={3} />
       ) : (
         <DataGrid
           aria-label="Разработчики"

@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { ShortcutsHelp, useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { PulseMark } from "@/components/brand/PulseMark";
 import { FreshPrompt } from "@/components/ops/FreshPrompt";
 import { failureText } from "@/components/ops/shell/failure";
+import { Jump, typingIn } from "@/components/ops/shell/Jump";
+import { keepReturnPath } from "@/components/ops/shell/returnPath";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { opsFetch } from "@/lib/ops/client";
@@ -41,12 +44,12 @@ function SectionLink({ section, active }: { section: Section; active: boolean })
       href={section.href}
       prefetch
       aria-current={active ? "page" : undefined}
-      className={`desk-focus relative flex h-9 w-full items-center gap-2.5 rounded-[10px] px-3 text-[14px] font-medium leading-5 transition-colors duration-[120ms] ${
-        active ? "bg-surface-2/60 text-text" : "text-muted hover:bg-surface-2/60 hover:text-text"
+      className={`desk-focus relative flex h-8 w-full items-center gap-2.5 rounded-[6px] px-2.5 text-[13px] font-medium leading-5 ${
+        active ? "bg-surface-2 text-text" : "text-muted hover:bg-surface-2/50 hover:text-text"
       }`}
     >
-      {active ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
-      <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={active ? "text-accent" : ""}>
+      {active ? <span aria-hidden className="absolute inset-y-1.5 left-0 w-[2px] bg-accent" /> : null}
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={active ? "text-accent" : ""}>
         <path d={section.icon} />
       </svg>
       <span className="min-w-0 flex-1 truncate">{section.label}</span>
@@ -58,16 +61,42 @@ function SectionLink({ section, active }: { section: Section; active: boolean })
  * The console's frame (D-157): a narrow column of sections with whoever is signed in at its foot,
  * the screen in `#desk-main` — the desk's own scroll and text selection, none of its shell: the
  * product's side navigation asks for a company this console does not have. Registers the prompt
- * for a fresh code.
+ * for a fresh code. A session that ends comes back to the same screen after the sign-in.
  */
 export function OpsFrame({ email, children }: { email: string; children: ReactNode }) {
   const pathname = usePathname();
   const [leaving, setLeaving] = useState(false);
+  const signingOut = useRef(false);
+
+  useShortcuts("Консоль", [
+    { keys: ["Ctrl K"], label: "Перейти к компании или разделу" },
+    { keys: ["/"], label: "Поиск на этом экране" },
+  ]);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== "Slash" || event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (typingIn(event.target) || document.body.hasAttribute("data-dialog-open")) return;
+      const field = document.querySelector<HTMLInputElement>("[data-ops-search] input");
+      if (!field) return;
+      event.preventDefault();
+      field.focus();
+      field.select();
+    };
+    const keep = () => keepReturnPath(signingOut.current ? null : window.location.pathname + window.location.search);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pagehide", keep);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pagehide", keep);
+    };
+  }, []);
 
   const logout = async () => {
     setLeaving(true);
     try {
       await opsFetch<{ ok: true }>("/api/ops/auth/logout", { method: "POST" });
+      signingOut.current = true;
       window.location.assign(OPS_LOGIN_PATH);
     } catch (failure) {
       setLeaving(false);
@@ -76,11 +105,14 @@ export function OpsFrame({ email, children }: { email: string; children: ReactNo
   };
 
   return (
-    <div className="grid h-dvh grid-cols-[200px_minmax(0,1fr)] overflow-hidden bg-bg" data-testid="ops-frame">
-      <nav aria-label="Разделы консоли" className="flex min-h-0 flex-col border-r border-border bg-surface/60 px-3 pb-3 pt-4">
-        <div className="mb-6 flex h-9 items-center gap-2 px-1">
+    <div className="grid h-dvh grid-cols-[192px_minmax(0,1fr)] overflow-hidden bg-bg" data-testid="ops-frame">
+      <nav aria-label="Разделы консоли" className="ops-frame-nav flex min-h-0 flex-col border-r border-border bg-surface/60 px-2.5 pb-2.5 pt-3.5">
+        <div className="mb-4 flex h-8 items-center gap-2 px-1.5">
           <PulseMark />
-          <span className="eyebrow">Консоль</span>
+          <span className="ops-tag">Консоль</span>
+        </div>
+        <div className="mb-2">
+          <Jump />
         </div>
         <ul className="flex min-h-0 flex-col gap-0.5">
           {SECTIONS.map((section) => (
@@ -89,11 +121,11 @@ export function OpsFrame({ email, children }: { email: string; children: ReactNo
             </li>
           ))}
         </ul>
-        <div className="mt-auto flex flex-col gap-1 border-t border-border pt-3">
-          <p className="truncate px-2 text-[13px] leading-5 text-muted" title={email} data-testid="ops-email">
+        <div className="mt-auto flex flex-col gap-1 border-t border-border pt-2.5">
+          <p className="ops-data truncate px-2.5 leading-5" title={email} data-testid="ops-email">
             {email}
           </p>
-          <Button size="sm" variant="ghost" className="justify-start !px-2" loading={leaving} onClick={() => void logout()} data-testid="ops-logout">
+          <Button size="sm" variant="ghost" className="w-full justify-start !px-2.5" loading={leaving} onClick={() => void logout()} data-testid="ops-logout">
             Выйти
           </Button>
         </div>
@@ -103,6 +135,7 @@ export function OpsFrame({ email, children }: { email: string; children: ReactNo
         {children}
       </main>
       <FreshPrompt />
+      <ShortcutsHelp />
     </div>
   );
 }

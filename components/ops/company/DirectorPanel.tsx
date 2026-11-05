@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { INPUT } from "@/components/desk/team/fields";
@@ -10,8 +11,9 @@ import { SettingGroup, SettingRow } from "@/components/desk/ui/SettingRow";
 import { Select } from "@/components/desk/ui/Toolbar";
 import { ActionDialog } from "@/components/ops/ActionDialog";
 import { CodeShow } from "@/components/ops/company/CodeShow";
+import { IssueCode } from "@/components/ops/company/IssueCode";
 import { Choice, Field, Outcome, OutcomeLine, useOnce } from "@/components/ops/company/shared";
-import { emailReady, roleText } from "@/components/ops/company/words";
+import { emailReady, firstName, roleText } from "@/components/ops/company/words";
 import { When } from "@/components/ops/shell/When";
 import { Button } from "@/components/ui/Button";
 import { newRequestId } from "@/lib/ops/client";
@@ -28,10 +30,16 @@ const FATES: { value: Fate; title: string; hint: string }[] = [
   { value: "keep", title: "Пока остаётся директором", hint: "В компании будет два директора. Подходит только на время передачи дел." },
 ];
 
+const FATE_SUMMARY: Record<Fate, string> = {
+  deactivate: "уходит из компании, вход закроется сразу",
+  demote: "остаётся сотрудником",
+  keep: "пока остаётся директором, их будет двое",
+};
+
 const count = (value: number, forms: [string, string, string]) => `${value} ${pluralRu(value, forms)}`;
 
 /** The result of a change: the moved numbers, and a way in when a new person was created. */
-function DoneDialog({ name, answer, onClose }: { name: string; answer: ChangeDirectorAnswer; onClose: () => void }) {
+function DoneDialog({ name, answer, person, onClose, onCode }: { name: string; answer: ChangeDirectorAnswer; person: CardPerson | null; onClose: () => void; onCode: (person: CardPerson) => void }) {
   const { moved } = answer;
   return (
     <Dialog open onClose={onClose} title="Директор сменён" width="md">
@@ -43,8 +51,14 @@ function DoneDialog({ name, answer, onClose }: { name: string; answer: ChangeDir
           <OutcomeLine count={moved.errands_cancelled}>Отменено заявок секретарю</OutcomeLine>
         </Outcome>
         {answer.login ? <CodeShow login={answer.login} /> : null}
-        <div className="flex justify-end">
-          <Button size="sm" onClick={onClose} data-autofocus>
+        <div className="flex justify-end gap-2">
+          {/* somebody of the company may have no way in yet, and a director without one is the next call */}
+          {!answer.login && person ? (
+            <Button size="sm" variant="secondary" onClick={() => onCode(person)} data-testid="ops-director-done-code">
+              Выдать код: {firstName(name)}
+            </Button>
+          ) : null}
+          <Button size="sm" onClick={onClose} data-autofocus={answer.login ? undefined : true}>
             Готово
           </Button>
         </div>
@@ -67,13 +81,15 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
 
   const badEmail = email.trim() !== "" && !emailReady(email);
   const successor = source === "people" ? newId !== "" : name.trim().length >= 2 && !badEmail;
+  const newName = source === "people" ? (candidates.find((person) => person.id === newId)?.full_name ?? "") : name.trim();
 
   return (
     <ActionDialog
       title={`Сменить директора · ${old.full_name}`}
       confirmLabel="Сменить директора"
       danger
-      disabled={!successor || fate === null}
+      width="lg"
+      waiting={!successor ? "Осталось выбрать нового директора" : fate === null ? "Осталось решить, что будет с прежним" : null}
       onClose={onClose}
       onSubmit={async (reason) => {
         if (fate === null) return;
@@ -86,10 +102,11 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
             ? { new_id: newId }
             : { new_person: { full_name: name.trim(), position: position.trim() || undefined, email: email.trim().toLowerCase() || undefined } }),
         });
-        onDone(source === "people" ? (candidates.find((person) => person.id === newId)?.full_name ?? "") : name.trim(), answer);
+        onDone(newName, answer);
       }}
     >
-      <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-2 gap-4">
+      <div className="flex min-w-0 flex-col gap-2">
         <p className="text-[13px] font-medium leading-5 text-muted">Кто становится директором</p>
         <Choice
           name="ops-successor"
@@ -117,7 +134,7 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <Field label="Имя и фамилия">
-              <input className={INPUT} value={name} data-autofocus autoComplete="off" maxLength={120} onChange={(event) => setName(event.target.value)} />
+              <input className={INPUT} value={name} data-autofocus autoFocus autoComplete="off" maxLength={120} onChange={(event) => setName(event.target.value)} />
             </Field>
             <Field label="Должность" hint="Необязательно">
               <input className={INPUT} value={position} autoComplete="off" maxLength={120} onChange={(event) => setPosition(event.target.value)} />
@@ -129,9 +146,10 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <p className="text-[13px] font-medium leading-5 text-muted">Что будет с прежним директором</p>
         <Choice name="ops-fate" label="Судьба прежнего директора" value={fate} onChange={setFate} items={FATES} />
+      </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3" data-testid="ops-director-preview">
@@ -151,6 +169,11 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
       <p className="text-[13px] leading-[18px] text-muted">
         Открытые заявки прежнего директора секретарю отменятся, его доски уйдут со стены. В переписке перенесённых задач появится служебная строка. Уведомлений никто не получит.
       </p>
+      {successor && fate ? (
+        <p className="text-[14px] font-medium leading-5" role="status" data-testid="ops-director-summary">
+          Директором станет {newName}. {old.full_name}: {FATE_SUMMARY[fate]}.
+        </p>
+      ) : null}
     </ActionDialog>
   );
 }
@@ -159,13 +182,23 @@ function ChangeDialog({ card, old, onClose, onDone }: { card: CompanyCard; old: 
 export function DirectorPanel({ card }: { card: CompanyCard }) {
   const [changing, setChanging] = useState<CardPerson | null>(null);
   const [done, setDone] = useState<{ name: string; answer: ChangeDirectorAnswer } | null>(null);
-  const directors = card.people.filter((person) => person.role === "director");
+  const [coding, setCoding] = useState<CardPerson | null>(null);
+  const directors = card.people.filter((person) => person.role === "director").sort((a, b) => Number(b.is_active) - Number(a.is_active));
+  const working = directors.filter((person) => person.is_active).length;
 
   return (
     <div className="flex max-w-[808px] flex-col gap-2" data-testid="ops-director">
       <SectionLabel count={directors.length}>Сейчас директор</SectionLabel>
       {directors.length === 0 ? (
-        <EmptyState title="Директора нет" hint="Сменить можно только действующего директора. Загляни в журнал: как компания осталась без него." />
+        <EmptyState
+          title="Директора нет"
+          hint="Сменить можно только действующего директора, назначить с нуля консоль пока не умеет. Посмотри в журнале, как компания осталась без него."
+          action={
+            <Link href={`/ops/log?company=${card.id}&action=change_director`} className="underline underline-offset-2">
+              Смены директора в журнале
+            </Link>
+          }
+        />
       ) : (
         <SettingGroup>
           {directors.map((person) => (
@@ -182,6 +215,11 @@ export function DirectorPanel({ card }: { card: CompanyCard }) {
                 </>
               }
             >
+              {person.is_active ? (
+                <Button size="sm" variant="secondary" onClick={() => setCoding(person)} data-testid="ops-director-issue">
+                  Выдать код
+                </Button>
+              ) : null}
               <Button size="sm" variant="secondary" onClick={() => setChanging(person)} data-testid="ops-director-change">
                 Сменить
               </Button>
@@ -189,9 +227,22 @@ export function DirectorPanel({ card }: { card: CompanyCard }) {
           ))}
         </SettingGroup>
       )}
+      {working > 1 ? <p className="text-[13px] leading-[18px] text-muted">Работают {working} директора. Так задумано только на время передачи дел: лишнего смени, выбрав ему судьбу.</p> : null}
 
       {changing ? <ChangeDialog card={card} old={changing} onClose={() => setChanging(null)} onDone={(name, answer) => setDone({ name, answer })} /> : null}
-      {done ? <DoneDialog name={done.name} answer={done.answer} onClose={() => setDone(null)} /> : null}
+      {done ? (
+        <DoneDialog
+          name={done.name}
+          answer={done.answer}
+          person={card.people.find((person) => person.id === done.answer.new_id) ?? null}
+          onClose={() => setDone(null)}
+          onCode={(person) => {
+            setDone(null);
+            setCoding(person);
+          }}
+        />
+      ) : null}
+      {coding ? <IssueCode companyId={card.id} person={coding} onClose={() => setCoding(null)} /> : null}
     </div>
   );
 }

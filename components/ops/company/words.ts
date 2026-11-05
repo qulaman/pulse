@@ -138,7 +138,7 @@ export const BUCKET_TEXT: Record<keyof Footprint["files"], string> = {
   brand: "Логотип и оформление",
 };
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+export const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The purge opens for 24 hours after a finished export; `at` is when the footprint was read. */
 export function exportFresh(footprint: Footprint, at: number): boolean {

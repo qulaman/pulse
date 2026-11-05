@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 
 import { newRequestId, opsFetch, OpsError } from "./client";
+import { LIVE_MS } from "./queries";
 import type {
   AddPersonAnswer,
   AddPersonBody,
@@ -53,14 +54,15 @@ export const footprintKey = (id: string) => [...companyKey(id), "footprint"] as 
 /** An answer of the server is final; only a lost one is worth asking again. */
 const retryLost = (count: number, error: unknown) => !(error instanceof OpsError) && count < 2;
 
-/** `enabled: false` after the purge: nobody is left to ask about. */
-export function useCompanyCard(id: string, enabled = true) {
+/** `enabled: false` after the purge: nobody is left to ask about. `live`: the card on screen keeps itself fresh. */
+export function useCompanyCard(id: string, enabled = true, live = false) {
   return useQuery({
     queryKey: companyCardKey(id),
     queryFn: () => opsFetch<CompanyCard>(`${API}/companies/${id}`),
     enabled,
     retry: retryLost,
     staleTime: 15_000,
+    refetchInterval: live && enabled ? LIVE_MS : false,
   });
 }
 

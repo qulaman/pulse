@@ -20,11 +20,15 @@ export function useMe() {
   return useQuery({ queryKey: opsKeys.me(), queryFn: () => opsFetch<MeAnswer>("/api/ops/me") });
 }
 
+/** A minute: the registry is what is watched while something burns; a hidden tab does not ask. */
+export const LIVE_MS = 60_000;
+
 export function useCompanies() {
   return useQuery({
     queryKey: opsKeys.companies(),
     queryFn: () => opsFetch<CompaniesAnswer>("/api/ops/companies"),
     select: (answer) => answer.companies,
+    refetchInterval: LIVE_MS,
   });
 }
 

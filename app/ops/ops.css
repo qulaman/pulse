@@ -1,0 +1,583 @@
+/*
+ * The developers' console (D-157): the product's dark tokens in a tool's register. One family with
+ * the phone (the same colours, Manrope for titles, Golos for reading) and a face of its own:
+ * hairlines instead of cards, a 6 px radius, flat controls, IBM Plex Mono for whatever a machine
+ * wrote (numbers, time, addresses, ids). Colour says a state and nothing else: a quiet row has
+ * none, a zero is grey, red is a failure or an act that cannot be undone. Nothing moves for looks.
+ *
+ * `data-ops` lands on <html> before the first paint (app/ops/layout.tsx) and comes off with the
+ * console. The console shares the desk's primitives (components/desk/ui), so they are tuned here
+ * through their hooks and never in their sources: the desk's sheet speaks its own language
+ * (app/desk/journal.css). Everything here is unlayered and so outranks Tailwind's utilities.
+ */
+html[data-surface="desk"][data-ops] {
+  --ops-mono: var(--font-plex-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --ops-radius: 6px;
+  --ops-radius-box: 8px;
+  --ops-hair: color-mix(in srgb, var(--border) 58%, transparent);
+  --ops-well: color-mix(in srgb, var(--bg) 62%, var(--surface));
+  --ops-text-2: color-mix(in srgb, var(--text) 72%, var(--text-muted));
+  --ops-ring: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--accent) 70%, transparent);
+  --ops-ring-danger: 0 0 0 2px var(--bg), 0 0 0 4px color-mix(in srgb, var(--danger) 70%, transparent);
+
+  & #desk-main {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* ---- voices ---------------------------------------------------------------------------- */
+  /* Plex Mono is loaded in 400 and 500: anything heavier would be a synthetic bold */
+  & .nums,
+  & .font-mono,
+  & .ops-data {
+    font-family: var(--ops-mono);
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+  & .ops-data {
+    font-size: 12.5px;
+    color: var(--ops-text-2);
+  }
+  /* h2's -0.02em (globals.css) wins over the label's own tracking otherwise */
+  & .desk-label,
+  & .ops-label {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  & .ops-tag {
+    padding: 0 5px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: var(--ops-mono);
+    font-size: 10.5px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* ---- the light of a state: a line for what asks for a look, nothing for calm --------------- */
+  & .desk-light[data-tone="ok"],
+  & .desk-light[data-tone="accent"],
+  & .desk-light[data-tone="muted"],
+  & .desk-light[data-tone="none"] {
+    display: none;
+  }
+  & .desk-light-layer {
+    transition: none;
+    background: linear-gradient(90deg, var(--light) 0%, transparent 70%) top left / 100% 2px no-repeat;
+  }
+
+  /* ---- the screen's head ------------------------------------------------------------------- */
+  & .desk-page {
+    gap: 16px;
+    padding-top: 20px;
+  }
+  & .desk-page-title {
+    align-items: center;
+    min-height: 32px;
+  }
+  & .desk-page-title h1 {
+    font-size: 22px;
+    line-height: 28px;
+    letter-spacing: -0.02em;
+  }
+  & .desk-page-title p {
+    margin-top: 2px;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 18px;
+  }
+
+  /* ---- the numbers of a company: one strip of cells, read left to right ----------------------- */
+  & .ops-stats {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 1px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--ops-radius-box);
+    background: var(--border);
+  }
+  & .ops-stat {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px 9px;
+    background: var(--surface);
+  }
+  & .ops-stat-label {
+    overflow: hidden;
+    font-size: 11.5px;
+    line-height: 16px;
+    color: var(--text-muted);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .ops-stat-value {
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 22px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  & .ops-stat[data-quiet] .ops-stat-value {
+    font-weight: 400;
+    color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+  }
+  & .ops-stat[data-tone="warn"] {
+    background: color-mix(in srgb, var(--warn) 7%, var(--surface));
+  }
+  & .ops-stat[data-tone="danger"] {
+    background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  }
+  @media (max-width: 1279px) {
+    & .ops-stats {
+      grid-auto-flow: row;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  /* ---- the card's sections: tabs on a line, not pills ----------------------------------------- */
+  & .seg {
+    display: flex;
+    height: auto;
+    gap: 2px;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    background: none;
+  }
+  & .seg > button {
+    height: 34px;
+    margin-bottom: -1px;
+    padding-inline: 12px;
+    border-radius: var(--ops-radius) var(--ops-radius) 0 0;
+    border-bottom: 2px solid transparent;
+    transition: color 100ms var(--ease-out);
+  }
+  & .seg > button:hover {
+    border-bottom-color: var(--border);
+  }
+  & .seg > .seg-thumb,
+  & .seg > .seg-thumb:hover {
+    background: none;
+    box-shadow: none;
+    border-bottom-color: var(--accent);
+  }
+  & .seg > button:focus-visible {
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent);
+  }
+
+  /* ---- buttons: flat, one height with the fields, no press scale ------------------------------ */
+  & [class*="min-h-[36px]"],
+  & .btn-primary {
+    min-height: 32px;
+    height: 32px;
+    padding-inline: 12px;
+    border-radius: var(--ops-radius);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    letter-spacing: 0;
+    scale: none;
+    transition: background-color 100ms var(--ease-out), border-color 100ms var(--ease-out), color 100ms var(--ease-out);
+  }
+  & [class*="min-h-[36px]"]:focus-visible,
+  & .btn-primary:focus-visible {
+    outline: none;
+    box-shadow: var(--ops-ring);
+  }
+  & .btn-primary {
+    background: var(--accent);
+    box-shadow: none;
+    color: var(--bg);
+  }
+  & .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 84%, white);
+    box-shadow: none;
+  }
+  & .btn-primary:disabled {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    opacity: 1;
+  }
+  & .btn-secondary {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    box-shadow: none;
+  }
+  & .btn-secondary:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--text-muted) 60%, var(--border));
+    background: color-mix(in srgb, var(--surface-2) 82%, white);
+  }
+  & .btn-secondary:disabled {
+    background: none;
+    color: var(--text-muted);
+    opacity: 1;
+  }
+  & .ops-frame-nav [class*="min-h-[36px]"].bg-transparent,
+  & .desk-dialog [class*="min-h-[36px]"].bg-transparent:not([class*="border-danger"]) {
+    color: var(--text-muted);
+  }
+  & [class*="min-h-[36px]"].bg-transparent:not([class*="border-danger"]):hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  /* an act that cannot be undone weighs more than its neighbours, and more still at the last step */
+  & button[class*="border-danger"] {
+    border: 1px solid color-mix(in srgb, var(--danger) 60%, transparent);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+    color: var(--danger);
+  }
+  & button[class*="border-danger"]:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--danger) 22%, transparent);
+  }
+  & button[class*="border-danger"]:focus-visible {
+    box-shadow: var(--ops-ring-danger);
+  }
+  & button[class*="border-danger"]:disabled {
+    border-style: dashed;
+    border-color: color-mix(in srgb, var(--danger) 34%, var(--border));
+    background: none;
+    color: color-mix(in srgb, var(--danger) 58%, var(--text-muted));
+    opacity: 1;
+  }
+  & .desk-dialog button[type="submit"][class*="border-danger"]:not(:disabled) {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: var(--bg);
+  }
+  & .desk-dialog button[type="submit"][class*="border-danger"]:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--danger) 84%, white);
+    background: color-mix(in srgb, var(--danger) 84%, white);
+  }
+
+  /* ---- fields: wells in the surface ----------------------------------------------------------- */
+  & .field {
+    border-radius: var(--ops-radius);
+    background-color: var(--ops-well);
+    font-size: 13px;
+    transition: border-color 100ms var(--ease-out);
+  }
+  & .field input {
+    font-size: 13px;
+  }
+  & .field.h-9 {
+    height: 32px;
+  }
+  & select.field {
+    background-position: right 8px center;
+    padding-right: 30px;
+  }
+  & .field:hover:not(:focus, :focus-within) {
+    border-color: color-mix(in srgb, var(--text-muted) 55%, var(--border));
+  }
+  & .field:focus,
+  & .field:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  & .field::placeholder {
+    color: color-mix(in srgb, var(--text-muted) 62%, transparent);
+  }
+  & .field[readonly]:not(:focus) {
+    background: none;
+    color: var(--text-muted);
+  }
+  & input[type="radio"] {
+    appearance: none;
+    margin: 3px 0 0;
+    border: 1px solid var(--text-muted);
+    border-radius: 50%;
+    background: none;
+  }
+  & input[type="radio"]:checked {
+    border: 4px solid var(--accent);
+    background: var(--bg);
+  }
+  & input[type="checkbox"] {
+    appearance: none;
+    height: 14px;
+    width: 14px;
+    flex-shrink: 0;
+    border: 1px solid var(--text-muted);
+    border-radius: 3px;
+    background: none;
+  }
+  /* the mark is a data URI, so its colour mirrors --bg by hand (same as the select's chevron) */
+  & input[type="checkbox"]:checked {
+    border-color: var(--accent);
+    background: var(--accent) url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%230B0F14' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 6.2 2.4 2.4 4.6-5'/%3E%3C/svg%3E") center / 12px no-repeat;
+  }
+  & input[type="checkbox"]:focus-visible,
+  & input[type="radio"]:focus-visible {
+    outline: none;
+    box-shadow: var(--ops-ring);
+  }
+
+  /* a number or an id reads better in the machine's voice, a sentence never does */
+  & input[data-testid="ops-task-id"],
+  & [data-testid="ops-new-slug"] {
+    font-family: var(--ops-mono);
+  }
+  & [data-testid="ops-code-left"] {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+  }
+  & .ops-frame-nav .ops-data {
+    color: var(--text-muted);
+  }
+  & .shrink-0[class*="rounded-[12px]"] {
+    border-radius: var(--ops-radius-box);
+  }
+
+  /* ---- tables --------------------------------------------------------------------------------- */
+  & .desk-grid,
+  & .ops-box {
+    border-radius: var(--ops-radius-box);
+    border-color: var(--border);
+    background: color-mix(in srgb, var(--surface) 46%, transparent);
+  }
+  & .desk-grid:focus-visible {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  & .desk-grid > [role="row"]:first-child,
+  & .ops-table-head {
+    border-radius: 7px 7px 0 0;
+    background: var(--surface);
+    backdrop-filter: none;
+  }
+  & [role="columnheader"],
+  & .ops-table-head {
+    font-size: 11px;
+    line-height: 16px;
+    letter-spacing: 0.06em;
+  }
+  & [role="columnheader"] {
+    padding-block: 6px;
+    white-space: nowrap;
+  }
+  /* the sort arrow lives in the cell's padding: a right-aligned title stands over its numbers */
+  & [role="columnheader"] .justify-end {
+    position: relative;
+  }
+  & [role="columnheader"] .justify-end > [aria-hidden] {
+    position: absolute;
+    left: 100%;
+    margin-left: 2px;
+  }
+  & .desk-row {
+    min-height: 34px;
+    border-color: var(--ops-hair);
+    transition: none;
+  }
+  & .desk-row:hover {
+    background: color-mix(in srgb, var(--surface-2) 48%, transparent);
+  }
+  & .desk-row[aria-selected="true"] {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent);
+  }
+  /* the state strip runs the row's full height, flush with the table's edge */
+  & [role="row"].desk-row > span[aria-hidden]:first-child {
+    inset-block: 0;
+    width: 2px;
+    border-radius: 0;
+  }
+  & [role="gridcell"] {
+    padding-block: 5px;
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--ops-text-2);
+  }
+  & [role="gridcell"]:first-of-type {
+    color: var(--text);
+  }
+  & .desk-row .nums {
+    font-size: 12.5px;
+  }
+  & [role="gridcell"]:first-of-type .ops-data:not(.ops-sub) {
+    font-size: 13px;
+    color: var(--text);
+  }
+  & .ops-sub {
+    font-size: 11.5px;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  /* «исчезнет» is the rule on this screen, not the news: a mark, not forty red words */
+  & .ops-wipe {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  & .ops-wipe[data-gone] {
+    color: var(--ops-text-2);
+  }
+  & .ops-wipe[data-gone]::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+  @media (max-width: 1180px) {
+    & [role="columnheader"],
+    & [role="gridcell"] {
+      padding-inline: 8px;
+    }
+  }
+  /* a row that opens something says so under the mouse */
+  & .desk-grid[aria-label="Компании"] .desk-row {
+    cursor: pointer;
+  }
+  & .ops-menu-button {
+    display: flex;
+    height: 26px;
+    width: 26px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--ops-radius);
+    font-size: 16px;
+    line-height: 1;
+    color: var(--text-muted);
+  }
+  & .ops-menu-button:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  & .ops-menu-button:focus-visible {
+    outline: none;
+    box-shadow: var(--ops-ring);
+  }
+
+  /* ---- groups of settings, forms, empty lines -------------------------------------------------- */
+  & [class*="[&>*+*]:border-t"] {
+    border-radius: var(--ops-radius-box);
+    background: color-mix(in srgb, var(--surface) 46%, transparent);
+  }
+  & [class*="[&>*+*]:border-t"] > div {
+    padding: 8px 12px;
+  }
+  & [class*="[&>*+*]:border-t"] .min-h-9 {
+    min-height: 32px;
+  }
+  & [class*="[&>*+*]:border-t"] [class*="text-[14px]"] {
+    font-size: 13px;
+  }
+  & .desk-form-row {
+    padding-block: 8px;
+    border-color: var(--ops-hair);
+  }
+  & .desk-form-row > label,
+  & .desk-form-row > span {
+    padding-top: 6px;
+  }
+  & [data-testid="desk-empty"] {
+    gap: 0;
+    padding: 14px 16px;
+    border-radius: var(--ops-radius-box);
+    border-color: var(--ops-hair);
+    background: none;
+  }
+  & [data-testid="desk-empty"] > span[aria-hidden]:first-child {
+    display: none;
+  }
+  & [data-testid="desk-empty"] > div > p:first-child {
+    font-size: 14px;
+    line-height: 20px;
+  }
+  & [data-testid="desk-empty"] > div > p:nth-child(2) {
+    margin-top: 0;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  & .ops-failure [data-testid="desk-empty"] {
+    border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+    background: color-mix(in srgb, var(--danger) 6%, transparent);
+  }
+  & .ops-failure [data-testid="desk-empty"] > div > p:first-child {
+    color: var(--danger);
+  }
+
+  /* files still waiting to leave the storage: not a failure, but it will not finish by itself */
+  & [data-testid="ops-drain"] {
+    border-color: color-mix(in srgb, var(--warn) 45%, var(--border));
+  }
+  /* an action that cannot be undone sits on its own red edge, apart from the ones that can */
+  & .ops-action[data-danger] {
+    background: color-mix(in srgb, var(--danger) 5%, transparent);
+    box-shadow: inset 2px 0 0 var(--danger);
+  }
+
+  /* ---- codes ----------------------------------------------------------------------------------- */
+  & input[data-testid="ops-code"] {
+    font-weight: 500;
+    letter-spacing: 0.32em;
+  }
+  & [data-testid="ops-code-value"] {
+    font-size: 28px;
+    font-weight: 500;
+    line-height: 34px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
+  /* a toast keeps off the numbers at the top of a screen: the window's corner, the top one too */
+  & .fixed.inset-x-0[class*="z-[60]"] {
+    inset: auto 16px 16px auto !important;
+    width: min(440px, calc(100vw - 32px));
+    align-items: flex-end;
+    padding-inline: 0;
+    translate: none;
+  }
+
+  /* ---- dialogs and menus ----------------------------------------------------------------------- */
+  & .desk-dialog {
+    padding: 18px 20px 20px;
+    border-radius: 10px;
+  }
+  & .desk-dialog > h2 {
+    margin-bottom: 10px;
+    font-size: 16px;
+    line-height: 22px;
+    letter-spacing: -0.01em;
+  }
+  /* what cannot be undone is marked before a word is read */
+  & .desk-dialog:has([data-danger]) {
+    border-top: 3px solid var(--danger);
+    padding-top: 16px;
+  }
+  & .ops-outcome-danger {
+    border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+    background: color-mix(in srgb, var(--danger) 7%, transparent);
+  }
+  & .ops-confirm-name:focus {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 1px var(--danger);
+  }
+  /* the one thing the code screen is for */
+  & .ops-once {
+    padding: 8px 12px;
+    border-left: 2px solid var(--warn);
+    background: color-mix(in srgb, var(--warn) 8%, transparent);
+    color: var(--text);
+  }
+  & [data-testid="desk-menu"] button {
+    font-size: 13px;
+  }
+}

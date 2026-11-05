@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { INPUT } from "@/components/desk/team/fields";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
+import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Num } from "@/components/desk/ui/Num";
 import { Switch } from "@/components/desk/ui/SettingRow";
-import { SearchField, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { ActionDialog } from "@/components/ops/ActionDialog";
 import { CodeDialog } from "@/components/ops/company/CodeShow";
+import { IssueCode } from "@/components/ops/company/IssueCode";
 import { Field, useOnce } from "@/components/ops/company/shared";
 import { emailReady, firstName, roleText } from "@/components/ops/company/words";
+import { focusGrid, GridSearch, useUrlText } from "@/components/ops/shell/GridSearch";
 import { When } from "@/components/ops/shell/When";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -25,7 +29,7 @@ type OpsRole = (typeof OPS_PERSON_ROLES)[number];
 type PersonAction = "code" | "sessions" | "edit" | "points";
 type Open = { action: PersonAction; person: CardPerson } | { action: "add" } | null;
 
-const MENU_BUTTON = "flex h-8 w-8 items-center justify-center rounded-[10px] text-[18px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text";
+const MENU_BUTTON = "ops-menu-button";
 
 /** The base refuses these: a director changes through «Директор» (their name only here), a screen stays a screen. */
 const roleLocked = (person: CardPerson) => person.role === "director" || person.role === "tv";
@@ -35,42 +39,26 @@ function byTime(a: string | null, b: string | null): number {
   return (a ?? "").localeCompare(b ?? "");
 }
 
-function IssueCodeDialog({ companyId, person, onClose, onIssued }: { companyId: string; person: CardPerson; onClose: () => void; onIssued: (login: IssuedCode | null) => void }) {
-  const requestId = useOnce(newRequestId);
-  const issue = useIssueCode();
-  return (
-    <ActionDialog
-      title={`Выдать код · ${person.full_name}`}
-      description="Восемь цифр на 15 минут, один вход. Прежний код, если он был, перестанет работать. Код будет показан один раз."
-      confirmLabel="Выдать код"
-      onClose={onClose}
-      onSubmit={async (reason) => {
-        const answer = await issue.mutateAsync({ personId: person.id, body: { reason, client_request_id: requestId, company_id: companyId } });
-        onIssued(answer.login);
-      }}
-    />
-  );
-}
-
-function RevokeDialog({ companyId, person, onClose }: { companyId: string; person: CardPerson; onClose: () => void }) {
+function RevokeDialog({ companyId, person, onClose, onDone }: { companyId: string; person: CardPerson; onClose: () => void; onDone: (id: string) => void }) {
   const requestId = useOnce(newRequestId);
   const revoke = useRevokeSessions();
   return (
     <ActionDialog
-      title={`Сбросить сессии · ${person.full_name}`}
-      description={`Вход закроется сразу на всех телефонах и компьютерах (сейчас входов ${person.sessions}, устройств с уведомлениями ${person.devices}), уведомления на них перестанут приходить. Задачи и история останутся. Войти снова можно по новому коду.`}
-      confirmLabel="Сбросить сессии"
+      title={`Закрыть все входы · ${person.full_name}`}
+      description={`Человек выйдет сразу на всех телефонах и компьютерах (сейчас входов ${person.sessions}, устройств с уведомлениями ${person.devices}), уведомления на них перестанут приходить. Задачи и история останутся. Войти снова можно по новому коду.`}
+      confirmLabel="Закрыть все входы"
       danger
       onClose={onClose}
       onSubmit={async (reason) => {
         const answer = await revoke.mutateAsync({ personId: person.id, body: { reason, client_request_id: requestId, company_id: companyId } });
         toast(`Входов закрыто: ${answer.sessions}, устройств: ${answer.devices}`);
+        onDone(person.id);
       }}
     />
   );
 }
 
-function EditDialog({ companyId, person, onClose }: { companyId: string; person: CardPerson; onClose: () => void }) {
+function EditDialog({ companyId, person, onClose, onDone }: { companyId: string; person: CardPerson; onClose: () => void; onDone: (id: string) => void }) {
   const requestId = useOnce(newRequestId);
   const update = useUpdatePerson();
   const [name, setName] = useState(person.full_name);
@@ -89,11 +77,12 @@ function EditDialog({ companyId, person, onClose }: { companyId: string; person:
     <ActionDialog
       title={`Изменить · ${person.full_name}`}
       confirmLabel="Сохранить"
-      disabled={Object.keys(patch).length === 0 || name.trim().length < 2}
+      waiting={name.trim().length < 2 ? "Осталось вписать имя" : Object.keys(patch).length === 0 ? "Изменений пока нет" : null}
       onClose={onClose}
       onSubmit={async (reason) => {
         await update.mutateAsync({ personId: person.id, body: { ...patch, reason, client_request_id: requestId, company_id: companyId } });
-        toast("Сохранил");
+        toast(`${firstName(name)}: сохранено`);
+        onDone(person.id);
       }}
     >
       <Field label="Имя и фамилия">
@@ -135,7 +124,7 @@ function parseAmount(text: string): number | null {
   return value !== 0 && Math.abs(value) <= 100_000 ? value : null;
 }
 
-function PointsDialog({ companyId, person, onClose }: { companyId: string; person: CardPerson; onClose: () => void }) {
+function PointsDialog({ companyId, person, onClose, onDone }: { companyId: string; person: CardPerson; onClose: () => void; onDone: (id: string) => void }) {
   const requestId = useOnce(newRequestId);
   const adjust = useAdjustPoints();
   const [text, setText] = useState("");
@@ -143,15 +132,16 @@ function PointsDialog({ companyId, person, onClose }: { companyId: string; perso
 
   return (
     <ActionDialog
-      title={`Очки · ${person.full_name}`}
+      title={`Поправить очки · ${person.full_name}`}
       description="Новая строка в истории очков, прежние не меняются. Человеку уведомление не придёт."
-      confirmLabel="Начислить"
-      disabled={amount === null}
+      confirmLabel={amount !== null && amount < 0 ? "Списать" : "Начислить"}
+      waiting={amount === null ? "Осталось указать, сколько" : null}
       onClose={onClose}
       onSubmit={async (reason) => {
         if (amount === null) return;
         const answer = await adjust.mutateAsync({ personId: person.id, body: { amount, reason, client_request_id: requestId, company_id: companyId } });
         toast(`${firstName(person.full_name)}: теперь ${formatNum(answer.balance)}`);
+        onDone(person.id);
       }}
     >
       <Field
@@ -173,19 +163,29 @@ function PointsDialog({ companyId, person, onClose }: { companyId: string; perso
 
 function AddDialog({ companyId, onClose, onAdded }: { companyId: string; onClose: () => void; onAdded: (id: string, name: string) => void }) {
   const requestId = useOnce(newRequestId);
+  const codeId = useOnce(newRequestId);
   const add = useAddPerson(companyId);
+  const issue = useIssueCode();
+  const [withCode, setWithCode] = useState(true);
+  const [login, setLogin] = useState<IssuedCode | null>(null);
+  // the action dialog closes itself after its submit, and the code must outlive that
+  const issued = useRef(false);
   const [name, setName] = useState("");
   const [role, setRole] = useState<OpsRole>("employee");
   const [position, setPosition] = useState("");
   const [email, setEmail] = useState("");
   const badEmail = email.trim() !== "" && !emailReady(email);
 
+  if (login) return <CodeDialog login={login} onClose={onClose} />;
+
   return (
     <ActionDialog
       title="Добавить человека"
-      confirmLabel="Добавить"
-      disabled={name.trim().length < 2 || badEmail}
-      onClose={onClose}
+      confirmLabel={withCode ? "Добавить и выдать код" : "Добавить"}
+      waiting={name.trim().length < 2 ? "Осталось вписать имя" : badEmail ? "Проверь почту" : null}
+      onClose={() => {
+        if (!issued.current) onClose();
+      }}
       onSubmit={async (reason) => {
         const fullName = name.trim();
         const answer = await add.mutateAsync({
@@ -197,6 +197,12 @@ function AddDialog({ companyId, onClose, onAdded }: { companyId: string; onClose
           client_request_id: requestId,
         });
         onAdded(answer.user_id, fullName);
+        if (!withCode) return;
+        const code = await issue.mutateAsync({ personId: answer.user_id, body: { reason, client_request_id: codeId, company_id: companyId } });
+        if (code.login) {
+          issued.current = true;
+          setLogin(code.login);
+        }
       }}
     >
       <Field label="Имя и фамилия">
@@ -219,31 +225,81 @@ function AddDialog({ companyId, onClose, onAdded }: { companyId: string; onClose
       <Field label="Почта" hint="Необязательно: без неё человек входит по коду." error={badEmail ? "Похоже, в почте опечатка" : null}>
         <input type="email" className={INPUT} value={email} autoComplete="off" autoCapitalize="none" spellCheck={false} onChange={(event) => setEmail(event.target.value)} />
       </Field>
+      <label className="flex cursor-pointer items-center gap-2.5 text-[13px] leading-5" data-testid="ops-add-code">
+        <input type="checkbox" checked={withCode} onChange={(event) => setWithCode(event.target.checked)} className="h-3.5 w-3.5 shrink-0 accent-[var(--accent)]" />
+        Сразу выдать код входа
+      </label>
     </ActionDialog>
   );
 }
 
-/** «Люди»: everyone of the company, the kiosk included, each action behind the row's «⋯». */
-export function PeoplePanel({ card }: { card: CompanyCard }) {
-  const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [open, setOpen] = useState<Open>(null);
-  const [code, setCode] = useState<{ login: IssuedCode; tv: boolean } | null>(null);
+/** The row's letters: the same four as its «⋯», by the key's place, so the layout does not matter. */
+const ROW_KEYS: Record<string, PersonAction> = { KeyC: "code", KeyS: "sessions", KeyE: "edit", KeyP: "points" };
 
-  const close = () => setOpen(null);
+const GLOW_MS = 1500;
+
+/**
+ * «Люди»: everyone of the company, the kiosk included. Each action sits behind the row's «⋯» and on
+ * a letter while the table has focus. Whatever a dialog changed glows in place, and the keys come
+ * back to the table when it closes.
+ */
+export function PeoplePanel({ card }: { card: CompanyCard }) {
+  const router = useRouter();
+  const [query, setQuery] = useUrlText("q");
+  const [selected, setSelected] = useState<string | null>(null);
+  const [touched, setTouched] = useState<string | null>(null);
+  const [open, setOpen] = useState<Open>(null);
+
+  useShortcuts("Люди", [
+    { keys: ["↑ ↓"], label: "По строкам таблицы" },
+    { keys: ["C"], label: "Выдать код" },
+    { keys: ["S"], label: "Закрыть все входы" },
+    { keys: ["E"], label: "Изменить, то же Enter" },
+    { keys: ["P"], label: "Поправить очки" },
+  ]);
+
+  const close = () => {
+    const toTable = open?.action !== "add";
+    setOpen(null);
+    // after the dialog hands the focus back: from a menu it has nobody to hand it to
+    if (toTable) requestAnimationFrame(focusGrid);
+  };
+  const glow = (id: string) => {
+    setSelected(id);
+    setTouched(id);
+    window.setTimeout(() => setTouched(null), GLOW_MS);
+  };
+  const act = (action: PersonAction, person: CardPerson) => {
+    setSelected(person.id);
+    setOpen({ action, person });
+  };
+
   const words = query.trim().toLowerCase();
   const rows = useMemo(
     () =>
-      card.people.filter((person) => !words || [person.full_name, person.position, person.email].some((text) => text?.toLowerCase().includes(words))),
+      card.people.filter((person) => !words || [person.full_name, person.position, person.email, roleText(person.role), person.id].some((text) => text?.toLowerCase().includes(words))),
     [card.people, words],
   );
+  const pickFirst = () => {
+    if (rows[0]) setSelected(rows[0].id);
+  };
+  const onRowKey = (event: KeyboardEvent<HTMLDivElement>, person: CardPerson | null) => {
+    const action = ROW_KEYS[event.code];
+    if (!person || !action || event.ctrlKey || event.metaKey || event.altKey) return false;
+    if (action === "points" && person.role === "tv") return false;
+    event.preventDefault();
+    act(action, person);
+    return true;
+  };
 
   const columns = useMemo<Column<CardPerson>[]>(() => {
     const menu = (person: CardPerson): MenuItem[] => [
-      { key: "code", label: "Выдать код", onSelect: () => setOpen({ action: "code", person }) },
-      { key: "sessions", label: "Сбросить сессии", onSelect: () => setOpen({ action: "sessions", person }) },
-      { key: "edit", label: "Изменить", onSelect: () => setOpen({ action: "edit", person }) },
-      ...(person.role === "tv" ? [] : [{ key: "points", label: "Очки", onSelect: () => setOpen({ action: "points", person }) }]),
+      { key: "code", label: "Выдать код", hint: "C", onSelect: () => act("code", person) },
+      { key: "sessions", label: "Закрыть все входы", hint: "S", onSelect: () => act("sessions", person) },
+      { key: "edit", label: "Изменить", hint: "E", onSelect: () => act("edit", person) },
+      ...(person.role === "tv" ? [] : [{ key: "points", label: "Поправить очки", hint: "P", onSelect: () => act("points", person) }]),
+      "separator",
+      { key: "log", label: "Показать в журнале", onSelect: () => router.push(`/ops/log?company=${card.id}&q=${person.id}`) },
     ];
     return [
       {
@@ -265,16 +321,16 @@ export function PeoplePanel({ card }: { card: CompanyCard }) {
         title: "Почта",
         render: (person) =>
           person.email ? (
-            <span className="block truncate text-[13px]" title={person.email}>
+            <span className="ops-data block truncate" title={person.email}>
               {person.email}
             </span>
           ) : (
             <span className="text-muted/60">—</span>
           ),
       },
-      { key: "seen", title: "Вход", width: "112px", sort: (a, b) => byTime(a.last_seen_at, b.last_seen_at), render: (person) => <When iso={person.last_seen_at} /> },
-      { key: "sessions", title: "Сессии", width: "76px", align: "right", sort: (a, b) => a.sessions - b.sessions, render: (person) => <Num value={person.sessions} /> },
-      { key: "points", title: "Очки", width: "76px", align: "right", sort: (a, b) => a.points - b.points, render: (person) => <Num value={person.points} /> },
+      { key: "seen", title: <span title="Когда человек был в приложении последний раз">Был</span>, width: "116px", sort: (a, b) => byTime(a.last_seen_at, b.last_seen_at), render: (person) => <When iso={person.last_seen_at} /> },
+      { key: "sessions", title: <span title="Сколько раз человек вошёл и не вышел: телефоны и компьютеры">Входов</span>, width: "84px", align: "right", sort: (a, b) => a.sessions - b.sessions, render: (person) => <Num value={person.sessions} /> },
+      { key: "points", title: "Очки", width: "96px", align: "right", sort: (a, b) => a.points - b.points, render: (person) => <Num value={person.points} /> },
       {
         key: "menu",
         title: "",
@@ -287,7 +343,7 @@ export function PeoplePanel({ card }: { card: CompanyCard }) {
         ),
       },
     ];
-  }, []);
+  }, [card.id, router]);
 
   return (
     <div className="flex flex-col gap-3" data-testid="ops-people">
@@ -298,7 +354,7 @@ export function PeoplePanel({ card }: { card: CompanyCard }) {
           </Button>
         }
       >
-        <SearchField value={query} onChange={setQuery} placeholder="Имя, должность, почта" aria-label="Поиск по людям" />
+        <GridSearch value={query} onChange={setQuery} placeholder="Имя, должность, роль, почта" label="Поиск по людям" width={280} onDown={pickFirst} onEnter={rows.length > 0 ? () => { pickFirst(); focusGrid(); } : undefined} />
       </Toolbar>
 
       <DataGrid
@@ -309,35 +365,26 @@ export function PeoplePanel({ card }: { card: CompanyCard }) {
         selectedKey={selected}
         onSelect={(person) => setSelected(person.id)}
         onActivate={(person) => setOpen({ action: "edit", person })}
+        onKey={onRowKey}
+        rowHighlightKey={touched}
         rowTone={(person) => (person.is_active ? null : "muted")}
         empty={words ? <EmptyState title="Никого не нашлось" hint="Проверь написание или очисти поиск." /> : <EmptyState title="В компании пока никого" hint="Добавь первого человека кнопкой справа сверху." />}
       />
 
-      {open?.action === "code" ? (
-        <IssueCodeDialog
-          companyId={card.id}
-          person={open.person}
-          onClose={close}
-          onIssued={(login) => {
-            if (login) setCode({ login, tv: open.person.role === "tv" });
-            else toast("Этот код уже выдан и показан, для нового открой меню ещё раз");
-          }}
-        />
-      ) : null}
-      {open?.action === "sessions" ? <RevokeDialog companyId={card.id} person={open.person} onClose={close} /> : null}
-      {open?.action === "edit" ? <EditDialog companyId={card.id} person={open.person} onClose={close} /> : null}
-      {open?.action === "points" ? <PointsDialog companyId={card.id} person={open.person} onClose={close} /> : null}
+      {open?.action === "code" ? <IssueCode companyId={card.id} person={open.person} onClose={close} /> : null}
+      {open?.action === "sessions" ? <RevokeDialog companyId={card.id} person={open.person} onClose={close} onDone={glow} /> : null}
+      {open?.action === "edit" ? <EditDialog companyId={card.id} person={open.person} onClose={close} onDone={glow} /> : null}
+      {open?.action === "points" ? <PointsDialog companyId={card.id} person={open.person} onClose={close} onDone={glow} /> : null}
       {open?.action === "add" ? (
         <AddDialog
           companyId={card.id}
           onClose={close}
           onAdded={(id, name) => {
-            setSelected(id);
-            toast(`${firstName(name)} в компании. Код входа выдаётся в меню строки`);
+            glow(id);
+            toast(`${firstName(name)} в компании`);
           }}
         />
       ) : null}
-      {code ? <CodeDialog login={code.login} tv={code.tv} onClose={() => setCode(null)} /> : null}
     </div>
   );
 }

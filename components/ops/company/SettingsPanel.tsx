@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 
 import { INPUT } from "@/components/desk/team/fields";
 import { SettingGroup, SettingRow, Switch } from "@/components/desk/ui/SettingRow";
@@ -102,11 +102,34 @@ function SettingsForm({ card }: { card: CompanyCard }) {
 
   const model = card.settings.parser_model;
   const ready = changes.length > 0 && nameOk && slugOk;
+  const save = (event: FormEvent) => {
+    event.preventDefault();
+    if (ready) setSaving(true);
+  };
+  const reset = () => {
+    setName(card.name);
+    setSlug(card.slug ?? "");
+    setProvider(savedProvider);
+    setPoints(card.settings.points_enabled);
+    setLab(card.settings.lab_for_all);
+    setDevTools(card.settings.dev_tools);
+    setSlugError(null);
+  };
 
   return (
-    <div className="flex max-w-[808px] flex-col gap-4" data-testid="ops-settings">
+    <form onSubmit={save} className="flex max-w-[808px] flex-col gap-4" data-testid="ops-settings">
       <SettingGroup>
-        <SettingRow label="Название" hint="Его видят люди компании: на входе, в шапке и на стене">
+        <SettingRow
+          label="Название"
+          hint="Его видят люди компании: на входе, в шапке и на стене"
+          below={
+            nameOk ? undefined : (
+              <p role="alert" className="text-[12px] font-medium leading-4 text-danger">
+                Хотя бы 2 буквы
+              </p>
+            )
+          }
+        >
           <div className="w-[300px]">
             <input className={INPUT} value={name} aria-label="Название" autoComplete="off" maxLength={120} onChange={(event) => setName(event.target.value)} />
           </div>
@@ -159,13 +182,23 @@ function SettingsForm({ card }: { card: CompanyCard }) {
           <Switch on={devTools} onChange={setDevTools} label="Инструменты разработчиков" />
         </SettingRow>
       </SettingGroup>
-      <div>
-        <Button size="sm" disabled={!ready} onClick={() => setSaving(true)} data-testid="ops-settings-save">
+      <div className="flex items-center gap-3">
+        <Button size="sm" type="submit" disabled={!ready} data-testid="ops-settings-save">
           Сохранить
         </Button>
+        {changes.length > 0 ? (
+          <>
+            <Button size="sm" variant="ghost" onClick={reset} data-testid="ops-settings-reset">
+              Вернуть как было
+            </Button>
+            <span className="text-[13px] leading-5 text-muted" data-testid="ops-settings-dirty">
+              Не сохранено изменений: {changes.length}
+            </span>
+          </>
+        ) : null}
       </div>
       {saving ? <SaveDialog companyId={card.id} patch={patch} changes={changes} onClose={() => setSaving(false)} onSlugTaken={setSlugError} /> : null}
-    </div>
+    </form>
   );
 }
 

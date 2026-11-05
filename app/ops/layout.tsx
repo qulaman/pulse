@@ -8,7 +8,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false, nocache: true },
 };
 
-/** The developers' console (D-157, tasks/029), outside every company. `data-surface="desk"` goes on <html> in OpsProviders. */
+/** Before the first paint, or a hard load flashes the desk's look until hydration; OpsProviders keeps them from there. */
+const OPS_SURFACE_SCRIPT = `(function(r){r.dataset.surface="desk";r.dataset.ops=""})(document.documentElement)`;
+
+/** The developers' console (D-157, tasks/029), outside every company. */
 export default function OpsLayout({ children }: { children: ReactNode }) {
-  return <OpsProviders>{children}</OpsProviders>;
+  return (
+    <>
+      <script dangerouslySetInnerHTML={{ __html: OPS_SURFACE_SCRIPT }} />
+      <OpsProviders>{children}</OpsProviders>
+    </>
+  );
 }
