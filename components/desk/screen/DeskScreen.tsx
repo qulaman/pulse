@@ -12,7 +12,6 @@ import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import type { Tone } from "@/components/desk/ui/tone";
 import { ejectReceipt } from "@/components/mindboard/carry";
 import { EXTEND_MINUTES } from "@/components/mindboard/WallSheet";
 import { useWallBoard } from "@/components/screen/useWallBoard";
@@ -74,9 +73,6 @@ function useTick(): Date {
   }, []);
   return now;
 }
-
-/** The light of the screen is the wall's receipt: green while it answers, amber once it has gone silent. */
-const RECEIPT_LIGHT: Record<"ok" | "warn" | "muted", Tone | null> = { ok: "ok", warn: "warn", muted: null };
 
 /** «По кругу» stands in the row of scenes as the sixth way the wall can look. */
 type SceneKey = TvScene | "round";
@@ -214,7 +210,6 @@ export function DeskScreen() {
     <DeskPage>
       <PageTitle
         title="Экран"
-        light={loading ? null : RECEIPT_LIGHT[receipt.tone]}
         actions={
           <>
             <Tooltip label="Стена загрузится заново — если зависла или не обновилась" side="bottom">
@@ -229,8 +224,8 @@ export function DeskScreen() {
         }
       />
 
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] items-start gap-5">
-        <div className="flex min-w-0 flex-col gap-4">
+      <div className="grid grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] items-start gap-8">
+        <div className="flex min-w-0 flex-col gap-5">
           <WallFrame receipt={loading ? null : receipt} label={screens.length === 1 ? screens[0].full_name : screens.length > 1 ? `${screens.length} экрана` : null} />
 
           <Visits
@@ -241,14 +236,14 @@ export function DeskScreen() {
             onAnswer={(visit, value) => answer.mutate({ id: visit.id, answer: value })}
           />
 
-          <section className="card flex flex-col gap-3 px-5 pb-4 pt-3.5" data-testid="desk-screen-now">
-            <SectionLabel>Сейчас на стене</SectionLabel>
-            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <section className="flex flex-col" data-testid="desk-screen-now">
+            <SectionLabel className="mb-0.5">Сейчас на стене</SectionLabel>
+            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-t border-text pb-2.5 pt-2">
               <div className="min-w-0 flex-1">
                 {loading ? (
                   <Bone h={28} w="55%" />
                 ) : (
-                  <p className="font-display text-[22px] font-semibold leading-7 tracking-[-0.015em] [overflow-wrap:anywhere]" data-testid="desk-screen-now-line">
+                  <p className="desk-figure text-[26px] leading-8 [overflow-wrap:anywhere]" data-testid="desk-screen-now-line">
                     {connected
                       ? wallNow(row, people.data ?? [], now, boards.data ?? [], { points, guest, taskTitle, boardPoints: wall.points.map((point) => point.id) })
                       : "Экран ещё не подключался"}
@@ -269,7 +264,8 @@ export function DeskScreen() {
                 {night ? (
                   <Button
                     size="sm"
-                    variant={awake ? "secondary" : "primary"}
+                    variant="secondary"
+                    className={awake ? "" : "desk-move"}
                     onClick={() => show({ wake: awake === null }, awake === null ? `Экран проснулся до ${tvTime(new Date(Date.now() + WAKE_MS))}` : "Экран снова спит")}
                     data-testid="desk-screen-wake"
                   >
@@ -285,30 +281,29 @@ export function DeskScreen() {
                 ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 border-t border-border/70 pt-3" data-testid="desk-screen-scenes">
+            <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-1" data-testid="desk-screen-scenes">
               <SegmentTabs<SceneKey>
                 aria-label="Заставка на стене"
                 value={sceneValue}
                 onChange={pickScene}
                 items={sceneOrder.map((value, index) => ({ value, label: <KeyLabel label={value === "round" ? "По кругу" : SCENE_LABEL[value]} hint={String(index + 1)} /> }))}
               />
-              <span className="ml-auto text-[12px] leading-4 text-muted">клавиши 1–{sceneOrder.length} — сразу на стену</span>
             </div>
           </section>
 
           {wall.boardId ? (
-            <section className="card flex flex-col gap-2 px-5 pb-4 pt-3.5" data-testid="desk-screen-cartridge">
-              <SectionLabel>Доска на стене</SectionLabel>
-              <div className="flex flex-wrap items-center justify-between gap-3">
+            <section className="flex flex-col" data-testid="desk-screen-cartridge">
+              <SectionLabel className="mb-0.5">Доска на стене</SectionLabel>
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-text py-2">
                 <div className="min-w-0">
-                  <p className="truncate font-display text-[17px] font-semibold leading-6">{wall.board ? wall.board.title : wall.loading ? "" : "Доска другого директора"}</p>
+                  <p className="truncate text-[17px] font-semibold leading-6">{wall.board ? wall.board.title : wall.loading ? "" : "Доска другого директора"}</p>
                   <p className="nums text-[13px] leading-[18px] text-muted">
                     {wall.board?.deleted_at ? "в корзине — на стене её уже нет" : until ? cartridgeLine(wall.counts.get(wall.boardId), until) : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {mine ? (
-                    <Link href={`/desk/notes/b/${wall.boardId}`} className="inline-flex min-h-[36px] items-center rounded-[12px] px-3 font-display text-[13px] font-semibold text-accent hover:bg-accent/10">
+                    <Link href={`/desk/notes/b/${wall.boardId}`} className="inline-flex min-h-[36px] items-center px-3 text-[13px] font-medium text-text hover:underline">
                       Открыть
                     </Link>
                   ) : null}
@@ -332,7 +327,7 @@ export function DeskScreen() {
                   {guest ? (
                     <Button
                       size="sm"
-                      variant={row?.board_guest ? "primary" : "ghost"}
+                      variant={row?.board_guest ? "secondary" : "ghost"}
                       aria-pressed={row?.board_guest ?? false}
                       onClick={() => show({ boardGuest: !row?.board_guest }, row?.board_guest ? "Доска скрыта от гостя" : "Доска видна гостю")}
                     >
@@ -347,7 +342,7 @@ export function DeskScreen() {
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4" data-testid="desk-screen-panel">
+        <div className="flex min-w-0 flex-col gap-6" data-testid="desk-screen-panel">
           <Section title="Вид на стене" testId="desk-screen-look">
             <SettingRow label="Часы">
               <SegmentTabs<ClockStyle>
@@ -390,32 +385,32 @@ export function DeskScreen() {
                 />
               </SettingRow>
             ) : null}
-            <div className="border-t border-border/70 pt-3">
-              <SettingRow label="Гость в кабинете" hint={guest ? (guestEnds ? `Имена скрыты до ${tvTime(guestEnds)}` : "Имена скрыты") : "Имена на стене видны"}>
-                <Switch on={guest} label="Гость в кабинете" testId="desk-screen-guest" onToggle={() => show({ guest: !guest }, guest ? "Гость ушёл: имена снова видны" : "Гость в кабинете: имена скрыты")} />
-              </SettingRow>
-            </div>
+            <SettingRow label="Гость в кабинете" hint={guest ? (guestEnds ? `Имена скрыты до ${tvTime(guestEnds)}` : "Имена скрыты") : "Имена на стене видны"}>
+              <Switch on={guest} label="Гость в кабинете" testId="desk-screen-guest" onToggle={() => show({ guest: !guest }, guest ? "Гость ушёл: имена снова видны" : "Гость в кабинете: имена скрыты")} />
+            </SettingRow>
           </Section>
 
           <Section title="Показать на стене" testId="desk-screen-show">
-            <SegmentTabs<Pick>
-              aria-label="Что показать"
-              value={shownPick}
-              onChange={setPick}
-              items={[
-                { value: "people", label: "Человека" },
-                { value: "task", label: "Дело" },
-                { value: "board", label: "Доску" },
-              ]}
-            />
-            <p className="-mt-1 text-[12px] leading-4 text-muted">
-              {shownPick === "people"
-                ? "Его дела — на 10 минут, второй клик — ещё 10"
-                : shownPick === "task"
-                  ? "Одна задача во весь экран — на 10 минут"
-                  : "До вечера; «Неделя» — в круг заставок до воскресенья"}
-            </p>
-            <div className="[&_label]:!w-full" data-testid="desk-screen-pick">
+            <div className="flex flex-col gap-0.5 py-1">
+              <SegmentTabs<Pick>
+                aria-label="Что показать"
+                value={shownPick}
+                onChange={setPick}
+                items={[
+                  { value: "people", label: "Человека" },
+                  { value: "task", label: "Дело" },
+                  { value: "board", label: "Доску" },
+                ]}
+              />
+              <p className="pt-1 text-[12px] leading-4 text-muted">
+                {shownPick === "people"
+                  ? "Его дела — на 10 минут, второй клик — ещё 10"
+                  : shownPick === "task"
+                    ? "Одна задача во весь экран — на 10 минут"
+                    : "До вечера; «Неделя» — в круг заставок до воскресенья"}
+              </p>
+            </div>
+            <div className="desk-fields [&_label]:!w-full" data-testid="desk-screen-pick">
               {shownPick === "people" ? (
                 <PeoplePick
                   people={people.data ?? []}

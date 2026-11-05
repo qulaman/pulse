@@ -37,6 +37,15 @@ export function canChangeAccess(editor: Who, target: Who): boolean {
 }
 
 /**
+ * Who may delete a card at all (the owner, 2026-11-04, narrowing D-104 §7): by the rule of
+ * editing it, and never oneself or a director. That a card has no history is decided apart
+ * (lib/people/history.ts): only a duplicate or a typo goes, everything else is a firing.
+ */
+export function canDeletePerson(editor: Who, target: Who): boolean {
+  return target.role !== "director" && canChangeAccess(editor, target);
+}
+
+/**
  * Login (password and email): the director — anyone but another director; the secretary —
  * anyone but a director. Taking over a director's login is the one escalation that matters.
  */

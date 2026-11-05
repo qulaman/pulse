@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
-import { hasAssignee, KIND_LABEL, KindMark, chosenId, mainField } from "@/components/desk/confirm/kinds";
+import { hasAssignee, KIND_LABEL, chosenId, mainField } from "@/components/desk/confirm/kinds";
 import { PeopleField, PersonField, type PickPerson } from "@/components/desk/confirm/PersonField";
 import { EventRepeatField, RecurrenceFields } from "@/components/desk/confirm/RepeatFields";
 import { WhenField } from "@/components/desk/confirm/WhenField";
@@ -16,7 +16,7 @@ import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
 function Field({ label, children, align = "center" }: { label: string; children: ReactNode; align?: "center" | "start" }) {
   return (
     <div className={`grid grid-cols-[60px_minmax(0,1fr)] gap-x-3 ${align === "center" ? "items-center" : "items-start"}`}>
-      <span className={`text-[13px] leading-5 text-muted ${align === "start" ? "pt-2" : ""}`}>{label}</span>
+      <span className={`text-[13px] leading-5 text-muted ${align === "start" ? "pt-[7px]" : ""}`}>{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -53,7 +53,7 @@ function TextField({ value, onChange, label, multiline = false, placeholder, tes
       aria-label={label}
       spellCheck
       data-testid={testId}
-      className="desk-input block min-h-9 w-full resize-none overflow-hidden px-2.5 py-[7px] text-[14px] leading-5 outline-none"
+      className="desk-input block min-h-9 w-full resize-none overflow-hidden px-0 py-[7px] text-[14px] leading-5 outline-none"
     />
   );
 }
@@ -113,15 +113,13 @@ export function EntityEditor({
       aria-label={`${KIND_LABEL[entity.kind]} ${n}`}
       data-testid="desk-entity"
       data-kind={entity.kind}
-      className="flex flex-col gap-1.5 px-4 pb-3.5 pt-3"
+      className="flex flex-col gap-1 pb-3 pt-2"
       style={{ opacity: muted ? 0.6 : 1 }}
     >
       <header className="flex h-7 items-center gap-2">
-        <KindMark kind={entity.kind} />
-        <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{KIND_LABEL[entity.kind]}</span>
+        <span className="desk-label uppercase">{KIND_LABEL[entity.kind]}</span>
         {status ? (
-          <span className="flex items-center gap-1.5 text-[12px] font-medium leading-4" style={{ color: status.tone }}>
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: status.tone }} />
+          <span className="text-[13px] font-medium leading-4" style={{ color: status.tone }}>
             {status.text}
           </span>
         ) : null}
@@ -132,8 +130,8 @@ export function EntityEditor({
               type="button"
               aria-pressed={entity.priority === "high"}
               onClick={() => onPatch({ priority: entity.priority === "high" ? "normal" : "high" })}
-              className={`desk-focus h-6 rounded-[6px] px-2 text-[12px] font-semibold leading-none transition-colors duration-[120ms] ${
-                entity.priority === "high" ? "bg-danger/15 text-danger" : "text-muted hover:bg-surface-2 hover:text-text"
+              className={`desk-focus h-6 rounded-[2px] px-1.5 text-[13px] leading-none transition-colors duration-[120ms] ${
+                entity.priority === "high" ? "font-semibold text-text underline underline-offset-4" : "text-muted hover:bg-surface-2 hover:text-text"
               }`}
             >
               срочно
@@ -146,7 +144,7 @@ export function EntityEditor({
             aria-label={`Убрать: ${field.value || KIND_LABEL[entity.kind]}`}
             onClick={onRemove}
             data-testid="desk-entity-remove"
-            className="desk-focus flex h-6 w-6 items-center justify-center rounded-[6px] text-[16px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="desk-focus -mr-1.5 flex h-6 w-6 items-center justify-center rounded-[2px] text-[16px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
           >
             ×
           </button>
@@ -167,13 +165,13 @@ export function EntityEditor({
             testId="desk-entity-who"
           />
           {ambiguous && candidates.length > 0 ? (
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
               {candidates.slice(0, 4).map((candidate, at) => (
                 <button
                   key={candidate.user_id}
                   type="button"
                   onClick={() => ctx.onPickAssignee(index, { id: candidate.user_id, full_name: candidate.full_name })}
-                  className="desk-focus flex h-7 items-center gap-1.5 rounded-full border border-border pl-1 pr-2.5 text-[13px] leading-4 transition-colors duration-[120ms] hover:border-accent/60 hover:bg-accent/10"
+                  className="desk-focus flex h-7 items-center gap-1.5 rounded-[2px] border border-border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2"
                 >
                   {ctx.digitsFor === index ? <Kbd>{at + 1}</Kbd> : null}
                   {shortName(candidate.full_name)}
@@ -270,7 +268,7 @@ export function EntityEditor({
               onChange={(event) => onPatch({ location: event.target.value || null })}
               placeholder="Место — можно не писать"
               aria-label={`Где: ${entity.title}`}
-              className="desk-input h-9 w-full px-2.5 text-[14px] leading-5 outline-none placeholder:text-muted"
+              className="desk-input h-9 w-full px-0 text-[14px] leading-5 outline-none placeholder:text-muted"
             />
           </Field>
           <Field label="Повтор">
@@ -287,14 +285,14 @@ export function EntityEditor({
             value={entity.amount}
             onChange={(event) => onPatch({ amount: Number(event.target.value) || 0 })}
             aria-label="Сколько очков"
-            className="desk-input nums h-9 w-28 px-2.5 text-[14px] leading-5 outline-none"
+            className="desk-input nums h-9 w-28 px-0 text-[14px] leading-5 outline-none"
           />
         </Field>
       ) : null}
 
-      {entity.kind === "announcement" ? <p className="pl-[72px] text-[12px] leading-4 text-muted">Уйдёт всем в Эфир</p> : null}
-      {entity.kind === "note" ? <p className="pl-[72px] text-[12px] leading-4 text-muted">Заметка — видите только вы</p> : null}
-      {entity.kind === "reminder" ? <p className="pl-[72px] text-[12px] leading-4 text-muted">Напоминание придёт вам</p> : null}
+      {entity.kind === "announcement" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Уйдёт всем в Эфир</p> : null}
+      {entity.kind === "note" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Заметка — видите только вы</p> : null}
+      {entity.kind === "reminder" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Напоминание придёт вам</p> : null}
     </article>
   );
 }

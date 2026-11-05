@@ -5,6 +5,7 @@ import { apiError, apiOk } from "@/lib/api/respond";
 import { assignableRoles } from "@/lib/people/access";
 import { suggestAliases } from "@/lib/people/aliases";
 import { syntheticEmail } from "@/lib/people/email";
+import { cleanPhone, phoneLooksRight } from "@/lib/people/phone";
 import { loadRoster } from "@/lib/roster";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
@@ -16,9 +17,20 @@ const BodySchema = z.strictObject({
   full_name: z.string().trim().min(2).max(120),
   role: z.enum(["director", "manager", "employee", "shopkeeper", "secretary", "tv"]),
   position: z.string().trim().max(120).optional(),
+  phone: z.string().trim().refine(phoneLooksRight).optional(),
   aliases: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
   manager_id: z.guid().nullable().optional(), // guid: seed ids are not RFC-4122
+  /** A list repeats a row whose answer was lost: the same id gets the same card back. */
+  client_request_id: z.guid().optional(),
 });
+
+/** The card an earlier try of this request made, in this company. */
+async function madeBefore(service: ReturnType<typeof createServiceSupabase>, companyId: string, requestId: string | undefined): Promise<string | null> {
+  if (!requestId) return null;
+  const { data, error } = await service.from("profiles").select("id").eq("company_id", companyId).eq("client_request_id", requestId).maybeSingle();
+  if (error) throw new Error(`request lookup failed: ${error.message}`);
+  return data?.id ?? null;
+}
 
 /**
  * Director or secretary (D-104) creates a login + profile in one go — the secretary never
@@ -35,6 +47,9 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       return apiError(403, "forbidden", "Директора добавляет только директор");
     }
     const service = createServiceSupabase();
+
+    const earlier = await madeBefore(service, profile.companyId, body.client_request_id);
+    if (earlier) return apiOk({ id: earlier, aliases: [], namesakes: [] });
 
     const created = await service.auth.admin.createUser({
       email: body.email ?? syntheticEmail(),
@@ -59,6 +74,7 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const aliases = body.aliases?.length ? body.aliases : suggestion.mine;
 
     const userId = created.data.user.id;
+    const phone = cleanPhone(body.phone ?? "");
     const inserted = await service.from("profiles").insert({
       id: userId,
       company_id: profile.companyId,
@@ -67,12 +83,22 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
       position: body.position ?? null,
       aliases,
       manager_id: body.manager_id ?? null,
+      client_request_id: body.client_request_id ?? null,
     });
 
     if (inserted.error) {
       await service.auth.admin.deleteUser(userId).catch(() => undefined);
+      // the same request won the race a moment ago: its card is the answer
+      const winner = inserted.error.code === "23505" ? await madeBefore(service, profile.companyId, body.client_request_id) : null;
+      if (winner) return apiOk({ id: winner, aliases: [], namesakes: [] });
       console.error("profile insert failed:", inserted.error.message);
       return apiError(502, "profile_failed", "Не удалось создать профиль, попробуй ещё раз");
+    }
+
+    // the card stands without it: a phone can be typed again
+    if (phone) {
+      const saved = await service.from("profile_phones").insert({ user_id: userId, company_id: profile.companyId, phone });
+      if (saved.error) console.error("phone insert failed:", saved.error.message);
     }
 
     for (const other of suggestion.forOthers) {

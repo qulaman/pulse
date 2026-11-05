@@ -101,16 +101,16 @@ function resetOf(key: SectionKey, server: CompanySettings): Partial<CompanySetti
   }
 }
 
-/** The shape of a tab while the settings load: its groups as quiet planes, nothing that will jump. */
+/** The shape of a tab while the settings load: its groups under their rules, nothing that will jump. */
 function PanelBone() {
   return (
     <div className="flex flex-col gap-8" aria-hidden>
       {[3, 2].map((rows, group) => (
         <div key={group}>
-          <Bone h={16} w={140} className="mb-3 ml-1" />
-          <div className="rounded-[12px] border border-border bg-surface/40">
+          <Bone h={16} w={140} className="mb-2" />
+          <div className="desk-list">
             {Array.from({ length: rows }, (_, index) => (
-              <div key={index} className="flex items-center justify-between gap-6 border-b border-border/60 px-4 py-4 last:border-b-0">
+              <div key={index} className="flex items-center justify-between gap-6 py-3">
                 <div className="flex flex-col gap-1.5">
                   <Bone h={14} w={180} />
                   <Bone h={12} w={280} />
@@ -175,7 +175,7 @@ function Panels({ tab, visited, director }: { tab: SettingsTab; visited: Readonl
       {SETTINGS_TABS.map((key) =>
         visited.has(key) ? (
           <section key={key} id={`desk-settings-panel-${key}`} data-testid={`desk-settings-panel-${key}`} aria-label={SETTINGS_TAB_META[key].title} hidden={key !== tab}>
-            {key === "company" ? <CompanyPanel director={director} /> : key === "app" ? <AppPanel /> : key === "team" ? <TeamPanel director={director} /> : <AiPanel />}
+            {key === "company" ? <CompanyPanel /> : key === "app" ? <AppPanel /> : key === "team" ? <TeamPanel director={director} /> : <AiPanel />}
           </section>
         ) : null,
       )}
@@ -272,7 +272,7 @@ export function SettingsPanels({ tab }: { tab: SettingsTab }) {
 
   const meta = SETTINGS_TAB_META[tab];
   return (
-    <div className="flex w-full max-w-[880px] flex-col gap-6">
+    <div className="flex w-full max-w-[880px] flex-col gap-5">
       <PageTitle title={meta.title} state={{ text: meta.about }} />
       <Ready>
         <Panels tab={tab} visited={visited} director={director} />

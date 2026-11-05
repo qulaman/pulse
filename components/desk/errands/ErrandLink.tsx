@@ -64,11 +64,11 @@ export function SecretaryLink({ errand, meId, catalogue }: { errand: Errand; meI
     return (
       <section className="flex flex-col gap-2" data-testid="desk-errand-result">
         <p className="text-[14px] font-semibold leading-5">Что передать директору?</p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
           {RESULTS[scene].map((text) => (
-            <Button key={text} size="sm" variant="secondary" disabled={busy} onClick={() => send(text)}>
+            <button key={text} type="button" disabled={busy} onClick={() => send(text)} className="desk-word desk-focus text-[14px] leading-5">
               {text}
-            </Button>
+            </button>
           ))}
         </div>
         <WordField placeholder="Своими словами…" action="Передать" busy={busy} onSend={send} />
@@ -85,12 +85,12 @@ export function SecretaryLink({ errand, meId, catalogue }: { errand: Errand; meI
   return (
     <section className="flex flex-col gap-2" data-testid="desk-errand-link">
       {taken && !errand.eta_at && !guard && !alarm ? (
-        <div className="flex flex-wrap items-center gap-2" data-testid="desk-errand-eta">
-          <span className="text-[13px] leading-4 text-muted">Будет:</span>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14px] leading-5" data-testid="desk-errand-eta">
+          <span className="text-muted">Будет:</span>
           {ETAS.map((option) => (
-            <Button key={option.min} size="sm" variant="secondary" disabled={busy} onClick={() => link.mutate({ fn: "errand_eta", id: errand.id, min: option.min })}>
+            <button key={option.min} type="button" disabled={busy} onClick={() => link.mutate({ fn: "errand_eta", id: errand.id, min: option.min })} className="desk-word desk-focus">
               {option.label}
-            </Button>
+            </button>
           ))}
         </div>
       ) : null}
@@ -98,18 +98,18 @@ export function SecretaryLink({ errand, meId, catalogue }: { errand: Errand; meI
       {!errand.question || errand.answer ? (
         asking ? (
           <div className="flex flex-col gap-2" data-testid="desk-errand-ask">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
               {QUESTIONS[scene].map((text) => (
-                <Button key={text} size="sm" variant="secondary" disabled={busy} onClick={() => ask(text)}>
+                <button key={text} type="button" disabled={busy} onClick={() => ask(text)} className="desk-word desk-focus text-[14px] leading-5">
                   {text}
-                </Button>
+                </button>
               ))}
             </div>
             <WordField placeholder="Свой вопрос…" action="Спросить" busy={busy} onSend={ask} />
           </div>
         ) : (
           <div>
-            <Button size="sm" variant="ghost" onClick={() => setAsking(true)} data-testid="desk-errand-ask-open">
+            <Button size="sm" variant="ghost" className="!px-0" onClick={() => setAsking(true)} data-testid="desk-errand-ask-open">
               Уточнить у директора
             </Button>
           </div>
@@ -141,7 +141,7 @@ export function DirectorLink({ errand, now }: { errand: Errand; now: Date }) {
         </p>
         {isYesNo(errand.question ?? "") ? (
           <div className="flex gap-2">
-            <Button size="sm" disabled={busy} onClick={() => answer("Да")}>
+            <Button size="sm" variant="secondary" className="desk-move" disabled={busy} onClick={() => answer("Да")}>
               Да
             </Button>
             <Button size="sm" variant="secondary" disabled={busy} onClick={() => answer("Нет")}>

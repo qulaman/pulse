@@ -7,6 +7,9 @@ import type { Page } from "playwright";
 
 process.loadEnvFile(".env.local");
 
+/** On while a part answers 500 itself to see the screen name a failure: those are not the app's errors. */
+export const injected = { failures: false };
+
 export const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
 export type Check = { name: string; ok: boolean; detail: string };

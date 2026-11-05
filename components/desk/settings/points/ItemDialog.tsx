@@ -14,14 +14,11 @@ const PRICES = [100, 200, 500, 1000, 2000];
 
 function Label({ children, htmlFor }: { children: string; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
+    <label htmlFor={htmlFor} className="desk-label mb-0.5 block uppercase">
       {children}
     </label>
   );
 }
-
-const pill = (on: boolean) =>
-  `h-8 rounded-[9px] border px-2.5 text-[13px] font-semibold transition-colors duration-[120ms] ${on ? "border-accent/60 bg-accent/10 text-text" : "border-border text-muted hover:text-text"}`;
 
 function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyId: string | undefined; onDone: () => void }) {
   const save = useSaveShopItem(companyId);
@@ -81,20 +78,20 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
           submit();
         }
       }}
-      className="grid grid-cols-[minmax(0,1fr)_260px] gap-6"
+      className="desk-fields grid grid-cols-[minmax(0,1fr)_260px] gap-6"
       data-testid="shop-item-form"
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <div>
           <Label htmlFor="item-title">Что это</Label>
-          <input id="item-title" data-autofocus value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} placeholder="Брендовая куртка" className="field h-9 w-full px-3 text-[14px] leading-5 outline-none" />
+          <input id="item-title" data-autofocus value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} placeholder="Брендовая куртка" className="field h-9 w-full text-[14px] leading-5 outline-none" />
           <input
             aria-label="Описание"
             value={description}
             maxLength={140}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="Одна строка: что человек получает"
-            className="field mt-2 h-9 w-full px-3 text-[14px] leading-5 outline-none"
+            className="field h-9 w-full text-[14px] leading-5 outline-none"
           />
         </div>
 
@@ -108,18 +105,18 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
                 role="radio"
                 aria-checked={icon === emoji}
                 onClick={() => setIcon(emoji)}
-                className={`flex h-8 w-8 items-center justify-center rounded-[9px] border text-[16px] leading-none transition-colors duration-[120ms] ${icon === emoji ? "border-accent/60 bg-accent/10" : "border-transparent hover:bg-surface-2"}`}
+                className="desk-choice w-8 text-center !text-[16px] !leading-none"
               >
                 {emoji}
               </button>
             ))}
-            <input aria-label="Свой значок" value={ICONS.includes(icon) ? "" : icon} maxLength={4} onChange={(event) => setIcon(event.target.value || "🎁")} placeholder="свой" className="field ml-1 h-8 w-16 px-2 text-center text-[14px] outline-none" />
+            <input aria-label="Свой значок" value={ICONS.includes(icon) ? "" : icon} maxLength={4} onChange={(event) => setIcon(event.target.value || "🎁")} placeholder="свой" className="field ml-1 h-8 w-14 text-[14px] outline-none" />
           </div>
         </div>
 
         <div>
           <Label htmlFor="item-price">Цена</Label>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center gap-x-3">
             <input
               id="item-price"
               inputMode="numeric"
@@ -132,18 +129,19 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
                 setPrice(String(Math.max(0, (priceNumber || 0) + (event.key === "ArrowUp" ? step : -step))));
               }}
               placeholder="0"
-              className="nums field h-9 w-24 px-3 text-right text-[14px] outline-none"
+              className="nums field h-9 w-20 pr-1 text-right text-[14px] outline-none"
             />
-            <span className="mr-1 text-[13px] text-muted">очков</span>
+            <span className="text-[13px] text-muted">очков</span>
             {PRICES.map((p) => (
-              <button key={p} type="button" onClick={() => setPrice(String(p))} className={pill(priceNumber === p)}>
-                <span className="nums">{p}</span>
+              <button key={p} type="button" aria-pressed={priceNumber === p} onClick={() => setPrice(String(p))} className="desk-choice nums px-1">
+                {p}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-[10px] border border-border/70 px-3 py-2">
+        <div className="desk-list">
+        <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <label htmlFor="item-counted" className="cursor-pointer text-[14px] font-medium leading-5">
               Считать остаток
@@ -158,14 +156,14 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
                 value={stock}
                 onChange={(event) => setStock(event.target.value.replace(/[^\d]/g, ""))}
                 placeholder="шт."
-                className="nums field h-8 w-20 px-2.5 text-right text-[14px] outline-none"
+                className="nums field h-8 w-16 pr-1 text-right text-[14px] outline-none"
               />
             ) : null}
             <Switch id="item-counted" label="Считать остаток" checked={counted} onChange={setCounted} />
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-4 rounded-[10px] border border-border/70 px-3 py-2">
+        <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <label htmlFor="item-active" className="cursor-pointer text-[14px] font-medium leading-5">
               Показывать в магазине
@@ -174,16 +172,18 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
           </div>
           <Switch id="item-active" label="Показывать в магазине" checked={active} onChange={setActive} />
         </div>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Так увидит сотрудник</span>
-        <ul className="pointer-events-none" aria-label="Предпросмотр">
+        <span className="desk-label uppercase">Так увидит сотрудник</span>
+        {/* the employee's phone is dark: the card keeps its tokens, as the wall's preview does */}
+        <ul className="desk-phone-look pointer-events-none p-2" aria-label="Предпросмотр">
           <ItemCard item={preview} />
         </ul>
       </div>
 
-      <div className="col-span-2 flex items-center gap-2 border-t border-border/60 pt-4">
+      <div className="col-span-2 flex items-center gap-2">
         {item ? (
           <Button
             size="sm"

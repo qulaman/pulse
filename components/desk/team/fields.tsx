@@ -37,7 +37,8 @@ export function FormRow({
   align?: "field" | "text";
 }) {
   return (
-    <div className={`grid ${LABEL_W} items-start gap-x-6 border-t border-border/60 px-5 py-2.5 first:border-t-0`} data-testid={testId}>
+    // `desk-form-row` — the hook of the desk's ruled sheet (journal.css); the developers' console keeps this look
+    <div className={`desk-form-row grid ${LABEL_W} items-start gap-x-6 border-t border-border/60 px-5 py-2.5 first:border-t-0`} data-align={align} data-testid={testId}>
       {htmlFor ? (
         <label htmlFor={htmlFor} className={`text-[13px] font-medium leading-5 text-muted ${align === "field" ? "pt-2" : ""}`}>
           {label}
@@ -55,25 +56,6 @@ export function FormRow({
         {hint ? <p className="text-[12px] leading-4 text-muted">{hint}</p> : null}
       </div>
     </div>
-  );
-}
-
-/** A switch on the desk: the word first, the toggle after it; Space and a click flip it. */
-export function Switch({ id, on, onToggle, label }: { id?: string; on: boolean; onToggle: () => void; label: string }) {
-  return (
-    <button
-      id={id}
-      type="button"
-      role="switch"
-      aria-checked={on}
-      onClick={onToggle}
-      className="inline-flex h-9 items-center gap-3 self-start rounded-[10px] text-left text-[14px] leading-5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-    >
-      <span aria-hidden className="relative h-5 w-9 shrink-0 rounded-full transition-colors duration-[120ms]" style={{ background: on ? "var(--accent)" : "var(--border)" }}>
-        <span className="absolute top-0.5 h-4 w-4 rounded-full bg-bg transition-transform duration-[120ms]" style={{ transform: on ? "translateX(18px)" : "translateX(2px)" }} />
-      </span>
-      {label}
-    </button>
   );
 }
 
@@ -165,7 +147,7 @@ export function AliasChips({
               key={s}
               type="button"
               onClick={() => onChange([...value, s])}
-              className="inline-flex h-6 items-center rounded-[7px] border border-dashed border-border px-2 text-[12px] font-medium leading-4 text-text/85 transition-colors hover:border-accent/50 hover:text-text"
+              className="desk-alias-add inline-flex h-6 items-center rounded-[7px] border border-dashed border-border px-2 text-[12px] font-medium leading-4 text-text/85 transition-colors hover:border-accent/50 hover:text-text"
             >
               + {s}
             </button>
@@ -224,7 +206,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, { id?: string; value: 
           autoFocus={autoFocus}
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="nums min-w-0 flex-1 bg-transparent font-mono text-[15px] leading-5 tracking-[0.04em] outline-none"
+          className="nums min-w-0 flex-1 bg-transparent text-[15px] leading-5 outline-none"
           data-testid="password-input"
         />
         <IconButton label="Другой пароль" onClick={() => onChange(generatePassword())}>

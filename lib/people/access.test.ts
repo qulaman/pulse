@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assignableRoles, canChangeAccess, canEditPerson, canResetLogin } from "./access";
+import { assignableRoles, canChangeAccess, canDeletePerson, canEditPerson, canResetLogin } from "./access";
 
 const director = { id: "d1", role: "director" as const };
 const director2 = { id: "d2", role: "director" as const };
@@ -72,5 +72,18 @@ describe("canResetLogin", () => {
 
   it("nobody else resets anything", () => {
     expect(canResetLogin(marat, marat)).toBe(false);
+  });
+});
+
+describe("canDeletePerson", () => {
+  it("follows the rule of editing, and never takes oneself or a director", () => {
+    expect(canDeletePerson(director, marat)).toBe(true);
+    expect(canDeletePerson(secretary, marat)).toBe(true);
+    expect(canDeletePerson(secretary, kiosk)).toBe(true);
+    expect(canDeletePerson(director, director)).toBe(false);
+    expect(canDeletePerson(director, director2)).toBe(false);
+    expect(canDeletePerson(secretary, secretary)).toBe(false);
+    expect(canDeletePerson(secretary, director)).toBe(false);
+    expect(canDeletePerson(marat, kiosk)).toBe(false);
   });
 });

@@ -36,6 +36,12 @@ export function clearViewCookie(): string {
   return `${VIEW_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
 }
 
+/**
+ * Before the first paint of a hard load: the desk's sheet (D-158) is light, and the attributes
+ * DeskShell sets in its layout effect come after the phone's dark tokens have been painted.
+ */
+export const DESK_SHEET_SCRIPT = `(function(p,r){if(p==="/desk"||p.indexOf("/desk/")===0){r.dataset.surface="desk";r.dataset.journal=""}})(location.pathname,document.documentElement)`;
+
 /** Browser only: the phone screens from now on, then a full load so the proxy sees the cookie. */
 export function goPhoneView(to: string): void {
   document.cookie = phoneViewCookie();

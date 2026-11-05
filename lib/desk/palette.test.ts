@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchSections, matchTasks, searchPeople } from "./palette";
+import { matchSections, matchTasks, searchPeople, taskLookup } from "./palette";
 
 const sections = [
   { href: "/desk/today", label: "Сегодня" },
@@ -76,5 +76,27 @@ describe("matchTasks", () => {
 
   it("needs two letters", () => {
     expect(matchTasks("с", tasks)).toEqual([]);
+  });
+
+  it("takes the server's word for what it found, and still ranks it", () => {
+    const old = task("t5", "Пересмотреть договор", "done", null, "2025-01-01T10:00:00Z");
+    expect(matchTasks("смотр", [...tasks, old]).map((t) => t.id)).toEqual([]);
+    expect(matchTasks("смотр", [...tasks, old], 5, new Set(["t5"])).map((t) => t.id)).toEqual(["t5"]);
+    expect(matchTasks("смет", [...tasks, old], 5, new Set(["t5"])).map((t) => t.id)).toEqual(["t3", "t1", "t2", "t5"]);
+  });
+});
+
+describe("taskLookup", () => {
+  it("gives the names to the assignee and the rest to the title", () => {
+    expect(taskLookup("смета ерлан", people)).toEqual({ text: "смета", assignees: ["e1", "e2"] });
+    expect(taskLookup("марату смета кровля", people)).toEqual({ text: "смета кровля", assignees: ["m1"] });
+  });
+
+  it("keeps the text whole when there is no name in it", () => {
+    expect(taskLookup("смета по объекту", people)).toEqual({ text: "смета по объекту", assignees: [] });
+  });
+
+  it("keeps a lone name as a word of a title", () => {
+    expect(taskLookup("ерлан", people)).toEqual({ text: "ерлан", assignees: [] });
   });
 });

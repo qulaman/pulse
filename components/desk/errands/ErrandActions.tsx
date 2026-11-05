@@ -32,12 +32,12 @@ export function ErrandActions({ errand, meId, catalogue }: { errand: Errand; meI
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="desk-errand-panel-actions">
       {taken ? (
-        <Button size="sm" loading={busy} onClick={() => transition.mutate({ id: errand.id, to: "done" })}>
+        <Button size="sm" variant="secondary" className="desk-move" loading={busy} onClick={() => transition.mutate({ id: errand.id, to: "done" })}>
           {guard ? "Снять «не беспокоить»" : alarm ? "Охрана на месте" : "Готово"}
         </Button>
       ) : (
         <>
-          <Button size="sm" loading={busy} onClick={() => transition.mutate({ id: errand.id, to: "accepted" })}>
+          <Button size="sm" variant="secondary" className="desk-move" loading={busy} onClick={() => transition.mutate({ id: errand.id, to: "accepted" })}>
             {alarm ? "Вызываю охрану" : "Принял"}
           </Button>
           {alarm ? null : (

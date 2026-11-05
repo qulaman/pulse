@@ -11,7 +11,7 @@ import { ShortcutsHelp, useShortcuts, type Shortcut } from "@/components/desk/ui
 import { SideNav, useDeskBadges, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
 import { goPhoneView } from "@/lib/desk/device";
-import { NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
+import { LIST_MIN, NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, PANEL_MIN, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
 import { isCommandKey, focusCommandLine, isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { chordHref, DESK_NAV, DESK_PROFILE_KEY, deskAllows, deskHomeFor, type DeskRole } from "@/lib/desk/routes";
 import { homeForRole } from "@/lib/routes";
@@ -27,8 +27,10 @@ function useDeskSurface() {
   useLayoutEffect(() => {
     const root = document.documentElement;
     root.dataset.surface = "desk";
+    root.dataset.journal = "";
     return () => {
       delete root.dataset.surface;
+      delete root.dataset.journal;
     };
   }, []);
 }
@@ -133,7 +135,7 @@ function useDeskKeys(role: DeskRole, panel: { isOpen: boolean; close: () => void
 function DeskTitle({ role }: { role: DeskRole }) {
   const { counts } = useDeskBadges(role);
   const pathname = usePathname();
-  const waiting = (role === "director" ? (counts.tasks ?? 0) : 0) + (counts.errands ?? 0);
+  const waiting = (role === "director" ? (counts.tasks ?? 0) + (counts.today ?? 0) : 0) + (counts.errands ?? 0);
   useEffect(() => {
     // after the route's own title is set (it says «Pulse» again on every screen)
     const timer = setTimeout(() => {
@@ -245,7 +247,9 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
     };
   }, [panelOpen, panelWidth]);
 
-  const columns = (width: number) => (panel.api.isOpen ? `${navWidth}px minmax(0,1fr) ${width}px` : `${navWidth}px minmax(0,1fr)`);
+  // the list keeps its room: in a small window a panel dragged wide gives way, down to its minimum
+  const columns = (width: number) =>
+    panel.api.isOpen ? `${navWidth}px minmax(0,1fr) min(${width}px, max(${PANEL_MIN}px, calc(100vw - ${navWidth + LIST_MIN}px)))` : `${navWidth}px minmax(0,1fr)`;
   const resizePanel = (width: number, phase: "move" | "end") => {
     // while the mouse drags, the column moves without a render; the width is kept once it lets go
     if (phase === "move") {

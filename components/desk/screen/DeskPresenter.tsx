@@ -81,8 +81,8 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
 
 
   return (
-    <section aria-label="Ведущий" className="mt-2 rounded-[10px] border border-border px-3 py-2.5" data-testid="desk-presenter">
-      <p className="text-[11px] font-semibold uppercase leading-4 tracking-[0.08em] text-muted" data-testid="presenter-step">
+    <section aria-label="Ведущий" className="border-t border-border/60 py-2" data-testid="desk-presenter">
+      <p className="desk-label uppercase" data-testid="presenter-step">
         {words.eyebrow}
       </p>
       <p className="mt-1 line-clamp-2 text-[14px] font-semibold leading-5" style={done ? { opacity: 0.62 } : undefined} aria-live="polite">

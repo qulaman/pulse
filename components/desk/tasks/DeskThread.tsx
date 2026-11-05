@@ -3,13 +3,13 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
 
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { messageFlags } from "@/components/tasks/TaskThread";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
 import { VoiceMessage } from "@/components/tasks/thread/VoiceMessage";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import { opensRun } from "@/lib/desk/tasks";
+import { clearDraft, readDraft, writeDraft } from "@/lib/desk/drafts";
+import { DESK_STATUS_LABEL, opensRun, type LoadState } from "@/lib/desk/tasks";
 import { PHOTO_MIME, shrinkPhoto, uploadPhotoBlob } from "@/lib/files/photo";
 import { claimMedia, dropMedia, handOverMedia, keepMedia, releaseMedia, type PendingMedia } from "@/lib/media/pending";
 import { showKeptMedia } from "@/lib/media/show";
@@ -18,23 +18,24 @@ import { TIME_ANSWER_WORD } from "@/lib/tasks/lifecycle";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { fetchEarlierMessages, isPendingMessage, prependMessages, THREAD_PAGE, type Me, type TaskMessage } from "@/lib/tasks/queries";
 import { receiptLine, useThreadReceipt } from "@/lib/tasks/receipts";
-import { STATUS_LABEL, TEXT, type TaskStatus } from "@/lib/tasks/status-text";
+import { TEXT, type TaskStatus } from "@/lib/tasks/status-text";
 import { dayLabel, messageState, startsNewDay, withoutPassedRevoke } from "@/lib/tasks/thread";
 import { fitHeight } from "@/lib/ui/fitHeight";
 import { useUpdateHold } from "@/lib/update/client";
 
-const RECEIPT_TONE = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
+import { LoadNote } from "./LoadState";
+
 /** Eight lines of the field, then the words scroll. */
 const MAX_FIELD_PX = 8 * 20 + 18;
 
 /** What a message is, in the thread's own small words: «Отчёт», «Вопрос · ждёт ответа», «Причина отказа». */
 function tagOf(message: TaskMessage): { text: string; tone: "warn" | "danger" | "muted" } | null {
   const flags = messageFlags(message);
-  if (flags.report) return { text: flags.partial ? "Отчёт · сделано не всё" : "Отчёт", tone: flags.partial ? "warn" : "muted" };
+  if (flags.report) return { text: flags.partial ? "Отчёт · сделано не всё" : "Отчёт", tone: "muted" };
   if (flags.timeRequest) return { text: `Просьба о сроке · ${flags.timeAnswer ? TIME_ANSWER_WORD[flags.timeAnswer] : "ждёт ответа"}`, tone: flags.timeAnswer ? "muted" : "warn" };
   if (flags.handoffNote) return { text: "При передаче", tone: "muted" };
   if (flags.declineReason) return { text: "Причина отказа", tone: "danger" };
-  if (flags.reworkComment) return { text: "Комментарий к доработке", tone: "warn" };
+  if (flags.reworkComment) return { text: "Комментарий к доработке", tone: "muted" };
   if (flags.isQuestion) return { text: flags.answered ? "Вопрос · отвечено" : "Вопрос · ждёт ответа", tone: flags.answered ? "muted" : "warn" };
   return null;
 }
@@ -54,12 +55,11 @@ function keptHere(message: TaskMessage): boolean {
 /** «Принята · 14:41» — a line of the order's own history in the same feed (D-64 §4). */
 function HistoryLine({ message }: { message: TaskMessage }) {
   const status = messageFlags(message).newStatus as TaskStatus | null;
-  const label = message.type === "system" ? (message.content ?? "Изменение") : status ? (STATUS_LABEL[status] ?? status) : "Статус изменён";
+  const label = message.type === "system" ? (message.content ?? "Изменение") : status ? (DESK_STATUS_LABEL[status] ?? status) : "Статус изменён";
   return (
-    <p className="flex items-center gap-2 py-1 pl-[34px] text-[12px] leading-4 text-muted" data-testid="system-row">
-      <span aria-hidden className="h-1 w-1 shrink-0 rounded-full bg-muted/60" />
+    <p className="flex items-baseline gap-2 py-1 text-[12px] leading-4 text-muted" data-testid="system-row">
       <span className="min-w-0 truncate">{label}</span>
-      <span className="nums shrink-0 text-muted/70">{humanAqtobe(new Date(message.created_at)).replace(/^сегодня /, "")}</span>
+      <span className="nums shrink-0">{humanAqtobe(new Date(message.created_at)).replace(/^сегодня /, "")}</span>
     </p>
   );
 }
@@ -67,21 +67,26 @@ function HistoryLine({ message }: { message: TaskMessage }) {
 /**
  * The thread at the desk's density (D-154 wave 3): one column of words, not bubbles left and right —
  * a name and a time open a run of one person's words, the next ones within five minutes hang under
- * it; the order's history as thin lines; photos and voices in place; what is on its way with a
+ * it; the order's history as quiet lines; photos and voices in place; what is on its way with a
  * clock, what failed with «повторить»; under the director's last word, how far it got (принцип 8).
- * The panel or the page scrolls it — the thread has no scroller of its own.
+ * The panel or the page scrolls it — the thread has no scroller of its own. A thread that did not
+ * load says so: «Переписки пока нет» is said only of one that came back empty.
  */
 export function DeskThread({
   taskId,
   me,
   messages,
   loading,
+  load,
+  onRetry,
   actions,
 }: {
   taskId: string;
   me: Me;
   messages: TaskMessage[] | undefined;
   loading: boolean;
+  load: LoadState;
+  onRetry: () => void;
   actions: TaskActions;
 }) {
   const queryClient = useQueryClient();
@@ -108,12 +113,14 @@ export function DeskThread({
     actions.sendMessage({ taskId, companyId: me.companyId, text: message.content ?? "", filePath: message.file_path, type: message.type as "text" | "photo" | "voice", id: message.id });
 
   if (loading && rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Загружаю переписку…</p>;
+  if (rows.length === 0 && load.kind === "failed") return <LoadNote state={load} failed="Переписка не загрузилась" onRetry={onRetry} className="py-2" />;
   if (rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Переписки пока нет — вопрос, отчёт или фото появятся здесь</p>;
 
   return (
     <div className="flex flex-col" data-testid="thread">
+      <LoadNote state={load} failed="Новые сообщения не загрузились" onRetry={onRetry} className="pb-1" />
       {rows.length >= THREAD_PAGE && hasMore ? (
-        <button type="button" onClick={() => void showEarlier()} disabled={loadingMore} className="mb-2 self-start rounded-[8px] px-2 py-1 text-[12px] leading-4 text-muted hover:bg-surface-2 hover:text-text">
+        <button type="button" onClick={() => void showEarlier()} disabled={loadingMore} className="mb-2 self-start py-1 text-[12px] leading-4 text-muted hover:text-text">
           {loadingMore ? "Загружаю…" : "Показать раньше"}
         </button>
       ) : null}
@@ -128,30 +135,28 @@ export function DeskThread({
         return (
           <div key={message.id}>
             {day ? (
-              <p className="mb-1 mt-3 flex items-center gap-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted/80 first:mt-0" data-testid="day-separator">
+              <p className={`text-[12px] leading-4 text-muted ${index > 0 ? "mt-3 border-t border-border pt-1" : "pt-1"}`} data-testid="day-separator">
                 {dayLabel(message.created_at)}
-                <span aria-hidden className="h-px flex-1 bg-border/70" />
               </p>
             ) : null}
             {system ? (
               <HistoryLine message={message} />
             ) : (
-              <div className={`group/message flex gap-2.5 rounded-[8px] px-1 ${head ? "mt-2 pt-1" : ""} ${state === "pending" ? "opacity-60" : ""}`} data-testid="message-row" data-state={state}>
-                <span className="w-6 shrink-0">{head ? <Avatar name={mine ? me.fullName : (message.sender?.full_name ?? "")} size={24} /> : null}</span>
-                <div className="min-w-0 flex-1">
+              <div className={`group/message ${head ? "mt-1.5" : ""} ${state === "pending" ? "opacity-60" : ""}`} data-testid="message-row" data-state={state}>
+                <div className="min-w-0">
                   {head ? (
-                    <p className="flex items-baseline gap-2 text-[12px] leading-4">
-                      <span className="font-semibold text-text/90">{mine ? "Вы" : shortName(message.sender?.full_name) || "—"}</span>
+                    <p className="flex items-baseline gap-2 text-[13px] leading-5">
+                      <span className="font-semibold">{mine ? "Вы" : shortName(message.sender?.full_name) || "—"}</span>
                       <span className="nums text-muted">{humanAqtobe(new Date(message.created_at)).replace(/^сегодня /, "")}</span>
                       {state === "pending" ? <span className="text-muted">· отправляю…</span> : null}
                     </p>
                   ) : null}
                   {tag ? (
-                    <p className="mt-0.5 text-[11px] font-semibold uppercase leading-4 tracking-[0.05em]" style={{ color: TAG_COLOR[tag.tone] }}>
+                    <p className="text-[12px] font-medium leading-4" style={{ color: TAG_COLOR[tag.tone] }}>
                       {tag.text}
                     </p>
                   ) : null}
-                  {message.content ? <p className="whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{message.content}</p> : null}
+                  {message.content ? <p className="max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{message.content}</p> : null}
                   {keptHere(message) ? (
                     <p className="text-[13px] leading-5 text-muted" data-testid="message-kept">
                       {message.type === "voice" ? `Голосовое 0:${String(Math.max(1, Math.round((durationOf(message) ?? 0) / 1000))).padStart(2, "0")}` : "Фото"} · ждёт связи
@@ -173,7 +178,7 @@ export function DeskThread({
                     </button>
                   ) : null}
                   {line && lastMine?.id === message.id && state === "sent" ? (
-                    <p className="mt-0.5 text-[12px] leading-4" style={{ color: RECEIPT_TONE[line.tone] }} data-testid="thread-receipt">
+                    <p className="mt-0.5 text-[12px] leading-4 text-muted" data-testid="thread-receipt">
                       {line.text}
                       {/* at night the words wait for the morning — unless the director says «now» (D-129) */}
                       {line.held ? (
@@ -200,22 +205,34 @@ export function DeskThread({
  * The answer field of the desk (D-154 wave 3): Enter sends, Shift+Enter breaks the line, a picture
  * pasted (Ctrl+V), dropped or attached goes as a photo with the words as its caption. The photo is
  * kept in the browser before it is sent (принцип 5, D-130): with no network it waits in the thread
- * and goes later under the same id. A voice is the phone's — the desk writes.
+ * and goes later under the same id. A voice is the phone's — the desk writes. What is typed lives
+ * by the task (`lib/desk/drafts.ts`): another row, a closed panel or a reload take none of it; it
+ * is let go when it is handed to the thread, which holds the words from there — with a clock, in
+ * the outbox with no network, with «повторить» when the server refuses.
  */
-export function DeskComposer({
-  taskId,
-  me,
-  actions,
-  placeholder = "Ответить…",
-  onSent,
-}: {
+export function DeskComposer(props: ComposerProps) {
+  // one field per task: the words of one never show under another
+  return <Composer key={props.taskId} {...props} />;
+}
+
+type ComposerProps = {
   taskId: string;
   me: Me;
   actions: TaskActions;
   placeholder?: string;
   onSent?: () => void;
-}) {
-  const [draft, setDraft] = useState("");
+};
+
+function Composer({ taskId, me, actions, placeholder = "Ответить…", onSent }: ComposerProps) {
+  const [draft, setDraftText] = useState(() => readDraft(me.userId, taskId));
+  const setDraft = (text: string) => {
+    setDraftText(text);
+    writeDraft(me.userId, taskId, text);
+  };
+  const dropDraft = () => {
+    setDraftText("");
+    clearDraft(me.userId, taskId);
+  };
   const [uploading, setUploading] = useState(false);
   const [over, setOver] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -234,7 +251,7 @@ export function DeskComposer({
     const text = draft.trim();
     if (!text) return;
     actions.sendMessage({ taskId, companyId: me.companyId, text });
-    setDraft("");
+    dropDraft();
     onSent?.();
   };
 
@@ -280,7 +297,7 @@ export function DeskComposer({
         handOverMedia(item.id);
         toast("Нет связи. Фото отправлю, как появится");
       }
-      setDraft("");
+      dropDraft();
       onSent?.();
     } finally {
       setUploading(false);
@@ -312,7 +329,7 @@ export function DeskComposer({
       }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={`rounded-[12px] border bg-surface-2/40 transition-colors duration-[120ms] focus-within:border-accent/60 ${over ? "border-accent border-dashed" : "border-border"}`}
+      className={`rounded-[2px] border transition-colors duration-[120ms] focus-within:border-accent ${over ? "border-dashed border-accent" : "border-border"}`}
     >
       <input ref={file} type="file" accept="image/*" className="hidden" aria-label="Приложить фото" onChange={(event) => void sendPhoto(event.target.files?.[0])} />
       <textarea
@@ -331,14 +348,14 @@ export function DeskComposer({
         aria-label="Ответ в переписку"
         className="no-bar block min-h-[40px] w-full resize-none bg-transparent px-3 py-2.5 text-[14px] leading-5 outline-none placeholder:text-muted"
       />
-      <div className="flex items-center gap-2 px-2 pb-1.5">
+      <div className="flex items-center gap-2 px-1.5 pb-1.5">
         <button
           type="button"
           onClick={() => file.current?.click()}
           disabled={uploading}
           title="Приложить фото — или вставьте его (Ctrl+V), или перетащите сюда"
           aria-label="Приложить фото"
-          className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text disabled:opacity-50"
+          className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text disabled:opacity-50"
         >
           {uploading ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
@@ -348,14 +365,12 @@ export function DeskComposer({
             </svg>
           )}
         </button>
-        <span className="min-w-0 flex-1 truncate text-[11px] leading-4 text-muted/80">
-          {uploading ? "Отправляю фото…" : "Enter — отправить · Shift+Enter — перенос"}
-        </span>
+        <span className="min-w-0 flex-1 truncate text-[12px] leading-4 text-muted">{uploading ? "Отправляю фото…" : draft.trim() ? "Enter — отправить" : ""}</span>
         <button
           type="button"
           onClick={sendText}
           disabled={!draft.trim()}
-          className="inline-flex h-7 items-center gap-1.5 rounded-[8px] bg-accent px-2.5 font-display text-[12px] font-semibold leading-4 text-bg transition-opacity duration-[120ms] disabled:opacity-30"
+          className="desk-move inline-flex h-7 items-center rounded-[2px] border px-2 text-[13px] leading-4 transition-opacity duration-[120ms] disabled:opacity-30"
           data-testid="desk-composer-send"
         >
           Отправить

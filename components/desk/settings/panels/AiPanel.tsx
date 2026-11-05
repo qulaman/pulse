@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { CheckLine, Segmented, SelectInput, SettingRow, SettingsGroup, Switch, TextInput, TimeInput } from "@/components/desk/settings/form";
+import { useDevTools } from "@/components/desk/settings/SettingsFrame";
 import { useDraft } from "@/components/settings/draft";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
 import { usePeople } from "@/lib/people/queries";
@@ -47,11 +48,11 @@ const stepsOf = (steps: number[], value: number) => [...new Set([...steps, value
  */
 function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved: Convention[]; onChange: (index: number, patch: Partial<Convention>) => void }) {
   return (
-    <div className="overflow-hidden rounded-[10px] border border-border/70" data-testid="settings-conventions">
-      <div className="grid grid-cols-[180px_minmax(0,1fr)_84px_150px] items-center gap-2 border-b border-border/70 bg-bg/40 px-3 py-1.5 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
+    <div className="desk-cells" data-testid="settings-conventions">
+      <div className="desk-label grid grid-cols-[180px_minmax(0,1fr)_76px_140px] items-center gap-4 border-b border-text pb-1 uppercase">
         <span>Когда</span>
         <span>Как говорите · через «/»</span>
-        <span className="text-center">Время</span>
+        <span>Время</span>
         <span>Уверенность</span>
       </div>
       {rows.map((row, index) => {
@@ -61,8 +62,8 @@ function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved
         const changed = !before || !same(before, row);
         const steps = [...new Set([...CONFIDENCE_STEPS, row.confidence])].sort((a, b) => a - b);
         return (
-          <div key={row.key ?? index} className="relative grid grid-cols-[180px_minmax(0,1fr)_84px_150px] items-center gap-2 border-b border-border/50 px-3 py-1.5 last:border-b-0 hover:bg-surface-2/30">
-            {changed ? <span aria-hidden className="absolute inset-y-1.5 left-0 w-[2px] rounded-full bg-accent" /> : null}
+          <div key={row.key ?? index} className="relative grid grid-cols-[180px_minmax(0,1fr)_76px_140px] items-center gap-4 border-b border-border/60 py-0.5 last:border-b-0">
+            {changed ? <span aria-hidden className="absolute inset-y-1 -left-3 w-[2px] bg-accent" /> : null}
             <span className="min-w-0 text-[14px] leading-5">
               {label}
               {row.day === "friday" ? <span className="block text-[12px] leading-4 text-muted">пятница этой недели</span> : null}
@@ -73,7 +74,7 @@ function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved
               aria-label={`${label}: уверенность`}
               value={String(row.confidence)}
               onChange={(event) => onChange(index, { confidence: Number(event.target.value) })}
-              className="field h-9 w-full cursor-pointer pl-3 text-[13px] leading-5"
+              className="field h-9 w-full cursor-pointer pl-0 text-[13px] leading-5"
             >
               {steps.map((step) => (
                 <option key={step} value={String(step)}>
@@ -114,6 +115,8 @@ export function AiPanel() {
   const names = (people.data ?? []).filter((p) => p.is_active && p.role !== "tv").reduce((sum, p) => sum + p.aliases.length, 0);
   const words = server.vocabulary.length;
   const rules = server.parser_rules?.versions[0];
+  // the rules live in the lab (D-138): without the developers' tools the row would lead nowhere
+  const devTools = useDevTools();
   const models = PARSER_MODELS.map((m) => ({ value: m as string, label: PARSER_MODEL_LABEL[m] ?? m }));
 
   return (
@@ -169,7 +172,7 @@ export function AiPanel() {
           <SelectInput id="set-parser-escalation" label="Модель для перепроверки" value={parser.escalation_model} width={420} onChange={(escalation_model) => setParser({ escalation_model })} items={models} />
         </SettingRow>
         <SettingRow id="parser-kinds" label="Что модель различает" hint="Выключенного вида модель не знает: ни правил, ни примеров. Поручения — всегда" stack changed={!same(kinds, server.parser.kinds ?? PARSER_KINDS)}>
-          <div className="-mx-2 grid grid-cols-2 gap-x-6" data-testid="settings-parser-kinds">
+          <div className="grid grid-cols-2 gap-x-8" data-testid="settings-parser-kinds">
             {PARSER_KINDS.map((kind) => (
               <CheckLine
                 key={kind}
@@ -182,11 +185,13 @@ export function AiPanel() {
             ))}
           </div>
         </SettingRow>
-        <SettingRow id="parser-rules" label="Правила компании" hint={rules?.text ? `Действует версия ${rules.version}. Меняются только после проверки на корпусе` : "Своих нет — разбор идёт по ядру промпта"}>
-          <Link href="/desk/settings/lab?tab=parser" data-testid="settings-parser-rules" className="text-[13px] font-medium text-accent hover:underline">
-            Открыть в Лаборатории →
-          </Link>
-        </SettingRow>
+        {devTools ? (
+          <SettingRow id="parser-rules" label="Правила компании" hint={rules?.text ? `Действует версия ${rules.version}. Меняются только после проверки на корпусе` : "Своих нет — разбор идёт по ядру промпта"}>
+            <Link href="/desk/settings/lab?tab=parser" data-testid="settings-parser-rules" className="text-[13px] font-medium underline underline-offset-2">
+              Открыть в Лаборатории →
+            </Link>
+          </SettingRow>
+        ) : null}
       </SettingsGroup>
 
       <SettingsGroup id="dictionary" title="Словарь" about="Как ИИ слышит имена людей и слова компании — контрагентов, объекты, термины.">
@@ -195,7 +200,7 @@ export function AiPanel() {
           label="Имена и слова"
           hint={`${people.data ? `${names} ${pluralRu(names, ["имя", "имени", "имён"])}` : "имена"} · ${words ? `${words} ${pluralRu(words, ["слово", "слова", "слов"])}` : "слов нет"}`}
         >
-          <Link href="/desk/settings/dictionary" data-testid="settings-dictionary" className="text-[13px] font-medium text-accent hover:underline">
+          <Link href="/desk/settings/dictionary" data-testid="settings-dictionary" className="text-[13px] font-medium underline underline-offset-2">
             Открыть словарь →
           </Link>
         </SettingRow>

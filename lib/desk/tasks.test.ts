@@ -1,26 +1,36 @@
 import { describe, expect, it } from "vitest";
 
+import { closedSections } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 
 import {
   ACT_LABEL,
+  archiveStatusOf,
   bulkPlan,
+  columnFits,
+  COLUMN_FLOORS,
   cursorStep,
   deadlinePresets,
   decisionLine,
+  decisionParts,
   deliveryLine,
+  disputeLines,
   enterMove,
+  extrasWord,
   firstChanged,
   fitColumn,
   groupChoices,
   groupOf,
+  handInVerdict,
   inPlaceOf,
   isDangerAction,
   keyOfAction,
   latestLine,
+  loadStateOf,
   matchesDue,
   matchesStatus,
   opensRun,
+  orderLines,
   parseTab,
   parseTimeInput,
   personNow,
@@ -32,6 +42,7 @@ import {
   shiftYmd,
   stackMoves,
   stageOf,
+  staleNote,
   stepHm,
   tableSections,
   togglePick,
@@ -39,7 +50,11 @@ import {
   wallIso,
   wallYmd,
   weekdayOf,
+  verdictRank,
+  widthBucket,
   withSkipped,
+  worstLoad,
+  type QueryView,
 } from "./tasks";
 
 // 2026-11-03 12:00 in Aqtobe (UTC+5)
@@ -120,6 +135,10 @@ describe("a row's words", () => {
     };
     expect(latestLine({ status: "pending_review", assignee_id: "e1" }, handed, NOW)?.text).toBe("сдано с фото · не всё · «готово»");
     expect(latestLine(task, undefined, NOW)).toBeNull();
+    // with the deadline in hand the line says how it was handed in; only a late one asks for a colour
+    const late = { status: "pending_review" as const, assignee_id: "e1", deadline: at("2026-11-03T03:00:00Z"), completed_at: at("2026-11-03T06:00:00Z") };
+    expect(latestLine(late, handed, NOW)).toEqual({ text: "сдано с фото · позже на 3 ч · не всё · «готово»", tone: "warn" });
+    expect(latestLine({ ...late, completed_at: at("2026-11-03T02:00:00Z") }, handed, NOW)).toEqual({ text: "сдано с фото · в срок · не всё · «готово»", tone: undefined });
   });
 
   it("the grey line under the title is the newest word unless «Последнее» says it", () => {
@@ -221,9 +240,25 @@ describe("grouping", () => {
     expect(sections.map((s) => s.title)).toEqual(["Отказы"]);
   });
 
+  it("«Закрытые» call the last seven days what they are; the phone keeps its own word", () => {
+    const threeDays = row("w", { status: "done", closed_at: at("2026-10-31T10:00:00Z") });
+    expect(tableSections("closed", "due", [threeDays], new Map(), NOW).map((s) => s.title)).toEqual(["За 7 дней"]);
+    expect(closedSections([threeDays], NOW).map((s) => s.title)).toEqual(["На этой неделе"]);
+  });
+
   it("«В работе» by the stage: not taken, in work, redone, held", () => {
     const tasks = [row("a", { status: "rework" }), row("b", { status: "sent" }), row("c", { status: "scheduled" }), row("d", {})];
-    expect(tableSections("working", "reason", tasks, new Map(), NOW).map((s) => s.title)).toEqual(["Не приняты", "В работе", "На доработке", "Отправлю позже"]);
+    expect(tableSections("working", "reason", tasks, new Map(), NOW).map((s) => s.title)).toEqual(["Не приняты", "В работе", "На доработке", "Отложены"]);
+  });
+});
+
+describe("the status filter on «Закрытые»", () => {
+  it("narrows by the two statuses that live there and by nothing else", () => {
+    expect(archiveStatusOf("done")).toBe("done");
+    expect(archiveStatusOf("revoked")).toBe("revoked");
+    expect(archiveStatusOf("declined")).toBeNull();
+    expect(archiveStatusOf("sent")).toBeNull();
+    expect(archiveStatusOf(null)).toBeNull();
   });
 });
 
@@ -297,6 +332,8 @@ describe("why a task waits, in words", () => {
     const head = { ...waiting, closed_at: null, updated_at: at("2026-11-03T06:10:00Z") };
     expect(reasonHeadline("overdue", { ...head, deadline: at("2026-10-27T07:00:00Z") }, NOW)).toBe("Просрочена на 7 дней");
     expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z") }, NOW)).toBe("Сдана 40 мин назад — ждёт приёмки");
+    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T03:20:00Z") }, NOW)).toBe("Сдана 40 мин назад · позже на 3 ч — ждёт приёмки");
+    expect(reasonHeadline("review", { ...head, completed_at: at("2026-11-03T06:20:00Z"), deadline: at("2026-11-03T13:00:00Z") }, NOW)).toBe("Сдана 40 мин назад · в срок — ждёт приёмки");
     expect(reasonHeadline("declined", { ...head, closed_at: at("2026-11-03T06:10:00Z") }, NOW)).toBe("Отказ 50 мин назад — решение за вами");
     expect(reasonHeadline("question", { ...head, question_at: at("2026-11-03T06:46:00Z") }, NOW)).toBe("Вопрос ждёт ответа 14 мин");
     const request = { id: "q", proposed: at("2026-11-04T05:00:00Z"), words: null, at: at("2026-11-03T06:35:00Z"), senderId: "e1" };
@@ -310,6 +347,10 @@ describe("why a task waits, in words", () => {
       last_message: { id: "m", content: "всё во вложении", type: "photo", sender_id: "e1", seq: 4, created_at: at("2026-11-03T06:20:00Z") },
     };
     expect(decisionLine("review", handed, NOW)).toBe("сдано 40 мин назад · фото · «всё во вложении»");
+    expect(decisionLine("review", { ...handed, deadline: at("2026-11-03T13:00:00Z") }, NOW)).toBe("сдано 40 мин назад · в срок · фото · «всё во вложении»");
+    const late = decisionParts("review", { ...handed, deadline: at("2026-11-03T03:20:00Z") }, NOW);
+    expect(late.map((part) => part.text).join(" · ")).toBe("сдано 40 мин назад · позже на 3 ч · фото · «всё во вложении»");
+    expect(late.filter((part) => part.tone)).toEqual([{ text: "позже на 3 ч", tone: "warn" }]);
     expect(decisionLine("question", { ...waiting, question: "какой адрес?", question_at: at("2026-11-03T06:46:00Z") }, NOW)).toBe("«какой адрес?» · 14 мин без ответа");
     expect(decisionLine("declined", { ...waiting, decline_reason: "нет доступа", suggestion: { id: "e2", name: "Ерлан Сапаров" } }, NOW)).toBe(
       "не может: «нет доступа» · предлагает: Ерлан",
@@ -463,5 +504,162 @@ describe("the desk's own hand (wave 3)", () => {
     expect(opensRun(word("a", "2026-11-03T06:00:00Z", "status_change"), word("a", "2026-11-03T06:01:00Z"))).toBe(true);
     // 23:58 and 00:01 in Aqtobe: two days
     expect(opensRun(word("a", "2026-11-03T18:58:00Z"), word("a", "2026-11-03T19:01:00Z"))).toBe(true);
+  });
+});
+
+describe("«в срок / позже» on a handed-in task (the rule of `tasks_points`)", () => {
+  const task = (patch: Partial<Parameters<typeof handInVerdict>[0]>) => ({
+    status: "pending_review" as const,
+    deadline: at("2026-11-03T13:00:00Z"),
+    completed_at: at("2026-11-03T10:00:00Z"),
+    ...patch,
+  });
+
+  it("before the deadline and up to it — in time, to the very second", () => {
+    expect(handInVerdict(task({}))).toEqual({ late: false, text: "в срок" });
+    expect(handInVerdict(task({ completed_at: at("2026-11-03T13:00:00Z") }))).toEqual({ late: false, text: "в срок" });
+  });
+
+  it("after it — by how much, never «0 мин»", () => {
+    expect(handInVerdict(task({ completed_at: at("2026-11-03T16:00:00Z") }))).toEqual({ late: true, text: "позже на 3 ч" });
+    expect(handInVerdict(task({ completed_at: at("2026-11-03T13:40:00Z") }))?.text).toBe("позже на 40 мин");
+    expect(handInVerdict(task({ completed_at: at("2026-11-03T13:00:20Z") }))).toEqual({ late: true, text: "позже на 1 мин" });
+    expect(handInVerdict(task({ completed_at: at("2026-11-05T13:00:00Z") }))?.text).toBe("позже на 2 дня");
+  });
+
+  it("no deadline, or no hand-in on record — nothing to say", () => {
+    expect(handInVerdict(task({ deadline: null }))).toBeNull();
+    expect(handInVerdict(task({ completed_at: null }))).toBeNull();
+  });
+
+  it("the column sorts late work to one end and the rows with nothing to say to the other", () => {
+    const late = handInVerdict(task({ completed_at: at("2026-11-03T16:00:00Z") }));
+    const inTime = handInVerdict(task({}));
+    expect([verdictRank(null), verdictRank(inTime), verdictRank(late)]).toEqual([0, 1, 2]);
+  });
+
+  it("a deadline moved forward counts as the deadline: the task's present one, as the points read it", () => {
+    const moved = task({ deadline: at("2026-11-04T13:00:00Z"), completed_at: at("2026-11-03T16:00:00Z") });
+    expect(handInVerdict(moved)).toEqual({ late: false, text: "в срок" });
+  });
+
+  it("after a rework the latest hand-in is the hand-in; on rework there is none", () => {
+    // handed in on time, returned, handed in again next day: `completed_at` holds the second time
+    expect(handInVerdict(task({ completed_at: at("2026-11-04T10:00:00Z") }))).toEqual({ late: true, text: "позже на 21 ч" });
+    expect(handInVerdict(task({ status: "rework" }))).toBeNull();
+    expect(handInVerdict(task({ status: "accepted" }))).toBeNull();
+  });
+
+  it("accepted work keeps its verdict; a refusal and a recall have none", () => {
+    expect(handInVerdict(task({ status: "done" }))).toEqual({ late: false, text: "в срок" });
+    expect(handInVerdict(task({ status: "declined" }))).toBeNull();
+    expect(handInVerdict(task({ status: "revoked" }))).toBeNull();
+  });
+
+  it("instants, not strings: 18:00 in Aqtobe against 13:30 UTC is half an hour late", () => {
+    const aqtobe = task({ deadline: "2026-11-03T18:00:00+05:00", completed_at: "2026-11-03T13:30:00Z" });
+    expect(handInVerdict(aqtobe)).toEqual({ late: true, text: "позже на 30 мин" });
+    // across midnight on the wall: 23:30 to 02:00 next day in Aqtobe
+    expect(handInVerdict(task({ deadline: "2026-11-03T23:30:00+05:00", completed_at: "2026-11-04T02:00:00+05:00" }))?.text).toBe("позже на 2 ч 30 мин");
+  });
+
+  it("a broken date is no verdict", () => {
+    expect(handInVerdict(task({ deadline: "not a date" }))).toBeNull();
+  });
+});
+
+describe("what a screen knows about its data", () => {
+  const query = (patch: Partial<QueryView>): QueryView => ({ data: undefined, status: "pending", fetchStatus: "fetching", dataUpdatedAt: 0, errorUpdatedAt: 0, ...patch });
+
+  it("the first look: waiting, a failure, or no network with no copy — never an empty list", () => {
+    expect(loadStateOf(query({}))).toEqual({ kind: "loading" });
+    expect(loadStateOf(query({ status: "error", fetchStatus: "idle" }))).toEqual({ kind: "failed", offline: false });
+    expect(loadStateOf(query({ fetchStatus: "paused" }))).toEqual({ kind: "failed", offline: true });
+  });
+
+  it("a press of «Повторить» keeps the failure on screen until the answer comes", () => {
+    expect(loadStateOf(query({ status: "error", fetchStatus: "fetching" }))).toEqual({ kind: "failed", offline: false });
+  });
+
+  it("a copy on screen stays, with a word that it could not be refreshed", () => {
+    const failedAt = new Date("2026-11-03T06:32:00Z").getTime();
+    const dataAt = new Date("2026-11-03T06:20:00Z").getTime();
+    expect(loadStateOf(query({ data: [], status: "success", fetchStatus: "idle" }))).toEqual({ kind: "ready" });
+    const refused = loadStateOf(query({ data: [], status: "error", fetchStatus: "idle", errorUpdatedAt: failedAt, dataUpdatedAt: dataAt }));
+    expect(refused).toEqual({ kind: "stale", failedAt, dataAt });
+  });
+
+  it("a copy waiting for the network is fine: the app's own line says «Нет связи»", () => {
+    expect(loadStateOf(query({ data: [], status: "success", fetchStatus: "paused", dataUpdatedAt: 1 }))).toEqual({ kind: "ready" });
+  });
+
+  it("an empty list that came from the server is ready — it is the truth", () => {
+    expect(loadStateOf(query({ data: [], status: "success", fetchStatus: "idle", dataUpdatedAt: 1 }))).toEqual({ kind: "ready" });
+  });
+
+  it("the note names the Aqtobe time of the failure, the hint how old the copy is", () => {
+    const failedAt = new Date("2026-11-03T06:32:00Z").getTime();
+    const dataAt = new Date("2026-11-03T06:20:00Z").getTime();
+    expect(staleNote({ kind: "stale", failedAt, dataAt }, NOW)).toEqual({ text: "Не обновилось в 11:32", title: "На экране данные на 11:20" });
+    const lastNight = new Date("2026-11-02T18:50:00Z").getTime();
+    expect(staleNote({ kind: "stale", failedAt: lastNight, dataAt: lastNight }, new Date("2026-11-02T19:10:00Z")).text).toBe("Не обновилось вчера 23:50");
+  });
+
+  it("several queries: a failure outweighs a wait, a wait outweighs a stale copy, the oldest copy speaks", () => {
+    const stale = (dataAt: number) => ({ kind: "stale" as const, failedAt: 9, dataAt });
+    expect(worstLoad([{ kind: "ready" }, { kind: "failed", offline: false }, { kind: "loading" }])).toEqual({ kind: "failed", offline: false });
+    expect(worstLoad([stale(5), { kind: "loading" }])).toEqual({ kind: "loading" });
+    expect(worstLoad([stale(5), stale(3), { kind: "ready" }])).toEqual(stale(3));
+    expect(worstLoad([{ kind: "ready" }, { kind: "ready" }])).toEqual({ kind: "ready" });
+  });
+});
+
+describe("the table on a narrow list", () => {
+  it("1280 with the panel keeps who, what and when; the stage and the rest give way", () => {
+    const bucket = widthBucket(560);
+    expect(columnFits("who", bucket)).toBe(true);
+    expect(columnFits("due", bucket)).toBe(true);
+    expect(columnFits("pick", bucket)).toBe(true);
+    expect(columnFits("stage", bucket)).toBe(false);
+    expect(columnFits("delivery", bucket)).toBe(false);
+    expect(columnFits("last", bucket)).toBe(false);
+  });
+
+  it("1440 with the panel keeps the stage", () => {
+    expect(columnFits("stage", widthBucket(720))).toBe(true);
+    expect(columnFits("delivery", widthBucket(720))).toBe(false);
+  });
+
+  it("a wide list keeps everything; a sliver of one keeps the title alone", () => {
+    expect(COLUMN_FLOORS.every((floor) => widthBucket(1200) >= floor)).toBe(true);
+    expect(widthBucket(300)).toBe(0);
+    expect(columnFits("who", 0)).toBe(false);
+    expect(columnFits("due", 0)).toBe(false);
+  });
+
+  it("the width between two floors is one bucket: dragging the panel there redraws nothing", () => {
+    expect(widthBucket(641)).toBe(widthBucket(759));
+    expect(widthBucket(639)).not.toBe(widthBucket(640));
+  });
+});
+
+describe("«Ждут вашего решения» beyond tasks", () => {
+  it("a dispute says the minus, what for, and the person's words", () => {
+    const dispute = { text: "Был на больничном", created_at: at("2026-11-03T06:20:00Z"), tx: { amount: -5, reason: "после срока: Смета" } };
+    expect(disputeLines(dispute, NOW)).toEqual({ title: "Оспаривает −5 · после срока: Смета", line: "«Был на больничном» · 40 мин назад", refund: 5 });
+    expect(disputeLines({ ...dispute, tx: null }, NOW)).toEqual({ title: "Оспаривает", line: "«Был на больничном» · 40 мин назад", refund: 0 });
+  });
+
+  it("an order says the reward, the price, the wait", () => {
+    const order = { price: 200, created_at: at("2026-11-03T04:00:00Z"), item: { title: "Кружка" } };
+    expect(orderLines(order, NOW)).toEqual({ title: "Кружка", line: "заказ · 200 очков · 3 ч назад" });
+    expect(orderLines({ ...order, price: 1, item: null }, NOW)).toEqual({ title: "Награда", line: "заказ · 1 очко · 3 ч назад" });
+  });
+
+  it("the moment's quiet line counts them, one word for one", () => {
+    expect(extrasWord(0, 0)).toBeNull();
+    expect(extrasWord(1, 0)).toBe("1 спор ждёт вас");
+    expect(extrasWord(1, 2)).toBe("1 спор · 2 заказа ждут вас");
+    expect(extrasWord(0, 5)).toBe("5 заказов ждут вас");
   });
 });

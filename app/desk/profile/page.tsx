@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ProfileDesk } from "@/app/desk/profile/ProfileDesk";
-import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
+import { DeskPage } from "@/components/desk/ui/PageTitle";
 import { getSessionProfile } from "@/lib/auth";
 import { loadBrand } from "@/lib/brand";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -28,7 +28,6 @@ export default async function DeskProfilePage() {
 
   return (
     <DeskPage width="narrow">
-      <PageTitle title="Профиль" />
       <ProfileDesk userId={profile.userId} fullName={profile.fullName} role={profile.role} company={brand.name} email={email} signOut={signOut} />
     </DeskPage>
   );

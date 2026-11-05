@@ -6,19 +6,18 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { DeskConfirm } from "@/components/desk/DeskConfirm";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { formatWhen } from "@/lib/desk/when";
 import { COMMAND_FIELD_ID } from "@/lib/desk/keys";
-import { matchSections, matchTasks, searchPeople } from "@/lib/desk/palette";
+import { matchSections, matchTasks, searchPeople, taskLookup } from "@/lib/desk/palette";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY } from "@/lib/desk/routes";
 import { suggestPeople, wordAtCaret } from "@/lib/desk/suggest";
 import { shortName } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { useComposeStore, type ComposePin } from "@/lib/store/compose";
 import { useIngestStore, type IngestStage } from "@/lib/store/ingest";
-import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
+import { useMe, useSentTasks, useTaskSearch, type TaskWithPeople } from "@/lib/tasks/queries";
 import { STAGE_LINE } from "@/lib/voice/stages";
 
 /** Stages the line shows as a thin bar under itself; the phrase is never silently in flight (D-43). */
@@ -51,34 +50,20 @@ function rowKey(row: Row): string {
   return `${row.kind}:${row.person.id}`;
 }
 
-function PulseGlyph() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden className="shrink-0 text-accent" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="2,12 7,12 10,5 14,19 17,10 19,12 22,12" />
-    </svg>
-  );
-}
-
-function SectionGlyph() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden className="shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h12M13 7l5 5-5 5" />
-    </svg>
-  );
-}
-
 /**
- * The director's order line over the whole desk (D-153 §5, D-154): the product's signature — the
- * pulse mark, a real example in the field, a ring of the accent when it has the caret. Free text
- * goes through the very same parser as speech (principle 1; the errand matcher of D-79 §9 is
+ * The director's order line over the whole desk (D-153 §5, D-154): the product's signature — a
+ * line of a form standing on the sheet's heavy rule, a real example in the field, the rule turning
+ * to the pen when it has the caret (D-158). Free text goes through the very same parser as speech (principle 1; the errand matcher of D-79 §9 is
  * inside `submitText`); the stage shows under the line, the parsed order in the right-hand panel.
  *
  * It is the desk's palette too (D-154 wave 3): while the words are typed, what they may also mean
  * shows under the line from data already read — whom to give it to (the name under the caret;
  * Tab pins the person by id, D-84, and the parser no longer guesses «кому из них»), a section, a
- * person's card, a task already given. ↑/↓ pick a row and Enter opens it; with no row picked
- * Enter sends the order, as always. The roster and the tasks are asked on the first focus only:
- * asked by the shell at once, they landed before the screen under it hydrated (#418).
+ * person's card, a task already given — the ones loaded at once, the rest of history from the
+ * server a moment later (`useTaskSearch`, never while a person is pinned: then the words are an
+ * order). ↑/↓ pick a row and Enter opens it; with no row picked Enter sends the order, as always.
+ * The roster and the tasks are asked on the first focus only: asked by the shell at once, they
+ * landed before the screen under it hydrated (#418).
  */
 export function CommandLine() {
   const router = useRouter();
@@ -124,14 +109,20 @@ export function CommandLine() {
     () => (people.data ?? []).filter((person) => person.is_active && person.role !== "tv" && person.role !== "director"),
     [people.data],
   );
+  // the server reads titles: a name among the words goes to the assignee (`taskLookup`)
+  const lookup = useMemo(() => taskLookup(value.trim(), team), [value, team]);
+  const searched = useTaskSearch({ text: lookup.text, assignees: lookup.assignees, enabled: touched && focused && !pin });
   const tasks = useMemo(() => {
-    const list = sent.data ?? [];
+    // a loaded list's own copy wins
+    const byId = new Map([...searched.rows, ...(sent.data ?? [])].map((task) => [task.id, task]));
     return {
-      byId: new Map(list.map((task) => [task.id, task])),
+      byId,
       // the palette matches the assignee's name too: «смета ерлан»
-      plain: list.map((task) => ({ id: task.id, title: task.title, status: task.status, assignee: task.assignee?.full_name ?? null, deadline: task.deadline, created_at: task.created_at })),
+      plain: [...byId.values()].map((task) => ({ id: task.id, title: task.title, status: task.status, assignee: task.assignee?.full_name ?? null, deadline: task.deadline, created_at: task.created_at })),
+      // hits of an older text stand under the new words only in the list of known tasks, not as hits
+      found: new Set(searched.stale ? [] : searched.rows.map((task) => task.id)),
     };
-  }, [sent.data]);
+  }, [sent.data, searched.rows, searched.stale]);
 
   // who the word under the caret may be — only while no one is pinned yet
   const at = pin ? null : wordAtCaret(value, caret);
@@ -142,7 +133,7 @@ export function CommandLine() {
     const offered = new Set(offers.map((person) => person.id));
     const sections = matchSections(query, SECTIONS);
     const others = searchPeople(team, query, 3).filter((person) => !offered.has(person.id));
-    const found = matchTasks(query, tasks.plain).flatMap((hit) => {
+    const found = matchTasks(query, tasks.plain, 5, tasks.found).flatMap((hit) => {
       const task = tasks.byId.get(hit.id);
       return task ? [task] : [];
     });
@@ -198,14 +189,12 @@ export function CommandLine() {
   };
 
   return (
-    <div className="relative min-w-0 max-w-[1280px] flex-1">
-      <div className="desk-command field flex h-12 items-center gap-2.5 rounded-[14px] pl-3.5 pr-2.5">
-        <PulseGlyph />
+    <div className="relative min-w-0 flex-1">
+      <div className="desk-command field flex h-12 items-center gap-2.5 rounded-[2px] pl-3.5 pr-2.5">
         {pin ? (
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-accent/50 bg-accent/12 py-0.5 pl-0.5 pr-1 text-[13px] font-semibold leading-[18px]" data-testid="command-pin">
-            <Avatar name={pin.name} size={20} />
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-[15px] font-medium leading-5 text-accent" data-testid="command-pin">
             {pin.name}
-            <button type="button" aria-label="Убрать исполнителя" onClick={() => setPin(null)} className="flex h-5 w-5 items-center justify-center rounded-full text-[14px] leading-none text-muted hover:text-text">
+            <button type="button" aria-label="Убрать исполнителя" onClick={() => setPin(null)} className="flex h-5 w-5 items-center justify-center text-[15px] leading-none text-muted hover:text-text">
               ×
             </button>
           </span>
@@ -291,8 +280,9 @@ export function CommandLine() {
         )}
       </div>
       {working ? (
-        <span aria-hidden className="absolute inset-x-4 -bottom-[3px] h-[2px] overflow-hidden rounded-full bg-accent/15">
-          <span className="desk-progress block h-full w-1/3 rounded-full bg-accent" />
+        // the bar runs along the sheet's heavy rule: the pen on a pale track, whatever the rule's own ink
+        <span aria-hidden className="absolute inset-x-0 -bottom-[10px] h-[2px] overflow-hidden bg-border">
+          <span className="desk-progress block h-full w-1/3 bg-accent" />
         </span>
       ) : null}
       {open ? <Palette rows={rows} chosen={chosen} onHover={setChosen} onAct={act} pins={pins} picked={picked} /> : null}
@@ -323,7 +313,7 @@ function Palette({
 }) {
   return (
     <div
-      className="absolute left-0 top-[calc(100%+6px)] z-30 w-[min(560px,100%)] overflow-hidden rounded-[12px] border border-border bg-surface"
+      className="absolute left-0 top-[calc(100%+6px)] z-30 w-[min(560px,100%)] overflow-hidden rounded-[2px] border border-text bg-surface"
       style={{ boxShadow: "var(--shadow-raised)" }}
       data-testid="command-palette"
     >
@@ -333,7 +323,7 @@ function Palette({
           const active = index === chosen;
           return (
             <li key={rowKey(row)} role="presentation">
-              {head ? <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{GROUP[row.kind]}</p> : null}
+              {head ? <p className="desk-label px-3 pb-1 pt-2 uppercase">{GROUP[row.kind]}</p> : null}
               <div
                 id={`${LIST_ID}-${index}`}
                 role="option"
@@ -345,7 +335,7 @@ function Palette({
                 onMouseMove={() => {
                   if (!active) onHover(index);
                 }}
-                className={`mx-1 flex h-10 cursor-default items-center gap-2.5 rounded-[8px] px-2.5 ${active ? "bg-surface-2" : ""}`}
+                className={`flex h-9 cursor-default items-center gap-2.5 px-3 ${active ? "bg-surface-2" : ""}`}
               >
                 <RowBody row={row} />
                 <span className="ml-auto flex shrink-0 items-center gap-1 pl-2">
@@ -375,11 +365,9 @@ function Palette({
           );
         })}
       </ul>
-      <div className="flex items-center gap-3 border-t border-border/70 px-3 py-1.5 text-[12px] leading-4 text-muted">
-        <Hint keys={["↑", "↓"]}>выбрать</Hint>
+      <div className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[12px] leading-4 text-muted">
         <Hint keys={["Enter"]}>{picked ? (picked.kind === "pin" ? "поручить" : "открыть") : "отправить поручение"}</Hint>
         {pins > 0 ? <Hint keys={["Tab"]}>поручить первому</Hint> : null}
-        {picked?.kind === "pin" ? <Hint keys={["Shift", "Enter"]}>карточка</Hint> : null}
         <span className="ml-auto">
           <Hint keys={["Esc"]}>скрыть</Hint>
         </span>
@@ -401,16 +389,14 @@ function Hint({ keys, children }: { keys: string[]; children: ReactNode }) {
 
 function RowBody({ row }: { row: Row }) {
   if (row.kind === "section") {
-    return (
-      <>
-        <SectionGlyph />
-        <span className="truncate text-[14px] leading-5">{row.label}</span>
-      </>
-    );
+    return <span className="truncate text-[14px] leading-5">{row.label}</span>;
   }
   if (row.kind === "task") {
     const task = row.task;
-    const sub = [task.assignee?.full_name ? shortName(task.assignee.full_name) : null, task.deadline ? `до ${formatWhen(task.deadline)}` : null].filter(Boolean).join(" · ");
+    // closed work is found by when it closed; its deadline no longer says anything
+    const closed = task.status === "done" || task.status === "revoked";
+    const when = closed && task.closed_at ? `закрыта ${formatWhen(task.closed_at)}` : task.deadline ? `до ${formatWhen(task.deadline)}` : null;
+    const sub = [task.assignee?.full_name ? shortName(task.assignee.full_name) : null, when].filter(Boolean).join(" · ");
     return (
       <>
         <StatusGlyph status={task.status} size={16} />
@@ -422,7 +408,6 @@ function RowBody({ row }: { row: Row }) {
   const person = row.person;
   return (
     <>
-      <Avatar name={person.full_name} size={24} />
       <span className="min-w-0 truncate text-[14px] leading-5">{person.full_name}</span>
       {person.position ? <span className="min-w-0 shrink truncate text-[12px] leading-4 text-muted">{person.position}</span> : null}
     </>

@@ -50,8 +50,14 @@ export async function checkSettings(ctx: Ctx) {
     await tabs(ctx);
     await search(ctx);
     await dictionary(ctx);
-    await lab(ctx);
-    await data(ctx);
+    // the developers' tools are the company's flag (settings.dev_tools): open — tested, closed — must stay closed
+    await open(ctx.page, "/desk/settings");
+    if ((await ctx.page.getByTestId("settings-nav-lab").count()) > 0) {
+      await lab(ctx);
+      await data(ctx);
+    } else {
+      await closedTools(ctx);
+    }
     await points(ctx);
   } finally {
     page.off("pageerror", onError);
@@ -68,7 +74,12 @@ async function tabs(ctx: Ctx) {
   const nav = page.getByTestId("settings-subnav");
   await nav.waitFor({ timeout: 15_000 });
   const items = await nav.locator('[data-testid^="settings-nav-"]').count();
-  record("настройки: под-навигация директора — поиск, четыре вкладки и четыре экрана", items === 8 && (await nav.getByLabel("Найти настройку").count()) === 1, `пунктов ${items}`);
+  const devTools = (await nav.getByTestId("settings-nav-lab").count()) + (await nav.getByTestId("settings-nav-data").count());
+  record(
+    "настройки: под-навигация директора — поиск, четыре вкладки и экраны рядом (без флага — без «Лаборатории» и «Данных»)",
+    items === 6 + devTools && devTools !== 1 && (await nav.getByLabel("Найти настройку").count()) === 1,
+    `пунктов ${items}, инструментов разработчика ${devTools}`,
+  );
 
   for (const [tab, groups] of TABS) {
     await page.getByTestId(`settings-nav-${tab}`).click();
@@ -208,6 +219,17 @@ async function dictionary(ctx: Ctx) {
   record("словарь: N — поле нового слова", add === "Новое слово или список", add);
   await page.keyboard.press("Escape");
   await ctx.shot("settings-dictionary-words");
+}
+
+/** Without `settings.dev_tools`: nothing leads to the two screens, and their addresses go to the settings. */
+async function closedTools(ctx: Ctx) {
+  const { page } = ctx;
+  for (const path of ["/desk/settings/lab", "/desk/settings/data"]) {
+    await open(page, path);
+    record(`инструменты разработчика закрыты: ${path} уводит в настройки`, new URL(page.url()).pathname === "/desk/settings", page.url());
+  }
+  await open(page, "/desk/settings?tab=ai");
+  record("инструменты разработчика закрыты: в «ИИ-модель» нет ссылки на «Лабораторию»", (await page.getByTestId("settings-parser-rules").count()) === 0);
 }
 
 async function lab(ctx: Ctx) {

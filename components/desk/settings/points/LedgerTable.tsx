@@ -6,6 +6,7 @@ import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { pointsTone } from "@/lib/desk/format";
@@ -48,37 +49,37 @@ export function LedgerTable({ who, search }: { who: string; search: string }) {
     {
       key: "when",
       title: "Когда",
-      width: "150px",
+      width: "136px",
       sort: (a, b) => time(a) - time(b),
-      render: (row) => <span className="nums whitespace-nowrap text-muted">{humanAqtobe(new Date(row.created_at))}</span>,
+      render: (row) => <When className="whitespace-nowrap text-muted">{humanAqtobe(new Date(row.created_at))}</When>,
     },
     {
       key: "who",
       title: "Кто",
-      width: "minmax(180px,1fr)",
+      width: "minmax(130px,1fr)",
       sort: (a, b) => (a.user?.full_name ?? "").localeCompare(b.user?.full_name ?? "", "ru"),
       render: (row) => <PersonCell name={row.user?.full_name ?? "—"} />,
     },
     {
       key: "amount",
       title: "Сумма",
-      width: "100px",
+      width: "88px",
       align: "right",
       sort: (a, b) => a.amount - b.amount,
-      // a plus is the reward's gold; a minus — a fine, a shop order — is quiet with a real «−», never an alarm (D-154)
+      // a plus is print; a minus — a fine, a shop order — is quiet with a real «−», never an alarm (D-154)
       render: (row) => <Num value={row.amount} signed tone={pointsTone(row.amount)} className="font-semibold" />,
     },
     {
       key: "reason",
       title: "За что",
-      width: "minmax(220px,2fr)",
+      width: "minmax(170px,2fr)",
       render: (row) => (
         <span className="block truncate" title={row.reason}>
           {row.reason}
         </span>
       ),
     },
-    { key: "source", title: "Откуда", width: "170px", render: (row) => <span className="text-muted">{SOURCE_LABEL[row.source] ?? row.source}</span> },
+    { key: "source", title: "Откуда", width: "150px", render: (row) => <span className="text-muted">{SOURCE_LABEL[row.source] ?? row.source}</span> },
   ];
 
   return (

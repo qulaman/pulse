@@ -25,8 +25,6 @@ export const NAMES_STEPS: GuideStep[] = [
   { title: "Одно прозвище — одному", body: "Если «Саша» у двоих, на «Саша» ИИ каждый раз спросит, кого. Такие совпадения отмечены в таблице." },
 ];
 
-const TONE = { sure: "var(--ok)", check: "var(--warn)", ask: "var(--warn)", none: "var(--danger)" } as const;
-
 /**
  * «Проверить имя» on the desk (D-111): the spoken form in, what the name matcher makes of it out —
  * the pipeline's `matchName` with the company's thresholds. A form an alias would settle goes to a
@@ -61,7 +59,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
 
   return (
     <Strip title="Проверить имя" about="как говорите вслух, в любом падеже — что поймёт ИИ">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
       <input
         type="search"
         value={spoken}
@@ -71,11 +69,10 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
         }}
         placeholder="Имя, как в речи"
         aria-label="Имя, как в речи"
-        className="field h-9 w-[260px] px-3 text-[14px] leading-5 outline-none"
+        className="field h-9 w-[240px] text-[14px] leading-5 outline-none"
       />
       {result ? (
         <div role="status" className="flex min-w-0 flex-1 gap-2">
-          <span aria-hidden className="mt-[6px] h-2 w-2 shrink-0 rounded-full" style={{ background: TONE[result.kind] }} />
           <p className="min-w-0 flex-1 text-[13px] leading-[18px]">
             {result.kind === "sure" ? (
               <>
@@ -102,7 +99,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
       ) : null}
       {result && result.kind !== "sure" && result.teach ? (
         <div className="flex items-center gap-2">
-          <select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="field h-8 w-[220px] cursor-pointer pl-2.5 text-[13px] leading-5">
+          <select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="field h-8 w-[220px] cursor-pointer text-[13px] leading-5">
             <option value="" disabled>
               Кого так зовёте?
             </option>
@@ -131,9 +128,9 @@ function MisheardBlock({ items, lockedIds, onAdded }: { items: Misheard[]; locke
   if (!visible.length) return null;
   return (
     <Strip title="Из ваших записей" count={visible.length} about="ИИ не узнал эти имена, и вы выбрали человека сами — запомнить?" testId="dictionary-misheard">
-      <ul className="grid grid-cols-2 gap-x-6">
+      <ul className="desk-list grid grid-cols-2 gap-x-8">
         {visible.map((item) => (
-          <li key={item.key} className="flex items-center gap-2 border-t border-border/50 py-1.5 [&:nth-child(-n+2)]:border-t-0">
+          <li key={item.key} className="flex items-center gap-2 py-1">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-medium leading-5">«{item.form}»</p>
               <p className="truncate text-[12px] leading-4 text-muted">
@@ -157,7 +154,7 @@ function MisheardBlock({ items, lockedIds, onAdded }: { items: Misheard[]; locke
               aria-label={`Не запоминать «${item.form}»`}
               title="Не запоминать"
               onClick={() => dismiss.mutate([item.key])}
-              className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+              className="flex h-6 w-6 shrink-0 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
             >
               ×
             </button>
@@ -182,12 +179,12 @@ export function NamesTab({ people, me, matching, query, filter }: { people: Pers
   const markFresh = (id: string, entries: string[]) => setFresh((seen) => new Set([...seen, ...entries.map((entry) => `${id}:${entry}`)]));
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-4">
       <NameCheckBlock people={roster} matching={matching} lockedIds={locked} onAdded={markFresh} />
       <MisheardBlock items={misheard.data ?? []} lockedIds={locked} onAdded={markFresh} />
       <div className="flex min-w-0 flex-col gap-2">
         <NamesTable people={people} canEdit={canEdit} query={query} filter={filter} fresh={fresh} waiting={waiting.aliases} onAdded={markFresh} />
-        <p className="px-1 text-[12px] leading-4 text-muted">
+        <p className="text-[12px] leading-4 text-muted">
           {people.length} {pluralRu(people.length, ["человек", "человека", "человек"])} · уволенных и экранов здесь нет
           {people.length > HINT_MAX_PEOPLE ? `. Распознаванию подсказываются ${HINT_MAX_PEOPLE}, кому вы чаще ставите задачи; остальных узнаёт разбор поручений` : ""}
         </p>

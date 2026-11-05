@@ -4,7 +4,6 @@ import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { Button } from "@/components/ui/Button";
 import { useAwardPoints } from "@/lib/points/queries";
 
@@ -20,7 +19,7 @@ const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
 
 function Label({ children, htmlFor }: { children: string; htmlFor?: string }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1.5 block text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
+    <label htmlFor={htmlFor} className="desk-label mb-0.5 block uppercase">
       {children}
     </label>
   );
@@ -73,8 +72,7 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
 
   return (
     <div className="relative">
-      <div className="field flex h-9 items-center gap-2 px-2.5">
-        {chosen ? <Avatar name={chosen.name} size={22} /> : null}
+      <div className="field flex h-9 items-center gap-2">
         <input
           id="award-who"
           aria-label="Кому"
@@ -105,14 +103,14 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
               onChange("");
               setOpen(true);
             }}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+            className="flex h-6 w-6 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
           >
             ×
           </button>
         ) : null}
       </div>
       {open && !chosen ? (
-        <ul id="award-who-list" role="listbox" className="absolute inset-x-0 top-[calc(100%+4px)] z-10 max-h-[240px] overflow-y-auto rounded-[12px] border border-border bg-surface py-1" style={{ boxShadow: "var(--shadow-raised)" }}>
+        <ul id="award-who-list" role="listbox" className="absolute inset-x-0 top-[calc(100%+4px)] z-10 max-h-[240px] overflow-y-auto border border-text bg-surface py-1" style={{ boxShadow: "var(--shadow-raised)" }}>
           {found.length === 0 ? <li className="px-3 py-2 text-[13px] text-muted">Никого с таким именем</li> : null}
           {found.map((person, index) => (
             <li key={person.id} role="option" aria-selected={index === at}>
@@ -124,7 +122,6 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
                 onClick={() => take(person)}
                 className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[14px] leading-5 ${index === at ? "bg-surface-2" : ""}`}
               >
-                <Avatar name={person.name} size={22} />
                 <span className="min-w-0 flex-1 truncate">{person.name}</span>
                 {person.sub ? <span className="truncate text-[12px] text-muted">{person.sub}</span> : null}
               </button>
@@ -156,7 +153,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="desk-fields flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -191,18 +188,11 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
               setAmountText(String(amount + (event.shiftKey ? 10 : 1) * (event.key === "ArrowUp" ? 1 : -1)));
             }}
             aria-label="Сумма очков"
-            className="nums field h-9 w-24 px-3 text-right text-[14px] outline-none"
+            className="nums field h-9 w-20 pr-1 text-right text-[14px] outline-none"
           />
-          <span className="mr-1 text-[13px] text-muted">очков</span>
+          <span className="mr-2 text-[13px] text-muted">очков</span>
           {PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => setAmountText(String(preset))}
-              className={`nums h-8 rounded-[9px] border px-2.5 text-[13px] font-semibold transition-colors duration-[120ms] ${
-                amount === preset ? "border-accent/60 bg-accent/10 text-text" : "border-border text-muted hover:text-text"
-              }`}
-            >
+            <button key={preset} type="button" aria-pressed={amount === preset} onClick={() => setAmountText(String(preset))} className="desk-choice nums px-1">
               +{preset}
             </button>
           ))}
@@ -212,7 +202,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
       <div>
         <Label htmlFor="award-reason">За что</Label>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-x-4">
           {REASONS.map((item) => {
             const on = reason === item && !custom.trim();
             return (
@@ -224,14 +214,14 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
                   setReason(item);
                   setCustom("");
                 }}
-                className={`h-8 rounded-[9px] border px-2.5 text-[13px] font-medium transition-colors duration-[120ms] ${on ? "border-accent/60 bg-accent/10 text-text" : "border-border text-muted hover:text-text"}`}
+                className="desk-choice"
               >
                 {item}
               </button>
             );
           })}
         </div>
-        <input id="award-reason" value={custom} onChange={(event) => setCustom(event.target.value)} placeholder="Своя причина" aria-label="Своя причина" className="field mt-2 h-9 w-full px-3 text-[14px] leading-5 outline-none" />
+        <input id="award-reason" value={custom} onChange={(event) => setCustom(event.target.value)} placeholder="Своя причина" aria-label="Своя причина" className="field mt-1 h-9 w-full text-[14px] leading-5 outline-none" />
       </div>
 
       {amount > 0 ? (

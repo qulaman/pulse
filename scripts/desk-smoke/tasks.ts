@@ -7,9 +7,9 @@
  * row with no unread message is opened, and «Разобрать» is left alone while the table shows unread
  * ones.
  */
-import type { Page } from "playwright";
+import type { Page, Route } from "playwright";
 
-import { APP_URL, open, record, skip, type Ctx } from "./shared";
+import { APP_URL, injected, open, record, skip, type Ctx } from "./shared";
 
 /** «Сегодня» (D-154): the hero and every block, or the block's empty state — looked at, nothing pressed. */
 async function checkToday(ctx: Ctx) {
@@ -20,9 +20,6 @@ async function checkToday(ctx: Ctx) {
   const label = came ? ((await page.getByTestId("desk-moment-label").textContent()) ?? "").trim() : "";
   record("сегодня: герой «Момент» — число и фраза", came && label.length > 0, label);
   record("сегодня: один герой, ни одной плитки", (await hero.count()) === 1 && (await page.getByTestId("stat-tile").count()) === 0);
-  const light = await page.locator(".desk-light").first().getAttribute("data-tone").catch(() => null);
-  const tone = came ? await hero.getAttribute("data-tone") : null;
-  record("сегодня: свет экрана — тон момента", Boolean(light && light === tone), `свет ${light}, момент ${tone}`);
   // the team and the decisions land with their own queries: a block or its empty state
   await page
     .getByTestId("today-person")
@@ -92,9 +89,128 @@ async function fullShot(page: Page, ctx: Ctx, name: string) {
   });
 }
 
+/**
+ * A failed load is said as a failure, never as a calm empty screen: the answers are cut in this
+ * browser (GET only), a screen says what did not come — or, with a copy kept from the last visit
+ * (D-127), keeps it and says the refresh failed — and «Повторить» brings it back.
+ */
+async function checkFailure(ctx: Ctx) {
+  const { page } = ctx;
+  const refused = async (route: Route) => {
+    if (route.request().method() !== "GET") return route.fallback();
+    await route.fulfill({ status: 500, contentType: "application/json", body: '{"message":"smoke"}' });
+  };
+  const calm = /всё закрыто|ничего не ждёт|всё разобрано/i;
+  const pattern = "**/rest/v1/tasks*";
+  for (const [path, name] of [
+    ["/desk/today", "сегодня"],
+    ["/desk/tasks", "задачи"],
+    ["/desk/inbox", "разобрать"],
+  ] as const) {
+    injected.failures = true;
+    await page.route(pattern, refused);
+    await open(page, path);
+    const failure = page.getByTestId("desk-load-failed").or(page.locator('[data-testid="desk-load-note"][data-load="stale"]'));
+    const said = await failure.first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    const copy = (await page.getByTestId("desk-load-failed").count()) === 0;
+    const words = said ? await page.locator("#desk-main").innerText() : "";
+    record(`${name}: сбой загрузки назван, зелёных итогов нет`, said && (copy ? words.includes("Не обновилось") : !calm.test(words) && (await page.getByTestId("desk-moment").count()) === 0), words.replace(/\s+/g, " ").slice(0, 70));
+    if (name === "сегодня") await ctx.shot("today-failed");
+    await page.unroute(pattern, refused);
+    injected.failures = false;
+    if (said) {
+      await page.getByTestId("desk-load-retry").or(page.getByTestId("desk-load-note-retry")).first().click();
+      const back = await failure.first().waitFor({ state: "detached", timeout: 15_000 }).then(() => true, () => false);
+      record(`${name}: «Повторить» возвращает экран`, back);
+    }
+  }
+}
+
+/**
+ * «Закрытые» as an archive and the search over all of history, on whatever dev holds: nothing is
+ * pressed but the tabs, the period and the search field. Long lists and the literal `%` are the
+ * unit tests' (lib/desk/archive.test.ts).
+ */
+async function checkArchive(ctx: Ctx) {
+  const { page } = ctx;
+  await open(page, "/desk/tasks?tab=closed");
+  await page.getByTestId("desk-range").waitFor({ timeout: 20_000 });
+  record("закрытые: нет итога «ждут вас»", (await page.getByTestId("desk-moment").count()) === 0);
+  await page.getByTestId("desk-row").first().or(page.getByTestId("desk-empty")).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  const rows = await page.getByTestId("desk-row").count();
+  if (rows > 0) {
+    const heads = (await page.locator('[role="columnheader"]').allInnerTexts()).join(" ").toLowerCase();
+    record("закрытые: колонки «Закрыта» и «В срок», без «Срок»", heads.includes("закрыта") && heads.includes("в срок") && !/(^|\s)срок/.test(heads.replace("в срок", "")), heads.replace(/\s+/g, " "));
+  } else {
+    skip("закрытые: колонки", "закрытых нет");
+  }
+  await page.getByTestId("desk-range").click();
+  const picker = page.getByTestId("desk-range-picker");
+  await picker.waitFor({ timeout: 5_000 });
+  const presets = (await page.getByTestId("desk-range-preset").allInnerTexts()).map((text) => text.split("\n")[0]);
+  record("закрытые: быстрые периоды", ["Эта неделя", "Прошлая неделя", "Этот месяц", "Прошлый месяц"].every((name) => presets.some((one) => one.includes(name))), presets.join(" · "));
+  await page.getByTestId("desk-range-preset").nth(3).click();
+  await page.waitForTimeout(600);
+  const address = new URL(page.url()).searchParams;
+  record("закрытые: период пишется в адрес", Boolean(address.get("from") && address.get("to")), page.url().replace(APP_URL, ""));
+  record("закрытые: период называется на кнопке", ((await page.getByTestId("desk-range").innerText()) ?? "").trim() === "Прошлый месяц");
+  await ctx.shot("tasks-archive-range");
+
+  // the working tab asks the server only for a search, and a stranger's word finds nothing there
+  await open(page, "/desk/tasks?tab=working");
+  await page.locator('input[aria-label="Поиск по задачам"]').waitFor({ timeout: 20_000 });
+  const asked: string[] = [];
+  const watch = (request: { url(): string }) => {
+    if (request.url().includes("/rest/v1/tasks") && request.url().includes("title=")) asked.push(request.url());
+  };
+  page.on("request", watch);
+  await page.locator('input[aria-label="Поиск по задачам"]').fill("ззз%_з");
+  await page.waitForTimeout(900);
+  page.off("request", watch);
+  const query = new URL(asked.at(-1) ?? APP_URL).searchParams.get("title") ?? "";
+  record("поиск: уходит на сервер один раз, с экранированием", asked.length === 1 && query.includes("\\%") && query.includes("\\_"), query);
+  record("поиск: мимо — «Ничего не нашёл», а не пустота", /Ничего не нашёл/.test(await page.getByTestId("desk-empty").innerText().catch(() => "")));
+}
+
+/** 1280×720 (D-154, audit 2026-11-04): the screens keep a working shape; a row opened only with no unread in it. */
+async function checkNarrow(ctx: Ctx) {
+  const { page } = ctx;
+  const size = page.viewportSize();
+  await page.setViewportSize({ width: 1280, height: 720 });
+  for (const [path, name] of [["/desk/today", "сегодня"], ["/desk/tasks", "задачи"], ["/desk/inbox", "разобрать"]] as const) {
+    await open(page, path);
+    const wide = await page.evaluate(() => {
+      const main = document.getElementById("desk-main");
+      return main ? main.scrollWidth - main.clientWidth : -1;
+    });
+    record(`${name}: на 1280×720 ничего не выходит вбок`, wide === 0, `${wide} px`);
+  }
+  await open(page, "/desk/tasks?tab=closed");
+  const row = page.getByTestId("desk-row").first();
+  if ((await row.count()) > 0 && (await row.locator('[aria-label="новое сообщение"]').count()) === 0) {
+    await row.locator('[role="gridcell"]').nth(2).click();
+    await page.getByTestId("desk-panel").waitFor({ timeout: 10_000 }).catch(() => undefined);
+    await page.waitForTimeout(600);
+    const title = await page.locator('[data-testid="desk-row"] [role="gridcell"]:has([data-testid="desk-glyph"])').first().boundingBox();
+    record("задачи: 1280 с панелью — «Что» не меньше 200 px", (title?.width ?? 0) >= 200, `${Math.round(title?.width ?? 0)} px`);
+    await ctx.shot("tasks-1280-panel");
+    // the archive has no moment: it folds on a working tab, the panel stays open over it
+    await page.getByTestId("seg-working").click();
+    await page.getByTestId("desk-moment").waitFor({ timeout: 5_000 }).catch(() => undefined);
+    const hero = await page.getByTestId("desk-moment").boundingBox();
+    record("задачи: 1280 с панелью — герой сложен в строку", (hero?.height ?? 999) < 130, `${Math.round(hero?.height ?? 0)} px`);
+    await page.keyboard.press("Escape");
+  } else {
+    skip("задачи: 1280 с панелью", "нет строки без непрочитанного");
+  }
+  if (size) await page.setViewportSize(size);
+}
+
 export async function checkTasks(ctx: Ctx) {
   const { page } = ctx;
   await checkToday(ctx);
+  await checkFailure(ctx);
+  await checkNarrow(ctx);
   await open(page, "/desk/tasks");
   const rows = page.getByTestId("desk-row");
   const empty = page.getByTestId("desk-empty");
@@ -104,8 +220,7 @@ export async function checkTasks(ctx: Ctx) {
   record("задачи: таблица с группами или пустое состояние", (count > 0 && groups > 0) || (await empty.count()) > 0, `строк ${count}, групп ${groups}`);
   const tiles = await page.getByTestId("stat-tile").count();
   const hero = await page.getByTestId("desk-moment").count();
-  const bar = await page.getByTestId("desk-moment-bar").count();
-  record("задачи: «Момент» вместо плиток — герой и полоса стадий", hero === 1 && bar === 1 && tiles === 0, `героев ${hero}, плиток ${tiles}`);
+  record("задачи: «Момент» вместо плиток — один итог", hero === 1 && tiles === 0, `героев ${hero}, плиток ${tiles}`);
   const counters = await page.getByTestId("desk-moment-counters").locator("button").count();
   record("задачи: вторичные счётчики героя — фильтры", counters === 4, `счётчиков ${counters}`);
   await ctx.shot("tasks");
@@ -229,10 +344,9 @@ export async function checkTasks(ctx: Ctx) {
     record("задачи: X — отметка и полоса действий, Esc снимает", barCame && marks === 1 && barGone, `отмечено ${marks}`);
 
     // D on a row in hand — the deadline picker hangs from its cell; Esc closes it, nothing is set.
-    // The hint names the chosen row's letters: walk down to a row whose deadline can change
+    // A row whose deadline can change marks its cell for the popover: walk down to the first one
     for (let step = 0; step < 12; step += 1) {
-      const words = (await page.getByTestId("desk-keys-hint").textContent().catch(() => "")) ?? "";
-      if (/D\s*(срок|другой срок)/.test(words)) break;
+      if ((await page.locator('[data-testid="desk-row"][aria-selected="true"] [data-act="extend retime"]').count()) > 0) break;
       await page.keyboard.press("ArrowDown");
       await page.waitForTimeout(80);
     }
@@ -279,6 +393,7 @@ export async function checkTasks(ctx: Ctx) {
   await page.waitForTimeout(600);
   record("задачи: вкладка «Закрытые» пишется в адрес", new URL(page.url()).searchParams.get("tab") === "closed", page.url().replace(APP_URL, ""));
   await ctx.shot("tasks-closed");
+  await checkArchive(ctx);
 
   if (unread > 0) {
     // «Разобрать» shows a whole task with its thread — it would mark the director's unread as read

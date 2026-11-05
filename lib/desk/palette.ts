@@ -18,6 +18,7 @@ const SECTION_WORDS: Record<string, string> = {
   "/desk/inbox": "решения входящие ждут",
   "/desk/team": "люди сотрудники",
   "/desk/errands": "секретарь приёмная кофе посетитель",
+  "/desk/ether": "эфир объявление новости сообщение",
   "/desk/reports": "отчет день",
   "/desk/calendar": "встречи мероприятия",
   "/desk/notes": "мысли доски",
@@ -73,13 +74,30 @@ export function searchPeople<T extends PalettePerson>(people: readonly T[], quer
 /**
  * Tasks whose title or assignee fits every typed word (two letters at least): the open ones
  * first, a title that starts with the words before one that only has them, the newest first.
+ * `found` — the ids the server's search brought: it has already matched them (`useTaskSearch`).
  */
-export function matchTasks<T extends PaletteTask>(query: string, tasks: readonly T[], limit = 5): T[] {
+export function matchTasks<T extends PaletteTask>(query: string, tasks: readonly T[], limit = 5, found: ReadonlySet<string> = new Set()): T[] {
   const head = fold(query.trim());
   if (head.length < 2) return [];
   const typed = words(query);
-  const hits = tasks.filter((task) => allFit(typed, [...words(task.title), ...words(task.assignee)]));
+  const hits = tasks.filter((task) => found.has(task.id) || allFit(typed, [...words(task.title), ...words(task.assignee)]));
   const rank = (task: T) => (CLOSED.has(task.status) ? 2 : 0) + (fold(task.title).startsWith(head) ? 0 : 1);
   hits.sort((a, b) => rank(a) - rank(b) || b.created_at.localeCompare(a.created_at));
   return hits.slice(0, limit);
+}
+
+/**
+ * What the server's search needs of the typed words: «смета ерлан» is the word «смета» in a title
+ * of Ерлан's. The search reads titles only, so the names go to the assignee. Nothing but names —
+ * «ерлан» alone — stays a title's word: there is nothing else to look for.
+ */
+export function taskLookup(query: string, people: readonly PalettePerson[]): { text: string; assignees: string[] } {
+  const typed = words(query);
+  const assignees = new Set<string>();
+  const rest = typed.filter((word) => {
+    const named = people.filter((person) => words(person.full_name).some((name) => fits(word, name)));
+    for (const person of named) assignees.add(person.id);
+    return named.length === 0;
+  });
+  return rest.length > 0 && assignees.size > 0 ? { text: rest.join(" "), assignees: [...assignees] } : { text: query, assignees: [] };
 }

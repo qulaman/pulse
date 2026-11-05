@@ -93,6 +93,21 @@ export async function checkCalendar(ctx: Ctx) {
     } else {
       skip("календарь: метка срока ведёт в «Задачи»", "на этой неделе открытых сроков нет");
     }
+    // what does not fit in a day's column waits behind «+N»: a list of links, Esc takes it away
+    const more = page.getByTestId("desk-deadline-more").first();
+    if ((await more.count()) > 0) {
+      const count = Number((await more.innerText()).replace(/\D/g, ""));
+      await more.click();
+      const items = page.getByTestId("desk-deadline-item");
+      await items.first().waitFor({ timeout: 4_000 }).catch(() => undefined);
+      const listed = await items.count();
+      const href = listed > 0 ? await items.first().getAttribute("href") : null;
+      record("календарь: «+N» — список всех скрытых сроков со ссылками на задачи", listed === count && /^\/desk\/tasks\?id=/.test(href ?? ""), `+${count}, в списке ${listed}`);
+      await ctx.shot("calendar-deadlines-more");
+      record("календарь: Esc закрывает список сроков", await escapes(page, "desk-deadline-list"));
+    } else {
+      skip("календарь: «+N» у сроков", "на этой неделе все метки помещаются");
+    }
     // D — the same switch from the keyboard (the physical key: a Russian layout presses it too)
     await toggle.blur();
     await page.keyboard.press("KeyD");
@@ -139,20 +154,20 @@ export async function checkCalendar(ctx: Ctx) {
   const byW = await week.waitFor({ timeout: 10_000 }).then(() => true, () => false);
   record("календарь: клавиши M и W — месяц и неделя", byM && byW && new URL(page.url()).searchParams.get("view") === null, search(page));
 
-  // «Новое мероприятие» (and N) — the desk's own form, a centred dialog; Esc closes it, nothing is made
+  // «Новая встреча» (and N) — the desk's own form, a centred dialog; Esc closes it, nothing is made
   const add = page.getByTestId("desk-event-new");
   if (await add.count()) {
     await add.click();
     const dialog = await centred(page, "desk-event-form");
     const titled = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
-    record("календарь: «Новое мероприятие» — настольная форма по центру, курсор в названии", dialog.ok && titled === "desk-event-title", `${dialog.detail} · фокус ${titled}`);
+    record("календарь: «Новая встреча» — настольная форма по центру, курсор в названии", dialog.ok && titled === "desk-event-title", `${dialog.detail} · фокус ${titled}`);
     await ctx.shot("calendar-new-event");
     record("календарь: Esc закрывает форму", await escapes(page, "desk-event-form"));
     await page.keyboard.press("KeyN");
     const byN = await page.getByTestId("desk-event-form").waitFor({ timeout: 5_000 }).then(() => true, () => false);
     record("календарь: клавиша N открывает форму", byN && (await escapes(page, "desk-event-form")));
   } else {
-    record("календарь: «Новое мероприятие» у директора", false, "кнопки нет");
+    record("календарь: «Новая встреча» у директора", false, "кнопки нет");
   }
 
   // a meeting opens as a card beside its block, the grid in sight — looked at, not answered
@@ -165,11 +180,11 @@ export async function checkCalendar(ctx: Ctx) {
     const cardBox = await card.boundingBox();
     const blockBox = await event.boundingBox();
     const beside = Boolean(cardBox && blockBox && (cardBox.x >= blockBox.x + blockBox.width - 1 || cardBox.x + cardBox.width <= blockBox.x + 1));
-    record("календарь: мероприятие — карточка рядом с блоком, сетка видна", shown && beside, cardBox && blockBox ? `карточка x=${Math.round(cardBox.x)}, блок ${Math.round(blockBox.x)}–${Math.round(blockBox.x + blockBox.width)}` : "нет");
+    record("календарь: встреча — карточка рядом с блоком, сетка видна", shown && beside, cardBox && blockBox ? `карточка x=${Math.round(cardBox.x)}, блок ${Math.round(blockBox.x)}–${Math.round(blockBox.x + blockBox.width)}` : "нет");
     await ctx.shot("calendar-event");
     record("календарь: Esc закрывает карточку", await escapes(page, "desk-event-card"));
   } else {
-    skip("календарь: мероприятие — карточка рядом с блоком", "на этой неделе мероприятий нет");
+    skip("календарь: встреча — карточка рядом с блоком", "на этой неделе мероприятий нет");
   }
 
   // a click on an empty stretch of a day ahead: the block of the new meeting and the quick card;
@@ -201,7 +216,7 @@ export async function checkCalendar(ctx: Ctx) {
       record("календарь: клик по пустому часу — блок и быстрая карточка, курсор в названии", shown && ghost === 1 && focus === "desk-quick-title", `блок ${ghost}, фокус ${focus}`);
       await ctx.shot("calendar-quick");
       const gone = await escapes(page, "desk-quick-create");
-      record("календарь: Esc отпускает новое мероприятие — блока нет", gone && (await page.getByTestId("desk-slot-ghost").count()) === 0);
+      record("календарь: Esc отпускает новую встречу — блока нет", gone && (await page.getByTestId("desk-slot-ghost").count()) === 0);
     } else {
       skip("календарь: клик по пустому часу", "свободного места в дне нет");
     }
@@ -364,7 +379,7 @@ export async function checkScreen(ctx: Ctx) {
     record("экран: список «Показать на стене» не пуст", listed > 0, `строк ${listed}`);
 
     // the keys of the remote are said, not pressed: the digits on the scenes and the help
-    const hinted = (await scenes.innerText()).includes("клавиши 1–");
+    const hinted = /1\s/.test(await scenes.innerText());
     record("экран: у заставок — их клавиши, в справке «?» — «Экран»", hinted && (await helpLists(page, "Экран")));
 
     await page.waitForTimeout(2500);

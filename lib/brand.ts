@@ -18,6 +18,8 @@ export type Brand = {
   pointsEnabled: boolean;
   /** `settings.lab_for_all` (D-150): the team's bar carries «Лаб» — read here for the first paint. */
   labForAll: boolean;
+  /** `settings.dev_tools`: «Лаборатория» and «Данные», closed to a client. */
+  devTools: boolean;
 };
 
 const FALLBACK: Brand = {
@@ -29,6 +31,7 @@ const FALLBACK: Brand = {
   customAccent: false,
   pointsEnabled: false,
   labForAll: false,
+  devTools: false,
 };
 
 type CompanyRow = { id: string; name: string; settings: unknown };
@@ -96,5 +99,6 @@ function brandOf(data: CompanyRow): Brand {
     customAccent: custom,
     pointsEnabled: settings.points_enabled,
     labForAll: settings.lab_for_all,
+    devTools: settings.dev_tools,
   };
 }

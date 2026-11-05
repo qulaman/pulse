@@ -6,6 +6,7 @@ import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { copyText } from "@/components/people/copy";
 import { QrCode } from "@/components/people/QrCode";
+import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -40,13 +41,11 @@ function left(ms: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-function Line({ label, value, tone, action }: { label: string; value: ReactNode; tone?: "warn"; action?: ReactNode }) {
+function Line({ label, value, action }: { label: string; value: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex min-h-10 items-center gap-3 border-t border-border/60 px-4 py-1.5 first:border-t-0">
+    <div className="flex min-h-[34px] items-center gap-3 py-px">
       <span className="w-[116px] shrink-0 text-[13px] leading-5 text-muted">{label}</span>
-      <span className="min-w-0 flex-1 truncate text-[14px] leading-5" style={tone ? { color: "var(--warn)" } : undefined}>
-        {value}
-      </span>
+      <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{value}</span>
       {action}
     </div>
   );
@@ -62,7 +61,7 @@ function ErrorLine({ text }: { text: string | null }) {
 }
 
 const CHECK = (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden className="shrink-0">
     <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
@@ -131,9 +130,9 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
             : "Последний код так и не ввели"
         : null;
     return (
-      <div className="flex items-start gap-4 px-4 py-3" data-testid="desk-code-idle">
+      <div className="flex items-start gap-4 py-2" data-testid="desk-code-idle">
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[15px] font-semibold leading-5">Код входа</p>
+          <p className="text-[14px] font-semibold leading-5">Код входа</p>
           <p className="mt-0.5 text-[13px] leading-[18px] text-muted">
             {autoIssue && !error
               ? "Выдаю код…"
@@ -159,12 +158,10 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   if (landed) {
     return (
-      <div className="flex items-center gap-3 px-4 py-3" data-testid="code-landed">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full" style={{ background: "color-mix(in srgb, var(--ok) 16%, transparent)", color: "var(--ok)" }}>
-          {CHECK}
-        </span>
+      <div className="flex items-center gap-2.5 py-2" data-testid="code-landed">
+        {CHECK}
         <div className="min-w-0 flex-1">
-          <p className="font-display text-[15px] font-semibold leading-5">{tv ? "Экран подключён" : "Вход выполнен"}</p>
+          <p className="text-[14px] font-semibold leading-5">{tv ? "Экран подключён" : "Вход выполнен"}</p>
           <p className="text-[13px] leading-[18px] text-muted">
             {status.data?.device ?? "Устройство"} · {status.data?.used_at ? hm(status.data.used_at) : ""}
           </p>
@@ -178,10 +175,10 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   if (expired) {
     return (
-      <div className="flex items-center gap-4 px-4 py-3" data-testid="code-expired">
+      <div className="flex items-center gap-4 py-2" data-testid="code-expired">
         <p className="min-w-0 flex-1 text-[14px] leading-5">Код сгорел — его не ввели за 15 минут.</p>
         <ErrorLine text={error} />
-        <Button size="sm" loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
+        <Button size="sm" variant="secondary" className="desk-move" loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
           Выдать новый код
         </Button>
       </div>
@@ -190,29 +187,28 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   const message = () => codeMessage({ name: person.full_name, company: issued.code.company, code: issued.code.code, expiresAt: issued.code.expires_at, url: issued.code.link });
   return (
-    <div className="flex flex-col gap-4 px-4 py-4" data-testid="desk-code-issued">
-      <div className="flex items-start gap-5">
+    <div className="flex flex-col gap-3 py-3" data-testid="desk-code-issued">
+      <div className="flex items-start gap-4">
         {tv ? null : <QrCode text={issued.code.link} size={176} label={`QR-код: вход в ${issued.code.company}`} />}
-        <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
-          <p className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Код входа</p>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
+          <p className="desk-label uppercase">Код входа</p>
           <div className="flex items-center gap-1">
-            <span className="nums select-all whitespace-nowrap font-mono text-[26px] font-semibold leading-8 tracking-[0.06em]" data-testid="code-value">
+            <span className="nums select-all whitespace-nowrap text-[26px] leading-8" data-testid="code-value">
               {formatCode(issued.code.code)}
             </span>
             <CopyButton text={() => issued.code.code} label="Скопировать код" done="Скопировал код" />
           </div>
-          <p className="nums text-[13px] leading-[18px] text-muted" data-testid="code-left">
-            действует ещё {left(leftMs)}
+          <p className="text-[13px] leading-[18px] text-muted" data-testid="code-left">
+            действует ещё <When>{left(leftMs)}</When>
           </p>
-          <p className="mt-1 flex items-center gap-2 text-[13px] leading-[18px]" data-testid="code-waiting">
-            <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-accent" aria-hidden />
+          <p className="text-[13px] leading-[18px]" data-testid="code-waiting">
             Ждёт входа…
           </p>
         </div>
       </div>
       {tv ? (
         <p className="text-[13px] leading-[18px] text-muted" data-testid="code-address">
-          В браузере телевизора — <span className="select-all font-mono text-text">{issued.code.link.replace(/^https?:\/\//, "")}</span>, код — пультом.
+          В браузере телевизора — <span className="nums select-all text-text">{issued.code.link.replace(/^https?:\/\//, "")}</span>, код — пультом.
         </p>
       ) : (
         <p className="text-[13px] leading-[18px] text-muted">Камера телефона откроет вход по QR. Сначала приложение — на главный экран, потом код.</p>
@@ -234,17 +230,17 @@ function FreshCredentials({ person, email, password, onDone }: { person: Person;
   const first = person.full_name.split(/\s+/)[0] || person.full_name;
   const message = () => loginMessage({ name: person.full_name, email, password, url: window.location.origin });
   return (
-    <div className="flex flex-col gap-3 px-4 py-3" data-testid="desk-login-fresh">
-      <p className="font-display text-[15px] font-semibold leading-5">{first} — в команде</p>
-      <dl className="rounded-[10px] bg-surface-2/70" data-testid="credentials">
-        <div className="flex items-center gap-3 px-3 py-1.5">
+    <div className="flex flex-col gap-2 py-3" data-testid="desk-login-fresh">
+      <p className="text-[14px] font-semibold leading-5">{first} — в команде</p>
+      <dl className="desk-list" data-testid="credentials">
+        <div className="flex min-h-[34px] items-center gap-3">
           <dt className="w-16 shrink-0 text-[13px] leading-5 text-muted">Почта</dt>
           <dd className="min-w-0 flex-1 truncate text-[14px] leading-5">{email}</dd>
           <CopyButton text={() => email} label="Скопировать почту" done="Скопировал почту" />
         </div>
-        <div className="flex items-center gap-3 border-t border-border/60 px-3 py-1.5">
+        <div className="flex min-h-[34px] items-center gap-3">
           <dt className="w-16 shrink-0 text-[13px] leading-5 text-muted">Пароль</dt>
-          <dd className="nums min-w-0 flex-1 select-all font-mono text-[17px] font-semibold leading-6 tracking-[0.04em]" data-testid="credentials-password">
+          <dd className="nums min-w-0 flex-1 select-all text-[17px] leading-6" data-testid="credentials-password">
             {password}
           </dd>
           <CopyButton text={() => password} label="Скопировать пароль" done="Скопировал пароль" />
@@ -337,31 +333,29 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
 
   return (
     <Block title="Вход" testId="desk-login">
-      <section ref={box} className="scroll-mt-24 overflow-hidden rounded-[12px] border border-border bg-surface/40" data-testid="desk-login-code" data-focus={focus ? "" : undefined}>
+      <section ref={box} className="desk-list scroll-mt-24" data-testid="desk-login-code" data-focus={focus ? "" : undefined}>
         {freshCredentials ? <FreshCredentials person={person} email={freshCredentials.email} password={freshCredentials.password} onDone={() => setFresh(null)} /> : null}
         {manage || !freshCredentials ? (
-          <div className={freshCredentials ? "border-t border-border/60" : ""}>
-            <CodePanel
-              key={codeKey}
-              person={person}
-              focus={focus && codeKey === 0}
-              // a person just created without an email gets the code at once (the phone's «Добавить»)
-              autoIssue={codeKey === 0 && fresh !== null && !freshCredentials}
-              onDone={() => {
-                setFresh(null);
-                setCodeKey((k) => k + 1);
-              }}
-            />
-          </div>
+          <CodePanel
+            key={codeKey}
+            person={person}
+            focus={focus && codeKey === 0}
+            // a person just created without an email gets the code at once (the phone's «Добавить»)
+            autoIssue={codeKey === 0 && fresh !== null && !freshCredentials}
+            onDone={() => {
+              setFresh(null);
+              setCodeKey((k) => k + 1);
+            }}
+          />
         ) : null}
         {manage ? (
-          <div className="border-t border-border/60">
+          <>
             <Line
               label="Почта"
               value={login.isLoading ? "…" : login.isError ? "не прочиталась" : (shownEmail ?? <span className="text-muted">нет</span>)}
               action={
                 login.data ? (
-                  <Button size="sm" variant="ghost" className="!min-h-8" onClick={openEmail}>
+                  <Button size="sm" variant="ghost" className="!min-h-8 !px-0" onClick={openEmail}>
                     {shownEmail ? "Изменить" : "Добавить"}
                   </Button>
                 ) : null
@@ -369,26 +363,25 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
             />
             <Line
               label="Последний вход"
-              value={login.isLoading ? "…" : last ? humanAqtobe(new Date(last)) : login.data ? "ни разу — поможет код входа" : "—"}
-              tone={login.data && !last ? "warn" : undefined}
+              value={login.isLoading ? "…" : last ? <When>{humanAqtobe(new Date(last))}</When> : login.data ? "ни разу — поможет код входа" : "—"}
             />
             <Line
               label="Пароль"
               value={login.data && !shownEmail ? <span className="text-muted">нужна почта</span> : <span className="text-muted">••••••</span>}
               action={
                 login.data && !shownEmail ? null : (
-                  <Button size="sm" variant="ghost" className="!min-h-8" onClick={openPassword} data-testid="desk-login-password">
+                  <Button size="sm" variant="ghost" className="!min-h-8 !px-0" onClick={openPassword} data-testid="desk-login-password">
                     Сбросить
                   </Button>
                 )
               }
             />
-            <div className="flex items-center justify-between gap-3 border-t border-border/60 px-4 py-2">
-              <span className="min-w-0 truncate text-[12px] leading-4 text-muted">Потерял телефон?</span>
+            <div className="flex min-h-[34px] items-center justify-between gap-3 py-px">
+              <span className="min-w-0 truncate text-[13px] leading-5 text-muted">Потерял телефон?</span>
               <Button
                 size="sm"
                 variant="ghost"
-                className="!min-h-8 shrink-0 whitespace-nowrap !text-danger hover:!bg-danger/10"
+                className="!min-h-8 shrink-0 whitespace-nowrap !px-0"
                 onClick={() => {
                   setError(null);
                   setDialog("signout");
@@ -398,15 +391,15 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
                 Выйти со всех устройств
               </Button>
             </div>
-          </div>
+          </>
         ) : null}
       </section>
 
       <Dialog open={dialog === "password"} onClose={close} title={done ? "Пароль задан" : `Новый пароль · ${first}`} width="sm">
         {done ? (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2 rounded-[10px] bg-surface-2/70 px-3 py-2">
-              <span className="nums min-w-0 flex-1 select-all font-mono text-[19px] font-semibold leading-7 tracking-[0.04em]" data-testid="credentials-password">
+            <div className="flex items-center gap-2 border-y border-border py-1">
+              <span className="nums min-w-0 flex-1 select-all text-[19px] leading-7" data-testid="credentials-password">
                 {password}
               </span>
               <CopyButton text={() => password} label="Скопировать пароль" done="Скопировал пароль" />

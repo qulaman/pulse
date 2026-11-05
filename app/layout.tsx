@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Golos_Text, Manrope } from "next/font/google";
+import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed, Manrope } from "next/font/google";
 
 import { AppUpdate } from "@/components/AppUpdate";
 import { MascotPower } from "@/components/brand/MascotPower";
@@ -14,6 +14,7 @@ import { SecretaryAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { ErrandReplay } from "@/components/secretary/ErrandReplay";
 import { TapHaptics } from "@/components/TapHaptics";
 import { loadBrand } from "@/lib/brand";
+import { DESK_SHEET_SCRIPT } from "@/lib/desk/device";
 import { QUIET_LOOPS } from "@/lib/design/quiet-loops";
 import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
 import { ToastHost } from "@/components/ui/Toast";
@@ -23,6 +24,13 @@ import "./globals.css";
 // numbers, Golos Text for running Cyrillic text (D-50).
 const display = Manrope({ subsets: ["cyrillic", "latin"], weight: ["600", "700", "800"], variable: "--font-display", display: "swap" });
 const body = Golos_Text({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-body", display: "swap" });
+
+// The desk's three voices (D-158). `preload: false`: only a page that sets them in type fetches a
+// file, so a phone never does. Condensed has no Russian letters on Google Fonts: it speaks in
+// figures, and Russian words in its place fall back to Plex Sans.
+const plexSans = IBM_Plex_Sans({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans", display: "swap", preload: false });
+const plexCond = IBM_Plex_Sans_Condensed({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-cond", display: "swap", preload: false });
+const plexMono = IBM_Plex_Mono({ subsets: ["cyrillic", "latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap", preload: false });
 
 export const metadata: Metadata = {
   title: "Pulse",
@@ -48,13 +56,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="ru"
-      className={`${display.variable} ${body.variable}`}
+      className={`${display.variable} ${body.variable} ${plexSans.variable} ${plexCond.variable} ${plexMono.variable}`}
+      // the desk's attributes land before hydration, from the script below
+      suppressHydrationWarning
       style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}
     >
       <head>
         {/* before React registers its listeners: nobody listens for loop boundaries, so the
             compositor keeps every infinite animation off the main thread (lib/design/quiet-loops.ts) */}
         <script dangerouslySetInnerHTML={{ __html: QUIET_LOOPS }} />
+        {/* the desk's sheet is light: a hard load must not flash the phone's dark tokens first */}
+        <script dangerouslySetInnerHTML={{ __html: DESK_SHEET_SCRIPT }} />
       </head>
       <body className="min-h-dvh bg-bg text-text antialiased">
         {/* Chrome's install offer can come before hydration: kept for «Установить Pulse» (D-125) */}

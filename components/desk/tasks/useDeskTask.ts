@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 
 import { cardKeysFor } from "@/components/tasks/list/DirectorTaskCard";
 import { latestDeclineReason, latestOpenQuestion } from "@/components/tasks/TaskThread";
-import { rowKeys, type RowKey } from "@/lib/desk/tasks";
+import { loadStateOf, rowKeys, type RowKey } from "@/lib/desk/tasks";
 import type { BoardTask } from "@/lib/pulse/board";
 import { clearTaskNotifications } from "@/lib/push/client";
 import { useRecurrenceRules, type Rule } from "@/lib/recurrence/queries";
@@ -44,6 +44,9 @@ function signalsOf(task: TaskWithPeople | undefined, row: BoardTask | undefined,
   };
 }
 
+/** What PostgREST answers for a row that is not there (or not for this person), as `fetchTask` rethrows it. */
+const NO_ROW = /single JSON object|multiple \(or no\) rows/i;
+
 /**
  * One task as the desk works on it — in the right-hand panel and on the stack of «Разобрать»
  * (tasks/022 A, D-154 wave 3): the task and its thread live, what waits on it, the director's
@@ -74,6 +77,7 @@ export function useDeskTask({
 }) {
   const { task, messages } = useTaskThread(taskId);
   const data = task.data;
+  const taskLoad = loadStateOf(task);
   const signals = signalsOf(data, row, messages.data);
   const reason: DeskReason | null = data ? reasonFor(data, signals.question, now, Boolean(signals.request)) : null;
   const keys: DeskAction[] = data
@@ -115,8 +119,16 @@ export function useDeskTask({
   return {
     task: data,
     loading: task.isLoading,
+    /** the task did not come, and not because it is gone: «не найдена» would be a guess */
+    failure: taskLoad.kind === "failed" && !NO_ROW.test(task.error?.message ?? "") ? taskLoad : null,
+    retrying: task.isFetching,
+    retry: () => {
+      void task.refetch();
+      void messages.refetch();
+    },
     messages: messages.data,
     messagesLoading: messages.isLoading,
+    threadLoad: loadStateOf(messages),
     signals,
     reason,
     keys,

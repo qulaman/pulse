@@ -5,15 +5,28 @@ import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { Button } from "@/components/ui/Button";
+import { shortName, useNamesKey } from "@/lib/people/names";
 
 /**
- * The desk's settings form (D-154 wave 3) — macOS System Settings and Linear's settings in the
- * desk's language: groups with a label and a line of what they are for, each a flat plane of
- * rows; a row says what it is and why on the left and holds its control on the right. A changed
- * row carries a line of the accent at its left edge until it is saved. Controls are sized for a
- * mouse (36 px) and answer the keys a desktop expects: ↑/↓ step a number or a time, ←/→ move a
- * choice, Space flips a switch.
+ * The desk's settings form (D-154 wave 3, D-158) — a ruled form, not a pile of panels: a group is
+ * a label and a line of what it is for over a rule of print, its rows split by hairlines; a row
+ * says what it is and why on the left and holds its control on the right. A changed row carries a
+ * line of the pen in the margin until it is saved. Controls are sized for a mouse (36 px) and
+ * answer the keys a desktop expects: ↑/↓ step a number or a time, ←/→ move a choice, Space flips a
+ * switch.
  */
+
+/** A person in a ruled list: one line, the name and after it the position in the second voice. */
+export function PersonLine({ name, sub }: { name: string; sub?: string | null }) {
+  // re-reads the company's names, so «Ерлан» becomes «Ерлан Б.» once the roster has come
+  useNamesKey();
+  return (
+    <span className="block truncate text-[14px] leading-5" title={name}>
+      {shortName(name)}
+      {sub ? <span className="text-[12px] text-muted"> · {sub}</span> : null}
+    </span>
+  );
+}
 
 /** A row's anchor in the page: the settings search lands here (`set-<id>`). */
 export const rowAnchor = (id: string) => `set-${id}`;
@@ -36,18 +49,16 @@ export function SettingsGroup({
 }) {
   return (
     <section id={rowAnchor(id)} data-settings-group={id} aria-label={title} className="scroll-mt-6">
-      <SectionLabel action={action} className="px-1">
-        {title}
-      </SectionLabel>
-      {about ? <p className="mb-2 max-w-[620px] px-1 text-[13px] leading-[18px] text-muted">{about}</p> : <div className="h-1.5" />}
-      <div className="rounded-[12px] border border-border bg-surface/40 [&>*+*]:border-t [&>*+*]:border-border/60">{children}</div>
+      <SectionLabel action={action}>{title}</SectionLabel>
+      {about ? <p className="mb-1 max-w-[620px] text-[13px] leading-[18px] text-muted">{about}</p> : null}
+      <div className="desk-list">{children}</div>
     </section>
   );
 }
 
 /**
  * One setting: the words on the left, the control on the right. `changed` — the draft differs from
- * what is saved: a 2 px line of the accent at the left edge says so before «Сохранить».
+ * what is saved: a 2 px line of the pen in the margin says so before «Сохранить».
  */
 export function SettingRow({
   id,
@@ -88,25 +99,25 @@ export function SettingRow({
       id={rowAnchor(id)}
       data-setting={id}
       data-changed={changed ? "" : undefined}
-      className={`relative scroll-mt-24 px-4 py-3 transition-opacity duration-[120ms] ${muted ? "opacity-55" : ""}`}
+      className={`relative scroll-mt-24 py-2 transition-opacity duration-[120ms] ${muted ? "opacity-55" : ""}`}
     >
-      {changed ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
+      {changed ? <span aria-hidden className="absolute inset-y-1.5 -left-3 w-[2px] bg-accent" /> : null}
       {stack ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2">
           {words}
           {children}
         </div>
       ) : (
-        <div className="grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-6">
+        <div className="grid min-h-8 grid-cols-[minmax(120px,1fr)_minmax(0,auto)] items-center gap-6">
           {words}
-          <div className="flex items-center justify-end gap-2">{children}</div>
+          <div className="flex min-w-0 items-center justify-end gap-2">{children}</div>
         </div>
       )}
     </div>
   );
 }
 
-/** On / off, desk size: 36×20, Space or Enter flips it, the label's click too. */
+/** On / off: the desk's small ruled box (journal.css); Space or Enter flips it, the label's click too. */
 export function Switch({
   id,
   checked,
@@ -129,14 +140,9 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-[120ms] disabled:opacity-40 ${FOCUS} focus-visible:ring-offset-2 focus-visible:ring-offset-bg`}
-      style={{ background: checked ? "var(--accent)" : "var(--border)" }}
+      className="relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
     >
-      <span
-        aria-hidden
-        className="absolute left-0 top-0.5 h-4 w-4 rounded-full bg-bg transition-transform duration-[120ms]"
-        style={{ transform: checked ? "translateX(18px)" : "translateX(2px)", background: checked ? "var(--bg)" : "var(--text-muted)" }}
-      />
+      <span aria-hidden className="absolute transition-transform duration-[120ms]" />
     </button>
   );
 }
@@ -150,14 +156,14 @@ export function CheckLine({ checked, onChange, label, hint, disabled = false }: 
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex min-h-8 items-center gap-2.5 rounded-[8px] px-2 text-left text-[14px] leading-5 transition-colors duration-[120ms] hover:bg-surface-2/60 disabled:cursor-default disabled:hover:bg-transparent ${FOCUS}`}
+      className={`flex min-h-8 items-center gap-2.5 text-left text-[14px] leading-5 transition-colors duration-[120ms] hover:bg-surface-2/60 disabled:cursor-default disabled:hover:bg-transparent ${FOCUS}`}
     >
       <span
         aria-hidden
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border transition-colors duration-[120ms]"
+        className="flex h-4 w-4 shrink-0 items-center justify-center border transition-colors duration-[120ms]"
         style={{
-          background: checked ? (disabled ? "var(--surface-2)" : "var(--accent)") : "transparent",
-          borderColor: checked && !disabled ? "var(--accent)" : "var(--border)",
+          background: checked ? (disabled ? "var(--surface-2)" : "var(--text)") : "transparent",
+          borderColor: checked && !disabled ? "var(--text)" : "var(--text-muted)",
           color: disabled ? "var(--text-muted)" : "var(--bg)",
         }}
       >
@@ -361,7 +367,7 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
     buttons[next]?.focus();
   };
   return (
-    <div id={id} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="seg inline-flex h-9 items-center gap-0.5 rounded-[11px] p-0.5">
+    <div id={id} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="seg inline-flex h-9 items-center gap-0.5 p-0.5">
       {items.map((item, index) => {
         const active = index === at;
         return (
@@ -372,7 +378,7 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(item.value)}
-            className={`flex h-8 items-center whitespace-nowrap rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${FOCUS} ${
+            className={`flex h-8 items-center whitespace-nowrap px-3 text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${FOCUS} ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >
@@ -406,7 +412,7 @@ export function SelectInput<V extends string>({
       aria-label={label}
       value={value}
       onChange={(event) => onChange(event.target.value as V)}
-      className="field h-9 cursor-pointer pl-3 text-[14px] leading-5"
+      className="field h-9 min-w-0 cursor-pointer pl-3 text-[14px] leading-5"
       style={{ width }}
     >
       {items.map((item) => (
@@ -420,15 +426,14 @@ export function SelectInput<V extends string>({
 
 /**
  * The one bar of a tab with edits (D-154 wave 3): what is unsaved, «Отменить» and «Сохранить» with
- * its key — in the flow under the form, stuck to the bottom of the window while the form is longer
+ * its key — the form's closing rule, stuck to the bottom of the window while the form is longer
  * than the window. Gone when there is nothing to save.
  */
 export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes: string[]; saving: boolean; onSave: () => void; onReset: () => void; blocked?: string | null }) {
   if (changes.length === 0) return null;
   return (
-    <div className="sticky bottom-4 z-10 mt-2" data-testid="settings-savebar">
-      <div className="card-in flex items-center gap-3 rounded-[14px] border border-border bg-surface px-4 py-2.5" style={{ boxShadow: "var(--shadow-raised)" }}>
-        <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-accent" />
+    <div className="sticky bottom-0 z-10 bg-bg pb-3" data-testid="settings-savebar">
+      <div className="card-in flex items-center gap-3 border-t border-text pt-2">
         <p className="min-w-0 flex-1 truncate text-[14px] leading-5">
           <span className="font-medium">Не сохранено:</span> <span className="text-muted">{changes.join(", ")}</span>
           {blocked ? <span className="text-warn"> · {blocked}</span> : null}
@@ -450,5 +455,5 @@ export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes
 
 /** A line under a group: where the rest of it lives on the desk. */
 export function GroupNote({ children }: { children: ReactNode }) {
-  return <p className="px-1 pt-2 text-[13px] leading-[18px] text-muted">{children}</p>;
+  return <p className="text-[13px] leading-[18px] text-muted">{children}</p>;
 }

@@ -55,7 +55,7 @@ export function RecurrenceFields({ value, onChange }: { value: RepeatValue; onCh
               value={value.month_day || 1}
               onChange={(event) => set({ month_day: Number(event.target.value) })}
               aria-label="Число месяца"
-              className="desk-input nums h-9 w-16 px-2 text-[14px] text-text"
+              className="desk-input nums h-9 w-16 px-0 text-[14px] text-text"
             />
           </label>
         ) : null}
@@ -69,7 +69,7 @@ export function RecurrenceFields({ value, onChange }: { value: RepeatValue; onCh
               if (event.target.value) set({ due_time: event.target.value });
             }}
             aria-label="Срок каждого раза"
-            className="desk-input nums h-9 px-2 text-[14px] text-text [color-scheme:dark]"
+            className="desk-input nums h-9 px-0 text-[14px] text-text"
           />
         </label>
       </div>
@@ -83,8 +83,8 @@ export function RecurrenceFields({ value, onChange }: { value: RepeatValue; onCh
                 type="button"
                 aria-pressed={on}
                 onClick={() => set({ weekdays: on ? value.weekdays.filter((d) => d !== day) : [...value.weekdays, day] })}
-                className={`desk-focus h-8 w-9 rounded-[8px] border text-[13px] font-semibold leading-none transition-colors duration-[120ms] ${
-                  on ? "border-accent/60 bg-accent/15 text-text" : "border-border text-muted hover:text-text"
+                className={`desk-focus h-8 w-9 rounded-[2px] border text-[13px] font-medium leading-none transition-colors duration-[120ms] ${
+                  on ? "border-accent text-accent" : "border-border text-muted hover:text-text"
                 }`}
               >
                 {WEEKDAY_SHORT[day]}

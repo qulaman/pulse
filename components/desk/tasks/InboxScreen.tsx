@@ -17,6 +17,7 @@ import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
+import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useTaskReactions } from "@/lib/points/game";
@@ -29,12 +30,14 @@ import { useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import { REASON_TONE, REASON_WORD } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue } from "@/lib/tasks/status-text";
+import { useHydrated } from "@/lib/useHydrated";
 
-import { enterMove, inPlaceOf, KEY_CAP, reasonHeadline, stackMoves, withSkipped, type Move } from "@/lib/desk/tasks";
+import { enterMove, inPlaceOf, loadStateOf, reasonHeadline, stackMoves, withSkipped, type LoadState, type Move } from "@/lib/desk/tasks";
 import { DeskComposer, DeskThread } from "./DeskThread";
-import { MoveRow } from "./RowMoves";
+import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
+import { DraftMark, MoveRow } from "./RowMoves";
 import { deskLayerOpen } from "./TaskPanel";
-import { DeskReactions, focusReply, TaskFacts, TaskHead } from "./TaskParts";
+import { DeskReactions, focusReply, MORE_WORD, TaskFacts, TaskHead } from "./TaskParts";
 import { useDeskTask, type DeskTask } from "./useDeskTask";
 
 /**
@@ -44,22 +47,43 @@ import { useDeskTask, type DeskTask } from "./useDeskTask";
  */
 const DONE_AT_ONCE: ReadonlySet<DeskAction> = new Set<DeskAction>(["approve", "grant", "keep", "nudge", "insist"]);
 
-/** The stack's column and the queue beside it (D-154): the card reads at a page's width, the queue stays in sight. */
-const LAYOUT = "grid grid-cols-[minmax(0,880px)_256px] items-start gap-6";
+/** The task in hand and the queue beside it (D-154): the rules run the sheet's width, the queue stays in sight. */
+const LAYOUT = "grid grid-cols-[minmax(0,1fr)_288px] items-start gap-x-8";
+
+/** The task while it lands: why it waits, who, the title, its fields, the path, the moves. */
+function TaskBone() {
+  return (
+    <div className="flex flex-col">
+      <Bone h={20} w="44%" />
+      <Bone h={20} w={96} className="mt-2" />
+      <Bone h={32} w="62%" className="mt-2" />
+      <Bone h={20} w={220} className="mt-3" />
+      <Bone h={44} className="mt-3" />
+      <div className="mt-4 border-t border-text pt-3">
+        <Bone h={36} w={220} />
+      </div>
+    </div>
+  );
+}
 
 export function InboxSkeleton() {
   return (
     <DeskPage>
-      <PageTitle title="Разобрать" />
+      {/* the walk's room is kept: the head does not move when the stack lands */}
+      <PageTitle title="Разобрать" actions={<span className="block h-9" />} />
       <SkeletonGroup className={LAYOUT}>
-        <div className="flex flex-col gap-4">
-          <Bone h={20} />
-          <Bone h={360} className="!rounded-[16px]" />
-        </div>
-        <div className="flex flex-col gap-2">
-          {Array.from({ length: 5 }, (_, index) => (
-            <Bone key={index} h={40} />
-          ))}
+        <TaskBone />
+        <div className="flex flex-col gap-1">
+          <div className="flex h-6 items-center">
+            <Bone h={12} w="34%" />
+          </div>
+          <div className="desk-list">
+            {Array.from({ length: 5 }, (_, index) => (
+              <div key={index} className="flex h-[45px] items-center">
+                <Bone h={14} w="82%" />
+              </div>
+            ))}
+          </div>
         </div>
       </SkeletonGroup>
     </DeskPage>
@@ -68,9 +92,9 @@ export function InboxSkeleton() {
 
 /**
  * «Разобрать» (tasks/022 A п.6, D-154): everything waiting for the director as a stack, one task at
- * a time — why it waits as the headline, the card at the height of what it says, the reason's
- * buttons with their keys inside, the thread under it with the answer field, the rest of the queue
- * beside it. Made for the keyboard (wave 3): ←/→ or J/K walk, Enter presses the main move, the
+ * a time — why it waits as the first line in its ink, the task at the height of what it says, the
+ * reason's buttons with their keys inside, the thread under it with the answer field, the rest of
+ * the queue beside it. Made for the keyboard (wave 3): ←/→ or J/K walk, Enter presses the main move, the
  * letters the others, digits answer a question, S skips, «.» opens everything else. The queue is
  * the nav badge's own (`queueOf` of the board, `REASON_ORDER`); what is skipped goes to its end.
  */
@@ -78,11 +102,17 @@ export function InboxScreen() {
   useNamesKey();
   const me = useMe();
   const board = usePulseBoard(me.data);
-  if (me.isPending || board.isPending || !me.data) return <InboxSkeleton />;
-  return <InboxView me={me.data} board={board.data ?? []} />;
+  const load = loadStateOf(board);
+  const retry = () => void board.refetch();
+  // a start with no network pauses the query before this boundary hydrates: the first render stays the server's skeleton
+  const hydrated = useHydrated();
+  if (!hydrated || me.isPending || !me.data || load.kind === "loading") return <InboxSkeleton />;
+  // never «Всё разобрано» over a queue that did not come
+  if (load.kind === "failed") return <FailedScreen title="Разобрать" what="очередь решений" offline={load.offline} busy={board.isFetching} onRetry={retry} />;
+  return <InboxView me={me.data} board={board.data ?? []} load={load} onRetry={retry} />;
 }
 
-function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
+function InboxView({ me, board, load, onRetry }: { me: Me; board: readonly BoardTask[]; load: LoadState; onRetry: () => void }) {
   const router = useRouter();
   const actions = useTaskActions(me);
   const now = useMinute();
@@ -90,6 +120,7 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
   const [skipped, setSkipped] = useState<string[]>([]);
   const order = useMemo(() => withSkipped(queue, (item) => item.task.id, skipped), [queue, skipped]);
   const ids = useMemo(() => order.map((item) => item.task.id), [order]);
+  const drafts = useDraftTasks(me.userId);
 
   // the task in hand by its id; when it leaves the queue (accepted, answered) the one in its place comes
   const [current, setCurrent] = useState<string | null>(null);
@@ -134,13 +165,14 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
     { keys: ["Esc"], label: "Отпустить поле" },
   ]);
 
+  const staleMark = <LoadNote state={load} failed="" now={now} onRetry={onRetry} />;
   if (!item) {
     // the good kind of empty: what comes next is the nearest deadline still ahead
     const soon = nearestDeadline([...board], now);
     const next = soon ? board.find((task) => task.deadline === soon && task.status !== "declined") : undefined;
     return (
       <DeskPage width="narrow">
-        <PageTitle title="Разобрать" light="ok" />
+        <PageTitle title="Разобрать" actions={staleMark} />
         <EmptyState
           tone="ok"
           title="Всё разобрано"
@@ -169,27 +201,14 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
     <DeskPage>
       <PageTitle
         title="Разобрать"
-        light={REASON_TONE[item.reason]}
         actions={
-          <Button size="sm" variant="secondary" onClick={() => router.push("/desk/tasks")}>
-            К задачам
-          </Button>
-        }
-      />
-
-      <div className={LAYOUT}>
-        <div className="flex min-w-0 flex-col gap-4">
-          {/* the director's own progress: the accent, not the tone of what is late */}
-          <div className="flex items-center gap-4" data-testid="desk-inbox-progress">
-            <span className="nums shrink-0 font-display text-[14px] font-semibold leading-5">
-              <span className="text-accent">{index + 1}</span>
-              <span className="text-muted"> из </span>
-              {total}
-            </span>
-            <span className="relative h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
-              <span className="absolute inset-y-0 left-0 rounded-full bg-accent transition-[width] duration-[240ms] ease-out" style={{ width: `${((index + 1) / total) * 100}%` }} />
-            </span>
-            <span className="flex shrink-0 items-center gap-1">
+          <>
+            {staleMark}
+            {/* where the director is in the stack: the one figure of the screen, and the walk beside it */}
+            <span className="flex items-center gap-1" data-testid="desk-inbox-progress">
+              <span className="nums mr-2 text-[14px] leading-5">
+                {index + 1} из {total}
+              </span>
               <Tooltip label="Предыдущая" keys={["←"]}>
                 <Button size="sm" variant="ghost" aria-label="Предыдущая" disabled={index === 0} onClick={() => go(-1)} className="!min-h-8 !px-2">
                   ←
@@ -206,26 +225,45 @@ function InboxView({ me, board }: { me: Me; board: readonly BoardTask[] }) {
                 </Button>
               </Tooltip>
             </span>
-          </div>
+            <Button size="sm" variant="secondary" onClick={() => router.push("/desk/tasks")}>
+              К задачам
+            </Button>
+          </>
+        }
+      />
 
+      <div className={LAYOUT}>
+        <div className="flex min-w-0 flex-col gap-5">
           <InboxCard key={item.task.id} item={item} me={me} base={actions} now={now} onPrev={() => go(-1)} onNext={() => go(1)} onSkip={skip} onDone={advance} />
         </div>
 
-        <QueueAside order={order} current={shown} now={now} onPick={setCurrent} />
+        <QueueAside order={order} current={shown} now={now} onPick={setCurrent} drafts={drafts} />
       </div>
     </DeskPage>
   );
 }
 
 /** The rest of the queue beside the card: who and what, why — the one in hand marked, any one a click away. */
-function QueueAside({ order, current, now, onPick }: { order: readonly DeskItem[]; current: string | null; now: Date; onPick: (id: string) => void }) {
+function QueueAside({
+  order,
+  current,
+  now,
+  onPick,
+  drafts,
+}: {
+  order: readonly DeskItem[];
+  current: string | null;
+  now: Date;
+  onPick: (id: string) => void;
+  drafts: ReadonlySet<string>;
+}) {
   const LIMIT = 12;
   const shown = order.slice(0, LIMIT);
   return (
-    <aside className="sticky top-6 flex flex-col gap-2" data-testid="desk-inbox-queue">
+    <aside className="sticky top-4 flex flex-col gap-1" data-testid="desk-inbox-queue">
       <SectionLabel count={order.length}>Очередь</SectionLabel>
-      <ol className="flex flex-col">
-        {shown.map((item, at) => {
+      <ol className="desk-list">
+        {shown.map((item) => {
           const on = item.task.id === current;
           return (
             <li key={item.task.id}>
@@ -233,25 +271,26 @@ function QueueAside({ order, current, now, onPick }: { order: readonly DeskItem[
                 type="button"
                 onClick={() => onPick(item.task.id)}
                 aria-current={on ? "true" : undefined}
-                className={`relative flex w-full items-start gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${on ? "bg-accent/8" : "hover:bg-surface-2/60"}`}
+                className="desk-row flex w-full items-start gap-2.5 py-1 text-left focus-visible:outline-none"
               >
-                {on ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
                 <span className="mt-0.5 shrink-0">
                   <StatusGlyph status={item.task.status} overdue={isOverdue(item.task, now)} size={16} />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className={`truncate text-[13px] leading-[18px] ${on ? "font-semibold text-text" : "text-text/90"}`}>{item.task.title}</span>
-                  <span className="truncate text-[12px] leading-4 text-muted">
-                    {shortName(item.task.assignee?.full_name)} · {REASON_WORD[item.reason]}
+                  <span className={`truncate text-[13px] leading-5 ${on ? "font-semibold" : ""}`}>{item.task.title}</span>
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span className="truncate text-[12px] leading-4 text-muted">
+                      {shortName(item.task.assignee?.full_name)} · {REASON_WORD[item.reason]}
+                    </span>
+                    {drafts.has(item.task.id) ? <DraftMark /> : null}
                   </span>
                 </span>
-                <span className="nums mt-0.5 shrink-0 text-[11px] leading-4 text-muted/60">{at + 1}</span>
               </button>
             </li>
           );
         })}
       </ol>
-      {order.length > LIMIT ? <p className="px-2.5 text-[12px] leading-4 text-muted">и ещё {order.length - LIMIT}</p> : null}
+      {order.length > LIMIT ? <p className="pt-1 text-[12px] leading-4 text-muted">и ещё {order.length - LIMIT}</p> : null}
     </aside>
   );
 }
@@ -278,7 +317,7 @@ function StackKeys({
   const [menuAt, setMenuAt] = useState<HTMLElement | null>(null);
   return (
     <div data-testid="desk-task-keys">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <MoveRow moves={moves} onPress={onPress} size="md" fillMain />
         {main ? (
           <span className="flex items-center gap-1 text-[12px] leading-4 text-muted">
@@ -293,10 +332,10 @@ function StackKeys({
           data-testid="desk-task-more"
           data-desk-more={task.id}
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-border bg-surface-2 px-3 font-display text-[14px] font-semibold leading-4 text-text transition-colors duration-[120ms] hover:border-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className={MORE_WORD}
         >
           Ещё
-          <span aria-hidden className="rounded-[4px] bg-bg/60 px-1.5 text-[12px] font-bold leading-[14px] text-muted">
+          <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
             .
           </span>
         </button>
@@ -312,9 +351,9 @@ function StackKeys({
 }
 
 /**
- * One task of the stack: the headline of why it waits in its tone, the card (the panel's head and
- * facts, larger) with the reason's buttons at its foot, the thread with its field under it. Its
- * keys are on the window — the stack has no table to hold the focus.
+ * One task of the stack: why it waits in its ink, the task (the panel's head and facts, larger) with
+ * the reason's buttons at its foot, the thread with its field under it. Its keys are on the window
+ * — the stack has no table to hold the focus.
  */
 function InboxCard({
   item,
@@ -426,10 +465,10 @@ function InboxCard({
   }, []);
 
   if (!task) {
+    if (desk.failure) return <LoadFailure what="задачу" offline={desk.failure.offline} busy={desk.retrying} onRetry={desk.retry} />;
     return (
-      <SkeletonGroup className="flex flex-col gap-4">
-        <Bone h={360} className="!rounded-[16px]" />
-        <Bone h={120} />
+      <SkeletonGroup>
+        <TaskBone />
       </SkeletonGroup>
     );
   }
@@ -438,60 +477,44 @@ function InboxCard({
   const headline = reasonHeadline(item.reason, { ...item.task, ...task, time_request: desk.signals.request ?? item.task.time_request ?? null }, now);
   return (
     <>
-      <section
-        ref={card}
-        className="card flex flex-col px-6 pb-5 pt-5"
-        style={{ boxShadow: "var(--shadow-card), var(--shadow-raised)" }}
-        data-testid="desk-inbox-card"
-        data-task-id={task.id}
-        data-desk-task={task.id}
-      >
-        <p className="mb-4 flex items-center gap-2.5 font-display text-[20px] font-semibold leading-[26px] tracking-[-0.015em]" style={{ color: tone }} data-testid="desk-inbox-reason">
-          <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: tone, boxShadow: `0 0 12px ${tone}` }} />
-          <span className="min-w-0 [overflow-wrap:anywhere]">{headline}</span>
+      <section ref={card} className="flex flex-col" data-testid="desk-inbox-card" data-task-id={task.id} data-desk-task={task.id}>
+        <p className="mb-2 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]" style={{ color: tone }} data-testid="desk-inbox-reason">
+          {headline}
         </p>
         <TaskHead desk={desk} now={now} large scope={() => card.current} />
         <TaskFacts desk={desk} now={now} onWords={() => focusReply(thread.current)} />
-        <div className="mt-5 border-t border-border/70 pt-4">
+        <div className="mt-4 border-t border-text pt-3">
           <StackKeys desk={desk} me={me} moves={moves} onPress={pressMove} pointsEnabled={pointsEnabled} />
         </div>
       </section>
 
-      <section ref={thread} className="flex flex-col gap-2" data-testid="desk-inbox-thread">
+      <section ref={thread} className="flex flex-col gap-1" data-testid="desk-inbox-thread">
         <SectionLabel>Переписка</SectionLabel>
-        <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} actions={desk.acts.actions} />
+        <div className="border-t border-text pt-1">
+          <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} load={desk.threadLoad} onRetry={desk.retry} actions={desk.acts.actions} />
+        </div>
         {task.status === "revoked" ? (
           <p className="text-[13px] leading-5 text-muted" data-testid="thread-closed">
             Задача отозвана — переписка закрыта
           </p>
         ) : (
           // the answer field rides at the window's foot while the thread scrolls
-          <div className="sticky bottom-0 z-[1] -mx-1 bg-bg px-1 pb-3 pt-2">
+          <div className="sticky bottom-0 z-[1] bg-bg pb-3 pt-2">
             <DeskComposer taskId={task.id} me={me} actions={desk.acts.actions} placeholder={desk.signals.question ? "Ответить на вопрос…" : "Написать…"} />
           </div>
         )}
       </section>
 
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-inbox-hint">
-        {keys.map((key) => (
-          <span key={key.code}>
-            <Kbd>{KEY_CAP[key.code]}</Kbd> {key.label}
-          </span>
-        ))}
+      {/* the letters stand on the buttons above: the hint keeps to the walk */}
+      <p className="-mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-inbox-hint">
+        <span>
+          <Kbd>←</Kbd> <Kbd>→</Kbd> соседняя
+        </span>
         {desk.signals.question ? (
           <span>
             <Kbd>1</Kbd>…<Kbd>{Math.min(9, answersFor(desk.signals.question, task.deadline, now).length)}</Kbd> быстрый ответ
           </span>
         ) : null}
-        <span>
-          <Kbd>S</Kbd> пропустить
-        </span>
-        <span>
-          <Kbd>←</Kbd> <Kbd>→</Kbd> соседняя
-        </span>
-        <span>
-          <Kbd>.</Kbd> все действия
-        </span>
         <span>
           <Kbd>?</Kbd> все клавиши
         </span>

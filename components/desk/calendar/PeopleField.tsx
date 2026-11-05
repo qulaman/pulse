@@ -2,7 +2,6 @@
 
 import { useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { shortName } from "@/lib/people/names";
 import { foldRu, searchPeople, useRoster } from "@/lib/people/roster";
 
@@ -83,7 +82,7 @@ export function PeopleField({
   return (
     <div className="flex flex-col gap-1" data-testid={testId}>
       <div
-        className="field flex min-h-10 cursor-text flex-wrap items-center gap-1.5 px-2 py-1.5"
+        className="field flex min-h-9 cursor-text flex-wrap items-center gap-x-3 gap-y-1 px-0 py-1"
         onMouseDown={(event) => {
           if (event.target === event.currentTarget) {
             event.preventDefault();
@@ -132,11 +131,11 @@ export function PeopleField({
           aria-controls={listId}
           aria-expanded={listed}
           aria-autocomplete="list"
-          className="h-7 min-w-[120px] flex-1 bg-transparent px-1 text-[14px] leading-5 outline-none placeholder:text-muted"
+          className="h-7 min-w-[120px] flex-1 bg-transparent text-[14px] leading-5 outline-none placeholder:text-muted"
         />
       </div>
       {listed ? (
-        <ul id={listId} role="listbox" className="rounded-[10px] border border-border bg-surface-2/60 py-1" data-testid="desk-people-options">
+        <ul id={listId} role="listbox" className="[&>li]:border-b [&>li]:border-border/60" data-testid="desk-people-options">
           {matches.map((person, index) => (
             <li key={person.id}>
               <button
@@ -147,15 +146,8 @@ export function PeopleField({
                 onMouseDown={(event) => event.preventDefault()}
                 onMouseEnter={() => setAt(index)}
                 onClick={() => add(person.id)}
-                className={`flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left ${index === at && (keyed || query.trim()) ? "bg-surface-2" : "hover:bg-surface-2/70"}`}
+                className={`flex h-8 w-full items-center gap-2.5 px-1 text-left ${index === at && (keyed || query.trim()) ? "bg-surface-2" : "hover:bg-surface-2/70"}`}
               >
-                {person.id === EVERYONE ? (
-                  <span aria-hidden className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/15 text-[11px] font-bold text-accent">
-                    ∀
-                  </span>
-                ) : (
-                  <Avatar name={person.full_name} size={24} />
-                )}
                 <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px]">{person.full_name}</span>
                 {person.position ? <span className="max-w-[45%] shrink-0 truncate text-[12px] leading-4 text-muted">{person.position}</span> : null}
               </button>
@@ -169,15 +161,14 @@ export function PeopleField({
 
 function PersonChip({ label, name, onRemove }: { label: string; name?: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-surface-2 pl-1 pr-1.5 text-[13px] leading-4" title={name}>
-      {name ? <Avatar name={name} size={20} /> : <span aria-hidden className="ml-1" />}
+    <span className="inline-flex h-6 max-w-full items-center gap-0.5 text-[14px] font-medium leading-5" title={name}>
       <span className="truncate">{label}</span>
       <button
         type="button"
         aria-label={`Убрать: ${label}`}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onRemove}
-        className="flex h-5 w-5 items-center justify-center rounded-full text-[14px] leading-none text-muted transition-colors duration-[120ms] hover:bg-bg/60 hover:text-text"
+        className="flex h-5 w-4 items-center justify-center text-[14px] leading-none text-muted transition-colors duration-[120ms] hover:text-danger"
       >
         ×
       </button>

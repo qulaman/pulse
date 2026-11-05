@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { When } from "@/components/desk/ui/When";
 import { ItemDialog } from "@/components/desk/settings/points/ItemDialog";
 import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Button } from "@/components/ui/Button";
@@ -31,16 +32,11 @@ function Price({ value }: { value: number }) {
   );
 }
 
-function Reward({ icon, title, sub }: { icon: string | null; title: string; sub?: string | null }) {
+function Reward({ title, sub }: { title: string; sub?: string | null }) {
   return (
-    <span className="flex min-w-0 items-center gap-2">
-      <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] bg-surface-2 text-[15px] leading-none">
-        {icon || "🎁"}
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[14px] leading-5">{title}</span>
-        {sub ? <span className="truncate text-[12px] leading-4 text-muted">{sub}</span> : null}
-      </span>
+    <span className="block truncate text-[14px] leading-5">
+      {title}
+      {sub ? <span className="text-[12px] text-muted"> · {sub}</span> : null}
     </span>
   );
 }
@@ -77,33 +73,35 @@ export function ShopDesk() {
   const list = items.data ?? [];
 
   const queueColumns: Column<Order>[] = [
-    { key: "who", title: "Кто", width: "minmax(180px,1fr)", render: (order) => <PersonCell name={order.user?.full_name ?? "Сотрудник"} /> },
-    { key: "item", title: "Награда", width: "minmax(200px,1.4fr)", render: (order) => <Reward icon={order.item?.icon ?? null} title={order.item?.title ?? "Награда"} /> },
-    { key: "price", title: "Цена", width: "120px", align: "right", sort: (a, b) => a.price - b.price, render: (order) => <Price value={order.price} /> },
-    { key: "status", title: "Статус", width: "170px", render: (order) => <span className="text-muted">{ORDER_STATUS[order.status].text}</span> },
+    { key: "who", title: "Кто", width: "minmax(110px,1fr)", render: (order) => <PersonCell name={order.user?.full_name ?? "Сотрудник"} /> },
+    { key: "item", title: "Награда", width: "minmax(130px,1.4fr)", render: (order) => <Reward title={order.item?.title ?? "Награда"} /> },
+    { key: "price", title: "Цена", width: "110px", align: "right", sort: (a, b) => a.price - b.price, render: (order) => <Price value={order.price} /> },
+    { key: "status", title: "Статус", width: "130px", render: (order) => <span className="text-muted">{ORDER_STATUS[order.status].text}</span> },
     {
       key: "wait",
       title: "Ждёт",
-      width: "110px",
+      width: "96px",
       sort: byTime("created_at"),
-      render: (order) => <span className="nums whitespace-nowrap text-muted">{waitingRu(new Date(order.created_at))}</span>,
+      render: (order) => <When className="whitespace-nowrap text-muted">{waitingRu(new Date(order.created_at))}</When>,
     },
     {
       key: "act",
       title: "",
-      width: "200px",
+      width: "164px",
       align: "right",
       render: (order) => (
         <span className="flex justify-end gap-1.5">
           <Button
             size="sm"
+            variant="secondary"
+            className="desk-move !min-h-6 !px-2"
             loading={setStatus.isPending && setStatus.variables?.order.id === order.id}
             onClick={() => setStatus.mutate({ order, status: "delivered" })}
             data-testid="order-deliver"
           >
             Выдал
           </Button>
-          <Button size="sm" variant="ghost" disabled={cancel.isPending && cancel.variables?.id === order.id} onClick={() => cancel.mutate(order)}>
+          <Button size="sm" variant="ghost" className="!min-h-6 !px-2" disabled={cancel.isPending && cancel.variables?.id === order.id} onClick={() => cancel.mutate(order)}>
             Отменить
           </Button>
         </span>
@@ -115,15 +113,15 @@ export function ShopDesk() {
     {
       key: "item",
       title: "Награда",
-      width: "minmax(240px,2fr)",
+      width: "minmax(200px,2fr)",
       sort: (a, b) => a.title.localeCompare(b.title, "ru"),
-      render: (item) => <Reward icon={item.icon} title={item.title} sub={item.description} />,
+      render: (item) => <Reward title={item.title} sub={item.description} />,
     },
-    { key: "price", title: "Цена", width: "120px", align: "right", sort: (a, b) => a.price - b.price, render: (item) => <Price value={item.price} /> },
+    { key: "price", title: "Цена", width: "110px", align: "right", sort: (a, b) => a.price - b.price, render: (item) => <Price value={item.price} /> },
     {
       key: "stock",
       title: "Осталось",
-      width: "120px",
+      width: "100px",
       align: "right",
       sort: (a, b) => (a.stock ?? Number.POSITIVE_INFINITY) - (b.stock ?? Number.POSITIVE_INFINITY),
       render: (item) => (item.stock === null ? <span className="text-muted">без счёта</span> : <span><Num value={item.stock} /> шт.</span>),
@@ -131,24 +129,24 @@ export function ShopDesk() {
     {
       key: "taken",
       title: "Брали",
-      width: "150px",
+      width: "120px",
       sort: (a, b) => (taken[a.id] ?? 0) - (taken[b.id] ?? 0),
       render: (item) => <span className="text-muted">{takenLabel(taken[item.id] ?? 0)}</span>,
     },
     {
       key: "shown",
       title: "Витрина",
-      width: "110px",
+      width: "84px",
       // shown is the usual state — a plain word; hidden is the one worth noticing, quiet like its row
       render: (item) => (item.is_active ? <span>видна</span> : <span className="text-muted">скрыта</span>),
     },
     {
       key: "edit",
       title: "",
-      width: "120px",
+      width: "92px",
       align: "right",
       render: (item) => (
-        <Button size="sm" variant="ghost" onClick={() => setEditing(item)} title="Изменить · Enter" className="opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100">
+        <Button size="sm" variant="ghost" onClick={() => setEditing(item)} title="Изменить · Enter" className="!min-h-6 !px-2 opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100">
           Изменить
         </Button>
       ),
@@ -157,14 +155,14 @@ export function ShopDesk() {
 
   const recentColumns: Column<Order>[] = [
     { key: "who", title: "Кто", width: "minmax(180px,1fr)", render: (order) => <PersonCell name={order.user?.full_name ?? "Сотрудник"} /> },
-    { key: "item", title: "Награда", width: "minmax(200px,1.4fr)", render: (order) => <Reward icon={order.item?.icon ?? null} title={order.item?.title ?? "Награда"} /> },
+    { key: "item", title: "Награда", width: "minmax(200px,1.4fr)", render: (order) => <Reward title={order.item?.title ?? "Награда"} /> },
     { key: "price", title: "Цена", width: "120px", align: "right", render: (order) => <Price value={order.price} /> },
     {
       key: "when",
       title: "Выдано",
       width: "150px",
       sort: byTime("delivered_at"),
-      render: (order) => <span className="nums whitespace-nowrap text-muted">{order.delivered_at ? humanAqtobe(new Date(order.delivered_at)) : "—"}</span>,
+      render: (order) => <When className="whitespace-nowrap text-muted">{order.delivered_at ? humanAqtobe(new Date(order.delivered_at)) : "—"}</When>,
     },
   ];
 
@@ -192,7 +190,6 @@ export function ShopDesk() {
           rowKey={(order) => order.id}
           selectedKey={selectedOrder}
           onSelect={(order) => setSelectedOrder(order.id)}
-          rowTone={(order) => (order.status === "pending" ? "warn" : "accent")}
           empty={
             <EmptyState
               title={orders.isPending ? "Загружаю заказы" : "Выдавать нечего"}
@@ -208,7 +205,7 @@ export function ShopDesk() {
           title="Награды"
           count={list.length}
           end={
-            <Button size="sm" onClick={() => setEditing("new")} data-testid="shop-add-item">
+            <Button size="sm" variant="secondary" onClick={() => setEditing("new")} data-testid="shop-add-item">
               + Награда
             </Button>
           }
@@ -233,7 +230,6 @@ export function ShopDesk() {
           selectedKey={selectedItem}
           onSelect={(item) => setSelectedItem(item.id)}
           onActivate={(item) => setEditing(item)}
-          rowTone={(item) => (item.is_active ? null : "muted")}
           empty={
             <EmptyState
               title={items.isPending ? "Загружаю награды" : "Наград пока нет"}

@@ -58,8 +58,7 @@ export function WhenField({
   const shown = value ? formatWhen(value, now) : "";
 
   return (
-    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2 px-2.5" data-tone={open ? undefined : tone} aria-expanded={open}>
-      <ClockMark />
+    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2" data-tone={open ? undefined : tone} aria-expanded={open}>
       <input
         value={text ?? shown}
         placeholder={emptyText}
@@ -104,7 +103,7 @@ export function WhenField({
         autoComplete="off"
         spellCheck={false}
         data-testid={testId}
-        className={`min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none ${tone === "danger" ? "placeholder:text-danger" : "placeholder:text-muted"}`}
+        className={`min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none ${value && text === null ? "nums" : ""} ${tone === "danger" ? "placeholder:text-danger" : "placeholder:text-muted"}`}
       />
       {heard && text === null ? <span className="max-w-[45%] shrink truncate text-[12px] leading-4 text-muted" title={`Услышал: «${heard}»`}>„{heard}“</span> : null}
       <span aria-hidden className="pointer-events-none shrink-0 text-muted">
@@ -141,7 +140,7 @@ export function WhenField({
                   onMouseMove={() => {
                     if (!on) setActive(index);
                   }}
-                  className={`mx-1 flex h-8 cursor-default items-center gap-2 rounded-[8px] px-2.5 text-[14px] leading-5 ${on ? "bg-surface-2" : ""}`}
+                  className={`flex h-8 cursor-default items-center gap-2 px-3 text-[14px] leading-5 ${on ? "bg-surface-2" : ""}`}
                 >
                   <span className="min-w-0 flex-1">{preset.label}</span>
                   <span className="nums shrink-0 text-[12px] text-muted">{preset.iso ? formatWhen(preset.iso, now) : ""}</span>
@@ -168,20 +167,11 @@ export function WhenField({
                 if (!box?.contains(event.relatedTarget as Node | null) && !inside.current?.contains(event.relatedTarget as Node | null)) close();
               }}
               aria-label={`${label}: дата и время`}
-              className="desk-input h-8 min-w-0 flex-1 px-2 text-[13px] text-text [color-scheme:dark]"
+              className="desk-input h-8 min-w-0 flex-1 px-2 text-[13px] text-text"
             />
           </label>
         </div>
       </Popover>
     </div>
-  );
-}
-
-function ClockMark() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden className="shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.5V12l3 2" />
-    </svg>
   );
 }

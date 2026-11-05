@@ -7,6 +7,8 @@
  * never clicked; the forms are typed into and cancelled; the menus are opened and closed. Writes the
  * screens could send from here are cut off in the browser while these checks run.
  */
+import { readFile } from "node:fs/promises";
+
 import type { Page } from "playwright";
 
 import { open, record, skip, type Ctx } from "./shared";
@@ -52,8 +54,94 @@ export async function checkTeam(ctx: Ctx) {
     await teamTable(ctx);
     await personCard(ctx);
     await newPerson(ctx);
+    await personMoves(ctx);
   } finally {
     await release();
+  }
+}
+
+/**
+ * The moves that end something, up to their last click: «Уволить…» is opened and cancelled, the
+ * leave question is answered, the promotion is cancelled, a failed load is staged in the browser.
+ */
+async function personMoves(ctx: Ctx) {
+  const { page } = ctx;
+  await open(page, "/desk/team");
+  const rows = page.locator(TEAM_ROWS);
+  await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  const employee = rows.filter({ hasText: /Сотрудник|Шустряк|Специалист/ }).first();
+  if ((await employee.count()) === 0) return skip("увольнение и черновик", "в команде нет сотрудника");
+  const id = (await employee.getAttribute("data-row-key")) ?? "";
+
+  // «Уволить…» from the row's menu: the name and the open tasks, then «Отмена»
+  await employee.locator('[role="gridcell"]').first().click({ button: "right" });
+  await page.getByTestId("desk-menu").getByRole("menuitem", { name: /Уволить/ }).click();
+  const dialog = await visible(ctx, "fire-dialog", 5_000);
+  await page.getByTestId("fire-reading").waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
+  const said = dialog ? (await page.getByTestId("fire-dialog").innerText()).replace(/\s+/g, " ") : "";
+  record("команда: «Уволить…» в меню строки — диалог с именем и открытыми задачами", dialog && /открыт/i.test(said), said.slice(0, 120));
+  await ctx.shot("team-fire");
+  await page.getByTestId("fire-cancel").click();
+  await page.getByTestId("fire-dialog").waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
+
+  // an unsaved card: «Команда ›» asks; «Остаться» keeps the words, «Не сохранять» goes
+  await open(page, `/desk/team/${id}?edit=1`);
+  await visible(ctx, "desk-person-editor");
+  await page.waitForTimeout(400);
+  record("карточка: тумблера «Работает» в форме больше нет, телефон и фото есть", (await page.getByRole("switch").count()) === 0 && (await page.getByTestId("person-phone").count()) === 1 && (await page.getByTestId("person-photo").count()) === 1);
+  await page.getByTestId("person-name").press("End");
+  await page.keyboard.type(" смоук");
+  await page.getByTestId("desk-person-back").click();
+  const asks = await visible(ctx, "person-leave", 3_000);
+  await ctx.shot("team-leave");
+  if (asks) {
+    await page.getByTestId("leave-stay").click();
+    await page.getByTestId("person-leave").waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
+  }
+  const kept = (await page.getByTestId("person-name").inputValue()).endsWith(" смоук");
+  record("карточка: «Команда ›» с черновиком спрашивает, «Остаться» его хранит", asks && kept && page.url().includes("edit=1"), page.url());
+
+  // the director's role asks on «Сохранить» — cancelled there
+  const role = page.getByTestId("person-role");
+  if ((await role.count()) && (await role.isEnabled()) && (await role.locator('option[value="director"]').count())) {
+    const was = await role.inputValue();
+    await role.selectOption("director");
+    await page.getByTestId("desk-person-save").click();
+    const promote = await visible(ctx, "person-promote", 3_000);
+    await ctx.shot("team-promote");
+    if (promote) await page.getByTestId("promote-cancel").click();
+    await role.selectOption(was);
+    record("карточка: роль «Директор» спрашивает подтверждение", promote);
+  } else {
+    skip("карточка: подтверждение роли «Директор»", "этому зрителю роль не предлагается");
+  }
+
+  await page.getByTestId("desk-person-back").click();
+  if (await visible(ctx, "person-leave", 3_000)) await page.getByTestId("leave-discard").click();
+  const left = await page.waitForURL((url) => url.pathname === "/desk/team", { timeout: 10_000 }).then(() => true, () => false);
+  record("карточка: «Не сохранять» уходит", left, page.url());
+
+  // nothing came: the failure is said, the zeros are not. A browser that has been here restores
+  // the last roster from its offline copy (D-127) — honest, and not this case: a clean context
+  const browser = page.context().browser();
+  if (!browser) return skip("команда: сбой загрузки", "нет браузера для чистого контекста");
+  const clean = await browser.newContext({ storageState: await page.context().storageState(), viewport: page.viewportSize() });
+  try {
+    const first = await clean.newPage();
+    await guardWrites(first);
+    const failing = /\/rest\/v1\/profiles\?/;
+    await first.route(failing, (route) => route.abort("failed"));
+    await open(first, "/desk/team");
+    const retry = first.getByTestId("desk-team-retry");
+    const failed = await retry.waitFor({ timeout: 20_000 }).then(() => true, () => false);
+    const words = (await first.locator("#desk-main").innerText()).replace(/\s+/g, " ");
+    record("команда: сбой загрузки — «Не смог загрузить» и «Повторить», без нулей", failed && !words.includes("на месте") && !words.includes("просрочек нет"), words.slice(0, 100));
+    await first.unroute(failing);
+    await retry.click();
+    const back = await first.locator(TEAM_ROWS).first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    record("команда: «Повторить» возвращает таблицу", back);
+  } finally {
+    await clean.close();
   }
 }
 
@@ -66,11 +154,11 @@ async function teamTable(ctx: Ctx) {
   const heads = await headsOf(ctx, '[data-testid="desk-team-table"]');
   record("команда: таблица людей", count > 0, `строк ${count}; колонки: ${heads.join(" | ")}`);
   record(
-    "команда директора: имя, нагрузка, сейчас, вход — без трёх колонок нулей и «Доступности»",
-    ["имя", "нагрузка", "сейчас", "вход"].every((h) => heads.includes(h)) && !heads.some((h) => ["в работе", "просрочено", "на приёмке", "доступность"].includes(h)),
+    "команда директора: имя, нагрузка, сейчас, уведомления — без трёх колонок нулей и «Доступности»",
+    ["имя", "нагрузка", "сейчас", "уведомления"].every((h) => heads.includes(h)) && !heads.some((h) => ["в работе", "просрочено", "на приёмке", "доступность"].includes(h)),
   );
   const box = count ? await rows.first().boundingBox() : null;
-  record("команда: строка ~40 px", Boolean(box && box.height <= 44), box ? `высота ${Math.round(box.height)}` : "нет строки");
+  record("команда: строка 34–36 px", Boolean(box && box.height <= 36), box ? `высота ${Math.round(box.height)}` : "нет строки");
   const hero = await visible(ctx, "desk-team-hero");
   const heroText = hero ? ((await page.getByTestId("desk-team-hero").innerText()) ?? "").replace(/\s+/g, " ") : "";
   record("команда: герой «на месте» с числами", hero && heroText.includes("на месте"), heroText.slice(0, 120));
@@ -95,7 +183,7 @@ async function teamTable(ctx: Ctx) {
     skip("команда: фильтр по числу героя", "проблемных чисел нет");
   }
 
-  // the load leads to the person's tasks; on a quiet dev — the hero's «задач в работе»
+  // the load leads to the person's tasks; on a quiet dev — the hero's «открытых задач»
   const load = page.getByTestId("team-load").first();
   if (await load.count()) {
     const href = (await load.getAttribute("href")) ?? "";
@@ -105,7 +193,7 @@ async function teamTable(ctx: Ctx) {
   } else {
     const fact = page.getByTestId("hero-fact-open");
     const href = (await fact.getAttribute("href").catch(() => null)) ?? "";
-    record("команда: «задач в работе» ведёт в «Задачи» (открытых задач нет — нагрузка пуста)", href.startsWith("/desk/tasks"), href);
+    record("команда: «открытых задач» ведёт в «Задачи» (открытых задач нет — нагрузка пуста)", href.startsWith("/desk/tasks"), href);
   }
 
   // F puts the caret in the search, which narrows the table (typed, then cleared — nothing else)
@@ -141,8 +229,8 @@ async function teamTable(ctx: Ctx) {
   const menu = await visible(ctx, "desk-menu", 3_000);
   const items = menu ? (await page.getByTestId("desk-menu").getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim()) : [];
   record(
-    "команда: правая кнопка — меню строки («Открыть карточку», «Изменить»…)",
-    menu && items.some((t) => t.startsWith("Открыть карточку")) && items.some((t) => t.startsWith("Изменить")),
+    "команда: правая кнопка — меню строки («Открыть карточку», «Изменить», «Уволить…»)",
+    menu && items.some((t) => t.startsWith("Открыть карточку")) && items.some((t) => t.startsWith("Изменить")) && items.some((t) => /^(Уволить|Выключить экран)/.test(t)),
     items.join(" | "),
   );
   await ctx.shot("team-menu");
@@ -300,10 +388,13 @@ export async function checkErrands(ctx: Ctx) {
       await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
       await page.keyboard.press("KeyF");
       await page.keyboard.type("яяяяя");
-      await page.waitForTimeout(300);
-      const none = await page.locator('[data-testid="desk-errands-history"] [data-testid="desk-empty"]').isVisible();
+      // the search goes to the server after a pause: wait for what it says, not for a time
+      const nothing = page.locator('[data-testid="desk-errands-history"] [data-testid="desk-empty"]');
+      await nothing.waitFor({ timeout: 5_000 }).catch(() => undefined);
+      const none = await nothing.isVisible();
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
+      await page.locator(history).first().waitFor({ timeout: 5_000 }).catch(() => undefined);
+      await page.waitForTimeout(300);
       const back = await page.locator(history).count();
       record("заявки: фильтр «Готово», F — поиск по истории, сброс", done <= all && none && back === all, `все ${all}, готово ${done}, после ${back}`);
     } else {
@@ -334,9 +425,8 @@ export async function checkReports(ctx: Ctx) {
   const tabs = (await page.getByTestId("seg-day").isVisible()) && (await page.getByTestId("seg-period").isVisible());
   record("отчёты: вкладки «День» и «Период»", tabs);
   const hero = await visible(ctx, "desk-day-hero", 15_000);
-  const bar = await page.getByTestId("desk-day-bar").isVisible().catch(() => false);
   const heroText = hero ? ((await page.getByTestId("desk-day-hero").innerText()) ?? "").replace(/\s+/g, " ") : "";
-  record("отчёты «День»: герой «N из M сдали» и честная полоса", hero && bar && /из \d+ сдали|сдали в выходной/.test(heroText), heroText.slice(0, 120));
+  record("отчёты «День»: итог «N из M сдали», полосы-дубля нет", hero && (await page.getByTestId("desk-day-bar").count()) === 0 && /из \d+ сдали|сдали в выходной/.test(heroText), heroText.slice(0, 120));
   const rows = page.locator('[data-testid="desk-reports-day"] [data-testid="desk-row"]');
   const count = await rows.count();
   const heads = await headsOf(ctx, '[data-testid="desk-reports-day"]');
@@ -429,6 +519,27 @@ export async function checkReports(ctx: Ctx) {
   record("отчёты «Период»: «Месяц» меняет даты", week !== month && month.length > 0, `${week} → ${month}`);
   await ctx.shot("reports-month");
 
+  // what the screen hands out: the file — bytes, name, the total; the paper sheet — every row and column
+  const save = page.getByTestId("desk-report-csv");
+  if (await save.isEnabled()) {
+    const [file] = await Promise.all([page.waitForEvent("download"), save.click()]);
+    const bytes = await readFile(await file.path());
+    const text = bytes.toString("utf8");
+    const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+    record(
+      "отчёты «Период»: «Скачать для Excel» — CSV с BOM, «;», CRLF и итогом",
+      /^Табель \d\d\.\d\d–\d\d\.\d\d\.csv$/.test(file.suggestedFilename()) && bom && text.includes("Сотрудник;Сдача;Сдал;") && /\r\nИтого;[^\r\n]*\r\n$/.test(text) && !/[^\r]\n/.test(text),
+      file.suggestedFilename(),
+    );
+    const onScreen = await periodRows.count();
+    const sheet = page.getByTestId("desk-print-sheet");
+    const printed = await sheet.locator("tbody tr").count();
+    record("отчёты «Период»: лист печати — все строки, заголовок и итог", printed === onScreen && (await sheet.locator("h2").innerText()).startsWith("Табель") && (await sheet.locator("tfoot td").first().innerText()) === "Итого", `строк ${printed} из ${onScreen}`);
+    record("отчёты «Период»: «Печать» рядом с выгрузкой", await page.getByTestId("desk-report-print").isEnabled());
+  } else {
+    skip("отчёты «Период»: выгрузка и печать", "в таблице никого нет");
+  }
+
   // a day's column opens that day
   const column = page.locator('[data-testid="desk-period-strip"] [data-day]').first();
   const day = await column.getAttribute("data-day");
@@ -489,7 +600,7 @@ export async function checkSecretary(ctx: Ctx) {
     const heads = await headsOf(ctx, '[data-testid="desk-team-table"]');
     record(
       "секретарь: команда без задач и очков",
-      (await rows.count()) > 0 && !heads.includes("нагрузка") && !heads.includes("сейчас") && !heads.includes("очки") && heads.includes("вход"),
+      (await rows.count()) > 0 && !heads.includes("нагрузка") && !heads.includes("сейчас") && !heads.includes("очки") && heads.includes("уведомления"),
       heads.join(" | "),
     );
     await ctx.shot("team");

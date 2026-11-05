@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu } from "@/components/desk/ui/Menu";
 import { Popover } from "@/components/desk/ui/Popover";
 import { useDeskPanel } from "@/components/desk/ui/DeskPanel";
+import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { DECLINE_REASONS, useErrandActions, useErrandLink } from "@/lib/errands/mutations";
 import { waitedFor, type Errand } from "@/lib/errands/queries";
@@ -19,13 +20,10 @@ import { ETAS } from "./ErrandLink";
 /** How long a request done by her keeps asking «Что передать директору?» at the top of the queue. */
 const RESULT_FOR_MS = 15 * 60_000;
 
-/** The key of a button, inside it: dark on the accent fill, quiet on a plain one. */
-export function KeyCap({ children, muted = false }: { children: string; muted?: boolean }) {
+/** The key of a button, inside it: a quiet letter of the mono voice, no plate (D-158). */
+export function KeyCap({ children }: { children: string }) {
   return (
-    <span
-      aria-hidden
-      className={`ml-2 inline-flex h-[18px] items-center rounded-[5px] px-1.5 font-display text-[10px] font-bold leading-none ${muted ? "bg-surface-2 text-muted" : "bg-black/20 text-bg/80"}`}
-    >
+    <span aria-hidden className="nums ml-1.5 text-[11px] leading-none opacity-70">
       {children}
     </span>
   );
@@ -134,7 +132,7 @@ export function AskPopover({ anchor, errand, catalogue, onClose }: { anchor: HTM
   return (
     <Popover open={Boolean(anchor)} onClose={onClose} anchor={anchor} align="end" width={300} label="Уточнить у директора">
       <div ref={list} className="flex flex-col gap-2 p-2" data-testid="desk-errand-ask">
-        <p className="px-1.5 pt-1 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Уточнить у директора</p>
+        <p className="desk-label px-1.5 pt-1 uppercase">Уточнить у директора</p>
         <div className="flex flex-col">
           {questions.map((question, index) => (
             <button
@@ -155,28 +153,24 @@ export function AskPopover({ anchor, errand, catalogue, onClose }: { anchor: HTM
   );
 }
 
-/** One line under the request: who asked, the promise, the question and the director's answer. */
+/** One more line under the request, only when there is something to say: until when, the promise, the question and the director's answer. */
 function Meta({ errand, now, mine }: { errand: Errand; now: Date; mine: boolean }) {
   const eta = mine && errand.status === "accepted" ? etaLine(etaLeftMin(errand, now)) : null;
-  // the note first: it is what the request means («в аэропорт»), the row's first line keeps the label
   const parts: ReactNode[] = [];
-  if (errand.note) parts.push(<span key="note" className="text-text/80">{errand.note}</span>);
-  parts.push(shortName(errand.author?.full_name ?? "Директор"));
   if (errand.until_at) parts.push(untilLine(errand.until_at));
   if (eta) parts.push(<span key="eta">обещано: {eta}</span>);
   if (errand.question) {
     parts.push(
       errand.answer ? (
         <span key="q">
-          {errand.question} — <span style={{ color: "var(--ok)" }}>директор: {errand.answer}</span>
+          {errand.question} — <span className="text-text">директор: {errand.answer}</span>
         </span>
       ) : (
-        <span key="q">
-          спросили: {errand.question} — <span style={{ color: "var(--accent)" }}>ждём ответа</span>
-        </span>
+        <span key="q">спросили: {errand.question} — ждём ответа</span>
       ),
     );
   }
+  if (parts.length === 0) return null;
   return (
     <p className="truncate text-[12px] leading-4 text-muted">
       {parts.map((part, index) => (
@@ -198,10 +192,11 @@ type RowMoves = {
 };
 
 /**
- * A request in the secretary's queue (wave 3): a record in one flat plane, not a phone card —
- * how long it waits, what (by when, the note), who asked and what was said about it; on the right
- * her moves with their keys while the row is chosen. A click on the row (not a button) chooses
- * it and opens it in the panel.
+ * A request in the secretary's queue (wave 3, D-158): a line of a ruled list, not a phone card —
+ * how long it waits, what (by when, the note), who asked; a second line only for what was said
+ * about it. On the right edge one word — her next move; the chosen row (or the one under the
+ * mouse) opens the others, and holds the screen's one filled button: that is what Enter does. A
+ * click on the row (not a button) chooses it and opens it in the panel.
  */
 function QueueRow({
   errand,
@@ -227,7 +222,10 @@ function QueueRow({
   const guard = scene === "dnd";
   const taken = errand.status === "accepted" && errand.claimed_by === meId;
   const asking = Boolean(errand.question && !errand.answer);
-  const rail = alarm ? "var(--danger)" : taken ? "var(--ok)" : "var(--accent)";
+  const late = Boolean(errand.due_at) && new Date(errand.due_at as string) < now;
+  // the moves of second rank: for the row in hand, the rest of the list stays one word wide
+  const second = chosen ? "flex" : "hidden [.desk-row:hover_&]:flex";
+  const main = chosen ? { variant: "primary" as const, className: "!min-h-8" } : { variant: "secondary" as const, className: "desk-move !min-h-8" };
   const open = (event: MouseEvent<HTMLElement>) => {
     if ((event.target as HTMLElement).closest("button, a, input, [role=dialog]")) return;
     onOpen();
@@ -236,44 +234,44 @@ function QueueRow({
     <div
       role="row"
       aria-selected={chosen}
-      className="desk-row relative grid min-h-[56px] cursor-default grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-4 border-t border-border/50 py-2 pl-4 pr-3 first:border-t-0"
-      style={alarm ? { background: "color-mix(in srgb, var(--danger) 10%, transparent)" } : undefined}
+      className={`desk-row grid cursor-default grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-x-3 py-px ${alarm ? "desk-queue-alarm" : ""}`}
       onClick={open}
       data-testid="desk-errand-card"
       data-status={errand.status}
       data-chosen={chosen ? "" : undefined}
       data-errand-id={errand.id}
     >
-      <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full" style={{ background: rail }} />
-      <span className="nums text-[13px] leading-5 text-muted" title="Сколько ждёт">
+      <span className="nums truncate text-[13px] leading-5 text-muted" title="Сколько ждёт">
         {waitedFor(errand, now)}
       </span>
       <div className="min-w-0">
-        <p className="truncate font-display text-[15px] font-semibold leading-5" style={alarm ? { color: "var(--danger)" } : undefined}>
-          {alarm ? "Вызови охрану!" : errand.label}
+        <p className="truncate text-[14px] leading-5">
+          {alarm ? (
+            <span className="font-semibold" style={{ color: "var(--danger)" }}>
+              Вызови охрану!
+            </span>
+          ) : (
+            <span className="font-medium">{errand.label}</span>
+          )}
           {!alarm && errand.due_at ? (
-            <span style={{ color: "var(--accent)" }} data-testid="errand-due">
-              {" "}
-              · {atLine(errand.due_at, now)}
+            <span data-testid="errand-due">
+              {" · "}
+              <When overdue={late}>{atLine(errand.due_at, now)}</When>
             </span>
           ) : null}
+          {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
+          <span className="text-muted"> · {shortName(errand.author?.full_name ?? "Директор")}</span>
         </p>
         <Meta errand={errand} now={now} mine={taken} />
       </div>
-      <div className="flex shrink-0 items-center gap-1.5" data-testid="desk-errand-actions">
+      <div className="flex shrink-0 items-center gap-2.5" data-testid="desk-errand-actions">
         {taken && !errand.eta_at && !guard && !alarm ? (
-          <div className="mr-1 flex items-center gap-1" data-testid="desk-errand-eta">
-            <span className="mr-0.5 text-[12px] leading-4 text-muted">Будет:</span>
+          <div className={`${second} items-baseline gap-2.5 text-[13px] leading-5`} data-testid="desk-errand-eta">
+            <span className="text-muted">Будет:</span>
             {ETAS.map((option, index) => (
-              <button
-                key={option.min}
-                type="button"
-                disabled={busy}
-                onClick={() => moves.eta(option.min)}
-                className="inline-flex h-8 items-center gap-1 rounded-[8px] border border-border bg-surface-2/60 px-2 text-[12px] font-semibold leading-4 transition-colors hover:border-muted/50 disabled:opacity-40"
-              >
+              <button key={option.min} type="button" disabled={busy} onClick={() => moves.eta(option.min)} className="desk-word desk-focus">
                 {option.label}
-                {chosen ? <span className="nums text-[10px] font-bold text-muted">{index + 1}</span> : null}
+                {chosen ? <KeyCap>{String(index + 1)}</KeyCap> : null}
               </button>
             ))}
           </div>
@@ -282,32 +280,34 @@ function QueueRow({
           <button
             type="button"
             onClick={(event) => moves.ask(event.currentTarget)}
-            className="inline-flex h-8 items-center rounded-[8px] px-2 text-[12px] font-medium leading-4 text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            className={`${second} h-8 items-center text-[13px] leading-5 text-muted hover:text-text`}
             data-testid="desk-errand-ask-open"
             data-ask-for={errand.id}
             title="Уточнить у директора (Q)"
           >
             Уточнить
-            {chosen ? <KeyCap muted>Q</KeyCap> : null}
+            {chosen ? <KeyCap>Q</KeyCap> : null}
           </button>
         ) : null}
         {taken ? (
-          <Button size="sm" loading={busy} onClick={moves.done} data-testid="desk-errand-done">
+          <Button size="sm" {...main} loading={busy} onClick={moves.done} data-testid="desk-errand-done">
             {guard ? "Снять «не беспокоить»" : alarm ? "Охрана на месте" : "Готово"}
             {chosen ? <KeyCap>Enter</KeyCap> : null}
           </Button>
         ) : (
           <>
-            <Button size="sm" loading={busy} onClick={moves.accept} data-testid="desk-errand-accept">
+            {alarm ? null : (
+              <span className={second}>
+                <Button size="sm" variant="secondary" className="!min-h-8" disabled={busy} onClick={(event) => moves.decline(event.currentTarget)} data-testid="desk-errand-decline" data-decline-for={errand.id}>
+                  Не могу
+                  {chosen ? <KeyCap>N</KeyCap> : null}
+                </Button>
+              </span>
+            )}
+            <Button size="sm" {...main} loading={busy} onClick={moves.accept} data-testid="desk-errand-accept">
               {alarm ? "Вызываю охрану" : "Принял"}
               {chosen ? <KeyCap>Enter</KeyCap> : null}
             </Button>
-            {alarm ? null : (
-              <Button size="sm" variant="secondary" disabled={busy} onClick={(event) => moves.decline(event.currentTarget)} data-testid="desk-errand-decline" data-decline-for={errand.id}>
-                Не могу
-                {chosen ? <KeyCap muted>N</KeyCap> : null}
-              </Button>
-            )}
           </>
         )}
       </div>
@@ -327,7 +327,7 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
     <div
       role="row"
       aria-selected={chosen}
-      className="desk-row relative grid min-h-[56px] cursor-default grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-4 border-t border-border/50 py-2 pl-4 pr-3 first:border-t-0"
+      className="desk-row grid cursor-default grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-x-3 py-px"
       onClick={(event) => {
         if (!(event.target as HTMLElement).closest("button, input")) onOpen();
       }}
@@ -335,15 +335,12 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
       data-chosen={chosen ? "" : undefined}
       data-errand-id={errand.id}
     >
-      <span aria-hidden className="absolute inset-y-2 left-0 w-[3px] rounded-r-full bg-muted/40" />
-      <span className="text-[13px] leading-5" style={{ color: "var(--ok)" }}>
-        готово
-      </span>
-      <div className="min-w-0">
-        <p className="truncate font-display text-[15px] font-semibold leading-5">{errand.label}</p>
-        <p className="truncate text-[12px] leading-4 text-muted">что передать?</p>
-      </div>
-      <div className="flex shrink-0 items-center justify-end gap-1.5">
+      <span className="text-[13px] leading-5 text-muted">готово</span>
+      <p className="min-w-0 truncate text-[14px] leading-5">
+        <span className="font-medium">{errand.label}</span>
+        <span className="text-muted"> · что передать?</span>
+      </p>
+      <div className="flex shrink-0 items-center justify-end gap-3 text-[13px] leading-5">
         {typing ? (
           <div className="w-[280px]">
             <WordField
@@ -360,20 +357,20 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
         ) : (
           <>
             {results.map((text, index) => (
-              <Button key={text} size="sm" variant="secondary" className="!min-h-8" disabled={busy} onClick={() => onSend(text)}>
+              <button key={text} type="button" disabled={busy} onClick={() => onSend(text)} className="desk-word desk-focus">
                 {text}
-                {chosen ? <KeyCap muted>{String(index + 1)}</KeyCap> : null}
-              </Button>
+                {chosen ? <KeyCap>{String(index + 1)}</KeyCap> : null}
+              </button>
             ))}
-            <Button size="sm" variant="ghost" className="!min-h-8" onClick={() => setTyping(true)}>
+            <button type="button" onClick={() => setTyping(true)} className="text-muted hover:text-text">
               Своими словами…
-            </Button>
+            </button>
           </>
         )}
-        <Button size="sm" variant="ghost" className="!min-h-8" onClick={onDismiss} data-testid="desk-errand-result-skip">
+        <button type="button" onClick={onDismiss} className="flex h-8 items-center text-muted hover:text-text" data-testid="desk-errand-result-skip">
           Не нужно
-          {chosen ? <KeyCap muted>Esc</KeyCap> : null}
-        </Button>
+          {chosen ? <KeyCap>Esc</KeyCap> : null}
+        </button>
       </div>
     </div>
   );
@@ -395,8 +392,8 @@ export function resultsOf(rows: readonly Errand[], meId: string, now: Date, cata
 }
 
 /**
- * The secretary's queue from the keyboard and the mouse (D-154, wave 3): one plane of records,
- * the chosen one ringed — ↑/↓ choose; Enter — its next step («Принял», then «Готово»); 1–4 —
+ * The secretary's queue from the keyboard and the mouse (D-154, wave 3): one ruled list, the
+ * chosen line in the pen — ↑/↓ choose; Enter — its next step («Принял», then «Готово»); 1–4 —
  * «Будет: сейчас / 5 / 15 / 30 мин» once it is hers; N — «Не могу» with its reasons (1–3); Q — a
  * question to the director. «Готово» leaves «Что передать директору?» at the top: 1–2 — the
  * ready words, Esc — «Не нужно». By the physical key, so a Russian layout works.
@@ -424,6 +421,8 @@ export function QueueList({
   const link = useErrandLink();
   const panel = useDeskPanel();
   const items: Item[] = [...results.map((errand) => ({ kind: "result" as const, errand })), ...queue.map((errand) => ({ kind: "errand" as const, errand }))];
+  // her own work under a line of its own, once something else stands above it
+  const firstTaken = items.findIndex((item) => item.kind === "errand" && item.errand.status !== "sent");
   const [chosen, setChosen] = useState<{ id: string; index: number } | null>(null);
   const at = chosen ? items.findIndex((item) => item.errand.id === chosen.id) : -1;
   const current = at >= 0 ? items[at] : (items[Math.min(chosen?.index ?? 0, items.length - 1)] ?? null);
@@ -514,39 +513,44 @@ export function QueueList({
 
   return (
     <>
-      <div role="grid" aria-label="Очередь заявок" className="overflow-hidden rounded-[12px] border border-border bg-surface/40">
-        {items.map((item) =>
-          item.kind === "result" ? (
-            <ResultRow
-              key={`r-${item.errand.id}`}
-              errand={item.errand}
-              catalogue={catalogue}
-              chosen={current?.errand.id === item.errand.id}
-              busy={busyOf(item.errand.id)}
-              onSend={(text) => sendResult(item.errand.id, text)}
-              onDismiss={() => onDismiss(item.errand.id)}
-              onOpen={() => {
-                choose(item.errand.id);
-                onOpen(item.errand.id);
-              }}
-            />
-          ) : (
-            <QueueRow
-              key={item.errand.id}
-              errand={item.errand}
-              meId={meId}
-              now={now}
-              catalogue={catalogue}
-              chosen={current?.errand.id === item.errand.id || (current === null && openId === item.errand.id)}
-              busy={busyOf(item.errand.id)}
-              moves={movesOf(item.errand)}
-              onOpen={() => {
-                choose(item.errand.id);
-                onOpen(item.errand.id);
-              }}
-            />
-          ),
-        )}
+      <div role="grid" aria-label="Очередь заявок" className="desk-list">
+        {items.map((item, index) => (
+          <Fragment key={`${item.kind}-${item.errand.id}`}>
+            {index === firstTaken && index > 0 ? (
+              <div role="row" className="flex h-[30px] items-end pb-1">
+                <span className="desk-label uppercase">В работе</span>
+              </div>
+            ) : null}
+            {item.kind === "result" ? (
+              <ResultRow
+                errand={item.errand}
+                catalogue={catalogue}
+                chosen={current?.errand.id === item.errand.id}
+                busy={busyOf(item.errand.id)}
+                onSend={(text) => sendResult(item.errand.id, text)}
+                onDismiss={() => onDismiss(item.errand.id)}
+                onOpen={() => {
+                  choose(item.errand.id);
+                  onOpen(item.errand.id);
+                }}
+              />
+            ) : (
+              <QueueRow
+                errand={item.errand}
+                meId={meId}
+                now={now}
+                catalogue={catalogue}
+                chosen={current?.errand.id === item.errand.id || (current === null && openId === item.errand.id)}
+                busy={busyOf(item.errand.id)}
+                moves={movesOf(item.errand)}
+                onOpen={() => {
+                  choose(item.errand.id);
+                  onOpen(item.errand.id);
+                }}
+              />
+            )}
+          </Fragment>
+        ))}
       </div>
       {current ? <QueueKeys item={current} meId={meId} catalogue={catalogue} /> : null}
       <ReasonMenu
@@ -618,7 +622,7 @@ function QueueKeys({ item, meId, catalogue }: { item: Item; meId: string; catalo
     }
   }
   return (
-    <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
+    <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
       {parts}
     </p>
   );

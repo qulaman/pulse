@@ -178,6 +178,24 @@ describe("the lab for the whole team (D-150)", () => {
   });
 });
 
+describe("the developers' tools (dev_tools)", () => {
+  it("are closed for a fresh company and keep what the row holds", () => {
+    expect(parseCompanySettings({}).dev_tools).toBe(false);
+    expect(parseCompanySettings({ dev_tools: true }).dev_tools).toBe(true);
+  });
+
+  it("a broken value reads as closed and costs no other setting", () => {
+    const settings = parseCompanySettings({ dev_tools: "yes", points_enabled: true });
+    expect(settings.dev_tools).toBe(false);
+    expect(settings.points_enabled).toBe(true);
+  });
+
+  it("no patch carries the flag: a company cannot open them for itself", () => {
+    expect(SettingsPatchSchema.safeParse({ dev_tools: true }).success).toBe(false);
+    expect(SettingsPatchSchema.safeParse({ dev_tools: false }).success).toBe(false);
+  });
+});
+
 describe("secretary settings (D-79)", () => {
   it("gives a fresh company the seven default buttons (D-87: «не беспокоить», the guest; D-99: «охрана»)", () => {
     const settings = parseCompanySettings({});

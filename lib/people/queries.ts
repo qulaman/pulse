@@ -40,6 +40,14 @@ export const peopleKeys = {
   one: (id: string) => ["people", id] as const,
 };
 
+/**
+ * One count of the team on every screen: working people, without the director and the wall's
+ * kiosk — the same set `team_role` gives the reports.
+ */
+export function isTeamMember(person: Pick<Person, "is_active" | "role">): boolean {
+  return person.is_active && person.role !== "director" && person.role !== "tv";
+}
+
 /** Everybody in the company, inactive last — RLS shows the director the whole roster. */
 export const peopleQuery = {
   queryKey: peopleKeys.all,
@@ -137,6 +145,7 @@ export type NewPerson = {
   full_name: string;
   role: Role;
   position?: string;
+  phone?: string;
   aliases?: string[];
   manager_id?: string | null;
 };

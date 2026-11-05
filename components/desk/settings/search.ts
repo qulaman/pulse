@@ -14,6 +14,8 @@ export type SettingEntry = {
   href?: string;
   words?: string;
   director?: boolean;
+  /** Lives in «Лаборатория» or «Данные», or leads there: only for who has the developers' tools. */
+  devTools?: boolean;
 };
 
 export const SETTINGS_INDEX: SettingEntry[] = [
@@ -48,16 +50,16 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "parser-model", tab: "ai", place: "ИИ-модель", title: "Модель разбора поручений", words: "claude haiku sonnet deepseek парсер" },
   { id: "parser-escalate", tab: "ai", place: "ИИ-модель", title: "Перепроверка сильной моделью", words: "эскалация вторая модель" },
   { id: "parser-kinds", tab: "ai", place: "ИИ-модель", title: "Что модель различает", words: "виды объявления напоминания встречи заметки" },
-  { id: "parser-rules", tab: "ai", place: "ИИ-модель", title: "Правила компании для разбора", words: "промпт правила корпус" },
+  { id: "parser-rules", tab: "ai", place: "ИИ-модель", title: "Правила компании для разбора", words: "промпт правила корпус", devTools: true },
   { id: "conventions", tab: "ai", place: "ИИ-модель", title: "Слова о сроках", words: "до обеда к вечеру утро срок дедлайн" },
   { id: "retention", tab: "ai", place: "ИИ-модель", title: "Хранение записей", words: "аудио голосовые удалять дней" },
   // the screens beside the tabs
   { id: "page-names", href: "/desk/settings/dictionary?tab=names", place: "Словарь", title: "Имена людей — как их зовут вслух", words: "прозвище алиас тёзки" },
   { id: "page-words", href: "/desk/settings/dictionary?tab=words", place: "Словарь", title: "Слова компании", words: "контрагенты объекты словарь термины" },
-  { id: "page-lab", href: "/desk/settings/lab", place: "Лаборатория", title: "Сравнение моделей", words: "лаб модели стоимость" },
-  { id: "page-lab-parser", href: "/desk/settings/lab?tab=parser", place: "Лаборатория", title: "Парсер: правила и песочница", words: "промпт корпус проверка" },
-  { id: "page-lab-costs", href: "/desk/settings/lab?tab=costs", place: "Лаборатория", title: "Себестоимость клиента", words: "цена расходы деньги" },
-  { id: "page-data", href: "/desk/settings/data", place: "Данные", title: "Таблицы компании", words: "база логи данные таблица", director: true },
+  { id: "page-lab", href: "/desk/settings/lab", place: "Лаборатория", title: "Сравнение моделей", words: "лаб модели стоимость", devTools: true },
+  { id: "page-lab-parser", href: "/desk/settings/lab?tab=parser", place: "Лаборатория", title: "Парсер: правила и песочница", words: "промпт корпус проверка", devTools: true },
+  { id: "page-lab-costs", href: "/desk/settings/lab?tab=costs", place: "Лаборатория", title: "Себестоимость клиента", words: "цена расходы деньги", devTools: true },
+  { id: "page-data", href: "/desk/settings/data", place: "Данные", title: "Таблицы компании", words: "база логи данные таблица", devTools: true },
   { id: "page-points", href: "/desk/settings/points", place: "Очки и магазин", title: "Балансы, споры и история очков", words: "начислить баланс спор", director: true },
   { id: "page-shop", href: "/desk/settings/points?view=shop", place: "Очки и магазин", title: "Магазин наград", words: "товар награда выдать заказ мерч", director: true },
 ];
@@ -65,10 +67,10 @@ export const SETTINGS_INDEX: SettingEntry[] = [
 const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").replace(/[«»"]/g, "");
 
 /** The entries a query finds — every word of it somewhere in the title, the place or the words; titles first. */
-export function searchSettings(query: string, options: { director: boolean }): SettingEntry[] {
+export function searchSettings(query: string, options: { director: boolean; devTools: boolean }): SettingEntry[] {
   const words = fold(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
-  const allowed = SETTINGS_INDEX.filter((entry) => !entry.director || options.director);
+  const allowed = SETTINGS_INDEX.filter((entry) => (!entry.director || options.director) && (!entry.devTools || options.devTools));
   const scored = allowed
     .map((entry) => {
       const title = fold(entry.title);

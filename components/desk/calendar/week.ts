@@ -133,3 +133,25 @@ export function stackTops(wanted: readonly number[], step: number): number[] {
   for (const top of wanted) tops.push(tops.length ? Math.max(top, tops[tops.length - 1] + step) : top);
   return tops;
 }
+
+/** What of a stack stands in its column: the tops, how many marks are shown, where «+N» goes (null — no need). */
+export type MarkFit = { tops: number[]; shown: number; moreTop: number | null };
+
+/**
+ * A day's marks in a column `height` tall: stacked from their hours, as many as fit whole; the
+ * rest go behind «+N», which takes the place under the last mark shown. A single mark that would
+ * hang over the column's foot stands up instead — a «+1» is no better than the mark itself.
+ */
+export function fitMarks(wanted: readonly number[], step: number, markH: number, moreH: number, height: number): MarkFit {
+  const tops = stackTops(wanted, step);
+  let shown = tops.filter((top) => top + markH <= height).length;
+  if (shown === tops.length) return { tops, shown, moreTop: null };
+  const above = shown > 0 ? tops[shown - 1] + step : 0;
+  if (shown === tops.length - 1 && height - markH >= above) {
+    tops[shown] = height - markH;
+    return { tops, shown: tops.length, moreTop: null };
+  }
+  while (shown > 0 && tops[shown - 1] + step + moreH > height) shown -= 1;
+  const moreTop = shown > 0 ? tops[shown - 1] + step : Math.max(0, Math.min(tops[0], height - moreH));
+  return { tops, shown, moreTop };
+}

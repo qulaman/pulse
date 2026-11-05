@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chordHref, DESK_NAV, deskAllows, deskHomeFor, deskNavActive, deskRouteFor, mayHaveDeskRoute } from "./routes";
+import { chordHref, DESK_NAV, deskAllows, deskDevToolsOpen, deskHomeFor, deskNavActive, deskRouteFor, mayHaveDeskRoute } from "./routes";
 
 describe("deskHomeFor (D-153)", () => {
   it("sends the director to tasks and the secretary to the errands", () => {
@@ -58,8 +58,14 @@ describe("deskRouteFor — the director", () => {
     expect(to("/profile")).toBe("/desk/profile");
   });
 
+  it("takes «Эфир» to the desk's announcements, and an address's query stays behind", () => {
+    expect(to("/ether")).toBe("/desk/ether");
+    expect(to("/ether/")).toBe("/desk/ether");
+    expect(to("/ether", "?x=1")).toBe("/desk/ether");
+  });
+
   it("has nothing for the team's screens and the rest", () => {
-    for (const path of ["/feed", "/tasks", "/report", "/ether", "/tv", "/desk/tasks", "/", "/login", "/pulse-pixel"]) {
+    for (const path of ["/feed", "/tasks", "/report", "/tv", "/desk/tasks", "/", "/login", "/pulse-pixel"]) {
       expect(to(path)).toBeNull();
     }
   });
@@ -78,7 +84,8 @@ describe("deskRouteFor — the secretary", () => {
     expect(to("/secretary", "?e=e2")).toBe("/desk/errands?e=e2");
   });
 
-  it("maps what her desk has: the team, the calendar, the settings, the lab, the profile", () => {
+  it("maps what her desk has: the team, the calendar, the announcements, the settings, the lab, the profile", () => {
+    expect(to("/ether")).toBe("/desk/ether");
     expect(to("/people")).toBe("/desk/team");
     expect(to("/people/p2/edit")).toBe("/desk/team/p2?edit=1");
     expect(to("/calendar")).toBe("/desk/calendar");
@@ -110,6 +117,7 @@ describe("mayHaveDeskRoute", () => {
     expect(mayHaveDeskRoute("/feed")).toBe(true);
     expect(mayHaveDeskRoute("/pulse")).toBe(true);
     expect(mayHaveDeskRoute("/tasks/x")).toBe(true);
+    expect(mayHaveDeskRoute("/ether")).toBe(true);
     expect(mayHaveDeskRoute("/tasks")).toBe(false);
     expect(mayHaveDeskRoute("/report")).toBe(false);
     expect(mayHaveDeskRoute("/desk/tasks")).toBe(false);
@@ -118,14 +126,23 @@ describe("mayHaveDeskRoute", () => {
 
 describe("deskAllows and the navigation", () => {
   it("keeps the secretary off the director's desk screens", () => {
-    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/screen", "/desk/settings/data", "/desk/settings/points"]) {
+    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/screen", "/desk/settings/lab", "/desk/settings/data", "/desk/settings/points"]) {
       expect(deskAllows(path, "secretary")).toBe(false);
       expect(deskAllows(path, "director")).toBe(true);
     }
-    for (const path of ["/desk", "/desk/errands", "/desk/team/1", "/desk/calendar", "/desk/settings", "/desk/settings/lab", "/desk/settings/dictionary", "/desk/profile"]) {
+    for (const path of ["/desk", "/desk/errands", "/desk/team/1", "/desk/ether", "/desk/calendar", "/desk/settings", "/desk/settings/dictionary", "/desk/profile"]) {
       expect(deskAllows(path, "secretary")).toBe(true);
     }
     expect(deskAllows("/desk/tasks", "employee")).toBe(false);
+  });
+
+  it("opens the developers' tools to the director of a company with the flag, and to nobody else", () => {
+    expect(deskDevToolsOpen("director", true)).toBe(true);
+    expect(deskDevToolsOpen("director", false)).toBe(false);
+    expect(deskDevToolsOpen("secretary", true)).toBe(false);
+    expect(deskDevToolsOpen("secretary", false)).toBe(false);
+    expect(deskDevToolsOpen("employee", true)).toBe(false);
+    expect(deskDevToolsOpen(undefined, true)).toBe(false);
   });
 
   it("lists for the secretary only what she may open", () => {
@@ -144,6 +161,8 @@ describe("chordHref (D-154 wave 3)", () => {
   it("goes to the role's section by the letter after G", () => {
     expect(chordHref("KeyT", "director")).toBe("/desk/tasks");
     expect(chordHref("KeyS", "director")).toBe("/desk/today");
+    expect(chordHref("KeyA", "director")).toBe("/desk/ether");
+    expect(chordHref("KeyA", "secretary")).toBe("/desk/ether");
     expect(chordHref("KeyH", "secretary")).toBe("/desk/settings");
     expect(chordHref("KeyP", "secretary")).toBe("/desk/profile");
   });

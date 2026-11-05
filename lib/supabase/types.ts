@@ -1353,12 +1353,46 @@ export type Database = {
           },
         ]
       }
+      profile_phones: {
+        Row: {
+          company_id: string
+          phone: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          phone: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          phone?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_phones_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_phones_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           aliases: string[]
           availability: Database["public"]["Enums"]["availability_t"]
           avatar_url: string | null
           away_until: string | null
+          client_request_id: string | null
           company_id: string
           created_at: string
           full_name: string
@@ -1377,6 +1411,7 @@ export type Database = {
           availability?: Database["public"]["Enums"]["availability_t"]
           avatar_url?: string | null
           away_until?: string | null
+          client_request_id?: string | null
           company_id: string
           created_at?: string
           full_name: string
@@ -1395,6 +1430,7 @@ export type Database = {
           availability?: Database["public"]["Enums"]["availability_t"]
           avatar_url?: string | null
           away_until?: string | null
+          client_request_id?: string | null
           company_id?: string
           created_at?: string
           full_name?: string
@@ -2422,6 +2458,13 @@ export type Database = {
       }
       daily_report_reminders_due: { Args: { p_now?: string }; Returns: number }
       daily_reports_due_missed: { Args: { p_now?: string }; Returns: number }
+      director_busy: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          ends_at: string
+          starts_at: string
+        }[]
+      }
       director_day_summaries_due: { Args: { p_now?: string }; Returns: number }
       director_digest_slot: {
         Args: { p_at: string; p_prefs: Json }

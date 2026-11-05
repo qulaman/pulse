@@ -199,7 +199,7 @@ export function DeskConfirm() {
     return (
       <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="error">
         <PanelHeader>
-          <h2 className="font-display text-[17px] font-semibold leading-6">Не получилось</h2>
+          <h2 className="desk-task-title text-[21px] leading-[26px] text-danger">Не получилось</h2>
           <p className="mt-1 text-[14px] leading-5" data-testid="desk-confirm-error">
             {error?.message || ERROR_LINE[error?.code ?? "unknown"] || "Что-то пошло не так — повторить?"}
           </p>
@@ -227,7 +227,7 @@ export function DeskConfirm() {
     return (
       <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="question">
         <PanelHeader>
-          <h2 className="font-display text-[17px] font-semibold leading-6">{reply && !reply.understood ? "Не понял вопрос" : "Отвечаю"}</h2>
+          <h2 className="desk-task-title text-[21px] leading-[26px]">{reply && !reply.understood ? "Не понял вопрос" : "Отвечаю"}</h2>
         </PanelHeader>
         <Quote text={question || transcript} />
         {reply ? (
@@ -257,7 +257,7 @@ export function DeskConfirm() {
     return (
       <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="empty">
         <PanelHeader>
-          <h2 className="font-display text-[17px] font-semibold leading-6">Не разобрал</h2>
+          <h2 className="desk-task-title text-[21px] leading-[26px]">Не разобрал</h2>
           <p className="mt-1 text-[14px] leading-5 text-muted">Не нашёл здесь ни задач, ни объявлений. Поправьте слова и разберу заново — или сделаю из них задачу.</p>
         </PanelHeader>
         <textarea
@@ -272,7 +272,7 @@ export function DeskConfirm() {
             }
           }}
           rows={3}
-          className="desk-input w-full px-3 py-2 text-[14px] leading-5 outline-none"
+          className="desk-input w-full py-2 text-[14px] leading-5 outline-none"
           aria-label="Текст поручения"
           autoFocus
         />
@@ -311,7 +311,7 @@ export function DeskConfirm() {
   return (
     <section ref={section} className="flex min-h-full flex-col" data-testid="desk-confirm" data-state="confirm">
       <PanelHeader>
-        <h2 className="font-display text-[17px] font-semibold leading-6">Понял так: {entitiesSummary(entities)}</h2>
+        <h2 className="desk-task-title text-[19px] leading-6">Понял так: {entitiesSummary(entities)}</h2>
         {transcript ? (
           <p className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-muted" title={transcript}>
             «{transcript}»
@@ -319,20 +319,20 @@ export function DeskConfirm() {
         ) : null}
       </PanelHeader>
 
-      <div className="-mx-5 divide-y divide-border/60 border-b border-border/60" data-testid="desk-entities">
+      <div className="divide-y divide-border border-b border-border" data-testid="desk-entities">
         {entities.map((entity, index) => (
           <EntityEditor key={`${entity.kind}-${index}`} entity={entity} index={index} ctx={ctx} onPatch={(patch) => editEntity(index, patch)} onRemove={() => removeEntity(index)} />
         ))}
       </div>
 
       {why || blank || waiting > 0 ? (
-        <p className="mt-3 text-[13px] leading-5 text-warn" data-testid="desk-confirm-why">
+        <p className="mt-2 text-[13px] leading-5 text-warn" data-testid="desk-confirm-why">
           {why || (blank ? "Пустой текст не уйдёт — допишите или уберите строку." : `Ждёт исполнителя: ${waiting}. Остальное уйдёт.`)}
         </p>
       ) : null}
 
       <div className="flex-1" />
-      <footer className="sticky -bottom-6 -mx-5 -mb-6 mt-4 border-t border-border bg-surface px-5 pb-4 pt-3">
+      <footer className="sticky -bottom-6 -mx-5 -mb-6 mt-4 border-t border-text bg-surface px-5 pb-4 pt-3">
         <div className="flex items-center gap-2">
           <Button size="sm" disabled={!canSend} loading={sending} onClick={() => void sendBatch(false)} data-testid="desk-confirm-send" className="whitespace-nowrap">
             {label}
@@ -360,5 +360,5 @@ export function DeskConfirm() {
 }
 
 function Quote({ text }: { text: string }): ReactNode {
-  return <p className="rounded-[10px] bg-surface-2 px-3 py-2 text-[13px] leading-[18px] text-muted">«{text}»</p>;
+  return <p className="-ml-3 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">«{text}»</p>;
 }

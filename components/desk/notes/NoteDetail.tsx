@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
+import { When } from "@/components/desk/ui/When";
 import { BoardPicker } from "@/components/mindboard/BoardPicker";
 import { AssignSheet } from "@/components/notes/AssignSheet";
 import { ConvertedCard, Original, SaveReceipt, TrashCard } from "@/components/notes/NoteCard";
@@ -41,12 +42,12 @@ const BOARDS_SHOWN = 7;
  * «Сохранено» in the bar. A note that became a task, or lies in the bin, shows what it is instead.
  */
 export function NoteDetail() {
-  const { rows, selectedId, loading, newNote } = useNotesDesk();
+  const { rows, selectedId, loading } = useNotesDesk();
   const note = selectedId ? (rows.find((row) => row.id === selectedId) ?? null) : null;
 
   if (!selectedId || (!note && !loading)) {
     return (
-      <div className="mx-auto w-full max-w-[760px] px-6 pt-16">
+      <div className="w-full max-w-[760px] px-10 pt-16">
         <EmptyState
           title={selectedId ? "Заметки нет" : "Выберите заметку"}
           hint={
@@ -58,20 +59,15 @@ export function NoteDetail() {
               </>
             )
           }
-          action={
-            <Button size="sm" variant="secondary" onClick={newNote}>
-              Новая заметка
-            </Button>
-          }
         />
       </div>
     );
   }
-  if (!note) return <div className="mx-auto mt-5 h-[320px] w-full max-w-[760px] rounded-[12px] bg-surface-2/60 px-6" aria-hidden />;
+  if (!note) return <div className="ml-10 mt-5 h-[320px] w-full max-w-[680px] bg-surface-2/60" aria-hidden />;
 
   if (note.deleted_at === null && !isConverted(note) && note.board_id === null) return <Thought key={note.id} note={note} />;
   return (
-    <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 px-6 pb-10 pt-5" data-testid="desk-note">
+    <div className="flex w-full max-w-[760px] flex-col gap-3 px-10 pb-10 pt-5" data-testid="desk-note">
       {note.deleted_at !== null ? <Trashed note={note} /> : isConverted(note) ? <Converted note={note} /> : <OnBoard note={note} />}
     </div>
   );
@@ -162,15 +158,14 @@ function Thought({ note }: { note: Note }) {
   return (
     <div className="flex min-h-full flex-col" data-testid="desk-note">
       {/* the bar stays on top while a long note scrolls under it */}
-      <div className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-1 border-b border-border/60 bg-bg/90 px-5 backdrop-blur-sm">
+      <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 border-b border-text bg-bg pl-10 pr-6">
         <Tooltip label="Поручить кому-то из команды" side="bottom">
           <Button size="sm" icon={<NoteIcon name="task" size={15} />} disabled={empty} onClick={() => setAssigning(true)} data-testid="desk-note-assign">
             Поручить
           </Button>
         </Tooltip>
-        <span className="mx-1 h-5 w-px bg-border/80" aria-hidden />
         <MenuButton items={remindItems} label="Напомнить" align="start" width={220} className={BAR_BUTTON}>
-          <span className={`flex items-center gap-1.5 ${ringing ? "text-accent" : ""}`} data-testid="desk-note-remind">
+          <span className="flex items-center gap-1.5" data-testid="desk-note-remind">
             <NoteIcon name="bell" size={15} />
             <span className="nums">{ringing && reminder ? reminder : "Напомнить"}</span>
             <Chevron />
@@ -210,9 +205,9 @@ function Thought({ note }: { note: Note }) {
         />
       </div>
 
-      <div className="mx-auto flex w-full max-w-[760px] flex-1 flex-col px-10 pb-16 pt-6">
-        <p className="nums mb-3 text-[12px] leading-4 text-muted">
-          {humanAqtobe(new Date(note.created_at))}
+      <div className="flex w-full max-w-[760px] flex-1 flex-col px-10 pb-16 pt-5">
+        <p className="mb-3 text-[12px] leading-4 text-muted">
+          <When>{humanAqtobe(new Date(note.created_at))}</When>
           {note.audio_path ? " · голосом" : ""}
           {note.pinned ? " · закреплена" : ""}
           {ringing && reminder ? ` · ${reminder}` : ""}
@@ -255,7 +250,7 @@ function Thought({ note }: { note: Note }) {
   );
 }
 
-const BAR_BUTTON = "flex h-9 items-center rounded-[10px] px-2.5 font-display text-[13px] font-semibold leading-4 text-text/90 transition-colors duration-[120ms] hover:bg-surface-2";
+const BAR_BUTTON = "flex h-9 items-center px-2.5 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2";
 
 function Chevron() {
   return (
@@ -293,7 +288,7 @@ function BarIcon({
         disabled={disabled}
         onClick={onClick}
         data-testid={testId}
-        className={`flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors duration-[120ms] hover:bg-surface-2 disabled:opacity-40 ${
+        className={`flex h-9 w-9 items-center justify-center transition-colors duration-[120ms] hover:bg-surface-2 disabled:opacity-40 ${
           active ? "text-accent" : danger ? "text-muted hover:text-danger" : "text-muted hover:text-text"
         }`}
       >
@@ -392,7 +387,7 @@ function Converted({ note }: { note: Note }) {
       <ConvertedCard note={note} task={task} now={now} query="" />
       {note.converted_task_id ? (
         <div>
-          <Link href={`/desk/tasks?id=${note.converted_task_id}`} className="text-[14px] font-semibold text-accent hover:underline">
+          <Link href={`/desk/tasks?id=${note.converted_task_id}`} className="text-[14px] font-medium underline underline-offset-2">
             Открыть задачу ›
           </Link>
         </div>
@@ -413,7 +408,7 @@ function OnBoard({ note }: { note: Note }) {
       hint={firstLine(note.text)}
       action={
         board ? (
-          <Link href={`/desk/notes/b/${board.id}`} className="text-[14px] font-semibold text-accent hover:underline">
+          <Link href={`/desk/notes/b/${board.id}`} className="text-[14px] font-medium underline underline-offset-2">
             Открыть доску ›
           </Link>
         ) : null

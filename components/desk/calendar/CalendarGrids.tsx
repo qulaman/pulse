@@ -1,8 +1,8 @@
 "use client";
 
-import { TONE_VAR } from "@/components/desk/ui/tone";
+import { When } from "@/components/desk/ui/When";
 import { hhmm, isOver, myStatus, timeRange } from "@/lib/calendar/agenda";
-import { isRunning, toneAhead } from "@/lib/calendar/overview";
+import { isRunning } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { parseYmd, WEEKDAYS_SHORT_RU, type Month, type Ymd } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
@@ -15,7 +15,7 @@ const CELL_CHIPS = 3;
 /** Deadline diamonds a month cell shows before their count. */
 const CELL_MARKS = 3;
 
-const MARK_COLOR = { danger: "var(--danger)", warn: "var(--warn)", muted: "var(--text-muted)" } as const;
+const MARK_COLOR = { danger: "var(--danger)", warn: "var(--text)", muted: "var(--text-muted)" } as const;
 
 type Props = {
   days: Ymd[];
@@ -35,16 +35,13 @@ type Props = {
 };
 
 /**
- * The colour a month chip carries, only when it says something (D-154): on now — the accent,
- * about to start or waiting for this person's answer — a warning; an ordinary meeting ahead is
- * a plain line, a past one is quiet.
+ * The line on a month chip's left, only when it says something: the pen — this person's answer is
+ * owed; print — on now. An ordinary meeting ahead is a plain line of text, a past one is quiet.
  */
-function chipSignal(event: CalendarEvent, meId: string, now: Date): string | null {
-  if (isOver(event, now)) return null;
-  if (event.author_id !== meId && myStatus(event, meId) === "invited") return "var(--warn)";
-  if (isRunning(event, now)) return "var(--accent)";
-  const tone = toneAhead(event, now);
-  return tone === "warn" ? TONE_VAR.warn : null;
+function chipLine(event: CalendarEvent, meId: string, now: Date): string {
+  if (isOver(event, now)) return "transparent";
+  if (event.author_id !== meId && myStatus(event, meId) === "invited") return "var(--accent)";
+  return isRunning(event, now) ? "var(--text)" : "transparent";
 }
 
 /** A day's deadlines as diamonds by the date — a click on the day opens its week, where they are written out. */
@@ -60,24 +57,24 @@ function MarkDots({ marks }: { marks: DeadlineMark[] }) {
       data-tone={loudest(marks)}
     >
       {marks.slice(0, CELL_MARKS).map((mark) => (
-        <span key={mark.id} aria-hidden className="h-[6px] w-[6px] rotate-45 rounded-[1px]" style={{ background: MARK_COLOR[mark.tone] }} />
+        <span key={mark.id} aria-hidden className="h-[6px] w-[6px] rotate-45" style={{ background: MARK_COLOR[mark.tone] }} />
       ))}
-      {marks.length > CELL_MARKS ? <span className="nums ml-0.5 text-[10px] font-semibold leading-3 text-muted">+{marks.length - CELL_MARKS}</span> : null}
+      {marks.length > CELL_MARKS ? <span className="nums ml-0.5 text-[10px] leading-3 text-muted">+{marks.length - CELL_MARKS}</span> : null}
     </span>
   );
 }
 
 /**
- * The month as weeks of seven: the neighbours' days dimmed, today ringed, up to three meetings
- * in a cell and «+N»; a click on a day opens its week, a click on a meeting — the meeting. The
- * chips are quiet lines — colour only on what is on now or waits for an answer.
+ * The month as weeks of seven under a rule of print: the neighbours' days dimmed, today's date
+ * stamped, up to three meetings in a cell and «+N»; a click on a day opens its week, a click on a
+ * meeting — the meeting. The chips are plain lines of text — a mark only on what waits for an answer.
  */
 export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay, onNew, deadlines }: Props) {
   return (
-    <div className="min-w-0 overflow-hidden rounded-[12px] border border-border" data-testid="desk-calendar-month">
-      <div className="grid grid-cols-7 border-b border-border">
+    <div className="min-w-0 overflow-hidden border-t border-text" data-testid="desk-calendar-month">
+      <div className="grid grid-cols-7 border-b border-text">
         {WEEKDAYS_SHORT_RU.map((name, index) => (
-          <span key={name} className={`px-2.5 py-2 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted ${index > 0 ? "border-l border-border/70" : ""}`}>
+          <span key={name} className={`desk-label px-2 py-1.5 uppercase ${index > 0 ? "border-l border-border/60" : ""}`}>
             {name}
           </span>
         ))}
@@ -87,7 +84,6 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
           const parts = parseYmd(ymd)!;
           const outside = parts.year !== month.year || parts.month !== month.month;
           const isToday = ymd === today;
-          const weekend = index % 7 >= 5;
           const events = byDay.get(ymd) ?? [];
           const more = events.length - CELL_CHIPS;
           return (
@@ -104,14 +100,14 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                   onDay(ymd);
                 }
               }}
-              className={`group/day flex min-h-[116px] min-w-0 cursor-pointer flex-col gap-0.5 p-1.5 outline-none transition-colors duration-[120ms] hover:bg-surface-2/40 focus-visible:bg-surface-2/50 ${
-                index % 7 > 0 ? "border-l border-border/70" : ""
-              } ${index >= 7 ? "border-t border-border/70" : ""} ${isToday ? "bg-accent/[0.04]" : outside ? "bg-bg" : weekend ? "bg-surface/40" : ""}`}
+              className={`group/day flex min-h-[116px] min-w-0 cursor-pointer flex-col gap-0.5 p-1.5 outline-none transition-colors duration-[120ms] hover:bg-surface-2/50 focus-visible:bg-surface-2/60 ${
+                index % 7 > 0 ? "border-l border-border/60" : ""
+              } ${index >= 7 ? "border-t border-border/60" : ""}`}
             >
               <span className="mb-0.5 flex items-center">
                 <span
-                  className={`nums flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[13px] font-semibold leading-none ${
-                    isToday ? "bg-accent text-bg" : outside ? "text-muted/45" : ymd < today ? "text-muted" : ""
+                  className={`nums flex h-6 min-w-6 items-center justify-center px-1 text-[13px] leading-none ${
+                    isToday ? "bg-text text-bg" : outside ? "text-muted/45" : ymd < today ? "text-muted" : ""
                   }`}
                 >
                   {parts.day}
@@ -120,15 +116,15 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                 {onNew && ymd >= today ? (
                   <button
                     type="button"
-                    aria-label={`Новое мероприятие на ${ymd}`}
-                    title="Новое мероприятие на этот день"
+                    aria-label={`Новая встреча на ${ymd}`}
+                    title="Новая встреча на этот день"
                     tabIndex={-1}
                     data-testid="desk-month-new"
                     onClick={(click) => {
                       click.stopPropagation();
                       onNew(ymd);
                     }}
-                    className={`${deadlines && (deadlines.get(ymd) ?? []).length > 0 ? "ml-1" : "ml-auto"} flex h-6 w-6 items-center justify-center rounded-[7px] text-[16px] leading-none text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-accent group-hover/day:opacity-100`}
+                    className={`${deadlines && (deadlines.get(ymd) ?? []).length > 0 ? "ml-1" : "ml-auto"} flex h-6 w-6 items-center justify-center text-[16px] leading-none text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-accent group-hover/day:opacity-100`}
                   >
                     +
                   </button>
@@ -136,7 +132,6 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
               </span>
               {events.slice(0, CELL_CHIPS).map((event) => {
                 const over = isOver(event, now);
-                const signal = chipSignal(event, meId, now);
                 return (
                   <button
                     key={event.id}
@@ -148,17 +143,17 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
                       click.stopPropagation();
                       onOpen(event, click.currentTarget);
                     }}
-                    className={`flex min-w-0 items-center gap-1.5 rounded-[6px] px-1.5 py-[3px] text-left text-[12px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 ${
+                    className={`flex min-w-0 items-center gap-1.5 border-l-2 px-1 py-[3px] text-left text-[12px] leading-4 transition-colors duration-[120ms] hover:bg-surface-2 ${
                       over || outside ? "text-muted" : ""
                     }`}
+                    style={{ borderLeftColor: chipLine(event, meId, now) }}
                   >
-                    {signal ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: signal }} /> : null}
-                    <span className={`nums shrink-0 ${over || outside ? "text-muted/70" : "text-muted"}`}>{hhmm(event.starts_at)}</span>
+                    <When className={`shrink-0 ${over || outside ? "text-muted/70" : "text-muted"}`}>{hhmm(event.starts_at)}</When>
                     <span className={`min-w-0 truncate ${over ? "" : "font-medium"}`}>{event.title}</span>
                   </button>
                 );
               })}
-              {more > 0 ? <span className="nums px-1.5 text-[12px] font-semibold leading-4 text-muted">+{more}</span> : null}
+              {more > 0 ? <span className="nums px-1 text-[12px] leading-4 text-muted">+{more}</span> : null}
             </div>
           );
         })}

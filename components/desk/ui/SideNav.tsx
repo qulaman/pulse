@@ -10,9 +10,13 @@ import { useCalendar } from "@/lib/calendar/queries";
 import { todayCount } from "@/lib/calendar/agenda";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
+import { useDeskScope } from "@/components/desk/DeskScope";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY, deskNavActive, type DeskBadge, type DeskRole } from "@/lib/desk/routes";
 import { activeCount, useErrands } from "@/lib/errands/queries";
 import { afterHydration } from "@/lib/offline/persist";
+import { useOpenDisputes } from "@/lib/points/game";
+import { ordersWaiting } from "@/lib/shop/format";
+import { useOrders } from "@/lib/shop/queries";
 import { inboxCounts, useDirectorInbox, useMe } from "@/lib/tasks/queries";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector } from "@/lib/visits/text";
@@ -50,12 +54,17 @@ export type DeskBadges = { counts: Partial<Record<DeskBadge, number>>; tones: Pa
  * number never disagrees with the list behind it (D-153 §3): «Задачи» — everything waiting for
  * the director (danger with an overdue one, warn otherwise), «Заявки» — open errands and, for the
  * director, visitors waiting for an answer; for the secretary — requests nobody has taken yet,
- * «Календарь» — today's meetings still ahead. The same counts name the browser tab (DeskShell).
+ * «Календарь» — today's meetings still ahead, «Сегодня» — what waits for the director besides
+ * tasks: open disputes and orders. The same counts name the browser tab (DeskShell).
  */
 export function useDeskBadges(role: DeskRole): DeskBadges {
   const me = useMe().data;
   const settled = useSettled();
   const director = role === "director";
+  const { pointsEnabled } = useDeskScope();
+  const game = director && pointsEnabled && settled;
+  const disputes = useOpenDisputes(game);
+  const orders = useOrders(game);
   const inbox = useDirectorInbox(me, director && settled);
   const errands = useErrands(settled);
   const visits = useVisits(director && settled);
@@ -66,15 +75,17 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
     const open = director
       ? activeCount(errands.data) + awaitingDirector(visits.data ?? []).length
       : (errands.data ?? []).filter((errand) => errand.status === "sent").length;
+    const besides = game ? (disputes.data?.length ?? 0) + ordersWaiting(orders.data ?? [], me?.userId).length : 0;
     return {
       counts: {
+        today: besides,
         tasks: ask?.total ?? 0,
         errands: open,
         calendar: calendar.data ? todayCount(calendar.data, now) : 0,
       },
-      tones: { tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: "muted" },
+      tones: { today: "warn", tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: "muted" },
     };
-  }, [calendar.data, director, errands.data, inbox.data, now, visits.data]);
+  }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, me?.userId, now, orders.data, visits.data]);
 }
 
 const ICON: Record<string, string> = {
@@ -83,6 +94,7 @@ const ICON: Record<string, string> = {
   "/desk/inbox": "M4 13h4l1.5 2.5h5L16 13h4M5.5 6h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z",
   "/desk/team": "M9 11a3.2 3.2 0 1 0 0-6.4A3.2 3.2 0 0 0 9 11zM3 19.5a6 6 0 0 1 12 0M16 11.2a2.8 2.8 0 1 0-.6-5.5M17.5 14a5.5 5.5 0 0 1 3.5 5.5",
   "/desk/errands": "M5 8h14l-1.2 11a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3zM9 8V6.5a3 3 0 0 1 6 0V8",
+  "/desk/ether": "M4 10v4h3l6 4V6l-6 4zM16.5 9.5a3.5 3.5 0 0 1 0 5M19 7a7 7 0 0 1 0 10",
   "/desk/reports": "M6 3.5h8.5L19 8v12.5H6zM14.5 3.5V8H19M9 12.5h6.5M9 16h4",
   "/desk/calendar": "M3.5 5h17v15.5h-17zM3.5 10h17M8 3v4M16 3v4",
   "/desk/notes": "M6 3.5h7.5L19 9v11.5H6zM13.5 3.5V9H19M9 13h6.5M9 16.5h4",
@@ -99,12 +111,9 @@ function NavIcon({ href }: { href: string }) {
   );
 }
 
+/** A count is a number on the binding; only something overdue takes the red pencil. */
 function badgeColors(tone: Tone | undefined) {
-  const quiet = !tone || tone === "muted";
-  return {
-    background: quiet ? "var(--surface-2)" : `color-mix(in srgb, ${TONE_VAR[tone]} 18%, transparent)`,
-    color: quiet ? "var(--text)" : TONE_VAR[tone],
-  };
+  return tone === "danger" ? { background: TONE_VAR.danger, color: "#fff" } : { color: "inherit" };
 }
 
 function NavLink({
@@ -133,28 +142,25 @@ function NavLink({
         aria-current={active ? "page" : undefined}
         aria-label={count ? `${label}, ${count}` : label}
         data-chord={chord}
-        // the chosen section: a line of the accent at the left edge and full-strength words, no fill (D-154)
-        className={`desk-focus group relative flex h-9 w-full items-center rounded-[10px] text-[14px] font-medium leading-5 transition-colors duration-[120ms] ${
-          folded ? "justify-center px-0" : "gap-2.5 px-3"
-        } ${active ? "bg-surface-2/60 text-text" : "text-muted hover:bg-surface-2/60 hover:text-text"}`}
+        // the chosen section is a tab of the sheet cut into the binding (journal.css): words, no icons;
+        // icons are for the folded navigation, where there is no room for the words
+        className={`desk-focus desk-nav-link group relative flex w-full items-center leading-5 ${folded ? "justify-center px-0" : "gap-2.5 pl-2.5 pr-3.5"}`}
       >
-        {active ? <span aria-hidden className={`absolute inset-y-2 w-[2px] rounded-full bg-accent ${folded ? "-left-2" : "left-0"}`} /> : null}
-        <span className={`relative ${active ? "text-accent" : ""}`}>
-          <NavIcon href={href} />
-          {folded && shown ? (
-            // folded: the count rides the icon's corner, in the same tone
-            <span
-              className="nums absolute -right-2.5 -top-2 min-w-[16px] rounded-full px-1 text-center text-[10px] font-bold leading-[15px]"
-              style={{ ...badgeColors(tone), boxShadow: "0 0 0 2px var(--bg)" }}
-              data-testid="nav-badge"
-            >
-              {shown}
-            </span>
-          ) : null}
-        </span>
-        {folded ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
+        {folded ? (
+          <span className="relative">
+            <NavIcon href={href} />
+            {shown ? (
+              // folded: the count rides the icon's corner
+              <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
+                {shown}
+              </span>
+            ) : null}
+          </span>
+        ) : (
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+        )}
         {!folded && shown ? (
-          <span className="nums min-w-[20px] rounded-full px-1.5 text-center text-[11px] font-bold leading-[18px]" style={badgeColors(tone)} data-testid="nav-badge">
+          <span className="nums text-center" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
             {shown}
           </span>
         ) : null}
@@ -199,7 +205,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
   const foldLabel = folded ? "Развернуть навигацию" : "Свернуть навигацию";
 
   return (
-    <nav aria-label="Разделы" data-folded={folded ? "" : undefined} className={`flex min-h-0 flex-col border-r border-border bg-surface/60 pb-3 pt-4 ${folded ? "px-2" : "px-3"}`}>
+    <nav aria-label="Разделы" data-folded={folded ? "" : undefined} className="desk-nav flex min-h-0 flex-col">
       <div className={`mb-6 flex h-9 items-center ${folded ? "justify-center" : "px-2"}`} title={brand.name}>
         {logo ? (
           // a still frame of the client's logo: an animated one would keep the main thread awake (В-9, D-155)
@@ -212,7 +218,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
           <PulseMark />
         )}
       </div>
-      <ul className="no-bar flex min-h-0 flex-col gap-0.5 overflow-y-auto">
+      <ul className="no-bar flex min-h-0 flex-col overflow-y-auto">
         {DESK_NAV[role].map((item) => (
           <li key={item.href}>
             <NavLink
@@ -227,7 +233,7 @@ export function SideNav({ role, brand, folded = false, onToggle }: { role: DeskR
           </li>
         ))}
       </ul>
-      <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
+      <div className="desk-nav-foot mt-auto flex flex-col gap-2 border-t pt-3">
         <NavLink href={DESK_PROFILE} label="Профиль" active={active === DESK_PROFILE} chord={DESK_PROFILE_KEY} folded={folded} />
         <div className={`flex items-center ${folded ? "flex-col gap-2" : "justify-between pl-3"}`}>
           {logo || named ? <span className="opacity-50">{folded ? <PulseGlyphMark /> : <PulseMark />}</span> : <span aria-hidden />}

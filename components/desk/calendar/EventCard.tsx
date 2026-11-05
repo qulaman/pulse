@@ -2,16 +2,15 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { Popover, type Anchor } from "@/components/desk/ui/Popover";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { TONE_VAR } from "@/components/desk/ui/tone";
+import { When } from "@/components/desk/ui/When";
 import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { isOver, myStatus, rsvpSummary, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
 import { useDeleteEvent, useRespondEvent } from "@/lib/calendar/mutations";
-import { toneAhead, whenAhead } from "@/lib/calendar/overview";
+import { whenAhead } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { humanYmd } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
@@ -57,7 +56,7 @@ export function EventCard({
   onConfirming: (on: boolean) => void;
 }) {
   return (
-    <Popover open={Boolean(event)} onClose={onClose} anchor={anchor} width={WIDTH} label={event?.title ?? "Мероприятие"}>
+    <Popover open={Boolean(event)} onClose={onClose} anchor={anchor} width={WIDTH} label={event?.title ?? "Встреча"}>
       {event ? (
         <CardBody key={event.id} event={event} meId={meId} isDirector={isDirector} now={now} onClose={onClose} onEdit={onEdit} confirming={confirming} onConfirming={onConfirming} />
       ) : null}
@@ -98,7 +97,6 @@ function CardBody({
   const canAnswer = mine !== null && event.author_id !== meId && !over;
   const when = whenAhead(event, now);
   const live = !over && (when.startsWith("идёт") || when.startsWith("через"));
-  const tone = toneAhead(event, now);
   const othersKnow = event.participants.some((p) => p.user_id !== event.author_id);
 
   // the question takes the focus: Enter deletes, Esc leaves the card
@@ -121,17 +119,14 @@ function CardBody({
 
   return (
     <div className="flex max-h-[min(72vh,600px)] flex-col" data-testid="desk-event-card" data-event-id={event.id}>
-      <div className="relative flex items-start gap-2 px-4 pb-2 pt-3.5">
-        <span aria-hidden className="absolute bottom-2 left-1.5 top-4 w-[3px] rounded-full" style={{ background: TONE_VAR[tone], opacity: over ? 0.4 : 1 }} />
-        <div className="min-w-0 flex-1 pl-1">
-          <h2 className="font-display text-[17px] font-semibold leading-6 [overflow-wrap:anywhere]">{event.title}</h2>
-          <p className="nums mt-0.5 text-[13px] leading-[18px] text-muted">
-            {capitalize(humanYmd(ymdOfEvent(event), now))} · {timeRange(event)}
-            {live ? (
-              <span className="ml-1.5 font-semibold" style={{ color: TONE_VAR[tone] }}>
-                {when}
-              </span>
-            ) : null}
+      <div className="flex items-start gap-2 px-4 pb-2 pt-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-[17px] font-semibold leading-6 [overflow-wrap:anywhere]">{event.title}</h2>
+          <p className="mt-0.5 text-[13px] leading-[18px] text-muted">
+            <When>
+              {capitalize(humanYmd(ymdOfEvent(event), now))} · {timeRange(event)}
+            </When>
+            {live ? <When className="ml-1.5 text-text">{when}</When> : null}
           </p>
         </div>
         <div className="-mr-1.5 flex shrink-0 items-center">
@@ -155,14 +150,14 @@ function CardBody({
 
       <div className="no-bar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-3">
         {event.location || rule ? (
-          <div className="flex flex-col gap-1.5 text-[13px] leading-[18px]">
+          <div className="flex flex-col gap-1 text-[13px] leading-[18px]">
             {event.location ? (
-              <Line icon={<PinIcon />}>
+              <Line word="Где">
                 <span className="[overflow-wrap:anywhere]">{event.location}</span>
               </Line>
             ) : null}
             {rule ? (
-              <Line icon={<RepeatIcon />}>
+              <Line word="Повтор">
                 <span className="min-w-0 flex-1">
                   {ruleLine(rule)}
                   <span className="text-muted"> · {ruleState(rule).text}</span>
@@ -170,7 +165,7 @@ function CardBody({
                 {isDirector ? (
                   <button
                     type="button"
-                    className="shrink-0 font-semibold text-accent hover:underline"
+                    className="shrink-0 font-medium underline underline-offset-2"
                     onClick={() =>
                       updateRule.mutate({
                         id: rule.id,
@@ -187,15 +182,15 @@ function CardBody({
           </div>
         ) : null}
 
-        {event.body ? <p className="whitespace-pre-line rounded-[10px] bg-surface-2/50 px-3 py-2 text-[13px] leading-5 [overflow-wrap:anywhere]">{event.body}</p> : null}
+        {event.body ? <p className="whitespace-pre-line text-[13px] leading-5 [overflow-wrap:anywhere]">{event.body}</p> : null}
         {event.audio_path ? <AudioOriginal path={event.audio_path} /> : null}
 
         <section>
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Участники</h3>
-            <span className="nums text-[12px] leading-4 text-muted">{rsvpSummary(event)}</span>
+          <div className="flex items-baseline justify-between gap-3 pb-1">
+            <h3 className="desk-label uppercase">Участники</h3>
+            <span className="text-[12px] leading-4 text-muted">{rsvpSummary(event)}</span>
           </div>
-          <ul className="mt-1 flex flex-col" data-testid="desk-event-people-list">
+          <ul className="desk-list" data-testid="desk-event-people-list">
             {shown.map((person) => {
               const name = person.person?.full_name ?? "Сотрудник";
               const state =
@@ -210,7 +205,6 @@ function CardBody({
                         : { text: "ждём ответа", color: "var(--text-muted)" };
               return (
                 <li key={person.user_id} className="flex min-h-8 items-center gap-2 py-0.5">
-                  <Avatar name={name} size={22} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] leading-[18px]" title={name}>
                       {shortName(name)}
@@ -226,7 +220,7 @@ function CardBody({
             })}
           </ul>
           {people.length > SHOWN ? (
-            <button type="button" onClick={() => setAll((was) => !was)} className="mt-0.5 text-[12px] font-semibold leading-5 text-accent hover:underline">
+            <button type="button" onClick={() => setAll((was) => !was)} className="mt-0.5 text-[12px] font-medium leading-5 underline underline-offset-2">
               {all ? "Свернуть" : `Ещё ${people.length - SHOWN}`}
             </button>
           ) : null}
@@ -234,8 +228,8 @@ function CardBody({
       </div>
 
       {confirming ? (
-        <div ref={confirmBox} className="border-t border-border px-4 py-3" style={{ background: "color-mix(in srgb, var(--danger) 6%, transparent)" }} data-testid="desk-event-confirm">
-          <p className="text-[14px] font-semibold leading-5">Удалить мероприятие?</p>
+        <div ref={confirmBox} className="border-t border-text px-4 py-3" data-testid="desk-event-confirm">
+          <p className="text-[14px] font-semibold leading-5">Удалить встречу?</p>
           <p className="mt-0.5 text-[12px] leading-4 text-muted">
             {/* who already knew gets «Отмена»; a past meeting just leaves the calendar */}
             {!over && othersKnow ? "Исчезнет у всех. Кто уже знает о нём, получит уведомление об отмене." : "Исчезнет из календаря у всех."}
@@ -277,10 +271,10 @@ function CardBody({
           ) : (
             <div className="flex items-center gap-2">
               <span className="mr-auto text-[13px] leading-[18px] text-muted">{mine === "invited" ? "Придёте?" : mine === "going" ? "Вы будете" : "Вы не сможете"}</span>
-              <Button size="sm" variant={mine === "declined" ? "secondary" : "primary"} onClick={() => answer("going")} disabled={respond.isPending} data-testid="desk-event-going">
+              <Button size="sm" variant={mine === "declined" ? "ghost" : "secondary"} className={mine === "declined" ? "" : "desk-move"} onClick={() => answer("going")} disabled={respond.isPending} data-testid="desk-event-going">
                 {mine === "going" ? "Буду ✓" : "Буду"}
               </Button>
-              <Button size="sm" variant={mine === "declined" ? "danger" : "secondary"} onClick={() => setDeclining(true)} disabled={respond.isPending} data-testid="desk-event-declined">
+              <Button size="sm" variant={mine === "declined" ? "danger" : "ghost"} onClick={() => setDeclining(true)} disabled={respond.isPending} data-testid="desk-event-declined">
                 {mine === "declined" ? "Не смогу ✓" : "Не смогу"}
               </Button>
             </div>
@@ -299,7 +293,7 @@ function IconButton({ label, keys, onClick, children, testId, danger = false }: 
         aria-label={label}
         onClick={onClick}
         data-testid={testId}
-        className={`flex h-8 w-8 items-center justify-center rounded-[9px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 ${danger ? "hover:text-danger" : "hover:text-text"}`}
+        className={`flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 ${danger ? "hover:text-danger" : "hover:text-text"}`}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           {children}
@@ -309,33 +303,12 @@ function IconButton({ label, keys, onClick, children, testId, danger = false }: 
   );
 }
 
-function Line({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+/** A fact of the meeting: its word in the margin, its value beside it. */
+function Line({ word, children }: { word: string; children: ReactNode }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-px shrink-0 text-muted">{icon}</span>
-      <span className="flex min-w-0 flex-1 items-start gap-2">{children}</span>
+    <p className="grid grid-cols-[56px_minmax(0,1fr)] items-baseline gap-2">
+      <span className="desk-label uppercase">{word}</span>
+      <span className="flex min-w-0 items-start gap-2">{children}</span>
     </p>
-  );
-}
-
-const STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-
-function PinIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden {...STROKE}>
-      <path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" />
-      <circle cx="12" cy="10" r="2.3" />
-    </svg>
-  );
-}
-
-function RepeatIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden {...STROKE}>
-      <path d="M4 12a8 8 0 0 1 13.5-5.8" />
-      <polyline points="18,3 18,7 14,7" />
-      <path d="M20 12a8 8 0 0 1-13.5 5.8" />
-      <polyline points="6,21 6,17 10,17" />
-    </svg>
   );
 }

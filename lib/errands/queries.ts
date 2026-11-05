@@ -1,12 +1,16 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { keepPreviousData, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { create } from "zustand";
 
-import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
+import { appendPage, foldFirstPage, ilikeAny, phrasePattern, rangeBounds, searchWords, type DayRange } from "@/lib/desk/archive";
+import { useRealtimeInvalidate, useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import type { CompanySettings, SecretaryAction } from "@/lib/settings";
 import { fetchSettings, settingsKey } from "@/lib/settings-query";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
+import { useDebounced } from "@/lib/useDebounced";
 
 export type ErrandRow = Database["public"]["Tables"]["errands"]["Row"];
 export type ErrandStatus = Database["public"]["Enums"]["errand_status"];
@@ -21,6 +25,10 @@ export const errandKeys = {
   root: ["errands"] as const,
   list: () => ["errands", "list"] as const,
   history: (days: number) => ["errands", "history", days] as const,
+  // plain lists under the root: «Отменить» paints them and a change invalidates them with the others
+  archive: (scope: string) => ["errands", "archive", scope] as const,
+  counts: (scope: string) => ["errands", "counts", scope] as const,
+  one: (id: string) => ["errands", "one", id] as const,
 };
 
 const SELECT =
@@ -69,6 +77,187 @@ export function useErrandHistory(days = 30, enabled = true) {
     channel: { table: "errands" },
     enabled,
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* The desk's history: closed requests from the server, a page at a time        */
+/* -------------------------------------------------------------------------- */
+
+export const ERRAND_PAGE = 50;
+
+const SEARCH_PAUSE_MS = 250;
+
+/** The request's own words: what was asked, what was noted, what came back, why not. */
+const WORD_COLUMNS = ["label", "note", "result", "decline_reason"] as const;
+
+export type ClosedErrandStatus = Extract<ErrandStatus, "done" | "declined" | "cancelled">;
+
+export const CLOSED_ERRANDS: readonly ClosedErrandStatus[] = ["done", "declined", "cancelled"];
+
+/** `claimed`: a person's id, «nobody» — what nobody took, null — everybody's. */
+export type ErrandFilter = { range: DayRange | null; claimed: string | "nobody" | null; text: string };
+
+const NO_ERRANDS: Errand[] = [];
+
+/** How many rows each history has on the server, by its key: the list itself stays a plain array. */
+const useTotals = create<Record<string, number>>(() => ({}));
+
+/** What the filters need of a request: a list and a count narrow the same way. */
+type Narrowable<T> = {
+  gte(column: string, value: string): T;
+  lt(column: string, value: string): T;
+  eq(column: string, value: string): T;
+  is(column: string, value: null): T;
+  or(filters: string): T;
+};
+
+function narrowed<T extends Narrowable<T>>(request: T, filter: ErrandFilter, text: string): T {
+  const { gte, lt } = rangeBounds(filter.range);
+  let next = request;
+  if (gte) next = next.gte("created_at", gte);
+  if (lt) next = next.lt("created_at", lt);
+  if (filter.claimed === "nobody") next = next.is("claimed_by", null);
+  else if (filter.claimed) next = next.eq("claimed_by", filter.claimed);
+  if (text) next = next.or(ilikeAny(WORD_COLUMNS, phrasePattern(text)));
+  return next;
+}
+
+async function fetchErrandPage(
+  filter: ErrandFilter,
+  status: ClosedErrandStatus | null,
+  text: string,
+  offset: number,
+  signal?: AbortSignal,
+): Promise<{ rows: Errand[]; total: number }> {
+  const supabase = createBrowserSupabase();
+  const asked = supabase
+    .from("errands")
+    .select(SELECT, { count: "exact" })
+    .in("status", status ? [status] : [...CLOSED_ERRANDS]);
+  let ordered = narrowed(asked, filter, text)
+    .order("created_at", { ascending: false })
+    .order("id")
+    .range(offset, offset + ERRAND_PAGE - 1);
+  if (signal) ordered = ordered.abortSignal(signal);
+  const { data, count, error } = await ordered;
+  if (error) throw new Error(error.message);
+  return { rows: (data ?? []) as unknown as Errand[], total: count ?? 0 };
+}
+
+/**
+ * Closed requests by the server: a range of days, the words of the request, a state, who took it —
+ * all of it, not the thirty days `useErrandHistory` holds for the hero and the numbers. RLS is
+ * `errands_select`: the company's, and within it the author, the director and every secretary.
+ * The list stays a plain array under the root, so «Отменить» and every invalidate reach it;
+ * «Показать ещё» asks for the next page alone, an event for the first page alone.
+ */
+export function useErrandArchive(filter: ErrandFilter, status: ClosedErrandStatus | null, enabled = true) {
+  const queryClient = useQueryClient();
+  const settled = useDebounced(filter.text, SEARCH_PAUSE_MS);
+  const text = searchWords(settled).length > 0 ? settled : "";
+  const name = JSON.stringify([filter.range, filter.claimed, status, text]);
+  const queryKey = errandKeys.archive(name);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const query = useQuery({
+    queryKey,
+    enabled,
+    meta: { keep: false },
+    placeholderData: keepPreviousData,
+    refetchOnReconnect: false,
+    queryFn: async ({ signal }): Promise<Errand[]> => {
+      const { rows, total } = await fetchErrandPage(filter, status, text, 0, signal);
+      useTotals.setState({ [name]: total });
+      return foldFirstPage(rows, queryClient.getQueryData<Errand[]>(queryKey) ?? NO_ERRANDS, ERRAND_PAGE, (row) => row.created_at);
+    },
+  });
+  useRealtimeInvalidate({ table: "errands" }, queryKey, enabled);
+  const total = useTotals((state) => state[name]);
+
+  const more = async () => {
+    const held = queryClient.getQueryData<Errand[]>(queryKey) ?? NO_ERRANDS;
+    setLoadingMore(true);
+    try {
+      const page = await fetchErrandPage(filter, status, text, held.length);
+      useTotals.setState({ [name]: page.total });
+      queryClient.setQueryData<Errand[]>(queryKey, (now) => appendPage(now ?? held, page.rows));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  return {
+    query,
+    rows: query.data ?? NO_ERRANDS,
+    total: query.isPlaceholderData ? null : (total ?? null),
+    /** The answer for these filters is still on its way: an empty list says nothing yet. */
+    busy: enabled && (settled !== filter.text || (query.isFetching && (query.isPending || query.isPlaceholderData))),
+    more,
+    loadingMore,
+  };
+}
+
+/** How the filtered history ended, state by state: the numbers on its tabs, for the whole of it. */
+export function useErrandCounts(filter: ErrandFilter, enabled = true) {
+  const settled = useDebounced(filter.text, SEARCH_PAUSE_MS);
+  const text = searchWords(settled).length > 0 ? settled : "";
+  const queryKey = errandKeys.counts(JSON.stringify([filter.range, filter.claimed, text]));
+  const query = useQuery({
+    queryKey,
+    enabled,
+    meta: { keep: false },
+    placeholderData: keepPreviousData,
+    refetchOnReconnect: false,
+    queryFn: async ({ signal }): Promise<Record<ClosedErrandStatus, number>> => {
+      const supabase = createBrowserSupabase();
+      const counted = await Promise.all(
+        CLOSED_ERRANDS.map(async (status) => {
+          const asked = supabase.from("errands").select("id", { count: "exact", head: true }).eq("status", status);
+          const { count, error } = await narrowed(asked, filter, text).abortSignal(signal);
+          if (error) throw new Error(error.message);
+          return [status, count ?? 0] as const;
+        }),
+      );
+      return Object.fromEntries(counted) as Record<ClosedErrandStatus, number>;
+    },
+  });
+  useRealtimeInvalidate({ table: "errands" }, queryKey, enabled);
+  return query.data ?? null;
+}
+
+/** The same request in any list a screen holds: a row opened from a list paints at once. */
+function findCachedErrand(client: QueryClient, id: string): Errand | undefined {
+  for (const [, data] of client.getQueriesData<unknown>({ queryKey: errandKeys.root })) {
+    if (!Array.isArray(data)) continue;
+    const hit = (data as Errand[]).find((row) => row?.id === id);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/** One request, whatever its age: the panel opened from history or from a push. Kept as a list, as `paint` expects. */
+export function useErrand(id: string | null, enabled = true) {
+  const client = useQueryClient();
+  const live = enabled && Boolean(id);
+  const query = useRealtimeQuery<Errand[], ErrandRow>({
+    queryKey: errandKeys.one(id ?? ""),
+    enabled: live,
+    channel: { table: "errands", filter: id ? `id=eq.${id}` : undefined },
+    placeholderData: () => {
+      const hit = id ? findCachedErrand(client, id) : undefined;
+      return hit ? [hit] : undefined;
+    },
+    queryFn: async () => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase
+        .from("errands")
+        .select(SELECT)
+        .eq("id", id as string);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as Errand[];
+    },
+  });
+  return { errand: live ? query.data?.[0] : undefined, isLoading: live && query.isPending };
 }
 
 /**

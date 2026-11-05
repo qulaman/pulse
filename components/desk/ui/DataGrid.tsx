@@ -175,7 +175,7 @@ export function DataGrid<T>({
           group.rows.length === 0 ? null : (
             <Fragment key={group.key}>
               {group.title ? (
-                <div role="row" className="flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3">
+                <div role="row" className="desk-grid-group flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3">
                   {group.onToggle ? (
                     <button
                       type="button"
@@ -188,12 +188,12 @@ export function DataGrid<T>({
                       <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className={`transition-transform duration-[120ms] ${group.collapsed ? "-rotate-90" : ""}`}>
                         <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
-                      {group.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
+                      {group.tone ? <span aria-hidden className="desk-dot h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
                       <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em]">{group.title}</span>
                     </button>
                   ) : (
                     <>
-                      {group.tone ? <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
+                      {group.tone ? <span aria-hidden className="desk-dot h-1.5 w-1.5 rounded-full" style={{ background: TONE_VAR[group.tone] }} /> : null}
                       <span className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{group.title}</span>
                     </>
                   )}

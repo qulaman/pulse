@@ -3,7 +3,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { humanAqtobe } from "@/lib/ai/time";
 import { addMonths, aqtobeIsoToYmdHm, monthMatrix, monthOf, monthTitleRu, WEEKDAYS_SHORT_RU, type Month } from "@/lib/datetime/calendar";
 import { deadlinePresets, parseTimeInput, shiftYmd, stepHm, wallIso, wallYmd } from "@/lib/desk/tasks";
@@ -20,7 +19,7 @@ import { pluralRu } from "@/lib/tasks/status-text";
  */
 
 /** A picker takes the caret when it opens and gives it back where it was when it goes. */
-function useOwnFocus<T extends HTMLElement>(): RefObject<T | null> {
+export function useOwnFocus<T extends HTMLElement>(): RefObject<T | null> {
   const box = useRef<T>(null);
   useLayoutEffect(() => {
     const own = box.current;
@@ -38,15 +37,95 @@ function useOwnFocus<T extends HTMLElement>(): RefObject<T | null> {
   return box;
 }
 
-function PickerHead({ title, hint, children }: { title: string; hint?: ReactNode; children?: ReactNode }) {
+export function PickerHead({ title, hint, children }: { title: string; hint?: ReactNode; children?: ReactNode }) {
   return (
     <div className="border-b border-border/70 px-3 pb-2 pt-2.5">
       <div className="flex items-center gap-2">
-        <p className="min-w-0 flex-1 truncate text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{title}</p>
+        <p className="desk-label min-w-0 flex-1 truncate uppercase">{title}</p>
         {children}
       </div>
       {hint ? <p className="mt-1 text-[12px] leading-4 text-muted">{hint}</p> : null}
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* A month                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The month of the desk's pickers: its head with the two arrows and the days. What a day means is
+ * the picker's: `off` — it cannot be taken, `on` — it is chosen, `within` — it lies between the
+ * ends of a range, `cursor` — the arrows stand on it.
+ */
+export function MonthGrid({
+  month,
+  onMonth,
+  today,
+  label,
+  off,
+  on,
+  within,
+  cursor,
+  onDay,
+  onDayDouble,
+  onHover,
+}: {
+  month: Month;
+  onMonth: (update: (was: Month) => Month) => void;
+  today: string;
+  label: string;
+  off: (day: string) => boolean;
+  on: (day: string) => boolean;
+  within?: (day: string) => boolean;
+  cursor?: string | null;
+  onDay: (day: string) => void;
+  onDayDouble?: (day: string) => void;
+  onHover?: (day: string | null) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <button type="button" aria-label="Предыдущий месяц" title="Предыдущий месяц (PageUp)" onClick={() => onMonth((was) => addMonths(was, -1))} className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted hover:bg-surface-2 hover:text-text">
+          ‹
+        </button>
+        <span className="text-[13px] font-semibold leading-4 first-letter:uppercase">{monthTitleRu(month)}</span>
+        <button type="button" aria-label="Следующий месяц" title="Следующий месяц (PageDown)" onClick={() => onMonth((was) => addMonths(was, 1))} className="flex h-7 w-7 items-center justify-center rounded-[2px] text-muted hover:bg-surface-2 hover:text-text">
+          ›
+        </button>
+      </div>
+      <div role="grid" aria-label={label} className="mt-1 grid grid-cols-7 gap-0.5 text-center" onMouseLeave={() => onHover?.(null)}>
+        {WEEKDAYS_SHORT_RU.map((day) => (
+          <span key={day} className="text-[11px] leading-6 text-muted/70">
+            {day}
+          </span>
+        ))}
+        {monthMatrix(month)
+          .flat()
+          .map((day, index) => {
+            if (!day) return <span key={`blank-${index}`} />;
+            const chosen = on(day);
+            return (
+              <button
+                key={day}
+                type="button"
+                tabIndex={-1}
+                disabled={off(day)}
+                onClick={() => onDay(day)}
+                onDoubleClick={onDayDouble ? () => onDayDouble(day) : undefined}
+                onMouseEnter={onHover ? () => onHover(day) : undefined}
+                aria-pressed={chosen}
+                data-day={day}
+                className={`nums relative h-7 rounded-[2px] text-[12px] leading-7 transition-colors duration-[120ms] disabled:text-muted/35 ${
+                  chosen ? "bg-accent text-bg disabled:text-bg" : within?.(day) ? "bg-accent/10 hover:bg-accent/20" : "hover:bg-surface-2 disabled:hover:bg-transparent"
+                } ${day === today && !chosen ? "underline underline-offset-4" : ""} ${day === cursor ? "outline outline-1 -outline-offset-1 outline-accent" : ""}`}
+              >
+                {Number(day.slice(8))}
+              </button>
+            );
+          })}
+      </div>
+    </>
   );
 }
 
@@ -131,7 +210,6 @@ export function DeadlinePicker({
     }
   };
 
-  const grid = monthMatrix(month);
   return (
     <div ref={box} tabIndex={-1} onKeyDown={onKey} className="outline-none" data-testid="desk-deadline-picker">
       <PickerHead title={title} hint={hint}>
@@ -156,45 +234,19 @@ export function DeadlinePicker({
       </ul>
 
       <div className="border-t border-border/70 px-3 pb-3 pt-2">
-        <div className="flex items-center justify-between">
-          <button type="button" aria-label="Предыдущий месяц" title="Предыдущий месяц (PageUp)" onClick={() => setMonth((was) => addMonths(was, -1))} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted hover:bg-surface-2 hover:text-text">
-            ‹
-          </button>
-          <span className="font-display text-[13px] font-semibold leading-4 first-letter:uppercase">{monthTitleRu(month)}</span>
-          <button type="button" aria-label="Следующий месяц" title="Следующий месяц (PageDown)" onClick={() => setMonth((was) => addMonths(was, 1))} className="flex h-7 w-7 items-center justify-center rounded-[7px] text-muted hover:bg-surface-2 hover:text-text">
-            ›
-          </button>
-        </div>
-        <div role="grid" aria-label="Дата" className="mt-1 grid grid-cols-7 gap-0.5 text-center">
-          {WEEKDAYS_SHORT_RU.map((day) => (
-            <span key={day} className="text-[11px] leading-6 text-muted/70">
-              {day}
-            </span>
-          ))}
-          {grid.flat().map((day, index) =>
-            day ? (
-              <button
-                key={day}
-                type="button"
-                tabIndex={-1}
-                disabled={day < today}
-                onClick={() => choose(day)}
-                onDoubleClick={() => {
-                  choose(day);
-                  if (hm) onPick(wallIso(day, hm));
-                }}
-                aria-pressed={day === ymd}
-                className={`nums relative h-7 rounded-[7px] text-[12px] leading-7 transition-colors duration-[120ms] disabled:text-muted/35 ${
-                  day === ymd ? "bg-accent font-semibold text-bg" : "hover:bg-surface-2 disabled:hover:bg-transparent"
-                } ${day === today && day !== ymd ? "font-semibold text-accent" : ""}`}
-              >
-                {Number(day.slice(8))}
-              </button>
-            ) : (
-              <span key={`blank-${index}`} />
-            ),
-          )}
-        </div>
+        <MonthGrid
+          month={month}
+          onMonth={setMonth}
+          today={today}
+          label="Дата"
+          off={(day) => day < today}
+          on={(day) => day === ymd}
+          onDay={choose}
+          onDayDouble={(day) => {
+            choose(day);
+            if (hm) onPick(wallIso(day, hm));
+          }}
+        />
         <div className="mt-2 flex items-center gap-2">
           <label className="text-[12px] leading-4 text-muted" htmlFor="desk-deadline-time">
             Время
@@ -224,7 +276,7 @@ export function DeadlinePicker({
             type="button"
             disabled={!ready}
             onClick={apply}
-            className="btn-primary inline-flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 text-bg disabled:opacity-40"
+            className="desk-move inline-flex h-8 items-center gap-1.5 rounded-[2px] border px-3 text-[13px] leading-4 disabled:opacity-40"
             data-testid="deadline-apply"
           >
             Готово <span aria-hidden className="text-[11px] opacity-70">⏎</span>
@@ -347,7 +399,6 @@ export function PersonPicker({
                 onClick={() => pick(person)}
                 className={`flex h-10 w-full items-center gap-2.5 px-3 text-left transition-colors duration-[80ms] disabled:opacity-50 ${on ? "bg-surface-2" : ""}`}
               >
-                <Avatar name={person.full_name} size={24} />
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate text-[13px] leading-4">{shortName(person.full_name)}</span>
                   {person.position ? <span className="truncate text-[11px] leading-[14px] text-muted">{person.position}</span> : null}

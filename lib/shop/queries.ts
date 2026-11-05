@@ -71,9 +71,10 @@ export function useAllShopItems(enabled: boolean) {
  * Заказы под RLS: сотрудник видит свои, директор и завхоз — все компании. Один и тот же
  * запрос обслуживает обе секции страницы — второго источника правды о заказе нет.
  */
-export function useOrders() {
+export function useOrders(enabled = true) {
   return useRealtimeQuery<Order[]>({
     queryKey: shopKeys.orders,
+    enabled,
     queryFn: async () => {
       const supabase = createBrowserSupabase();
       const { data, error } = await supabase

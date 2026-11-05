@@ -5,9 +5,8 @@ import { shortName, useNamesKey } from "@/lib/people/names";
 import { initialsOf } from "@/lib/people/queries";
 
 /**
- * A person in a desk cell (D-154): initials in a neutral circle, and around it — when given — a
- * 2 px ring in the tone of the person's most urgent task, the waiting screen's crew circles in
- * small (D-118). The accent is the director's own action, never a decoration on every face.
+ * A person in a desk cell: the name. On the sheet the initials are not drawn in a list (D-158): a
+ * circle is a task's stage there, and the name says everything the initials do.
  */
 export function PersonCell({
   name,
@@ -43,7 +42,8 @@ export function Avatar({ name, ring, size = 28 }: { name: string; ring?: Tone | 
   return (
     <span
       aria-hidden
-      className="flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-display font-bold text-text/85"
+      data-list={size < 40 ? "" : undefined}
+      className="desk-avatar flex shrink-0 items-center justify-center rounded-full bg-surface-2 font-display font-bold text-text/85"
       style={{
         width: size,
         height: size,

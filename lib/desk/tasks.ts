@@ -1,4 +1,6 @@
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
+import { ARCHIVE_STATUSES, type ArchiveStatus } from "@/lib/desk/archive";
+import { formatNum } from "@/lib/desk/format";
 import type { BoardTask } from "@/lib/pulse/board";
 import { isWaiting, receiptText, type DeskAction, type DeskReason } from "@/lib/tasks/desk";
 import { compareTasks, groupTasks } from "@/lib/tasks/grouping";
@@ -17,7 +19,7 @@ import {
   type Section,
 } from "@/lib/tasks/overview";
 import { receiptLine, type DeliveryRow } from "@/lib/tasks/receipts";
-import { isOverdue, pluralRu, STATUS_LABEL, type TaskStatus } from "@/lib/tasks/status-text";
+import { isOverdue, pluralRu, type TaskStatus } from "@/lib/tasks/status-text";
 import { toneOf, type Tone } from "@/lib/tasks/tone";
 
 /**
@@ -31,6 +33,62 @@ export const TABS: readonly DirectorTab[] = ["yours", "working", "closed"];
 
 export function parseTab(value: string | null | undefined): DirectorTab | null {
   return TABS.includes(value as DirectorTab) ? (value as DirectorTab) : null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* What a screen knows about its data                                          */
+/* -------------------------------------------------------------------------- */
+
+/** The part of a query the screens read. Pure on purpose: the states are tested here. */
+export type QueryView = {
+  data: unknown;
+  status: "pending" | "error" | "success";
+  fetchStatus: "fetching" | "paused" | "idle";
+  dataUpdatedAt: number;
+  errorUpdatedAt: number;
+};
+
+/**
+ * A screen's honest position towards its data. `failed` — nothing to show: an error, or no
+ * network with no copy (TanStack pauses such a query, and it would stay a skeleton forever).
+ * `stale` — a refresh of the copy on screen failed. Never an empty list standing for either. A
+ * copy merely waiting for the network is `ready`: the app's own line says «Нет связи · данные на
+ * 14:32» (OfflineBanner), the screen need not say it again.
+ */
+export type LoadState =
+  | { kind: "loading" }
+  | { kind: "ready" }
+  | { kind: "failed"; offline: boolean }
+  | { kind: "stale"; failedAt: number; dataAt: number };
+
+export function loadStateOf(query: QueryView): LoadState {
+  if (query.data === undefined) {
+    if (query.fetchStatus === "paused") return { kind: "failed", offline: true };
+    return query.status === "error" ? { kind: "failed", offline: false } : { kind: "loading" };
+  }
+  return query.status === "error" ? { kind: "stale", failedAt: query.errorUpdatedAt, dataAt: query.dataUpdatedAt } : { kind: "ready" };
+}
+
+/** What several queries of one screen add up to: a failure first, then waiting, then a stale copy — the oldest. */
+export function worstLoad(states: readonly LoadState[]): LoadState {
+  const failed = states.find((state) => state.kind === "failed");
+  if (failed) return failed;
+  if (states.some((state) => state.kind === "loading")) return { kind: "loading" };
+  const stale = states.filter((state) => state.kind === "stale");
+  if (stale.length === 0) return { kind: "ready" };
+  return stale.reduce((oldest, state) => (state.dataAt < oldest.dataAt ? state : oldest));
+}
+
+/** The time of a stale note: «в 14:32» today, «вчера 23:50» across midnight. */
+function atWords(ms: number, now: Date): string {
+  const words = humanAqtobe(new Date(ms), now);
+  return words.startsWith("сегодня ") ? `в ${words.slice("сегодня ".length)}` : words;
+}
+
+/** The quiet note over a copy that could not be refreshed: when the refresh failed, how old the copy is in the hint. */
+export function staleNote(state: Extract<LoadState, { kind: "stale" }>, now: Date = new Date()): { text: string; title?: string } {
+  const when = state.failedAt || now.getTime();
+  return { text: `Не обновилось ${atWords(when, now)}`, title: state.dataAt ? `На экране данные ${atWords(state.dataAt, now).replace(/^в /, "на ")}` : undefined };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -70,8 +128,24 @@ export type StatusFilter = Exclude<TaskStatus, "in_progress">;
 
 export const STATUS_FILTERS: readonly StatusFilter[] = ["sent", "accepted", "rework", "pending_review", "declined", "scheduled", "done", "revoked"];
 
+/**
+ * One word per status on the desk, the director's: the phone's `STATUS_LABEL` speaks to the
+ * employee too («На проверке у директора»), and three words for one status read as three states.
+ */
+export const DESK_STATUS_LABEL: Record<TaskStatus, string> = {
+  scheduled: "Отложена",
+  sent: "Не принята",
+  accepted: "В работе",
+  in_progress: "В работе",
+  pending_review: "На приёмке",
+  done: "Готово",
+  rework: "На доработке",
+  declined: "Отказ",
+  revoked: "Отозвана",
+};
+
 export function statusFilterLabel(status: StatusFilter): string {
-  return STATUS_LABEL[status];
+  return DESK_STATUS_LABEL[status];
 }
 
 export function parseStatus(value: string | null | undefined): StatusFilter | null {
@@ -86,6 +160,11 @@ export function matchesStatus(task: { status: TaskStatus }, status: StatusFilter
   if (!status) return true;
   if (status === "accepted") return task.status === "accepted" || task.status === "in_progress";
   return task.status === status;
+}
+
+/** The status filter as «Закрытые» reads it: a status that never lives there narrows nothing. */
+export function archiveStatusOf(status: StatusFilter | null): ArchiveStatus | null {
+  return ARCHIVE_STATUSES.find((one) => one === status) ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -131,6 +210,36 @@ export function deliveryLine(
   return null;
 }
 
+/** «в срок» / «позже на 3 ч» — one verdict on a handed-in task. */
+export type HandIn = { late: boolean; text: string };
+
+/**
+ * Handed in by the deadline or after it, and by how much — what the points of D-133 will read
+ * (`tasks_points`), so the director sees it before pressing «Принять»: the same instants, the same
+ * rule, `completed_at <= deadline` is in time, to the very second.
+ *
+ * - No deadline, or no hand-in on record: nothing to say — null, never a guess.
+ * - The deadline that counts is the task's present one: a date moved before the hand-in moves the
+ *   verdict too, as it moves the points.
+ * - A hand-in is the latest one: `completed_at` is stamped anew on every `→ pending_review`, so
+ *   work returned for rework and handed in again is judged by the second time. A task on rework
+ *   has no verdict at all: the earlier hand-in no longer stands.
+ * - Instants, not wall clocks: a span means the same in Aqtobe and anywhere else, whatever offset
+ *   each timestamp was written with.
+ */
+export function handInVerdict(task: { status: TaskStatus; deadline: string | null; completed_at: string | null }): HandIn | null {
+  if (task.status !== "pending_review" && task.status !== "done") return null;
+  if (!task.deadline || !task.completed_at) return null;
+  const over = new Date(task.completed_at).getTime() - new Date(task.deadline).getTime();
+  if (Number.isNaN(over)) return null;
+  return over <= 0 ? { late: false, text: "в срок" } : { late: true, text: `позже на ${spanRu(over)}` };
+}
+
+/** «В срок» as a column sorts: late work on one end, the rows with nothing to say on the other. */
+export function verdictRank(verdict: HandIn | null): number {
+  return !verdict ? 0 : verdict.late ? 2 : 1;
+}
+
 /** What the employee's newest word says, short: «фото · готово», «голосовое». */
 export function lastWordText(last: BoardTask["last_message"]): string {
   if (!last) return "";
@@ -144,7 +253,7 @@ export function lastWordText(last: BoardTask["last_message"]): string {
  * refusal's reason, or the handed-in work («сдано с фото · не всё»). Null when none of that.
  */
 export function latestLine(
-  task: { status: TaskStatus; assignee_id: string },
+  task: { status: TaskStatus; assignee_id: string; deadline?: string | null; completed_at?: string | null },
   row: Pick<BoardTask, "question" | "time_request" | "decline_reason" | "partial" | "last_message"> | undefined,
   now: Date = new Date(),
 ): Line | null {
@@ -156,8 +265,9 @@ export function latestLine(
     const last = row.last_message && row.last_message.sender_id === task.assignee_id ? row.last_message : null;
     const photo = last?.type === "photo";
     const words = last?.content ? ` · «${last.content}»` : "";
+    const verdict = handInVerdict({ status: task.status, deadline: task.deadline ?? null, completed_at: task.completed_at ?? null });
     // nominal — a name gives no gender (lib/tv/feed.ts)
-    return { text: `сдано${photo ? " с фото" : ""}${row.partial ? " · не всё" : ""}${words}` };
+    return { text: `сдано${photo ? " с фото" : ""}${verdict ? ` · ${verdict.text}` : ""}${row.partial ? " · не всё" : ""}${words}`, tone: verdict?.late ? "warn" : undefined };
   }
   return null;
 }
@@ -167,7 +277,7 @@ export function latestLine(
  * the director's own as «Вы: …», the employee's as it is (whose it is stands in «Кто»).
  */
 export function underTitle(
-  task: { status: TaskStatus; assignee_id: string },
+  task: { status: TaskStatus; assignee_id: string; deadline?: string | null; completed_at?: string | null },
   row: Pick<BoardTask, "question" | "time_request" | "decline_reason" | "partial" | "last_message"> | undefined,
   meId: string,
   now: Date = new Date(),
@@ -279,7 +389,7 @@ const STAGES: { key: string; title: string; statuses: readonly TaskStatus[]; ton
   { key: "stage-work", title: "В работе", statuses: ["accepted", "in_progress"], tone: "ok" },
   { key: "stage-rework", title: "На доработке", statuses: ["rework"], tone: "warn" },
   { key: "stage-review", title: "На приёмке", statuses: ["pending_review"], tone: "warn" },
-  { key: "stage-scheduled", title: "Отправлю позже", statuses: ["scheduled"], tone: "muted" },
+  { key: "stage-scheduled", title: "Отложены", statuses: ["scheduled"], tone: "muted" },
 ];
 
 /** «В работе» by the stage the work is at — who has not taken it yet, who is on it, who redoes it. */
@@ -340,7 +450,10 @@ export function tableSections<T extends Grouped>(
   now: Date = new Date(),
 ): Section<T>[] {
   if (mode === "person") return personSections(tasks, reasons, tab === "closed");
-  if (tab === "closed") return closedSections(tasks, now);
+  if (tab === "closed") {
+    // those are the last seven days, whichever week they fall in: the phone's own word stays the phone's
+    return closedSections(tasks, now).map((section) => (section.key === "closed-week" ? { ...section, title: "За 7 дней" } : section));
+  }
   if (tab === "yours") {
     if (mode === "reason") {
       return yoursSections(
@@ -528,8 +641,10 @@ type Waiting = Pick<
  */
 export function reasonHeadline(reason: DeskReason, task: Waiting & { closed_at: string | null; updated_at: string }, now: Date = new Date()): string {
   switch (reason) {
-    case "review":
-      return task.completed_at ? `Сдана ${since(task.completed_at, now)} назад — ждёт приёмки` : "Сдана — ждёт приёмки";
+    case "review": {
+      const verdict = handInVerdict({ status: "pending_review", deadline: task.deadline, completed_at: task.completed_at });
+      return task.completed_at ? `Сдана ${since(task.completed_at, now)} назад${verdict ? ` · ${verdict.text}` : ""} — ждёт приёмки` : "Сдана — ждёт приёмки";
+    }
     case "question":
       return task.question_at ? `Вопрос ждёт ответа ${since(task.question_at, now)}` : "Вопрос ждёт ответа";
     case "declined":
@@ -542,17 +657,21 @@ export function reasonHeadline(reason: DeskReason, task: Waiting & { closed_at: 
 }
 
 /**
- * The grey line of a decision on «Сегодня»: what exactly waits — «сдано 40 мин назад · фото ·
- * «всё во вложении»», ««какой адрес?» · 14 мин без ответа», «не может: «нет доступа»». Nominal,
- * so it never guesses the person's gender.
+ * The grey line of a decision on «Сегодня», part by part: what exactly waits — «сдано 40 мин назад
+ * · позже на 3 ч · фото · «всё во вложении»», ««какой адрес?» · 14 мин без ответа», «не может:
+ * «нет доступа»». Nominal, so it never guesses the person's gender. A part with a tone is the one
+ * thing of the line worth a colour: a hand-in after the deadline.
  */
-export function decisionLine(reason: DeskReason, task: Waiting, now: Date = new Date()): string {
-  const words = (parts: (string | null | false | undefined)[]) => parts.filter(Boolean).join(" · ");
+export function decisionParts(reason: DeskReason, task: Waiting, now: Date = new Date()): Line[] {
+  const words = (parts: (string | Line | null | false | undefined)[]): Line[] =>
+    parts.flatMap((part) => (!part ? [] : typeof part === "string" ? [{ text: part }] : [part]));
   switch (reason) {
     case "review": {
       const last = task.last_message && task.last_message.sender_id === task.assignee_id ? task.last_message : null;
+      const verdict = handInVerdict({ status: "pending_review", deadline: task.deadline, completed_at: task.completed_at });
       return words([
         task.completed_at ? `сдано ${since(task.completed_at, now)} назад` : "сдано",
+        verdict && (verdict.late ? { text: verdict.text, tone: "warn" } : verdict.text),
         last?.type === "photo" && "фото",
         task.partial && "не всё",
         last?.content && `«${last.content}»`,
@@ -573,6 +692,50 @@ export function decisionLine(reason: DeskReason, task: Waiting, now: Date = new 
     case "overdue":
       return words([task.deadline ? `просрочено на ${since(task.deadline, now)}` : "просрочено", task.nudged_at && `напомнили ${at(task.nudged_at, now)}`]);
   }
+}
+
+/** The same line as plain words. */
+export function decisionLine(reason: DeskReason, task: Waiting, now: Date = new Date()): string {
+  return decisionParts(reason, task, now)
+    .map((part) => part.text)
+    .join(" · ");
+}
+
+/* -------------------------------------------------------------------------- */
+/* «Ждут вашего решения» beyond tasks: points disputes and shop orders (D-133)   */
+/* -------------------------------------------------------------------------- */
+
+type DisputeWords = { text: string; created_at: string; tx: { amount: number; reason: string } | null };
+
+/** A dispute in a row: the minus and what it was for, then the person's own words. */
+export function disputeLines(dispute: DisputeWords, now: Date = new Date()): { title: string; line: string; refund: number } {
+  const amount = dispute.tx?.amount ?? 0;
+  const reason = dispute.tx?.reason?.trim();
+  const minus = amount ? formatNum(amount, { signed: true }) : "";
+  return {
+    title: ["Оспаривает", minus, reason ? `· ${reason}` : ""].filter(Boolean).join(" "),
+    line: `«${dispute.text}» · ${since(dispute.created_at, now)} назад`,
+    refund: Math.abs(amount),
+  };
+}
+
+type OrderWords = { price: number; created_at: string; item: { title: string } | null };
+
+/** An order to hand out in a row: the reward, what it cost, how long it has waited. */
+export function orderLines(order: OrderWords, now: Date = new Date()): { title: string; line: string } {
+  const points = `${formatNum(order.price)} ${pluralRu(order.price, ["очко", "очка", "очков"])}`;
+  return { title: order.item?.title ?? "Награда", line: `заказ · ${points} · ${since(order.created_at, now)} назад` };
+}
+
+/** The moment's quiet line when no task waits but people do: «1 спор · 2 заказа ждут вас». */
+export function extrasWord(disputes: number, orders: number): string | null {
+  const total = disputes + orders;
+  if (total === 0) return null;
+  const parts = [
+    disputes > 0 && `${disputes} ${pluralRu(disputes, ["спор", "спора", "споров"])}`,
+    orders > 0 && `${orders} ${pluralRu(orders, ["заказ", "заказа", "заказов"])}`,
+  ].filter(Boolean);
+  return `${parts.join(" · ")} ${total === 1 ? "ждёт" : "ждут"} вас`;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -722,6 +885,29 @@ export function pickedInOrder(ids: readonly string[], picked: ReadonlySet<string
 export function fitColumn(texts: readonly string[], { min, max, extra = 24, perChar = 7.4 }: { min: number; max: number; extra?: number; perChar?: number }): string {
   const longest = texts.reduce((most, text) => Math.max(most, text.length), 0);
   return `${Math.round(Math.min(max, Math.max(min, longest * perChar + extra)))}px`;
+}
+
+/**
+ * The table's columns by the width the list really has — the panel takes it from the window, a
+ * person can drag it wider still. The title never gives way: below each floor a column that only
+ * repeats something leaves first — the waiting words (the panel and the stage say them), the
+ * receipt (the panel's), the stage (the ring at the title says it), the tick (X and Ctrl-click
+ * still mark), the person and, on the very narrowest list, the deadline.
+ */
+export const COLUMN_FLOOR = { last: 960, delivery: 760, stage: 640, pick: 500, who: 440, due: 340 } as const;
+
+export type TableColumn = keyof typeof COLUMN_FLOOR;
+
+/** The width buckets the table is redrawn at: dragging the panel between two of them costs no render. */
+export const COLUMN_FLOORS: readonly number[] = Object.values(COLUMN_FLOOR).sort((a, b) => b - a);
+
+/** The bucket a width falls in — the highest floor it reaches, 0 under all of them. */
+export function widthBucket(width: number): number {
+  return COLUMN_FLOORS.find((floor) => width >= floor) ?? 0;
+}
+
+export function columnFits(column: TableColumn, bucket: number): boolean {
+  return bucket >= COLUMN_FLOOR[column];
 }
 
 /** The next row under the cursor of a list (J/K): stays at the ends, the first one when none is held. */

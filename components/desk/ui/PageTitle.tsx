@@ -4,10 +4,9 @@ import { DeskLight } from "@/components/desk/ui/Light";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 
 /**
- * The head of a desk screen: the title (28/34), an optional state line in its tone with a dot,
- * actions on the right. `light` — the screen has a state worth a light (D-154): its tone glows
- * quietly at the top of the screen, as the phone's sky does louder. No back button — the side
- * navigation is always there.
+ * The head of a desk screen: the title, an optional state line in its tone, actions on the right.
+ * No back button — the side navigation is always there. `light` is the developers' console's:
+ * the desk's sheet draws no light (D-158).
  */
 export function PageTitle({
   title,
@@ -21,7 +20,7 @@ export function PageTitle({
   light?: Tone | null;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="desk-page-title flex flex-wrap items-end justify-between gap-3">
       {light !== undefined ? <DeskLight tone={light} /> : null}
       <div className="min-w-0">
         <h1 className="truncate font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em]">{title}</h1>
@@ -43,5 +42,5 @@ export function PageTitle({
  */
 export function DeskPage({ children, width = "wide" }: { children: ReactNode; width?: "wide" | "narrow" | "full" }) {
   const max = width === "full" ? "" : width === "narrow" ? "max-w-[808px]" : "max-w-[1328px]";
-  return <div className={`flex w-full flex-col gap-5 px-6 pb-12 pt-6 ${max}`}>{children}</div>;
+  return <div className={`desk-page flex w-full flex-col gap-5 px-6 pb-12 pt-6 ${width === "narrow" ? "desk-page-narrow" : ""} ${max}`}>{children}</div>;
 }

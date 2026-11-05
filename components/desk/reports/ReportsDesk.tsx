@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -16,14 +17,17 @@ import { addDaysYmd, periodOf, type PeriodKind } from "@/lib/daily-report/format
 import { useTeamDailyReportDay, useTeamDailyReportPeriod } from "@/lib/daily-report/queries";
 import type { TeamDayRow, TeamPeriodRow } from "@/lib/daily-report/types";
 import { todayYmd, type Ymd } from "@/lib/datetime/calendar";
+import { dayFileName, daySheet, daySheetTitle, inOrder, periodFileName, periodSheet, periodSheetTitle, toCsv } from "@/lib/desk/report-export";
+import { useCompanyCard } from "@/lib/desk/settings-queries";
 import { useCompanySettings } from "@/lib/dictionary-queries";
 import { useNamesKey } from "@/lib/people/names";
 import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
 
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
-import { DayStepper, DayView, dayTone } from "./DayView";
-import { PeriodControls, PeriodView, rateTone } from "./PeriodView";
+import { DayStepper, DayView } from "./DayView";
+import { PeriodControls, PeriodView } from "./PeriodView";
+import { PrintSheet, saveCsv } from "./PrintSheet";
 
 type Tab = "day" | "period";
 type DayShow = "all" | "owe" | "in";
@@ -36,6 +40,10 @@ const TABS: { value: Tab; label: string }[] = [
 
 const normalise = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
 const ROWS = '[data-testid="desk-reports-day"] [data-row-key], [data-testid="desk-reports-period"] [data-row-key]';
+const NO_ORDER: readonly string[] = [];
+
+/** The people as the table stands right now, its sort included: the table keeps that to itself. */
+const shownKeys = () => [...document.querySelectorAll<HTMLElement>(ROWS)].map((row) => row.dataset.rowKey ?? "");
 
 /** A person by the words typed: the name, the position — every word somewhere in them. */
 function matches(row: { full_name: string; position: string | null }, query: string): boolean {
@@ -46,13 +54,15 @@ function matches(row: { full_name: string; position: string | null }, query: str
 }
 
 /**
- * «Отчёты» on the desk (D-152, D-154; wave 3): the director's day and period as the desk reads
- * them — one hero in the tone of the moment, the people as a table below. Over the same hooks as
+ * «Отчёты» on the desk (D-152, D-154; wave 3, D-158): the director's day and period as the desk
+ * reads them — one total, the people as a table right under it; which day and which view stand in
+ * the head of the sheet, beside the title. Over the same hooks as
  * the phone's screen; the tab lives in the address (`?tab=period`), the person open in the panel
  * too (`?p=<id>` — where «Команда» and the card lead; it stays open across the tabs). Filters by
  * people: the words typed (F) and who has the report or not. ← and → step through the days (or
  * the weeks and months), T — back to today, ↑/↓ — the people (the panel follows), Enter or Space
- * — open the chosen one.
+ * — open the chosen one. «Скачать для Excel» and «Печать» hand out what is shown: the filters, the
+ * search and the table's sort, every column whatever the window has hidden (lib/desk/report-export.ts).
  */
 export function ReportsDesk() {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)
@@ -78,7 +88,9 @@ export function ReportsDesk() {
   const [dayShow, setDayShow] = useState<DayShow>("all");
   const [periodShow, setPeriodShow] = useState<PeriodShow>("all");
   const [selected, setSelected] = useState<string | null>(openId);
+  const [printOrder, setPrintOrder] = useState(NO_ORDER);
   const searchField = useRef<HTMLInputElement>(null);
+  const company = useCompanyCard();
 
   const companyId = me.data?.companyId;
   const settings = useCompanySettings();
@@ -89,6 +101,13 @@ export function ReportsDesk() {
 
   // the day and its words come from this computer's clock: the server's HTML is the skeleton
   const hydrated = useHydrated();
+
+  // the button and Ctrl+P alike: the sheet takes the table's order at the moment of printing
+  useEffect(() => {
+    const beforePrint = () => flushSync(() => setPrintOrder(shownKeys()));
+    window.addEventListener("beforeprint", beforePrint);
+    return () => window.removeEventListener("beforeprint", beforePrint);
+  }, []);
 
   const address = (next: { tab?: Tab; p?: string | null }) => {
     const query = new URLSearchParams();
@@ -162,19 +181,75 @@ export function ReportsDesk() {
     { keys: ["↑", "↓"], label: "Выбрать человека" },
     { keys: ["Enter"], label: "Открыть отчёт в панели" },
     { keys: ["F"], label: "Найти человека" },
+    { keys: ["Ctrl P"], label: "Распечатать то, что на экране" },
   ]);
 
-  const light = !hydrated || off ? null : tab === "day" ? dayTone(day.data) : rateTone(period.data?.totals.submit_rate);
   const owe = dayRows.filter((row) => row.state === "missed" || row.state === "pending").length;
   const handed = dayRows.filter((row) => row.state === "submitted").length;
   const gaps = periodRows.filter((row) => row.missed > 0).length;
   const clean = periodRows.filter((row) => row.missed === 0 && row.submitted > 0).length;
+  const shownDay = dayRows.filter(dayFilter);
+  const shownPeriod = periodRows.filter(periodFilter);
+
+  // the data's own day and period, not the controls': while the next one loads the old one is on screen
+  const sheetOf = (keys: readonly string[]) =>
+    tab === "day"
+      ? day.data && { file: dayFileName(day.data.date), title: daySheetTitle(day.data.date), sheet: daySheet(inOrder(shownDay, (row) => row.user_id, keys), { pointsOn: pointsEnabled }) }
+      : period.data && {
+          file: periodFileName(period.data.from, period.data.to),
+          title: periodSheetTitle(period.data.from, period.data.to),
+          sheet: periodSheet(inOrder(shownPeriod, (row) => row.user_id, keys), { pointsOn: pointsEnabled }),
+        };
+  const paper = sheetOf(printOrder);
+  const [shownCount, allCount, waiting] = tab === "day" ? [shownDay.length, dayRows.length, day.isPlaceholderData] : [shownPeriod.length, periodRows.length, period.isPlaceholderData];
+  const download = () => {
+    const made = sheetOf(shownKeys());
+    if (made) saveCsv(made.file, toCsv(made.sheet));
+  };
+  const handOut = (
+    <>
+      <Button size="sm" variant="ghost" disabled={shownCount === 0 || waiting} onClick={download} data-testid="desk-report-csv">
+        Скачать для Excel
+      </Button>
+      <Button size="sm" variant="ghost" disabled={shownCount === 0 || waiting} onClick={() => window.print()} data-testid="desk-report-print">
+        Печать
+      </Button>
+    </>
+  );
 
   const search = <SearchField ref={searchField} value={query} onChange={setQuery} placeholder="Найти человека  ·  F" width={240} aria-label="Найти человека" />;
 
   return (
     <DeskPage>
-      <PageTitle title="Отчёты" light={light} />
+      <PageTitle
+        title="Отчёты"
+        actions={
+          hydrated && !off ? (
+            <Toolbar>
+              <SegmentTabs aria-label="Вид отчётов" value={tab} onChange={(next) => address({ tab: next })} items={TABS} />
+              {tab === "day" ? (
+                <DayStepper date={date} today={today} onDate={onDate} />
+              ) : (
+                <PeriodControls
+                  kind={kind}
+                  onKind={(next) => {
+                    // «Свой» starts from what is on screen, so the first pick moves one end only
+                    if (next === "custom" && !custom) setCustom(range);
+                    setKind(next);
+                  }}
+                  range={range}
+                  onRange={setCustom}
+                  onStep={step}
+                  atToday={anchor === null}
+                  onToday={() => setAnchor(null)}
+                  today={today}
+                  now={now}
+                />
+              )}
+            </Toolbar>
+          ) : null
+        }
+      />
       {off ? (
         <EmptyState
           title="Отчёты за день выключены"
@@ -189,39 +264,22 @@ export function ReportsDesk() {
         />
       ) : !hydrated ? (
         <SkeletonGroup grow>
-          <Bone h={36} w={520} className="rounded-[11px]" />
-          <Bone h={120} className="mt-5 rounded-[16px]" />
-          <Bone h={320} className="mt-5 rounded-[12px]" />
+          <Bone h={48} w={520} />
+          <Bone h={320} className="mt-5" />
         </SkeletonGroup>
       ) : (
-        <div className="flex flex-col gap-5" data-testid="desk-reports">
-          <Toolbar>
-            <SegmentTabs aria-label="Вид отчётов" value={tab} onChange={(next) => address({ tab: next })} items={TABS} />
-            <span aria-hidden className="mx-1 h-5 w-px bg-border" />
-            {tab === "day" ? (
-              <DayStepper date={date} today={today} onDate={onDate} />
-            ) : (
-              <PeriodControls
-                kind={kind}
-                onKind={(next) => {
-                  // «Свой» starts from what is on screen, so the first pick moves one end only
-                  if (next === "custom" && !custom) setCustom(range);
-                  setKind(next);
-                }}
-                range={range}
-                onRange={setCustom}
-                onStep={step}
-                atToday={anchor === null}
-                onToday={() => setAnchor(null)}
-                today={today}
-                now={now}
-              />
-            )}
-          </Toolbar>
+        <div className="flex flex-col gap-3.5" data-testid="desk-reports">
           {tab === "day" ? (
             <DayView
               filters={
-                <Toolbar end={<span className="nums text-[13px] leading-4 text-muted">{day.data ? `${dayRows.filter(dayFilter).length} из ${dayRows.length}` : " "}</span>}>
+                <Toolbar
+                  end={
+                    <>
+                      <span className="nums text-[13px] leading-4 text-muted">{day.data ? `${shownDay.length} из ${dayRows.length}` : " "}</span>
+                      {handOut}
+                    </>
+                  }
+                >
                   <SegmentTabs<DayShow>
                     aria-label="Кого показать"
                     value={dayShow}
@@ -255,7 +313,14 @@ export function ReportsDesk() {
           ) : (
             <PeriodView
               filters={
-                <Toolbar end={<span className="nums text-[13px] leading-4 text-muted">{period.data ? `${periodRows.filter(periodFilter).length} из ${periodRows.length}` : " "}</span>}>
+                <Toolbar
+                  end={
+                    <>
+                      <span className="nums text-[13px] leading-4 text-muted">{period.data ? `${shownPeriod.length} из ${periodRows.length}` : " "}</span>
+                      {handOut}
+                    </>
+                  }
+                >
                   <SegmentTabs<PeriodShow>
                     aria-label="Кого показать"
                     value={periodShow}
@@ -294,6 +359,7 @@ export function ReportsDesk() {
           )}
         </div>
       )}
+      {hydrated && !off && paper ? <PrintSheet company={company.data?.name} title={paper.title} note={shownCount < allCount ? `Показано ${shownCount} из ${allCount}` : null} sheet={paper.sheet} /> : null}
     </DeskPage>
   );
 }

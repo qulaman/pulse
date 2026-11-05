@@ -7,7 +7,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { usePushTest } from "@/components/push/usePushTest";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { Avatar } from "@/components/desk/ui/PersonCell";
+import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SettingGroup, SettingRow } from "@/components/desk/ui/SettingRow";
 import { openShortcuts } from "@/components/desk/ui/Shortcuts";
@@ -157,8 +157,7 @@ function PushSetting() {
       testId="desk-profile-push"
     >
       {words ? (
-        <span className="flex items-center gap-1.5 text-[13px] font-medium" style={{ color: words.tone }}>
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: words.tone }} />
+        <span className="text-[13px]" style={{ color: words.tone }}>
           {words.text}
         </span>
       ) : null}
@@ -273,7 +272,7 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
 
   return (
     <SettingRow label="Выйти из аккаунта" hint="Задачи, сообщения и очки останутся на месте" testId="desk-profile-signout">
-      <Button size="sm" variant="danger" onClick={show}>
+      <Button size="sm" variant="secondary" onClick={show}>
         Выйти
       </Button>
       <Dialog open={open} onClose={() => !pending && setOpen(false)} title="Выйти из аккаунта?" width="sm">
@@ -309,7 +308,7 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
 function ViewSettings({ role }: { role: Role }) {
   const folded = useSyncExternalStore(subscribeFrame, () => readNavFolded() ?? false, () => false);
   return (
-    <SettingGroup testId="desk-profile-view">
+    <SettingGroup className="desk-settings" testId="desk-profile-view">
       <SettingRow label="Боковая навигация" hint={<span className="inline-flex items-center gap-1">Свернуть и развернуть — клавиша <Kbd>[</Kbd></span>}>
         <SegmentTabs
           aria-label="Боковая навигация"
@@ -337,10 +336,10 @@ function ViewSettings({ role }: { role: Role }) {
 }
 
 /**
- * The desk's profile (D-153, D-154 wave 3): a computer's account page, not the phone's list of
- * 58 px rows — who is signed in, the account, this browser's notifications and the director's
- * rules as a table, the sessions, how this computer shows the desk, signing out; every setting
- * a label on the left and its control on the right.
+ * The desk's profile (D-153, D-154 wave 3, D-158): a computer's account page, not the phone's list
+ * of 58 px rows — who is signed in beside the title, the account, this browser's notifications and
+ * the director's rules as a table, the sessions, how this computer shows the desk, signing out;
+ * every setting a label on the left and its control on the right, under one ruled sheet.
  */
 export function ProfileDesk({
   userId,
@@ -359,54 +358,47 @@ export function ProfileDesk({
 }) {
   const director = role === "director";
   return (
-    <div className="flex flex-col gap-8" data-testid="desk-profile">
-      <div className="flex items-center gap-4" data-testid="desk-profile-who">
-        <Avatar name={fullName} size={56} />
-        <div className="min-w-0">
-          <p className="truncate font-display text-[20px] font-bold leading-7 tracking-[-0.01em]">{fullName}</p>
-          <p className="truncate text-[14px] leading-5 text-muted">
-            {ROLE_LABEL[role]} · {company}
-            {email ? ` · ${email}` : ""}
-          </p>
-        </div>
+    <div className="flex flex-col gap-6" data-testid="desk-profile">
+      <div data-testid="desk-profile-who">
+        <PageTitle title="Профиль" state={{ text: `${ROLE_LABEL[role]} · ${company}` }} />
       </div>
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-1">
         <SectionLabel>Аккаунт</SectionLabel>
-        <SettingGroup>
+        <SettingGroup className="desk-settings">
           <SettingRow label="Имя" hint="Так вас видят в задачах и на стене">
-            <span className="text-[14px] text-text/90">{fullName}</span>
+            <span className="text-[14px]">{fullName}</span>
           </SettingRow>
           {email ? (
             <SettingRow label="Почта" hint="Вход на компьютере — по почте и паролю">
-              <span className="text-[14px] text-text/90">{email}</span>
+              <span className="text-[14px]">{email}</span>
             </SettingRow>
           ) : null}
           <PasswordSetting />
         </SettingGroup>
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-1">
         <SectionLabel>Уведомления на этом компьютере</SectionLabel>
-        <SettingGroup>
+        <SettingGroup className="desk-settings">
           <PushSetting />
         </SettingGroup>
       </section>
 
       {director ? (
-        <section className="flex flex-col gap-3">
+        <section className="flex flex-col gap-1">
           <NotifyRules meId={userId} />
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-1">
         <SectionLabel>Рабочий стол</SectionLabel>
         <ViewSettings role={role} />
       </section>
 
-      <section className="flex flex-col gap-3">
+      <section className="flex flex-col gap-1">
         <SectionLabel>Сеансы</SectionLabel>
-        <SettingGroup>
+        <SettingGroup className="desk-settings">
           <OthersSetting userId={userId} />
           <SignOutSetting action={signOut} userId={userId} />
         </SettingGroup>

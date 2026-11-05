@@ -12,16 +12,8 @@ import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField } from "@/components/desk/ui/Toolbar";
 import { SettingsDraftProvider, useDirtySections } from "@/components/settings/draft";
-import { BookIcon, GiftIcon, TableIcon } from "@/components/settings/icons";
 import { DirtyDot, SETTINGS_TAB_META } from "@/components/settings/SettingsTiles";
 import { parseSettingsTab, SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
-
-const FlaskIcon = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-    <path d="M8 3h4M8.5 3v4.6L4.2 15a1.4 1.4 0 0 0 1.2 2.1h9.2a1.4 1.4 0 0 0 1.2-2.1L11.5 7.6V3" />
-    <path d="M6.3 12h7.4" />
-  </svg>
-);
 
 /**
  * A screen under «Настройки» that has a search of its own (the dictionary, the data, the points'
@@ -35,6 +27,16 @@ export function usePageSearch(field: RefObject<HTMLInputElement | null>) {
     register(field);
     return () => register(null);
   }, [register, field]);
+}
+
+/**
+ * «Лаборатория» and «Данные» open for this person (lib/desk/routes.ts `deskDevToolsOpen`), as the
+ * layout decided on the server: the navigation, the settings search and the links to them ask here.
+ */
+const DevToolsContext = createContext(false);
+
+export function useDevTools(): boolean {
+  return useContext(DevToolsContext);
 }
 
 const NAV_ITEM = "[data-settings-nav]";
@@ -52,7 +54,6 @@ function walkNav(event: KeyboardEvent<HTMLElement>) {
 function NavItem({
   href,
   label,
-  icon,
   active,
   dirty = false,
   testId,
@@ -61,7 +62,6 @@ function NavItem({
 }: {
   href: string;
   label: string;
-  icon: ReactNode;
   active: boolean;
   dirty?: boolean;
   testId: string;
@@ -77,13 +77,12 @@ function NavItem({
       data-settings-nav=""
       data-dirty={dirty ? "" : undefined}
       title={keyHint ? `${label} · ${keyHint}` : label}
-      // the chosen screen as the side navigation marks its section: a line of the accent at the left edge, no accent fill (D-154)
-      className={`group relative flex h-9 items-center gap-2.5 rounded-[10px] px-3 text-[14px] font-medium leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 [&_svg]:h-[18px] [&_svg]:w-[18px] ${
-        active ? "bg-surface-2/60 text-text" : "text-muted hover:bg-surface-2/60 hover:text-text"
+      // words only (D-158): the chosen screen is marked by a line of the pen in the margin
+      className={`group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
+        active ? "font-semibold text-text" : "text-muted hover:text-text"
       }`}
     >
-      {active ? <span aria-hidden className="absolute inset-y-2 left-0 w-[2px] rounded-full bg-accent" /> : null}
-      <span className={`shrink-0 ${active ? "text-accent" : ""}`}>{icon}</span>
+      {active ? <span aria-hidden className="absolute inset-y-1 -left-3 w-[2px] bg-accent" /> : null}
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {dirty ? <DirtyDot /> : null}
       {keyHint && !dirty ? (
@@ -100,7 +99,7 @@ const within = (pathname: string, base: string) => pathname === base || pathname
 /** The search's results in place of the navigation, as in macOS System Settings: a title and where it lives. */
 function Results({ results, at, onPick, onHover }: { results: SettingEntry[]; at: number; onPick: (entry: SettingEntry) => void; onHover: (index: number) => void }) {
   if (results.length === 0) {
-    return <p className="px-3 py-2 text-[13px] leading-[18px] text-muted">Ничего не нашлось. Попробуйте другое слово</p>;
+    return <p className="py-2 text-[13px] leading-[18px] text-muted">Ничего не нашлось. Попробуйте другое слово</p>;
   }
   return (
     <ul role="listbox" aria-label="Найденные настройки" className="flex flex-col gap-0.5" data-testid="settings-search-results">
@@ -111,7 +110,7 @@ function Results({ results, at, onPick, onHover }: { results: SettingEntry[]; at
             tabIndex={-1}
             onMouseEnter={() => onHover(index)}
             onClick={() => onPick(entry)}
-            className={`flex w-full flex-col rounded-[10px] px-3 py-1.5 text-left transition-colors duration-[120ms] ${index === at ? "bg-surface-2 text-text" : "text-text/90 hover:bg-surface-2/60"}`}
+            className={`flex w-full flex-col py-1 text-left transition-colors duration-[120ms] ${index === at ? "bg-surface-2 text-text" : "hover:bg-surface-2/60"}`}
           >
             <span className="text-[13px] font-medium leading-[18px]">{entry.title}</span>
             <span className="text-[12px] leading-4 text-muted">{entry.place}</span>
@@ -125,7 +124,8 @@ function Results({ results, at, onPick, onHover }: { results: SettingEntry[]; at
 /**
  * The settings' own navigation, on the left of the screen: a search over every setting, the four
  * tabs of the phone's «Настройки» (D-85) — a dot on a tab that holds unsaved edits — then the
- * screens that live next to them. «Данные» and «Очки и магазин» are the director's (D-153 §1).
+ * screens that live next to them. «Очки и магазин» are the director's (D-153 §1); «Лаборатория» and
+ * «Данные» — the developers' tools, a director's with the flag only (`useDevTools`).
  */
 function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | null> }) {
   const { role } = useDeskScope();
@@ -135,6 +135,7 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   const sections = useDirtySections();
   const brand = useBrandDraft();
   const director = role === "director";
+  const devTools = useDevTools();
   const [query, setQuery] = useState("");
   const [at, setAt] = useState(0);
 
@@ -146,7 +147,7 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   };
   const onTabs = pathname === "/desk/settings";
   const current = onTabs ? parseSettingsTab(params.get("tab") ?? undefined) : null;
-  const results = query.trim() ? searchSettings(query, { director }) : null;
+  const results = query.trim() ? searchSettings(query, { director, devTools }) : null;
 
   const pick = (entry: SettingEntry) => {
     setQuery("");
@@ -155,9 +156,9 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   };
 
   return (
-    <nav aria-label="Разделы настроек" data-testid="settings-subnav" className="sticky top-5 w-[208px] shrink-0 self-start" onKeyDown={walkNav}>
+    <nav aria-label="Разделы настроек" data-testid="settings-subnav" className="sticky top-4 w-[176px] shrink-0 self-start" onKeyDown={walkNav}>
       <div
-        className="mb-4"
+        className="desk-fields mb-3"
         onKeyDownCapture={(event) => {
           if (!results) return;
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -179,21 +180,20 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
           }}
           placeholder="Найти настройку"
           aria-label="Найти настройку"
-          width={208}
+          width={176}
         />
       </div>
       {results ? (
         <Results results={results} at={at} onPick={pick} onHover={setAt} />
       ) : (
         <>
-          <SectionLabel className="px-3 pb-2">Настройки</SectionLabel>
-          <div className="flex flex-col gap-0.5">
+          <SectionLabel>Настройки</SectionLabel>
+          <div className="flex flex-col">
             {SETTINGS_TABS.map((key, index) => (
               <NavItem
                 key={key}
                 href={`/desk/settings?tab=${key}`}
                 label={SETTINGS_TAB_META[key].title}
-                icon={SETTINGS_TAB_META[key].icon}
                 active={current === key}
                 dirty={dirty[key]}
                 testId={`settings-nav-${key}`}
@@ -207,24 +207,24 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
               />
             ))}
           </div>
-          <SectionLabel className="mt-5 px-3 pb-2">Ещё</SectionLabel>
-          <div className="flex flex-col gap-0.5">
+          <SectionLabel className="mt-4">Ещё</SectionLabel>
+          <div className="flex flex-col">
             <NavItem
               href="/desk/settings/dictionary"
               label="Словарь"
-              icon={<BookIcon />}
               active={within(pathname, "/desk/settings/dictionary")}
               testId="settings-nav-dictionary"
             />
-            <NavItem href="/desk/settings/lab" label="Лаборатория" icon={<FlaskIcon />} active={within(pathname, "/desk/settings/lab")} testId="settings-nav-lab" />
-            {director ? (
-              <NavItem href="/desk/settings/data" label="Данные" icon={<TableIcon />} active={within(pathname, "/desk/settings/data")} testId="settings-nav-data" />
+            {devTools ? (
+              <NavItem href="/desk/settings/lab" label="Лаборатория" active={within(pathname, "/desk/settings/lab")} testId="settings-nav-lab" />
+            ) : null}
+            {devTools ? (
+              <NavItem href="/desk/settings/data" label="Данные" active={within(pathname, "/desk/settings/data")} testId="settings-nav-data" />
             ) : null}
             {director ? (
               <NavItem
                 href="/desk/settings/points"
                 label="Очки и магазин"
-                icon={<GiftIcon />}
                 active={within(pathname, "/desk/settings/points")}
                 testId="settings-nav-points"
               />
@@ -273,7 +273,6 @@ function useLeaveGuard() {
 }
 
 function FrameBody({ children }: { children: ReactNode }) {
-  const pathname = usePathname();
   useLeaveGuard();
   const settingsSearch = useRef<HTMLInputElement>(null);
   const pageSearch = useRef<RefObject<HTMLInputElement | null> | null>(null);
@@ -286,11 +285,9 @@ function FrameBody({ children }: { children: ReactNode }) {
     { keys: ["Ctrl F"], label: "Найти настройку (или поиск экрана)" },
     { keys: ["↑ ↓"], label: "По разделам — в навигации настроек" },
   ]);
-  // «Данные» is a sheet of a table: it takes the whole width the window gives
-  const wide = within(pathname, "/desk/settings/data");
   return (
     <PageSearchContext.Provider value={register}>
-      <div className={`flex w-full gap-6 px-6 pb-12 pt-6 ${wide ? "" : "max-w-[1328px]"}`}>
+      <div className="flex w-full gap-10 px-8 pb-12 pt-4">
         <SettingsNav searchRef={settingsSearch} />
         <DeskLinks className="min-w-0 flex-1">{children}</DeskLinks>
       </div>
@@ -304,12 +301,14 @@ function FrameBody({ children }: { children: ReactNode }) {
  * above the screens, so an unsaved edit survives a trip to the dictionary and back and the
  * navigation can show where it is.
  */
-export function SettingsFrame({ children }: { children: ReactNode }) {
+export function SettingsFrame({ devTools, children }: { devTools: boolean; children: ReactNode }) {
   return (
-    <SettingsDraftProvider>
-      <BrandDraftProvider>
-        <FrameBody>{children}</FrameBody>
-      </BrandDraftProvider>
-    </SettingsDraftProvider>
+    <DevToolsContext.Provider value={devTools}>
+      <SettingsDraftProvider>
+        <BrandDraftProvider>
+          <FrameBody>{children}</FrameBody>
+        </BrandDraftProvider>
+      </SettingsDraftProvider>
+    </DevToolsContext.Provider>
   );
 }

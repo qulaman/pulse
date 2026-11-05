@@ -22,14 +22,14 @@ export type HeroFact = {
   title?: string;
 };
 
-const FACT_BOX = "flex min-w-[88px] flex-col items-start rounded-[10px] px-3 py-1.5 text-left";
+const FACT_BOX = "flex min-w-[72px] flex-col items-start px-3 py-0.5 text-left";
 
 function Fact({ fact }: { fact: HeroFact }) {
   const quiet = fact.value === 0;
   const body = (
     <>
       <span
-        className={`nums font-display text-[28px] font-bold leading-[32px] tracking-[-0.03em] ${quiet ? "text-muted/50" : ""}`}
+        className={`nums desk-figure text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`}
         style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}
       >
         {fact.text ?? formatNum(fact.value)}
@@ -37,7 +37,7 @@ function Fact({ fact }: { fact: HeroFact }) {
       <span className="whitespace-nowrap text-[12px] leading-4 text-muted">{fact.label}</span>
     </>
   );
-  const interactive = `${FACT_BOX} transition-[background-color,box-shadow] duration-[120ms] hover:bg-surface-2/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
+  const interactive = `${FACT_BOX} hover:bg-surface-2/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40`;
   if (fact.href) {
     return (
       <Link href={fact.href} className={interactive} title={fact.title} data-testid={`hero-fact-${fact.key}`}>
@@ -53,7 +53,7 @@ function Fact({ fact }: { fact: HeroFact }) {
         aria-pressed={fact.active}
         title={fact.title}
         data-testid={`hero-fact-${fact.key}`}
-        className={`${interactive} ${fact.active ? "bg-accent/10 shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--accent)_55%,transparent)]" : ""}`}
+        className={`${interactive} ${fact.active ? "shadow-[inset_0_-2px_0_var(--accent)]" : ""}`}
       >
         {body}
       </button>
@@ -69,7 +69,7 @@ function Fact({ fact }: { fact: HeroFact }) {
 /** The hero's numbers in a row — also a card's own (the person's load). */
 export function HeroFacts({ facts, className = "" }: { facts: HeroFact[]; className?: string }) {
   return (
-    <div className={`flex flex-wrap items-center gap-1 ${className}`}>
+    <div className={`flex flex-wrap items-center divide-x divide-border [&>*:first-child]:pl-0 ${className}`}>
       {facts.map((fact) => (
         <Fact key={fact.key} fact={fact} />
       ))}
@@ -78,10 +78,9 @@ export function HeroFacts({ facts, className = "" }: { facts: HeroFact[]; classN
 }
 
 /**
- * The one hero of a desk screen (D-154): raised over the flat table below it, it says the moment
- * in a glance — the big figure (48/52) in the moment's tone, a line of what it means, the facts
- * next to it (28/32, a zero quiet) that filter the screen or lead to another, and room for the
- * screen's own move (`children`: a bar, the quick requests) or a picture on the right (`aside`).
+ * The total of a desk screen, one line of the sheet (D-158): the figure in the moment's ink, a line
+ * of what it means, the facts next to it (a zero quiet) that filter the screen or lead to another,
+ * and room for the screen's own move (`children`) or a picture on the right (`aside`).
  */
 export function DeskHero({
   value,
@@ -103,12 +102,12 @@ export function DeskHero({
   testId?: string;
 }) {
   return (
-    <section className="card @container flex flex-col gap-4 px-5 py-4" style={{ boxShadow: "var(--shadow-raised)" }} data-testid={testId}>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex min-w-0 items-center gap-4">
+    <section className="desk-total @container flex flex-col gap-3" data-testid={testId}>
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+        <div className="flex min-w-0 items-center gap-3.5">
           {value !== undefined && value !== null ? (
             <span
-              className="nums shrink-0 font-display text-[48px] font-bold leading-[52px] tracking-[-0.04em]"
+              className="nums desk-figure shrink-0 text-[44px] leading-[44px]"
               style={tone && tone !== "muted" ? { color: TONE_VAR[tone] } : undefined}
               data-testid="hero-value"
             >
@@ -116,13 +115,13 @@ export function DeskHero({
             </span>
           ) : null}
           <div className="min-w-0">
-            <p className="font-display text-[17px] font-semibold leading-[22px] tracking-[-0.01em]" data-testid="hero-title">
+            <p className="text-[17px] font-semibold leading-[22px]" data-testid="hero-title">
               {title}
             </p>
-            {sub ? <p className="mt-0.5 text-[13px] leading-[18px] text-muted">{sub}</p> : null}
+            {sub ? <p className="text-[13px] leading-[18px] text-muted">{sub}</p> : null}
           </div>
         </div>
-        {facts && facts.length > 0 ? <HeroFacts facts={facts} className="border-l border-border/70 pl-4" /> : null}
+        {facts && facts.length > 0 ? <HeroFacts facts={facts} className="border-l border-border pl-3" /> : null}
         {/* on the right while the hero is wide; on a narrower one it takes its own line from the left edge */}
         {aside ? <div className="min-w-0 @min-[1040px]:ml-auto">{aside}</div> : null}
       </div>
@@ -134,11 +133,11 @@ export function DeskHero({
 /** The hero while its numbers load: the same height, nothing moves when they land. */
 export function HeroBone() {
   return (
-    <section className="card flex h-[86px] items-center gap-4 px-5" style={{ boxShadow: "var(--shadow-raised)" }} aria-hidden>
-      <span className="skeleton h-[44px] w-[64px] rounded-[10px] bg-surface-2" />
+    <section className="desk-total flex h-[48px] items-center gap-3.5" aria-hidden>
+      <span className="skeleton h-[40px] w-[52px] rounded-[2px] bg-surface-2" />
       <span className="flex flex-col gap-2">
-        <span className="skeleton h-[16px] w-[180px] rounded-[6px] bg-surface-2" />
-        <span className="skeleton h-[12px] w-[120px] rounded-[6px] bg-surface-2" />
+        <span className="skeleton h-[16px] w-[180px] rounded-[2px] bg-surface-2" />
+        <span className="skeleton h-[12px] w-[120px] rounded-[2px] bg-surface-2" />
       </span>
     </section>
   );

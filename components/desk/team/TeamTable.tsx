@@ -12,13 +12,14 @@ import { Kbd } from "@/components/desk/ui/Kbd";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
+import { When } from "@/components/desk/ui/When";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
+import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { timeOf } from "@/lib/daily-report/format";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
@@ -26,9 +27,10 @@ import type { TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { pointsTone } from "@/lib/desk/format";
 import { useCompanySettings } from "@/lib/dictionary-queries";
-import { canEditPerson, canResetLogin, type Who } from "@/lib/people/access";
-import { LOAD_COLOR, loadColor, useTeamLoads, type Load } from "@/lib/people/loads";
-import { ROLE_LABEL, usePeople, type Person, type Role } from "@/lib/people/queries";
+import { canChangeAccess, canEditPerson, canResetLogin, type Who } from "@/lib/people/access";
+import { usePhones, useSetWorking } from "@/lib/people/card-queries";
+import { useTeamLoads, type Load } from "@/lib/people/loads";
+import { ROLE_LABEL, isTeamMember, usePeople, type Person, type Role } from "@/lib/people/queries";
 import { useTeamBalances } from "@/lib/points/queries";
 import type { Health } from "@/lib/push/health";
 import { usePushHealth } from "@/lib/push/health-query";
@@ -36,10 +38,11 @@ import { useComposeStore } from "@/lib/store/compose";
 import { sortByUrgency, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
+import { FireDialog } from "./FireDialog";
 import { HeroBone, DeskHero, type HeroFact } from "./Hero";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "./keys";
 import { PersonPeek } from "./PersonPeek";
-import { AwayTag, Dot, GridBone, LoadBar, RING_TONE, ROLE_ORDER, addressOf, counted, loadWords, matchesPerson, useBoxWidth } from "./shared";
+import { AwayTag, GridBone, LoadTally, ROLE_ORDER, StateWord, addressOf, counted, loadWords, matchesPerson, tidy, useBoxWidth } from "./shared";
 
 const NO_LOADS: Record<string, Load> = {};
 const NO_BALANCES: Record<string, number> = {};
@@ -61,11 +64,6 @@ const unreachable = (h: Health | undefined) => h !== undefined && (h.state === "
 
 type Filter = "overdue" | "review" | "unreachable" | "away";
 
-/** A menu without a separator at either end or two in a row. */
-function tidy(items: MenuItem[]): MenuItem[] {
-  return items.filter((item, i) => item !== "separator" || (i > 0 && i < items.length - 1 && items[i - 1] !== "separator"));
-}
-
 const FILTER_LABEL: Record<Filter, string> = {
   overdue: "с просрочкой",
   review: "с работой на приёмке",
@@ -75,8 +73,8 @@ const FILTER_LABEL: Record<Filter, string> = {
 
 /**
  * «Вход» from what the roster already knows without a request per person (tasks/022 B.1): the
- * push channel (D-114) — a device that takes pushes was signed in on. Colour only for trouble;
- * the card tells the rest («Последний вход», the last code).
+ * push channel (D-114) — a device that takes pushes was signed in on. The red pencil only for a
+ * push that failed; the card tells the rest («Последний вход», the last code).
  */
 function LoginCell({ person, health }: { person: Person; health: Health | undefined }) {
   if (!person.is_active) return <span className="text-muted">закрыт</span>;
@@ -90,16 +88,21 @@ function LoginCell({ person, health }: { person: Person; health: Health | undefi
       </span>
     );
   }
-  if (health.state === "broken") return <Dot tone="warn" title={`Уведомления: ${health.text}`}>пуш не прошёл</Dot>;
+  if (health.state === "broken") {
+    return (
+      <StateWord tone="danger" title={`Уведомления: ${health.text}`}>
+        пуш не прошёл
+      </StateWord>
+    );
+  }
   return <span title={`Уведомления: ${health.text}. Вход — в карточке`}>без уведомлений</span>;
 }
 
-/** The name, the position after it, «в отпуске» when so — one line, so the row stays 40 px. */
-function NameCell({ person, ring }: { person: Person; ring: Tone | null }) {
+/** The name, the position after it, «в отпуске» when so — one line, so the row stays 34 px. */
+function NameCell({ person }: { person: Person }) {
   const position = person.position && person.position.toLowerCase() !== ROLE_LABEL[person.role].toLowerCase() ? person.position : null;
   return (
-    <span className={`flex min-w-0 items-center gap-2.5 ${person.is_active ? "" : "opacity-55"}`}>
-      <Avatar name={person.full_name} ring={ring} size={24} />
+    <span className={`flex min-w-0 items-baseline gap-2.5 ${person.is_active ? "" : "opacity-55"}`}>
       <span className="truncate" title={[person.full_name, person.position].filter(Boolean).join(" · ")}>
         {person.full_name}
         {position ? <span className="text-muted"> · {position}</span> : null}
@@ -109,23 +112,23 @@ function NameCell({ person, ring }: { person: Person; ring: Tone | null }) {
   );
 }
 
-/** The load: the bar and the count in its tone; both lead to the person's tasks — to «Ждут вас» when the move is the director's. */
-function LoadCell({ person, load, scale, now }: { person: Person; load: Load | undefined; scale: number; now: number }) {
+/**
+ * The load: the count and its tally, both lead to the person's tasks — to «Ждут вас» when the move
+ * is the director's. The red pencil for what is late, the pen for what waits for him; a deadline
+ * merely close is nobody's move yet (D-158).
+ */
+function LoadCell({ person, load, scale }: { person: Person; load: Load | undefined; scale: number }) {
   const active = load?.active ?? 0;
   if (active === 0) return <span className="text-muted">{person.availability === "active" ? "свободен" : "—"}</span>;
-  const color = loadColor(load, person.availability === "active", now);
-  const yours = (load?.overdue ?? 0) > 0 || (load?.review ?? 0) > 0;
+  const late = (load?.overdue ?? 0) > 0;
+  const waits = (load?.review ?? 0) > 0;
+  const tone = late ? TONE_VAR.danger : waits ? TONE_VAR.warn : undefined;
   return (
-    <Link
-      href={`/desk/tasks?who=${person.id}${yours ? "&tab=yours" : ""}`}
-      className="group/load -mx-1 flex items-center gap-2.5 rounded-[8px] px-1 py-0.5 transition-colors duration-[120ms] hover:bg-surface-2/70"
-      title={`${loadWords(load)} — открыть в «Задачах»`}
-      data-testid="team-load"
-    >
-      <LoadBar load={load} scale={scale} />
-      <span className="nums font-semibold" style={{ color: LOAD_COLOR[color] }}>
+    <Link href={`/desk/tasks?who=${person.id}${late || waits ? "&tab=yours" : ""}`} className="flex items-center gap-2.5" title={`${loadWords(load)} — открыть в «Задачах»`} data-testid="team-load">
+      <span className="nums w-5 text-right" style={tone ? { color: tone } : undefined}>
         {active}
       </span>
+      <LoadTally load={load} scale={scale} />
     </Link>
   );
 }
@@ -135,36 +138,30 @@ function NowCell({ task, now }: { task: TaskWithPeople | undefined; now: Date })
   if (!task) return <span className="text-muted/40">—</span>;
   const late = isOverdue(task, now);
   return (
-    <Link
-      href={`/desk/tasks?id=${task.id}`}
-      className="-mx-1 flex min-w-0 items-baseline gap-2 rounded-[8px] px-1 py-0.5 transition-colors duration-[120ms] hover:bg-surface-2/70"
-      title={task.title}
-      data-testid="team-now"
-    >
+    <Link href={`/desk/tasks?id=${task.id}`} className="flex min-w-0 items-baseline gap-2 hover:underline" title={task.title} data-testid="team-now">
       <span className="min-w-[3.5em] truncate">{task.title}</span>
       {task.deadline ? (
         // today goes without its word — the column is «Сейчас»; the title keeps the room
-        <span className="nums shrink-0 text-[13px] leading-5" style={{ color: late ? TONE_VAR.danger : "var(--text-muted)" }}>
+        <When overdue={late} className="shrink-0 text-[13px] leading-5 text-muted">
           {humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "")}
-        </span>
+        </When>
       ) : null}
     </Link>
   );
 }
 
-/** Today's report: «✓ 18:04» — handed in and when; a quiet dash while it is still due. */
+/** Today's report: «18:04» — when it was handed in; a quiet dash while it is still due. */
 function ReportCell({ person, row }: { person: Person; row: TeamDayRow | undefined }) {
   if (!row || row.state === "off") return null;
   if (row.state === "away") return <span className="text-muted/40">—</span>;
   if (row.state === "submitted") {
     return (
-      <Link href={`/desk/reports?p=${person.id}`} className="nums inline-flex items-baseline gap-1.5 rounded-[6px] hover:text-accent" title="Открыть отчёт" data-testid="team-report">
-        <span aria-hidden>✓</span>
-        <span className="text-muted">{timeOf(row.report?.submitted_at)}</span>
+      <Link href={`/desk/reports?p=${person.id}`} className="hover:underline" title="Открыть отчёт" data-testid="team-report">
+        <When className="text-muted">{timeOf(row.report?.submitted_at)}</When>
       </Link>
     );
   }
-  if (row.state === "missed") return <span style={{ color: TONE_VAR.danger }}>не сдан</span>;
+  if (row.state === "missed") return <StateWord tone="danger">не сдан</StateWord>;
   return <span className="text-muted/50" title="Ещё не сдан">—</span>;
 }
 
@@ -174,6 +171,10 @@ type ViewProps = {
   me: Who | null;
   people: Person[] | undefined;
   loading: boolean;
+  /** Something the screen stands on did not come: it says so instead of drawing zeros. */
+  failed: boolean;
+  retrying: boolean;
+  onRetry: () => void;
   loads: Record<string, Load>;
   balances: Record<string, number>;
   pointsOn: boolean;
@@ -184,9 +185,9 @@ type ViewProps = {
 };
 
 /**
- * «Команда» on the desk as the dispatcher's board (D-154): the hero says who is here and where
- * the trouble is — each number filters the table; one row a person, 40 px, the troubled first:
- * how loaded (a bar of stages and the count, to their tasks), what they are on now, today's
+ * «Команда» on the desk as the dispatcher's board (D-154, D-158): the total says who is here and
+ * where the trouble is — each number filters the table; one row a person, 34 px, the troubled
+ * first: how loaded (the count and its tally, to their tasks), what they are on now, today's
  * report, the points, whether pushes reach them. Directors and the wall stand apart below; those
  * who left wait at the bottom, grey. The secretary sees the roster only (D-104).
  *
@@ -195,8 +196,10 @@ type ViewProps = {
  * of the row; ↑/↓ choose (the panel follows), Space peeks, E edits, T gives a task, N — a new
  * person, F — the search.
  */
-function TeamTableView({ director, me, people, loading, loads, balances, pointsOn, push, tasks, report, now }: ViewProps) {
+function TeamTableView({ director, me, people, loading, failed, retrying, onRetry, loads, balances, pointsOn, push, tasks, report, now }: ViewProps) {
   const router = useRouter();
+  const setWorking = useSetWorking();
+  const [firing, setFiring] = useState<{ person: Person; mode: "fire" | "pass" } | null>(null);
   const params = useSearchParams();
   const openId = params.get("p");
   const [query, setQuery] = useState("");
@@ -206,7 +209,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
   const search = useRef<HTMLInputElement>(null);
   const menu = useContextMenu();
   const [box, width] = useBoxWidth();
-  const at = now.getTime();
+  const phones = usePhones();
 
   const all = useMemo(() => people ?? [], [people]);
   const roles = useMemo(() => {
@@ -225,7 +228,6 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
   const load = (p: Person) => (works(p) ? loads[p.id] : undefined);
   const overdueOf = (p: Person) => load(p)?.overdue ?? 0;
   const reviewOf = (p: Person) => load(p)?.review ?? 0;
-  const ringOf = (p: Person): Tone | null => (director && works(p) ? RING_TONE[loadColor(load(p), p.availability === "active", at)] : null);
   const scale = Math.max(5, ...all.filter(works).map((p) => loads[p.id]?.active ?? 0));
 
   const passes = (p: Person): boolean => {
@@ -236,7 +238,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
     if (filter === "away") return p.availability !== "active";
     return unreachable(push?.get(p.id));
   };
-  const shown = all.filter((p) => (role ? p.role === role : true) && matchesPerson(p, query) && passes(p));
+  const shown = all.filter((p) => (role ? p.role === role : true) && matchesPerson(p, query, phones.data?.[p.id]) && passes(p));
   const byName = (a: Person, b: Person) => a.full_name.localeCompare(b.full_name, "ru");
   // the troubled first: late, then work waiting for the director's «Принято», then by name
   const byTrouble = (a: Person, b: Person) => overdueOf(b) - overdueOf(a) || reviewOf(b) - reviewOf(a) || byName(a, b);
@@ -252,7 +254,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
       title: "Имя",
       width: director ? "minmax(180px,1.25fr)" : "minmax(220px,1fr)",
       sort: byName,
-      render: (p) => <NameCell person={p} ring={ringOf(p)} />,
+      render: (p) => <NameCell person={p} />,
     },
   ];
   if (!director) {
@@ -271,9 +273,12 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
         title: "Нагрузка",
         width: "132px",
         sort: (a, b) => overdueOf(a) - overdueOf(b) || reviewOf(a) - reviewOf(b) || (load(a)?.active ?? 0) - (load(b)?.active ?? 0),
-        // a director gets no orders: a dash unless somebody gave them one
-        render: (p) =>
-          crew(p) || (works(p) && (load(p)?.active ?? 0) > 0) ? <LoadCell person={p} load={load(p)} scale={scale} now={at} /> : <span className="text-muted/40">—</span>,
+        // a director gets no orders: a dash unless somebody gave them one; who left shows only what is still on them
+        render: (p) => {
+          const held = loads[p.id]?.active ?? 0;
+          if (!p.is_active && held > 0) return <LoadCell person={p} load={loads[p.id]} scale={scale} />;
+          return crew(p) || (works(p) && held > 0) ? <LoadCell person={p} load={load(p)} scale={scale} /> : <span className="text-muted/40">—</span>;
+        },
       },
       {
         key: "now",
@@ -305,28 +310,27 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
         render: (p) => {
           if (!crew(p)) return <span className="text-muted/40">—</span>;
           const value = balances[p.id] ?? 0;
-          return <Num value={value} tone={pointsTone(value)} className="font-semibold" />;
+          return <Num value={value} tone={pointsTone(value)} />;
         },
       });
     }
   }
   columns.push({
     key: "login",
-    title: "Вход",
+    title: "Уведомления",
     width: "minmax(124px,160px)",
     sort: (a, b) => Number(unreachable(push?.get(a.id))) - Number(unreachable(push?.get(b.id))) || byName(a, b),
     render: (p) => <LoginCell person={p} health={push?.get(p.id)} />,
   });
 
   // the hero: who is here, and the trouble — each number a filter of the table
-  const staff = all.filter(works);
+  const staff = all.filter(isTeamMember);
   const present = staff.filter((p) => p.availability === "active").length;
   const away = staff.length - present;
   const lateCount = staff.filter((p) => overdueOf(p) > 0).length;
   const reviewCount = staff.filter((p) => reviewOf(p) > 0).length;
   const deaf = push ? staff.filter((p) => unreachable(push.get(p.id))).length : 0;
   const open = staff.reduce((sum, p) => sum + (loads[p.id]?.active ?? 0), 0);
-  const worst: Tone | null = loading ? null : lateCount > 0 ? "danger" : reviewCount > 0 || deaf > 0 ? "warn" : "ok";
   const toggle = (next: Filter) => () => setFilter((was) => (was === next ? null : next));
   // a trouble that is not there takes no room: the line under the figure says «просрочек нет»
   const trouble = (key: Filter, value: number, label: string, tone: Tone | null): HeroFact[] =>
@@ -335,10 +339,10 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
     ? [
         ...trouble("overdue", lateCount, "с просрочкой", "danger"),
         ...trouble("review", reviewCount, "на приёмке", "warn"),
-        ...trouble("unreachable", deaf, "без уведомлений", "warn"),
-        { key: "open", value: open, label: "задач в работе", href: "/desk/tasks?tab=working", title: "Открыть «Задачи»" },
+        ...trouble("unreachable", deaf, "без уведомлений", null),
+        { key: "open", value: open, label: "открытых задач", href: "/desk/tasks", title: "Открыть «Задачи»" },
       ]
-    : [...trouble("unreachable", deaf, "без уведомлений", "warn"), ...trouble("away", away, "не на месте", null)];
+    : [...trouble("unreachable", deaf, "без уведомлений", null), ...trouble("away", away, "не на месте", null)];
   const calm = director && lateCount === 0 && reviewCount === 0 ? "просрочек нет" : null;
   const sub = [away > 0 ? `из ${counted(staff.length, ["человека", "человек", "человек"])} · ${counted(away, ["отсутствует", "отсутствуют", "отсутствуют"])}` : "вся команда", calm]
     .filter(Boolean)
@@ -368,8 +372,24 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
     if (editable(p)) items.push({ key: "edit", label: "Изменить", hint: "E", onSelect: () => edit(p) });
     // the code itself is issued on the card, in front of the person — the menu only leads there
     if (me && p.is_active && canResetLogin(me, p)) items.push("separator", { key: "login", label: "Выдать код входа…", onSelect: () => router.push(`/desk/team/${p.id}?login=1`) });
+    if (me && canChangeAccess(me, p)) {
+      const kiosk = p.role === "tv";
+      if (p.is_active) items.push("separator", { key: "fire", label: kiosk ? "Выключить экран…" : "Уволить…", danger: true, onSelect: () => setFiring({ person: p, mode: "fire" }) });
+      else {
+        if (director && (loads[p.id]?.active ?? 0) > 0) items.push("separator", { key: "pass", label: "Передать задачи…", onSelect: () => setFiring({ person: p, mode: "pass" }) });
+        items.push({ key: "revive", label: kiosk ? "Включить экран" : "Вернуть в команду", onSelect: () => revive(p) });
+      }
+    }
     return items;
   };
+  const revive = (p: Person) =>
+    setWorking.mutate(
+      { id: p.id, working: true },
+      {
+        onSuccess: () => toast(p.role === "tv" ? `Экран «${p.full_name}» включён` : `${p.full_name} снова в команде. Вход — по новому коду`),
+        onError: (error) => toast(error.message),
+      },
+    );
 
   /* ---- the keys: by the physical key, never while a field or a menu has them ---- */
   const chosenId = selected ?? openId;
@@ -422,7 +442,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
 
   const count = shown.filter((p) => p.is_active).length;
   const narrowed = Boolean(query || role || filter);
-  const opened = byId(openId);
+  const opened = failed ? null : byId(openId);
   const chosen = byId(chosenId);
   const managerOf = (p: Person) => byId(p.manager_id);
   const openTasksOf = (id: string) => sortByUrgency(tasks.filter((task) => task.assignee_id === id && OPEN_STATUSES.includes(task.status)), now);
@@ -432,7 +452,6 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
     <DeskPage>
       <PageTitle
         title="Команда"
-        light={worst}
         actions={
           <Tooltip label="Добавить человека" keys={["N"]} side="bottom">
             <Button size="sm" onClick={() => router.push("/desk/team/new")} data-testid="desk-team-new">
@@ -441,7 +460,17 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
           </Tooltip>
         }
       />
-      {loading ? (
+      {failed ? (
+        <EmptyState
+          title="Не смог загрузить команду"
+          hint="Проверьте связь и попробуйте ещё раз"
+          action={
+            <Button size="sm" variant="secondary" loading={retrying} onClick={onRetry} data-testid="desk-team-retry">
+              Повторить
+            </Button>
+          }
+        />
+      ) : loading ? (
         <HeroBone />
       ) : (
         <DeskHero
@@ -452,10 +481,10 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
           facts={facts}
         />
       )}
-      <Toolbar
+      {failed ? null : <Toolbar
         end={
           <span className="nums text-[13px] leading-4 text-muted">
-            {loading ? " " : filter ? `${FILTER_LABEL[filter]}: ${count}` : counted(count, ["человек", "человека", "человек"])}
+            {loading ? " " : filter ? `${FILTER_LABEL[filter]}: ${count}` : counted(query || role ? count : staff.length, ["человек", "человека", "человек"])}
           </span>
         }
       >
@@ -472,17 +501,15 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
           <button
             type="button"
             onClick={() => setFilter(null)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-accent/50 bg-accent/10 px-3 text-[13px] font-semibold leading-4 text-text transition-colors duration-[120ms] hover:bg-accent/15"
+            className="inline-flex h-8 items-center gap-1.5 text-[14px] leading-5 text-accent hover:underline"
             data-testid="desk-team-filter"
           >
             {FILTER_LABEL[filter]}
-            <span aria-hidden className="text-muted">
-              ×
-            </span>
+            <span aria-hidden>×</span>
           </button>
         ) : null}
-      </Toolbar>
-      {loading ? (
+      </Toolbar>}
+      {failed ? null : loading ? (
         <GridBone columns={director ? 6 : 3} />
       ) : (
         <div
@@ -539,7 +566,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
         </div>
       )}
 
-      {shown.length > 0 ? (
+      {shown.length > 0 && !failed ? (
         // the moves of the chosen row only — a hint never names a key that does nothing here
         <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
           <span>
@@ -572,7 +599,6 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
             manager={managerOf(opened)}
             director={director}
             load={load(opened)}
-            ring={ringOf(opened)}
             tasks={director ? openTasksOf(opened.id) : NO_TASKS}
             report={report?.get(opened.id)}
             balance={pointsOn && crew(opened) ? (balances[opened.id] ?? 0) : null}
@@ -588,6 +614,7 @@ function TeamTableView({ director, me, people, loading, loads, balances, pointsO
         </InPanel>
       ) : null}
       {menu.node}
+      {firing ? <FireDialog person={firing.person} roster={all} director={director} mode={firing.mode} onClose={() => setFiring(null)} /> : null}
     </DeskPage>
   );
 }
@@ -607,15 +634,25 @@ function DirectorTeam() {
   const reportsOn = settings.data ? settings.data.daily_report.enabled : undefined;
   const day = useTeamDailyReportDay(todayYmd(now), me.data?.companyId, reportsOn === true);
   const report = useMemo(() => (day.data ? new Map(day.data.rows.map((row) => [row.user_id, row])) : null), [day.data]);
+  // stale data stays on a failed refresh; only what never came breaks the screen
+  const failed = people.isLoadingError || loads.isLoadingError || sent.isLoadingError;
   return (
     <TeamTableView
       director
       me={me.data ? { id: me.data.userId, role: me.data.role } : null}
       people={people.data}
       loading={people.isLoading || loads.isLoading}
+      failed={failed}
+      retrying={people.isFetching || loads.isFetching || sent.isFetching}
+      onRetry={() => {
+        void people.refetch();
+        void loads.refetch();
+        void sent.refetch();
+      }}
       loads={loads.data ?? NO_LOADS}
       balances={balances.data ?? NO_BALANCES}
-      pointsOn={pointsEnabled}
+      // no points came: no column, rather than a zero for everyone
+      pointsOn={pointsEnabled && !balances.isLoadingError}
       push={push.data}
       tasks={sent.data ?? NO_TASKS}
       report={reportsOn === false || day.isError ? null : (report ?? new Map())}
@@ -636,6 +673,9 @@ function SecretaryTeam() {
       me={me.data ? { id: me.data.userId, role: me.data.role } : null}
       people={people.data}
       loading={people.isLoading}
+      failed={people.isLoadingError}
+      retrying={people.isFetching}
+      onRetry={() => void people.refetch()}
       loads={NO_LOADS}
       balances={NO_BALANCES}
       pointsOn={false}

@@ -6,7 +6,7 @@ import { OfferPill, Pill } from "@/components/desk/settings/dictionary/parts";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
-import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { PersonLine } from "@/components/desk/settings/form";
 import { toast } from "@/components/ui/Toast";
 import { ALIAS_MAX, byRussian, entryKey, nameReport, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
 import { useEditAliases } from "@/lib/dictionary-queries";
@@ -62,7 +62,7 @@ function AddField({ line, people, onDone, onAdded }: { line: Line; people: Roste
         }}
         placeholder="Жаке, главбух — Enter добавит, Esc закроет"
         aria-label={`Как ещё зовут: ${line.person.full_name}`}
-        className="field h-8 w-full max-w-[420px] px-2.5 text-[13px] leading-5 outline-none"
+        className="field h-8 w-full max-w-[420px] px-2 text-[13px] leading-5 outline-none"
       />
       {notes.map((note) => (
         <span key={note} className="text-[12px] leading-4 text-warn">
@@ -166,9 +166,9 @@ export function NamesTable({
     {
       key: "person",
       title: "Человек",
-      width: "240px",
+      width: "280px",
       sort: (a, b) => byRussian(a.person.full_name, b.person.full_name),
-      render: (line) => <PersonCell name={line.person.full_name} sub={line.person.position} />,
+      render: (line) => <PersonLine name={line.person.full_name} sub={line.person.position} />,
     },
     {
       key: "names",
@@ -177,8 +177,8 @@ export function NamesTable({
       render: (line) => {
         const aliases = [...line.person.aliases].sort(byRussian);
         return (
-          <div className="py-0.5">
-            <div className="flex flex-wrap items-center gap-1">
+          <div>
+            <div className="flex flex-wrap items-center gap-x-1.5">
               {aliases.map((alias) => (
                 <Pill
                   key={alias}
@@ -196,15 +196,15 @@ export function NamesTable({
                     event.stopPropagation();
                     open(line);
                   }}
-                  className="inline-flex h-6 items-center rounded-full px-2 text-[13px] font-medium leading-4 text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+                  className="inline-flex h-6 items-center text-[13px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
                 >
                   + имя
                 </button>
               ) : null}
             </div>
             {line.report.shared.map((s) => (
-              <p key={s.alias} className="mt-1 flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-                <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-warn" />«{s.alias}» есть и у: {s.people.join(", ")} — ИИ спросит, кого
+              <p key={s.alias} className="text-[12px] leading-4 text-muted">
+                «{s.alias}» есть и у: {s.people.join(", ")} — ИИ спросит, кого
               </p>
             ))}
             {!line.editable ? <p className="mt-1 text-[12px] leading-4 text-muted">Имена директора меняет только директор</p> : null}
@@ -230,7 +230,7 @@ export function NamesTable({
       sort: (a, b) => a.report.suggestions.length - b.report.suggestions.length,
       render: (line) =>
         line.editable && line.report.suggestions.length ? (
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-x-3">
             {line.report.suggestions.map((suggestion) => (
               <OfferPill key={suggestion} label={suggestion} disabled={line.person.aliases.length >= ALIAS_MAX} onTake={() => take(line, [suggestion])} />
             ))}

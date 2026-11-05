@@ -18,6 +18,7 @@ import { shiftDay, ymdOfEvent } from "@/lib/calendar/agenda";
 import { calendarScreen, isRunning, type CalendarScreen } from "@/lib/calendar/overview";
 import { useCalendar, useCalendarMonth, useEvent, warmCalendarMonth, type CalendarEvent } from "@/lib/calendar/queries";
 import { addMonths, compareYmd, monthOf, parseYmd, todayYmd, ymdOf, type Ymd } from "@/lib/datetime/calendar";
+import { busyByDay } from "@/lib/desk/busy";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { useNamesKey } from "@/lib/people/names";
 import { usePointsEnabled } from "@/lib/points/queries";
@@ -36,6 +37,7 @@ import { EventForm, type EventSeed } from "./EventForm";
 import { QuickCreate } from "./QuickCreate";
 import { daysOf, monthTitle, weekTitle, type CalendarView } from "./range";
 import { besideAnchor, type Slot } from "./slots";
+import { useDirectorBusy } from "./useDirectorBusy";
 import { eventsByDay } from "./week";
 import { WeekHours } from "./WeekHours";
 
@@ -62,9 +64,10 @@ function besideOf(element: HTMLElement, width: number, height: number): { x: num
 /**
  * The moment in one sentence under the title (D-154) — the phone's status screen (D-100) said in
  * a line, loudest first: on now; about to start; invitations waiting; what today holds; a free day.
+ * It is print: only an invitation that waits for this person's answer is written in the pen.
  */
 function stateLine(screen: CalendarScreen, running: boolean): { text: string; tone?: Tone } {
-  const tone = screen.tone === "muted" ? undefined : screen.tone;
+  const tone: Tone | undefined = screen.focusId ? "warn" : undefined;
   const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
   if (running) return { text: `Идёт: ${screen.detail}`, tone };
   // a free day has no number: its words and what comes after it
@@ -79,12 +82,13 @@ function stateLine(screen: CalendarScreen, running: boolean): { text: string; to
  * «Календарь» of the desk (D-153, D-154, wave 3): «‹ сегодня ›» and «Неделя | Месяц» over the
  * grid — a week of hours or the month's weeks, `?view` and `?d` in the address — and «Ближайшее»
  * beside it. «Сроки задач» (`?deadlines=1`, the key D) lays the director's open orders over the
- * days. Made for a mouse and a keyboard: a meeting opens as a card beside its block (the grid
- * stays in sight), a click or a drag over an empty stretch of the week makes a new one with a
- * quick card (title, people, Enter), N opens the full desk form, E edits the open meeting and
+ * days. The secretary's week shows when the director is busy, as grey blocks with no word about
+ * the meetings; a month has no hours to lay them on. Made for a mouse and a keyboard: a meeting
+ * opens as a card beside its block (the grid stays in sight), a click or a drag over an empty
+ * stretch of the week makes a new one with a quick card (title, people, Enter), N opens the full
+ * desk form, E edits the open meeting and
  * Delete asks to delete it; W/M, ←/→, T and D move the view. `?e=<id>` (a push opened on a
- * computer) turns to that meeting's day and opens its card. The light of the screen is the
- * nearest meeting's: on now, or about to start.
+ * computer) turns to that meeting's day and opens its card.
  */
 export function DeskCalendar() {
   // a namesake gets the surname's initial once the roster has come (D-146)
@@ -156,13 +160,16 @@ export function DeskCalendar() {
   const marksShown = markCount(marks);
   const marksTone = loudest([...marks.values()].flat());
 
-  // the moment, and the light of the nearest meeting: on now — the accent, a quarter of an hour away — a warning
+  // the secretary sees the director's time, and only that (owner, 2026-11-04)
+  const busyShown = role === "secretary" && view === "week";
+  const busy = useDirectorBusy(first, shiftDay(last, 1), busyShown);
+  const busyDays = busyShown ? busyByDay(busy.data ?? [], days) : null;
+
+  // the moment in a line under the title
   const ahead = upcoming.data ?? EMPTY;
   const screen = calendarScreen(ahead, meId, now);
   // today's meeting on now — the one the status screen speaks of
   const running = ahead.some((event) => isRunning(event, now) && ymdOfEvent(event) === today);
-  const soon = !running && screen.tone === "warn" && !screen.focusId;
-  const light: Tone | null = running ? "accent" : soon ? "warn" : null;
 
   // the open meeting, by id: its card stays open (and live) when an edit carries it off the screen
   const [card, setCard] = useState<CardState | null>(() => {
@@ -273,13 +280,13 @@ export function DeskCalendar() {
     { keys: ["M"], label: "Месяц" },
     ...(isDirector
       ? [
-          { keys: ["N"], label: "Новое мероприятие" },
+          { keys: ["N"], label: "Новая встреча" },
           { keys: ["D"], label: "Сроки задач на календаре" },
-          { keys: ["E"], label: "Изменить открытое мероприятие" },
-          { keys: ["Del"], label: "Удалить открытое мероприятие" },
+          { keys: ["E"], label: "Изменить открытую встречу" },
+          { keys: ["Del"], label: "Удалить открытую встречу" },
         ]
       : []),
-    { keys: ["Tab", "Enter"], label: "К мероприятию и открыть его" },
+    { keys: ["Tab", "Enter"], label: "К встрече и открыть её" },
     { keys: ["Esc"], label: "Закрыть карточку" },
   ]);
 
@@ -290,15 +297,14 @@ export function DeskCalendar() {
     <DeskPage>
       <PageTitle
         title="Календарь"
-        light={light}
         state={upcoming.data ? stateLine(screen, running) : null}
         actions={
           isDirector ? (
             <>
               <CalendarOnWallButton />
-              <Tooltip label="Новое мероприятие" keys={["N"]} side="bottom">
+              <Tooltip label="Новая встреча" keys={["N"]} side="bottom">
                 <Button size="sm" onClick={() => newMeeting()} data-testid="desk-event-new">
-                  Новое мероприятие
+                  Новая встреча
                 </Button>
               </Tooltip>
             </>
@@ -322,24 +328,24 @@ export function DeskCalendar() {
           </>
         }
       >
-        <div className="flex items-center gap-1">
+        <h2 className="desk-figure min-w-[160px] text-[20px] leading-6" data-testid="desk-calendar-title">
+          {title}
+        </h2>
+        <div className="flex items-center">
           <ArrowButton label={view === "week" ? "Прошлая неделя" : "Прошлый месяц"} hint="←" onClick={() => step(-1)} back />
           <Tooltip label="Сегодня" keys={["T"]} side="bottom">
-            <Button size="sm" variant="secondary" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
+            <Button size="sm" variant="ghost" className="!min-h-8 !px-2 !text-[14px]" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
               Сегодня
             </Button>
           </Tooltip>
           <ArrowButton label={view === "week" ? "Следующая неделя" : "Следующий месяц"} hint="→" onClick={() => step(1)} />
         </div>
-        <h2 className="ml-2 font-display text-[17px] font-semibold leading-6" data-testid="desk-calendar-title">
-          {title}
-        </h2>
       </Toolbar>
 
       {/* the grid first: the column beside it gives way on a narrower screen */}
-      <div className="grid grid-cols-[minmax(0,1fr)_clamp(224px,18vw,280px)] items-start gap-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_clamp(224px,18vw,280px)] items-start gap-8">
         {loading ? (
-          <Bone h={view === "week" ? 628 : 640} className="!rounded-[12px]" />
+          <Bone h={view === "week" ? 628 : 640} />
         ) : view === "week" ? (
           <WeekHours
             days={days}
@@ -358,6 +364,7 @@ export function DeskCalendar() {
                 : null
             }
             ghost={quick ? { slot: quick.slot, title: quick.title } : null}
+            busy={busyDays}
           />
         ) : (
           <MonthGrid
@@ -416,8 +423,8 @@ export function DeskCalendar() {
 }
 
 /**
- * «Сроки задач»: the layer of the director's open orders over the calendar, on and off — with
- * how many are due on the days on screen, red while one of them is already late.
+ * «Сроки задач»: the layer of the director's open orders over the calendar, on and off — a word
+ * of the toolbar with how many are due on the days on screen, red while one of them is already late.
  */
 function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: number; tone: "danger" | "warn" | "muted"; onToggle: () => void }) {
   return (
@@ -427,14 +434,11 @@ function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: nu
       onClick={onToggle}
       title="Сроки открытых задач на этих днях · клавиша D"
       data-testid="desk-deadlines-toggle"
-      className={`flex h-9 items-center gap-2 rounded-[11px] border px-3 font-display text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${
-        on ? "border-accent/55 bg-accent/[0.08] text-text" : "border-border/75 bg-surface/80 text-muted hover:text-text"
-      }`}
+      className={`mr-3 flex h-8 items-center gap-1.5 text-[14px] leading-5 transition-colors duration-[120ms] ${on ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"}`}
     >
-      <span aria-hidden className={`h-[7px] w-[7px] rotate-45 rounded-[1px] ${on ? "bg-accent" : "bg-muted"}`} />
       Сроки задач
       {count > 0 ? (
-        <span className="nums text-[12px]" style={{ color: tone === "danger" ? "var(--danger)" : on ? "var(--accent)" : undefined }}>
+        <span className="nums text-[12px]" style={{ color: tone === "danger" ? "var(--danger)" : undefined }}>
           {count}
         </span>
       ) : null}
@@ -450,9 +454,9 @@ function ArrowButton({ label, hint, onClick, back = false }: { label: string; hi
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="flex h-9 w-9 items-center justify-center rounded-[10px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+        className="flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d={back ? "m15 6-6 6 6 6" : "m9 6 6 6-6 6"} />
         </svg>
       </button>
@@ -465,7 +469,7 @@ function KeyLabel({ label, hint }: { label: string; hint: string }) {
   return (
     <span className="group/key inline-flex items-center gap-1.5">
       {label}
-      <span className="nums text-[10px] font-semibold text-muted/60 transition-colors duration-[120ms] group-hover/key:text-muted">{hint}</span>
+      <span className="nums text-[11px] text-muted/60 transition-colors duration-[120ms] group-hover/key:text-muted">{hint}</span>
     </span>
   );
 }
@@ -484,7 +488,7 @@ function CalendarOnWallButton() {
   return (
     <Button
       size="sm"
-      variant={onWall ? "primary" : "secondary"}
+      variant="secondary"
       aria-pressed={onWall}
       disabled={control.isPending}
       data-testid="desk-calendar-on-wall"

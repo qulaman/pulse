@@ -135,11 +135,10 @@ export function PointsScreen() {
     ) : null;
 
   return (
-    <div className="flex w-full max-w-[1100px] flex-col gap-5">
+    <div className="flex w-full min-w-0 flex-col gap-3">
       <PageTitle
         title="Очки и магазин"
-        light={disputeCount > 0 || waiting > 0 ? "warn" : null}
-        state={enabled.isPending || on ? null : { text: "Очки выключены — начислять нельзя, магазин работает", tone: "warn" }}
+        state={enabled.isPending || on ? null : { text: "Очки выключены — начислять нельзя, магазин работает" }}
         actions={
           <>
             <Link href="/desk/settings?tab=team&focus=points-enabled" className="px-2 text-[13px] font-medium text-muted hover:text-text" data-testid="points-rules-link" title="Режим рейтинга и правила — во вкладке «Сотрудники»">

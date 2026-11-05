@@ -49,6 +49,8 @@ export function useErrandActions() {
         return;
       }
       toast("Не получилось. Попробуй ещё раз");
+      // the desk's «Отменить» paints the row first (components/desk/errands/cancel.tsx)
+      void queryClient.invalidateQueries({ queryKey: errandKeys.root });
     },
   });
 }

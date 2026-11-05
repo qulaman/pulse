@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { Calendar } from "@/components/ui/datetime/Calendar";
 import { kzFixedHolidays } from "@/lib/daily-report/holidays";
 import { parseYmd, todayYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
-import { REACTION_CODES, REACTION_GLYPH, REACTION_LABEL } from "@/lib/points/reactions";
+import { REACTION_CODES, REACTION_LABEL } from "@/lib/points/reactions";
 import type { CompanySettings } from "@/lib/settings";
 import { pluralRu } from "@/lib/tasks/status-text";
 
@@ -32,7 +32,7 @@ function holidayLabel(ymd: Ymd, thisYear: number): string {
 /** The working days as seven toggles — Monday first; the last one on cannot go off (a week without a working day asks nothing). */
 function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days: number[]) => void }) {
   return (
-    <div role="group" aria-label="Рабочие дни" className="seg inline-flex h-9 items-center gap-0.5 rounded-[11px] p-0.5">
+    <div role="group" aria-label="Рабочие дни" className="seg inline-flex h-9 items-center gap-0.5 p-0.5">
       {WEEKDAYS_SHORT_RU.map((label, index) => {
         const day = index + 1;
         const on = days.includes(day);
@@ -45,7 +45,7 @@ function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days
               if (on && days.length === 1) return;
               onChange(on ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b));
             }}
-            className={`flex h-8 w-9 items-center justify-center rounded-[9px] font-display text-[13px] font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+            className={`flex h-8 w-7 items-center justify-center text-[13px] font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
               on ? "seg-thumb text-text" : "text-muted/70 hover:text-text"
             }`}
           >
@@ -58,7 +58,7 @@ function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days
 }
 
 /**
- * The company's holidays (D-155 §7): the days from today on as chips with ×, the past ones only
+ * The company's holidays (D-155 §7): the days from today on as words with ×, the past ones only
  * counted (the director's «Период» still reads them); «+ День…» opens the month beside the
  * button, «+ Праздники Казахстана» adds the fixed-date ones without repeats.
  */
@@ -73,17 +73,17 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
 
   return (
     <div className="flex flex-col gap-2" data-testid="report-holidays">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {upcoming.map((day) => {
           const label = holidayLabel(day, year);
           return (
-            <span key={day} className="inline-flex h-7 items-center gap-0.5 rounded-full border border-border bg-surface-2 pl-2.5 text-[13px] leading-4">
+            <span key={day} className="nums inline-flex h-6 items-center text-[13px] leading-4">
               {label}
               <button
                 type="button"
                 aria-label={`Убрать праздник ${label}`}
                 onClick={() => onChange(days.filter((d) => d !== day))}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-[14px] leading-none text-muted hover:text-text"
+                className="flex h-6 w-5 items-center justify-center text-[14px] leading-none text-muted hover:text-danger"
               >
                 ×
               </button>
@@ -122,13 +122,10 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
   );
 }
 
-/** A reaction's price: its face, its name, the points it pays. */
+/** A reaction's price: its name, the points it pays. */
 function ReactionPrice({ code, value, onChange }: { code: (typeof REACTION_CODES)[number]; value: number; onChange: (value: number) => void }) {
   return (
-    <label className="flex items-center gap-2.5 rounded-[8px] px-2 py-1 hover:bg-surface-2/40">
-      <span aria-hidden className="w-6 text-center text-[18px] leading-6">
-        {REACTION_GLYPH[code]}
-      </span>
+    <label className="flex items-center gap-2.5 border-b border-border/60 py-0.5">
       <span className="min-w-0 flex-1 text-[14px] leading-5">{REACTION_LABEL[code]}</span>
       <NumberInput label={`Очков за ${REACTION_LABEL[code]}`} value={value} max={100000} unit="очк." width={110} onChange={onChange} />
     </label>
@@ -157,7 +154,7 @@ export function TeamPanel({ director }: { director: boolean }) {
         about="Очки начисляются сами за задачи, отчёты и реакции; директор добавляет свои. Тратятся в магазине."
         action={
           director ? (
-            <Link href="/desk/settings/points" className="text-[13px] font-medium text-accent hover:underline">
+            <Link href="/desk/settings/points" className="text-[13px] font-medium underline underline-offset-2">
               Балансы и магазин
             </Link>
           ) : null
@@ -218,7 +215,7 @@ export function TeamPanel({ director }: { director: boolean }) {
 
       <SettingsGroup id="points-reactions" title="Реакция директора на задачу" about="Реакция платит свою цену; 0 — реакция без очков. Сменил реакцию — разница доплачивается или списывается.">
         <SettingRow id="points-reactions-prices" label="Цена реакций" stack muted={off} changed={!same(rules.reactions, saved.reactions)}>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+          <div className="desk-cells grid grid-cols-2 gap-x-8">
             {REACTION_CODES.map((code) => (
               <ReactionPrice key={code} code={code} value={rules.reactions[code]} onChange={(value) => setRules({ reactions: { ...rules.reactions, [code]: value } })} />
             ))}
@@ -241,7 +238,7 @@ export function TeamPanel({ director }: { director: boolean }) {
           title="Ежедневный отчёт"
           about="В конце дня сотрудник пишет, когда пришёл и ушёл и чем занимался; задачи дня попадают в отчёт сами."
           action={
-            <Link href="/desk/reports" className="text-[13px] font-medium text-accent hover:underline">
+            <Link href="/desk/reports" className="text-[13px] font-medium underline underline-offset-2">
               Читать отчёты
             </Link>
           }
@@ -275,7 +272,7 @@ export function TeamPanel({ director }: { director: boolean }) {
 
       <GroupNote>
         Люди, роли и пароли — в разделе{" "}
-        <Link href="/desk/team" className="font-medium text-accent hover:underline">
+        <Link href="/desk/team" className="font-medium text-text underline underline-offset-2">
           «Команда»
         </Link>
       </GroupNote>

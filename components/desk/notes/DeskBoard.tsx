@@ -8,7 +8,6 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "reac
 import { DeskPresenter } from "@/components/desk/screen/DeskPresenter";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { DeskLight } from "@/components/desk/ui/Light";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
@@ -42,7 +41,7 @@ import { useTvBoardControl, useTvControl, useTvWeekBoard } from "@/lib/tv/mutati
 import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
 import { afterBoard, boardExtendTo, boardPointOf, boardViewOf, weekBoardLive } from "@/lib/tv/state";
 
-import { DeskSketch } from "./DeskSketch";
+import { darkPaper, DeskSketch } from "./DeskSketch";
 import { Outline, type OutlineActions } from "./Outline";
 
 const subscribeOnline = (onChange: () => void) => onlineManager.subscribe(onChange);
@@ -159,21 +158,21 @@ export function DeskBoard() {
 
   if (me.isLoading || notes.isLoading || boards.isLoading || !me.data) {
     return (
-      <div className="mx-auto w-full max-w-[860px] px-8 pt-6" aria-hidden>
-        <span className="block h-[34px] w-1/2 rounded-[10px] bg-surface-2/70" />
-        <span className="mt-6 block h-[320px] rounded-[12px] bg-surface-2/50" />
+      <div className="w-full max-w-[860px] px-10 pt-4" aria-hidden>
+        <span className="block h-[34px] w-1/2 bg-surface-2/70" />
+        <span className="mt-6 block h-[320px] bg-surface-2/50" />
       </div>
     );
   }
 
   if (!board || board.deleted_at) {
     return (
-      <div className="mx-auto w-full max-w-[760px] px-6 pt-16" data-testid="board-missing">
+      <div className="w-full max-w-[760px] px-10 pt-16" data-testid="board-missing">
         <EmptyState
           title="Доски нет"
           hint={board?.deleted_at ? "Она в корзине — вернуть можно там" : "Возможно, она удалена"}
           action={
-            <Link href="/desk/notes?tab=boards" className="text-[14px] font-semibold text-accent hover:underline">
+            <Link href="/desk/notes?tab=boards" className="text-[14px] font-medium underline">
               К доскам ›
             </Link>
           }
@@ -245,6 +244,11 @@ export function DeskBoard() {
       { onSuccess: (row) => toast(row.board_until ? `Доска на стене до ${tvTime(new Date(row.board_until))}` : "Продлил") },
     );
 
+  const openSketch = (row: Note | null) => {
+    darkPaper();
+    setSketching({ row });
+  };
+
   const actions: OutlineActions = {
     create: write,
     edit: (row, fields) => {
@@ -265,7 +269,7 @@ export function DeskBoard() {
     assign: setAssigning,
     move: setMoving,
     spotlight: (pointId) => boardControl.mutate(pointId ? { point: pointId } : { clearPoint: true }),
-    sketch: (row) => setSketching({ row }),
+    sketch: openSketch,
     writeMany: (points: SplitPoint[], at) => {
       if (at.parent) {
         let place = nextPlaceIn(rows, at.parent);
@@ -325,7 +329,7 @@ export function DeskBoard() {
         toast(board.pinned_at ? "Открепил" : "Закрепил сверху списка");
       },
     },
-    { key: "sketch", label: "Рисунок — новым пунктом…", icon: <NoteIcon name="pencil" size={14} />, onSelect: () => setSketching({ row: null }) },
+    { key: "sketch", label: "Рисунок — новым пунктом…", icon: <NoteIcon name="pencil" size={14} />, onSelect: () => openSketch(null) },
     ...(open.length > 0 ? [{ key: "copy", label: `Новая доска из открытых · ${openWords(open.length)}`, icon: <NoteIcon name="stack" size={14} />, onSelect: () => void carryOver(queryClient, meData, board, openBoard) }] : []),
     ...(ticks.length > 0 ? [{ key: "untick", label: `Снять все отметки · ${ticks.length}`, icon: <NoteIcon name="retry" size={14} />, onSelect: untickAll }] : []),
     ...(summary.total > 0 ? [{ key: "text", label: "Скопировать текстом", icon: <NoteIcon name="copy" size={14} />, onSelect: () => void copyText() }] : []),
@@ -380,8 +384,7 @@ export function DeskBoard() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-4 px-8 pb-16 pt-6" data-testid="desk-board">
-      <DeskLight tone={onWall ? "accent" : null} />
+    <div className="flex w-full max-w-[860px] flex-col gap-3 px-10 pb-16 pt-4" data-testid="desk-board">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {renaming ? (
@@ -396,21 +399,20 @@ export function DeskBoard() {
           ) : (
             <Tooltip label="Переименовать" keys={["F2"]} side="bottom">
               <h1>
-                <button type="button" onClick={() => setRenaming(true)} className="max-w-full truncate text-left font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em] hover:text-text/85" data-testid="desk-board-title">
+                <button type="button" onClick={() => setRenaming(true)} className="desk-figure max-w-full truncate text-left text-[30px] leading-[34px] hover:text-text/85" data-testid="desk-board-title">
                   {board.title}
                 </button>
               </h1>
             </Tooltip>
           )}
-          <p className="mt-1 flex items-center gap-1.5 text-[14px] font-medium leading-5" style={{ color: onWall ? "var(--accent)" : "var(--text-muted)" }}>
-            {onWall ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-accent" /> : null}
-            {onWall ? `На стене${until ? ` до ${tvTime(until)}` : ""} · ` : ""}
+          <p className="mt-0.5 text-[14px] leading-5 text-muted">
+            {onWall ? <span className="font-medium text-text">На стене{until ? ` до ${tvTime(until)}` : ""} · </span> : null}
             {stateLine}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           {onWall ? (
-            <MenuButton items={wallItems} label="Доска на стене" align="end" width={240} className="btn-primary inline-flex min-h-[36px] items-center gap-1.5 rounded-[12px] px-3 font-display text-[13px] font-semibold leading-4 text-bg">
+            <MenuButton items={wallItems} label="Доска на стене" align="end" width={240} className="btn-secondary inline-flex min-h-[36px] items-center gap-1.5 px-3 text-[13px] leading-4 text-text">
               <NoteIcon name="wall" size={15} />
               На стене{until ? ` до ${tvTime(until)}` : ""}
             </MenuButton>
@@ -419,7 +421,7 @@ export function DeskBoard() {
               На стену
             </Button>
           )}
-          <MenuButton items={menuItems} label="Все действия с доской" align="end" width={300} className="flex h-9 w-9 items-center justify-center rounded-[10px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text">
+          <MenuButton items={menuItems} label="Все действия с доской" align="end" width={300} className="flex h-9 w-9 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <circle cx="5.5" cy="12" r="1.7" />
               <circle cx="12" cy="12" r="1.7" />
@@ -434,15 +436,12 @@ export function DeskBoard() {
 
       <Outline rows={rows} phone={phone} hearing={heard} numbers={numbers} spot={spot} onWall={onWall} taskOf={(row) => (row.converted_task_id ? taskById.get(row.converted_task_id) : undefined)} actions={actions} autoStart={rows.length === 0} />
 
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 pt-3 text-[12px] leading-4 text-muted">
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted">
         <span className="inline-flex items-center gap-1">
           <Kbd>Enter</Kbd> строка
         </span>
         <span className="inline-flex items-center gap-1">
           <Kbd>Tab</Kbd> подпункт
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Kbd>Shift Tab</Kbd> в пункты
         </span>
         <span className="inline-flex items-center gap-1">
           <Kbd>Ctrl Enter</Kbd> отметить
@@ -568,7 +567,7 @@ function TitleField({ title, onDone, onCancel }: { title: string; onDone: (title
       }}
       aria-label="Название доски"
       data-testid="desk-board-title-input"
-      className="-ml-2 w-[calc(100%+8px)] rounded-[10px] bg-surface-2/60 px-2 font-display text-[28px] font-bold leading-[34px] tracking-[-0.025em] outline-none ring-2 ring-accent/40"
+      className="desk-figure w-full bg-transparent text-[30px] leading-[34px] shadow-[inset_0_-2px_0_var(--accent)] outline-none"
     />
   );
 }

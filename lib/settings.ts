@@ -354,6 +354,13 @@ export const CompanySettingsSchema = z.object({
   mascot_telegraph: z.boolean().default(true),
   /** «Лаб» on the whole team's bar while the company tests the product (D-150); off at release. */
   lab_for_all: z.boolean().default(false),
+  /**
+   * «Лаборатория» and «Данные»: the developers' tools, closed to a client (owner, 2026-11-04). Set
+   * in the database only: no PATCH takes it (the patch schema has no such key) and
+   * `update_company_settings` drops it, so a company cannot open them for itself. A broken value
+   * reads as closed, never as a broken settings row.
+   */
+  dev_tools: z.boolean().default(false).catch(false),
   points_rules: PointsRulesSchema.prefault({}),
   ether_events: EtherEventsSchema.prefault({}),
   delivery_window: DeliveryWindowSchema.prefault({}),

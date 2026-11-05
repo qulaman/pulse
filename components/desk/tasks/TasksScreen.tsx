@@ -15,18 +15,23 @@ import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
+import { When } from "@/components/desk/ui/When";
 import { RecurrenceSection } from "@/components/recurrence/RecurrenceSection";
 import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
+import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
+import { appendPage, ARCHIVE_STATUSES, inRange, parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
+import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { hasUnread, HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
+import { useHydrated } from "@/lib/useHydrated";
 import { queueOf, REASON_ORDER, type DeskReason } from "@/lib/tasks/desk";
 import { usePurgeClosed, useTaskActions, type TaskActions } from "@/lib/tasks/mutations";
 import {
@@ -35,17 +40,18 @@ import {
   directorTabOf,
   matchesQuery,
   peopleLoad,
-  REASON_TONE,
   reasonFor,
   type DirectorTab,
   type Section,
 } from "@/lib/tasks/overview";
-import { useClosedPages, useMe, usePulseBoard, useSentTasks, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
+import { useClosedPages, useMe, usePulseBoard, useSentTasks, useTaskArchive, useTaskSearch, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
 import { useTaskReceipts } from "@/lib/tasks/receipts";
 import { deadlineLabel, isOverdue, pluralRu, TEXT } from "@/lib/tasks/status-text";
 
 import {
+  archiveStatusOf,
   bulkPlan,
+  columnFits,
   deliveryLine,
   DUE_FILTERS,
   DUE_LABEL,
@@ -53,9 +59,10 @@ import {
   fitColumn,
   groupChoices,
   groupOf,
+  handInVerdict,
   inPlaceOf,
-  KEY_CAP,
   latestLine,
+  loadStateOf,
   matchesDue,
   matchesStatus,
   parseDue,
@@ -73,13 +80,18 @@ import {
   tableSections,
   togglePick,
   underTitle,
+  verdictRank,
+  worstLoad,
   type DueFilter,
+  type LoadState,
   type Move,
   type StatusFilter,
 } from "@/lib/desk/tasks";
-import { taggedActions, writeParams } from "./flow";
+import { DateRangeField } from "./DateRange";
+import { taggedActions, useWidthBucket, writeParams } from "./flow";
+import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
 import { MomentBar, type MomentCounter } from "./MomentBar";
-import { MoreButton, MoveRow } from "./RowMoves";
+import { DraftMark, MoreButton, MoveRow } from "./RowMoves";
 import { DeliveryCell } from "./TaskParts";
 import { deskLayerOpen, TaskPanel, type PanelNext } from "./TaskPanel";
 import { useDeskActs } from "./useDeskActs";
@@ -89,17 +101,26 @@ const GLOW_MS = 1300;
 /** The calm moment's quiet line on the desk: a new order is a line away, not the phone's voice (D-154). */
 export const DESK_NEW_TASK = "Новую задачу — строкой сверху · Ctrl K";
 
-/** The screen's frame while the lists land: the head, the moment, the tool bar, the rows. */
-export function TasksSkeleton() {
+/** The screen's frame while the lists land: the head, the moment (the archive has none), the tool bar, the rows. */
+export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
   return (
     <DeskPage>
       <PageTitle title="Задачи" />
-      <SkeletonGroup className="flex flex-col gap-5" grow>
-        <Bone h={138} className="!rounded-[16px]" />
-        <Bone h={36} w="72%" />
-        <div className="flex flex-col gap-1">
+      <SkeletonGroup className="flex flex-col gap-3.5" grow>
+        {moment ? (
+          <div className="flex h-11 items-center gap-4">
+            <Bone h={36} w={32} />
+            <Bone h={18} w={240} />
+          </div>
+        ) : null}
+        <div className="flex h-8 items-center">
+          <Bone h={14} w="56%" />
+        </div>
+        <div className="desk-list">
           {Array.from({ length: 10 }, (_, index) => (
-            <Bone key={index} h={36} />
+            <div key={index} className="flex h-[34px] items-center">
+              <Bone h={14} w="72%" />
+            </div>
           ))}
         </div>
       </SkeletonGroup>
@@ -109,11 +130,15 @@ export function TasksSkeleton() {
 
 /**
  * «Задачи» of the desk (tasks/022 A, D-154): the director's dashboard over the same data and
- * actions as the phone's «Задачи» (D-83) — the moment as one hero, the three piles as a table
+ * actions as the phone's «Задачи» (D-83) — the moment as one total, the three piles as a table
  * grouped by reason, person or deadline, the row's two moves under the hand, filters, and the
  * task in the right-hand panel that goes on to the next one after the director's move. Wave 3:
- * rows of 40 px with columns as wide as their words, a right click for a row's menu, rows marked
+ * rows of 34 px with columns as wide as their words, a right click for a row's menu, rows marked
  * with Ctrl/Shift and X for a reminder, a new date or a recall in bulk (never «Принять», принцип 3).
+ * «Закрытые» is the archive, by the server: when each closed and whether in time, a range of days
+ * in the address, «Показать ещё» a page at a time, no total of what waits. The search reads the
+ * loaded lists at once and the server's titles a moment later: on the two working tabs what it
+ * finds there stands in a group of its own, «В архиве».
  */
 export function TasksScreen() {
   // a namesake on screen gets the surname's initial once the roster has come (D-146)
@@ -123,18 +148,22 @@ export function TasksScreen() {
   const board = usePulseBoard(me.data);
   // «Повторы» stand over the table: the screen comes with them, nothing lands later
   const rulesSettled = useRecurrenceRulesSettled();
+  const archiveTab = useSearchParams().get("tab") === "closed";
 
-  // isPending, not isLoading: a query enabled in this very render has not started fetching yet
-  if (me.isPending || tasks.isPending || board.isPending || !rulesSettled || !me.data) return <TasksSkeleton />;
-  if (tasks.isError && !tasks.data) {
-    return (
-      <DeskPage>
-        <PageTitle title="Задачи" light="muted" />
-        <EmptyState title="Не смог загрузить задачи" hint="Проверьте связь — попробую ещё раз сам, как только она будет" />
-      </DeskPage>
-    );
-  }
-  return <TasksView me={me.data} all={tasks.data ?? []} board={board.data ?? []} />;
+  const taskLoad = loadStateOf(tasks);
+  const boardLoad = loadStateOf(board);
+  const load = worstLoad([taskLoad, boardLoad]);
+  const retry = () => {
+    void tasks.refetch();
+    void board.refetch();
+  };
+  const busy = tasks.isFetching || board.isFetching;
+  // a start with no network pauses the queries before this boundary hydrates: the first render stays the server's skeleton
+  const hydrated = useHydrated();
+  // a state of the query, not isLoading: one enabled in this very render has not started fetching yet
+  if (!hydrated || me.isPending || !rulesSettled || !me.data || load.kind === "loading") return <TasksSkeleton moment={!archiveTab} />;
+  if (taskLoad.kind === "failed") return <FailedScreen title="Задачи" what="задачи" offline={taskLoad.offline} busy={busy} onRetry={retry} />;
+  return <TasksView me={me.data} all={tasks.data ?? []} board={board.data ?? []} load={load} boardLoad={boardLoad} busy={busy} onRetry={retry} />;
 }
 
 type Tile = "yours" | "working" | "today" | "overdue" | "held";
@@ -145,9 +174,30 @@ function rowsOnScreen(box: HTMLElement | null): string[] {
   return [...box.querySelectorAll<HTMLElement>('[data-testid="desk-row"]')].map((row) => row.dataset.rowKey ?? "").filter(Boolean);
 }
 
+const NO_TASKS: TaskWithPeople[] = [];
+const NO_PEOPLE: string[] = [];
+
 const STAGE_ORDER = (task: TaskWithPeople, reason: DeskReason | null) => (reason ? REASON_ORDER.indexOf(reason) : 10 + ["sent", "accepted", "in_progress", "rework", "pending_review", "scheduled", "done", "revoked", "declined"].indexOf(task.status));
 
-function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[]; board: readonly BoardTask[] }) {
+function TasksView({
+  me,
+  all,
+  board,
+  load,
+  boardLoad,
+  busy,
+  onRetry,
+}: {
+  me: Me;
+  all: readonly TaskWithPeople[];
+  board: readonly BoardTask[];
+  /** the tasks and the board together: the note over the screen */
+  load: LoadState;
+  /** the board alone: without it the table stands, but no word about questions can be trusted */
+  boardLoad: LoadState;
+  busy: boolean;
+  onRetry: () => void;
+}) {
   const actions = useTaskActions(me);
   const purge = usePurgeClosed();
   const pages = useClosedPages(me.userId);
@@ -166,10 +216,15 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const due = parseDue(params.get("due"));
   const setStatus = (value: StatusFilter | null) => writeParams({ status: value });
   const setDue = (value: DueFilter | null) => writeParams({ due: value });
+  const rangeFrom = params.get("from");
+  const rangeTo = params.get("to");
+  const range = useMemo(() => parseRange(rangeFrom, rangeTo), [rangeFrom, rangeTo]);
+  const setRange = (value: DayRange | null) => writeParams({ from: value?.from ?? null, to: value?.to ?? null });
   const [purgeAsk, setPurgeAsk] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [focus, setFocus] = useState<string | null>(null);
   const gridBox = useRef<HTMLDivElement>(null);
+  const bucket = useWidthBucket(gridBox);
+  const drafts = useDraftTasks(me.userId);
 
   const setQuery = (value: string) => {
     setQueryState(value);
@@ -233,9 +288,44 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const group = groupOf(tab, params.get("group"));
   const choices = groupChoices(tab);
 
-  const sections: Section<TaskWithPeople>[] = useMemo(() => tableSections(tab, group, piles[tab], reasons, now), [tab, group, piles, reasons, now]);
+  /* ---- history from the server: the archive on its own tab, the search on the other two ---- */
+  const archiveTab = tab === "closed";
+  // the deadline filter speaks of work ahead, and a status that never lives here narrows nothing
+  const archiveStatus = archiveStatusOf(status);
+  const archive = useTaskArchive(me.userId, { range, who, status: archiveStatus, text: query }, archiveTab);
+  const search = useTaskSearch({ text: query, assignees: who ? [who] : NO_PEOPLE, closedOnly: true, enabled: !archiveTab });
+  const archiveLoad = loadStateOf(archive.query);
+
+  // the server's pages, and what only this screen knows yet: a task closed a second ago, a search
+  // that fits a description or a person's name (the server reads titles)
+  const closedRows = useMemo(() => {
+    if (!archiveTab) return NO_TASKS;
+    const known = scoped.filter((task) => tabOf(task) === "closed" && matchesQuery(task, query) && matchesStatus(task, archiveStatus) && inRange(closedAtOf(task), range));
+    return appendPage(archive.rows, known);
+  }, [archiveTab, archive.rows, scoped, tabOf, query, archiveStatus, range]);
+
+  // «В архиве» on the two working tabs: what the search found and neither of them holds
+  const archived = useMemo(() => {
+    if (archiveTab || !query.trim()) return NO_TASKS;
+    const own = new Map(all.map((task) => [task.id, task]));
+    return appendPage(search.rows.filter((task) => matchesStatus(task, status) && matchesDue(task, due, now)), piles.closed)
+      .filter((task) => {
+        const row = own.get(task.id);
+        return !row || tabOf(row) === "closed";
+      })
+      .sort((a, b) => closedAtOf(b).localeCompare(closedAtOf(a)));
+  }, [archiveTab, query, search.rows, status, due, now, piles.closed, all, tabOf]);
+  const archivedIds = useMemo(() => new Set(archived.map((task) => task.id)), [archived]);
+
+  const shown = archiveTab ? closedRows : piles[tab];
+  const sections: Section<TaskWithPeople>[] = useMemo(() => {
+    const own = tableSections(tab, group, shown, reasons, now);
+    return archived.length > 0 ? [...own, { key: "archive", title: "В архиве", tone: "muted", tasks: archived }] : own;
+  }, [tab, group, shown, archived, reasons, now]);
   const ids = useMemo(() => sections.flatMap((section) => section.tasks.map((task) => task.id)), [sections]);
-  const byId = useMemo(() => new Map(all.map((task) => [task.id, task])), [all]);
+  // every row a table may show; a loaded list's own copy wins
+  const byId = useMemo(() => new Map([...archive.rows, ...search.rows, ...all].map((task) => [task.id, task])), [archive.rows, search.rows, all]);
+  const known = useMemo(() => [...byId.values()], [byId]);
 
   /* ---- groups fold away (DataGrid's own folding: ↑/↓ step over a folded group) ---- */
   const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
@@ -336,7 +426,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   };
   const acts = useDeskActs({
     base: deskActions,
-    tasks: all,
+    tasks: known,
     flagsOf: (id) => ({ question: rows.get(id)?.question ?? null, request: rows.get(id)?.time_request ?? null, suggestion: rows.get(id)?.suggestion ?? null }),
     now,
     companyId: me.companyId,
@@ -513,50 +603,67 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     { key: "working", label: "В работе", value: counts.working, ...tile("working") },
     { key: "today", label: "Сегодня", value: counts.today, ...tile("today") },
     { key: "overdue", label: "Просрочено", value: counts.overdue, ...tile("overdue") },
-    { key: "held", label: "Позже", value: counts.held, ...tile("held") },
+    { key: "held", label: "Отложены", value: counts.held, ...tile("held") },
   ];
 
   const closedLoaded = all.filter((task) => task.status === "done" || task.status === "revoked" || task.status === "declined").length;
   const declinedLoaded = all.filter((task) => task.status === "declined").length;
   // the server's count: the list holds the latest pages only, the purge takes all of them
   const closedCount = Math.max(closedLoaded, pages.total ?? 0);
-  const moreClosed = closedCount > closedLoaded;
   const narrowed = Boolean(who || query.trim() || status || due);
-  const filtered = Boolean(query.trim() || status || due);
+  const filtered = Boolean(query.trim() || (archiveTab ? archiveStatus || range : status || due));
   const resetFilters = () => {
     setQuery("");
-    writeParams({ status: null, due: null });
+    writeParams({ status: null, due: null, from: null, to: null });
   };
+  const leftInArchive = rowsLeft(archive.total, archive.rows.length);
 
-  /* ---- the table: 40 px rows, columns as wide as their words ---- */
+  /* ---- the table: 34 px rows, columns as wide as their words ---- */
   const panelOpen = panel.isOpen;
-  const shown = piles[tab];
   // grouped by the person, the group's head names them: the column would only repeat it
   const byPerson = group === "person";
-  const closedRow = (task: TaskWithPeople) => task.status === "done" || task.status === "revoked";
+  const closedRow = (task: TaskWithPeople) => task.status === "done" || task.status === "revoked" || archivedIds.has(task.id);
+  // a column with nothing to say on this tab is not drawn: history has no receipts, no waiting
+  // words; the rest give way on a narrow list so that «Что» stays readable (COLUMN_FLOOR)
+  const showDelivery = !panelOpen && columnFits("delivery", bucket) && shown.some((task) => task.status === "sent" || task.status === "scheduled");
+  const showLast = !panelOpen && columnFits("last", bucket) && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
+  // grouped by the reason or the stage, the group's head already says it
+  const showStage = group !== "reason" && columnFits("stage", bucket);
+  const showWho = !byPerson && columnFits("who", bucket);
+  const showDue = columnFits("due", bucket);
+  // the verdict leaves with the tick: on the narrowest list «Закрыта» says the most
+  // the archive's own column: the panel says the same, so it leaves as early as the stage does
+  const showVerdict = columnFits("stage", bucket);
+  const anyPicked = picked.size > 0;
+  const verdictOf = (task: TaskWithPeople) => (task.status === "pending_review" ? handInVerdict(task) : null);
+  const closedText = (task: TaskWithPeople) => humanAqtobe(new Date(closedAtOf(task)), now);
+  // with «Последнее» gone, a handed-in row's deadline makes room for how it was handed in; under
+  // the head «Срок» a row of «В архиве» says what its date is
   const dueText = (task: TaskWithPeople) =>
-    closedRow(task) ? humanAqtobe(new Date(closedAtOf(task)), now) : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text;
+    (showLast ? null : verdictOf(task)?.text) ??
+    (closedRow(task) ? `закрыта ${closedText(task)}` : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text);
+  // under the floor of «Последнее» the columns keep to lower ceilings: their sum never leaves «Что» under its minimum
+  const snug = !columnFits("last", bucket);
   const widths = {
-    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 120, max: 190, extra: 24 + 24 + 10 }),
-    due: fitColumn(shown.map(dueText), { min: 92, max: 160 }),
-    stage: fitColumn(shown.map((task) => stageOf(task, reasons.get(task.id) ?? null, now).text), { min: 88, max: 150 }),
+    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96, max: snug ? 120 : 160, extra: 10 }),
+    due: fitColumn([...shown, ...archived].map(dueText), { min: 116, max: archived.length > 0 ? 196 : snug ? 132 : 172, perChar: archived.length > 0 ? 8 : undefined }),
+    closed: fitColumn(shown.map(closedText), { min: 116, max: snug ? 136 : 172 }),
+    verdict: fitColumn(shown.map((task) => handInVerdict(task)?.text ?? ""), { min: 84, max: snug ? 148 : 180, perChar: 8 }),
+    stage: fitColumn(shown.map((task) => stageOf(task, reasons.get(task.id) ?? null, now).text), { min: 88, max: snug ? 110 : 150, extra: 34 }),
     // never narrower than its own head («ДОСТАВКА» in capitals)
     delivery: fitColumn(
       shown.map((task) => (task.status === "sent" ? (deliveryLine(task, receipts.data?.[task.id] ?? null, now)?.text ?? "") : "—")),
-      { min: 104, max: 200 },
+      { min: 104, max: snug ? 150 : 200 },
     ),
   };
-  // a column with nothing to say on this tab is not drawn: history has no receipts, no waiting words
-  const showDelivery = !panelOpen && shown.some((task) => task.status === "sent" || task.status === "scheduled");
-  const showLast = !panelOpen && shown.some((task) => latestLine(task, rows.get(task.id), now) !== null);
-  const anyPicked = picked.size > 0;
-  const columns: Column<TaskWithPeople>[] = [
+  const everyColumn: Column<TaskWithPeople>[] = [
     {
       key: "pick",
       title: (
         <span className="sr-only">Отметка</span>
       ),
-      width: "34px",
+      // no room of its own: the mark hangs in the sheet's margin, the table starts on its vertical
+      width: "0px",
       render: (task) => {
         const on = picked.has(task.id);
         return (
@@ -575,12 +682,12 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
                 pickOne(task.id);
                 setSelected(task.id);
               }}
-              className={`relative -ml-1 flex h-5 w-5 items-center justify-center rounded-[5px] border transition-opacity duration-[120ms] ${
-                on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/50 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`
+              className={`absolute -left-[26px] top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-[2px] border transition-opacity duration-[120ms] after:absolute after:-inset-y-2 after:-left-1 after:-right-2.5 ${
+                on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`
               }`}
             >
               {on ? (
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="m5 12.5 4.5 4.5L19 7.5" />
                 </svg>
               ) : null}
@@ -597,29 +704,26 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
             title: "Кто",
             width: widths.who,
             sort: (a, b) => (a.assignee?.full_name ?? "").localeCompare(b.assignee?.full_name ?? "", "ru"),
-            render: (task) => {
-              // the ring is the director's move: the tone of the reason the task waits (D-154)
-              const reason = reasons.get(task.id);
-              return (
-                <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
-                  <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} ring={reason ? REASON_TONE[reason] : null} />
-                </span>
-              );
-            },
+            render: (task) => (
+              <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
+                <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} />
+              </span>
+            ),
           },
         ] satisfies Column<TaskWithPeople>[])),
     {
       key: "what",
       title: "Что",
+      width: columnFits("pick", bucket) ? "minmax(160px,1fr)" : "minmax(120px,1fr)",
       sort: (a, b) => a.title.localeCompare(b.title, "ru"),
       render: (task) => {
         const row = rows.get(task.id);
         const under = underTitle(task, row, me.userId, now);
         const unread = row ? hasUnread(row, me.userId) : false;
         return (
-          // one line: the title, then the thread's newest word in grey — a row stays 40 px
+          // one line: the title, then the thread's newest word in grey — a row stays 34 px
           <span className="flex min-w-0 items-center gap-2.5">
-            <span className="shrink-0" data-testid="desk-glyph" title={stageOf(task, reasons.get(task.id) ?? null, now).text}>
+            <span className="shrink-0" data-testid="desk-glyph" data-status={task.status} title={stageOf(task, reasons.get(task.id) ?? null, now).text}>
               <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={16} />
             </span>
             <span className="flex min-w-0 items-baseline gap-2" title={under ? `${task.title}\n${under}` : task.title}>
@@ -631,29 +735,82 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
                 <Icon name="repeat" size={13} />
               </span>
             ) : null}
-            {unread ? <span aria-label="новое сообщение" title="Новое сообщение" className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /> : null}
+            {drafts.has(task.id) && task.status !== "revoked" ? <DraftMark /> : null}
+            {unread ? (
+              <span aria-label="новое сообщение" title="Новое сообщение" className="shrink-0 text-[12px] leading-4 text-accent">
+                новое
+              </span>
+            ) : null}
           </span>
         );
       },
     },
+    ...(archiveTab
+      ? ([
+          {
+            key: "closed",
+            title: "Закрыта",
+            width: widths.closed,
+            sort: (a, b) => closedAtOf(a).localeCompare(closedAtOf(b)),
+            render: (task) => (
+              <span className="block truncate whitespace-nowrap text-[13px] text-muted" data-testid="desk-row-closed">
+                <When>{closedText(task)}</When>
+              </span>
+            ),
+          },
+          ...(showVerdict
+            ? ([
+                {
+                  key: "verdict",
+                  title: "В срок",
+                  width: widths.verdict,
+                  sort: (a, b) => verdictRank(handInVerdict(a)) - verdictRank(handInVerdict(b)),
+                  render: (task) => {
+                    const verdict = handInVerdict(task);
+                    if (!verdict) return <span className="text-muted/60">—</span>;
+                    return (
+                      <span
+                        className="block truncate whitespace-nowrap text-[13px]"
+                        title={`Сдано ${humanAqtobe(new Date(task.completed_at as string), now)} · срок ${humanAqtobe(new Date(task.deadline as string), now)}`}
+                        data-testid="desk-row-verdict"
+                      >
+                        <When overdue={verdict.late}>{verdict.text}</When>
+                      </span>
+                    );
+                  },
+                },
+              ] satisfies Column<TaskWithPeople>[])
+            : []),
+        ] satisfies Column<TaskWithPeople>[])
+      : []),
     {
       key: "due",
       title: "Срок",
       width: widths.due,
       sort: (a, b) => (a.deadline ?? "9").localeCompare(b.deadline ?? "9"),
       render: (task) => {
-        // history says when it closed; a refusal keeps its deadline — the director still decides it
-        if (closedRow(task)) return <span className="nums block truncate whitespace-nowrap text-[13px] text-muted">{dueText(task)}</span>;
-        if (!task.deadline && task.priority === "high") return <span className="text-[13px] font-medium text-warn" data-act-for={task.id} data-act="extend retime">{TEXT.urgent}</span>;
+        const verdict = verdictOf(task);
+        if (verdict) {
+          // a hand-in after the deadline is this row's missed deadline: the one colour it may carry (D-158)
+          return (
+            <span className="block truncate whitespace-nowrap text-[13px]" title={`Сдано ${verdict.text} · срок ${deadlineLabel(task, now).text}`} data-testid="desk-row-handin">
+              <When overdue={verdict.late}>{dueText(task)}</When>
+            </span>
+          );
+        }
+        // a row of «В архиве» says when it closed; a refusal keeps its deadline — the director still decides it
+        if (closedRow(task)) {
+          return (
+            <span className="block truncate whitespace-nowrap text-[13px] text-muted">
+              <When>{dueText(task)}</When>
+            </span>
+          );
+        }
+        if (!task.deadline && task.priority === "high") return <span className="text-[13px] font-medium" data-act-for={task.id} data-act="extend retime">{TEXT.urgent}</span>;
         const label = deadlineLabel(task, now);
         return (
-          <span
-            className={`nums block truncate whitespace-nowrap text-[13px] ${label.overdue ? "font-semibold" : label.none ? "text-muted" : ""}`}
-            style={label.overdue ? { color: "var(--danger)" } : undefined}
-            data-act-for={task.id}
-            data-act="extend retime"
-          >
-            {label.text}
+          <span className={`block truncate whitespace-nowrap text-[13px] ${label.none ? "text-muted" : ""}`} data-act-for={task.id} data-act="extend retime">
+            <When overdue={label.overdue}>{label.text}</When>
           </span>
         );
       },
@@ -663,7 +820,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
       title: "Стадия",
       width: widths.stage,
       sort: (a, b) => STAGE_ORDER(a, reasons.get(a.id) ?? null) - STAGE_ORDER(b, reasons.get(b.id) ?? null),
-      // the stage in words, neutral: the ring at the name already says it in colour (D-154)
+      // the stage in words, neutral: the ring at the title already says it (D-158)
       render: (task) => (
         <span className="block truncate text-[13px] text-text/80" data-testid="desk-stage">
           {stageOf(task, reasons.get(task.id) ?? null, now).text}
@@ -705,18 +862,11 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               // the row's two moves under the hand: over the row's right end while it is hovered or
               // chosen (with the panel open the panel holds the chosen row's moves)
               <span
-                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-11 hidden items-center pl-10 pr-1 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex [.desk-row:hover_&]:[--fill:var(--fill-hover)] ${
-                  panelOpen
-                    ? ""
-                    : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex [.desk-row.desk-row[aria-selected=true]_&]:[--fill:var(--fill-chosen)]"
+                className={`desk-row-moves pointer-events-none absolute inset-y-0 right-8 hidden items-center pl-3 [.desk-row:hover_&]:pointer-events-auto [.desk-row:hover_&]:flex ${
+                  panelOpen ? "" : "[.desk-row[aria-selected=true]_&]:pointer-events-auto [.desk-row[aria-selected=true]_&]:flex"
                 }`}
-                style={{
-                  ["--fill-hover" as string]: "color-mix(in srgb, var(--surface-2) 55%, color-mix(in srgb, var(--surface) 40%, var(--bg)))",
-                  ["--fill-chosen" as string]: "color-mix(in srgb, var(--accent) 7%, color-mix(in srgb, var(--surface) 40%, var(--bg)))",
-                  background: "linear-gradient(90deg, transparent, var(--fill) 36px)",
-                }}
               >
-                <MoveRow moves={moves} onPress={(move, target) => pressMove(move, task, target)} />
+                <MoveRow className="flex-row-reverse" moves={moves} onPress={(move, target) => pressMove(move, task, target)} />
               </span>
             ) : null}
             <MoreButton
@@ -731,6 +881,12 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
       },
     },
   ];
+
+  // the tool bar tightens with the table, so that the rows start higher: the person's list and the
+  // search give up their spare width, and on the narrowest list the count (the tab says the same)
+  const tight = !columnFits("delivery", bucket);
+  const givenWay = new Set([!showWho && "who", (!showDue || archiveTab) && "due", !showDue && "closed", !showStage && "stage"]);
+  const columns = everyColumn.filter((column) => !givenWay.has(column.key));
 
   const toggleFold = (section: Section<TaskWithPeople>) => {
     const key = foldKey(section.key);
@@ -753,18 +909,28 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     onToggle: () => toggleFold(section),
   }));
 
+  const boardDown = boardLoad.kind === "failed";
+  // no verdict while the answer is on its way: an empty list says nothing yet
+  const looking = archiveTab ? archive.busy : search.searching;
   const empty =
-    all.length === 0 ? (
+    looking ? (
+      <EmptyState title={query.trim() ? `Ищу «${query.trim()}»…` : "Загружаю закрытые задачи…"} />
+    ) : archiveTab && archiveLoad.kind === "failed" ? (
+      <LoadFailure what="закрытые задачи" offline={archiveLoad.offline} busy={archive.query.isFetching} onRetry={() => void archive.query.refetch()} />
+    ) : all.length === 0 ? (
       <EmptyState title="Пока ничего не отправлено" hint="Новая задача — строкой поручения сверху (Ctrl K) или голосом с телефона" />
     ) : filtered ? (
       <EmptyState
-        title={query.trim() ? `Ничего не нашёл по «${query.trim()}»` : "Под эти фильтры ничего не подходит"}
+        title={query.trim() ? `Ничего не нашёл по «${query.trim()}»` : archiveTab && range ? "За этот период ничего не закрыто" : "Под эти фильтры ничего не подходит"}
         action={
           <Button size="sm" variant="secondary" onClick={resetFilters}>
             Сбросить фильтры
           </Button>
         }
       />
+    ) : tab === "yours" && boardDown ? (
+      // the statuses are known, the questions and the requests for time are not: no green here
+      <EmptyState title="Вопросы и просьбы о сроке не загрузились" hint="Приёмки, отказов и просрочек нет, остальное станет видно после загрузки" />
     ) : tab === "yours" ? (
       <EmptyState
         tone="ok"
@@ -781,42 +947,43 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     ) : tab === "working" ? (
       <EmptyState title="У команды нет открытых задач" hint={DESK_NEW_TASK} />
     ) : (
-      <EmptyState title="Закрытых пока нет" hint="Принятые, отозванные и отказы лягут сюда по дням" />
+      <EmptyState title="Закрытых пока нет" hint="Принятые и отозванные лягут сюда по дням" />
     );
 
-  const chosen = focusKey ? all.find((task) => task.id === focusKey) : undefined;
-  const chosenKeys = chosen ? keysOf(chosen) : [];
   const calm = screen.value === null && screen.closedToday === 0;
 
   return (
     <DeskPage>
-      <PageTitle title="Задачи" light={screen.tone} />
-
-      <MomentBar
-        screen={screen}
-        eyebrow={person ? `${shortName(person.name)} · ${screen.eyebrow}` : undefined}
-        detail={calm ? DESK_NEW_TASK : undefined}
-        counters={counters}
-        queue={queue}
+      <PageTitle
+        title="Задачи"
+        actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
       />
 
+      {boardDown ? (
+        <LoadFailure what="вопросы и просьбы о сроке" offline={boardLoad.offline} busy={busy} onRetry={onRetry} />
+      ) : archiveTab ? null : (
+        <MomentBar
+          screen={screen}
+          eyebrow={person ? `${shortName(person.name)} · ${screen.eyebrow}` : undefined}
+          detail={calm ? DESK_NEW_TASK : undefined}
+          counters={counters}
+          queue={queue}
+        />
+      )}
+
       {/* the repeating orders (D-148): the phone's line and its list, a dialog here */}
-      <div className="max-w-[560px] empty:hidden [&_[data-testid=recurrence-entry]]:mt-0 [&_[data-testid=recurrence-entry]]:min-h-[40px]">
+      <div className="desk-repeats max-w-[560px] empty:hidden">
         <RecurrenceSection personId={who} />
       </div>
 
       <Toolbar
         end={
-          <>
-            {tab === "closed" && !who && closedCount > 0 ? (
-              <Button size="sm" variant="ghost" className="!px-2" onClick={() => setPurgeAsk(true)} data-testid="desk-purge">
-                Очистить закрытые
-              </Button>
-            ) : null}
-            <span className="nums whitespace-nowrap text-[13px] leading-5 text-muted" data-testid="desk-row-count">
-              {ids.length} {pluralRu(ids.length, ["задача", "задачи", "задач"])}
-            </span>
-          </>
+          // the button clears all of history: with a range on, its name would promise less than it does
+          archiveTab && !who && !range && closedCount > 0 ? (
+            <Button size="sm" variant="ghost" className="!min-h-8 !px-2" onClick={() => setPurgeAsk(true)} data-testid="desk-purge">
+              Очистить закрытые
+            </Button>
+          ) : undefined
         }
       >
         <SegmentTabs<DirectorTab>
@@ -828,7 +995,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
             { value: "working", label: "В работе", count: piles.working.length },
             // a person or a filter narrows what is loaded; the plain tab counts what the server has —
             // less the refusals, which wait in «Ждут вас»
-            { value: "closed", label: "Закрытые", count: narrowed ? piles.closed.length : Math.max(piles.closed.length, closedCount - declinedLoaded) },
+            { value: "closed", label: "Закрытые", count: archiveTab ? Math.max(closedRows.length, archive.total ?? 0) : narrowed ? Math.max(piles.closed.length, search.total ?? 0) : Math.max(piles.closed.length, closedCount - declinedLoaded) },
           ]}
         />
         <Select
@@ -844,7 +1011,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
             </option>
           ))}
         </Select>
-        <Select aria-label="Человек" value={who ?? ""} onChange={(event) => writeParams({ who: event.target.value || null })} className="w-[140px]">
+        <Select aria-label="Человек" value={who ?? ""} onChange={(event) => writeParams({ who: event.target.value || null })} className={tight ? "w-[116px]" : "w-[140px]"}>
           <option value="">Все люди</option>
           {personOptions.map((option) => (
             <option key={option.id} value={option.id}>
@@ -853,23 +1020,27 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
             </option>
           ))}
         </Select>
-        <Select aria-label="Статус" value={status ?? ""} onChange={(event) => setStatus(parseStatus(event.target.value))} className="w-[148px]">
+        <Select aria-label="Статус" value={(archiveTab ? archiveStatus : status) ?? ""} onChange={(event) => setStatus(parseStatus(event.target.value))} className="w-[148px]">
           <option value="">Любой статус</option>
-          {STATUS_FILTERS.map((value) => (
+          {(archiveTab ? ARCHIVE_STATUSES : STATUS_FILTERS).map((value) => (
             <option key={value} value={value}>
               {statusFilterLabel(value)}
             </option>
           ))}
         </Select>
-        <Select aria-label="Срок" value={due ?? ""} onChange={(event) => setDue(parseDue(event.target.value))} className="w-[136px]">
-          <option value="">Любой срок</option>
-          {DUE_FILTERS.map((value) => (
-            <option key={value} value={value}>
-              {DUE_LABEL[value]}
-            </option>
-          ))}
-        </Select>
-        <SearchField value={query} onChange={setQuery} placeholder="Поиск по задачам" width={176} />
+        {archiveTab ? (
+          <DateRangeField value={range} onChange={setRange} now={now} />
+        ) : (
+          <Select aria-label="Срок" value={due ?? ""} onChange={(event) => setDue(parseDue(event.target.value))} className="w-[136px]">
+            <option value="">Любой срок</option>
+            {DUE_FILTERS.map((value) => (
+              <option key={value} value={value}>
+                {DUE_LABEL[value]}
+              </option>
+            ))}
+          </Select>
+        )}
+        <SearchField value={query} onChange={setQuery} placeholder={tight ? "Поиск" : "Поиск по задачам"} width={tight ? 128 : 176} />
       </Toolbar>
 
       <div ref={gridBox} data-desk-tasks="" onMouseDownCapture={onGridMouseDown} onClickCapture={onGridClick} onContextMenu={onGridMenu}>
@@ -890,7 +1061,7 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
       </div>
 
       {ids.length > 0 && !anyPicked ? (
-        // the letters of the chosen row only — a hint never names a key that does nothing here
+        // the chosen row's letters stand on its own buttons: the hint keeps to the walk
         <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
           <span>
             <Kbd>↑</Kbd> <Kbd>↓</Kbd> выбор
@@ -898,22 +1069,6 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
           <span>
             <Kbd>Enter</Kbd> открыть
           </span>
-          {chosenKeys.map((key) => (
-            <span key={key.code}>
-              <Kbd>{KEY_CAP[key.code]}</Kbd> {key.label}
-            </span>
-          ))}
-          <span>
-            <Kbd>X</Kbd> отметить
-          </span>
-          <span>
-            <Kbd>.</Kbd> все действия
-          </span>
-          {openId ? (
-            <span>
-              <Kbd>Esc</Kbd> закрыть
-            </span>
-          ) : null}
           <span>
             <Kbd>?</Kbd> все клавиши
           </span>
@@ -923,8 +1078,8 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
       {anyPicked ? (
         // the marked rows' bar stands at the screen's foot while the table scrolls (принцип 3: no «Принять» here)
         <div className="sticky bottom-4 z-20 flex justify-center" data-testid="desk-bulk-bar">
-          <div className="flex items-center gap-1.5 rounded-[14px] border border-border bg-surface px-2 py-1.5" style={{ boxShadow: "var(--shadow-raised)" }}>
-            <span className="nums px-2 text-[13px] font-semibold leading-4">
+          <div className="flex items-center gap-1 rounded-[2px] border border-text bg-surface px-2 py-1">
+            <span className="nums px-2 text-[13px] leading-4">
               {marked.length} {pluralRu(marked.length, ["отмечена", "отмечены", "отмечено"])}
             </span>
             <span aria-hidden className="h-5 w-px bg-border" />
@@ -956,18 +1111,28 @@ function TasksView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         </div>
       ) : null}
 
-      {tab === "closed" && moreClosed ? (
+      {archiveTab ? <LoadNote state={archiveLoad} failed="Архив не ответил: показаны только последние закрытые" now={now} onRetry={() => void archive.query.refetch()} /> : null}
+      {!archiveTab && query.trim() ? <LoadNote state={loadStateOf(search.query)} failed="Поиск по архиву не ответил" now={now} onRetry={() => void search.query.refetch()} /> : null}
+
+      {!archiveTab && (search.total ?? 0) > search.rows.length ? (
+        <p className="text-[13px] leading-[18px] text-muted" data-testid="desk-archive-cut">
+          В архиве показаны последние <span className="nums">{search.rows.length}</span> из <span className="nums">{search.total}</span> ·{" "}
+          <button type="button" onClick={() => setTab("closed")} className="desk-word desk-focus" data-testid="desk-archive-all">
+            все в «Закрытых»
+          </button>
+        </p>
+      ) : null}
+
+      {archiveTab && leftInArchive > 0 ? (
         <div className="flex justify-center">
           <Button
             variant="secondary"
             size="sm"
-            loading={loadingMore}
-            onClick={() => {
-              setLoadingMore(true);
-              void pages.more().finally(() => setLoadingMore(false));
-            }}
+            loading={archive.loadingMore}
+            onClick={() => void archive.more().catch(() => toast("Не получилось загрузить. Попробуйте ещё раз"))}
+            data-testid="desk-archive-more"
           >
-            Показать ещё · {closedCount - closedLoaded}
+            Показать ещё · {leftInArchive}
           </Button>
         </div>
       ) : null}

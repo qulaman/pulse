@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
 
-import { inPlaceOf } from "@/lib/desk/tasks";
+import { inPlaceOf, widthBucket } from "@/lib/desk/tasks";
 import type { TaskActions } from "@/lib/tasks/mutations";
 
 import type { PanelNext } from "./TaskPanel";
@@ -16,6 +16,26 @@ export function writeParams(patch: Record<string, string | null>) {
   }
   const text = next.toString();
   window.history.replaceState(null, "", text ? `${window.location.pathname}?${text}` : window.location.pathname);
+}
+
+/**
+ * The width bucket of an element (`widthBucket`), kept up to date while the window or the panel
+ * changes it. Only a new bucket redraws: dragging the panel's edge between two floors costs nothing.
+ */
+export function useWidthBucket(ref: RefObject<HTMLElement | null>): number {
+  const [bucket, setBucket] = useState(Number.POSITIVE_INFINITY);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const measure = (width: number) => {
+      if (width > 0) setBucket(widthBucket(width));
+    };
+    measure(element.getBoundingClientRect().width);
+    const observer = new ResizeObserver(([entry]) => measure(entry.contentRect.width));
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [ref]);
+  return bucket;
 }
 
 /**

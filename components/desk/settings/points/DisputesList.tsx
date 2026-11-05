@@ -5,6 +5,7 @@ import { useState } from "react";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { formatNum, pointsTone } from "@/lib/desk/format";
@@ -17,31 +18,31 @@ function DisputeCard({ item }: { item: OpenDispute }) {
   const busy = resolve.isPending;
 
   return (
-    <li className="card flex flex-col gap-2 px-4 py-3" data-testid="dispute-card">
+    <li className="desk-fields flex flex-col gap-1 py-2.5" data-testid="dispute-card">
       <div className="flex items-center justify-between gap-3">
         <PersonCell name={item.user?.full_name ?? "Сотрудник"} />
-        <span className="nums shrink-0 text-[12px] leading-4 text-muted">{humanAqtobe(new Date(item.created_at))}</span>
+        <When className="shrink-0 text-[12px] leading-4 text-muted">{humanAqtobe(new Date(item.created_at))}</When>
       </div>
       <p className="text-[14px] leading-5 text-muted">
         <Num value={amount} signed tone={pointsTone(amount)} className="font-semibold" />{" "}
         {item.tx?.reason ?? ""}
       </p>
       <p className="text-[14px] leading-5">«{item.text}»</p>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <input
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
           maxLength={500}
           placeholder="Ответ, если нужно"
           aria-label="Ответ"
-          className="field h-9 min-w-0 flex-1 px-3 text-[14px] leading-5 outline-none focus:border-accent"
+          className="field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
         />
-        <Button size="sm" disabled={busy} onClick={() => resolve.mutate({ id: item.id, refund: true, answer: answer.trim() })} data-testid="dispute-refund">
+        <Button size="sm" variant="secondary" className="desk-move" disabled={busy} onClick={() => resolve.mutate({ id: item.id, refund: true, answer: answer.trim() })} data-testid="dispute-refund">
           Вернуть {formatNum(Math.abs(amount))}
         </Button>
         <Button
           size="sm"
-          variant="secondary"
+          variant="ghost"
           disabled={busy}
           onClick={() => resolve.mutate({ id: item.id, refund: false, answer: answer.trim() })}
           data-testid="dispute-keep"
@@ -71,7 +72,7 @@ export function DisputesList() {
   }
 
   return (
-    <ul className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(440px,1fr))]" aria-label="Оспаривания">
+    <ul className="desk-list" aria-label="Оспаривания">
       {items.map((item) => (
         <DisputeCard key={item.id} item={item} />
       ))}

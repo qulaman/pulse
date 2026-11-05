@@ -1,10 +1,11 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import type { MenuItem } from "@/components/desk/ui/Menu";
 import { Dialog } from "@/components/desk/ui/Dialog";
+import { Kbd } from "@/components/desk/ui/Kbd";
 import { Popover, type Anchor } from "@/components/desk/ui/Popover";
 import { ruleLine } from "@/components/recurrence/RecurrenceSection";
 import { allActionsFor } from "@/components/tasks/list/DirectorTaskCard";
@@ -380,9 +381,29 @@ export function useDeskActs({
 
 export type DeskActs = ReturnType<typeof useDeskActs>;
 
-/** «Что доработать?» — the comment the employee will read in the thread; Enter sends, Shift+Enter breaks the line. */
+/** Esc twice within this to drop what was typed (В-12 з). */
+const ESC_ARM_MS = 4000;
+
+/**
+ * «Что доработать?» — the comment the employee will read in the thread; Enter sends, Shift+Enter
+ * breaks the line. Words in the field are not lost to one Esc, a click outside or «×»: the first
+ * says so, the second closes — the desk's forms' way (В-12 з). «Не сейчас» is said on purpose.
+ */
 function ReworkDialog({ task, onClose, onSubmit }: { task: TaskWithPeople; onClose: () => void; onSubmit: (comment: string) => void }) {
   const [text, setText] = useState("");
+  const [armed, setArmed] = useState(false);
+  const askClose = () => {
+    if (text.trim() && !armed) {
+      setArmed(true);
+      return;
+    }
+    onClose();
+  };
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), ESC_ARM_MS);
+    return () => clearTimeout(timer);
+  }, [armed]);
   const submit = () => {
     const value = text.trim();
     if (!value) return;
@@ -390,7 +411,7 @@ function ReworkDialog({ task, onClose, onSubmit }: { task: TaskWithPeople; onClo
     onSubmit(value);
   };
   return (
-    <Dialog open onClose={onClose} title={TEXT.reworkTitle} width="md">
+    <Dialog open onClose={askClose} title={TEXT.reworkTitle} width="md">
       <p className="-mt-1 mb-3 line-clamp-1 text-[13px] leading-4 text-muted">
         {shortName(task.assignee?.full_name)} · «{task.title}»
       </p>
@@ -398,7 +419,10 @@ function ReworkDialog({ task, onClose, onSubmit }: { task: TaskWithPeople; onClo
         data-autofocus
         rows={4}
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => {
+          setText(event.target.value);
+          setArmed(false);
+        }}
         onKeyDown={(event) => {
           if ((event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) || (event.key === "Enter" && (event.ctrlKey || event.metaKey))) {
             event.preventDefault();
@@ -410,7 +434,13 @@ function ReworkDialog({ task, onClose, onSubmit }: { task: TaskWithPeople; onClo
         data-testid="desk-rework-text"
       />
       <div className="mt-3 flex items-center justify-end gap-2">
-        <span className="mr-auto text-[12px] leading-4 text-muted">Enter — отправить · Shift+Enter — новая строка</span>
+        {armed ? (
+          <span className="mr-auto text-[12px] leading-4" style={{ color: "var(--warn)" }} aria-live="polite" data-testid="desk-rework-armed">
+            Не отправлено — <Kbd>Esc</Kbd> ещё раз, чтобы закрыть
+          </span>
+        ) : (
+          <span className="mr-auto text-[12px] leading-4 text-muted">Enter — отправить · Shift+Enter — новая строка</span>
+        )}
         <Button size="sm" variant="secondary" onClick={onClose}>
           Не сейчас
         </Button>

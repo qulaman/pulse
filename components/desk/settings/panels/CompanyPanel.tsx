@@ -47,15 +47,15 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
     >
       {/* dashed — the one place on the page a file can be dropped into (D-154) */}
       <span
-        className="flex h-9 w-[132px] items-center justify-center overflow-hidden rounded-[10px] border border-dashed bg-bg px-2 transition-colors duration-[120ms]"
-        style={{ borderColor: over ? "var(--accent)" : "var(--border)" }}
+        className="flex h-9 w-[132px] items-center justify-center overflow-hidden border border-dashed px-2 transition-colors duration-[120ms]"
+        style={{ background: "var(--spine)", borderColor: over ? "var(--accent)" : "var(--text-muted)" }}
       >
         {upload.isPending ? (
-          <span className="text-[12px] text-muted">Загружаю…</span>
+          <span className="text-[12px] text-white/70">Загружаю…</span>
         ) : url ? (
           <StillLogo src={url} className="h-6 max-w-[116px] object-contain" />
         ) : (
-          <span className="text-[12px] leading-4 text-muted">{over ? "Отпустите файл" : `нет · «${letter}»`}</span>
+          <span className="text-[12px] leading-4 text-white/70">{over ? "Отпустите файл" : `нет · «${letter}»`}</span>
         )}
       </span>
       <input
@@ -95,7 +95,7 @@ function LogoWell({ url, letter }: { url: string | null; letter: string }) {
  * «Компания» on the desk: the company's card — name, tagline, logo, accent (D-44), with the
  * header as it will look — then the quiet hours of delivery.
  */
-export function CompanyPanel({ director }: { director: boolean }) {
+export function CompanyPanel() {
   const brand = useBrandDraft();
   const { draft, server, update } = useDraft();
   const edit = brand.edit;
@@ -113,16 +113,16 @@ export function CompanyPanel({ director }: { director: boolean }) {
         ) : (
           <>
             <SettingRow id="brand-preview" label="Как это выглядит" hint="Логотип и название в шапке, акцент — на кнопках и ссылках">
-              <span className="flex h-11 w-[300px] items-center gap-2.5 rounded-[10px] border border-border bg-bg px-3" data-testid="brand-preview">
+              <span className="flex h-11 w-[300px] items-center gap-2.5 px-3" style={{ background: "var(--spine)", color: "#f1f0ea" }} data-testid="brand-preview">
                 {brand.card?.brand.logo_url ? (
                   <StillLogo src={brand.card.brand.logo_url} className="h-6 max-w-[96px] object-contain" />
                 ) : (
-                  <span className="flex h-6 w-6 items-center justify-center rounded-[7px] bg-surface-2 text-[12px] font-semibold text-muted">{edit.name.trim().slice(0, 1).toUpperCase() || "?"}</span>
+                  <span className="flex h-6 w-6 items-center justify-center bg-white/10 text-[12px] font-semibold">{edit.name.trim().slice(0, 1).toUpperCase() || "?"}</span>
                 )}
-                <span className="truncate font-display text-[15px] font-semibold" style={{ color: shownAccent ?? "var(--text)" }}>
+                <span className="truncate text-[15px] font-semibold" style={{ color: shownAccent ?? undefined }}>
                   {edit.name.trim() || "Название компании"}
                 </span>
-                <span aria-hidden className="ml-auto h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: shownAccent ?? "var(--accent)" }} />
+                <span aria-hidden className="ml-auto h-2.5 w-2.5 shrink-0" style={{ background: shownAccent ?? "#2ed3b7" }} />
               </span>
             </SettingRow>
             <SettingRow id="brand-name" label="Название" htmlFor="set-brand-name" changed={brand.changed.name} hint={!edit.name.trim() ? <span className="text-warn">Без названия сохранить нельзя</span> : undefined}>
@@ -146,7 +146,7 @@ export function CompanyPanel({ director }: { director: boolean }) {
                 aria-label="Выбрать цвет"
                 value={(accent ?? DEFAULT_ACCENT).toLowerCase()}
                 onChange={(event) => brand.set({ accent: event.target.value.toUpperCase() })}
-                className="h-9 w-9 cursor-pointer rounded-[10px] border border-border bg-surface-2 p-1"
+                className="h-8 w-8 cursor-pointer border border-border bg-transparent p-0.5"
               />
               <TextInput id="set-brand-accent" label="Цвет, hex" value={edit.accent} maxLength={7} placeholder={DEFAULT_ACCENT} width={112} className="nums" onChange={(value) => brand.set({ accent: value })} />
               <Button size="sm" variant="ghost" disabled={!edit.accent} onClick={() => brand.set({ accent: "" })}>
@@ -171,7 +171,6 @@ export function CompanyPanel({ director }: { director: boolean }) {
           <TimeInput label="Доставка до" value={hours.to} onChange={(to) => setHours({ to })} />
         </SettingRow>
       </SettingsGroup>
-
     </div>
   );
 }

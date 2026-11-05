@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { DirectorBusyLine } from "@/components/desk/calendar/DirectorBusyLine";
 import { CommandLine } from "@/components/desk/CommandLine";
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Avatar } from "@/components/desk/ui/PersonCell";
@@ -86,7 +87,8 @@ function KeysButton() {
 
 /**
  * The secretary's two calls to the director, on top of every desk screen (D-96, D-116): a visitor
- * at the door and a message for the wall — the same sheets as on her phone, dialogs here.
+ * at the door and a message for the wall — the same sheets as on her phone, dialogs here — and
+ * whether he is free right now, in one line.
  */
 function SecretaryCalls() {
   // asked after the screen hydrated: the errands screen under it draws the same visits (D-143)
@@ -98,6 +100,7 @@ function SecretaryCalls() {
       <span className="mr-1 text-[13px] leading-4 text-muted">Директору:</span>
       <VisitorButton visits={rows} />
       <MessageButton visits={rows} />
+      <DirectorBusyLine />
     </div>
   );
 }
@@ -109,7 +112,7 @@ function SecretaryCalls() {
  */
 export function TopBar({ fullName, role, folded = false, onToggleNav }: { fullName: string; role: DeskRole; folded?: boolean; onToggleNav?: () => void }) {
   return (
-    <header className="flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
+    <header className="desk-head flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
       {role === "director" ? <CommandLine /> : <SecretaryCalls />}
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <KeysButton />

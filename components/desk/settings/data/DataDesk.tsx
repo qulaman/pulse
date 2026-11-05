@@ -6,10 +6,10 @@ import type { Column, TableSpec } from "@/components/admin/DataTable";
 import { usePageSearch } from "@/components/desk/settings/SettingsFrame";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
@@ -66,25 +66,25 @@ function Cell({ value, column, names }: { value: unknown; column: Column; names:
   switch (column.kind) {
     case "time": {
       const date = new Date(String(value));
-      return <span className="nums">{Number.isNaN(date.getTime()) ? String(value) : formatAqtobe(date)}</span>;
+      return <When>{Number.isNaN(date.getTime()) ? String(value) : formatAqtobe(date)}</When>;
     }
     case "id": {
       const text = String(value);
       const name = PERSON_KEYS.has(column.key) ? names.get(text) : undefined;
       return name ? (
         <span>
-          {name} <span className="nums font-mono text-[11px] text-muted/70">{text.slice(0, 4)}</span>
+          {name} <span className="nums text-[11px] text-muted/70">{text.slice(0, 4)}</span>
         </span>
       ) : (
-        <span className="nums font-mono text-[12px] text-muted">{text.slice(0, 8)}</span>
+        <span className="nums text-[12px] text-muted">{text.slice(0, 8)}</span>
       );
     }
     case "json": {
       const text = JSON.stringify(value);
-      return <span className={`font-mono text-[12px] ${text === "{}" || text === "[]" ? "text-muted/50" : "text-text/85"}`}>{text}</span>;
+      return <span className={`nums text-[12px] ${text === "{}" || text === "[]" ? "text-muted/50" : ""}`}>{text}</span>;
     }
     case "bool":
-      return <span style={{ color: value ? "var(--ok)" : "var(--text-muted)" }}>{value ? "да" : "нет"}</span>;
+      return <span className={value ? "" : "text-muted"}>{value ? "да" : "нет"}</span>;
     case "number":
       return <span className="nums">{typeof value === "number" ? formatNum(value) : String(value)}</span>;
     default:
@@ -100,22 +100,22 @@ function RecordPanel({ spec, row, names, field }: { spec: TableSpec; row: TableR
   return (
     <div className="flex flex-col gap-4" data-testid="data-record">
       <div className="pr-10">
-        <p className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{spec.title} · запись</p>
-        <code className="mt-1 block break-all font-mono text-[12px] leading-4 text-muted">{String(row.id ?? row.seq ?? row.client_request_id ?? "")}</code>
+        <p className="desk-label uppercase">{spec.title} · запись</p>
+        <code className="nums mt-1 block break-all text-[12px] leading-4 text-muted">{String(row.id ?? row.seq ?? row.client_request_id ?? "")}</code>
       </div>
-      <dl className="flex flex-col divide-y divide-border/60 rounded-[12px] border border-border bg-surface/40">
+      <dl className="desk-list">
         {spec.columns.map((column) => {
           const value = row[column.key];
           const name = column.kind === "id" && PERSON_KEYS.has(column.key) && value ? names.get(String(value)) : undefined;
           const text = rawText(value);
           return (
-            <div key={column.key} className={`group px-3 py-2 ${field === column.key ? "bg-accent/[0.06]" : ""}`}>
+            <div key={column.key} className={`group py-1.5 ${field === column.key ? "bg-accent/[0.06] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
               <dt className="flex items-center justify-between gap-2 text-[12px] font-semibold leading-4 text-muted">
                 <span>
-                  {column.label} <code className="font-mono font-normal text-muted/60">{column.key}</code>
+                  {column.label} <code className="nums text-muted/60">{column.key}</code>
                 </span>
                 {text ? (
-                  <button type="button" onClick={() => copy(text, column.label.toLowerCase())} className="rounded-[6px] px-1.5 text-[12px] font-medium text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 group-hover:opacity-100">
+                  <button type="button" onClick={() => copy(text, column.label.toLowerCase())} className="text-[12px] text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 group-hover:opacity-100">
                     Копировать
                   </button>
                 ) : null}
@@ -124,15 +124,15 @@ function RecordPanel({ spec, row, names, field }: { spec: TableSpec; row: TableR
                 {value === null || value === undefined ? (
                   <span className="text-muted/50">—</span>
                 ) : column.kind === "json" || (typeof value === "object" && value !== null) ? (
-                  <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-[8px] bg-bg/60 p-2 font-mono text-[11px] leading-4">{text}</pre>
+                  <pre className="nums max-h-80 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-4">{text}</pre>
                 ) : column.kind === "time" ? (
-                  <span className="nums">
+                  <When>
                     {formatAqtobe(new Date(String(value)))} <span className="text-muted">· {String(value)}</span>
-                  </span>
+                  </When>
                 ) : (
                   <span className="break-words">
                     {name ? <>{name} · </> : null}
-                    <span className={column.kind === "id" ? "font-mono text-[12px]" : ""}>{text}</span>
+                    <span className={column.kind === "id" ? "nums text-[12px]" : ""}>{text}</span>
                   </span>
                 )}
               </dd>
@@ -236,7 +236,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
       tabIndex={0}
       onKeyDown={onKeyDown}
       data-testid="data-sheet"
-      className="no-bar relative overflow-auto rounded-[12px] border border-border bg-surface/40 outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+      className="no-bar relative overflow-auto border-t border-text outline-none focus-visible:border-accent"
       style={{ height: "calc(100dvh - 300px)", minHeight: 320 }}
     >
       <table className="border-separate border-spacing-0 text-left text-[13px] leading-[18px]" style={{ tableLayout: "fixed", width: total }}>
@@ -252,7 +252,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
                 key={column.key}
                 scope="col"
                 title={column.key}
-                className="sticky top-0 z-[1] select-none border-b border-r border-border/60 bg-surface px-3 py-2 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted last:border-r-0"
+                className="desk-label sticky top-0 z-[1] select-none border-b border-r border-b-text border-r-border/60 bg-bg px-2.5 py-1 uppercase last:border-r-0"
               >
                 <span className="block truncate">{column.label}</span>
                 <span
@@ -266,7 +266,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
                     delete next[column.key];
                     keep(next);
                   }}
-                  className="absolute -right-1 top-0 z-[2] h-full w-2 cursor-col-resize hover:bg-accent/40"
+                  className="absolute -right-1 top-0 z-[2] h-full w-2 cursor-col-resize hover:bg-text/30"
                 />
               </th>
             ))}
@@ -277,7 +277,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
             const key = String(row.id ?? row.seq ?? row.client_request_id ?? r);
             const open = openKey === key;
             return (
-              <tr key={key} className={`${open ? "bg-accent/[0.07]" : r % 2 ? "bg-bg/25" : ""} hover:bg-surface-2/40`}>
+              <tr key={key} className={`${open ? "bg-accent/[0.07]" : ""} hover:bg-surface-2/40`}>
                 {spec.columns.map((column, c) => {
                   const chosen = at?.row === r && at.col === c;
                   return (
@@ -287,7 +287,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
                       onMouseDown={() => setAt({ row: r, col: c })}
                       onDoubleClick={() => onOpen(row, column.key)}
                       title={rawText(row[column.key]).slice(0, 400) || undefined}
-                      className={`truncate border-b border-r border-border/40 px-3 py-[7px] last:border-r-0 ${column.kind === "number" ? "text-right" : ""} ${chosen ? "relative outline outline-2 -outline-offset-2 outline-accent/70" : ""}`}
+                      className={`truncate border-b border-r border-border/50 px-2.5 py-[7px] last:border-r-0 ${column.kind === "number" ? "text-right" : ""} ${chosen ? "relative outline outline-2 -outline-offset-2 outline-accent" : ""}`}
                     >
                       <Cell value={row[column.key]} column={column} names={names} />
                     </td>
@@ -387,9 +387,9 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
   };
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-2">
       <PageTitle title="Данные" state={{ text: "таблицы компании как есть — только чтение" }} />
-      <div role="tablist" aria-label="Таблицы" onKeyDown={tabsKey} className="no-bar -mb-1 flex gap-0.5 overflow-x-auto border-b border-border" data-testid="data-tables">
+      <div role="tablist" aria-label="Таблицы" onKeyDown={tabsKey} className="no-bar flex gap-4 overflow-x-auto" data-testid="data-tables">
         {ADMIN_TABLES.map((t) => {
           const active = t.table === table;
           return (
@@ -401,12 +401,11 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
               tabIndex={active ? 0 : -1}
               data-table={t.table}
               onClick={() => pick(t.table)}
-              className={`relative shrink-0 whitespace-nowrap px-3 pb-2.5 pt-1 text-[13px] font-medium leading-5 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
-                active ? "text-text" : "text-muted hover:text-text"
+              className={`h-8 shrink-0 whitespace-nowrap text-[14px] leading-5 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+                active ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"
               }`}
             >
               {t.title}
-              {active ? <span aria-hidden className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-accent" /> : null}
             </button>
           );
         })}
@@ -446,12 +445,12 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
       >
         <SearchField ref={search} value={filter} onChange={setFilter} placeholder="Фильтр по странице" aria-label="Фильтр по странице" width={260} />
         <span className="min-w-0 flex-1 basis-0 truncate text-[13px] leading-5 text-muted" title={spec.hint}>
-          {spec.hint} · <code className="font-mono text-[12px]">{spec.table}</code>
+          {spec.hint} · <code className="nums text-[12px]">{spec.table}</code>
         </span>
       </Toolbar>
 
       {query.isPending ? (
-        <div className="flex flex-col gap-2 rounded-[12px] border border-border bg-surface/40 p-3" aria-hidden>
+        <div className="flex flex-col gap-2 border-t border-text py-3" aria-hidden>
           {Array.from({ length: 8 }, (_, index) => (
             <Bone key={index} h={18} w={`${60 + ((index * 13) % 35)}%`} />
           ))}
@@ -463,10 +462,6 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
       ) : (
         <Sheet key={spec.table} spec={spec} rows={rows} names={names} openKey={open?.key ?? null} onOpen={(row, field) => setOpen({ key: rowKeyOf(row, rows.indexOf(row)), row, field })} />
       )}
-      <p className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
-        <Kbd>Enter</Kbd> запись целиком · <Kbd>Ctrl C</Kbd> ячейку · колонки тянутся мышью за край заголовка
-      </p>
-
       {open ? (
         <InPanel panelKey={`data:${spec.table}:${open.key}`} onClose={() => setOpen(null)}>
           <RecordPanel spec={spec} row={open.row} names={names} field={open.field} />

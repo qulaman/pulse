@@ -54,15 +54,15 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
   };
 
   return (
-    <div className="flex flex-col gap-2" data-testid="secretary-actions">
-      <div className="overflow-hidden rounded-[10px] border border-border/70">
-        <div className="grid grid-cols-[56px_minmax(0,1fr)_300px_88px] items-center gap-2 border-b border-border/70 bg-bg/40 px-2 py-1.5 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
-          <span className="text-center">Знак</span>
-          <span className="px-1">Надпись на кнопке</span>
-          <span className="px-1">Что делает секретарь</span>
+    <div className="desk-cells flex flex-col gap-2" data-testid="secretary-actions">
+      <div>
+        <div className="desk-label grid grid-cols-[48px_minmax(0,1fr)_280px_88px] items-center gap-4 border-b border-text pb-1 uppercase">
+          <span>Знак</span>
+          <span>Надпись на кнопке</span>
+          <span>Что делает секретарь</span>
           <span />
         </div>
-        {actions.length === 0 ? <p className="px-3 py-3 text-[13px] text-muted">Кнопок нет — добавьте первую</p> : null}
+        {actions.length === 0 ? <p className="py-2 text-[13px] text-muted">Кнопок нет — добавьте первую</p> : null}
         {actions.map((row, index) => {
           const auto = sceneOfAction({ code: row.code, label: row.label });
           return (
@@ -70,7 +70,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
               key={index}
               data-action-row={index}
               onKeyDown={onRowKey(index)}
-              className="group grid grid-cols-[56px_minmax(0,1fr)_300px_88px] items-center gap-2 border-b border-border/50 px-2 py-1.5 last:border-b-0 hover:bg-surface-2/30"
+              className="group grid grid-cols-[48px_minmax(0,1fr)_280px_88px] items-center gap-4 border-b border-border/60 py-0.5 last:border-b-0"
             >
               <input
                 data-col="icon"
@@ -79,7 +79,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                 placeholder="☕"
                 value={row.icon}
                 onChange={(event) => set(index, { icon: event.target.value })}
-                className="field h-8 w-full px-0 text-center text-[16px] leading-5 outline-none"
+                className="field h-8 w-full px-0 text-[16px] leading-5 outline-none"
               />
               <input
                 data-col="label"
@@ -88,14 +88,14 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                 maxLength={40}
                 value={row.label}
                 onChange={(event) => set(index, { label: event.target.value })}
-                className="field h-8 w-full px-2.5 text-[14px] leading-5 outline-none"
+                className="field h-8 w-full px-0 text-[14px] leading-5 outline-none"
               />
               <select
                 data-col="scene"
                 aria-label="Что делает секретарь"
                 value={row.scene ?? ""}
                 onChange={(event) => set(index, { scene: event.target.value ? (event.target.value as DeskScene) : undefined })}
-                className="field h-8 w-full cursor-pointer pl-2.5 text-[13px] leading-5"
+                className="field h-8 w-full cursor-pointer pl-0 text-[13px] leading-5"
               >
                 <option value="">По надписи — {SCENE_NAME[auto].toLowerCase()}</option>
                 {DESK_SCENES.map((scene) => (
@@ -111,7 +111,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   title="Выше · Alt ↑"
                   disabled={index === 0}
                   onClick={() => move(index, index - 1, "label")}
-                  className="flex h-7 w-7 items-center justify-center rounded-[8px] opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
+                  className="flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
                 >
                   ↑
                 </button>
@@ -121,7 +121,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   title="Ниже · Alt ↓"
                   disabled={index === actions.length - 1}
                   onClick={() => move(index, index + 1, "label")}
-                  className="flex h-7 w-7 items-center justify-center rounded-[8px] opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
+                  className="flex h-7 w-7 items-center justify-center opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 disabled:!opacity-0 group-hover:opacity-100"
                 >
                   ↓
                 </button>
@@ -130,7 +130,7 @@ function ActionsTable({ actions, onChange }: { actions: Action[]; onChange: (act
                   aria-label={`Убрать кнопку ${row.label || "без надписи"}`}
                   title="Убрать"
                   onClick={() => onChange(actions.filter((_, i) => i !== index))}
-                  className="flex h-7 w-7 items-center justify-center rounded-[8px] text-[17px] leading-none hover:bg-surface-2 hover:text-danger"
+                  className="flex h-7 w-7 items-center justify-center text-[17px] leading-none hover:bg-surface-2 hover:text-danger"
                 >
                   ×
                 </button>
@@ -167,7 +167,7 @@ export function AppPanel() {
         title="Секретарь"
         about="Кнопки, которыми директор зовёт секретаря. Заявка — не задача: без срока, без приёмки, живёт минуты."
         action={
-          <Link href="/desk/team" className="text-[13px] font-medium text-accent hover:underline">
+          <Link href="/desk/team" className="text-[13px] font-medium underline underline-offset-2">
             Роли — в «Команде»
           </Link>
         }

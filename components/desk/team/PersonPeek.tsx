@@ -3,26 +3,28 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { Kbd } from "@/components/desk/ui/Kbd";
 import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
+import { When } from "@/components/desk/ui/When";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
 import { timeOf } from "@/lib/daily-report/format";
 import type { TeamDayRow } from "@/lib/daily-report/types";
 import { formatNum } from "@/lib/desk/format";
+import { usePhones } from "@/lib/people/card-queries";
 import type { Load } from "@/lib/people/loads";
+import { phoneHref } from "@/lib/people/phone";
 import { AVAILABILITY_LABEL, ROLE_LABEL, type Person } from "@/lib/people/queries";
 import type { Health } from "@/lib/push/health";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue } from "@/lib/tasks/status-text";
 
 import type { HeroFact } from "./Hero";
-import { AVAILABILITY_TONE, Dot, roleLine } from "./shared";
+import { PeriodPeek } from "./PeriodBlock";
+import { AVAILABILITY_TONE, Face, StateWord, roleLine } from "./shared";
 
 /** What a person's peek can do — the same moves as the row's menu and its letters. */
 export type PeekMoves = {
@@ -38,8 +40,8 @@ export type PeekMoves = {
 
 function FactRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-9 items-baseline gap-3 border-t border-border/60 py-2 first:border-t-0">
-      <dt className="w-[124px] shrink-0 text-[13px] leading-5 text-muted">{label}</dt>
+    <div className="flex min-h-[34px] items-baseline gap-3 py-[6px]">
+      <dt className="w-[116px] shrink-0 text-[13px] leading-5 text-muted">{label}</dt>
       <dd className="min-w-0 flex-1 text-[14px] leading-5">{children}</dd>
     </div>
   );
@@ -49,7 +51,7 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 function OpenTasks({ tasks, personId, now }: { tasks: TaskWithPeople[]; personId: string; now: Date }) {
   const shown = tasks.slice(0, 8);
   return (
-    <section className="flex flex-col gap-1.5" data-testid="person-peek-tasks">
+    <section className="flex flex-col gap-1" data-testid="person-peek-tasks">
       <SectionLabel
         count={tasks.length}
         action={
@@ -65,22 +67,22 @@ function OpenTasks({ tasks, personId, now }: { tasks: TaskWithPeople[]; personId
       {shown.length === 0 ? (
         <p className="text-[13px] leading-5 text-muted">Открытых задач нет</p>
       ) : (
-        <ul className="overflow-hidden rounded-[10px] border border-border bg-surface/40">
+        <ul className="desk-list">
           {shown.map((task) => {
             const late = isOverdue(task, now);
             return (
-              <li key={task.id} className="border-t border-border/50 first:border-t-0">
+              <li key={task.id}>
                 <Link
                   href={`/desk/tasks?id=${task.id}`}
-                  className="flex min-h-9 items-center gap-2.5 px-3 py-1.5 transition-colors duration-[120ms] hover:bg-surface-2/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                  className="flex min-h-[34px] items-center gap-2.5 py-1 hover:bg-surface-2/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
                   title={task.title}
                 >
                   <StatusGlyph status={task.status} overdue={late} size={16} />
-                  <span className="min-w-0 flex-1 truncate text-[13px] leading-5">{task.title}</span>
+                  <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{task.title}</span>
                   {task.deadline ? (
-                    <span className="nums shrink-0 text-[12px] leading-4" style={{ color: late ? TONE_VAR.danger : "var(--text-muted)" }}>
+                    <When overdue={late} className="shrink-0 text-[13px] leading-5 text-muted">
                       {humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "")}
-                    </span>
+                    </When>
                   ) : null}
                 </Link>
               </li>
@@ -88,7 +90,7 @@ function OpenTasks({ tasks, personId, now }: { tasks: TaskWithPeople[]; personId
           })}
         </ul>
       )}
-      {tasks.length > shown.length ? <p className="px-1 text-[12px] leading-4 text-muted">и ещё {tasks.length - shown.length}</p> : null}
+      {tasks.length > shown.length ? <p className="text-[12px] leading-4 text-muted">и ещё {tasks.length - shown.length}</p> : null}
     </section>
   );
 }
@@ -103,17 +105,16 @@ function reportWord(row: TeamDayRow): { text: string; tone?: Tone } | null {
 }
 
 /**
- * A person at a glance in the right-hand panel (D-154 wave 3): a click on a row of «Команда»
- * peeks here, the table stays in sight — who they are, how loaded, what they are on, today's
- * report, whether their phone hears; the moves of the row with their keys. The card's page is
- * one Enter away. The secretary sees the roster only (D-104): no tasks, no points, no report.
+ * A person at a glance in the right-hand panel (D-154 wave 3, D-158): a click on a row of
+ * «Команда» peeks here, the table stays in sight — who they are, how loaded, what they are on,
+ * today's report, whether their phone hears; the moves of the row. The card's page is one Enter
+ * away. The secretary sees the roster only (D-104): no tasks, no points, no report.
  */
 export function PersonPeek({
   person,
   manager,
   director,
   load,
-  ring,
   tasks,
   report,
   balance,
@@ -125,7 +126,6 @@ export function PersonPeek({
   manager: Person | null;
   director: boolean;
   load: Load | undefined;
-  ring: Tone | null;
   tasks: TaskWithPeople[];
   report: TeamDayRow | undefined;
   /** Points when the game is on and the person plays; null — no figure. */
@@ -135,6 +135,7 @@ export function PersonPeek({
   moves: PeekMoves;
 }) {
   const works = person.is_active && person.role !== "tv";
+  const phone = usePhones().data?.[person.id];
   const facts: HeroFact[] = [];
   if (director && works && (person.role !== "director" || (load?.active ?? 0) > 0)) {
     const tasksOf = `/desk/tasks?who=${person.id}`;
@@ -148,13 +149,13 @@ export function PersonPeek({
   const word = report ? reportWord(report) : null;
 
   return (
-    <div className="flex flex-col gap-5 pr-8" data-testid="person-peek">
+    <div className="flex flex-col gap-4 pr-8" data-testid="person-peek">
       <div className="flex items-center gap-3">
-        <span className={person.is_active ? "" : "opacity-55"}>
-          <Avatar name={person.full_name} ring={ring} size={48} />
+        <span className={`empty:hidden ${person.is_active ? "" : "opacity-55"}`}>
+          <Face person={person} size={48} />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[19px] font-semibold leading-6 tracking-[-0.01em]" title={person.full_name}>
+          <p className="desk-figure truncate text-[22px] leading-7" title={person.full_name}>
             {person.full_name}
           </p>
           <p className="truncate text-[13px] leading-[18px] text-muted">
@@ -167,7 +168,7 @@ export function PersonPeek({
       <div className="flex flex-wrap items-center gap-2" data-testid="person-peek-moves">
         {moves.give ? (
           <Tooltip label="Строка поручения уже знает, кому" keys={["T"]}>
-            <Button size="sm" onClick={moves.give} data-testid="person-peek-give">
+            <Button size="sm" variant="secondary" className="desk-move" onClick={moves.give} data-testid="person-peek-give">
               Дать задачу
             </Button>
           </Tooltip>
@@ -188,7 +189,7 @@ export function PersonPeek({
           <MenuButton
             items={moves.more}
             label="Ещё"
-            className="ml-auto flex h-9 w-9 items-center justify-center rounded-[10px] text-[18px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+            className="ml-auto flex h-9 w-9 items-center justify-center rounded-[2px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
           >
             ⋯
           </MenuButton>
@@ -196,23 +197,23 @@ export function PersonPeek({
       </div>
 
       {facts.length > 0 ? (
-        <dl className="grid grid-cols-4 border-y border-border/60" data-testid="person-peek-facts">
+        <dl className="grid grid-cols-4 divide-x divide-border" data-testid="person-peek-facts">
           {facts.map((fact) => {
             const quiet = fact.value === 0;
             const body = (
               <>
-                <dd className={`nums font-display text-[22px] font-bold leading-7 tracking-[-0.02em] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
+                <dd className={`nums desk-figure text-[22px] leading-[26px] ${quiet ? "text-muted/50" : ""}`} style={!quiet && fact.tone ? { color: TONE_VAR[fact.tone] } : undefined}>
                   {formatNum(fact.value)}
                 </dd>
                 <dt className="truncate text-[12px] leading-4 text-muted">{fact.label}</dt>
               </>
             );
             return fact.href ? (
-              <Link key={fact.key} href={fact.href} className="flex min-w-0 flex-col rounded-[8px] px-2 py-2 transition-colors hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" title="Открыть в «Задачах»">
+              <Link key={fact.key} href={fact.href} className="flex min-w-0 flex-col px-2.5 py-0.5 first:pl-0 hover:bg-surface-2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40" title="Открыть в «Задачах»">
                 {body}
               </Link>
             ) : (
-              <div key={fact.key} className="flex min-w-0 flex-col px-2 py-2">
+              <div key={fact.key} className="flex min-w-0 flex-col px-2.5 py-0.5 first:pl-0">
                 {body}
               </div>
             );
@@ -221,17 +222,26 @@ export function PersonPeek({
       ) : null}
 
       {director && works && person.role !== "director" ? <OpenTasks tasks={tasks} personId={person.id} now={now} /> : null}
+      {/* a person who left still has their last 30 days */}
+      {director && person.role !== "director" && person.role !== "tv" ? <PeriodPeek personId={person.id} now={now} /> : null}
 
       <section className="flex flex-col gap-1">
         <SectionLabel>Карточка</SectionLabel>
-        <dl>
+        <dl className="desk-list">
           {person.position ? <FactRow label="Должность">{person.position}</FactRow> : null}
+          {phone ? (
+            <FactRow label="Телефон">
+              <a href={phoneHref(phone)} className="nums hover:underline" data-testid="person-peek-phone">
+                {phone}
+              </a>
+            </FactRow>
+          ) : null}
           {person.role !== "tv" ? <FactRow label="В речи">{person.aliases.length ? person.aliases.join(", ") : <span className="text-muted">—</span>}</FactRow> : null}
           <FactRow label="Роль">{ROLE_LABEL[person.role]}</FactRow>
           {person.role !== "director" && person.role !== "tv" ? <FactRow label="Руководитель">{manager?.full_name ?? <span className="text-muted">нет</span>}</FactRow> : null}
           {works ? (
             <FactRow label="Доступность">
-              <Dot tone={AVAILABILITY_TONE[person.availability]}>{AVAILABILITY_LABEL[person.availability]}</Dot>
+              <StateWord tone={AVAILABILITY_TONE[person.availability]}>{AVAILABILITY_LABEL[person.availability]}</StateWord>
             </FactRow>
           ) : null}
           {director && word ? (
@@ -244,7 +254,7 @@ export function PersonPeek({
           {works ? (
             <FactRow label="Уведомления">
               {push ? (
-                <Dot tone={push.state === "ok" ? "ok" : push.state === "idle" ? "muted" : "danger"}>{push.text}</Dot>
+                <StateWord tone={push.state === "broken" ? "danger" : push.state === "idle" ? "muted" : "ok"}>{push.text}</StateWord>
               ) : (
                 <span className="text-muted">…</span>
               )}
@@ -252,18 +262,6 @@ export function PersonPeek({
           ) : null}
         </dl>
       </section>
-
-      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted">
-        <span>
-          <Kbd>↑</Kbd> <Kbd>↓</Kbd> соседний
-        </span>
-        <span>
-          <Kbd>Enter</Kbd> карточка
-        </span>
-        <span>
-          <Kbd>Esc</Kbd> закрыть
-        </span>
-      </p>
     </div>
   );
 }

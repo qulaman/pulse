@@ -6,7 +6,7 @@ import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { useContextMenu } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
-import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { PersonLine } from "@/components/desk/settings/form";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { pointsTone } from "@/lib/desk/format";
@@ -25,7 +25,7 @@ type Line = { row: RatingRow; sub: string | null; balance: number | null };
 const byName = (a: Line, b: Line) => a.row.display_name.localeCompare(b.row.display_name, "ru");
 const nums = (value: number | null) => value ?? Number.NEGATIVE_INFINITY;
 
-/** Points of a period, or their change: a gain in the reward's gold, a loss and nothing quiet, with a real «−» (D-154). */
+/** Points of a period, or their change: a gain in print, a loss and nothing quiet, with a real «−» (D-154). */
 function Points({ value, bold = false }: { value: number; bold?: boolean }) {
   return <Num value={value} signed tone={pointsTone(value)} className={bold ? "font-semibold" : ""} />;
 }
@@ -74,11 +74,11 @@ export function BalancesTable({
   }, [rating.data, balances.data, people.data]);
 
   const columns: Column<Line>[] = [
-    { key: "person", title: "Человек", sort: byName, render: (line) => <PersonCell name={line.row.display_name} sub={line.sub} /> },
+    { key: "person", title: "Человек", sort: byName, render: (line) => <PersonLine name={line.row.display_name} sub={line.sub} /> },
     {
       key: "balance",
       title: "Баланс",
-      width: "120px",
+      width: "104px",
       align: "right",
       sort: (a, b) => nums(a.balance) - nums(b.balance),
       // a balance is what a person holds, not news: plain figures, a debt quiet with its «−»
@@ -87,18 +87,18 @@ export function BalancesTable({
     {
       key: "period",
       title: PERIOD_COLUMN[period],
-      width: "140px",
+      width: "112px",
       align: "right",
       sort: (a, b) => a.row.points - b.row.points,
       render: (line) => <Points value={line.row.points} />,
     },
-    { key: "rank", title: "Место", width: "88px", align: "right", sort: (a, b) => a.row.rank - b.row.rank, render: (line) => <span className="nums text-muted">{line.row.rank}</span> },
+    { key: "rank", title: "Место", width: "72px", align: "right", sort: (a, b) => a.row.rank - b.row.rank, render: (line) => <span className="nums text-muted">{line.row.rank}</span> },
     ...(DELTA_COLUMN[period]
       ? [
           {
             key: "delta",
             title: DELTA_COLUMN[period],
-            width: "120px",
+            width: "100px",
             align: "right",
             sort: (a, b) => a.row.delta_vs_prev - b.row.delta_vs_prev,
             render: (line) => <Points value={line.row.delta_vs_prev} />,
@@ -108,7 +108,7 @@ export function BalancesTable({
     {
       key: "on_time",
       title: "В срок",
-      width: "96px",
+      width: "84px",
       align: "right",
       sort: (a, b) => (a.row.on_time_pct ?? -1) - (b.row.on_time_pct ?? -1),
       render: (line) => (line.row.on_time_pct !== null ? <span className="nums">{line.row.on_time_pct}%</span> : <span className="text-muted/60">—</span>),
@@ -116,7 +116,7 @@ export function BalancesTable({
     {
       key: "award",
       title: "",
-      width: "128px",
+      width: "100px",
       align: "right",
       render: (line) => (
         // the row's own «Начислить» shows under the mouse and on the chosen row only — not a column of the same word
@@ -127,7 +127,7 @@ export function BalancesTable({
           onClick={() => onAward(line.row.user_id)}
           data-testid="points-award-row"
           title="Начислить · N"
-          className="opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+          className="!min-h-6 !px-2 opacity-0 hover:bg-surface-2 focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
         >
           Начислить
         </Button>

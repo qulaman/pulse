@@ -139,13 +139,13 @@ function RowPanel({ row, crids, recordings }: { row: LabRow; crids: string[]; re
   return (
     <div className="flex flex-col gap-4 pr-8" data-testid="lab-row-panel">
       <div>
-        <p className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
+        <p className="desk-label uppercase">
           {whenAqtobe(row.created_at)} · {row.source ?? "?"}
         </p>
         <p className="mt-1.5 text-[15px] leading-[22px]">{row.transcript ?? "—"}</p>
       </div>
-      <dl className="flex flex-col divide-y divide-border/60 rounded-[12px] border border-border bg-surface/40 text-[13px] leading-[18px]">
-        <div className="px-3 py-2">
+      <dl className="desk-list text-[13px] leading-[18px]">
+        <div className="py-2">
           <dt className="text-[12px] font-semibold text-muted">Распознавание</dt>
           <dd className="nums mt-0.5">
             {row.stt ? (
@@ -158,14 +158,14 @@ function RowPanel({ row, crids, recordings }: { row: LabRow; crids: string[]; re
             )}
           </dd>
         </div>
-        <div className="px-3 py-2">
+        <div className="py-2">
           <dt className="text-[12px] font-semibold text-muted">
             Разбор{row.parse.escalated ? " · с перепроверкой" : ""}
             {row.parse.rules_version ? ` · правила v${row.parse.rules_version}` : ""}
           </dt>
           <dd className="mt-0.5 flex flex-col gap-0.5">{row.parse.calls.length ? row.parse.calls.map((call, i) => <CallLine key={i} call={call} />) : <p>{short(row.parse.model)} · без ответа</p>}</dd>
         </div>
-        <div className="flex items-center justify-between px-3 py-2">
+        <div className="flex items-center justify-between py-2">
           <dt className="text-[12px] font-semibold text-muted">Итого</dt>
           <dd className="nums text-[14px] font-semibold">{usd(row.total_cost)}</dd>
         </div>
@@ -206,14 +206,14 @@ function ModelsBench() {
     {
       key: "tokens",
       title: "Вход / кэш / выход",
-      width: "200px",
+      width: "176px",
       align: "right",
       render: (s) => <span className="nums text-muted">{s.calls ? `${tokens(s.input / s.calls)} / ${tokens(s.cache / s.calls)} / ${tokens(s.output / s.calls)}` : "—"}</span>,
     },
-    { key: "extra", title: "В кэш · мысли", width: "140px", align: "right", render: (s) => <span className="nums text-muted">{s.calls ? `${s.cacheWrite ? tokens(s.cacheWrite / s.calls) : "—"} · ${s.reasoning ? tokens(s.reasoning / s.calls) : "—"}` : "—"}</span> },
+    { key: "extra", title: "В кэш · мысли", width: "116px", align: "right", render: (s) => <span className="nums text-muted">{s.calls ? `${s.cacheWrite ? tokens(s.cacheWrite / s.calls) : "—"} · ${s.reasoning ? tokens(s.reasoning / s.calls) : "—"}` : "—"}</span> },
     { key: "time", title: "Время", width: "88px", align: "right", sort: (a, b) => a.ms / Math.max(1, a.calls) - b.ms / Math.max(1, b.calls), render: (s) => <span className="nums">{s.calls ? seconds(s.ms / s.calls) : "—"}</span> },
-    { key: "per", title: "За вызов", width: "110px", align: "right", sort: (a, b) => a.cost / Math.max(1, a.calls) - b.cost / Math.max(1, b.calls), render: (s) => <span className="nums font-semibold">{s.calls ? usd(s.cost / s.calls) : "—"}</span> },
-    { key: "total", title: "Всего", width: "100px", align: "right", sort: (a, b) => a.cost - b.cost, render: (s) => <span className="nums text-muted">{usd(s.cost)}</span> },
+    { key: "per", title: "За вызов", width: "96px", align: "right", sort: (a, b) => a.cost / Math.max(1, a.calls) - b.cost / Math.max(1, b.calls), render: (s) => <span className="nums font-semibold">{s.calls ? usd(s.cost / s.calls) : "—"}</span> },
+    { key: "total", title: "Всего", width: "88px", align: "right", sort: (a, b) => a.cost - b.cost, render: (s) => <span className="nums text-muted">{usd(s.cost)}</span> },
   ];
 
   const rowColumns: Column<LabRow>[] = [
@@ -231,7 +231,7 @@ function ModelsBench() {
     {
       key: "path",
       title: "Путь",
-      width: "230px",
+      width: "200px",
       render: (row) => (
         <span className="block truncate text-[13px] text-muted">
           {row.stt ? row.stt.model : "текст"} → {row.parse.calls.length ? row.parse.calls.map((c) => short(c.model)).join(" → ") : short(row.parse.model)}
@@ -248,13 +248,14 @@ function ModelsBench() {
     <div className="flex flex-col gap-8">
       <ModelsForm settings={settings} />
       <section className="flex flex-col gap-2" aria-label="По моделям">
-        <h2 className="px-1 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">По моделям · среднее на вызов</h2>
+        <h2 className="desk-label uppercase">По моделям · среднее на вызов</h2>
         <DataGrid aria-label="Сравнение моделей" columns={statColumns} rows={stats} rowKey={(s) => s.model} empty={<EmptyState title="Вызовов ещё не было" hint="Надиктуйте или напишите поручение — здесь появится цена каждой модели" />} />
       </section>
       <section className="flex flex-col gap-2" aria-label="Расходы по распознаваниям">
-        <h2 className="px-1 text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">
-          Распознавания · последние {rows.length}, новые сверху <span className="font-normal normal-case tracking-normal">— Enter или двойной клик: счёт целиком</span>
-        </h2>
+        <div className="flex items-baseline gap-2">
+          <h2 className="desk-label uppercase">Распознавания · последние {rows.length}, новые сверху</h2>
+          <span className="text-[12px] leading-4 text-muted">Enter или двойной клик: счёт целиком</span>
+        </div>
         <DataGrid
           aria-label="Расходы по распознаваниям"
           columns={rowColumns}
@@ -287,7 +288,7 @@ function ModelsBench() {
 function LabTopStrip() {
   const forAll = useLabForAll();
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-[12px] border border-border bg-surface/40 px-4 py-2.5">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border/60 pb-2">
       <label htmlFor="lab-for-all" className="flex cursor-pointer items-center gap-3">
         <Switch id="lab-for-all" label="Лаборатория для всех" checked={forAll.on ?? false} disabled={forAll.on === null} onChange={forAll.set} />
         <span className="text-[14px] font-medium leading-5">Лаборатория для всех</span>
@@ -301,7 +302,7 @@ function LabTopStrip() {
             target="_blank"
             rel="noreferrer"
             title="Откроется в новой вкладке"
-            className="rounded-[8px] px-2 py-1 text-[13px] font-medium text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+            className="px-2 py-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
           >
             {page.title} ↗
           </a>
@@ -347,7 +348,7 @@ export function LabDesk({ initialTab }: { initialTab: LabTab }) {
   ]);
 
   return (
-    <div className="flex w-full flex-col gap-5">
+    <div className="flex w-full min-w-0 flex-col gap-4">
       <PageTitle
         title="Лаборатория"
         state={{ text: "модели, разбор и себестоимость" }}
@@ -368,12 +369,12 @@ export function LabDesk({ initialTab }: { initialTab: LabTab }) {
       ) : null}
       {visited.has("parser") ? (
         // the phone's bench in a reading column; its fields at the desk's size
-        <section hidden={tab !== "parser"} aria-label="Парсер" className="max-w-[880px] [&_input.field]:min-h-9 [&_input.field]:text-[14px] [&_select.field]:min-h-9 [&_select.field]:text-[14px]">
+        <section hidden={tab !== "parser"} aria-label="Парсер" className="desk-bench max-w-[880px] [&_input.field]:min-h-9 [&_input.field]:text-[14px] [&_select.field]:min-h-9 [&_select.field]:text-[14px]">
           <ParserPanel />
         </section>
       ) : null}
       {visited.has("costs") ? (
-        <section hidden={tab !== "costs"} aria-label="Себестоимость" className="max-w-[880px]">
+        <section hidden={tab !== "costs"} aria-label="Себестоимость" className="desk-bench max-w-[880px]">
           <CostReport />
         </section>
       ) : null}

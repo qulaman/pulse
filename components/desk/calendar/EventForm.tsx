@@ -34,7 +34,7 @@ const REMIND: { min: number; label: string }[] = [
   { min: 1440, label: "за день" },
 ];
 
-const LABEL = "text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted";
+const LABEL = "desk-label uppercase";
 const INPUT = "field h-9 w-full px-3 text-[14px] leading-5 outline-none placeholder:text-muted";
 const WEEKDAY = new Intl.DateTimeFormat("ru-RU", { weekday: "short", day: "numeric", month: "long", timeZone: "UTC" });
 
@@ -80,7 +80,7 @@ export function EventForm({
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title={event ? "Изменить мероприятие" : "Новое мероприятие"} width="md">
+    <Dialog open={open} onClose={close} title={event ? "Изменить встречу" : "Новая встреча"} width="md">
       {open ? <FormBody key={event?.id ?? "new"} event={event} seed={seed} meId={meId} now={now} onClose={onClose} onSaved={onSaved} closeList={closeList} closeDay={closeDay} /> : null}
     </Dialog>
   );
@@ -170,7 +170,7 @@ function FormBody({
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="desk-fields flex flex-col gap-3"
       data-testid="desk-event-form"
       onSubmit={(submit) => {
         submit.preventDefault();
@@ -192,7 +192,7 @@ function FormBody({
           placeholder="Название — планёрка, встреча с клиентом…"
           aria-label="Название"
           data-testid="desk-event-title"
-          className="field h-11 w-full px-3 font-display text-[17px] font-semibold leading-6 outline-none placeholder:font-normal placeholder:text-muted"
+          className="field h-10 w-full px-0 text-[17px] font-semibold leading-6 outline-none placeholder:font-normal placeholder:text-muted"
         />
         {tried && !name ? <span className="text-[12px] leading-4 text-danger">Без названия не сохранить</span> : null}
       </div>
@@ -227,7 +227,7 @@ function FormBody({
         </label>
       </div>
       {badEnd ? <span className="-mt-2 text-[12px] leading-4 text-danger">Конец раньше начала</span> : null}
-      {past ? <span className="-mt-2 text-[12px] leading-4 text-danger">Новое мероприятие — на сегодня или позже</span> : null}
+      {past ? <span className="-mt-2 text-[12px] leading-4 text-danger">Новая встреча — на сегодня или позже</span> : null}
 
       <label className="flex flex-col gap-1.5">
         <span className={LABEL}>Где</span>
@@ -277,7 +277,7 @@ function FormBody({
         />
       </label>
 
-      <div className="flex items-center gap-2 border-t border-border/70 pt-3">
+      <div className="flex items-center gap-2 pt-2">
         <span className="flex items-center gap-1 text-[12px] leading-4 text-muted">
           <Kbd>Ctrl</Kbd>
           <Kbd>Enter</Kbd>
@@ -317,10 +317,6 @@ function DayButton({ value, onChange, min, now, closeRef }: { value: Ymd; onChan
         className="field flex h-9 w-full items-center gap-2 px-3 text-left text-[14px] leading-5"
         data-testid="desk-event-day"
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden className="shrink-0 text-muted">
-          <rect x="4" y="5.5" width="16" height="14.5" rx="2.5" />
-          <path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" />
-        </svg>
         <span className="min-w-0 flex-1 truncate">
           {dayLabel(value)}
           {value === today || human === "завтра" ? <span className="text-muted"> · {human}</span> : null}

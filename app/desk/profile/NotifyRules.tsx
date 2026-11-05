@@ -31,7 +31,7 @@ import {
 function ModeCell({ category, mode, on, onPick }: { category: NotifyCategory; mode: NotifyMode; on: boolean; onPick: () => void }) {
   return (
     <td className="text-center">
-      <label className="flex h-10 cursor-pointer items-center justify-center" title={`${CATEGORY_LABEL[category]} — ${MODE_LABEL[mode].toLowerCase()}`}>
+      <label className="flex h-[34px] cursor-pointer items-center justify-center" title={`${CATEGORY_LABEL[category]} — ${MODE_LABEL[mode].toLowerCase()}`}>
         <input
           type="radio"
           name={`notify-${category}`}
@@ -42,10 +42,11 @@ function ModeCell({ category, mode, on, onPick }: { category: NotifyCategory; mo
         />
         <span
           aria-hidden
-          className="flex h-[18px] w-[18px] items-center justify-center rounded-full border transition-colors duration-[120ms] peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg"
-          style={{ borderColor: on ? "var(--accent)" : "var(--border)" }}
+          className="flex h-4 w-4 items-center justify-center rounded-full border peer-focus-visible:ring-2 peer-focus-visible:ring-accent/60 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-bg"
+          style={{ borderColor: on ? (mode === "off" ? "var(--text-muted)" : "var(--accent)") : "var(--text-muted)" }}
         >
-          {on ? <span className="h-2 w-2 rounded-full" style={{ background: mode === "off" ? "var(--text-muted)" : "var(--accent)" }} /> : null}
+          {/* a single choice is the one other circle of the sheet: its dot is a dot too */}
+          {on ? <span className="h-2 w-2" style={{ borderRadius: "50%", background: mode === "off" ? "var(--text-muted)" : "var(--accent)" }} /> : null}
         </span>
       </label>
     </td>
@@ -63,7 +64,7 @@ function TimeInput({ value, onChange, label }: { value: string; onChange: (value
         if (event.target.value) onChange(event.target.value);
       }}
       aria-label={label}
-      className="desk-input nums h-9 px-2 text-[14px] text-text [color-scheme:dark]"
+      className="desk-input nums h-8 px-2 text-[14px] text-text"
     />
   );
 }
@@ -89,9 +90,9 @@ export function NotifyRules({ meId }: { meId: string }) {
   }
   if (!prefs) {
     return (
-      <div className="flex flex-col gap-3" aria-busy>
+      <div className="flex flex-col gap-1" aria-busy>
         <SectionLabel>Что присылать</SectionLabel>
-        <div className="skeleton h-[420px] rounded-[12px] bg-surface-2/50" />
+        <div className="skeleton h-[380px] rounded-[2px] bg-surface-2/50" />
       </div>
     );
   }
@@ -106,38 +107,38 @@ export function NotifyRules({ meId }: { meId: string }) {
     .filter(Boolean);
 
   return (
-    <div className="flex flex-col gap-3" data-testid="desk-notify-rules">
+    <div className="flex flex-col gap-1" data-testid="desk-notify-rules">
       <SectionLabel>Что присылать</SectionLabel>
-      <div className="overflow-hidden rounded-[12px] border border-border bg-surface/40">
+      <div className="desk-fields border-t border-text">
         <table className="w-full table-fixed border-collapse text-[14px] leading-5">
           <colgroup>
             <col />
             {NOTIFY_MODES.map((mode) => (
-              <col key={mode} className="w-[104px]" />
+              <col key={mode} className="w-[100px]" />
             ))}
           </colgroup>
           <thead>
-            <tr className="border-b border-border/70">
-              <th className="px-4 py-2.5 text-left text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Событие</th>
+            <tr className="border-b border-text">
+              <th className="desk-label py-1.5 text-left uppercase">Событие</th>
               {NOTIFY_MODES.map((mode) => (
-                <th key={mode} scope="col" className="px-1 py-2.5 text-center text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted" title={MODE_HINT[mode]}>
+                <th key={mode} scope="col" className="desk-label whitespace-nowrap py-1.5 text-center uppercase" title={MODE_HINT[mode]}>
                   {MODE_LABEL[mode]}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="[&>tr+tr]:border-t [&>tr+tr]:border-border/50">
+          <tbody>
             {NOTIFY_CATEGORIES.map((category) => (
-              <tr key={category} className="desk-row">
-                <th scope="row" className="px-4 py-1.5 text-left font-normal">
+              <tr key={category} className="border-b border-border/60 hover:bg-surface-2/50">
+                <th scope="row" className="py-0.5 text-left font-normal">
                   <span className="flex items-center gap-2">
-                    <span className="truncate font-medium">{CATEGORY_LABEL[category]}</span>
+                    <span className="truncate">{CATEGORY_LABEL[category]}</span>
                     {category === "unseen" && prefs.modes.unseen !== "off" ? (
                       <Select
                         value={String(prefs.unseen_after_min)}
                         onChange={(event) => update((p) => ({ ...p, unseen_after_min: Number(event.target.value) as NotifyPrefs["unseen_after_min"] }))}
                         aria-label="Сообщить, если не открыли за"
-                        className="!h-7 pr-7 text-[13px]"
+                        className="!h-[26px] !pl-0 pr-6 text-[13px]"
                       >
                         {[...new Set<number>([...UNSEEN_AFTER, prefs.unseen_after_min])].sort((a, b) => a - b).map((min) => (
                           <option key={min} value={min}>
@@ -158,11 +159,11 @@ export function NotifyRules({ meId }: { meId: string }) {
             ))}
           </tbody>
         </table>
-        <p className="border-t border-border/70 px-4 py-2 text-[12px] leading-4 text-muted">Ваши напоминания и тревога «Охрана» приходят всегда.</p>
+        <p className="py-1.5 text-[12px] leading-4 text-muted">Ваши напоминания и тревога «Охрана» приходят всегда.</p>
       </div>
 
-      <SectionLabel className="mt-4">Когда и как</SectionLabel>
-      <SettingGroup>
+      <SectionLabel className="mt-5">Когда и как</SectionLabel>
+      <SettingGroup className="desk-settings desk-fields">
         <SettingRow label="Сводка" hint="Всё, что стоит на «Сводкой», приходит одним пушем. Пустая не приходит">
           <Select value={prefs.digest_every} onChange={(event) => update((p) => ({ ...p, digest_every: event.target.value as NotifyPrefs["digest_every"] }))} aria-label="Сводка" className="pr-8">
             {DIGEST_EVERY.map((every) => (
@@ -247,12 +248,12 @@ export function NotifyRules({ meId }: { meId: string }) {
           </div>
         </SettingRow>
         <SettingRow label="Устройства" hint="Телефоны и компьютеры, куда приходят ваши уведомления">
-          <Link href="/profile/notifications" className="desk-focus rounded-[8px] px-2 py-1 text-[13px] font-semibold text-accent hover:underline">
+          <Link href="/profile/notifications" className="desk-word desk-focus text-[13px] leading-5">
             Открыть список
           </Link>
         </SettingRow>
       </SettingGroup>
-      <p className="text-[12px] leading-4 text-muted">
+      <p className="pt-1.5 text-[12px] leading-4 text-muted">
         Сотрудники, секретарь и завхоз настроек не имеют: задачи и ответы приходят им в рабочие часы компании (Настройки → Компания → Тихие часы), заявки и напоминания — сразу.
       </p>
     </div>

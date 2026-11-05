@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
-import { PersonCell } from "@/components/desk/ui/PersonCell";
+import { PersonLine } from "@/components/desk/settings/form";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SearchField } from "@/components/desk/ui/Toolbar";
 import { LoginCodePanel } from "@/components/people/LoginCodePanel";
@@ -26,12 +26,14 @@ const ON_WALL = new Set(["sent", "accepted", "in_progress", "rework", "pending_r
 
 const lower = (text: string) => text.toLowerCase().replace(/ё/g, "е");
 
-/** A block of the panel: the section's label over its controls. */
+/** A block of the panel: the section's label over a rule of print, its controls under the rule. */
 export function Section({ title, children, testId, end }: { title: string; children: ReactNode; testId?: string; end?: ReactNode }) {
   return (
-    <section className="card flex flex-col gap-3 px-4 pb-4 pt-3.5" data-testid={testId}>
-      <SectionLabel action={end}>{title}</SectionLabel>
-      {children}
+    <section className="flex flex-col" data-testid={testId}>
+      <SectionLabel action={end} className="mb-0.5">
+        {title}
+      </SectionLabel>
+      <div className="desk-list">{children}</div>
     </section>
   );
 }
@@ -40,16 +42,16 @@ export function Section({ title, children, testId, end }: { title: string; child
 export function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex min-h-9 items-center justify-between gap-3">
-      <span className="min-w-0">
-        <span className="block text-[14px] leading-5">{label}</span>
-        {hint ? <span className="block truncate text-[12px] leading-4 text-muted">{hint}</span> : null}
+      <span className="flex min-w-0 items-baseline gap-2">
+        <span className="text-[14px] leading-5">{label}</span>
+        {hint ? <span className="truncate text-[12px] leading-4 text-muted">{hint}</span> : null}
       </span>
       <span className="shrink-0">{children}</span>
     </div>
   );
 }
 
-/** An on/off of the wall — the guest in the office: a track and a knob, the accent while it is on. */
+/** An on/off of the wall — the guest in the office: the desk's small ruled box (journal.css). */
 export function Switch({ on, onToggle, label, testId, disabled }: { on: boolean; onToggle: () => void; label: string; testId?: string; disabled?: boolean }) {
   return (
     <button
@@ -60,14 +62,9 @@ export function Switch({ on, onToggle, label, testId, disabled }: { on: boolean;
       disabled={disabled}
       onClick={onToggle}
       data-testid={testId}
-      className="relative h-[22px] w-[38px] shrink-0 rounded-full transition-colors duration-[160ms] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35 disabled:opacity-40"
-      style={{ background: on ? "var(--accent)" : "var(--surface-2)", boxShadow: on ? "none" : "inset 0 0 0 1px var(--border)" }}
+      className="relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
     >
-      <span
-        aria-hidden
-        className="absolute top-[3px] h-4 w-4 rounded-full transition-[left] duration-[160ms]"
-        style={{ left: on ? 19 : 3, background: on ? "var(--bg)" : "var(--text-muted)" }}
-      />
+      <span aria-hidden className="absolute transition-transform duration-[120ms]" />
     </button>
   );
 }
@@ -80,10 +77,10 @@ function PickRow({ children, lit, onClick, testId, note }: { children: ReactNode
       onClick={onClick}
       data-testid={testId}
       aria-pressed={lit}
-      className={`flex min-h-[40px] w-full items-center gap-2 rounded-[10px] px-2 text-left transition-colors duration-[120ms] hover:bg-surface-2/70 ${lit ? "bg-accent/[0.08]" : ""}`}
+      className={`flex min-h-9 w-full items-center gap-2 border-b border-border/60 pr-1 text-left transition-colors duration-[120ms] last:border-b-0 hover:bg-surface-2/60 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : "pl-0"}`}
     >
       <span className="min-w-0 flex-1">{children}</span>
-      {note ? <span className={`nums shrink-0 text-[12px] font-semibold leading-4 ${lit ? "text-accent" : "text-muted"}`}>{note}</span> : null}
+      {note ? <span className={`nums shrink-0 text-[12px] leading-4 ${lit ? "text-accent" : "text-muted"}`}>{note}</span> : null}
     </button>
   );
 }
@@ -97,12 +94,12 @@ export function PeoplePick({ people, activeId, minutes, onPick }: { people: Pers
   return (
     <>
       {roster.length > PICK_ROWS ? <SearchField value={query} onChange={setQuery} placeholder="Имя или должность" width={360} /> : null}
-      <div className="flex max-h-[320px] flex-col overflow-y-auto" data-testid="desk-screen-people">
+      <div className="no-bar flex max-h-[324px] flex-col overflow-y-auto" data-testid="desk-screen-people">
         {shown.map((person) => {
           const lit = person.id === activeId;
           return (
             <PickRow key={person.id} lit={lit} testId="desk-screen-person" note={lit ? `на стене · ${minutes} мин` : null} onClick={() => onPick(person)}>
-              <PersonCell name={person.full_name} sub={person.position || ROLE_LABEL[person.role]} />
+              <PersonLine name={person.full_name} sub={person.position || ROLE_LABEL[person.role]} />
             </PickRow>
           );
         })}
@@ -126,8 +123,10 @@ export function TaskPick({ tasks, activeId, minutes, onPick }: { tasks: TaskWith
           const lit = task.id === activeId;
           return (
             <PickRow key={task.id} lit={lit} testId="desk-screen-task" note={lit ? `на стене · ${minutes} мин` : SHORT_STATUS[task.status]} onClick={() => onPick(task)}>
-              <span className="block truncate text-[14px] leading-5">{task.title}</span>
-              <span className="block truncate text-[12px] leading-4 text-muted">{task.assignee?.full_name ?? ""}</span>
+              <span className="block truncate text-[14px] leading-5">
+                {task.title}
+                {task.assignee?.full_name ? <span className="text-[12px] text-muted"> · {task.assignee.full_name}</span> : null}
+              </span>
             </PickRow>
           );
         })}
@@ -161,19 +160,19 @@ export function BoardsPick({
   if (boards.length === 0) {
     return (
       <p className="text-[13px] leading-[18px] text-muted">
-        Досок пока нет — <Link href="/desk/notes?tab=boards" className="font-semibold text-accent">заметки → доски</Link>
+        Досок пока нет — <Link href="/desk/notes?tab=boards" className="font-medium text-text underline underline-offset-2">заметки → доски</Link>
       </p>
     );
   }
   return (
-    <ul className="flex max-h-[300px] flex-col overflow-y-auto" data-testid="desk-screen-boards">
+    <ul className="no-bar flex max-h-[324px] flex-col overflow-y-auto" data-testid="desk-screen-boards">
       {boards.map((board) => {
         const lit = board.id === wallId;
         const week = board.id === weekId;
         return (
-          <li key={board.id} className={`flex min-h-[44px] items-center gap-2 rounded-[10px] px-2 ${lit ? "bg-accent/[0.08]" : ""}`}>
+          <li key={board.id} className={`flex min-h-11 items-center gap-1 border-b border-border/60 last:border-b-0 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
             <span className="min-w-0 flex-1">
-              <Link href={`/desk/notes/b/${board.id}`} className="block truncate text-[14px] leading-5 hover:text-accent">
+              <Link href={`/desk/notes/b/${board.id}`} className="block truncate text-[14px] leading-5 hover:underline">
                 {board.title}
               </Link>
               <span className="block truncate text-[12px] leading-4 text-muted">
@@ -182,7 +181,7 @@ export function BoardsPick({
                 {week ? " · доска недели" : ""}
               </span>
             </span>
-            <Button size="sm" variant={week ? "primary" : "ghost"} aria-pressed={week} disabled={weekBusy} onClick={() => onWeek(board, !week)} title="В круг заставок до воскресенья, 21:00">
+            <Button size="sm" variant="ghost" className={week ? "!text-accent" : ""} aria-pressed={week} disabled={weekBusy} onClick={() => onWeek(board, !week)} title="В круг заставок до воскресенья, 21:00">
               Неделя
             </Button>
             <Button size="sm" variant="secondary" disabled={lit} onClick={() => onPut(board)} data-testid="desk-screen-board">
@@ -214,18 +213,11 @@ export function Visits({
 }) {
   if (visitors.length + messages.length === 0) return null;
   return (
-    <div className="flex flex-col gap-2" data-testid="desk-screen-visits">
+    <div className="desk-list" data-testid="desk-screen-visits">
       {visitors.map((visit) => {
         const waiting = visit.status === "waiting";
         return (
-          <article
-            key={visit.id}
-            className="rounded-[12px] border px-4 py-3"
-            style={{
-              borderColor: waiting ? "color-mix(in srgb, var(--accent) 55%, var(--border))" : "var(--border)",
-              background: waiting ? "color-mix(in srgb, var(--accent) 8%, var(--surface))" : "var(--surface)",
-            }}
-          >
+          <article key={visit.id} className={`py-2.5 ${waiting ? "pl-3 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
             <p className="text-[12px] leading-4 text-muted">
               {waiting ? "К вам посетитель" : "Посетитель ждёт"} · {waitedSince(visit.created_at, now)}
               {waiting ? " · на стене поверх всего" : ""}
@@ -236,7 +228,8 @@ export function Visits({
                 <Button
                   key={option.value}
                   size="sm"
-                  variant={option.value === "invited" ? "primary" : "secondary"}
+                  variant="secondary"
+                  className={option.value === "invited" ? "desk-move" : ""}
                   disabled={busyId === visit.id || (option.value === "wait" && !waiting)}
                   onClick={() => onAnswer(visit, option.value)}
                 >
@@ -248,15 +241,11 @@ export function Visits({
         );
       })}
       {messages.map((message) => (
-        <article
-          key={message.id}
-          className="rounded-[12px] border px-4 py-3"
-          style={{ borderColor: "color-mix(in srgb, var(--accent) 55%, var(--border))", background: "color-mix(in srgb, var(--accent) 8%, var(--surface))" }}
-        >
+        <article key={message.id} className="py-2.5 pl-3 shadow-[inset_2px_0_0_var(--accent)]">
           <p className="text-[12px] leading-4 text-muted">Сообщение секретаря · {waitedSince(message.created_at, now)} · на стене поверх всего</p>
           <p className="mt-0.5 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]">{message.note?.trim()}</p>
           <div className="mt-2">
-            <Button size="sm" disabled={busyId === message.id} onClick={() => onAnswer(message, "read")}>
+            <Button size="sm" variant="secondary" className="desk-move" disabled={busyId === message.id} onClick={() => onAnswer(message, "read")}>
               Понятно
             </Button>
           </div>

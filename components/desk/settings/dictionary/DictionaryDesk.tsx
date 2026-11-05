@@ -29,10 +29,9 @@ import { useMe } from "@/lib/tasks/queries";
 function Loading() {
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-6" aria-hidden>
-      <div className="rounded-[12px] border border-border bg-surface/40">
+      <div className="desk-list">
         {Array.from({ length: 7 }, (_, index) => (
-          <div key={index} className="flex items-center gap-4 border-b border-border/50 px-3 py-3 last:border-b-0">
-            <Bone h={28} w={28} className="rounded-full" />
+          <div key={index} className="flex items-center gap-4 py-2.5">
             <Bone h={14} w={160} />
             <Bone h={22} w={index % 2 ? 180 : 120} className="ml-6" />
           </div>
@@ -158,12 +157,12 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
   const kinds = settings.data?.word_kinds ?? [];
 
   return (
-    <div className="flex w-full flex-col gap-4">
+    <div className="flex w-full min-w-0 flex-col gap-3">
       <PageTitle
         title="Словарь"
         state={
           waiting.count
-            ? { text: waiting.count === 1 ? "Правка ждёт связи — уйдёт сама" : `${waiting.count} ${pluralRu(waiting.count, ["правка ждёт", "правки ждут", "правок ждут"])} связи — уйдут сами`, tone: "warn" }
+            ? { text: waiting.count === 1 ? "Правка ждёт связи — уйдёт сама" : `${waiting.count} ${pluralRu(waiting.count, ["правка ждёт", "правки ждут", "правок ждут"])} связи — уйдут сами` }
             : { text: "как ИИ слышит имена людей и слова компании — сохраняется сразу" }
         }
       />
@@ -191,7 +190,7 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
             { value: "words", label: <span data-testid="dictionary-tab-words">Слова</span>, count: settings.data ? words : undefined },
           ]}
         />
-        <span aria-hidden className="mx-1 h-5 w-px bg-border" />
+        <span aria-hidden className="mr-3 h-4 w-px bg-border" />
         {tab === "names" ? (
           <SegmentTabs
             aria-label="Кого показать"

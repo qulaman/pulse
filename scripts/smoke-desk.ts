@@ -25,7 +25,7 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, webkit, type Browser, type BrowserContext, type Page } from "playwright";
 
-import { APP_URL, checks, open, record, skip, type Ctx } from "./desk-smoke/shared";
+import { APP_URL, checks, injected, open, record, skip, type Ctx } from "./desk-smoke/shared";
 import { checkCalendar, checkNotes, checkScreen } from "./desk-smoke/planning";
 import { checkErrands, checkReports, checkSecretary, checkTeam } from "./desk-smoke/people";
 import { checkSettings } from "./desk-smoke/settings";
@@ -60,7 +60,7 @@ function watch(page: Page, who: string) {
   };
   page.on("pageerror", (error) => note(`pageerror: ${error.message}`));
   page.on("console", (message) => {
-    if (message.type() === "error") note(`console.error: ${message.text()}`);
+    if (message.type() === "error" && !(injected.failures && message.text().includes("status of 500"))) note(`console.error: ${message.text()}`);
   });
 }
 
@@ -117,7 +117,7 @@ async function checkShell(ctx: Ctx) {
   await open(page, "/desk/profile");
   await ctx.shot("profile");
   const nav = await page.getByRole("navigation", { name: "Разделы" }).getByRole("link").count();
-  record("боковая навигация директора: десять разделов и профиль", nav === 11, `ссылок ${nav}`);
+  record("боковая навигация директора: одиннадцать разделов и профиль", nav === 12, `ссылок ${nav}`);
 
   // the profile is a computer's account page: a label on the left, its control on the right (D-154 wave 3)
   const parts = ["desk-profile-password", "desk-profile-push", "desk-notify-rules", "desk-profile-view", "desk-profile-others", "desk-profile-signout"];
@@ -485,7 +485,7 @@ async function runSecretary(browser: Browser) {
   await page.waitForURL((url) => url.pathname === "/desk/errands", { timeout: 15_000 }).catch(() => {});
   record("секретарь: /desk/tasks уводит на /desk/errands", new URL(page.url()).pathname === "/desk/errands", page.url());
   const nav = await page.getByRole("navigation", { name: "Разделы" }).getByRole("link").count();
-  record("секретарь: в навигации четыре раздела и профиль", nav === 5, `ссылок ${nav}`);
+  record("секретарь: в навигации пять разделов и профиль", nav === 6, `ссылок ${nav}`);
 
   // a phone sheet inside the desk is a centred dialog: «Посетитель» over every screen — opened, looked at, closed
   const visitor = page.getByTestId("visitor-button");

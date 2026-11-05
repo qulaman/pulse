@@ -5,9 +5,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEv
 
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
-import { TONE_VAR } from "@/components/desk/ui/tone";
 import { SketchView } from "@/components/mindboard/SketchView";
 import { NoteIcon } from "@/components/notes/icons";
+import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { toast } from "@/components/ui/Toast";
 import { demotedPlace, promotedPlace } from "@/lib/mindboard/branch";
 import { hasContent, isDrawn, sketchFrom } from "@/lib/mindboard/sketch";
@@ -18,7 +18,6 @@ import type { Note } from "@/lib/notes/queries";
 import { shortName } from "@/lib/people/names";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { SHORT_STATUS, isOverdue } from "@/lib/tasks/status-text";
-import { toneOf } from "@/lib/tasks/tone";
 import { holdUpdate } from "@/lib/update/client";
 
 import { childrenOf, draftAfter, draftIndented, draftOutdented, draftPlace, dropPlace, siblingsOf, stepPlace, type Draft } from "./outlinePlaces";
@@ -472,7 +471,7 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
   return (
     <div
       ref={box}
-      className="flex flex-col"
+      className="desk-list flex flex-col"
       data-testid="desk-outline"
       // the person went to another line: a pending «put the caret back» is no longer wanted
       onFocusCapture={(event) => {
@@ -522,7 +521,7 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
             const last = branches[branches.length - 1]?.point ?? null;
             startDraft({ id: crypto.randomUUID(), parent: null, after: last?.id ?? null, text: "" });
           }}
-          className="mt-1 flex h-9 items-center gap-2.5 rounded-[8px] pl-[38px] pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[120ms] hover:bg-surface/60 hover:text-text"
+          className="flex h-9 items-center gap-2.5 pl-[32px] pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[120ms] hover:bg-surface-2/50 hover:text-text"
           data-testid="desk-outline-add"
         >
           <NoteIcon name="plus" size={14} />
@@ -535,7 +534,7 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
 }
 
 function DropLine({ sub = false }: { sub?: boolean }) {
-  return <span aria-hidden className={`pointer-events-none absolute -top-px right-2 z-10 h-[2px] rounded-full bg-accent ${sub ? "left-[64px]" : "left-[30px]"}`} />;
+  return <span aria-hidden className={`pointer-events-none absolute -top-px right-2 z-10 h-[2px] bg-accent ${sub ? "left-[64px]" : "left-[30px]"}`} />;
 }
 
 /** What a line's own field hands its keys: keep these words (the line was split or removed), save now. */
@@ -583,7 +582,7 @@ function LineRow({
     <div
       data-line-box={row.id}
       onContextMenu={onMenu}
-      className={`group relative flex items-start gap-1.5 rounded-[8px] py-[3px] pr-1 transition-colors duration-[120ms] hover:bg-surface/50 focus-within:bg-surface/70 ${level === 1 ? "pl-[34px]" : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
+      className={`group relative flex items-start gap-1.5 py-[3px] pr-1 transition-colors duration-[120ms] hover:bg-surface-2/40 focus-within:bg-surface ${level === 1 ? "pl-[34px]" : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
       style={lit ? { boxShadow: "inset 2px 0 0 var(--accent)", background: "color-mix(in srgb, var(--accent) 7%, transparent)" } : undefined}
       data-testid="desk-outline-line"
       data-level={level}
@@ -593,7 +592,7 @@ function LineRow({
         aria-label="Перетащить"
         tabIndex={-1}
         onPointerDown={onGrip}
-        className="mt-[5px] flex h-6 w-5 shrink-0 cursor-grab items-center justify-center rounded-[5px] text-muted/60 opacity-0 transition-opacity duration-[120ms] hover:text-text active:cursor-grabbing group-hover:opacity-100"
+        className="mt-[5px] flex h-6 w-5 shrink-0 cursor-grab items-center justify-center text-muted/60 opacity-0 transition-opacity duration-[120ms] hover:text-text active:cursor-grabbing group-hover:opacity-100"
       >
         <NoteIcon name="grip" size={13} />
       </button>
@@ -607,9 +606,9 @@ function LineRow({
           disabled={onPhone}
           onClick={onToggle}
           data-testid="desk-outline-check"
-          className={`mt-[5px] flex shrink-0 items-center justify-center rounded-full border font-display font-bold leading-none transition-colors duration-[120ms] disabled:opacity-50 ${
+          className={`mt-[5px] flex shrink-0 items-center justify-center border leading-none transition-colors duration-[120ms] disabled:opacity-50 ${
             level === 0 ? "h-6 w-6 text-[12px]" : "mt-[7px] h-[18px] w-[18px] text-[10px]"
-          } ${done ? "border-ok/70 bg-ok/15 text-ok" : lit ? "border-accent bg-accent/15 text-accent" : "border-border text-muted hover:border-muted hover:text-text"}`}
+          } ${done ? "border-text bg-text text-bg" : lit ? "border-accent text-accent" : "border-border text-muted hover:border-muted hover:text-text"}`}
         >
           {done ? <NoteIcon name="check" size={level === 0 ? 13 : 11} /> : level === 0 && n !== null ? <span className="nums">{n}</span> : null}
         </button>
@@ -626,19 +625,19 @@ function LineRow({
           onPaste={onPaste}
         />
         {sketch ? (
-          <button type="button" onClick={onSketch} className="mt-1 mb-1 ml-1 block h-20 w-36 overflow-hidden rounded-[8px] border border-border bg-bg/60 p-1 transition-colors duration-[120ms] hover:border-muted/60" title="Открыть рисунок">
+          <button type="button" onClick={onSketch} className="desk-phone-look mb-1 ml-1 mt-1 block h-20 w-36 overflow-hidden p-1" title="Открыть рисунок">
             <SketchView sketch={sketch} />
           </button>
         ) : null}
       </div>
       {task ? <TaskPill task={task} /> : null}
-      {lit ? <span className="mt-[7px] shrink-0 text-[11px] font-semibold leading-4 text-accent">на стене</span> : null}
+      {lit ? <span className="mt-[7px] shrink-0 text-[12px] font-medium leading-4 text-accent">на стене</span> : null}
       <button
         type="button"
         aria-label="Действия с пунктом"
         tabIndex={-1}
         onClick={onMenu}
-        className="mt-[3px] flex h-7 w-7 shrink-0 items-center justify-center rounded-[7px] text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+        className="mt-[3px] flex h-7 w-7 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
         data-testid="desk-outline-menu"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -651,16 +650,15 @@ function LineRow({
   );
 }
 
-/** «→ Айгуль · в работе» — what a handed point became; a click opens the task. */
+/** «◔ Айгуль · в работе» — what a handed point became, with its stage's ring; a click opens the task. */
 function TaskPill({ task }: { task: TaskWithPeople }) {
-  const tone = toneOf(task.status, isOverdue(task));
   return (
     <Link
       href={`/desk/tasks?id=${task.id}`}
-      className="mt-[4px] inline-flex max-w-[220px] shrink-0 items-center gap-1.5 rounded-full border border-border px-2 py-0.5 text-[12px] leading-4 transition-colors duration-[120ms] hover:border-muted/60"
+      className="mt-[6px] inline-flex max-w-[220px] shrink-0 items-center gap-1.5 text-[12px] leading-4 hover:underline"
       title={`Задача: ${task.title}`}
     >
-      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: TONE_VAR[tone] }} />
+      <StatusGlyph status={task.status} overdue={isOverdue(task)} size={14} />
       <span className="truncate">{shortName(task.assignee?.full_name) || "Исполнитель"}</span>
       <span className="shrink-0 text-muted">· {SHORT_STATUS[task.status]}</span>
     </Link>
@@ -691,9 +689,9 @@ function DraftLine({
     node.style.height = `${node.scrollHeight}px`;
   }, [draft.text]);
   return (
-    <div className={`flex items-start gap-1.5 rounded-[8px] bg-surface/70 py-[3px] pr-1 ${sub ? "pl-[34px]" : "pl-0"}`} data-testid="desk-outline-draft">
+    <div className={`flex items-start gap-1.5 bg-surface py-[3px] pr-1 ${sub ? "pl-[34px]" : "pl-0"}`} data-testid="desk-outline-draft">
       <span aria-hidden className="mt-[5px] h-6 w-5 shrink-0" />
-      <span aria-hidden className={`mt-[5px] shrink-0 rounded-full border border-dashed border-accent/60 ${sub ? "mt-[7px] h-[18px] w-[18px]" : "h-6 w-6"}`} />
+      <span aria-hidden className={`mt-[5px] shrink-0 border border-dashed border-accent/60 ${sub ? "mt-[7px] h-[18px] w-[18px]" : "h-6 w-6"}`} />
       <textarea
         ref={field}
         rows={1}

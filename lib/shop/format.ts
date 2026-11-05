@@ -45,6 +45,11 @@ export function cancellableByOwner(status: OrderStatus): boolean {
 }
 
 /** Заказ ещё в работе у завхоза — он висит в очереди выдачи. */
+/** The orders that wait for the one looking at them: open, and not their own. */
+export function ordersWaiting<T extends { status: OrderStatus; user_id: string }>(orders: readonly T[], meId: string | undefined): T[] {
+  return orders.filter((order) => isOpenOrder(order.status) && order.user_id !== meId);
+}
+
 export function isOpenOrder(status: OrderStatus): boolean {
   return status === "pending" || status === "approved";
 }

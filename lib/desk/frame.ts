@@ -12,6 +12,8 @@ export const NAV_ICONS = 64;
 export const PANEL_MIN = 360;
 export const PANEL_MAX = 720;
 export const PANEL_DEFAULT = 440;
+/** What a panel always leaves to the list beside it. */
+export const LIST_MIN = 480;
 
 /** The cookie the layout reads: «icons» — folded. */
 export const NAV_COOKIE = "desk_nav";

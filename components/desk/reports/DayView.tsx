@@ -7,10 +7,10 @@ import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Num } from "@/components/desk/ui/Num";
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
+import { When } from "@/components/desk/ui/When";
 import { Icon } from "@/components/tasks/desk/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { Button } from "@/components/ui/Button";
@@ -41,14 +41,9 @@ const ROOM: Partial<Record<string, number>> = { summary: 860, hours: 640 };
 const DESK_ORDER: TeamDayState[] = ["missed", "pending", "submitted", "away", "off"];
 const GROUP_TONE: Record<TeamDayState, Tone> = { missed: "danger", pending: "muted", submitted: "ok", away: "muted", off: "muted" };
 
-/** The tone of a day: a missed report is the alarm; all in — calm green; a day still running says nothing yet. */
-export function dayTone(day: TeamDay | undefined): Tone | null {
-  if (!day) return null;
-  const t = day.totals;
-  if (!day.workday) return "muted";
-  if (t.missed > 0) return "danger";
-  if (t.pending === 0 && t.submitted > 0) return "ok";
-  return null;
+/** The ink of a day's figure: a missed report is the red pencil; anything else is print. */
+function dayTone(day: TeamDay): Tone | null {
+  return day.workday && day.totals.missed > 0 ? "danger" : null;
 }
 
 /** The first line of «Чем занимался» — the row's words; the rest is in the panel. */
@@ -56,28 +51,28 @@ function firstLine(text: string | null | undefined): string {
   return (text ?? "").split(/\n/).find((line) => line.trim())?.trim() ?? "";
 }
 
-const STEP =
-  "flex h-9 w-9 items-center justify-center rounded-[10px] border border-border bg-surface-2/60 text-text transition-colors duration-[120ms] hover:border-muted/50 disabled:pointer-events-none disabled:opacity-35";
+/** A step back or forth: a chevron on the sheet, no box. */
+export const STEP = "flex h-8 w-8 items-center justify-center rounded-[2px] text-muted hover:bg-surface-2 hover:text-text disabled:pointer-events-none disabled:opacity-35";
 
 /** ‹ Вторник, 3 ноября › — the day; tomorrow is not a day yet; ← and → step too. */
 export function DayStepper({ date, today, onDate }: { date: Ymd; today: Ymd; onDate: (date: Ymd) => void }) {
   const isToday = date === today;
   return (
-    <div className="flex items-center gap-1.5" data-testid="desk-day-stepper">
+    <div className="flex items-center gap-1" data-testid="desk-day-stepper">
       <button type="button" className={STEP} aria-label="Предыдущий день" title="Предыдущий день (←)" onClick={() => onDate(addDaysYmd(date, -1))}>
         <Icon name="left" size={16} />
       </button>
-      <span className="min-w-[188px] px-1 text-center font-display text-[15px] font-semibold leading-5" data-testid="desk-day-title">
+      <span className="min-w-[164px] text-center text-[14px] font-semibold leading-5" data-testid="desk-day-title">
         {dayTitle(date)}
       </span>
       <button type="button" className={STEP} aria-label="Следующий день" title="Следующий день (→)" disabled={isToday} onClick={() => onDate(addDaysYmd(date, 1))}>
         <Icon name="right" size={16} />
       </button>
       {isToday ? (
-        <span className="ml-1 text-[13px] font-semibold leading-4 text-accent">сегодня</span>
+        <span className="ml-1 w-[72px] text-right text-[13px] leading-4 text-muted">сегодня</span>
       ) : (
         <Tooltip label="К сегодня" keys={["T"]}>
-          <Button size="sm" variant="ghost" onClick={() => onDate(today)}>
+          <Button size="sm" variant="ghost" className="ml-1 !min-h-8 w-[72px] !justify-end !px-0" onClick={() => onDate(today)}>
             К сегодня
           </Button>
         </Tooltip>
@@ -86,63 +81,24 @@ export function DayStepper({ date, today, onDate }: { date: Ymd; today: Ymd; onD
   );
 }
 
-/**
- * The bar of the day, honest: handed in — green, missed — red, away — grey, and what is still
- * due stays the empty track; an empty day is a bare track, never a bar filled to the end.
- */
-function DayBar({ day }: { day: TeamDay }) {
-  const t = day.totals;
-  const total = Math.max(1, t.team);
-  const due = Math.max(0, t.team - t.submitted - t.missed - t.away);
-  const parts: { key: string; n: number; paint: string; label: string }[] = [
-    { key: "submitted", n: t.submitted, paint: TONE_VAR.ok, label: "сдали" },
-    { key: "missed", n: t.missed, paint: TONE_VAR.danger, label: "не сдали" },
-    { key: "away", n: t.away, paint: "color-mix(in srgb, var(--text-muted) 45%, var(--surface-2))", label: "в отпуске и на больничном" },
-  ];
-  return (
-    <div className="flex flex-col gap-2" data-testid="desk-day-bar">
-      <div className="flex h-2 gap-[3px] overflow-hidden rounded-full bg-surface-2" aria-hidden>
-        {parts.map((part) => (part.n > 0 ? <span key={part.key} className="h-full first:rounded-l-full" style={{ width: `${(part.n / total) * 100}%`, background: part.paint }} /> : null))}
-      </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] leading-[18px]">
-        {parts.map((part) =>
-          part.n > 0 ? (
-            <li key={part.key} className="flex items-center gap-1.5">
-              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: part.paint }} />
-              <span className="nums font-semibold">{part.n}</span>
-              <span className="text-muted">{part.label}</span>
-            </li>
-          ) : null,
-        )}
-        {due > 0 ? (
-          <li className="flex items-center gap-1.5">
-            <span aria-hidden className="h-2 w-2 rounded-full border border-muted/60" />
-            <span className="nums font-semibold">{due}</span>
-            <span className="text-muted">{day.today ? "ждём" : "без отчёта"}</span>
-          </li>
-        ) : null}
-      </ul>
-    </div>
-  );
-}
-
-/** The hero of a day: «6 из 9 сдали отчёт», the bar, and how much work moved. */
+/** The total of a day: «6 из 9 сдали отчёт», who did not, and how much work moved; the table under it says who is who. */
 function DayHero({ day }: { day: TeamDay }) {
   const t = day.totals;
+  const away = t.away > 0 ? `${t.away} в отпуске и на больничном` : null;
+  const when = !day.workday ? "не рабочий день — отчёт по желанию, без очков" : day.today ? (t.pending > 0 ? "сегодня — день ещё идёт" : "сегодня") : "итог дня";
   return (
     <DeskHero
       testId="desk-day-hero"
       value={t.submitted}
-      tone={dayTone(day)}
+      tone={null}
       title={day.workday ? `из ${t.team} сдали отчёт` : "сдали в выходной"}
-      sub={!day.workday ? "не рабочий день — отчёт по желанию, без очков" : day.today ? (t.pending > 0 ? "сегодня — день ещё идёт" : "сегодня") : "итог дня"}
+      sub={[when, away].filter(Boolean).join(" · ")}
       facts={[
+        ...(t.missed > 0 ? [{ key: "missed", value: t.missed, label: "не сдали", tone: dayTone(day) }] : []),
         { key: "handed", value: t.handed_over, label: "сдано задач" },
-        { key: "closed", value: t.closed, label: "принято", tone: "gold" },
+        { key: "closed", value: t.closed, label: "принято" },
       ]}
-    >
-      <DayBar day={day} />
-    </DeskHero>
+    />
   );
 }
 
@@ -156,13 +112,20 @@ function Summary({ row }: { row: TeamDayRow }) {
       </span>
     );
   }
+  if (row.state === "missed") {
+    return (
+      <span className="block truncate" style={{ color: TONE_VAR.danger }}>
+        {personDayLine(row)}
+      </span>
+    );
+  }
   return <span className="block truncate text-muted/60">{personDayLine(row)}</span>;
 }
 
 /** A time of the report, or a quiet dash. */
 function At({ iso }: { iso: string | null | undefined }) {
   const text = timeOf(iso);
-  return text ? <span className="nums">{text}</span> : <span className="text-muted/40">—</span>;
+  return text ? <When>{text}</When> : <span className="text-muted/40">—</span>;
 }
 
 /** The whole report of one person in the right-hand panel: the times, the words, the day's tasks, what they did in the tasks. */
@@ -186,28 +149,25 @@ function ReportPanel({ row }: { row: TeamDayRow }) {
           ? "Не сдал отчёт"
           : personDayLine(row).replace(/^./, (c) => c.toUpperCase());
   return (
-    <div className="flex flex-col gap-5 pr-8" data-testid="desk-report-panel">
-      <div className="flex items-center gap-3">
-        <Avatar name={row.full_name} size={40} />
-        <div className="min-w-0">
-          <p className="truncate font-display text-[17px] font-semibold leading-[22px]">{row.full_name}</p>
-          <p className="truncate text-[13px] leading-[18px]" style={{ color: TONE_VAR[GROUP_TONE[row.state]] }}>
-            {state}
-            {points ? <span style={{ color: TONE_VAR[pointsTone(row.report?.points ?? 0)] }}> · {points}</span> : null}
-          </p>
-        </div>
+    <div className="flex flex-col gap-4 pr-8" data-testid="desk-report-panel">
+      <div className="min-w-0">
+        <p className="desk-figure truncate text-[22px] leading-7">{row.full_name}</p>
+        <p className="truncate text-[13px] leading-[18px]" style={{ color: TONE_VAR[GROUP_TONE[row.state]] }}>
+          {state}
+          {points ? <span style={{ color: TONE_VAR[pointsTone(row.report?.points ?? 0)] }}> · {points}</span> : null}
+        </p>
       </div>
       {facts.length ? (
-        <dl className="grid grid-cols-3 gap-2">
+        <dl className="grid grid-cols-3 divide-x divide-border">
           {facts.map(([label, value]) => (
-            <div key={label} className="flex flex-col-reverse rounded-[10px] bg-surface-2/60 px-3 py-2">
+            <div key={label} className="flex flex-col-reverse px-3 py-0.5 first:pl-0">
               <dt className="text-[12px] leading-4 text-muted">{label}</dt>
-              <dd className="nums font-display text-[17px] font-semibold leading-[22px]">{value}</dd>
+              <dd className="nums desk-figure text-[22px] leading-[26px]">{value}</dd>
             </div>
           ))}
         </dl>
       ) : null}
-      <section className="flex flex-col gap-1.5">
+      <section className="flex flex-col gap-1">
         <SectionLabel>Чем занимался</SectionLabel>
         {report?.summary ? (
           <p className="whitespace-pre-wrap text-[14px] leading-[21px]">{report.summary}</p>
@@ -215,31 +175,29 @@ function ReportPanel({ row }: { row: TeamDayRow }) {
           <p className="text-[14px] leading-5 text-muted">{row.state === "pending" ? "Отчёт ещё не сдан" : personDayLine(row)}</p>
         )}
       </section>
-      <section className="flex flex-col gap-1.5">
+      <section className="flex flex-col gap-1">
         <SectionLabel count={row.tasks.length}>Задачи дня</SectionLabel>
         {row.tasks.length === 0 ? (
           <p className="text-[14px] leading-5 text-muted">Сданных и принятых нет</p>
         ) : (
-          <ul className="overflow-hidden rounded-[12px] border border-border bg-surface/40">
+          <ul className="desk-list">
             {row.tasks.map((task) => (
-              <li key={task.id} className="border-t border-border/50 first:border-t-0">
-                <Link href={`/desk/tasks?id=${task.id}`} className="flex min-h-[44px] items-center gap-3 px-3 py-2 transition-colors duration-[120ms] hover:bg-surface-2/55">
-                  <StatusGlyph status={task.status} size={18} />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[14px] leading-5">{task.title}</span>
-                    <span className="block truncate text-[12px] leading-4 text-muted">{taskMeta(task)}</span>
-                  </span>
+              <li key={task.id}>
+                <Link href={`/desk/tasks?id=${task.id}`} className="flex min-h-[34px] items-center gap-2.5 hover:bg-surface-2/55" title={taskMeta(task)}>
+                  <StatusGlyph status={task.status} size={16} />
+                  <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{task.title}</span>
+                  <span className="max-w-[40%] shrink-0 truncate text-[13px] leading-5 text-muted">{taskMeta(task)}</span>
                 </Link>
               </li>
             ))}
           </ul>
         )}
       </section>
-      <section className="flex flex-col gap-1.5">
+      <section className="flex flex-col gap-1">
         <SectionLabel>В задачах за день</SectionLabel>
-        <p className="nums text-[14px] leading-5 text-muted">{activityLine(row.activity)}</p>
+        <p className="text-[14px] leading-5 text-muted">{activityLine(row.activity)}</p>
       </section>
-      <Link href={`/desk/team/${row.user_id}`} className="self-start text-[13px] font-semibold leading-4 text-accent hover:underline">
+      <Link href={`/desk/team/${row.user_id}`} className="self-start text-[13px] leading-4 text-muted hover:text-text">
         Карточка сотрудника →
       </Link>
     </div>
@@ -251,9 +209,9 @@ function DayBone() {
   return (
     <>
       <HeroBone />
-      <SkeletonGroup grow className="overflow-hidden rounded-[12px] border border-border">
+      <SkeletonGroup grow className="desk-list">
         {Array.from({ length: 7 }, (_, i) => (
-          <div key={i} className="flex h-10 items-center gap-6 border-b border-border/50 px-3 last:border-b-0">
+          <div key={i} className="flex h-[34px] items-center gap-6">
             <Bone h={14} w="22%" />
             <Bone h={14} w="8%" />
             <Bone h={14} w="8%" />
@@ -282,8 +240,8 @@ export function LoadFailed({ onRetry }: { onRetry?: () => void }) {
 }
 
 /**
- * «Отчёты → День» on the desk (D-152, D-154): the hero — how many handed the report in, an
- * honest bar, how much work moved; the people as one table, 40 px a row, those who owe the
+ * «Отчёты → День» on the desk (D-152, D-154, D-158): the total — how many handed the report in,
+ * how many did not, how much work moved; the people as one table, 34 px a row, those who owe the
  * report first; a row opens the whole report in the right-hand panel (`?p=`).
  */
 export function DayView({
@@ -337,12 +295,7 @@ export function DayView({
       title: "Кто",
       width: "minmax(160px,1.1fr)",
       sort: (a, b) => a.full_name.localeCompare(b.full_name, "ru"),
-      render: (row) => (
-        <span className={`flex min-w-0 items-center gap-2.5 ${row.state === "away" || row.state === "off" ? "opacity-60" : ""}`}>
-          <Avatar name={row.full_name} size={24} />
-          <span className="truncate">{row.full_name}</span>
-        </span>
-      ),
+      render: (row) => <span className={`block truncate ${row.state === "away" || row.state === "off" ? "text-muted" : ""}`}>{row.full_name}</span>,
     },
     {
       key: "arrived",
@@ -391,7 +344,7 @@ export function DayView({
   }
 
   return (
-    <div className="flex flex-col gap-5 transition-opacity duration-[150ms]" style={{ opacity: stale ? 0.55 : 1 }} aria-busy={stale || undefined} data-testid="desk-reports-day">
+    <div className="flex flex-col gap-3.5 transition-opacity duration-[150ms]" style={{ opacity: stale ? 0.55 : 1 }} aria-busy={stale || undefined} data-testid="desk-reports-day">
       <DayHero day={day} />
       {filters}
       <div ref={box}>

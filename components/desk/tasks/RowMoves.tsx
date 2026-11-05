@@ -7,8 +7,8 @@ import { KEY_CAP, type Move } from "@/lib/desk/tasks";
 
 /**
  * A small button of the desk's lists (D-154), its letter inside — «Принять A». `main` — the
- * director's own move: tinted with the accent; `filled` — the one closing move of a raised card
- * (the panel, the stack), the screen's single filled button. The rest are quiet surfaces.
+ * director's own move: a word in the pen with a hairline (D-158); `filled` — the closing move of
+ * the task in hand (the panel, the stack), the screen's single filled button. The rest are words.
  */
 export function MiniButton({
   label,
@@ -31,13 +31,8 @@ export function MiniButton({
   size?: "sm" | "md";
   testId?: string;
 }) {
-  const height = size === "md" ? "h-9 px-3.5 text-[14px]" : "h-7 px-2.5 text-[13px]";
-  const look = filled
-    ? "btn-primary border-transparent text-bg"
-    : main
-      ? "border-accent/35 bg-accent/12 text-accent hover:bg-accent/20"
-      : "border-border bg-surface-2 text-text hover:border-muted/50";
-  const cap = filled ? "bg-black/15 text-bg/80" : main ? "bg-accent/15 text-accent/80" : "bg-bg/60 text-muted";
+  const height = size === "md" ? `h-9 text-[14px] ${filled || main ? "px-3.5" : "px-2"}` : "h-7 px-2 text-[13px]";
+  const look = filled ? "btn-primary border-transparent" : main ? "desk-move" : "border-transparent font-medium text-text hover:bg-surface-2";
   return (
     <button
       type="button"
@@ -49,11 +44,11 @@ export function MiniButton({
         event.stopPropagation();
         onPress(event.currentTarget);
       }}
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[9px] border font-display font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
+      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
     >
       {label}
       {keyCap ? (
-        <span aria-hidden className={`rounded-[4px] px-1 text-[10px] font-bold leading-[14px] ${cap}`}>
+        <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
           {keyCap}
         </span>
       ) : null}
@@ -83,7 +78,7 @@ export function MoveButton({
   if (move.held) {
     const height = size === "md" ? "h-9 px-1 text-[14px]" : "h-7 px-1 text-[13px]";
     return (
-      <span className={`inline-flex shrink-0 items-center whitespace-nowrap font-display font-semibold text-muted ${height}`} title={move.title} data-testid={`move-${move.action}`}>
+      <span className={`inline-flex shrink-0 items-center whitespace-nowrap text-muted ${height}`} title={move.title} data-testid={`move-${move.action}`}>
         {move.label}
       </span>
     );
@@ -121,10 +116,19 @@ export function MoveRow({
 }) {
   if (moves.length === 0) return null;
   return (
-    <span className={`flex items-center gap-1.5 ${className}`} data-testid="desk-moves">
+    <span className={`flex items-center gap-1 ${className}`} data-testid="desk-moves">
       {moves.map((move) => (
         <MoveButton key={move.action} move={move} onPress={onPress} size={size} showKey={showKeys} fill={fillMain} />
       ))}
+    </span>
+  );
+}
+
+/** A row's quiet word: the answer written on this task has not been sent yet. */
+export function DraftMark() {
+  return (
+    <span className="shrink-0 text-[12px] leading-4 text-muted" title="Ответ написан, но не отправлен" data-testid="desk-draft-mark">
+      черновик
     </span>
   );
 }
@@ -145,7 +149,7 @@ export function MoreButton({ items, testId = "desk-row-more", label = "Все д
           event.stopPropagation();
           setAnchor(anchor ? null : event.currentTarget);
         }}
-        className="-my-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="-my-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-[2px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
           <circle cx="5.5" cy="12" r="1.7" />

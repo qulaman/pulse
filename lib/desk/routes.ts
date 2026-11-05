@@ -23,7 +23,7 @@ export function deskHomeFor(role: Role | undefined): string {
   return role === "secretary" ? DESK_HOME.secretary : DESK_HOME.director;
 }
 
-export type DeskBadge = "tasks" | "errands" | "calendar";
+export type DeskBadge = "today" | "tasks" | "errands" | "calendar";
 
 /** `key` — the letter after «G» that goes there (D-154 wave 3), matched by the physical key. */
 export type DeskNavItem = { href: string; label: string; badge?: DeskBadge; key?: string };
@@ -36,11 +36,12 @@ export type DeskNavItem = { href: string; label: string; badge?: DeskBadge; key?
 export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   // «Разобрать» carries no count of its own: it is the same number as «Задачи» (D-154)
   director: [
-    { href: "/desk/today", label: "Сегодня", key: "S" },
+    { href: "/desk/today", label: "Сегодня", badge: "today", key: "S" },
     { href: "/desk/tasks", label: "Задачи", badge: "tasks", key: "T" },
     { href: "/desk/inbox", label: "Разобрать", key: "I" },
     { href: "/desk/team", label: "Команда", key: "K" },
     { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
+    { href: "/desk/ether", label: "Объявления", key: "A" },
     { href: "/desk/reports", label: "Отчёты", key: "O" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
     { href: "/desk/notes", label: "Заметки", key: "N" },
@@ -50,6 +51,7 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
   secretary: [
     { href: "/desk/errands", label: "Заявки", badge: "errands", key: "Z" },
     { href: "/desk/team", label: "Команда", key: "K" },
+    { href: "/desk/ether", label: "Объявления", key: "A" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
     { href: "/desk/settings", label: "Настройки", key: "H" },
   ],
@@ -71,7 +73,10 @@ export function chordHref(code: string, role: DeskRole): string | null {
   return DESK_NAV[role].find((item) => item.key === match[1])?.href ?? null;
 }
 
-/** Desk screens only the director has (D-153 §1); the secretary's direct address leads to her home. */
+/**
+ * Desk screens only the director has (D-153 §1); the secretary's direct address leads to her home.
+ * «Лаборатория» is here too since 2026-11-04: on the desk it is the developers', see `deskDevToolsOpen`.
+ */
 const DIRECTOR_ONLY = [
   "/desk/today",
   "/desk/tasks",
@@ -79,11 +84,20 @@ const DIRECTOR_ONLY = [
   "/desk/reports",
   "/desk/notes",
   "/desk/screen",
+  "/desk/settings/lab",
   "/desk/settings/data",
   "/desk/settings/points",
 ];
 
 const within = (pathname: string, base: string) => pathname === base || pathname.startsWith(`${base}/`);
+
+/**
+ * «Лаборатория» and «Данные» of the desk's settings: the developers' tools, hidden from clients
+ * (owner, 2026-11-04). The director of a company with `settings.dev_tools`; the secretary never.
+ */
+export function deskDevToolsOpen(role: Role | undefined, devTools: boolean): boolean {
+  return role === "director" && devTools;
+}
 
 /** May this role see this desk screen; `/desk` itself is everybody's (it only leads home). */
 export function deskAllows(pathname: string, role: Role | undefined): boolean {
@@ -170,6 +184,9 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
       return director ? "/desk/settings/points?view=shop" : null;
     case "/feed":
       return director ? null : "/desk/errands";
+    case "/ether":
+      // both read it on the phone; only the director's desk writes and deletes (RLS)
+      return "/desk/ether";
     case "/profile":
       return DESK_PROFILE;
   }

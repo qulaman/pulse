@@ -9,6 +9,8 @@ import { NAV_COOKIE, navFoldedFromCookie } from "@/lib/desk/frame";
 import { isDeskRole } from "@/lib/desk/routes";
 import { canManageTeam } from "@/lib/routes";
 
+import "./journal.css";
+
 export const metadata: Metadata = { title: "Pulse" };
 
 /**

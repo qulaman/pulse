@@ -53,7 +53,7 @@ export function QuickCreate({
       }}
       anchor={anchor}
       width={WIDTH}
-      label="Новое мероприятие"
+      label="Новая встреча"
     >
       {slot ? <QuickBody key={`${slot.ymd}-${slot.start}-${slot.end}`} slot={slot} meId={meId} now={now} onClose={onClose} onTitle={onTitle} onMore={onMore} onCreated={onCreated} closeList={closeList} /> : null}
     </Popover>
@@ -125,7 +125,7 @@ function QuickBody({
 
   return (
     <form
-      className="flex flex-col gap-3 p-4"
+      className="desk-fields flex flex-col gap-3 p-4"
       data-testid="desk-quick-create"
       onSubmit={(submit) => {
         submit.preventDefault();
@@ -133,7 +133,7 @@ function QuickBody({
       }}
     >
       <div>
-        <p className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">Новое мероприятие</p>
+        <p className="desk-label uppercase">Новая встреча</p>
         <p className="nums mt-0.5 text-[13px] leading-[18px]">
           {capitalize(humanYmd(slot.ymd, now))} · {hmAt(slot.start)}–{hmAt(slot.end)}
           <span className="text-muted"> · {lengthRu(slot.end - slot.start)}</span>
@@ -151,7 +151,7 @@ function QuickBody({
           placeholder="Название"
           aria-label="Название"
           data-testid="desk-quick-title"
-          className="field h-10 w-full px-3 font-display text-[15px] font-semibold leading-5 outline-none placeholder:font-normal placeholder:text-muted"
+          className="field h-9 w-full px-0 text-[15px] font-semibold leading-5 outline-none placeholder:font-normal placeholder:text-muted"
         />
         {tried && !name ? <span className="text-[12px] leading-4 text-danger">Без названия не создать</span> : null}
       </div>

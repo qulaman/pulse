@@ -207,9 +207,7 @@ export function DeskPanelColumn({
     <aside
       aria-label="Панель"
       data-testid="desk-panel"
-      // raised over the screen it details: a soft shadow to the left, the table stays a flat plane (D-154)
       className="relative z-10 flex min-h-0 flex-col border-l border-border bg-surface"
-      style={{ boxShadow: "-12px 0 32px rgba(0, 0, 0, 0.35)" }}
     >
       {onResize ? <PanelEdge width={width ?? PANEL_DEFAULT} onResize={onResize} /> : null}
       <div className="absolute right-3 top-3 z-10">

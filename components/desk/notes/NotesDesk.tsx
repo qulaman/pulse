@@ -10,6 +10,7 @@ import { PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
+import { When } from "@/components/desk/ui/When";
 import { BoardTrashCard } from "@/components/mindboard/BoardCards";
 import { Marked, TrashCard } from "@/components/notes/NoteCard";
 import { NoteIcon } from "@/components/notes/icons";
@@ -419,7 +420,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
       align: "right",
       render: ({ note, group }) => (
         // «В деле» says when the thought became something, the feed — when it was had
-        <span className="nums whitespace-nowrap text-[12px] text-muted">{tab === "converted" ? whenRu(note.converted_at ?? note.created_at, now) : noteTime(note.created_at, group, now)}</span>
+        <When className="whitespace-nowrap text-[12px] text-muted">{tab === "converted" ? whenRu(note.converted_at ?? note.created_at, now) : noteTime(note.created_at, group, now)}</When>
       ),
     },
   ];
@@ -428,7 +429,6 @@ export function NotesDesk({ children }: { children: ReactNode }) {
       ? groupNotes(shown.notes, now).map((group) => ({
           key: group.key,
           title: group.title,
-          tone: group.key === "pinned" || group.key === "reminders" ? ("accent" as const) : undefined,
           rows: group.notes.map((note) => ({ note, group: group.key })),
         }))
       : [{ key: "converted", title: null, rows: shown.converted.map((note) => ({ note, group: "month" as NoteGroupKey })) }];
@@ -443,7 +443,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
         </span>
       ),
     },
-    { key: "when", title: "", width: "104px", align: "right", render: (board) => <span className="nums whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</span> },
+    { key: "when", title: "", width: "104px", align: "right", render: (board) => <When className="whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</When> },
     { key: "menu", title: "", width: "44px", align: "center", render: (board) => <BoardRowMenu board={board} me={me.data} onBin={binBoard} /> },
   ];
   const boardGroups: Group<MindBoard>[] = [
@@ -468,19 +468,20 @@ export function NotesDesk({ children }: { children: ReactNode }) {
     <NotesDeskContext.Provider value={value}>
       <div className="absolute inset-0 grid grid-cols-[400px_minmax(0,1fr)]" data-testid="desk-notes">
         <section className="flex min-h-0 flex-col border-r border-border" aria-label="Список заметок">
-          <div className="flex flex-col gap-3 px-5 pb-3 pt-5">
+          <div className="desk-fields flex flex-col gap-2 pb-2 pl-8 pr-6 pt-4">
+            {/* the one filled button of the screen: «Новая…» until a note is open, then the note's own «Поручить» */}
             <PageTitle
               title="Заметки"
               actions={
                 tab === "boards" ? (
                   <Tooltip label="Новая доска" keys={["N"]} side="bottom">
-                    <Button size="sm" onClick={newBoard} disabled={!me.data} data-testid="desk-board-new">
+                    <Button size="sm" variant={boardId ? "secondary" : "primary"} onClick={newBoard} disabled={!me.data} data-testid="desk-board-new">
                       Новая доска
                     </Button>
                   </Tooltip>
                 ) : (
                   <Tooltip label="Новая заметка" keys={["N"]} side="bottom">
-                    <Button size="sm" onClick={newNote} disabled={!me.data} data-testid="desk-note-new">
+                    <Button size="sm" variant={selectedId ? "secondary" : "primary"} onClick={newNote} disabled={!me.data} data-testid="desk-note-new">
                       Новая заметка
                     </Button>
                   </Tooltip>
@@ -502,14 +503,14 @@ export function NotesDesk({ children }: { children: ReactNode }) {
               ref={search}
               value={query}
               onChange={setQuery}
-              width={360}
+              width={344}
               placeholder={tab === "boards" ? "Найти доску" : tab === "trash" ? "Найти в корзине" : tab === "converted" ? "Найти в деле" : "Найти в заметках"}
               aria-label="Поиск по заметкам"
             />
           </div>
 
           {/* a list, not a table: the grid's column titles are not drawn here */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 [&_[role=grid]>[role=row]:first-child]:hidden" data-testid="desk-notes-list" data-notes-list="">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-6 pl-8 pr-6 [&_[role=grid]>[role=row]:first-child]:hidden" data-testid="desk-notes-list" data-notes-list="">
             {value.loading ? (
               <ListBones />
             ) : tab === "boards" ? (
@@ -527,9 +528,9 @@ export function NotesDesk({ children }: { children: ReactNode }) {
                 empty={empty}
               />
             ) : tab === "trash" ? (
-              <div className="flex flex-col gap-2" data-testid="desk-notes-trash">
+              <div className="flex flex-col" data-testid="desk-notes-trash">
                 {trashTotal > 0 ? (
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-3 border-b border-text pb-1">
                     <p className="text-[12px] leading-4 text-muted">Хранится {TRASH_DAYS} дня, потом исчезнет</p>
                     <Button
                       size="sm"
@@ -621,66 +622,52 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   );
 }
 
-/** A row of the list: the mark (pinned, spoken, written), the first line, the next one or the reminder. */
+/** A row of the list: the first line with its mark (pinned, spoken), the next one or the reminder. */
 function NoteLine({ note, now, query }: { note: Note; now: Date; query: string }) {
   const head = firstLine(note.text);
   const rest = restLines(note.text).replace(/\s*\n\s*/g, " ");
   const ringing = awaitsReminder(note);
-  const name = note.pinned ? "pin" : note.audio_path ? "wave" : "note";
+  const mark = note.pinned ? "pin" : note.audio_path ? "wave" : null;
   return (
-    <span className="flex min-w-0 items-start gap-2.5" data-note-id={note.id}>
-      <span
-        aria-hidden
-        className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-        style={{
-          background: `color-mix(in srgb, ${note.pinned ? "var(--accent)" : "var(--text-muted)"} 14%, transparent)`,
-          color: note.pinned ? "var(--accent)" : "var(--text-muted)",
-        }}
-      >
-        <NoteIcon name={name} size={11} />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">
+    <span className="block min-w-0" data-note-id={note.id}>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className="min-w-0 truncate font-medium">
           <Marked text={head || (awaitsWords(note) ? "Голосовая заметка" : "Без текста")} query={query} />
         </span>
-        {ringing ? (
-          <span className="nums flex items-center gap-1 truncate text-[12px] font-semibold leading-4 text-accent">
-            <NoteIcon name="bell" size={11} />
-            {reminderRu(note, now)}
-          </span>
-        ) : rest ? (
-          <span className="block truncate text-[12px] leading-4 text-muted">
-            <Marked text={rest} query={query} />
+        {mark ? (
+          <span aria-hidden className="shrink-0 text-muted">
+            <NoteIcon name={mark} size={12} />
           </span>
         ) : null}
       </span>
+      {ringing ? (
+        <span className="nums flex items-center gap-1 truncate text-[12px] leading-4 text-muted">
+          <NoteIcon name="bell" size={11} />
+          {reminderRu(note, now)}
+        </span>
+      ) : rest ? (
+        <span className="block truncate text-[12px] leading-4 text-muted">
+          <Marked text={rest} query={query} />
+        </span>
+      ) : null}
     </span>
   );
 }
 
 function BoardLine({ board, summary, onWall, query }: { board: MindBoard; summary: BoardSummary | undefined; onWall: boolean; query: string }) {
   return (
-    <span className="flex min-w-0 items-start gap-2.5" data-board-id={board.id}>
-      <span
-        aria-hidden
-        className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full"
-        style={{ background: `color-mix(in srgb, ${onWall ? "var(--accent)" : "var(--text-muted)"} 14%, transparent)`, color: onWall ? "var(--accent)" : "var(--text-muted)" }}
-      >
-        <NoteIcon name="board" size={11} />
+    <span className="block min-w-0" data-board-id={board.id}>
+      <span className={`block truncate font-medium ${board.finished_at ? "text-muted" : ""}`}>
+        <Marked text={board.title} query={query} />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className={`block truncate font-medium ${board.finished_at ? "text-muted" : ""}`}>
-          <Marked text={board.title} query={query} />
-        </span>
-        <span className="flex items-center gap-1.5 truncate text-[12px] leading-4 text-muted">
-          {board.pinned_at && !board.finished_at ? (
-            <span className="text-accent" title="Закреплена">
-              <NoteIcon name="pin" size={11} />
-            </span>
-          ) : null}
-          <span className="truncate">{summaryLine(summary)}</span>
-          {onWall ? <span className="shrink-0 font-semibold text-accent">· на стене</span> : null}
-        </span>
+      <span className="flex items-center gap-1.5 truncate text-[12px] leading-4 text-muted">
+        {board.pinned_at && !board.finished_at ? (
+          <span title="Закреплена">
+            <NoteIcon name="pin" size={11} />
+          </span>
+        ) : null}
+        <span className="truncate">{summaryLine(summary)}</span>
+        {onWall ? <span className="shrink-0 font-medium text-text">· на стене</span> : null}
       </span>
     </span>
   );
@@ -690,7 +677,7 @@ function ListBones() {
   return (
     <div className="flex flex-col gap-2" aria-hidden>
       {Array.from({ length: 8 }, (_, index) => (
-        <span key={index} className="block h-[44px] rounded-[10px] bg-surface-2/70" />
+        <span key={index} className="block h-[44px] bg-surface-2/70" />
       ))}
     </div>
   );

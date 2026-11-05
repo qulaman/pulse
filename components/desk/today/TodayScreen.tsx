@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { taggedActions, usePanelFlow, writeParams } from "@/components/desk/tasks/flow";
+import { FailedScreen, LoadFailure, LoadNote } from "@/components/desk/tasks/LoadState";
 import { MomentBar, type MomentCounter } from "@/components/desk/tasks/MomentBar";
 import { deskLayerOpen, TaskPanel } from "@/components/desk/tasks/TaskPanel";
 import { DESK_NEW_TASK } from "@/components/desk/tasks/TasksScreen";
@@ -15,41 +16,69 @@ import { useContextMenu } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { useMinute } from "@/components/tasks/list/TaskList";
+import { formatNum } from "@/lib/desk/format";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { useCalendar } from "@/lib/calendar/queries";
 import { useTeamDailyReportDay } from "@/lib/daily-report/queries";
 import { todayYmd } from "@/lib/datetime/calendar";
+import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
-import { cursorStep, matchesDue, personNow, rowKeys, rowMoves, type Move } from "@/lib/desk/tasks";
+import { cursorStep, disputeLines, extrasWord, loadStateOf, matchesDue, orderLines, personNow, rowKeys, rowMoves, worstLoad, type LoadState, type Move, type QueryView } from "@/lib/desk/tasks";
 import { isActive, useErrands } from "@/lib/errands/queries";
 import { loadColor, useTeamLoads } from "@/lib/people/loads";
 import { useNamesKey } from "@/lib/people/names";
-import { usePeople } from "@/lib/people/queries";
+import { isTeamMember, usePeople } from "@/lib/people/queries";
+import { useOpenDisputes, useResolveDispute } from "@/lib/points/game";
 import type { BoardTask } from "@/lib/pulse/board";
 import { HELD_STATUS } from "@/lib/pulse/board";
 import { usePushHealth } from "@/lib/push/health-query";
+import { ordersWaiting } from "@/lib/shop/format";
+import { useOrders, useSetOrderStatus } from "@/lib/shop/queries";
 import { queueOf, type DeskItem, type DeskReason } from "@/lib/tasks/desk";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { directorScreen, directorTabOf, reasonFor } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, useSentTasks, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue } from "@/lib/tasks/status-text";
 import { useTvFeed } from "@/lib/tv/queries";
+import { useHydrated } from "@/lib/useHydrated";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import { useVisits, type Visit, type VisitAnswer } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 
-import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, TeamNow, type TeamRow } from "./TodayParts";
+import { LaunchBone, LaunchChecklist, useLaunchGate } from "./LaunchChecklist";
+import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, TeamNow, type ExtraDecision, type TeamRow } from "./TodayParts";
 
 /** How many decisions stand on the screen before «…ещё N — разобрать по одной». */
 const DECISIONS_SHOWN = 6;
 /** How many people stand in «Команда сейчас» before «Вся команда». */
 const TEAM_SHOWN = 8;
+/** Where a dispute and an order are decided in full: words to the person, a cancelled order. */
+const DISPUTES_HREF = "/desk/settings/points?view=disputes";
+const ORDERS_HREF = "/desk/settings/points?view=shop";
 
 /**
  * The grid of the day: the director's work on the left, the day around it on the right — one
  * column under the other once the panel takes the room (a container query, not the window's).
  */
-const LAYOUT = "grid items-start gap-y-7 @min-[1000px]:grid-cols-[minmax(0,1fr)_340px] @min-[1000px]:gap-x-8";
+const LAYOUT = "grid items-start gap-y-6 @min-[960px]:grid-cols-[minmax(0,1fr)_288px] @min-[960px]:gap-x-8 @min-[1100px]:grid-cols-[minmax(0,1fr)_340px] @min-[1500px]:grid-cols-[minmax(0,1fr)_420px]";
+
+/** One block of the frame: its label, the rule of ink, rows of the block's own height. */
+function BlockBone({ rows, height, label = "34%", wide = "64%" }: { rows: number; height: number; label?: string; wide?: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex h-6 items-center">
+        <Bone h={12} w={label} />
+      </div>
+      <div className="desk-list">
+        {Array.from({ length: rows }, (_, index) => (
+          <div key={index} className="flex items-center" style={{ height }}>
+            <Bone h={14} w={wide} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 /** The frame while the first data lands: the head, the moment, the two columns. */
 export function TodaySkeleton() {
@@ -57,20 +86,22 @@ export function TodaySkeleton() {
     <DeskPage>
       {/* the date line's room is kept: the head does not move when the day lands */}
       <PageTitle title="Сегодня" state={{ text: "\u00a0" }} />
-      <SkeletonGroup className="flex flex-col gap-6" grow>
-        <Bone h={138} className="!rounded-[16px]" />
-        <div className={`${LAYOUT} grid-cols-[minmax(0,1fr)_340px] gap-x-8`}>
-          <div className="flex flex-col gap-2">
-            <Bone h={16} w="30%" />
-            {Array.from({ length: 4 }, (_, index) => (
-              <Bone key={index} h={56} />
-            ))}
-          </div>
-          <div className="flex flex-col gap-2">
-            <Bone h={16} w="50%" />
-            <Bone h={84} />
-            <Bone h={16} w="40%" />
-            <Bone h={64} />
+      <SkeletonGroup className="flex flex-col gap-3.5" grow>
+        <div className="flex h-11 items-center gap-4">
+          <Bone h={36} w={32} />
+          <Bone h={18} w={240} />
+        </div>
+        <div className="@container">
+          <div className={LAYOUT}>
+            <div className="flex min-w-0 flex-col gap-6">
+              <BlockBone rows={4} height={47} />
+              <BlockBone rows={8} height={34} />
+            </div>
+            <div className="flex min-w-0 flex-col gap-6">
+              <BlockBone rows={3} height={35} label="48%" wide="84%" />
+              <BlockBone rows={2} height={35} label="38%" wide="72%" />
+              <BlockBone rows={4} height={35} label="26%" wide="84%" />
+            </div>
           </div>
         </div>
       </SkeletonGroup>
@@ -80,21 +111,67 @@ export function TodaySkeleton() {
 
 /**
  * «Сегодня» (D-154) — the director's home on the desk: what the moment is about and the move it
- * asks for as one hero, then the work — the decisions waiting with their buttons at hand, the team
- * now with the trouble first, the late tasks with «Напомнить» — and on the right the day around it:
- * the meetings, the reception, the company's last moves, the day's reports. Every number is the
- * phone's own query; a task opens in the panel, a person leads to their tasks.
+ * asks for as one total, then the work — the decisions waiting with their buttons at hand, the
+ * late tasks with «Напомнить», the team now with the trouble first — and on the right the day
+ * around it: the meetings, the reception, the company's last moves, the day's reports. J/K walk the
+ * decisions and the late ones in the order they stand on the sheet. Every number is the
+ * phone's own query; a task opens in the panel, a person leads to their tasks. A failed load is
+ * said for what it is: no tasks — the screen's failure with «Повторить», never a green «всё
+ * закрыто»; no queue — the same in the hero's and the decisions' place; any other block — a quiet
+ * line in that block; a copy that could not be refreshed stays with the time it missed.
  */
 export function TodayScreen() {
   useNamesKey();
   const me = useMe();
   const tasks = useSentTasks(me.data?.userId);
   const board = usePulseBoard(me.data);
-  if (me.isPending || tasks.isPending || board.isPending || !me.data) return <TodaySkeleton />;
-  return <TodayView me={me.data} all={tasks.data ?? []} board={board.data ?? []} />;
+  const { pointsEnabled } = useDeskScope();
+  const taskLoad = loadStateOf(tasks);
+  const boardLoad = loadStateOf(board);
+  const load = worstLoad([taskLoad, boardLoad]);
+  const retry = () => {
+    void tasks.refetch();
+    void board.refetch();
+  };
+  const busy = tasks.isFetching || board.isFetching;
+  // a start with no network pauses the queries before this boundary hydrates: the first render stays the server's skeleton
+  const hydrated = useHydrated();
+  if (!hydrated || me.isPending || !me.data || load.kind === "loading") return <TodaySkeleton />;
+  if (taskLoad.kind === "failed") return <FailedScreen title="Сегодня" what="задачи" offline={taskLoad.offline} busy={busy} onRetry={retry} />;
+  const view = (orders: OrdersQuery | null) => (
+    <TodayView me={me.data as Me} all={tasks.data ?? []} board={board.data ?? []} load={load} boardLoad={boardLoad} busy={busy} onRetry={retry} orders={orders} />
+  );
+  // orders are read only where the points game is on: `useOrders` knows no switch of its own
+  return pointsEnabled ? <WithOrders>{view}</WithOrders> : view(null);
 }
 
-function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[]; board: readonly BoardTask[] }) {
+type OrdersQuery = ReturnType<typeof useOrders>;
+
+function WithOrders({ children }: { children: (orders: OrdersQuery) => ReactNode }) {
+  return children(useOrders());
+}
+
+function TodayView({
+  me,
+  all,
+  board,
+  load,
+  boardLoad,
+  busy,
+  onRetry,
+  orders,
+}: {
+  me: Me;
+  all: readonly TaskWithPeople[];
+  board: readonly BoardTask[];
+  /** the tasks and the queue together: the note over the screen */
+  load: LoadState;
+  boardLoad: LoadState;
+  busy: boolean;
+  onRetry: () => void;
+  /** null — the points game is off in this company */
+  orders: OrdersQuery | null;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const now = useMinute();
@@ -110,6 +187,13 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
   const visits = useVisits();
   const feed = useTvFeed();
   const answerVisit = useAnswerVisit();
+  const disputes = useOpenDisputes(pointsEnabled);
+  const resolve = useResolveDispute();
+  const setOrderStatus = useSetOrderStatus();
+  const drafts = useDraftTasks(me.userId);
+  // a company nobody has worked in yet sees what to do next, not an empty «всё закрыто» (И-77)
+  const launch = useLaunchGate(me.companyId, all);
+  const launching = launch.state !== "off";
 
   const openId = params.get("id");
   const [focus, setFocus] = useState<string | null>(null);
@@ -146,7 +230,7 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     { key: "working", label: "В работе", value: counts.working, href: "/desk/tasks?tab=working" },
     { key: "today", label: "Сегодня", value: counts.today, href: `/desk/tasks?tab=${todayTab}&due=today` },
     { key: "overdue", label: "Просрочено", value: counts.overdue, href: "/desk/tasks?tab=yours&due=overdue" },
-    { key: "held", label: "Позже", value: counts.held, href: `/desk/tasks?tab=working&status=${HELD_STATUS}` },
+    { key: "held", label: "Отложены", value: counts.held, href: `/desk/tasks?tab=working&status=${HELD_STATUS}` },
   ];
 
   /* ---- the queue: the decisions, and the late ones apart ---- */
@@ -197,10 +281,75 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
     acts.press(move.action, item.task, target ? { at: target } : undefined);
   };
 
+  /* ---- what the secondary blocks know: a stale copy of everything is said once, over the screen ---- */
+  const blockLoad = (query: QueryView): LoadState => {
+    const state = loadStateOf(query);
+    return state.kind === "stale" && load.kind === "stale" ? { kind: "ready" } : state;
+  };
+  const noteOf = (state: LoadState, failed: string, refetch: () => void) => <LoadNote state={state} failed={failed} now={now} onRetry={refetch} />;
+  const peopleLoad = blockLoad(people);
+  const teamLoad = worstLoad([peopleLoad, blockLoad(loads)]);
+  const loadsMissing = loadStateOf(loads).kind === "failed";
+  const calendarLoad = blockLoad(calendar);
+  const feedLoad = blockLoad(feed);
+  const reportsLoad = blockLoad(reports);
+  const receptionLoad = worstLoad([blockLoad(visits), blockLoad(errands)]);
+
+  /* ---- besides tasks: disputes and orders, the same two lists as «Очки и магазин» (D-133) ---- */
+  const openOrders = useMemo(
+    () =>
+      ordersWaiting(orders?.data ?? [], me.userId).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [orders?.data, me.userId],
+  );
+  const openDisputes = pointsEnabled ? (disputes.data ?? []) : [];
+  const extras: ExtraDecision[] = [
+    ...openDisputes.map((dispute): ExtraDecision => {
+      const { title, line, refund } = disputeLines(dispute, now);
+      const busyHere = resolve.isPending && resolve.variables?.id === dispute.id;
+      return {
+        key: `dispute:${dispute.id}`,
+        kind: "dispute",
+        name: dispute.user?.full_name,
+        title,
+        line,
+        href: DISPUTES_HREF,
+        moves: [
+          { key: "refund", label: refund ? `Вернуть ${formatNum(refund)}` : "Вернуть", main: true, busy: busyHere, onPress: () => resolve.mutate({ id: dispute.id, refund: true }) },
+          { key: "keep", label: "Оставить", main: false, busy: busyHere, onPress: () => resolve.mutate({ id: dispute.id, refund: false }) },
+        ],
+      };
+    }),
+    ...openOrders.map((order): ExtraDecision => {
+      const { title, line } = orderLines(order, now);
+      return {
+        key: `order:${order.id}`,
+        kind: "order",
+        name: order.user?.full_name,
+        title,
+        line,
+        href: ORDERS_HREF,
+        moves: [
+          {
+            key: "deliver",
+            label: "Выдал",
+            main: true,
+            busy: setOrderStatus.isPending && setOrderStatus.variables?.order.id === order.id,
+            onPress: () => setOrderStatus.mutate({ order, status: "delivered" }),
+          },
+        ],
+      };
+    }),
+  ];
+  const extrasLoad = pointsEnabled ? worstLoad([blockLoad(disputes), ...(orders ? [blockLoad(orders)] : [])]) : ({ kind: "ready" } as const);
+  const retryExtras = () => {
+    void disputes.refetch();
+    void orders?.refetch();
+  };
+
   /* ---- the team now: trouble first ---- */
   const teamRows = useMemo(() => {
     const reportRows = new Map((reports.data?.rows ?? []).map((row) => [row.user_id, row]));
-    const staff = (people.data ?? []).filter((person) => person.is_active && person.role !== "director" && person.role !== "tv");
+    const staff = (people.data ?? []).filter(isTeamMember);
     const byPerson = new Map<string, TaskWithPeople[]>();
     for (const task of open) {
       const list = byPerson.get(task.assignee_id);
@@ -211,7 +360,8 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
       .map((person) => {
         const load = loads.data?.[person.id];
         const color = loadColor(load, person.availability === "active", now.getTime());
-        const state = personNow(person, load, color, byPerson.get(person.id) ?? [], reasons, now);
+        // no loads to read: the person is unknown, not «свободен»
+        const state = loadsMissing ? { ring: null, line: "—", rank: 4 } : personNow(person, load, color, byPerson.get(person.id) ?? [], reasons, now);
         const channel = health.data?.get(person.id);
         const row: TeamRow & { rank: number; overdue: number; active: number } = {
           id: person.id,
@@ -219,7 +369,7 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
           ring: state.ring,
           line: state.line,
           report: reportWord(reportRows.get(person.id), now),
-          push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "пуши выключены" : "пуш не прошёл") : null,
+          push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "без уведомлений" : "пуш не прошёл") : null,
           rank: state.rank,
           overdue: load?.overdue ?? 0,
           active: load?.active ?? 0,
@@ -227,7 +377,7 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
         return row;
       })
       .sort((a, b) => a.rank - b.rank || b.overdue - a.overdue || b.active - a.active || a.name.localeCompare(b.name, "ru"));
-  }, [people.data, loads.data, health.data, reports.data, open, reasons, now]);
+  }, [people.data, loads.data, loadsMissing, health.data, reports.data, open, reasons, now]);
 
   /* ---- the reception ---- */
   const visitRows = visits.data ?? [];
@@ -309,16 +459,32 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
 
   const calm = screen.value === null && screen.closedToday === 0;
   const reportDay = reports.data && reports.data.rows.some((row) => row.state !== "off") ? reports.data : null;
+  const boardDown = boardLoad.kind === "failed";
+  // with no task waiting, the hero's «всё закрыто» would stand over the disputes below it
+  const extrasLine = queue.length === 0 ? extrasWord(openDisputes.length, openOrders.length) : null;
+  const moment = extrasLine ? { ...screen, eyebrow: "Ваш ход", tone: "warn" as const } : screen;
 
   return (
     <DeskPage>
-      <PageTitle title="Сегодня" state={{ text: dateLine(now) }} light={screen.tone} />
+      <PageTitle
+        title="Сегодня"
+        state={{ text: dateLine(now) }}
+        actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
+      />
 
-      <MomentBar screen={screen} detail={calm ? DESK_NEW_TASK : undefined} counters={counters} queue={queue.length} enterKey />
+      {boardDown ? (
+        <LoadFailure what="очередь решений" offline={boardLoad.offline} busy={busy} onRetry={onRetry} />
+      ) : launch.state === "on" ? (
+        <LaunchChecklist people={people.data ?? []} health={health.data} healthKnown={!health.isPending} onHide={launch.hide} />
+      ) : launch.state === "checking" ? (
+        <LaunchBone />
+      ) : (
+        <MomentBar screen={moment} detail={extrasLine ?? (calm ? DESK_NEW_TASK : undefined)} counters={counters} queue={queue.length} enterKey />
+      )}
 
       <div className="@container">
         <div className={LAYOUT}>
-          <div className="flex min-w-0 flex-col gap-7">
+          <div className="flex min-w-0 flex-col gap-6">
             <Decisions
               items={decisions}
               limit={DECISIONS_SHOWN}
@@ -337,31 +503,12 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               }}
               compact={Boolean(openId)}
               now={now}
-            />
-            {decisions.length + late.length > 0 ? (
-              <p className="-mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="today-keys-hint">
-                <span>
-                  <Kbd>J</Kbd> <Kbd>K</Kbd> по строкам
-                </span>
-                <span>
-                  <Kbd>Enter</Kbd> открыть
-                </span>
-                <span>
-                  <Kbd>A</Kbd> <Kbd>R</Kbd> <Kbd>O</Kbd> <Kbd>N</Kbd> <Kbd>D</Kbd> <Kbd>T</Kbd> действие строки
-                </span>
-                <span>
-                  <Kbd>.</Kbd> меню
-                </span>
-                <span>
-                  <Kbd>?</Kbd> все клавиши
-                </span>
-              </p>
-            ) : null}
-            <TeamNow
-              rows={teamRows.slice(0, TEAM_SHOWN)}
-              total={teamRows.length}
-              loading={people.isPending}
-              onOpen={(id) => router.push(`/desk/tasks?who=${encodeURIComponent(id)}`)}
+              drafts={drafts}
+              extras={extras}
+              // while the launch stands, an empty block would only repeat it: the same «nothing to say» as a failed queue
+              failed={boardDown || launching}
+              extrasNote={noteOf(extrasLoad, "Споры и заказы не загрузились", retryExtras)}
+              extrasUnknown={extrasLoad.kind === "failed"}
             />
             <Overdue
               items={late}
@@ -379,13 +526,40 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
                 context.open(event, menuOf(item));
               }}
               now={now}
+              drafts={drafts}
+            />
+            {decisions.length + late.length > 0 ? (
+              <p className="-mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="today-keys-hint">
+                <span>
+                  <Kbd>J</Kbd> <Kbd>K</Kbd> по строкам
+                </span>
+                <span>
+                  <Kbd>Enter</Kbd> открыть
+                </span>
+                <span>
+                  <Kbd>?</Kbd> все клавиши
+                </span>
+              </p>
+            ) : null}
+            <TeamNow
+              rows={teamRows.slice(0, TEAM_SHOWN)}
+              total={teamRows.length}
+              loading={peopleLoad.kind === "loading"}
+              onOpen={(id) => router.push(`/desk/tasks?who=${encodeURIComponent(id)}`)}
+              note={noteOf(teamLoad, "Команда не загрузилась", () => {
+                void people.refetch();
+                void loads.refetch();
+              })}
+              failed={peopleLoad.kind === "failed"}
             />
           </div>
 
-          <div className="flex min-w-0 flex-col gap-5">
+          <div className="flex min-w-0 flex-col gap-6">
             <Agenda
               events={calendar.data ?? []}
-              loading={calendar.isPending}
+              loading={calendarLoad.kind === "loading"}
+              note={noteOf(calendarLoad, "Встречи не загрузились", () => void calendar.refetch())}
+              failed={calendarLoad.kind === "failed"}
               dueToday={dueToday.length}
               dueLast={dueToday.map((task) => task.deadline).filter((at): at is string => Boolean(at)).sort().at(-1) ?? null}
               now={now}
@@ -397,9 +571,24 @@ function TodayView({ me, all, board }: { me: Me; all: readonly TaskWithPeople[];
               now={now}
               onAnswer={answer}
               busyId={answerVisit.isPending ? (answerVisit.variables?.id ?? null) : null}
+              note={noteOf(receptionLoad, "Приёмная не загрузилась", () => {
+                void visits.refetch();
+                void errands.refetch();
+              })}
+              failed={receptionLoad.kind === "failed"}
             />
-            <Feed events={feed.data ?? []} loading={feed.isPending} now={now} />
-            {reportDay ? <Reports day={reportDay} /> : null}
+            <Feed
+              events={feed.data ?? []}
+              loading={feedLoad.kind === "loading"}
+              now={now}
+              note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
+              failed={feedLoad.kind === "failed"}
+            />
+            {reportsLoad.kind === "failed" ? (
+              <ReportsFailed note={noteOf(reportsLoad, "Отчёты не загрузились", () => void reports.refetch())} />
+            ) : reportDay ? (
+              <Reports day={reportDay} />
+            ) : null}
           </div>
         </div>
       </div>

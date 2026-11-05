@@ -91,7 +91,7 @@ function RenameCell({ fact, taken, onRename, onDone }: { fact: WordFact; taken: 
           }
         }}
         onBlur={() => finish(true)}
-        className="field h-8 w-full px-2.5 text-[14px] leading-5 outline-none"
+        className="field h-8 w-full px-2 text-[14px] leading-5 outline-none"
         style={clash ? { borderColor: "var(--warn)" } : undefined}
       />
       {clash ? <span className="mt-0.5 block text-[12px] leading-4 text-warn">«{next}» уже есть в словаре</span> : null}
@@ -249,8 +249,7 @@ export function WordsTab({
             }}
           />
         ) : (
-          <span className={`relative flex items-center gap-1.5 ${fact.stale ? "text-muted" : ""}`}>
-            {fresh.has(fact.key) ? <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent" /> : null}
+          <span className={`relative flex items-center gap-1.5 ${fresh.has(fact.key) ? "text-accent" : fact.stale ? "text-muted" : ""}`}>
             {waiting.words.has(fact.key) ? <span className="text-[12px] text-muted">ждёт связи ·</span> : null}
             <span className="truncate font-medium" title={fact.word}>
               {fact.word}
@@ -269,7 +268,7 @@ export function WordsTab({
           items={kindItems(fact)}
           align="start"
           width={200}
-          className="-mx-2 inline-flex h-7 items-center gap-1 rounded-[8px] px-2 text-[13px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+          className="inline-flex h-6 items-center gap-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
         >
           {kindLabel(kinds, fact.kind)}
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
@@ -289,13 +288,10 @@ export function WordsTab({
           <span className="text-muted/60">…</span>
         ) : fact.usage.count > 0 && fact.usage.lastAt ? (
           <span className="whitespace-nowrap">
-            <span className="nums font-semibold">{timesLine(fact.usage.count)}</span> <span className="text-muted">· {whenLine(fact.usage.lastAt)}</span>
+            <span className="nums">{timesLine(fact.usage.count)}</span> <span className="text-muted">· {whenLine(fact.usage.lastAt)}</span>
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 text-muted/70">
-            {fact.stale ? <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-warn/80" /> : null}
-            {fact.stale ? `не было ${STALE_DAYS} дней` : "пока не было"}
-          </span>
+          <span className="text-muted">{fact.stale ? `не было ${STALE_DAYS} дней` : "пока не было"}</span>
         ),
     },
     {
@@ -320,9 +316,9 @@ export function WordsTab({
   const long = vocabulary.length > VOCABULARY_SOFT_MAX;
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-4">
         {/* the field: a word with its type, or a pasted list — and what Enter will do, said before it */}
-        <section className="rounded-[12px] border border-border bg-surface/40 px-4 py-3" data-testid="words-add">
+        <section className="desk-fields" data-testid="words-add">
           <div className="flex items-center gap-2">
             <input
               ref={addRef}
@@ -342,13 +338,13 @@ export function WordsTab({
               }}
               placeholder="Новое слово или список через запятую"
               aria-label="Новое слово или список"
-              className="field h-9 min-w-0 flex-1 px-3 text-[14px] leading-5 outline-none"
+              className="field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
             />
             <select
               aria-label="Тип нового слова"
               value={kind ?? ""}
               onChange={(event) => setKind(event.target.value || null)}
-              className="field h-9 w-[170px] cursor-pointer pl-3 text-[14px] leading-5"
+              className="field h-9 w-[170px] cursor-pointer text-[14px] leading-5"
             >
               {kinds.map((k) => (
                 <option key={k.id} value={k.id}>
@@ -361,7 +357,7 @@ export function WordsTab({
               Добавить
             </Button>
           </div>
-          <div className="mt-2 flex items-center gap-4">
+          <div className="mt-1 flex items-center gap-4">
             <p className="min-w-0 flex-1 text-[13px] leading-[18px]">
               {entries.length > 1 ? (
                 <span className="text-muted">
@@ -372,7 +368,7 @@ export function WordsTab({
                   Похоже на «{plan.similar[0].to}» — это оно?{" "}
                   <button
                     type="button"
-                    className="font-semibold text-accent hover:underline"
+                    className="font-medium underline underline-offset-2"
                     onClick={() => {
                       add([plan.similar[0].entry], kind);
                       setText("");
@@ -386,7 +382,7 @@ export function WordsTab({
                   Уже есть в словаре.{" "}
                   <button
                     type="button"
-                    className="font-semibold text-accent hover:underline"
+                    className="font-medium underline underline-offset-2"
                     onClick={() => {
                       setSelected(entryKey(plan.existing[0]));
                       setText("");
@@ -410,8 +406,8 @@ export function WordsTab({
             </p>
             {/* the budget: the list's length is the STT prompt's length (D-53, D-55) */}
             <span className="flex shrink-0 items-center gap-2" data-testid="words-budget" title={long ? `Больше ${VOCABULARY_SOFT_MAX} — распознавание начинает ошибаться чаще` : undefined}>
-              <span aria-hidden className="h-1.5 w-24 overflow-hidden rounded-full bg-surface-2">
-                <span className="block h-full rounded-full" style={{ width: `${Math.max(share * 100, vocabulary.length ? 3 : 0)}%`, background: long ? "var(--warn)" : "var(--accent)" }} />
+              <span aria-hidden className="h-1 w-24 overflow-hidden bg-surface-2">
+                <span className="block h-full" style={{ width: `${Math.max(share * 100, vocabulary.length ? 3 : 0)}%`, background: long ? "var(--warn)" : "var(--text)" }} />
               </span>
               <span className={`nums text-[13px] leading-4 ${long ? "text-warn" : "text-muted"}`}>
                 {vocabulary.length} из {VOCABULARY_SOFT_MAX}
@@ -437,7 +433,7 @@ export function WordsTab({
                     aria-label={`Не предлагать «${s.word}»`}
                     title="Не предлагать"
                     onClick={() => dismiss.mutate(s.keys)}
-                    className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+                    className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
                   >
                     ×
                   </button>
@@ -447,9 +443,9 @@ export function WordsTab({
           </Strip>
         ) : null}
 
-        <div className="flex items-center gap-2 px-1">
-          <h2 className="text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">В словаре</h2>
-          <span className="nums text-[12px] font-semibold leading-4 text-muted/70">{shown.length === facts.length ? facts.length : `${shown.length} из ${facts.length}`}</span>
+        <div className="-mb-3 flex items-center gap-2">
+          <h2 className="desk-label uppercase">В словаре</h2>
+          <span className="nums text-[12px] leading-4 text-muted">{shown.length === facts.length ? facts.length : `${shown.length} из ${facts.length}`}</span>
           <span className="ml-auto flex items-center gap-1">
             {stale.length ? (
               <Button size="sm" variant="ghost" onClick={() => setCleanup(true)} data-testid="words-cleanup" title={`Никто не произносил ${STALE_DAYS} дней — подсказка распознаванию несёт их зря`}>

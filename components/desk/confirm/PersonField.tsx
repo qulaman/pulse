@@ -2,7 +2,6 @@
 
 import { useId, useMemo, useState } from "react";
 
-import { Avatar } from "@/components/desk/ui/PersonCell";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Popover } from "@/components/desk/ui/Popover";
 import { searchPeople } from "@/lib/desk/palette";
@@ -72,8 +71,7 @@ export function PersonField({
   };
 
   return (
-    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2 px-2" data-tone={!value && !open ? tone : undefined} aria-expanded={open}>
-      {value && query === null ? <Avatar name={name ?? ""} size={22} /> : <SearchMark />}
+    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2" data-tone={!value && !open ? tone : undefined} aria-expanded={open}>
       <input
         value={query ?? name ?? ""}
         placeholder={value ? (name ?? "") : placeholder}
@@ -112,7 +110,7 @@ export function PersonField({
         autoComplete="off"
         spellCheck={false}
         data-testid={testId}
-        className={`min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none ${value ? "placeholder:text-text/60" : tone === "danger" ? "placeholder:text-danger" : tone === "warn" ? "placeholder:text-warn" : "placeholder:text-muted"}`}
+        className={`min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none ${value ? "placeholder:text-muted" : tone === "danger" ? "placeholder:text-danger" : tone === "warn" ? "placeholder:text-warn" : "placeholder:text-muted"}`}
       />
       <span aria-hidden className="pointer-events-none shrink-0 text-muted">
         <Chevron />
@@ -126,7 +124,7 @@ export function PersonField({
             const on = option === current;
             return (
               <li key={option.person.id} role="presentation">
-                {head && !query ? <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.06em] text-muted">{head}</p> : null}
+                {head && !query ? <p className="desk-label px-3 pb-1 pt-2 uppercase">{head}</p> : null}
                 <div
                   id={`${listId}-${option.person.id}`}
                   role="option"
@@ -136,9 +134,8 @@ export function PersonField({
                   onMouseMove={() => {
                     if (!on) setActive(index);
                   }}
-                  className={`mx-1 flex h-9 cursor-default items-center gap-2.5 rounded-[8px] px-2 ${on ? "bg-surface-2" : ""}`}
+                  className={`flex h-[34px] cursor-default items-center gap-2.5 px-3 ${on ? "bg-surface-2" : ""}`}
                 >
-                  <Avatar name={option.person.full_name} size={24} />
                   <span className="min-w-0 truncate text-[14px] leading-5">{option.person.full_name}</span>
                   {option.person.position ? <span className="min-w-0 truncate text-[12px] leading-4 text-muted">{option.person.position}</span> : null}
                   {option.person.id === value ? <span className="ml-auto shrink-0 text-[12px] text-muted">сейчас</span> : on ? <span className="ml-auto shrink-0"><Kbd>Enter</Kbd></span> : null}
@@ -217,7 +214,7 @@ export function PeopleField({
             setOpen(true);
           }
         }}
-        className="desk-input flex h-9 w-full items-center gap-2 px-2.5 text-left text-[14px] leading-5"
+        className="desk-input flex h-9 w-full items-center gap-2 text-left text-[14px] leading-5"
       >
         <span className="min-w-0 flex-1 truncate">{summary}</span>
         <span aria-hidden className="shrink-0 text-muted">
@@ -271,10 +268,9 @@ export function PeopleField({
                 onMouseMove={() => {
                   if (!on) setActive(index);
                 }}
-                className={`mx-1 flex h-9 cursor-default items-center gap-2.5 rounded-[8px] px-2 ${on ? "bg-surface-2" : ""} ${all ? "mb-1" : ""}`}
+                className={`flex h-[34px] cursor-default items-center gap-2.5 px-3 ${on ? "bg-surface-2" : ""} ${all ? "border-b border-border" : ""}`}
               >
                 <Tick on={ticked} />
-                {all ? null : <Avatar name={person.full_name} size={22} />}
                 <span className={`min-w-0 truncate text-[14px] leading-5 ${all ? "font-semibold" : ""}`}>{person.full_name}</span>
                 {person.position ? <span className="min-w-0 truncate text-[12px] leading-4 text-muted">{person.position}</span> : null}
               </li>
@@ -298,7 +294,7 @@ function Tick({ on }: { on: boolean }) {
   return (
     <span
       aria-hidden
-      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[5px] border"
+      className="flex h-4 w-4 shrink-0 items-center justify-center rounded-[2px] border"
       style={{ borderColor: on ? "var(--accent)" : "var(--border)", background: on ? "var(--accent)" : "transparent" }}
     >
       {on ? (
@@ -307,15 +303,6 @@ function Tick({ on }: { on: boolean }) {
         </svg>
       ) : null}
     </span>
-  );
-}
-
-function SearchMark() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden className="mx-1 shrink-0 text-muted" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-      <circle cx="11" cy="11" r="6.5" />
-      <path d="m16 16 4 4" />
-    </svg>
   );
 }
 

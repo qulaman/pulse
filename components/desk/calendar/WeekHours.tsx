@@ -1,29 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 
-import { TONE_VAR } from "@/components/desk/ui/tone";
+import { Popover } from "@/components/desk/ui/Popover";
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { When } from "@/components/desk/ui/When";
 import { hhmm, isOver, myStatus, timeRange } from "@/lib/calendar/agenda";
-import { isRunning, toneAhead } from "@/lib/calendar/overview";
+import { isRunning } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
-import { parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { humanYmd, parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
+import { busyMinutes, type BusyBlock } from "@/lib/desk/busy";
 import { shortName } from "@/lib/people/names";
-import { initialsOf } from "@/lib/people/queries";
+import { pluralRu } from "@/lib/tasks/status-text";
 
-import type { DeadlineMark } from "./deadlines";
+import { loudest, type DeadlineMark } from "./deadlines";
 import { hmAt, minutesAt, SNAP_MIN, slotOf, type Slot } from "./slots";
-import { HOUR_PX, hourRange, layoutDay, stackTops, wallOf, yOf, type Placed } from "./week";
+import { fitMarks, HOUR_PX, hourRange, layoutDay, wallOf, yOf, type Placed } from "./week";
 
-/** Faces on a meeting before «+N». */
-const FACES = 3;
+/** Names on a meeting before «+N». */
+const NAMES = 3;
 /** The height of a deadline's mark (two lines: when and who, then what), and the gap between two stacked. */
 const MARK_H = 34;
 const MARK_GAP = 2;
+/** «+N» under the marks that fit. */
+const MORE_H = 20;
+/** A block of the director's busy time this tall holds its hours under the words. */
+const BUSY_TWO_LINES = 38;
 /** The time column on the left. */
 const GUTTER = 52;
 /** An hour's label gives way to the clock of now when they would touch. */
-const NOW_LABEL_ROOM_MIN = 14;
+const NOW_LABEL_ROOM_MIN = 20;
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const COLUMNS = `${GUTTER}px repeat(7, minmax(0, 1fr))`;
@@ -46,6 +53,8 @@ type Props = {
   onSlot: ((slot: Slot, box: { left: number; right: number; top: number }) => void) | null;
   /** The meeting being made — drawn where it will stand, with its title as typed. */
   ghost: { slot: Slot; title: string } | null;
+  /** The secretary's layer: when the director is busy, nothing about what with; null — not hers. */
+  busy: Map<Ymd, BusyBlock[]> | null;
 };
 
 /** A press that moved less than this is a click. */
@@ -69,18 +78,18 @@ function ahead(slot: Slot, first: number | null): Slot | null {
 
 /**
  * The week as hours (D-154): a column a day under its date, the hours 08:00–20:00 down the left
- * (wider when a meeting or a deadline on screen lies outside), today in a breath of the accent
- * and the line of now across it. A meeting is a block where the clock puts it, as tall as it
- * lasts, with the rail of its moment; meetings that overlap stand side by side. An empty week
- * still shows its hours — the structure of the days to fill.
+ * (wider when a meeting or a deadline on screen lies outside), today's date stamped in print and
+ * the line of now across its column. A meeting is a flat block where the clock puts it, as tall as
+ * it lasts, with a line of print on its left — the pen when it waits for this person's answer, a
+ * hairline when it is over; meetings that overlap stand side by side. An empty week still shows
+ * its hours — the structure of the days to fill. Deadlines are words on the sheet, stacked from
+ * their hours; what does not fit goes behind «+N», a list beside the day. For the secretary the
+ * director's busy time is a hatched stretch under her own meetings, without a word about them.
  */
-export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, onSlot, ghost }: Props) {
+export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, onSlot, ghost, busy }: Props) {
   const events = days.flatMap((ymd) => byDay.get(ymd) ?? []);
   const marks = deadlines ? days.flatMap((ymd) => deadlines.get(ymd) ?? []) : [];
-  const { from, to } = hourRange(
-    events,
-    marks.map((mark) => mark.minutes),
-  );
+  const { from, to } = hourRange(events, [...marks.map((mark) => mark.minutes), ...(busy ? busyMinutes(busy) : [])]);
   const height = (to - from) * HOUR_PX;
   const hours = Array.from({ length: to - from + 1 }, (_, index) => from + index);
 
@@ -137,7 +146,7 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
 
   /** The minutes under the mouse in a column, from its own box. */
   const minutesIn = (event: ReactMouseEvent<HTMLElement>, step = SNAP_MIN) => minutesAt(event.clientY - event.currentTarget.getBoundingClientRect().top, from, step);
-  const onEmpty = (event: ReactMouseEvent<HTMLElement>) => !(event.target as Element).closest("[data-testid=desk-event], [data-testid=desk-deadline]");
+  const onEmpty = (event: ReactMouseEvent<HTMLElement>) => !(event.target as Element).closest("[data-testid=desk-event], [data-testid=desk-deadline], [data-testid=desk-deadline-more]");
 
   const pressDay = (ymd: Ymd) => (event: ReactMouseEvent<HTMLElement>) => {
     if (!onSlot || event.button !== 0 || !onEmpty(event) || earliest(ymd, now) === null) return;
@@ -176,8 +185,8 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
   });
 
   return (
-    <div className="min-w-0 overflow-clip rounded-[12px] border border-border" data-testid="desk-calendar-week" data-hours={`${from}-${to}`}>
-      <div className="sticky top-0 z-30 grid border-b border-border bg-bg" style={{ gridTemplateColumns: COLUMNS }}>
+    <div className="min-w-0 overflow-clip border-t border-text" data-testid="desk-calendar-week" data-hours={`${from}-${to}`}>
+      <div className="sticky top-0 z-30 grid border-b border-text bg-bg" style={{ gridTemplateColumns: COLUMNS }}>
         <span aria-hidden />
         {days.map((ymd, index) => (
           <DayHead key={ymd} ymd={ymd} index={index} today={today} />
@@ -191,27 +200,27 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
             if (hour === to) return null;
             if (nowY !== null && Math.abs(clock.minutes - hour * 60) < NOW_LABEL_ROOM_MIN) return null;
             return (
-              <span key={hour} className="nums absolute right-2 text-[11px] font-medium leading-4 text-muted/80" style={{ top: hour === from ? 3 : yOf(hour * 60, from) - 8 }}>
+              <span key={hour} className="nums absolute right-2 text-[11px] leading-4 text-muted" style={{ top: hour === from ? 3 : yOf(hour * 60, from) - 8 }}>
                 {pad(hour)}:00
               </span>
             );
           })}
           {nowY !== null ? (
-            <span className="nums absolute right-1.5 rounded-[5px] px-1 text-[11px] font-bold leading-4 text-accent" style={{ top: nowY - 8 }} data-testid="desk-now-time">
+            <span className="nums absolute right-2 text-[11px] leading-4 text-text" style={{ top: nowY - 8 }} data-testid="desk-now-time">
               {pad(Math.floor(clock.minutes / 60))}:{pad(clock.minutes % 60)}
             </span>
           ) : null}
         </div>
 
-        {days.map((ymd, index) => (
+        {days.map((ymd) => (
           <DayColumn
             key={ymd}
             ymd={ymd}
-            weekend={index >= 5}
-            isToday={ymd === today}
             from={from}
+            height={height}
             events={byDay.get(ymd) ?? []}
             marks={deadlines?.get(ymd) ?? []}
+            busy={busy?.get(ymd) ?? []}
             now={now}
             nowY={ymd === clock.ymd ? nowY : null}
             meId={meId}
@@ -233,26 +242,21 @@ function DayHead({ ymd, index, today }: { ymd: Ymd; index: number; today: Ymd })
   const isToday = ymd === today;
   const past = ymd < today;
   return (
-    <div className={`flex h-[52px] items-center gap-2 border-l border-border/70 px-2.5 ${isToday ? "bg-accent/[0.05]" : ""}`}>
-      <span className={`text-[12px] font-semibold uppercase leading-4 tracking-[0.06em] ${isToday ? "text-accent" : "text-muted"}`}>{WEEKDAYS_SHORT_RU[index]}</span>
-      <span
-        className={`nums flex h-7 min-w-7 items-center justify-center rounded-full px-1 font-display text-[16px] font-bold leading-none ${
-          isToday ? "bg-accent text-bg" : past ? "text-muted" : ""
-        }`}
-      >
-        {parseYmd(ymd)!.day}
-      </span>
+    <div className="flex h-10 items-center gap-2 border-l border-border/60 px-2">
+      <span className="desk-label uppercase">{WEEKDAYS_SHORT_RU[index]}</span>
+      {/* today is a date stamped in print: the one solid mark on the head of the week */}
+      <span className={`nums desk-figure flex h-6 min-w-6 items-center justify-center px-1 text-[17px] leading-none ${isToday ? "bg-text text-bg" : past ? "text-muted" : ""}`}>{parseYmd(ymd)!.day}</span>
     </div>
   );
 }
 
 function DayColumn({
   ymd,
-  weekend,
-  isToday,
   from,
+  height,
   events,
   marks,
+  busy,
   now,
   nowY,
   meId,
@@ -265,11 +269,12 @@ function DayColumn({
   ghost,
 }: {
   ymd: Ymd;
-  weekend: boolean;
-  isToday: boolean;
   from: number;
+  /** The grid's height, the foot the marks must stay above. */
+  height: number;
   events: CalendarEvent[];
   marks: DeadlineMark[];
+  busy: BusyBlock[];
   now: Date;
   nowY: number | null;
   meId: string;
@@ -285,50 +290,74 @@ function DayColumn({
   const placed = layoutDay(events);
   // marks stack downwards when two deadlines share an hour
   // the first line of a mark — its diamond and time — sits on the hour it is due
-  const tops = stackTops(
+  const fit = fitMarks(
     marks.map((mark) => yOf(mark.minutes, from) - 9),
     MARK_H + MARK_GAP,
+    MARK_H,
+    MORE_H,
+    height,
   );
-  const stacked = marks.map((mark, index) => ({ mark, top: tops[index] }));
 
   return (
     <section
       aria-label={ymd}
       data-testid="desk-week-day"
-      className={`relative min-w-0 select-none border-l border-border/70 ${isToday ? "bg-accent/[0.04]" : weekend ? "bg-surface/40" : ""}`}
+      className="relative min-w-0 select-none border-l border-border/60"
       onMouseDown={creating ? onPress : undefined}
       onMouseMove={creating ? onHover : undefined}
       onMouseLeave={creating ? onLeave : undefined}
       style={{
         // the hour lines: one hairline at the top of every hour
-        backgroundImage: "linear-gradient(to bottom, color-mix(in srgb, var(--border) 62%, transparent) 1px, transparent 1px)",
+        backgroundImage: "linear-gradient(to bottom, var(--rule-soft) 1px, transparent 1px)",
         backgroundSize: `100% ${HOUR_PX}px`,
       }}
     >
       {hover !== null ? (
         <span
           aria-hidden
-          className="nums pointer-events-none absolute inset-x-[3px] z-[5] flex items-start rounded-[7px] px-2 pt-1 text-[11px] font-semibold leading-4 text-accent/80"
-          style={{ top: yOf(hover, from) + 1, height: HOUR_PX / 2 - 2, background: "color-mix(in srgb, var(--accent) 7%, transparent)" }}
+          className="nums pointer-events-none absolute inset-x-[3px] z-[5] flex items-start px-2 pt-1 text-[11px] leading-4 text-accent"
+          style={{ top: yOf(hover, from) + 1, height: HOUR_PX / 2 - 2, background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}
           data-testid="desk-slot-hint"
         >
           + {hmAt(hover)}
         </span>
       ) : null}
+      {busy.map((block) => (
+        <DirectorBusy key={block.start} block={block} from={from} />
+      ))}
       {placed.map((item) => (
         <HourEvent key={item.event.id} item={item} from={from} now={now} meId={meId} onOpen={onOpen} />
       ))}
       {ghost ? <Ghost slot={ghost.slot} title={ghost.title} from={from} /> : null}
-      {stacked.map(({ mark, top }) => (
-        <DeadlineChip key={mark.id} mark={mark} top={top} />
+      {marks.slice(0, fit.shown).map((mark, index) => (
+        <DeadlineChip key={mark.id} mark={mark} top={fit.tops[index]} />
       ))}
+      {fit.moreTop !== null ? <DeadlinesMore marks={marks.slice(fit.shown)} top={fit.moreTop} ymd={ymd} now={now} /> : null}
       {nowY !== null ? (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 z-20" style={{ top: nowY }} data-testid="desk-now-line">
-          <span className="absolute -left-[5px] -top-[5px] h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_0_2px_var(--bg)]" />
-          <span className="absolute inset-x-0 -top-px h-[2px] bg-accent" />
+          <span className="absolute inset-x-0 -top-px h-[2px] bg-text" />
         </div>
       ) : null}
     </section>
+  );
+}
+
+/** The director's busy time for the secretary: a hatched stretch under her own meetings, and nothing about it but the hours. */
+function DirectorBusy({ block, from }: { block: BusyBlock; from: number }) {
+  const height = Math.max(20, ((block.end - block.start) * HOUR_PX) / 60 - 2);
+  return (
+    <div
+      className="desk-busy pointer-events-none absolute inset-x-[3px] z-[5] overflow-hidden px-2 py-1 text-[11px] leading-4 text-muted"
+      style={{ top: yOf(block.start, from) + 1, height }}
+      data-testid="desk-director-busy"
+    >
+      <span className="block w-fit max-w-full truncate bg-bg pr-1 font-medium">Директор занят</span>
+      {height >= BUSY_TWO_LINES ? (
+        <span className="nums block w-fit max-w-full truncate bg-bg pr-1">
+          {hmAt(block.start)}–{hmAt(block.end)}
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -337,46 +366,40 @@ function owesAnswer(event: CalendarEvent, meId: string, now: Date): boolean {
   return event.author_id !== meId && !isOver(event, now) && myStatus(event, meId) === "invited";
 }
 
-/** Who comes, as neutral initials: the ones who have not refused, three and «+N». */
-function Faces({ event }: { event: CalendarEvent }) {
-  const names = event.participants.filter((p) => p.status !== "declined").map((p) => p.person?.full_name ?? "");
+/** Who comes, in words: the ones who have not refused, three names and «+N». */
+function Who({ event }: { event: CalendarEvent }) {
+  const names = event.participants.filter((p) => p.status !== "declined").flatMap((p) => (p.person?.full_name ? [p.person.full_name] : []));
   if (names.length === 0) return null;
   return (
-    <span className="flex items-center" title={names.filter(Boolean).join(", ")}>
-      {names.slice(0, FACES).map((name, index) => (
-        <span
-          key={`${name}-${index}`}
-          aria-hidden
-          className={`flex h-[18px] w-[18px] items-center justify-center rounded-full bg-surface-2 font-display text-[8px] font-bold leading-none text-text/85 shadow-[0_0_0_1.5px_var(--surface)] ${index > 0 ? "-ml-1" : ""}`}
-        >
-          {name ? initialsOf(name) : "•"}
-        </span>
-      ))}
-      {names.length > FACES ? <span className="nums ml-1 text-[10px] font-semibold leading-4 text-muted">+{names.length - FACES}</span> : null}
+    <span className="min-w-0 truncate text-[11px] leading-4 text-muted" title={names.join(", ")}>
+      {names.slice(0, NAMES).map((name) => shortName(name)).join(", ")}
+      {names.length > NAMES ? ` +${names.length - NAMES}` : ""}
     </span>
   );
 }
 
-/** A meeting on the grid: when, what, who — the rail in the colour of its moment. */
+/** A meeting on the grid: what, when, who — flat, the line on its left says whose move it is. */
 function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: number; now: Date; meId: string; onOpen: (event: CalendarEvent, element: HTMLElement) => void }) {
   const { event } = item;
   const over = isOver(event, now);
   const running = isRunning(event, now);
   const owes = owesAnswer(event, meId, now);
-  const tone = toneAhead(event, now);
   const top = yOf(item.start, from) + 1;
   const height = Math.max(20, ((item.end - item.start) * HOUR_PX) / 60 - 2);
-  const narrow = item.lanes > 1;
+  // on each line, not on the block: the block's second column must start past its edge, out of sight
+  const edge = item.lanes > 1 ? "pr-1" : "pr-1.5";
   const compact = height < 38;
   const tall = height >= 76;
-  // the title takes the lines the block has left after the time and the faces
-  const titleLines = Math.max(1, Math.floor((height - 8 - 16 - (tall ? 24 : 0)) / 16));
+  // the words matter more than the time, which the grid already says: a short title leaves room for
+  // it, a long one takes it (the block's column wraps: what does not fit leaves whole, not half a line)
+  const titleLines = Math.max(1, Math.floor((height - 8 - (tall ? 16 : 0)) / 16));
   const style: CSSProperties = {
     top,
     height,
     left: `calc(${(item.lane / item.lanes) * 100}% + 2px)`,
     width: `calc(${100 / item.lanes}% - ${item.lanes > 1 ? 3 : 6}px)`,
-    background: running ? "color-mix(in srgb, var(--accent) 10%, var(--surface-2))" : over ? "color-mix(in srgb, var(--surface) 70%, transparent)" : "var(--surface-2)",
+    // the pen: this person's answer is owed; print: the norm; a meeting that is over keeps a hairline
+    borderLeftColor: owes ? "var(--accent)" : over ? "var(--border)" : "var(--text)",
   };
 
   return (
@@ -386,30 +409,29 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
       data-testid="desk-event"
       data-event-id={event.id}
       title={`${timeRange(event)} · ${event.title}${event.location ? ` · ${event.location}` : ""}`}
-      className={`absolute z-10 flex flex-col overflow-hidden rounded-[8px] border border-border/80 py-1 pl-2.5 ${narrow ? "pr-1" : "pr-1.5"} text-left shadow-[0_1px_0_rgba(0,0,0,.25)] transition-[border-color,filter] duration-[120ms] hover:border-muted/60 hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-        over ? "text-muted" : ""
+      className={`absolute z-10 flex flex-col flex-wrap content-start overflow-hidden border border-l-2 border-border/60 py-1 pl-2 text-left transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+        over ? "text-muted" : running ? "bg-surface-2" : "bg-surface"
       }`}
       style={style}
     >
-      <span aria-hidden className="absolute inset-y-1 left-[3px] w-[3px] rounded-full" style={{ background: TONE_VAR[tone], opacity: over ? 0.35 : 1 }} />
-      {owes ? <span aria-label="нужен ответ" className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full" style={{ background: "var(--warn)" }} /> : null}
+      {owes ? <span className="sr-only">нужен ответ</span> : null}
       {compact ? (
-        <span className="truncate pr-2 text-[12px] leading-4">
-          <span className="nums text-muted">{hhmm(event.starts_at)}</span> <span className="font-semibold">{event.title}</span>
+        <span className={`w-full truncate ${edge} text-[12px] leading-4`}>
+          <When className="text-muted">{hhmm(event.starts_at)}</When> <span className="font-semibold">{event.title}</span>
         </span>
       ) : (
         <>
-          <span className={`text-[12px] font-semibold leading-4 ${narrow ? "pr-0.5" : "pr-2"}`} style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
+          <span className={`w-full ${edge} text-[12px] font-semibold leading-4`} style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
             {event.title}
           </span>
-          <span className="nums mt-0.5 truncate text-[11px] leading-4 text-muted">
-            {timeRange(event)}
+          <span className={`w-full truncate ${edge} text-[11px] leading-4 text-muted`}>
+            <When>{timeRange(event)}</When>
             {event.location ? ` · ${event.location}` : ""}
           </span>
           {tall ? (
-            <span className="mt-auto flex min-h-[20px] items-center justify-between gap-1 pt-1">
-              <Faces event={event} />
-              {owes ? <span className="truncate text-[10px] font-semibold leading-4 text-warn">нужен ответ</span> : null}
+            <span className={`mt-auto flex min-h-[16px] w-full ${edge} items-center justify-between gap-1`}>
+              <Who event={event} />
+              {owes ? <span aria-hidden className="shrink-0 text-[11px] font-medium leading-4 text-warn">нужен ответ</span> : null}
             </span>
           ) : null}
         </>
@@ -425,67 +447,121 @@ function Ghost({ slot, title, from }: { slot: Slot; title: string; from: number 
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-[3px] z-[25] flex flex-col overflow-hidden rounded-[8px] border px-2 py-1"
-      style={{
-        top,
-        height,
-        background: "color-mix(in srgb, var(--accent) 16%, var(--surface-2))",
-        borderColor: "color-mix(in srgb, var(--accent) 60%, transparent)",
-        boxShadow: "0 6px 18px -8px rgba(0,0,0,.6)",
-      }}
+      className="pointer-events-none absolute inset-x-[3px] z-[25] flex flex-col overflow-hidden border border-l-2 border-accent bg-surface px-2 py-1"
+      style={{ top, height }}
       data-testid="desk-slot-ghost"
     >
-      <span className="truncate text-[12px] font-semibold leading-4">{title.trim() || "Новое мероприятие"}</span>
-      <span className="nums truncate text-[11px] leading-4 text-text/70">
+      <span className="truncate text-[12px] font-semibold leading-4">{title.trim() || "Новая встреча"}</span>
+      <span className="nums truncate text-[11px] leading-4 text-muted">
         {hmAt(slot.start)}–{hmAt(slot.end)}
       </span>
     </div>
   );
 }
 
-const MARK_STYLE: Record<DeadlineMark["tone"], { background: string; border: string; time: string; glyph: string }> = {
-  danger: {
-    background: "color-mix(in srgb, var(--danger) 14%, var(--bg))",
-    border: "color-mix(in srgb, var(--danger) 45%, transparent)",
-    time: "var(--danger)",
-    glyph: "var(--danger)",
-  },
-  warn: {
-    background: "color-mix(in srgb, var(--warn) 13%, var(--bg))",
-    border: "color-mix(in srgb, var(--warn) 42%, transparent)",
-    time: "var(--warn)",
-    glyph: "var(--warn)",
-  },
-  muted: {
-    background: "color-mix(in srgb, var(--surface-2) 92%, var(--bg))",
-    border: "var(--border)",
-    time: "var(--text-muted)",
-    glyph: "var(--text-muted)",
-  },
+/** A deadline's ink: the red of the pencil once it is late; today's in print, any other day's quiet. */
+const MARK_INK: Record<DeadlineMark["tone"], string> = {
+  danger: "var(--danger)",
+  warn: "var(--text)",
+  muted: "var(--text-muted)",
 };
 
-/** «◆ 18:00 Айгуль · Смета» — an order due at this hour; a click opens it in «Задачи». */
-function DeadlineChip({ mark, top }: { mark: DeadlineMark; top: number }) {
-  const style = MARK_STYLE[mark.tone];
-  const who = mark.who ? shortName(mark.who) : `${mark.count} чел.`;
+const markWho = (mark: DeadlineMark) => (mark.who ? shortName(mark.who) : `${mark.count} чел.`);
+
+function markTitle(mark: DeadlineMark): string {
   const state = mark.tone === "danger" ? "просрочено" : mark.tone === "warn" ? "срок сегодня" : "срок";
+  return `${state} ${mark.time} · ${mark.who ?? `${mark.count} человек`} · ${mark.title}`;
+}
+
+/** ↑/↓ walk the list; the calendar's own keys (arrows, letters) wait until it is closed. */
+function walkLinks(event: ReactKeyboardEvent<HTMLElement>) {
+  event.stopPropagation();
+  if (event.code !== "ArrowDown" && event.code !== "ArrowUp") return;
+  event.preventDefault();
+  const links = [...event.currentTarget.querySelectorAll<HTMLElement>("a")];
+  const at = links.indexOf(document.activeElement as HTMLElement);
+  links[(at + (event.code === "ArrowDown" ? 1 : links.length - 1)) % links.length]?.focus();
+}
+
+/** «+5» under the marks that fit: the rest of the day's deadlines in a list, each opens its task. */
+function DeadlinesMore({ marks, top, ymd, now }: { marks: DeadlineMark[]; top: number; ymd: Ymd; now: Date }) {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const ink = MARK_INK[loudest(marks)];
+  const count = `${marks.length} ${pluralRu(marks.length, ["срок", "срока", "сроков"])}`;
+  const close = () => {
+    anchor?.focus({ preventScroll: true });
+    setAnchor(null);
+  };
+  return (
+    <>
+      <button
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded={Boolean(anchor)}
+        aria-label={`Ещё ${count}`}
+        title={`Ещё ${count}`}
+        onClick={(click) => setAnchor(anchor ? null : click.currentTarget)}
+        data-testid="desk-deadline-more"
+        data-tone={loudest(marks)}
+        className="absolute inset-x-[3px] z-[15] flex items-center gap-1.5 overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        style={{ top, height: MORE_H }}
+      >
+        <span aria-hidden className="h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: ink }} />
+        <span className="nums" style={{ color: ink }}>
+          +{marks.length}
+        </span>
+      </button>
+      <Popover open={Boolean(anchor)} onClose={close} anchor={anchor} width={320} label={`Ещё ${count}`}>
+        <div className="flex max-h-[min(420px,70vh)] flex-col" onKeyDown={walkLinks} data-testid="desk-deadline-list">
+          <SectionLabel count={marks.length} className="px-3 pt-1.5">
+            Ещё сроки · {humanYmd(ymd, now)}
+          </SectionLabel>
+          <div className="min-h-0 overflow-y-auto py-1">
+            {marks.map((mark, index) => (
+              <Link
+                key={mark.id}
+                href={`/desk/tasks?id=${mark.id}`}
+                title={markTitle(mark)}
+                onClick={() => setAnchor(null)}
+                data-autofocus={index === 0 ? "" : undefined}
+                data-testid="desk-deadline-item"
+                className="flex h-8 min-w-0 items-center gap-2 px-3 text-[13px] leading-4 transition-colors hover:bg-surface-2 focus-visible:bg-surface-2 focus-visible:outline-none"
+              >
+                <span aria-hidden className="h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: MARK_INK[mark.tone] }} />
+                <When overdue={mark.tone === "danger"} className={`shrink-0 ${mark.tone === "muted" ? "text-muted" : ""}`}>
+                  {mark.time}
+                </When>
+                <span className="shrink-0 font-medium">{markWho(mark)}</span>
+                <span className="min-w-0 truncate text-muted">{mark.title}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </Popover>
+    </>
+  );
+}
+
+/** «◆ 18:00 Айгуль · Смета» — an order due at this hour, words on the sheet; a click opens it in «Задачи». */
+function DeadlineChip({ mark, top }: { mark: DeadlineMark; top: number }) {
+  const ink = MARK_INK[mark.tone];
   return (
     <Link
       href={`/desk/tasks?id=${mark.id}`}
       data-testid="desk-deadline"
       data-tone={mark.tone}
-      title={`${state} ${mark.time} · ${mark.who ?? `${mark.count} человек`} · ${mark.title}`}
-      className="absolute inset-x-[3px] z-[15] flex flex-col justify-center overflow-hidden rounded-[7px] border px-1.5 text-[11px] leading-[14px] shadow-[0_1px_0_rgba(0,0,0,.3)] transition-[filter] duration-[120ms] hover:brightness-125 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-      style={{ top, height: MARK_H, background: style.background, borderColor: style.border }}
+      title={markTitle(mark)}
+      className="absolute inset-x-[3px] z-[15] flex flex-col justify-center overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      style={{ top, height: MARK_H }}
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <span aria-hidden className="h-[7px] w-[7px] shrink-0 rotate-45 rounded-[1px]" style={{ background: style.glyph }} />
-        <span className="nums shrink-0 font-semibold" style={{ color: style.time }}>
+        <span aria-hidden className="h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: ink }} />
+        <When overdue={mark.tone === "danger"} className={`shrink-0 ${mark.tone === "muted" ? "text-muted" : ""}`}>
           {mark.time}
-        </span>
-        <span className="min-w-0 truncate font-medium text-text/90">{who}</span>
+        </When>
+        <span className="min-w-0 truncate font-medium">{markWho(mark)}</span>
       </span>
-      <span className="truncate pl-[13px] text-text/75">{mark.title}</span>
+      <span className="truncate pl-3 text-muted">{mark.title}</span>
     </Link>
   );
 }

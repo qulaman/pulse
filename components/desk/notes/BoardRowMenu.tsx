@@ -28,7 +28,7 @@ export function BoardRowMenu({ board, me, onBin }: { board: MindBoard; me: { use
         items={items}
         label={`Действия с доской «${board.title}»`}
         width={248}
-        className="flex h-7 w-7 items-center justify-center rounded-[8px] text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+        className="flex h-7 w-7 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
       >
         <span data-testid="desk-board-menu" className="contents">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -105,7 +105,6 @@ function RenameBody({ board, me, onClose }: { board: MindBoard; me: { userId: st
       }}
     >
       <label className="field flex h-10 items-center px-3">
-        <NoteIcon name="board" size={15} className="mr-2 shrink-0 text-muted" />
         <input
           data-autofocus
           value={title}

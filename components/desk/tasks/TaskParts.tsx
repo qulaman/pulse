@@ -7,10 +7,10 @@ import { Menu } from "@/components/desk/ui/Menu";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
+import { When } from "@/components/desk/ui/When";
 import { ruleLine } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { useTaskDelivery } from "@/components/tasks/DeliveryStatus";
-import { Icon, type IconName } from "@/components/tasks/desk/icons";
 import { ACTION_LABEL, allActionsFor, isPrimaryKey, wideLabelOf } from "@/components/tasks/list/DirectorTaskCard";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
 import { humanAqtobe } from "@/lib/ai/time";
@@ -19,22 +19,20 @@ import { isReactable, priceLabel, REACTION_CODES, REACTION_GLYPH, REACTION_LABEL
 import { answersFor, wantsWords } from "@/lib/tasks/answers";
 import { heldLine } from "@/lib/tasks/held";
 import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
-import { closedAtOf, stepsOf, timeLeft, type StepState } from "@/lib/tasks/overview";
+import { closedAtOf, stepsOf, timeLeft, type Step } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, TEXT } from "@/lib/tasks/status-text";
 
-import { deliveryLine, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
+import { deliveryLine, handInVerdict, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
 import { focusComposer } from "./DeskThread";
 import { MiniButton } from "./RowMoves";
 import type { DeskTask } from "./useDeskTask";
 
-/** A line of words with its dot, in its tone — «не открывал с 9:14». */
+/** A line of words — «не открывал с 9:14». A receipt is nobody's move: only a failure takes a colour (D-158). */
 export function ToneLine({ line, testId, className = "", children }: { line: Line; testId?: string; className?: string; children?: ReactNode }) {
-  const color = line.tone ? TONE_VAR[line.tone] : "var(--text-muted)";
   return (
-    <span className={`flex min-w-0 items-center gap-1.5 ${className}`} style={{ color }} data-testid={testId}>
-      <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: color }} />
+    <span className={`flex min-w-0 items-center gap-1.5 ${className}`} style={{ color: line.tone === "danger" ? "var(--danger)" : "var(--text-muted)" }} data-testid={testId}>
       <span className="truncate" title={line.text}>
         {line.text}
       </span>
@@ -46,7 +44,7 @@ export function ToneLine({ line, testId, className = "", children }: { line: Lin
 /**
  * «Доставка» of a table row (принцип 8): the push receipt of a task not yet taken comes from the
  * table's one query for all such rows (`useTaskReceipts`). Neutral words: a row carries two
- * colours at most — its stage ring and a missed deadline (D-154).
+ * colours at most — its stage ring and a missed deadline (D-158).
  */
 export function DeliveryCell({ task, receipt, now }: { task: TaskWithPeople; receipt: DeliveryRow | undefined; now: Date }) {
   const line = task.status === "sent" || task.status === "scheduled" ? deliveryLine(task, receipt ?? null, now) : null;
@@ -88,7 +86,7 @@ function FieldButton({
         data-act={act}
         data-testid={testId}
         onClick={(event) => onPress(event.currentTarget)}
-        className="-mx-1.5 inline-flex min-w-0 items-center gap-1 rounded-[7px] px-1.5 py-0.5 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="-mx-1.5 inline-flex min-w-0 items-center gap-1 rounded-[2px] px-1.5 transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
       >
         {children}
         <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden className="shrink-0 text-muted/70">
@@ -102,38 +100,46 @@ function FieldButton({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
-      <dt className="pt-[3px] text-[12px] leading-4 text-muted">{label}</dt>
-      <dd className="flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] leading-5">{children}</dd>
+      <dt className="text-[13px] leading-5 text-muted">{label}</dt>
+      <dd className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[13px] leading-5">{children}</dd>
     </>
   );
 }
 
-/** What waits for the morning with «отправить сейчас» (D-129), else the push receipt or «принял». */
+/**
+ * «Доставка» (принцип 8): what waits for the morning with «отправить сейчас» (D-129), else the push
+ * receipt of a task not yet taken. Once it is taken the path under the fields says when.
+ */
 function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; onSendNow: () => void }) {
   const asks = task.status !== "scheduled" && task.status !== "revoked";
   const delivery = useTaskDelivery(asks ? task.id : null, task.assignee_id);
   const held = delivery.data ? heldLine(delivery.data.held, now) : null;
   if (held) {
     return (
-      <span className="flex items-center gap-1.5 text-muted" data-testid="desk-receipt">
-        {held} ·
-        <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onSendNow} data-testid="send-now">
-          отправить сейчас
-        </button>
-      </span>
+      <Field label="Доставка">
+        <span className="flex items-center gap-1.5 text-muted" data-testid="desk-receipt">
+          {held} ·
+          <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onSendNow} data-testid="send-now">
+            отправить сейчас
+          </button>
+        </span>
+      </Field>
     );
   }
-  const line = deliveryLine(task, delivery.data?.receipt, now);
-  return line ? <ToneLine line={line} testId="desk-receipt" /> : <span className="text-muted/60">—</span>;
+  const line = task.status === "sent" ? deliveryLine(task, delivery.data?.receipt, now) : null;
+  return line ? (
+    <Field label="Доставка">
+      <ToneLine line={line} testId="desk-receipt" />
+    </Field>
+  ) : null;
 }
 
-const STEP_TONE: Record<StepState, string> = {
-  done: "var(--ok)",
-  current: "var(--accent)",
-  warn: "var(--warn)",
-  bad: "var(--danger)",
-  todo: "var(--border)",
-};
+/** A step's ink: the pen only where the move is the director's — the check of work handed in. */
+function stepInk(step: Step): string {
+  if (step.state === "bad") return "var(--danger)";
+  if (step.state === "todo") return "var(--border)";
+  return step.state === "current" && step.key === "closed" ? "var(--warn)" : "var(--text)";
+}
 
 /** The four steps of a task in one quiet line (выдана → в работе → сдана → принята), each with its time. */
 function Path({ desk, now }: { desk: DeskTask; now: Date }) {
@@ -147,8 +153,8 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
         const time = step.at ? humanAqtobe(new Date(step.at), now).replace(/^сегодня /, "") : due ? `до ${humanAqtobe(new Date(due), now).replace(/^сегодня /, "")}` : "";
         return (
           <li key={step.key} className="min-w-0">
-            <span aria-hidden className="block h-[3px] rounded-full" style={{ background: STEP_TONE[step.state], opacity: step.state === "todo" ? 0.8 : 1 }} />
-            <span className={`mt-1 block truncate text-[12px] leading-4 ${pending ? "font-semibold" : step.state === "todo" ? "text-muted" : "text-text/85"}`} style={pending ? { color: STEP_TONE[step.state] } : undefined}>
+            <span aria-hidden className="block h-[2px]" style={{ background: stepInk(step) }} />
+            <span className={`mt-1 block truncate text-[12px] leading-4 ${pending ? "font-semibold" : step.state === "todo" ? "text-muted" : ""}`} style={pending ? { color: stepInk(step) } : undefined}>
               {step.label}
             </span>
             <span className="nums block h-4 truncate text-[11px] leading-4 text-muted">{time}</span>
@@ -162,8 +168,9 @@ function Path({ desk, now }: { desk: DeskTask; now: Date }) {
 /**
  * The head of a task at the desk (D-154 wave 3): who holds it — a click passes it on — and the
  * stage; the title; the fields a director changes with one click (the deadline: a popover with
- * the quick choices and a month); the receipt (принцип 8), the repeat, how much time is left, and
- * the path in four steps. `large` — the stack of «Разобрать», whose headline says the stage.
+ * the quick choices and a month); the receipt (принцип 8), the repeat, how much time is left or how
+ * the work came in, and the path in four steps. `large` — the stack of «Разобрать», whose headline
+ * says the stage and the hand-in.
  */
 export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; now: Date; large?: boolean; scope?: () => Element | null }) {
   const task = desk.task as TaskWithPeople;
@@ -176,7 +183,11 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
   const due = deadlineLabel(task, now);
   const urgentNow = !task.deadline && task.priority === "high" && !closed;
   const left = timeLeft(task, now);
+  const handedIn = (task.status === "pending_review" || task.status === "done") && Boolean(task.completed_at);
+  const verdict = handInVerdict(task);
   const from = (target: HTMLElement) => ({ at: target, scope: scope?.() ?? null });
+  // the pen and the pencil are for what waits on the director; a stage on its way stays in print
+  const stageInk = stage.tone === "danger" ? "var(--danger)" : desk.reason ? TONE_VAR[stage.tone] : "var(--text-muted)";
   return (
     <header>
       {/* the panel's «×» stands in the corner: the first line leaves it room */}
@@ -191,32 +202,35 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
           )}
         </div>
         {large ? null : (
-          <span className="shrink-0 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.08em]" style={{ color: TONE_VAR[stage.tone] }} data-testid="desk-task-stage">
+          <span className="desk-label shrink-0 uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
             {stage.text}
           </span>
         )}
       </div>
-      <h2 className={`mt-3 font-display font-bold tracking-[-0.01em] [overflow-wrap:anywhere] ${large ? "text-[24px] leading-[30px]" : "text-[18px] leading-6"}`}>{task.title}</h2>
+      <h2 className={`desk-task-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
 
-      <dl className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1.5" data-testid="desk-task-fields">
+      <dl className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">
         <Field label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}>
           {closed ? (
             <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
           ) : canDate ? (
             <FieldButton label="Изменить срок" keys={["D"]} taskId={task.id} act="extend retime" onPress={(target) => desk.acts.press("extend", task, from(target))} testId="desk-field-deadline">
-              <span className="nums" style={{ color: due.overdue ? "var(--danger)" : urgentNow ? "var(--warn)" : undefined }}>
-                {urgentNow ? TEXT.urgent : due.text}
-              </span>
+              <When overdue={due.overdue}>{urgentNow ? TEXT.urgent : due.text}</When>
             </FieldButton>
           ) : (
-            <span className="nums" style={{ color: due.overdue ? "var(--danger)" : undefined }}>
-              {due.text}
-            </span>
+            <When overdue={due.overdue}>{due.text}</When>
           )}
-          {task.priority === "high" && task.deadline && !closed ? <span className="text-warn">· {TEXT.urgent}</span> : null}
-          {!closed && !large && left.text !== TEXT.noDeadline ? (
-            <span className="text-[12px] font-semibold" style={{ color: TONE_VAR[left.tone] }}>
-              {left.text}
+          {task.priority === "high" && task.deadline && !closed ? <span>· {TEXT.urgent}</span> : null}
+          {!closed && !large && !handedIn && task.status !== "declined" && left.text !== TEXT.noDeadline ? (
+            <span className="text-muted">{left.text}</span>
+          ) : null}
+          {handedIn && verdict && !large ? (
+            <span
+              className={verdict.late ? "text-danger" : "text-muted"}
+              title={task.deadline ? `Срок: ${humanAqtobe(new Date(task.deadline), now)}` : undefined}
+              data-testid="desk-task-handin"
+            >
+              · сдана {verdict.text}
             </span>
           ) : null}
         </Field>
@@ -225,15 +239,10 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
             <span className="nums">{humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
           </Field>
         ) : null}
-        {task.status !== "revoked" && task.status !== "scheduled" ? (
-          <Field label="Доставка">
-            <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} />
-          </Field>
-        ) : null}
+        {task.status !== "revoked" && task.status !== "scheduled" ? <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} /> : null}
         {desk.rule ? (
           <Field label="Повтор">
             <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="desk-task-repeat">
-              <Icon name="repeat" size={13} />
               <span className="truncate">{ruleLine(desk.rule)}</span>
               {desk.rule.is_active ? null : <span className="text-muted">· остановлен</span>}
             </span>
@@ -252,19 +261,11 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
 /* What was said and what waits                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** One note of what waits on a task, at the desk's density: an icon in its tone, the words, maybe a way on. */
-export function Callout({ tone, icon, children, testId }: { tone: Tone; icon: IconName; children: ReactNode; testId?: string }) {
-  const color = TONE_VAR[tone];
+/** One note of what waits on a task: a stroke of its ink in the margin, the words on the sheet's vertical (D-158). */
+export function Callout({ tone, children, testId }: { tone: Tone; children: ReactNode; testId?: string }) {
   return (
-    <div
-      className="mt-3 flex items-start gap-2.5 rounded-[10px] border-l-2 py-2 pl-3 pr-3 text-[13px] leading-5"
-      style={{ borderColor: color, background: `color-mix(in srgb, ${color} 7%, transparent)` }}
-      data-testid={testId}
-    >
-      <span className="mt-[3px] shrink-0" style={{ color }}>
-        <Icon name={icon} size={14} />
-      </span>
-      <div className="min-w-0 flex-1">{children}</div>
+    <div className="-ml-3 mt-3 border-l-2 pl-2.5 text-[13px] leading-5" style={{ borderColor: TONE_VAR[tone] }} data-testid={testId}>
+      {children}
     </div>
   );
 }
@@ -278,25 +279,25 @@ function QuickReplies({ desk, now, onWords }: { desk: DeskTask; now: Date; onWor
   const question = desk.signals.question as string;
   const answers = answersFor(question, task.deadline, now);
   const words = wantsWords(question);
-  const chip = "inline-flex h-7 items-center gap-1.5 rounded-[8px] border px-2 text-[12px] font-semibold leading-4 transition-colors duration-[120ms]";
+  const chip = "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms]";
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="quick-answers">
+    <div className="mt-2 flex flex-wrap items-center gap-1" data-testid="quick-answers">
       {answers.map((answer, index) => (
         <button
           key={answer.label}
           type="button"
           onClick={() => desk.acts.answer(task, answer.text, answer.deadlineIso)}
           title={`Ответить «${answer.text}» (${index + 1})`}
-          className={`${chip} border-border bg-surface-2 text-text hover:border-muted/50`}
+          className={`${chip} border-border text-text hover:bg-surface-2`}
           data-quick-answer={index + 1}
         >
-          <span aria-hidden className="nums rounded-[4px] bg-bg/60 px-1 text-[10px] leading-[14px] text-muted">
+          <span aria-hidden className="nums text-[11px] leading-4 text-muted">
             {index + 1}
           </span>
           {answer.label}
         </button>
       ))}
-      <button type="button" onClick={onWords} className={`${chip} ${words ? "border-accent/35 bg-accent/12 text-accent hover:bg-accent/20" : "border-transparent text-muted hover:text-text"}`}>
+      <button type="button" onClick={onWords} className={`${chip} ${words ? "desk-move" : "border-transparent text-muted hover:text-text"}`}>
         Ответить словами <Kbd>O</Kbd>
       </button>
     </div>
@@ -317,22 +318,22 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
       : undefined;
   return (
     <div data-testid="desk-task-facts">
-      {task.body ? <p className="mt-4 whitespace-pre-line text-[14px] leading-5 text-text/90 [overflow-wrap:anywhere]">{task.body}</p> : null}
+      {task.body ? <p className="mt-3 max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{task.body}</p> : null}
 
       {question ? (
-        <Callout tone="warn" icon="question" testId="desk-question">
+        <Callout tone="warn" testId="desk-question">
           <p className="text-text">«{question}»</p>
           <QuickReplies desk={desk} now={now} onWords={onWords} />
         </Callout>
       ) : null}
       {task.status === "declined" ? (
-        <Callout tone="danger" icon="hand">
+        <Callout tone="danger">
           <span className="text-text">Отказ{declineReason ? `: ${declineReason}` : " без причины"}</span>
           {suggestion ? <span className="block text-muted">Предлагает передать: {suggestion.name}</span> : null}
         </Callout>
       ) : null}
       {request && isWorking(task.status) ? (
-        <Callout tone="warn" icon="clock">
+        <Callout tone="warn">
           <span className="text-text">
             Просит срок {untilWords(request.proposed, now)}
             {request.words ? ` · «${request.words}»` : ""}
@@ -341,23 +342,22 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
         </Callout>
       ) : null}
       {task.status === "rework" ? (
-        <Callout tone="warn" icon="rotate">
+        <Callout tone="muted">
           <span className="text-text">На доработке — ждём новый отчёт</span>
         </Callout>
       ) : null}
       {partial && task.status === "pending_review" ? (
-        <Callout tone="warn" icon="hand">
+        <Callout tone="warn">
           <span className="text-text">Сдано не всё — что осталось, в отчёте</span>
         </Callout>
       ) : null}
       {task.status === "revoked" ? (
-        <Callout tone="muted" icon={task.passed_to ? "swap" : "undo"}>
-          <span className="text-text/85">{task.passed_to ? passedWord(task.passed?.full_name) : TEXT.revoked}</span>
+        <Callout tone="muted">
+          <span className="text-text">{task.passed_to ? passedWord(task.passed?.full_name) : TEXT.revoked}</span>
         </Callout>
       ) : null}
       {nudgedAt && isWorking(task.status) ? (
-        <p className="mt-2 flex items-center gap-1.5 text-[12px] leading-4 text-muted" data-testid="nudged">
-          <Icon name="bell" size={12} />
+        <p className="mt-2 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
           Напомнили <span className="nums">{humanAqtobe(new Date(nudgedAt), now)}</span>
         </p>
       ) : null}
@@ -376,14 +376,13 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
       ) : null}
       {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
         <details className="group mt-3">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[12px] leading-4 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
-            <Icon name="quote" size={13} />
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-5 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
             {TEXT.transcriptSpoiler}
             <span aria-hidden className="transition-transform duration-[120ms] group-open:rotate-180">
               ▾
             </span>
           </summary>
-          <blockquote className="mt-2 border-l-2 pl-3 text-[13px] italic leading-5 text-muted" style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}>
+          <blockquote className="-ml-3 mt-1 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">
             «{task.source_transcript}»
           </blockquote>
         </details>
@@ -431,6 +430,10 @@ export function DeskReactions({ taskId, pointsEnabled }: { taskId: string; point
   );
 }
 
+/** «Ещё» of a task: a word like the row's other words, at the end of its line. */
+export const MORE_WORD =
+  "ml-auto inline-flex h-9 items-center gap-1.5 rounded-[2px] px-3 text-[14px] font-medium leading-4 text-text transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40";
+
 /**
  * The director's buttons of this task — the phone card's own (`cardKeysFor`), each with the letter
  * that does it, the closing move filled — and «Ещё» (or «.») with everything the task allows as
@@ -445,13 +448,14 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
   const wide = desk.keys[0] ? wideLabelOf(desk.keys[0], desk.signals.request, desk.signals.suggestion, now) : null;
   return (
     <div data-testid="desk-task-keys">
-      <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-wrap items-center gap-1">
         {desk.keys.map((key, index) => {
           const cap = keyOfAction(key, desk.letters);
           const label = index === 0 && wide ? wide : ACTION_LABEL[key];
           const filled = index === 0 && isPrimaryKey(key, desk.reason);
           return (
-            <span key={key} data-act-for={task.id} data-act={key === "reassign" || key === "handoff" ? "reassign handoff" : key === "extend" || key === "retime" ? "extend retime" : key} className="inline-flex">
+            // a word at the head of the line stands on the sheet's vertical, not its padding
+            <span key={key} data-act-for={task.id} data-act={key === "reassign" || key === "handoff" ? "reassign handoff" : key === "extend" || key === "retime" ? "extend retime" : key} className={`inline-flex ${index === 0 && !filled ? "-ml-2" : ""}`}>
               <MiniButton
                 label={label}
                 size="md"
@@ -473,10 +477,10 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
           data-testid="desk-task-more"
           data-desk-more={task.id}
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
-          className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-[9px] border border-border bg-surface-2 px-3 font-display text-[14px] font-semibold leading-4 text-text transition-colors duration-[120ms] hover:border-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+          className={MORE_WORD}
         >
           Ещё
-          <span aria-hidden className="rounded-[4px] bg-bg/60 px-1.5 text-[12px] font-bold leading-[14px] text-muted">
+          <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
             .
           </span>
         </button>
