@@ -117,6 +117,13 @@ async function checkShell(ctx: Ctx) {
   await open(page, "/desk/profile");
   await ctx.shot("profile");
   const nav = await page.getByRole("navigation", { name: "Разделы" }).getByRole("link").count();
+  // the switch of the sheet (D-159): dark by default, a press and back, nothing saved but in this browser
+  const themeOf = () => page.evaluate(() => document.documentElement.dataset.deskTheme);
+  const themeAtStart = await themeOf();
+  await page.getByTestId("desk-theme").click();
+  const themeSwitched = await themeOf();
+  await page.getByTestId("desk-theme").click();
+  record("тема: тёмная по умолчанию, кнопка переключает туда и обратно", themeAtStart === "dark" && themeSwitched === "light" && (await themeOf()) === "dark", `${themeAtStart} → ${themeSwitched}`);
   record("боковая навигация директора: одиннадцать разделов и профиль", nav === 12, `ссылок ${nav}`);
 
   // the profile is a computer's account page: a label on the left, its control on the right (D-154 wave 3)

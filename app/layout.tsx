@@ -65,7 +65,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* before React registers its listeners: nobody listens for loop boundaries, so the
             compositor keeps every infinite animation off the main thread (lib/design/quiet-loops.ts) */}
         <script dangerouslySetInnerHTML={{ __html: QUIET_LOOPS }} />
-        {/* the desk's sheet is light: a hard load must not flash the phone's dark tokens first */}
+        {/* the desk's sheet and its theme: a hard load must not flash the phone's tokens first */}
         <script dangerouslySetInnerHTML={{ __html: DESK_SHEET_SCRIPT }} />
       </head>
       <body className="min-h-dvh bg-bg text-text antialiased">

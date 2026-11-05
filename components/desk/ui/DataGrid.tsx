@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 
@@ -175,7 +175,11 @@ export function DataGrid<T>({
           group.rows.length === 0 ? null : (
             <Fragment key={group.key}>
               {group.title ? (
-                <div role="row" className="desk-grid-group flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3">
+                <div
+                  role="row"
+                  className="desk-grid-group flex items-center gap-2 border-b border-border/70 bg-bg/40 px-3 pb-1.5 pt-3"
+                  style={group.tone ? ({ "--group-tone": TONE_VAR[group.tone] } as CSSProperties) : undefined}
+                >
                   {group.onToggle ? (
                     <button
                       type="button"

@@ -11,6 +11,7 @@ import { ShortcutsHelp, useShortcuts, type Shortcut } from "@/components/desk/ui
 import { SideNav, useDeskBadges, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
 import { goPhoneView } from "@/lib/desk/device";
+import { useDeskTheme } from "@/lib/desk/theme";
 import { LIST_MIN, NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, PANEL_MIN, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
 import { isCommandKey, focusCommandLine, isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { chordHref, DESK_NAV, DESK_PROFILE_KEY, deskAllows, deskHomeFor, type DeskRole } from "@/lib/desk/routes";
@@ -33,6 +34,14 @@ function useDeskSurface() {
       delete root.dataset.journal;
     };
   }, []);
+  const theme = useDeskTheme();
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.deskTheme = theme;
+    return () => {
+      delete root.dataset.deskTheme;
+    };
+  }, [theme]);
 }
 
 /** How long «G» waits for the section's letter; once its card of letters is up, longer — it is being read. */

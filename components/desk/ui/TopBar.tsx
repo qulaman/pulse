@@ -12,6 +12,7 @@ import { useSettled } from "@/components/desk/ui/SideNav";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { goPhoneView } from "@/lib/desk/device";
+import { otherDeskTheme, useDeskTheme, writeDeskTheme } from "@/lib/desk/theme";
 import { DESK_PROFILE, type DeskRole } from "@/lib/desk/routes";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { ROLE_LABEL } from "@/lib/people/queries";
@@ -20,17 +21,19 @@ import { useVisits } from "@/lib/visits/queries";
 
 /**
  * Who is signed in, as a circle with a menu (D-154): the name and the role, «Профиль», «Клавиши»,
- * the fold of the navigation, «Телефонная версия» — each with the key that does the same
+ * the fold of the navigation, the theme, «Телефонная версия» — each with the key that does the same
  * (the desk's `Menu`: ↑/↓, Enter, Esc).
  */
 function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; role: DeskRole; folded: boolean; onToggleNav?: () => void }) {
   useNamesKey();
   const router = useRouter();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const theme = useDeskTheme();
   const items: MenuItem[] = [
     { key: "profile", label: "Профиль", hint: "G P", onSelect: () => router.push(DESK_PROFILE) },
     { key: "keys", label: "Клавиши", hint: "?", onSelect: openShortcuts },
     ...(onToggleNav ? [{ key: "fold", label: folded ? "Развернуть навигацию" : "Свернуть навигацию", hint: "[", onSelect: onToggleNav }] : []),
+    { key: "theme", label: THEME_WORD[otherDeskTheme(theme)], onSelect: () => writeDeskTheme(otherDeskTheme(theme)) },
     "separator",
     { key: "phone", label: <span data-testid="phone-view">Телефонная версия</span>, onSelect: () => goPhoneView(homeForRole(role)) },
   ];
@@ -65,6 +68,36 @@ function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; rol
         }
       />
     </div>
+  );
+}
+
+const THEME_WORD = { dark: "Тёмная тема", light: "Светлая тема" } as const;
+
+/** The sheet's two faces (D-159): one press, remembered by this browser; the icon shows where it leads. */
+function ThemeButton() {
+  const next = otherDeskTheme(useDeskTheme());
+  return (
+    <Tooltip label={THEME_WORD[next]} side="bottom">
+      <button
+        type="button"
+        aria-label={THEME_WORD[next]}
+        onClick={() => writeDeskTheme(next)}
+        data-testid="desk-theme"
+        data-next={next}
+        className="desk-focus flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          {next === "light" ? (
+            <>
+              <circle cx="12" cy="12" r="4" />
+              <path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4" />
+            </>
+          ) : (
+            <path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" />
+          )}
+        </svg>
+      </button>
+    </Tooltip>
   );
 }
 
@@ -115,6 +148,7 @@ export function TopBar({ fullName, role, folded = false, onToggleNav }: { fullNa
     <header className="desk-head flex h-[72px] shrink-0 items-center gap-4 border-b border-border px-6">
       {role === "director" ? <CommandLine /> : <SecretaryCalls />}
       <div className="ml-auto flex shrink-0 items-center gap-2">
+        <ThemeButton />
         <KeysButton />
         <MeMenu fullName={fullName} role={role} folded={folded} onToggleNav={onToggleNav} />
       </div>

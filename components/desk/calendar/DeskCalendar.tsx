@@ -61,6 +61,11 @@ function besideOf(element: HTMLElement, width: number, height: number): { x: num
   return besideAnchor(element.getBoundingClientRect(), width, { width: window.innerWidth, height: window.innerHeight }, height);
 }
 
+/** The phone's headline says «мероприятие»; the desk says «встреча» on every screen (D-158). */
+function meetingWords(text: string): string {
+  return text.replace(/мероприятий/g, "встреч").replace(/мероприятия/g, "встречи").replace(/мероприятие/g, "встреча");
+}
+
 /**
  * The moment in one sentence under the title (D-154) — the phone's status screen (D-100) said in
  * a line, loudest first: on now; about to start; invitations waiting; what today holds; a free day.
@@ -69,13 +74,13 @@ function besideOf(element: HTMLElement, width: number, height: number): { x: num
 function stateLine(screen: CalendarScreen, running: boolean): { text: string; tone?: Tone } {
   const tone: Tone | undefined = screen.focusId ? "warn" : undefined;
   const join = (...parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
-  if (running) return { text: `Идёт: ${screen.detail}`, tone };
+  if (running) return { text: meetingWords(`Идёт: ${screen.detail}`), tone };
   // a free day has no number: its words and what comes after it
-  if (screen.value === null) return { text: join(screen.eyebrow, screen.detail || screen.label), tone };
+  if (screen.value === null) return { text: meetingWords(join(screen.eyebrow, screen.detail || screen.label)), tone };
   // about to start — «Через 12 мин · 10:00 — Планёрка»
-  if (screen.tone === "warn" && !screen.focusId) return { text: join(screen.eyebrow, screen.detail), tone };
+  if (screen.tone === "warn" && !screen.focusId) return { text: meetingWords(join(screen.eyebrow, screen.detail)), tone };
   const detail = screen.detail ? screen.detail.charAt(0).toLowerCase() + screen.detail.slice(1) : null;
-  return { text: join(`${screen.value} ${screen.label}`, screen.focusId ? screen.detail : detail), tone };
+  return { text: meetingWords(join(`${screen.value} ${screen.label}`, screen.focusId ? screen.detail : detail)), tone };
 }
 
 /**

@@ -41,7 +41,7 @@ type Props = {
 function chipLine(event: CalendarEvent, meId: string, now: Date): string {
   if (isOver(event, now)) return "transparent";
   if (event.author_id !== meId && myStatus(event, meId) === "invited") return "var(--accent)";
-  return isRunning(event, now) ? "var(--text)" : "transparent";
+  return isRunning(event, now) ? "var(--sky)" : "transparent";
 }
 
 /** A day's deadlines as diamonds by the date — a click on the day opens its week, where they are written out. */
@@ -107,7 +107,7 @@ export function MonthGrid({ days, byDay, today, now, meId, onOpen, month, onDay,
               <span className="mb-0.5 flex items-center">
                 <span
                   className={`nums flex h-6 min-w-6 items-center justify-center px-1 text-[13px] leading-none ${
-                    isToday ? "bg-text text-bg" : outside ? "text-muted/45" : ymd < today ? "text-muted" : ""
+                    isToday ? "desk-today" : outside ? "text-muted/45" : ymd < today ? "text-muted" : ""
                   }`}
                 >
                   {parts.day}

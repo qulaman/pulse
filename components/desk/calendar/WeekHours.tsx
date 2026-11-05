@@ -245,7 +245,7 @@ function DayHead({ ymd, index, today }: { ymd: Ymd; index: number; today: Ymd })
     <div className="flex h-10 items-center gap-2 border-l border-border/60 px-2">
       <span className="desk-label uppercase">{WEEKDAYS_SHORT_RU[index]}</span>
       {/* today is a date stamped in print: the one solid mark on the head of the week */}
-      <span className={`nums desk-figure flex h-6 min-w-6 items-center justify-center px-1 text-[17px] leading-none ${isToday ? "bg-text text-bg" : past ? "text-muted" : ""}`}>{parseYmd(ymd)!.day}</span>
+      <span className={`nums desk-figure flex h-6 min-w-6 items-center justify-center px-1 text-[17px] leading-none ${isToday ? "desk-today" : past ? "text-muted" : ""}`}>{parseYmd(ymd)!.day}</span>
     </div>
   );
 }
@@ -335,7 +335,7 @@ function DayColumn({
       {fit.moreTop !== null ? <DeadlinesMore marks={marks.slice(fit.shown)} top={fit.moreTop} ymd={ymd} now={now} /> : null}
       {nowY !== null ? (
         <div aria-hidden className="pointer-events-none absolute inset-x-0 z-20" style={{ top: nowY }} data-testid="desk-now-line">
-          <span className="absolute inset-x-0 -top-px h-[2px] bg-text" />
+          <span className="desk-now absolute inset-x-0 -top-px h-[2px]" />
         </div>
       ) : null}
     </section>
@@ -399,7 +399,7 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
     left: `calc(${(item.lane / item.lanes) * 100}% + 2px)`,
     width: `calc(${100 / item.lanes}% - ${item.lanes > 1 ? 3 : 6}px)`,
     // the pen: this person's answer is owed; print: the norm; a meeting that is over keeps a hairline
-    borderLeftColor: owes ? "var(--accent)" : over ? "var(--border)" : "var(--text)",
+    borderLeftColor: owes ? "var(--accent)" : over ? "var(--border)" : "var(--sky)",
   };
 
   return (
