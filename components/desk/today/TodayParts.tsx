@@ -194,8 +194,19 @@ export function Decisions({
   if (failed && nothing) return null;
   return (
     <section className="@container flex flex-col gap-1" data-testid="today-decisions">
-      <SectionLabel count={items.length + extras.length} action={items.length > 0 ? <BlockLink href="/desk/tasks?tab=yours">Все в задачах →</BlockLink> : null}>
-        Ждут вашего решения
+      {/* the same words as the «Ждут вас» tab of «Задачи»; «Разобрать» goes through them one by one (D-160) */}
+      <SectionLabel
+        count={items.length + extras.length}
+        action={
+          items.length > 0 ? (
+            <span className="flex items-center gap-4">
+              <BlockLink href="/desk/inbox">Разобрать по одной →</BlockLink>
+              <BlockLink href="/desk/tasks?tab=yours">Все в задачах →</BlockLink>
+            </span>
+          ) : null
+        }
+      >
+        Ждут вас
       </SectionLabel>
       {!nothing || extrasUnknown ? null : (
         <EmptyState tone="ok" title="Ваших решений ничего не ждёт" hint="Сданная работа, вопросы, просьбы о сроке и отказы встанут сюда — с кнопками под рукой" />

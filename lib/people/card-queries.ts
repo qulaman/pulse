@@ -5,27 +5,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/components/ui/Toast";
 import { AVATAR_BUCKET, avatarPath } from "@/lib/people/avatar";
 import type { OpenWork } from "@/lib/people/handover";
+import type { HistoryLine } from "@/lib/people/history";
 import { peopleKeys } from "@/lib/people/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
-/** What stands behind a card: may it be deleted, the person's open work. */
-export type Standing = { deletable: boolean; open: OpenWork };
+/**
+ * What stands behind a card: may it be erased, the person's open work, and — asked with `full` —
+ * the history itself by kind («задачи — 12, очки — 3»; null when not counted).
+ */
+export type Standing = { deletable: boolean; history: HistoryLine[] | null; open: OpenWork };
 
-const standingKey = (id: string) => ["people", id, "standing"] as const;
+const standingKey = (id: string, full = false) => ["people", id, "standing", full ? "full" : "quick"] as const;
 
 async function failure(res: Response, fallback: string): Promise<Error> {
   const body = (await res.json().catch(() => ({}))) as { error?: { message_ru?: string } };
   return new Error(body.error?.message_ru ?? fallback);
 }
 
-/** `GET /api/people/[id]`, for those who may fire and delete: always read afresh, it decides destructive moves. */
-export function useStanding(id: string, enabled: boolean) {
+/** `GET /api/people/[id]`, for those who may remove and erase: always read afresh, it decides destructive moves. */
+export function useStanding(id: string, enabled: boolean, full = false) {
   return useQuery({
-    queryKey: standingKey(id),
+    queryKey: standingKey(id, full),
     enabled,
     staleTime: 0,
     queryFn: async (): Promise<Standing> => {
-      const res = await fetch(`/api/people/${id}`, { credentials: "include" });
+      const res = await fetch(`/api/people/${id}${full ? "?history=1" : ""}`, { credentials: "include" });
       if (!res.ok) throw await failure(res, "Не удалось прочитать карточку");
       return (await res.json()) as Standing;
     },
@@ -80,17 +84,22 @@ function useRosterRefresh() {
 export function useSetWorking() {
   const refresh = useRosterRefresh();
   return useMutation({
-    mutationFn: async ({ id, working }: { id: string; working: boolean }) => {
-      const supabase = createBrowserSupabase();
-      const { data, error } = await supabase.from("profiles").update({ is_active: working }).eq("id", id).select("id");
-      if (error) {
-        console.error("is_active update failed:", error.message);
-        throw new Error("Не получилось сохранить — можно ещё раз");
-      }
-      if (!data?.length) throw new Error("Эту карточку менять нельзя");
-    },
+    mutationFn: ({ id, working }: { id: string; working: boolean }) => setWorking(id, working),
     onSuccess: refresh,
   });
+}
+
+/**
+ * The same write without a hook: «Вернуть» in a toast outlives the dialog that showed it, and a
+ * hook's mutation of an unmounted dialog would run without its answer.
+ */
+export async function setWorking(id: string, working: boolean): Promise<void> {
+  const { data, error } = await createBrowserSupabase().from("profiles").update({ is_active: working }).eq("id", id).select("id");
+  if (error) {
+    console.error("is_active update failed:", error.message);
+    throw new Error("Не получилось сохранить — можно ещё раз");
+  }
+  if (!data?.length) throw new Error("Эту карточку менять нельзя");
 }
 
 /** One task to another person: the desk's own «Передать другому» API, `client_request_id` per task. */
@@ -102,6 +111,37 @@ export async function reassignTask(taskId: string, assigneeId: string, requestId
     body: JSON.stringify({ assignee_id: assigneeId, client_request_id: requestId }),
   });
   if (!res.ok) throw await failure(res, "Не получилось передать");
+}
+
+/** One task taken back (D-01): the person's copy closes, a `scheduled` one that reached nobody goes outright. */
+export async function revokeTask(taskId: string, requestId: string): Promise<void> {
+  const res = await fetch(`/api/tasks/${taskId}/revoke`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ client_request_id: requestId }),
+  });
+  if (!res.ok) throw await failure(res, "Не получилось отозвать");
+}
+
+/**
+ * The people who answered to someone leaving get another manager, or none (D-160): one update for
+ * all of them under RLS, as any edit of a card. Saying it twice changes nothing.
+ */
+export function useSetManager() {
+  const refresh = useRosterRefresh();
+  return useMutation({
+    mutationFn: async ({ ids, managerId }: { ids: string[]; managerId: string | null }) => {
+      if (ids.length === 0) return;
+      const { data, error } = await createBrowserSupabase().from("profiles").update({ manager_id: managerId }).in("id", ids).select("id");
+      if (error) {
+        console.error("manager update failed:", error.message);
+        throw new Error("Руководителя у подчинённых сменить не получилось — поправьте в их карточках");
+      }
+      if ((data?.length ?? 0) < ids.length) throw new Error("Не у всех подчинённых получилось сменить руководителя — поправьте в их карточках");
+    },
+    onSuccess: refresh,
+  });
 }
 
 /** A card without history goes. A repeat answers success: the card is gone either way. */
@@ -118,7 +158,7 @@ export function useDeletePerson() {
       void queryClient.invalidateQueries({ queryKey: ["roster"] });
     },
     // a refusal may mean the history has just appeared
-    onError: (_error, id) => void queryClient.invalidateQueries({ queryKey: standingKey(id) }),
+    onError: (_error, id) => void queryClient.invalidateQueries({ queryKey: ["people", id, "standing"] }),
   });
 }
 

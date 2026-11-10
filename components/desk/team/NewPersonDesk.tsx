@@ -25,7 +25,7 @@ type Tab = "one" | "list";
 
 const ONE_KEYS = [
   { keys: ["Ctrl Enter"], label: "Добавить" },
-  { keys: ["Esc"], label: "Назад в «Команду» (дважды, если что-то вписано)" },
+  { keys: ["Esc"], label: "Назад в «Команду» (спросит, если что-то вписано)" },
 ];
 const LIST_KEYS = [{ keys: ["Ctrl Enter"], label: "Добавить список" }];
 
@@ -91,6 +91,7 @@ export function NewPersonDesk() {
           roles={assignableRoles(me.data.role, null)}
           managers={(people.data ?? []).filter((p) => p.is_active && (p.role === "manager" || p.role === "director"))}
           roster={(people.data ?? []).filter((p) => p.is_active && p.role !== "tv")}
+          everyone={(people.data ?? []).filter((p) => p.role !== "tv")}
           pending={create.isPending || savePhoto.isPending}
           onCancel={() => router.push("/desk/team")}
           onSubmit={async (draft, photo) => {

@@ -52,6 +52,12 @@ export function WallFrame({ receipt, label }: { receipt: WallReceipt | null; lab
         <span className="truncate text-[13px] font-medium leading-[18px]" style={{ color: INK[receipt?.tone ?? "muted"] }}>
           {receipt?.text ?? "Связываюсь со стеной…"}
         </span>
+        {receipt?.tone === "warn" ? (
+          // what to do, not only what broke (D-160): the wall is a browser on a TV
+          <span className="truncate text-[12px] leading-4 text-muted" data-testid="desk-wall-help">
+            Проверьте, что телевизор включён, а на нём открыт Pulse — страница «Стена»
+          </span>
+        ) : null}
         {label ? <span className="ml-auto truncate pl-3 text-[12px] leading-4 text-muted">{label}</span> : null}
       </figcaption>
     </figure>

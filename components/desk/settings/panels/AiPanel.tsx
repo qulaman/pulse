@@ -121,7 +121,7 @@ export function AiPanel() {
 
   return (
     <div className="flex flex-col gap-8">
-      <SettingsGroup id="stt" title="Распознавание речи" about="Итог СТТ-гейта: gpt-4o-transcribe без языковой подсказки. Менять — только по данным гейта.">
+      <SettingsGroup id="stt" title="Распознавание речи" about="Как Pulse переводит голос в текст. Выбрано по проверке на живых записях: без нужды не меняйте.">
         <SettingRow id="stt-provider" label="Основной провайдер" htmlFor="set-stt-provider" changed={stt.provider !== server.stt.provider}>
           <SelectInput
             id="set-stt-provider"

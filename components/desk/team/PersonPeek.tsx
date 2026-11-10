@@ -160,7 +160,7 @@ export function PersonPeek({
           </p>
           <p className="truncate text-[13px] leading-[18px] text-muted">
             {roleLine(person)}
-            {!person.is_active ? " · не работает" : works && person.availability !== "active" ? ` · ${AVAILABILITY_LABEL[person.availability].toLowerCase()}` : ""}
+            {!person.is_active ? " · не в команде" : works && person.availability !== "active" ? ` · ${AVAILABILITY_LABEL[person.availability].toLowerCase()}` : ""}
           </p>
         </div>
       </div>

@@ -203,6 +203,35 @@ function matchOf(words: readonly string[], key: string, roster: readonly RosterP
   return like ? { kind: "like", person: like } : null;
 }
 
+/**
+ * Who a new card may already be (the one-person form, D-160): the same name in any order of its
+ * words, or a part of it — «Болат Сейтов» and «Болат Сейтов Ержанович», a working person before
+ * one who left. One letter off — «Сейтов» and «Сейтоф» — counts too, on the surname only, so two
+ * different first names never meet. Null — nobody like that.
+ */
+export function matchPerson<P extends RosterPerson>(fullName: string, roster: readonly P[]): { kind: "same" | "like"; person: P } | null {
+  const words = nameWords(fullName);
+  if (words.length === 0) return null;
+  const found = matchOf(words, nameKey(fullName), roster);
+  if (found && found.kind !== "list") return { kind: found.kind, person: found.person as P };
+  if (words.length < 2) return null;
+  const ordered = [...roster].sort((a, b) => Number(b.is_active) - Number(a.is_active));
+  const near = ordered.find((person) => {
+    const theirs = nameWords(person.full_name);
+    return theirs.length >= 2 && theirs[0] === words[0] && theirs[1].length >= 4 && oneLetterOff(theirs[1], words[1]);
+  });
+  return near ? { kind: "like", person: near } : null;
+}
+
+/** One letter changed, added or dropped: «сейтов» — «сейтоф», «ким» — «кимм». */
+function oneLetterOff(a: string, b: string): boolean {
+  if (a === b || Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i += 1;
+  const tail = (x: string, from: number) => x.slice(from);
+  return tail(a, i + 1) === tail(b, i + 1) || tail(a, i) === tail(b, i + 1) || tail(a, i + 1) === tail(b, i);
+}
+
 /** Who each row may already be: somebody on the roster, or an earlier row of the list. A row that cannot go is not compared. */
 export function matchRows(rows: readonly BulkRow[], roster: readonly RosterPerson[]): BulkItem[] {
   const seen = new Map<string, number>();

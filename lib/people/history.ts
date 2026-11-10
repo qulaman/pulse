@@ -1,8 +1,8 @@
 import { canDeletePerson, type Who } from "@/lib/people/access";
 
 /**
- * What stands behind a card (the owner, 2026-11-04): a card with history is never deleted — only
- * fired; a duplicate or a typo may go. Every foreign key to `profiles` in supabase/migrations is
+ * What stands behind a card (the owner, 2026-11-04; D-160): a card with history is never erased —
+ * «Удалить» takes the person out of the team and keeps what they did; a duplicate or a typo goes. Every foreign key to `profiles` in supabase/migrations is
  * listed here, one way or the other; history.test.ts reads the migrations, so a new one that
  * lands in neither list fails the tests instead of being cascaded away in silence.
  */
@@ -119,7 +119,7 @@ export function deleteRefusal(editor: Who, target: Who, history: readonly Histor
   if (target.role === "director") return { status: 403, code: "director", message: "Карточку директора удалить нельзя" };
   if (!canDeletePerson(editor, target)) return { status: 403, code: "forbidden", message: "Эту карточку удалить нельзя" };
   if (history && history.length > 0) {
-    return { status: 409, code: "has_history", message: `У карточки есть история (${historyWords(history)}) — её можно только уволить` };
+    return { status: 409, code: "has_history", message: `У карточки есть история (${historyWords(history)}) — насовсем не стирается, только уходит из команды` };
   }
   return null;
 }
@@ -128,5 +128,5 @@ export function deleteRefusal(editor: Who, target: Who, history: readonly Histor
 export const STILL_REFERENCED: Refusal = {
   status: 409,
   code: "has_history",
-  message: "За этой карточкой остались записи — её можно только уволить",
+  message: "За этой карточкой остались записи — насовсем она не стирается, только уходит из команды",
 };

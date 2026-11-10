@@ -46,17 +46,16 @@ import { useComposeStore } from "@/lib/store/compose";
 import { useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
-import { DeleteDialog } from "./DeleteDialog";
 import { deskDraftOf, deskPatchOf } from "./draft";
 import { NextWithoutLogin } from "./NextWithoutLogin";
 import { CopyButton, FormRow } from "./fields";
-import { FireDialog } from "./FireDialog";
 import { dropHandover, peekHandover } from "./handoff";
 import { HeroFacts, type HeroFact } from "./Hero";
 import { useScreenKeys } from "./keys";
 import { LoginBlock } from "./LoginBlock";
 import { PeriodBlock } from "./PeriodBlock";
 import { PersonEditor } from "./PersonEditor";
+import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { addressOf, AVAILABILITY_TONE, Block, Face, GridBone, LoadFailed, roleLine, StateWord, tidy } from "./shared";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
@@ -74,7 +73,7 @@ function messageLine(m: PersonMessage): string {
 
 /** «Сотрудник · Снабженец · в отпуске» — the line beside the name: the role, and a state only when there is one. */
 function personLine(person: Person): string {
-  const state = !person.is_active ? "не работает" : person.role !== "tv" && person.availability !== "active" ? AVAILABILITY_LABEL[person.availability].toLowerCase() : null;
+  const state = !person.is_active ? "не в команде" : person.role !== "tv" && person.availability !== "active" ? AVAILABILITY_LABEL[person.availability].toLowerCase() : null;
   return [roleLine(person), state].filter(Boolean).join(" · ");
 }
 
@@ -201,7 +200,8 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
       title: "Статус",
       width: "132px",
       // late is told by the ring and the deadline, the word stays the state's (lib/tasks/status-text)
-      render: (t) => <StateWord tone="muted">{DESK_STATUS_LABEL[t.status].toLowerCase()}</StateWord>,
+      // a task handed to someone else is «передана» here as in «Задачи», not «отозвана» (D-128)
+      render: (t) => <StateWord tone="muted">{t.status === "revoked" && t.passed_to ? "передана" : DESK_STATUS_LABEL[t.status].toLowerCase()}</StateWord>,
     },
     {
       key: "deadline",
@@ -294,6 +294,8 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
 /** The card read as facts — the same rows the editor turns into fields (a double click edits). */
 function CardFacts({ person, phone, people, onEdit }: { person: Person; phone: string | null; people: Person[]; onEdit?: () => void }) {
   const manager = person.manager_id ? people.find((p) => p.id === person.manager_id) : null;
+  // who answers to this person — the other side of «Подчиняется»
+  const team = people.filter((p) => p.is_active && p.manager_id === person.id && p.id !== person.id);
   const muted = (text: string) => <span className="text-muted">{text}</span>;
   return (
     <div
@@ -328,13 +330,27 @@ function CardFacts({ person, phone, people, onEdit }: { person: Person; phone: s
         {ROLE_LABEL[person.role]}
       </FormRow>
       {person.role !== "director" && person.role !== "tv" ? (
-        <FormRow label="Руководитель" align="text">
-          {manager?.full_name ?? muted("нет")}
+        <FormRow label="Подчиняется" align="text">
+          {manager?.full_name ?? muted("никому")}
+        </FormRow>
+      ) : null}
+      {team.length > 0 ? (
+        <FormRow label="Подчинённые" align="text">
+          <span data-testid="desk-person-team">
+            {team.map((p, index) => (
+              <span key={p.id}>
+                {index > 0 ? ", " : null}
+                <Link href={`/desk/team/${p.id}`} className="hover:underline">
+                  {p.full_name}
+                </Link>
+              </span>
+            ))}
+          </span>
         </FormRow>
       ) : null}
       {person.role !== "tv" ? (
         <FormRow label="Доступность" align="text">
-          {person.is_active ? <StateWord tone={AVAILABILITY_TONE[person.availability]}>{AVAILABILITY_LABEL[person.availability]}</StateWord> : muted("не работает в компании")}
+          {person.is_active ? <StateWord tone={AVAILABILITY_TONE[person.availability]}>{AVAILABILITY_LABEL[person.availability]}</StateWord> : muted("не в команде — вход закрыт")}
         </FormRow>
       ) : null}
     </div>
@@ -407,8 +423,10 @@ function PersonBone() {
  * Esc cancels), the tasks and the last messages. On the right the login: the code with a large QR, the email, the password,
  * «Выйти со всех устройств» (`?login=1` — opened from the team's menu, the code's button under
  * the caret), and the pushes. The secretary gets what her phone editor gives her (D-104).
- * «⋯» holds the moves that end something: «Уволить…» and, for a card nothing stands behind,
- * «Удалить карточку…» (the owner, 2026-11-04); for a person who left the head says «Вернуть в команду».
+ * «⋯» holds the move that ends something — «Удалить…» (Delete), one word for everybody: the dialog
+ * says whether the card is erased or the person leaves the team with their history (D-160); for a
+ * person who left the head says «Вернуть в команду», «⋯» — «Удалить насовсем…». A person who left
+ * has no login to manage: the login block and «Следующий без входа» are for the team.
  */
 export function PersonDesk({ id }: { id: string }) {
   const { role, pointsEnabled } = useDeskScope();
@@ -431,8 +449,7 @@ export function PersonDesk({ id }: { id: string }) {
   // a person just created here: their code (or first password) comes with them, once
   const [handed] = useState(() => peekHandover(id));
   useEffect(() => dropHandover(id), [id]);
-  const [firing, setFiring] = useState<"fire" | "pass" | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [removing, setRemoving] = useState<RemoveMode | null>(null);
 
   const setEditing = (on: boolean) => router.replace(on ? `${pathname}?edit=1` : pathname, { scroll: false });
 
@@ -440,8 +457,10 @@ export function PersonDesk({ id }: { id: string }) {
   const p = person.data ?? people.data?.find((row) => row.id === id);
   const editor: Who | null = me.data ? { id: me.data.userId, role: me.data.role } : null;
   const mayEdit = Boolean(p && editor && canEditPerson(editor, p));
-  const standing = useStanding(id, Boolean(p && editor && canChangeAccess(editor, p)));
+  // only «Передать задачи…» of a person who left waits on it: «Удалить…» is never late (D-160)
+  const standing = useStanding(id, Boolean(p && !p.is_active && editor && canChangeAccess(editor, p)));
   const works = Boolean(p?.is_active && p.role !== "tv");
+  const removable = Boolean(p && editor && canChangeAccess(editor, p));
   const givable = Boolean(director && p && works && p.role !== "director" && p.id !== editor?.id);
   const give = () => p && useComposeStore.getState().request("", { id: p.id, name: p.full_name, address: addressOf(p) });
 
@@ -455,6 +474,10 @@ export function PersonDesk({ id }: { id: string }) {
         give();
         return true;
       }
+      if (event.code === "Delete" && removable && !editing && p) {
+        setRemoving(p.is_active ? "remove" : "erase");
+        return true;
+      }
       return false;
     },
     Boolean(p),
@@ -462,7 +485,8 @@ export function PersonDesk({ id }: { id: string }) {
   useShortcuts("Карточка сотрудника", [
     ...(mayEdit ? [{ keys: ["E"], label: "Изменить карточку" }] : []),
     ...(givable ? [{ keys: ["T"], label: "Дать задачу" }] : []),
-    ...(mayEdit ? [{ keys: ["Ctrl S"], label: "Сохранить изменения" }, { keys: ["Esc"], label: "Отменить (дважды, если что-то вписано)" }] : []),
+    ...(mayEdit ? [{ keys: ["Ctrl S"], label: "Сохранить изменения" }, { keys: ["Esc"], label: "Отменить (спросит, если что-то вписано)" }] : []),
+    ...(removable ? [{ keys: ["Del"], label: "Удалить" }] : []),
   ]);
 
   // «нет такого человека» is said only when the roster says so, never because a request failed
@@ -528,10 +552,17 @@ export function PersonDesk({ id }: { id: string }) {
         onError: (error) => toast(error.message),
       },
     );
-  if (access && p.is_active) more.push("separator", { key: "fire", label: kiosk ? "Выключить экран…" : "Уволить…", danger: true, onSelect: () => setFiring("fire") });
-  if (access && !p.is_active && director && (standing.data?.open.movable ?? 0) > 0) more.push({ key: "pass", label: "Передать задачи…", onSelect: () => setFiring("pass") });
+  if (access && !p.is_active && director && (standing.data?.open.movable ?? 0) > 0) more.push({ key: "pass", label: "Передать задачи…", onSelect: () => setRemoving("pass") });
   // not from the editor: a card about to go has no draft worth a question
-  if (standing.data?.deletable && !editing) more.push("separator", { key: "delete", label: "Удалить карточку…", danger: true, onSelect: () => setDeleting(true) });
+  if (access && !editing) {
+    more.push("separator", {
+      key: "remove",
+      label: p.is_active ? (kiosk ? "Выключить экран…" : "Удалить…") : "Удалить насовсем…",
+      hint: "Del",
+      danger: true,
+      onSelect: () => setRemoving(p.is_active ? "remove" : "erase"),
+    });
+  }
 
   return (
     <DeskPage>
@@ -636,15 +667,24 @@ export function PersonDesk({ id }: { id: string }) {
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
-            {/* a login just created is handed over even where it cannot be managed later (a new director) */}
-            {manageLogin || handed ? <LoginBlock person={p} handed={handed} manage={manageLogin} focus={focusLogin} /> : null}
-            {manageLogin ? <NextWithoutLogin personId={p.id} /> : null}
+            {/* a login just created is handed over even where it cannot be managed later (a new director); who left has none */}
+            {p.is_active && (manageLogin || handed) ? <LoginBlock person={p} handed={handed} manage={manageLogin} focus={focusLogin} /> : null}
+            {p.is_active && manageLogin ? <NextWithoutLogin personId={p.id} /> : null}
             {mayEdit && works ? <PushBlock userId={p.id} /> : null}
           </div>
         </div>
       </div>
-      {firing ? <FireDialog person={p} roster={roster} director={director} mode={firing} onClose={() => setFiring(null)} /> : null}
-      {deleting ? <DeleteDialog person={p} onClose={() => setDeleting(false)} onDeleted={() => router.replace("/desk/team")} /> : null}
+      {removing ? (
+        <RemoveDialog
+          person={p}
+          roster={roster}
+          director={director}
+          mode={removing}
+          onClose={() => setRemoving(null)}
+          // out of the team or erased: back to the team, the toast holds «Вернуть»
+          onDone={() => router.replace("/desk/team")}
+        />
+      ) : null}
     </DeskPage>
   );
 }

@@ -14,12 +14,15 @@ export function PersonCell({
   muted = false,
   ring,
   size = 28,
+  gone = false,
 }: {
   name: string | null | undefined;
   sub?: string | null;
   muted?: boolean;
   ring?: Tone | null;
   size?: number;
+  /** The person left the team while the task is still open: nobody does it — the red pencil (D-160). */
+  gone?: boolean;
 }) {
   // re-reads the company's names, so «Ерлан» becomes «Ерлан Б.» once the roster has come
   useNamesKey();
@@ -31,7 +34,13 @@ export function PersonCell({
         <span className="truncate text-[14px] leading-5" title={full || undefined}>
           {full ? shortName(full) : "Без исполнителя"}
         </span>
-        {sub ? <span className="truncate text-[12px] leading-4 text-muted">{sub}</span> : null}
+        {gone ? (
+          <span className="truncate text-[12px] font-medium leading-4" style={{ color: TONE_VAR.danger }} title="Человек ушёл из команды — передайте задачу другому" data-testid="person-gone">
+            ушёл
+          </span>
+        ) : sub ? (
+          <span className="truncate text-[12px] leading-4 text-muted">{sub}</span>
+        ) : null}
       </span>
     </span>
   );

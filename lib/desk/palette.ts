@@ -1,8 +1,8 @@
 /**
  * The order line as a palette (D-154 wave 3): while the director types, what the words may also
  * mean — a section to go to, a person's card, a task already given — from data the desk has
- * already read. Nothing here is chosen by itself: Enter with no row picked still sends the order.
- * Pure: the line renders, this one matches.
+ * already read. Nothing here is chosen by itself — but a move named in words (`matchCommands`):
+ * otherwise Enter with no row picked still sends the order. Pure: the line renders, this one matches.
  */
 
 import { fits, fold } from "./suggest";
@@ -100,4 +100,41 @@ export function taskLookup(query: string, people: readonly PalettePerson[]): { t
     return named.length === 0;
   });
   return rest.length > 0 && assignees.size > 0 ? { text: rest.join(" "), assignees: [...assignees] } : { text: query, assignees: [] };
+}
+
+/**
+ * A move the director names in words rather than an order (D-160): «новый сотрудник», «добавить
+ * человека», «удалить Ерлана». Typed as an order they went to the parser and came back «не
+ * разобрал» — or as a task. `lead` — the words start with the verb and are short: the line picks
+ * the row by itself, so Enter does the move; anything longer stays an order unless picked.
+ */
+export type PaletteCommand<T extends PalettePerson = PalettePerson> =
+  | { kind: "new"; lead: boolean }
+  | { kind: "list"; lead: false }
+  | { kind: "remove"; person: T; lead: boolean }
+  | { kind: "team"; lead: false };
+
+const NEW_VERB = /^(нов|добав|нан|завед|созд|принят|прием)/;
+const PERSON_WORD = /^(сотрудн|человек|работник|кадр|людей|люди)/;
+const REMOVE_VERB = /^(удал|увол|убер|убра|исключ)/;
+/** Words around a name in «удалить сотрудника Ерлана из команды» that are not the name. */
+const FILLER = /^(сотрудн|человек|работник|из|команд|насовсем|карточк|профил)/;
+
+export function matchCommands<T extends PalettePerson>(query: string, people: readonly T[]): PaletteCommand<T>[] {
+  const typed = words(query);
+  if (typed.length === 0) return [];
+  const short = typed.length <= 5;
+  if (NEW_VERB.test(typed[0]) && typed.some((word) => PERSON_WORD.test(word))) {
+    return [{ kind: "new", lead: short }, { kind: "list", lead: false }];
+  }
+  if (typed[0] === "новый" || typed[0] === "новая" || (typed.length === 1 && PERSON_WORD.test(typed[0]) && typed[0].length >= 6)) {
+    return [{ kind: "new", lead: false }];
+  }
+  if (REMOVE_VERB.test(typed[0])) {
+    const name = typed.slice(1).filter((word) => !FILLER.test(word));
+    if (name.length === 0) return typed.some((word) => PERSON_WORD.test(word)) ? [{ kind: "team", lead: false }] : [];
+    const found = searchPeople(people, name.join(" "), 3);
+    return found.map((person, index) => ({ kind: "remove", person, lead: short && index === 0 && found.length === 1 }));
+  }
+  return [];
 }

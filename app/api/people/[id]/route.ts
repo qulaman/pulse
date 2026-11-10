@@ -61,17 +61,20 @@ async function hasHistory(service: Service, personId: string): Promise<boolean> 
  * What stands behind a card (the owner, 2026-11-04): may it be deleted, and the person's open
  * work. Tasks are read here because neither viewer sees them all under RLS: a secretary sees none
  * (she gets the numbers, D-104), a director does not see scheduled tasks of other authors. Task
- * titles go to the director only.
+ * titles go to the director only. `?history=1` — the «Удалить» dialog (D-160): the history itself
+ * by kind, «задачи — 12, очки — 3», so the dialog says why a card is not erased; without it the
+ * quick yes-or-no, which stops after the first tables that answer.
  */
-export const GET = withAuth(["director", "secretary"], async ({ profile, params }) => {
+export const GET = withAuth(["director", "secretary"], async ({ req, profile, params }) => {
   const service = createServiceSupabase();
   const target = await findTarget(service, params.id, profile.companyId);
   if (!target) return apiError(404, "not_found", "Сотрудник не найден");
   const editor = { id: profile.userId, role: profile.role };
   if (!canChangeAccess(editor, target)) return apiError(403, "forbidden", "Эту карточку менять нельзя");
+  const full = new URL(req.url).searchParams.get("history") === "1";
 
-  const [worked, open] = await Promise.all([
-    hasHistory(service, target.id),
+  const [lines, open] = await Promise.all([
+    full ? countHistory(service, target.id).then(historyLines) : hasHistory(service, target.id).then((worked) => (worked ? null : [])),
     service
       .from("tasks")
       .select("id, title, status, deadline")
@@ -83,7 +86,9 @@ export const GET = withAuth(["director", "secretary"], async ({ profile, params 
   if (open.error) throw new Error(`open tasks read failed: ${open.error.message}`);
 
   return apiOk({
-    deletable: !worked && deleteRefusal(editor, target, []) === null,
+    deletable: lines !== null && lines.length === 0 && deleteRefusal(editor, target, []) === null,
+    // null — not counted (the quick question); [] — nothing stands behind the card
+    history: full ? lines : null,
     open: openWork((open.data ?? []) as OpenTask[], profile.role === "director"),
   });
 });

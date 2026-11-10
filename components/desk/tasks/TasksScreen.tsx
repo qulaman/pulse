@@ -28,7 +28,7 @@ import { appendPage, ARCHIVE_STATUSES, inRange, parseRange, rowsLeft, type DayRa
 import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
-import { usePeople } from "@/lib/people/queries";
+import { useGoneIds, usePeople } from "@/lib/people/queries";
 import { hasUnread, HELD_STATUS, type BoardTask } from "@/lib/pulse/board";
 import { useRecurrenceRulesSettled } from "@/lib/recurrence/queries";
 import { useHydrated } from "@/lib/useHydrated";
@@ -202,6 +202,7 @@ function TasksView({
   const purge = usePurgeClosed();
   const pages = useClosedPages(me.userId);
   const people = usePeople();
+  const goneIds = useGoneIds();
   const now = useMinute();
   const { pointsEnabled } = useDeskScope();
   const panel = useDeskPanel();
@@ -706,7 +707,7 @@ function TasksView({
             sort: (a, b) => (a.assignee?.full_name ?? "").localeCompare(b.assignee?.full_name ?? "", "ru"),
             render: (task) => (
               <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
-                <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} />
+                <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} gone={!closedRow(task) && goneIds.has(task.assignee_id)} />
               </span>
             ),
           },

@@ -28,7 +28,7 @@ async function checkToday(ctx: Ctx) {
     .waitFor({ timeout: 15_000 })
     .catch(() => undefined);
   for (const [id, name] of [
-    ["today-decisions", "«Ждут вашего решения»"],
+    ["today-decisions", "«Ждут вас»"],
     ["today-team", "«Команда сейчас»"],
     ["today-agenda", "«Встречи и сроки»"],
     ["today-reception", "«Приёмная»"],

@@ -38,10 +38,10 @@ import { useComposeStore } from "@/lib/store/compose";
 import { sortByUrgency, useMe, useSentTasks, type TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
-import { FireDialog } from "./FireDialog";
 import { HeroBone, DeskHero, type HeroFact } from "./Hero";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "./keys";
 import { PersonPeek } from "./PersonPeek";
+import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { AwayTag, GridBone, LoadTally, ROLE_ORDER, StateWord, addressOf, counted, loadWords, matchesPerson, tidy, useBoxWidth } from "./shared";
 
 const NO_LOADS: Record<string, Load> = {};
@@ -62,13 +62,14 @@ const crew = (p: Person) => works(p) && p.role !== "director";
 /** «Без уведомлений»: no device, or the last push did not get through (D-114). */
 const unreachable = (h: Health | undefined) => h !== undefined && (h.state === "off" || h.state === "broken");
 
-type Filter = "overdue" | "review" | "unreachable" | "away";
+type Filter = "overdue" | "review" | "unreachable" | "away" | "left";
 
 const FILTER_LABEL: Record<Filter, string> = {
   overdue: "с просрочкой",
   review: "с работой на приёмке",
   unreachable: "без уведомлений",
   away: "не на месте",
+  left: "ушедшие с задачами",
 };
 
 /**
@@ -77,7 +78,7 @@ const FILTER_LABEL: Record<Filter, string> = {
  * push that failed; the card tells the rest («Последний вход», the last code).
  */
 function LoginCell({ person, health }: { person: Person; health: Health | undefined }) {
-  if (!person.is_active) return <span className="text-muted">закрыт</span>;
+  if (!person.is_active) return <span className="text-muted">вход закрыт</span>;
   if (person.role === "tv") return <span className="text-muted">киоск</span>;
   if (!health) return <span className="text-muted/50">…</span>;
   // the usual is quiet, the trouble reads in plain text — the hero has already counted it
@@ -95,7 +96,7 @@ function LoginCell({ person, health }: { person: Person; health: Health | undefi
       </StateWord>
     );
   }
-  return <span title={`Уведомления: ${health.text}. Вход — в карточке`}>без уведомлений</span>;
+  return <span title={`Уведомления: ${health.text}. Вход — в карточке`}>не включены</span>;
 }
 
 /** The name, the position after it, «в отпуске» when so — one line, so the row stays 34 px. */
@@ -189,19 +190,23 @@ type ViewProps = {
  * where the trouble is — each number filters the table; one row a person, 34 px, the troubled
  * first: how loaded (the count and its tally, to their tasks), what they are on now, today's
  * report, the points, whether pushes reach them. Directors and the wall stand apart below; those
- * who left wait at the bottom, grey. The secretary sees the roster only (D-104).
+ * who left are «Ушедшие» — out of sight until asked for (the toolbar's «Ушедшие · N», a search,
+ * or the hero's «задач у ушедших» when someone left with work on them, D-160). The secretary sees
+ * the roster only (D-104).
  *
  * Worked with a mouse and the keys (wave 3): a click peeks at the person in the right-hand panel
  * (`?p=`), the table stays; a double click or Enter opens the card; the right button — every move
- * of the row; ↑/↓ choose (the panel follows), Space peeks, E edits, T gives a task, N — a new
- * person, F — the search.
+ * of the row; ↑/↓ choose (the panel follows), Space peeks, E edits, T gives a task, Delete
+ * removes (D-160: one «Удалить…» for everybody, the dialog says what it does), N — a new person,
+ * F — the search. `?p=<id>&remove=1` opens the dialog — the order line's «удалить Ерлана».
  */
 function TeamTableView({ director, me, people, loading, failed, retrying, onRetry, loads, balances, pointsOn, push, tasks, report, now }: ViewProps) {
   const router = useRouter();
   const setWorking = useSetWorking();
-  const [firing, setFiring] = useState<{ person: Person; mode: "fire" | "pass" } | null>(null);
+  const [removing, setRemoving] = useState<{ person: Person; mode: RemoveMode } | null>(null);
   const params = useSearchParams();
   const openId = params.get("p");
+  const [showGone, setShowGone] = useState(false);
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role | "">("");
   const [filter, setFilter] = useState<Filter | null>(null);
@@ -230,8 +235,10 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
   const reviewOf = (p: Person) => load(p)?.review ?? 0;
   const scale = Math.max(5, ...all.filter(works).map((p) => loads[p.id]?.active ?? 0));
 
+  const heldByGone = (p: Person) => (!p.is_active && p.role !== "tv" ? (loads[p.id]?.active ?? 0) : 0);
   const passes = (p: Person): boolean => {
     if (!filter) return true;
+    if (filter === "left") return heldByGone(p) > 0;
     if (!works(p)) return false;
     if (filter === "overdue") return overdueOf(p) > 0;
     if (filter === "review") return reviewOf(p) > 0;
@@ -239,13 +246,16 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
     return unreachable(push?.get(p.id));
   };
   const shown = all.filter((p) => (role ? p.role === role : true) && matchesPerson(p, query, phones.data?.[p.id]) && passes(p));
+  // who left: in sight when asked for — the toolbar, a search, a filter that is about them
+  const goneInSight = showGone || Boolean(query) || filter === "left";
+  const goneCount = all.filter((p) => !p.is_active).length;
   const byName = (a: Person, b: Person) => a.full_name.localeCompare(b.full_name, "ru");
   // the troubled first: late, then work waiting for the director's «Принято», then by name
   const byTrouble = (a: Person, b: Person) => overdueOf(b) - overdueOf(a) || reviewOf(b) - reviewOf(a) || byName(a, b);
   const groups: Group<Person>[] = [
     { key: "crew", title: null, rows: shown.filter(crew).sort(director ? byTrouble : byName) },
     { key: "heads", title: "Директора и экран", tone: "muted", rows: shown.filter((p) => p.is_active && !crew(p)).sort((a, b) => ROLE_ORDER[a.role] - ROLE_ORDER[b.role] || byName(a, b)) },
-    { key: "gone", title: "Уволенные", tone: "muted", rows: shown.filter((p) => !p.is_active).sort(byName) },
+    { key: "gone", title: "Ушедшие", tone: "muted", rows: goneInSight ? shown.filter((p) => !p.is_active).sort(byName) : [] },
   ];
 
   const columns: Column<Person>[] = [
@@ -330,6 +340,8 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
   const lateCount = staff.filter((p) => overdueOf(p) > 0).length;
   const reviewCount = staff.filter((p) => reviewOf(p) > 0).length;
   const deaf = push ? staff.filter((p) => unreachable(push.get(p.id))).length : 0;
+  // work still on people who left: nobody does it — the director hands it over (D-160)
+  const orphaned = all.reduce((sum, p) => sum + heldByGone(p), 0);
   const open = staff.reduce((sum, p) => sum + (loads[p.id]?.active ?? 0), 0);
   const toggle = (next: Filter) => () => setFilter((was) => (was === next ? null : next));
   // a trouble that is not there takes no room: the line under the figure says «просрочек нет»
@@ -337,6 +349,7 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
     value > 0 || filter === key ? [{ key, value, label, tone, onClick: toggle(key), active: filter === key, title: filter === key ? "Показать всех" : "Показать только их" }] : [];
   const facts: HeroFact[] = director
     ? [
+        ...trouble("left", orphaned, orphaned === 1 ? "задача у ушедших" : "задач у ушедших", "danger"),
         ...trouble("overdue", lateCount, "с просрочкой", "danger"),
         ...trouble("review", reviewCount, "на приёмке", "warn"),
         ...trouble("unreachable", deaf, "без уведомлений", null),
@@ -374,14 +387,19 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
     if (me && p.is_active && canResetLogin(me, p)) items.push("separator", { key: "login", label: "Выдать код входа…", onSelect: () => router.push(`/desk/team/${p.id}?login=1`) });
     if (me && canChangeAccess(me, p)) {
       const kiosk = p.role === "tv";
-      if (p.is_active) items.push("separator", { key: "fire", label: kiosk ? "Выключить экран…" : "Уволить…", danger: true, onSelect: () => setFiring({ person: p, mode: "fire" }) });
+      if (p.is_active) items.push("separator", { key: "remove", label: kiosk ? "Выключить экран…" : "Удалить…", hint: "Del", danger: true, onSelect: () => remove(p) });
       else {
-        if (director && (loads[p.id]?.active ?? 0) > 0) items.push("separator", { key: "pass", label: "Передать задачи…", onSelect: () => setFiring({ person: p, mode: "pass" }) });
+        items.push("separator");
+        if (director && (loads[p.id]?.active ?? 0) > 0) items.push({ key: "pass", label: "Передать задачи…", onSelect: () => setRemoving({ person: p, mode: "pass" }) });
         items.push({ key: "revive", label: kiosk ? "Включить экран" : "Вернуть в команду", onSelect: () => revive(p) });
+        items.push({ key: "erase", label: "Удалить насовсем…", hint: "Del", danger: true, onSelect: () => remove(p) });
       }
     }
     return items;
   };
+  /** «Удалить…» of a person at work, «Удалить насовсем…» of one who left — the same key for both. */
+  const removable = (p: Person) => Boolean(me && canChangeAccess(me, p));
+  const remove = (p: Person) => setRemoving({ person: p, mode: p.is_active ? "remove" : "erase" });
   const revive = (p: Person) =>
     setWorking.mutate(
       { id: p.id, working: true },
@@ -428,14 +446,27 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
       give(person);
       return true;
     }
+    if ((event.code === "Delete" || event.code === "Backspace") && removable(person)) {
+      remove(person);
+      return true;
+    }
     return false;
   });
+  // the order line's «удалить Ерлана» lands here with the person and the dialog asked for: the
+  // address holds the question until the dialog closes
+  const asked = params.get("remove") === "1" ? byId(openId) : null;
+  const dialog: { person: Person; mode: RemoveMode } | null = removing ?? (asked && removable(asked) ? { person: asked, mode: asked.is_active ? "remove" : "erase" } : null);
+  const closeDialog = () => {
+    setRemoving(null);
+    if (asked) router.replace(`/desk/team?p=${asked.id}`, { scroll: false });
+  };
   useShortcuts("Команда", [
     { keys: ["↑", "↓"], label: "Выбрать человека" },
     { keys: ["Space"], label: "Посмотреть в панели" },
     { keys: ["Enter"], label: "Открыть карточку" },
     { keys: ["E"], label: "Изменить карточку" },
     ...(director ? [{ keys: ["T"], label: "Дать задачу" }] : []),
+    { keys: ["Del"], label: "Удалить (у ушедшего — насовсем)" },
     { keys: ["N"], label: "Новый сотрудник" },
     { keys: ["F"], label: "Поиск по команде" },
   ]);
@@ -497,6 +528,18 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
             </option>
           ))}
         </Select>
+        {goneCount > 0 && !query && filter !== "left" ? (
+          <button
+            type="button"
+            onClick={() => setShowGone((was) => !was)}
+            aria-pressed={showGone}
+            className={`inline-flex h-8 items-center gap-1.5 text-[14px] leading-5 hover:underline ${showGone ? "text-accent" : "text-muted"}`}
+            data-testid="desk-team-gone"
+          >
+            Ушедшие · <span className="nums">{goneCount}</span>
+            {showGone ? <span aria-hidden>×</span> : null}
+          </button>
+        ) : null}
         {filter ? (
           <button
             type="button"
@@ -588,6 +631,11 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
               <Kbd>T</Kbd> дать задачу
             </span>
           ) : null}
+          {chosen && removable(chosen) ? (
+            <span>
+              <Kbd>Del</Kbd> {chosen.is_active ? "удалить" : "удалить насовсем"}
+            </span>
+          ) : null}
           <span>правая кнопка — все действия</span>
         </p>
       ) : null}
@@ -614,7 +662,17 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
         </InPanel>
       ) : null}
       {menu.node}
-      {firing ? <FireDialog person={firing.person} roster={all} director={director} mode={firing.mode} onClose={() => setFiring(null)} /> : null}
+      {dialog ? (
+        <RemoveDialog
+          person={dialog.person}
+          roster={all}
+          director={director}
+          mode={dialog.mode}
+          onClose={closeDialog}
+          // the row is gone from the team: the panel does not stay on it
+          onDone={() => (openId === dialog.person.id ? peek(null) : undefined)}
+        />
+      ) : null}
     </DeskPage>
   );
 }

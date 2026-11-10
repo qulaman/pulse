@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { matchSections, matchTasks, searchPeople, taskLookup } from "./palette";
+import { matchCommands, matchSections, matchTasks, searchPeople, taskLookup } from "./palette";
 
 const sections = [
   { href: "/desk/today", label: "Сегодня" },
@@ -98,5 +98,41 @@ describe("taskLookup", () => {
 
   it("keeps a lone name as a word of a title", () => {
     expect(taskLookup("ерлан", people)).toEqual({ text: "ерлан", assignees: [] });
+  });
+});
+
+describe("matchCommands — a move named in words (D-160)", () => {
+  it("«новый сотрудник» and «добавить человека» lead to the form, picked by themselves", () => {
+    expect(matchCommands("добавить нового сотрудника", people)[0]).toEqual({ kind: "new", lead: true });
+    expect(matchCommands("добавь человека", people)[0]).toEqual({ kind: "new", lead: true });
+    expect(matchCommands("новый сотрудник", people)[0]).toMatchObject({ kind: "new" });
+  });
+
+  it("a long sentence with the same words stays an order unless picked", () => {
+    const commands = matchCommands("добавить в смету новый пункт для сотрудника склада завтра", people);
+    expect(commands[0]).toEqual({ kind: "new", lead: false });
+  });
+
+  it("an order that starts with a name is no command", () => {
+    expect(matchCommands("Ерлану добавить нового сотрудника в чат", people)).toEqual([]);
+    expect(matchCommands("Марат проверь смету", people)).toEqual([]);
+  });
+
+  it("«удалить Марата» finds the person in any case of the name; one hit is picked by itself", () => {
+    const commands = matchCommands("удалить Марата", people);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]).toMatchObject({ kind: "remove", lead: true, person: { id: "m1" } });
+    expect(matchCommands("уволить сотрудника Дину из команды", people)[0]).toMatchObject({ kind: "remove", person: { id: "d1" } });
+  });
+
+  it("two namesakes are both offered, none picked", () => {
+    const commands = matchCommands("удалить ерлана", people);
+    expect(commands.map((c) => (c.kind === "remove" ? c.person.id : c.kind))).toEqual(["e1", "e2"]);
+    expect(commands.every((c) => !c.lead)).toBe(true);
+  });
+
+  it("«удалить старые файлы» names nobody: no command, the words stay an order", () => {
+    expect(matchCommands("удалить старые файлы", people)).toEqual([]);
+    expect(matchCommands("удалить сотрудника", people)).toEqual([{ kind: "team", lead: false }]);
   });
 });

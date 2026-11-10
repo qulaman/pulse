@@ -20,7 +20,8 @@ import { rosterKey } from "@/lib/people/roster";
 import { dropDraft, keepDraft, peekDraft, useLeaveGuard } from "./useLeaveGuard";
 
 const DRAFT_KEY = "bulk";
-const PLACEHOLDER = "Марат Оспанов\tСнабженец\t+7 701 234 56 78\nДина Ахметова; Бухгалтер; +7 702 345 67 89\nТимур Салимов, Прораб";
+// examples nobody is called by: a real colleague's name in the field read as already typed
+const PLACEHOLDER = "Например:\nИван Петров\tБухгалтер\t+7 700 000 00 01\nАнна Смирнова; Прораб; +7 700 000 00 02\nОлег Ким, Водитель";
 
 type Phase = "edit" | "running" | "done";
 
@@ -57,7 +58,7 @@ function Match({ row, forced, locked, onForce }: { row: BulkItem; forced: boolea
   const match = row.match;
   if (!match) return null;
   const person = match.kind === "list" ? null : match.person;
-  const words = match.kind === "list" ? `Повтор строки ${match.line}` : match.kind === "same" ? (match.person.is_active ? "Уже в команде:" : "Среди уволенных:") : "Похоже на";
+  const words = match.kind === "list" ? `Повтор строки ${match.line}` : match.kind === "same" ? (match.person.is_active ? "Уже в команде:" : "Среди ушедших:") : "Похоже на";
   return (
     <span className="flex min-w-0 flex-col gap-0.5" data-testid="bulk-match" data-kind={match.kind}>
       <span className="truncate text-[13px] leading-[18px]" style={{ color: "var(--warn)" }}>
@@ -191,6 +192,8 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
     }
   };
 
+  /** Every row held back by a likeness goes too: the person has looked and says they are all new. */
+  const forceAll = () => setForced(new Set(live.filter((row) => row.problems.length === 0 && row.match).map((row) => row.line)));
   const force = (line: number, value: boolean) =>
     setForced((all) => {
       const next = new Set(all);
@@ -294,9 +297,21 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
             <Button size="sm" onClick={() => void start()} disabled={toAdd.length === 0 || tooMany} data-testid="bulk-add">
               Добавить {toAdd.length}
             </Button>
+            {withMatches > 0 && !tooMany ? (
+              <Button size="sm" variant="secondary" onClick={forceAll} data-testid="bulk-force-all">
+                Добавить и похожих
+              </Button>
+            ) : null}
             {tooMany ? (
               <span className="text-[13px] leading-[18px] text-danger" data-testid="bulk-too-many">
                 В одном списке до {BULK_MAX} строк, здесь {live.length}
+              </span>
+            ) : toAdd.length === 0 && live.length > 0 ? (
+              // a grey button never stands without its reason
+              <span className="text-[12px] leading-4 text-muted" data-testid="bulk-why-none">
+                {withMatches > 0
+                  ? "Все строки похожи на людей в команде: отметьте «Всё равно добавить» у новых — или «Добавить и похожих»"
+                  : "Исправьте строки с ошибкой — они отмечены красным"}
               </span>
             ) : toAdd.length > 0 ? (
               <span className="text-[12px] leading-4 text-muted">

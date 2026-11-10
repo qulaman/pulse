@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
@@ -10,6 +11,7 @@ import { Select, SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { initialAlias, suggestAliases } from "@/lib/people/aliases";
+import { matchPerson } from "@/lib/people/bulk";
 import type { PhotoDraft } from "@/lib/people/card-queries";
 import { generatePassword } from "@/lib/people/password";
 import { phoneLooksRight } from "@/lib/people/phone";
@@ -21,12 +23,23 @@ import { PhotoField } from "./PhotoField";
 import { dropDraft, keepDraft, peekDraft, useLeaveGuard } from "./useLeaveGuard";
 
 const AVAILABILITIES: Availability[] = ["active", "vacation", "sick"];
-/** Esc twice within this to drop what was typed. */
-const ESC_ARM_MS = 4000;
 const PHOTO_SAME: PhotoDraft = { kind: "same" };
 
 /** A form that left without a word: what the next visit to it picks up. */
 type Kept = { draft: DeskDraft; photo: PhotoDraft; withEmail: boolean };
+
+/**
+ * The hint under the spoken forms: what they are for, or — with a namesake — how the parser tells
+ * the two apart. «Ерлан Б.» says nothing when both are «Б.»: then a word of the director's own.
+ */
+function namesakeHint(fullName: string, namesakes: readonly string[]): string {
+  if (namesakes.length === 0) return "По этим формам распознаётся речь. Enter — добавить, Backspace — убрать последнюю";
+  const mine = initialAlias(fullName);
+  const clash = mine !== null && namesakes.some((name) => initialAlias(name)?.toLowerCase() === mine.toLowerCase());
+  return clash
+    ? `Тёзка с той же буквой фамилии: ${namesakes.join(", ")}. Добавьте форму, по которой зовёте именно этого человека, — по фамилии или должности`
+    : `Тёзка: ${namesakes.join(", ")}. Инициал («${mine ?? "Имя Ф."}») отличает их в речи`;
+}
 
 /** A person who works with the team, not the director at the top or the wall (PersonForm's rule). */
 function hasManager(role: Role): boolean {
@@ -63,12 +76,15 @@ function Plane({ title, children, end }: { title?: string; children: ReactNode; 
  * wave 3): the phone's draft (`draftOf` / `patchOf` in PersonForm) laid out for a mouse and the
  * keys — the label on the left, the control on the right; the role and the manager as dropdowns
  * with the role's meaning under it, the availability as segments, the spoken forms as chips. A
- * problem is said under its field. Ctrl+S (or Ctrl+Enter) saves, Esc cancels — twice when
- * something is typed. While it is unsaved the form says so, and leaving asks «Сохранить / Не
- * сохранять / Остаться»; a way out that cannot be seen coming keeps the draft and offers the way
- * back. Giving somebody the director's role asks first, on «Сохранить». The photo and the phone
- * are the card's fields like any other; firing is not one, it lives in the card's moves.
- * Creating: a code by default (D-135), an email and a ready password on request.
+ * problem is said under its field. Ctrl+S (or Ctrl+Enter) saves, Esc cancels — and asks first
+ * when something is typed (D-160: a second Esc dropped a whole form without a word). While it is
+ * unsaved the form says so, and leaving asks «Сохранить / Не сохранять / Остаться»; a way out
+ * that cannot be seen coming keeps the draft and offers the way back. Giving somebody the
+ * director's role asks first, on «Сохранить». The photo and the phone are the card's fields like
+ * any other; removing is not one, it lives in the card's moves. Creating: a code by default
+ * (D-135), an email and a ready password on request; a name already on the roster (or one letter
+ * off it, or among those who left) is said under the field, and «Добавить» asks once more.
+ * The examples in the fields are nobody's: a real colleague's name there read as already typed.
  */
 export function PersonEditor({
   initial,
@@ -79,6 +95,7 @@ export function PersonEditor({
   lockedRole,
   managers,
   roster,
+  everyone,
   pending,
   onSubmit,
   onCancel,
@@ -95,6 +112,8 @@ export function PersonEditor({
   managers: Person[];
   /** Everyone else on the roster — spoken forms are suggested against it (D-54). */
   roster: Person[];
+  /** Creating: everybody the new card may already be, those who left too — the double is said before «Добавить». */
+  everyone?: Person[];
   pending: boolean;
   /** Resolves when saved; the draft then becomes the new baseline. `leaving` — the form goes elsewhere right after, stay put. */
   onSubmit: (draft: DeskDraft, photo: PhotoDraft, options: { leaving: boolean }) => Promise<unknown>;
@@ -117,7 +136,8 @@ export function PersonEditor({
   const [withEmail, setWithEmail] = useState(restored?.withEmail ?? false);
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
   const [tried, setTried] = useState(false);
-  const [armed, setArmed] = useState(false);
+  /** The double the person has seen and still wants to add — asked once per name. */
+  const [twinOk, setTwinOk] = useState<string | null>(null);
   // on the way out: «Сохранить / Не сохранять / Остаться»; the promotion asks before any save
   const [leaving, setLeaving] = useState<{ go: () => void } | null>(null);
   const [promoting, setPromoting] = useState<{ go?: () => void } | null>(null);
@@ -129,6 +149,9 @@ export function PersonEditor({
   const person = draft.role !== "tv";
   const dirty = JSON.stringify(draft) !== JSON.stringify(baseline) || photo.kind !== "same" || (mode === "create" && withEmail);
   const problems = problemsOf(draft, mode, withEmail);
+  // creating: somebody with this name is here already (or was) — said under the name
+  const twin = mode === "create" && person && everyone && draft.full_name.trim().length >= 3 ? matchPerson(draft.full_name, everyone) : null;
+  const twinAsked = twin !== null && twinOk !== draft.full_name.trim();
   const errorOf = (field: Field) => (tried || touched[field] ? (problems[field] ?? null) : null);
   const touch = (field: Field) => () => setTouched((t) => ({ ...t, [field]: true }));
 
@@ -139,6 +162,12 @@ export function PersonEditor({
     if (first) {
       setTried(true);
       document.getElementById(first === "full_name" ? ids.name : first === "phone" ? ids.phone : first === "email" ? ids.email : ids.password)?.focus();
+      return;
+    }
+    // a double asks once: the first «Добавить» only points at it, the second adds anyway
+    if (twinAsked) {
+      setTwinOk(draft.full_name.trim());
+      document.getElementById(ids.name)?.focus();
       return;
     }
     // the one role its giver cannot take back alone: a director can only be changed by another (D-104)
@@ -162,17 +191,16 @@ export function PersonEditor({
     passed.current = true;
     setDraft(baseline);
     setPhoto(PHOTO_SAME);
-    setArmed(false);
     onCancel?.();
   };
   useLeaveGuard(dirty, passed, (go) => setLeaving({ go }));
 
   // the keys of the form: Ctrl/Cmd+S and Ctrl/Cmd+Enter — save from any field; Esc — cancel,
-  // twice when something is typed. Caught before the desk's own Esc (which would only let go of
-  // the field's caret); a dialog or a menu over the form keeps its Esc.
-  const latest = useRef({ submit, cancel, dirty, armed, kept: { draft, photo, withEmail } as Kept });
+  // asking first when something is typed. Caught before the desk's own Esc (which would only let
+  // go of the field's caret); a dialog or a menu over the form keeps its Esc.
+  const latest = useRef({ submit, cancel, dirty, kept: { draft, photo, withEmail } as Kept });
   useLayoutEffect(() => {
-    latest.current = { submit, cancel, dirty, armed, kept: { draft, photo, withEmail } };
+    latest.current = { submit, cancel, dirty, kept: { draft, photo, withEmail } };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -190,8 +218,9 @@ export function PersonEditor({
       }
       if (event.key !== "Escape" || !onCancel) return;
       event.preventDefault();
-      if (latest.current.dirty && !latest.current.armed) {
-        setArmed(true);
+      // words in the form: the same question as any way out — nothing is dropped silently
+      if (latest.current.dirty) {
+        setLeaving({ go: () => latest.current.cancel() });
         return;
       }
       latest.current.cancel();
@@ -199,11 +228,6 @@ export function PersonEditor({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [onCancel]);
-  useEffect(() => {
-    if (!armed) return;
-    const timer = setTimeout(() => setArmed(false), ESC_ARM_MS);
-    return () => clearTimeout(timer);
-  }, [armed]);
   // gone with words in it, by a way out nobody could ask about (the palette, the profile menu):
   // the draft stays in this tab and the toast leads back. A timeout: Strict Mode unmounts and
   // mounts every effect once, and that rehearsal is no way out
@@ -229,14 +253,33 @@ export function PersonEditor({
   }, [ids.name, mode]);
 
   const nameRow = (
-    <FormRow label={person ? "Имя и фамилия" : "Название экрана"} htmlFor={ids.name} error={errorOf("full_name")}>
+    <FormRow
+      label={person ? "Имя и фамилия" : "Название экрана"}
+      htmlFor={ids.name}
+      error={errorOf("full_name")}
+      hint={
+        twin ? (
+          <span style={{ color: "var(--warn)" }} data-testid="person-twin">
+            {twin.kind === "same" ? (twin.person.is_active ? "Уже в команде: " : "Среди ушедших: ") : "Похоже на "}
+            <Link href={`/desk/team/${twin.person.id}`} target="_blank" className="underline underline-offset-2">
+              {twin.person.full_name}
+            </Link>
+            {twin.person.position ? ` · ${twin.person.position}` : ""}.{" "}
+            {!twin.person.is_active ? "Вернуть его — в его карточке. " : ""}
+            {twinAsked ? "Проверьте, не тот ли это человек" : "Это другой человек? Нажмите «Добавить» ещё раз"}
+          </span>
+        ) : undefined
+      }
+    >
       <input
         id={ids.name}
         className={INPUT}
         value={draft.full_name}
         onChange={(e) => setName(e.target.value)}
-        onBlur={touch("full_name")}
-        placeholder={person ? "Марат Оспанов" : "ТВ в холле"}
+        // an empty name is said on «Добавить», not on the way out: the error line appearing under
+        // the caret moved the form, and the click meant for «Почта и пароль» landed on nothing
+        onBlur={draft.full_name.trim() ? touch("full_name") : undefined}
+        placeholder={person ? "Например, Иван Петров" : "Например, ТВ в холле"}
         autoComplete="off"
         aria-invalid={Boolean(errorOf("full_name"))}
         data-testid="person-name"
@@ -249,7 +292,7 @@ export function PersonEditor({
         <PhotoField name={draft.full_name} current={photoUrl} value={photo} onChange={setPhoto} />
       </FormRow>
       <FormRow label="Должность" htmlFor={ids.position}>
-        <input id={ids.position} className={INPUT} value={draft.position} onChange={(e) => set({ position: e.target.value })} placeholder="Снабженец" autoComplete="off" />
+        <input id={ids.position} className={INPUT} value={draft.position} onChange={(e) => set({ position: e.target.value })} placeholder="Например, бухгалтер" autoComplete="off" />
       </FormRow>
       <FormRow label="Телефон" htmlFor={ids.phone} error={errorOf("phone")}>
         <input
@@ -260,7 +303,7 @@ export function PersonEditor({
           value={draft.phone}
           onChange={(e) => set({ phone: e.target.value })}
           onBlur={touch("phone")}
-          placeholder="+7 701 234 56 78"
+          placeholder="Например, +7 700 000 00 00"
           autoComplete="off"
           aria-invalid={Boolean(errorOf("phone"))}
           data-testid="person-phone"
@@ -269,11 +312,7 @@ export function PersonEditor({
       <FormRow
         label="Как называет директор"
         htmlFor={ids.aliases}
-        hint={
-          suggestion.namesakes.length
-            ? `Тёзка: ${suggestion.namesakes.join(", ")}. Инициал («${initialAlias(draft.full_name) ?? "Имя Ф."}») отличает их в речи`
-            : "По этим формам распознаётся речь. Enter — добавить, Backspace — убрать последнюю"
-        }
+        hint={namesakeHint(draft.full_name, suggestion.namesakes)}
       >
         <AliasChips
           id={ids.aliases}
@@ -283,7 +322,7 @@ export function PersonEditor({
             set({ aliases: next.join(", ") });
           }}
           suggestions={suggestion.mine}
-          placeholder="Ерлан, Ерлан Б."
+          placeholder="Например: Ваня, Иван П."
         />
       </FormRow>
     </>
@@ -314,9 +353,9 @@ export function PersonEditor({
         </Select>
       </FormRow>
       {hasManager(draft.role) ? (
-        <FormRow label="Руководитель" htmlFor={ids.manager} hint="Руководитель видит задачи своих людей">
+        <FormRow label="Подчиняется" htmlFor={ids.manager} hint="Тот, кому человек подчиняется, видит его задачи">
           <Select id={ids.manager} value={draft.manager_id ?? ""} onChange={(e) => set({ manager_id: e.target.value || null })} className="w-full max-w-[280px]">
-            <option value="">Нет</option>
+            <option value="">Никому</option>
             {managers.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.full_name}
@@ -332,11 +371,7 @@ export function PersonEditor({
     // stays at the foot of the window while the form is longer than it: the unsaved state and «Сохранить» in sight
     <div className="desk-form-foot sticky bottom-0 z-[1] flex flex-wrap items-center gap-3 bg-bg py-2" data-testid="person-form-footer">
       <p className="min-w-0 flex-1 text-[12px] leading-4" aria-live="polite">
-        {armed ? (
-          <span style={{ color: "var(--warn)" }} data-testid="person-form-armed">
-            Не сохранено — <Kbd>Esc</Kbd> ещё раз, чтобы отменить
-          </span>
-        ) : dirty && mode === "edit" ? (
+        {dirty && mode === "edit" ? (
           <span style={{ color: "var(--warn)" }} data-testid="person-form-dirty">
             Есть несохранённые изменения
           </span>
@@ -511,7 +546,7 @@ export function PersonEditor({
                   value={draft.email}
                   onChange={(e) => set({ email: e.target.value })}
                   onBlur={touch("email")}
-                  placeholder="name@company.kz"
+                  placeholder="Например, name@company.kz"
                   aria-invalid={Boolean(errorOf("email"))}
                   data-testid="new-person-email"
                 />

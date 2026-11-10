@@ -61,8 +61,9 @@ export async function checkTeam(ctx: Ctx) {
 }
 
 /**
- * The moves that end something, up to their last click: «Уволить…» is opened and cancelled, the
- * leave question is answered, the promotion is cancelled, a failed load is staged in the browser.
+ * The moves that end something, up to their last click: «Удалить…» is opened and cancelled — from
+ * the row's menu and by the Delete key (D-160), the leave question is answered, the promotion is
+ * cancelled, a failed load is staged in the browser.
  */
 async function personMoves(ctx: Ctx) {
   const { page } = ctx;
@@ -73,16 +74,36 @@ async function personMoves(ctx: Ctx) {
   if ((await employee.count()) === 0) return skip("увольнение и черновик", "в команде нет сотрудника");
   const id = (await employee.getAttribute("data-row-key")) ?? "";
 
-  // «Уволить…» from the row's menu: the name and the open tasks, then «Отмена»
+  // «Удалить…» from the row's menu: the name and what happens — erased, or out of the team with the history — then «Отмена»
   await employee.locator('[role="gridcell"]').first().click({ button: "right" });
-  await page.getByTestId("desk-menu").getByRole("menuitem", { name: /Уволить/ }).click();
-  const dialog = await visible(ctx, "fire-dialog", 5_000);
-  await page.getByTestId("fire-reading").waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
-  const said = dialog ? (await page.getByTestId("fire-dialog").innerText()).replace(/\s+/g, " ") : "";
-  record("команда: «Уволить…» в меню строки — диалог с именем и открытыми задачами", dialog && /открыт/i.test(said), said.slice(0, 120));
-  await ctx.shot("team-fire");
-  await page.getByTestId("fire-cancel").click();
-  await page.getByTestId("fire-dialog").waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
+  await page.getByTestId("desk-menu").getByRole("menuitem", { name: /^Удалить/ }).click();
+  const dialog = await visible(ctx, "remove-dialog", 5_000);
+  await page.getByTestId("remove-reading").waitFor({ state: "detached", timeout: 15_000 }).catch(() => undefined);
+  const said = dialog ? (await page.getByTestId("remove-dialog").innerText()).replace(/\s+/g, " ") : "";
+  record("команда: «Удалить…» в меню строки — диалог говорит, что будет: уйдёт из команды с историей или исчезнет", dialog && /уйдёт из команды|нет истории/i.test(said), said.slice(0, 160));
+  await ctx.shot("team-remove");
+  await page.getByTestId("remove-cancel").click();
+  await page.getByTestId("remove-dialog").waitFor({ state: "detached", timeout: 3_000 }).catch(() => undefined);
+  // the Delete key on the chosen row opens the same dialog; Esc closes it, nothing is removed
+  await employee.locator('[role="gridcell"]').first().click();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Delete");
+  const byKey = await visible(ctx, "remove-dialog", 5_000);
+  await page.keyboard.press("Escape");
+  const keyGone = await page.getByTestId("remove-dialog").waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+  record("команда: Delete на выбранной строке — тот же диалог, Esc закрывает", byKey && keyGone);
+  // who left is out of sight until asked for: «Ушедшие · N» in the toolbar
+  const goneToggle = page.getByTestId("desk-team-gone");
+  if (await goneToggle.count()) {
+    const before = await page.locator(TEAM_ROWS).count();
+    await goneToggle.click();
+    await page.waitForTimeout(300);
+    const after = await page.locator(TEAM_ROWS).count();
+    record("команда: ушедшие скрыты, «Ушедшие · N» показывает их", after > before, `${before} → ${after}`);
+    await goneToggle.click();
+  } else {
+    skip("команда: «Ушедшие»", "ушедших нет");
+  }
 
   // an unsaved card: «Команда ›» asks; «Остаться» keeps the words, «Не сохранять» goes
   await open(page, `/desk/team/${id}?edit=1`);
@@ -229,8 +250,8 @@ async function teamTable(ctx: Ctx) {
   const menu = await visible(ctx, "desk-menu", 3_000);
   const items = menu ? (await page.getByTestId("desk-menu").getByRole("menuitem").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim()) : [];
   record(
-    "команда: правая кнопка — меню строки («Открыть карточку», «Изменить», «Уволить…»)",
-    menu && items.some((t) => t.startsWith("Открыть карточку")) && items.some((t) => t.startsWith("Изменить")) && items.some((t) => /^(Уволить|Выключить экран)/.test(t)),
+    "команда: правая кнопка — меню строки («Открыть карточку», «Изменить», «Удалить…»)",
+    menu && items.some((t) => t.startsWith("Открыть карточку")) && items.some((t) => t.startsWith("Изменить")) && items.some((t) => /^(Удалить|Выключить экран)/.test(t)),
     items.join(" | "),
   );
   await ctx.shot("team-menu");
@@ -290,7 +311,7 @@ async function personCard(ctx: Ctx) {
     skip("карточка: «Дать задачу»", "у этой карточки кнопки нет");
   }
 
-  // E — the facts turn into fields in place; typed, «несохранено» shows; Esc, Esc — gone, nothing saved
+  // E — the facts turn into fields in place; typed, «несохранено» shows; Esc asks, «Не сохранять» — gone, nothing saved
   await open(page, `/desk/team/${id}`);
   await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("KeyE");
@@ -304,11 +325,11 @@ async function personCard(ctx: Ctx) {
     await page.keyboard.type(" смоук");
     const dirty = await visible(ctx, "person-form-dirty", 3_000);
     await page.keyboard.press("Escape");
-    const armed = await visible(ctx, "person-form-armed", 3_000);
-    await ctx.shot("team-edit-armed");
-    await page.keyboard.press("Escape");
+    const asked = await visible(ctx, "person-leave", 3_000);
+    await ctx.shot("team-edit-asked");
+    if (asked) await page.getByTestId("leave-discard").click();
     const gone = await page.getByTestId("desk-person-editor").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
-    record("карточка: несохранённое заметно; Esc — предупреждение, Esc ещё раз — отмена", dirty && armed && gone && !page.url().includes("edit=1"), page.url());
+    record("карточка: несохранённое заметно; Esc спрашивает, «Не сохранять» — отмена", dirty && asked && gone && !page.url().includes("edit=1"), page.url());
   }
 
   // ?edit=1 still opens the editor at once (the phone's /people/<id>/edit leads here)
@@ -332,6 +353,8 @@ async function newPerson(ctx: Ctx) {
   const { page } = ctx;
   await open(page, "/desk/team");
   await page.locator(TEAM_ROWS).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  // somebody already in the team, for the double's warning — read off the first row's name
+  const known = ((await page.locator(TEAM_ROWS).first().locator("[title]").first().getAttribute("title").catch(() => null)) ?? "").split(" · ")[0].trim();
   await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("KeyN");
   const went = await page.waitForURL((url) => url.pathname === "/desk/team/new", { timeout: 10_000 }).then(() => true, () => false);
@@ -355,12 +378,22 @@ async function newPerson(ctx: Ctx) {
   const password = ((await page.getByTestId("password-input").inputValue().catch(() => "")) ?? "").length;
   record("новый сотрудник: «Почта и пароль» — почта и готовый пароль", email && password >= 6, `пароль ${password} симв.`);
   await ctx.shot("team-new");
-  // Esc twice — back to the team, nobody created
+  // a name already in the team is said under the field before «Добавить»
+  if (known) {
+    await page.getByTestId("person-name").fill(known);
+    const twin = await visible(ctx, "person-twin", 3_000);
+    record("новый сотрудник: имя, которое уже есть в команде, — предупреждение под полем", twin, known);
+    await ctx.shot("team-new-twin");
+  } else {
+    skip("новый сотрудник: двойник", "в команде нет строк");
+  }
+  // Esc with words in the form asks; «Не сохранять» — back to the team, nobody created
   await page.getByTestId("person-name").focus();
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Escape");
+  const asks = await visible(ctx, "person-leave", 3_000);
+  if (asks) await page.getByTestId("leave-discard").click();
   const back = await page.waitForURL((url) => url.pathname === "/desk/team", { timeout: 10_000 }).then(() => true, () => false);
-  record("новый сотрудник: Esc, Esc — назад в «Команду», никто не создан", back, page.url());
+  record("новый сотрудник: Esc спрашивает, «Не сохранять» — назад в «Команду», никто не создан", asks && back, page.url());
 }
 
 /** The director's view of the errands; the secretary's queue — `checkSecretary`. */

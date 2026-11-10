@@ -638,6 +638,14 @@ html[data-surface="desk"][data-journal] {
   .desk-fields .field:not(textarea) {
     padding-left: 0;
   }
+  /* an example in an empty field is pale and slanted: it never reads as something already typed (D-160) */
+  .desk-fields .field::placeholder,
+  .desk-fields .field input::placeholder,
+  [data-testid="bulk-text"]::placeholder {
+    color: var(--ink-2);
+    opacity: 0.55;
+    font-style: italic;
+  }
   /* in a table of fields the row's hairline is the line: a field shows its own only when it is touched */
   .desk-cells .field {
     padding-left: 0;

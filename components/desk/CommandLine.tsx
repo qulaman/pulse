@@ -10,7 +10,7 @@ import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { formatWhen } from "@/lib/desk/when";
 import { COMMAND_FIELD_ID } from "@/lib/desk/keys";
-import { matchSections, matchTasks, searchPeople, taskLookup } from "@/lib/desk/palette";
+import { matchCommands, matchSections, matchTasks, searchPeople, taskLookup } from "@/lib/desk/palette";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY } from "@/lib/desk/routes";
 import { suggestPeople, wordAtCaret } from "@/lib/desk/suggest";
 import { shortName } from "@/lib/people/names";
@@ -30,14 +30,15 @@ const SECTIONS = [...DESK_NAV.director, { href: DESK_PROFILE, label: "Профи
 
 type Person = { id: string; full_name: string; position: string | null; aliases: string[] | null };
 
-/** One row of the palette: pin a person to the order, or go somewhere. */
+/** One row of the palette: a move named in words, pin a person to the order, or go somewhere. */
 type Row =
+  | { kind: "command"; key: string; label: string; href: string; lead: boolean }
   | { kind: "pin"; person: Person }
   | { kind: "section"; href: string; label: string; key?: string }
   | { kind: "person"; person: Person }
   | { kind: "task"; task: TaskWithPeople };
 
-const GROUP: Record<Row["kind"], string> = { pin: "Поручить", section: "Разделы", person: "Люди", task: "Задачи" };
+const GROUP: Record<Row["kind"], string> = { command: "Действия", pin: "Поручить", section: "Разделы", person: "Люди", task: "Задачи" };
 
 /** What goes in front of the phrase for a pinned person: the name they are called by (as on Пульс). */
 function addressOf(person: Person): string {
@@ -45,6 +46,7 @@ function addressOf(person: Person): string {
 }
 
 function rowKey(row: Row): string {
+  if (row.kind === "command") return `command:${row.key}`;
   if (row.kind === "section") return `section:${row.href}`;
   if (row.kind === "task") return `task:${row.task.id}`;
   return `${row.kind}:${row.person.id}`;
@@ -61,7 +63,10 @@ function rowKey(row: Row): string {
  * Tab pins the person by id, D-84, and the parser no longer guesses «кому из них»), a section, a
  * person's card, a task already given — the ones loaded at once, the rest of history from the
  * server a moment later (`useTaskSearch`, never while a person is pinned: then the words are an
- * order). ↑/↓ pick a row and Enter opens it; with no row picked Enter sends the order, as always.
+ * order). ↑/↓ pick a row and Enter opens it; with no row picked Enter sends the order, as always —
+ * except a move named in words (D-160): «новый сотрудник», «удалить Ерлана» stand first under
+ * «Действия», and when the words are short and start with the verb the row is picked by itself:
+ * Enter opens the form or the «Удалить» dialog instead of sending a «не разобрал» to the parser.
  * The roster and the tasks are asked on the first focus only: asked by the shell at once, they
  * landed before the screen under it hydrated (#418).
  */
@@ -89,6 +94,7 @@ export function CommandLine() {
     { keys: ["↑", "↓"], label: "Выбрать раздел, человека, задачу" },
     { keys: ["Tab"], label: "Поручить человеку из подсказки" },
     { keys: ["Shift Enter"], label: "Открыть карточку человека" },
+    { keys: ["Ctrl K"], label: "«новый сотрудник» или «удалить Ерлана» + Enter — действие, не поручение" },
     { keys: ["Esc"], label: "Убрать подсказку, выйти из строки" },
   ]);
 
@@ -137,8 +143,18 @@ export function CommandLine() {
       const task = tasks.byId.get(hit.id);
       return task ? [task] : [];
     });
+    const commands = matchCommands(query, team).map((command): Row => {
+      if (command.kind === "new") return { kind: "command", key: "new", label: "Новый сотрудник", href: "/desk/team/new", lead: command.lead };
+      if (command.kind === "list") return { kind: "command", key: "list", label: "Добавить списком из Excel", href: "/desk/team/new?tab=list", lead: false };
+      if (command.kind === "team") return { kind: "command", key: "team", label: "Удалить сотрудника — выбрать в «Команде»", href: "/desk/team", lead: false };
+      const who = command.person;
+      return { kind: "command", key: `remove:${who.id}`, label: `Удалить: ${who.full_name}…`, href: `/desk/team?p=${who.id}&remove=1`, lead: command.lead };
+    });
+    // a command's words are not a name to pin: «удалить ерлана» offers no «Поручить Ерлану»
+    const pinning = commands.length === 0;
     return [
-      ...offers.map((person): Row => ({ kind: "pin", person })),
+      ...commands,
+      ...(pinning ? offers : []).map((person): Row => ({ kind: "pin", person })),
       ...sections.map((section): Row => ({ kind: "section", ...section })),
       ...others.map((person): Row => ({ kind: "person", person })),
       ...found.map((task): Row => ({ kind: "task", task })),
@@ -146,7 +162,10 @@ export function CommandLine() {
   }, [at, query, team, tasks]);
   const pins = rows.filter((row) => row.kind === "pin").length;
   const open = focused && rows.length > 0 && dismissed !== value;
-  const picked = open && chosen >= 0 && chosen < rows.length ? rows[chosen] : null;
+  // a move named in short words is picked by itself; the arrows take over (-2: nothing, on purpose)
+  const lead = rows[0]?.kind === "command" && rows[0].lead;
+  const current = chosen >= 0 ? chosen : chosen === -1 && lead ? 0 : -1;
+  const picked = open && current >= 0 && current < rows.length ? rows[current] : null;
 
   const pinPerson = (person: Person) => {
     // the typed word gives way to the pin; what was before and after it stays
@@ -169,7 +188,8 @@ export function CommandLine() {
   };
 
   const act = (row: Row, alt: boolean) => {
-    if (row.kind === "pin" && !alt) pinPerson(row.person);
+    if (row.kind === "command") go(row.href);
+    else if (row.kind === "pin" && !alt) pinPerson(row.person);
     else if (row.kind === "pin" || row.kind === "person") go(`/desk/team/${row.person.id}`);
     else if (row.kind === "section") go(row.href);
     else go(`/desk/tasks?id=${row.task.id}`);
@@ -230,7 +250,8 @@ export function CommandLine() {
             if (open && (event.code === "ArrowDown" || event.code === "ArrowUp")) {
               event.preventDefault();
               const down = event.code === "ArrowDown";
-              setChosen((index) => (down ? (index + 1 >= rows.length ? -1 : index + 1) : index <= -1 ? rows.length - 1 : index - 1));
+              const index = current;
+              setChosen(down ? (index + 1 >= rows.length ? -2 : index + 1) : index <= -1 ? rows.length - 1 : index === 0 ? -2 : index - 1);
               return;
             }
             if (open && pins > 0 && event.key === "Tab" && !event.shiftKey) {
@@ -285,7 +306,7 @@ export function CommandLine() {
           <span className="desk-progress block h-full w-1/3 bg-accent" />
         </span>
       ) : null}
-      {open ? <Palette rows={rows} chosen={chosen} onHover={setChosen} onAct={act} pins={pins} picked={picked} /> : null}
+      {open ? <Palette rows={rows} chosen={current} onHover={setChosen} onAct={act} pins={pins} picked={picked} /> : null}
       {IN_PANEL.has(stage) ? (
         <InPanel panelKey="ingest" onClose={reset}>
           <DeskConfirm />
@@ -340,7 +361,12 @@ function Palette({
                 <RowBody row={row} />
                 <span className="ml-auto flex shrink-0 items-center gap-1 pl-2">
                   {active ? (
-                    row.kind === "pin" ? (
+                    row.kind === "command" ? (
+                      <>
+                        <Kbd>Enter</Kbd>
+                        <span className="text-[12px] text-muted">сделать</span>
+                      </>
+                    ) : row.kind === "pin" ? (
                       <>
                         <Kbd>Enter</Kbd>
                         <span className="text-[12px] text-muted">поручить</span>
@@ -366,8 +392,9 @@ function Palette({
         })}
       </ul>
       <div className="flex items-center gap-3 border-t border-border px-3 py-1.5 text-[12px] leading-4 text-muted">
-        <Hint keys={["Enter"]}>{picked ? (picked.kind === "pin" ? "поручить" : "открыть") : "отправить поручение"}</Hint>
+        <Hint keys={["Enter"]}>{picked ? (picked.kind === "pin" ? "поручить" : picked.kind === "command" ? "сделать" : "открыть") : "отправить поручение"}</Hint>
         {pins > 0 ? <Hint keys={["Tab"]}>поручить первому</Hint> : null}
+        {picked?.kind === "pin" ? <Hint keys={["Shift Enter"]}>карточка</Hint> : null}
         <span className="ml-auto">
           <Hint keys={["Esc"]}>скрыть</Hint>
         </span>
@@ -388,6 +415,13 @@ function Hint({ keys, children }: { keys: string[]; children: ReactNode }) {
 }
 
 function RowBody({ row }: { row: Row }) {
+  if (row.kind === "command") {
+    return (
+      <span className={`truncate text-[14px] leading-5 ${row.key.startsWith("remove") ? "text-danger" : "font-medium"}`} data-testid="command-action">
+        {row.label}
+      </span>
+    );
+  }
   if (row.kind === "section") {
     return <span className="truncate text-[14px] leading-5">{row.label}</span>;
   }
@@ -395,7 +429,9 @@ function RowBody({ row }: { row: Row }) {
     const task = row.task;
     // closed work is found by when it closed; its deadline no longer says anything
     const closed = task.status === "done" || task.status === "revoked";
-    const when = closed && task.closed_at ? `закрыта ${formatWhen(task.closed_at)}` : task.deadline ? `до ${formatWhen(task.deadline)}` : null;
+    // a task handed over is «передана», as in «Задачи» and on the person's card
+    const closedWord = task.status === "revoked" && task.passed_to ? "передана" : "закрыта";
+    const when = closed && task.closed_at ? `${closedWord} ${formatWhen(task.closed_at)}` : task.deadline ? `до ${formatWhen(task.deadline)}` : null;
     const sub = [task.assignee?.full_name ? shortName(task.assignee.full_name) : null, when].filter(Boolean).join(" · ");
     return (
       <>

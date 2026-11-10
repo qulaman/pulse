@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import { createBrowserSupabase } from "@/lib/supabase/client";
@@ -66,6 +67,14 @@ export const peopleQuery = {
 /** `enabled` — false keeps the list unasked until a part needs it (the desk's order line, D-154). */
 export function usePeople(enabled = true) {
   return useQuery({ ...peopleQuery, enabled });
+}
+
+const NOBODY: ReadonlySet<string> = new Set();
+
+/** Who left the team (D-160): their open tasks wait for the director's handover — the desk marks them «ушёл». */
+export function useGoneIds(): ReadonlySet<string> {
+  const people = usePeople();
+  return useMemo(() => (people.data ? new Set(people.data.filter((p) => !p.is_active).map((p) => p.id)) : NOBODY), [people.data]);
 }
 
 export type PersonMessage = Database["public"]["Tables"]["task_messages"]["Row"] & {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { addInTurn, BULK_MAX, matchRows, nameKey, parseBulk, personBody, rowsToAdd, type RosterPerson } from "./bulk";
+import { addInTurn, BULK_MAX, matchPerson, matchRows, nameKey, parseBulk, personBody, rowsToAdd, type RosterPerson } from "./bulk";
 
 const read = (text: string) => parseBulk(text).map(({ full_name, position, phone }) => [full_name, position, phone]);
 
@@ -263,4 +263,34 @@ describe("nameKey", () => {
 
 it("keeps a list within a working size", () => {
   expect(BULK_MAX).toBeGreaterThanOrEqual(100);
+});
+
+describe("matchPerson — the one-person form's double (D-160)", () => {
+  const roster: RosterPerson[] = [
+    { id: "b", full_name: "Болат Сейтов", is_active: true },
+    { id: "g", full_name: "Гульнара Ахметова", is_active: false },
+    { id: "k", full_name: "Ким", is_active: true },
+  ];
+
+  it("the same name in any order and case", () => {
+    expect(matchPerson("сейтов болат", roster)).toMatchObject({ kind: "same", person: { id: "b" } });
+  });
+
+  it("one who left is found too", () => {
+    expect(matchPerson("Гульнара Ахметова", roster)).toMatchObject({ kind: "same", person: { id: "g", is_active: false } });
+  });
+
+  it("one letter off in the surname: «Сейтоф», «Сейтова», «Сеитов»", () => {
+    expect(matchPerson("Болат Сейтоф", roster)).toMatchObject({ kind: "like", person: { id: "b" } });
+    expect(matchPerson("Болат Сейтова", roster)).toMatchObject({ kind: "like", person: { id: "b" } });
+  });
+
+  it("another first name with a near surname is somebody else", () => {
+    expect(matchPerson("Арман Сейтоф", roster)).toBeNull();
+    expect(matchPerson("Болат Нуров", roster)).toBeNull();
+  });
+
+  it("a part of the name: a patronymic added", () => {
+    expect(matchPerson("Болат Сейтов Ержанович", roster)).toMatchObject({ kind: "like", person: { id: "b" } });
+  });
 });

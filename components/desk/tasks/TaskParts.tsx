@@ -14,6 +14,7 @@ import { useTaskDelivery } from "@/components/tasks/DeliveryStatus";
 import { ACTION_LABEL, allActionsFor, isPrimaryKey, wideLabelOf } from "@/components/tasks/list/DirectorTaskCard";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
 import { humanAqtobe } from "@/lib/ai/time";
+import { useGoneIds } from "@/lib/people/queries";
 import { useReactionPrices, useReactToTask, useTaskReactions } from "@/lib/points/game";
 import { isReactable, priceLabel, REACTION_CODES, REACTION_GLYPH, REACTION_LABEL, showsReactionBar } from "@/lib/points/reactions";
 import { answersFor, wantsWords } from "@/lib/tasks/answers";
@@ -176,6 +177,7 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
   const task = desk.task as TaskWithPeople;
   const stage = stageOf(task, desk.reason, now);
   const closed = task.status === "done" || task.status === "revoked";
+  const gone = useGoneIds().has(task.assignee_id) && !closed;
   const flags = { request: Boolean(desk.signals.request), suggestion: Boolean(task.status === "declined" && desk.signals.suggestion) };
   const all = allActionsFor(task, flags);
   const canPass = all.includes("reassign");
@@ -195,10 +197,10 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
         <div className="min-w-0 flex-1">
           {canPass ? (
             <FieldButton label="Передать другому" keys={["T"]} taskId={task.id} act="reassign handoff" onPress={(target) => desk.acts.press("reassign", task, from(target))} testId="desk-field-assignee">
-              <PersonCell name={task.assignee?.full_name} />
+              <PersonCell name={task.assignee?.full_name} gone={gone} />
             </FieldButton>
           ) : (
-            <PersonCell name={task.assignee?.full_name} />
+            <PersonCell name={task.assignee?.full_name} gone={gone} />
           )}
         </div>
         {large ? null : (
