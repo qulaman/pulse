@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { taggedActions, usePanelFlow, writeParams } from "@/components/desk/tasks/flow";
@@ -12,7 +12,7 @@ import { DESK_NEW_TASK } from "@/components/desk/tasks/TasksScreen";
 import { useDeskActs } from "@/components/desk/tasks/useDeskActs";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { useContextMenu } from "@/components/desk/ui/Menu";
+import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { useMinute } from "@/components/tasks/list/TaskList";
@@ -24,13 +24,14 @@ import { todayYmd } from "@/lib/datetime/calendar";
 import { useDraftTasks } from "@/lib/desk/drafts";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { cursorStep, disputeLines, extrasWord, loadStateOf, matchesDue, orderLines, personNow, rowKeys, rowMoves, worstLoad, type LoadState, type Move, type QueryView } from "@/lib/desk/tasks";
-import { isActive, useErrands } from "@/lib/errands/queries";
 import { loadColor, useTeamLoads } from "@/lib/people/loads";
-import { useNamesKey } from "@/lib/people/names";
-import { isTeamMember, usePeople } from "@/lib/people/queries";
+import { shortName, useNamesKey } from "@/lib/people/names";
+import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
 import { useOpenDisputes, useResolveDispute } from "@/lib/points/game";
 import type { BoardTask } from "@/lib/pulse/board";
 import { HELD_STATUS } from "@/lib/pulse/board";
+import { greeting, quietLine } from "@/lib/pulse/briefing";
+import { useComposeStore } from "@/lib/store/compose";
 import { usePushHealth } from "@/lib/push/health-query";
 import { ordersWaiting } from "@/lib/shop/format";
 import { useOrders, useSetOrderStatus } from "@/lib/shop/queries";
@@ -45,13 +46,21 @@ import { useAnswerVisit } from "@/lib/visits/mutations";
 import { useVisits, type Visit, type VisitAnswer } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 
+import { addressOf } from "@/components/desk/team/shared";
+
+import { HomeEther } from "./home/HomeEther";
+import { HomeMessages } from "./home/HomeMessages";
+import { HomeRating } from "./home/HomeRating";
+import { HomeSecretary } from "./home/HomeSecretary";
 import { LaunchBone, LaunchChecklist, useLaunchGate } from "./LaunchChecklist";
-import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, TeamNow, type ExtraDecision, type TeamRow } from "./TodayParts";
+import { JustSent, PeopleNow, PersonHome, type PersonRow } from "./PeopleNow";
+import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, type ExtraDecision } from "./TodayParts";
 
 /** How many decisions stand on the screen before «…ещё N — разобрать по одной». */
 const DECISIONS_SHOWN = 6;
-/** How many people stand in «Команда сейчас» before «Вся команда». */
-const TEAM_SHOWN = 8;
+/** «Только что отправлено» — the director's own tasks of the last half hour, at most this many. */
+const JUST_SENT_MS = 30 * 60_000;
+const JUST_SENT_SHOWN = 3;
 /** Where a dispute and an order are decided in full: words to the person, a cancelled order. */
 const DISPUTES_HREF = "/desk/settings/points?view=disputes";
 const ORDERS_HREF = "/desk/settings/points?view=shop";
@@ -183,7 +192,6 @@ function TodayView({
   const today = todayYmd(now);
   const reports = useTeamDailyReportDay(today, me.companyId);
   const calendar = useCalendar();
-  const errands = useErrands();
   const visits = useVisits();
   const feed = useTvFeed();
   const answerVisit = useAnswerVisit();
@@ -196,9 +204,14 @@ function TodayView({
   const launching = launch.state !== "off";
 
   const openId = params.get("id");
+  // a person in the panel (`?p=`): the phone's circle of people opened on the home (D-164); a task
+  // opened from there stands over them and gives the panel back when closed
+  const personId = params.get("p");
   const [focus, setFocus] = useState<string | null>(null);
   const openTask = useCallback((id: string) => writeParams({ id }), []);
   const closeTask = useCallback(() => writeParams({ id: null }), []);
+  const openPerson = useCallback((id: string) => writeParams({ p: id, id: null }), []);
+  const closePerson = useCallback(() => writeParams({ p: null }), []);
 
   /* ---- the moment: the same numbers as «Задачи» ---- */
   const rows = useMemo(() => {
@@ -293,7 +306,7 @@ function TodayView({
   const calendarLoad = blockLoad(calendar);
   const feedLoad = blockLoad(feed);
   const reportsLoad = blockLoad(reports);
-  const receptionLoad = worstLoad([blockLoad(visits), blockLoad(errands)]);
+  const receptionLoad = blockLoad(visits);
 
   /* ---- besides tasks: disputes and orders, the same two lists as «Очки и магазин» (D-133) ---- */
   const openOrders = useMemo(
@@ -346,50 +359,86 @@ function TodayView({
     void orders?.refetch();
   };
 
-  /* ---- the team now: trouble first ---- */
+  /* ---- the people: the phone's circles — those with work, and the free (D-164) ---- */
+  const byPerson = useMemo(() => {
+    const map = new Map<string, TaskWithPeople[]>();
+    for (const task of open) {
+      const list = map.get(task.assignee_id);
+      if (list) list.push(task);
+      else map.set(task.assignee_id, [task]);
+    }
+    return map;
+  }, [open]);
   const teamRows = useMemo(() => {
     const reportRows = new Map((reports.data?.rows ?? []).map((row) => [row.user_id, row]));
     const staff = (people.data ?? []).filter(isTeamMember);
-    const byPerson = new Map<string, TaskWithPeople[]>();
-    for (const task of open) {
-      const list = byPerson.get(task.assignee_id);
-      if (list) list.push(task);
-      else byPerson.set(task.assignee_id, [task]);
-    }
-    return staff
-      .map((person) => {
-        const load = loads.data?.[person.id];
-        const color = loadColor(load, person.availability === "active", now.getTime());
-        // no loads to read: the person is unknown, not «свободен»
-        const state = loadsMissing ? { ring: null, line: "—", rank: 4 } : personNow(person, load, color, byPerson.get(person.id) ?? [], reasons, now);
-        const channel = health.data?.get(person.id);
-        const row: TeamRow & { rank: number; overdue: number; active: number } = {
-          id: person.id,
-          name: person.full_name,
-          ring: state.ring,
-          line: state.line,
-          report: reportWord(reportRows.get(person.id), now),
-          push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "без уведомлений" : "пуш не прошёл") : null,
-          rank: state.rank,
-          overdue: load?.overdue ?? 0,
-          active: load?.active ?? 0,
-        };
-        return row;
-      })
-      .sort((a, b) => a.rank - b.rank || b.overdue - a.overdue || b.active - a.active || a.name.localeCompare(b.name, "ru"));
-  }, [people.data, loads.data, loadsMissing, health.data, reports.data, open, reasons, now]);
+    return staff.map((person): PersonRow => {
+      const load = loads.data?.[person.id];
+      const color = loadColor(load, person.availability === "active", now.getTime());
+      const mine = byPerson.get(person.id) ?? [];
+      // no loads to read: the person is unknown, not «свободен»
+      const state = loadsMissing ? { ring: null, line: "—", rank: 4 } : personNow(person, load, color, mine, reasons, now);
+      const channel = health.data?.get(person.id);
+      return {
+        id: person.id,
+        name: person.full_name,
+        ring: state.ring,
+        line: state.line,
+        active: Math.max(load?.active ?? 0, mine.length),
+        report: reportWord(reportRows.get(person.id), now),
+        push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "уведомления не включены" : "пуш не прошёл") : null,
+        away: person.availability !== "active",
+      };
+    });
+  }, [people.data, loads.data, loadsMissing, health.data, reports.data, byPerson, reasons, now]);
+  const personOf = (id: string | null): Person | null => (id ? ((people.data ?? []).find((p) => p.id === id) ?? null) : null);
+  const opened = personOf(personId);
+  const give = useCallback((person: Person) => useComposeStore.getState().request("", { id: person.id, name: shortName(person.full_name), address: addressOf(person) }), []);
+  const givable = (person: Person | null): person is Person => Boolean(person && person.is_active && person.role !== "director" && person.role !== "tv" && person.id !== me.userId);
+  const personMenu = (person: Person): MenuItem[] => [
+    { key: "peek", label: "Открыть здесь", onSelect: () => openPerson(person.id) },
+    ...(givable(person) ? [{ key: "give", label: "Дать задачу", hint: "T", onSelect: () => give(person) }] : []),
+    { key: "tasks", label: "Все дела", onSelect: () => router.push(`/desk/tasks?who=${encodeURIComponent(person.id)}`) },
+    { key: "card", label: "Карточка", onSelect: () => router.push(`/desk/team/${encodeURIComponent(person.id)}`) },
+  ];
+  const onPersonMenu = (id: string, event: MouseEvent) => {
+    const person = personOf(id);
+    if (!person) return;
+    event.preventDefault();
+    context.open(event, personMenu(person));
+  };
+  const taskMenu = (task: TaskWithPeople) => acts.menu(task, { onOpenRow: () => openTask(task.id) });
 
-  /* ---- the reception ---- */
+  /* ---- what the director has just given: found again on the home ---- */
+  const justSent = useMemo(
+    () =>
+      all
+        .filter((task) => task.author_id === me.userId && now.getTime() - new Date(task.created_at).getTime() < JUST_SENT_MS && task.status !== "revoked")
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, JUST_SENT_SHOWN),
+    [all, me.userId, now],
+  );
+
+  /* ---- the feed's line about a task: found among the director's own by its title ---- */
+  const byTitle = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const task of [...all].sort((a, b) => a.created_at.localeCompare(b.created_at))) map.set(task.title.trim().toLowerCase(), task.id);
+    return map;
+  }, [all]);
+  const taskOfTitle = (title: string | null) => (title ? (byTitle.get(title.trim().toLowerCase()) ?? null) : null);
+  const dueList = useMemo(() => [...dueToday].sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? "")), [dueToday]);
+
+  /* ---- who is at the door ---- */
   const visitRows = visits.data ?? [];
   const visitors = awaitingDirector(visitRows);
   const messages = unreadMessages(visitRows);
-  const mine = (errands.data ?? []).filter((errand) => errand.author_id === me.userId && isActive(errand)).slice(0, 4);
   const answer = (visit: Visit, value: VisitAnswer) => answerVisit.mutate({ id: visit.id, answer: value });
 
   /* ---- the keys of the screen: J/K the cursor, Enter opens it (or the stack), the row's letters ---- */
-  const latest = useRef({ queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask });
+  const toGive = givable(opened) ? opened : null;
+  const latest = useRef({ queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give });
   useLayoutEffect(() => {
-    latest.current = { queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask };
+    latest.current = { queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -399,6 +448,12 @@ function TodayView({
       // the panel's own keys are its own; the screen answers from itself or from nowhere
       if (target && target !== document.body && !target.closest("#desk-main")) return;
       const k = latest.current;
+      // T with a person open in the panel: the order line knows whom (the phone's circle, then hold)
+      if (event.code === "KeyT" && k.toGive && !k.openId) {
+        event.preventDefault();
+        k.give(k.toGive);
+        return;
+      }
       const step = event.code === "KeyJ" ? 1 : event.code === "KeyK" ? -1 : 0;
       if (step !== 0) {
         const next = cursorStep(k.ids, k.cursor, step);
@@ -452,7 +507,7 @@ function TodayView({
     { keys: ["O"], label: "Ответить" },
     { keys: ["N"], label: "Напомнить" },
     { keys: ["D"], label: "Срок" },
-    { keys: ["T"], label: "Передать" },
+    { keys: ["T"], label: "Передать (у человека в панели — дать ему задачу)" },
     { keys: ["."], label: "Все действия строки (или правый клик)" },
     { keys: ["Esc"], label: "Убрать курсор, закрыть панель" },
   ]);
@@ -463,12 +518,20 @@ function TodayView({
   // with no task waiting, the hero's «всё закрыто» would stand over the disputes below it
   const extrasLine = queue.length === 0 ? extrasWord(openDisputes.length, openOrders.length) : null;
   const moment = extrasLine ? { ...screen, eyebrow: "Ваш ход", tone: "warn" as const } : screen;
+  // the phone's first words under the face: a greeting, and the quiet day said in one sentence
+  const firstName = me.fullName.trim().split(/\s+/)[0] ?? "";
+  const brief = calm
+    ? quietLine(
+        open.map((task) => ({ id: task.id, title: task.title, deadline: task.deadline, assignee: shortName(task.assignee?.full_name ?? "") || null, assigneeId: task.assignee_id })),
+        now,
+      )
+    : null;
 
   return (
     <DeskPage>
       <PageTitle
         title="Сегодня"
-        state={{ text: dateLine(now) }}
+        state={{ text: `${dateLine(now)} · ${greeting(now, firstName)}` }}
         actions={load.kind === "stale" ? <LoadNote state={load} failed="" now={now} onRetry={onRetry} /> : undefined}
       />
 
@@ -479,12 +542,13 @@ function TodayView({
       ) : launch.state === "checking" ? (
         <LaunchBone />
       ) : (
-        <MomentBar screen={moment} detail={extrasLine ?? (calm ? DESK_NEW_TASK : undefined)} counters={counters} queue={queue.length} enterKey />
+        <MomentBar screen={moment} detail={extrasLine ?? (calm ? (brief ?? DESK_NEW_TASK) : undefined)} counters={counters} queue={queue.length} enterKey />
       )}
 
       <div className="@container">
         <div className={LAYOUT}>
           <div className="flex min-w-0 flex-col gap-6">
+            <JustSent tasks={justSent} now={now} onOpen={openTask} openId={openId} />
             <Decisions
               items={decisions}
               limit={DECISIONS_SHOWN}
@@ -541,11 +605,12 @@ function TodayView({
                 </span>
               </p>
             ) : null}
-            <TeamNow
-              rows={teamRows.slice(0, TEAM_SHOWN)}
-              total={teamRows.length}
+            <PeopleNow
+              rows={teamRows}
               loading={peopleLoad.kind === "loading"}
-              onOpen={(id) => router.push(`/desk/tasks?who=${encodeURIComponent(id)}`)}
+              chosenId={personId}
+              onOpen={openPerson}
+              onMenu={onPersonMenu}
               note={noteOf(teamLoad, "Команда не загрузилась", () => {
                 void people.refetch();
                 void loads.refetch();
@@ -555,34 +620,38 @@ function TodayView({
           </div>
 
           <div className="flex min-w-0 flex-col gap-6">
+            {/* the phone's home besides the face: who is at the door, the messages, the calendar,
+                the secretary, the ether, the rating — each its own block here (D-164) */}
+            <Reception
+              visitors={visitors}
+              messages={messages}
+              now={now}
+              onAnswer={answer}
+              busyId={answerVisit.isPending ? (answerVisit.variables?.id ?? null) : null}
+              note={noteOf(receptionLoad, "Посетители не загрузились", () => void visits.refetch())}
+              failed={receptionLoad.kind === "failed"}
+            />
+            <HomeMessages me={me} onOpenTask={openTask} />
             <Agenda
               events={calendar.data ?? []}
               loading={calendarLoad.kind === "loading"}
               note={noteOf(calendarLoad, "Встречи не загрузились", () => void calendar.refetch())}
               failed={calendarLoad.kind === "failed"}
-              dueToday={dueToday.length}
-              dueLast={dueToday.map((task) => task.deadline).filter((at): at is string => Boolean(at)).sort().at(-1) ?? null}
+              due={dueList}
+              onOpenTask={openTask}
               now={now}
             />
-            <Reception
-              visitors={visitors}
-              messages={messages}
-              errands={mine}
-              now={now}
-              onAnswer={answer}
-              busyId={answerVisit.isPending ? (answerVisit.variables?.id ?? null) : null}
-              note={noteOf(receptionLoad, "Приёмная не загрузилась", () => {
-                void visits.refetch();
-                void errands.refetch();
-              })}
-              failed={receptionLoad.kind === "failed"}
-            />
+            <HomeSecretary me={me} />
+            <HomeEther onAnnounce={() => useComposeStore.getState().request("Всем: ")} />
+            <HomeRating />
             <Feed
               events={feed.data ?? []}
               loading={feedLoad.kind === "loading"}
               now={now}
               note={noteOf(feedLoad, "Лента не загрузилась", () => void feed.refetch())}
               failed={feedLoad.kind === "failed"}
+              taskOf={taskOfTitle}
+              onOpenTask={openTask}
             />
             {reportsLoad.kind === "failed" ? (
               <ReportsFailed note={noteOf(reportsLoad, "Отчёты не загрузились", () => void reports.refetch())} />
@@ -596,6 +665,22 @@ function TodayView({
       {acts.node}
       {context.node}
 
+      {!openId && opened ? (
+        <InPanel panelKey={`person:${opened.id}`} onClose={closePerson}>
+          <PersonHome
+            person={opened}
+            tasks={byPerson.get(opened.id) ?? []}
+            now={now}
+            onGive={givable(opened) ? () => give(opened) : null}
+            onOpenTask={openTask}
+            menuOf={taskMenu}
+            onMenu={(task, event) => {
+              event.preventDefault();
+              context.open(event, taskMenu(task));
+            }}
+          />
+        </InPanel>
+      ) : null}
       {openId ? (
         <InPanel panelKey={`task:${openId}`} onClose={closeTask}>
           <TaskPanel

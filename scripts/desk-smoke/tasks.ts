@@ -24,14 +24,18 @@ async function checkToday(ctx: Ctx) {
   await page
     .getByTestId("today-person")
     .first()
+    .or(page.getByTestId("today-free-person").first())
     .or(page.getByTestId("today-team").getByTestId("desk-empty"))
     .waitFor({ timeout: 15_000 })
     .catch(() => undefined);
+  // the phone's home on the desk (D-164): its balls and the secretary's desk are blocks here
   for (const [id, name] of [
     ["today-decisions", "«Ждут вас»"],
-    ["today-team", "«Команда сейчас»"],
+    ["today-team", "«Люди»"],
     ["today-agenda", "«Встречи и сроки»"],
-    ["today-reception", "«Приёмная»"],
+    ["home-messages", "«Сообщения»"],
+    ["home-secretary", "«Секретарь»"],
+    ["home-ether", "«Эфир»"],
     ["today-feed", "«Лента»"],
   ] as const) {
     const block = page.getByTestId(id);
@@ -41,9 +45,31 @@ async function checkToday(ctx: Ctx) {
   const decisions = await page.getByTestId("today-decision").count();
   const entry = await page.getByTestId("desk-inbox-entry").count();
   record("сегодня: «Разобрать по одной» — только когда есть что разбирать", decisions > 0 ? entry === 1 : true, `решений ${decisions}, кнопка ${entry}`);
-  const people = await page.getByTestId("today-person").count();
-  if (people > 0) record("сегодня: «Команда сейчас» — люди", true, `людей ${people}`);
-  else skip("сегодня: «Команда сейчас» — люди", "в команде никого");
+  const people = (await page.getByTestId("today-person").count()) + (await page.getByTestId("today-free-person").count());
+  if (people > 0) {
+    record("сегодня: «Люди» — все люди, занятые и свободные", true, `людей ${people}`);
+    // a person opens in the panel on the home — their tasks and «Дать задачу»; T puts them into the order line
+    const first = page.getByTestId("today-free-person").first().or(page.getByTestId("today-person").first()).first();
+    await first.click();
+    const panel = await page.getByTestId("today-person-panel").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    const stayed = page.url().includes("/desk/today");
+    await ctx.shot("today-person-panel");
+    const give = page.getByTestId("today-person-give");
+    if (panel && (await give.count())) {
+      await page.locator("#desk-main h1").click();
+      await page.keyboard.press("KeyT");
+      await page.waitForTimeout(300);
+      const pinned = await page.getByTestId("command-pin").count();
+      record("сегодня: человек — панель на главной, T — он в строке поручения", stayed && pinned === 1, `плашка ${pinned}`);
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      // nothing typed: the pin is let go, no order goes anywhere
+      await page.getByLabel("Убрать исполнителя").click().catch(() => undefined);
+    } else {
+      record("сегодня: человек — панель на главной", panel && stayed, page.url());
+    }
+    await page.goto(page.url().replace(/\?.*$/, ""), { waitUntil: "load" });
+  } else skip("сегодня: «Люди»", "в команде никого");
   const lateRows = await page.getByTestId("today-overdue-row").count();
   if (decisions + lateRows > 0) {
     // J — the keyboard's cursor on the first row, nothing opens; Esc takes it off

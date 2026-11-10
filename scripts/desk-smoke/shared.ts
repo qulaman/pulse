@@ -7,8 +7,12 @@ import type { Page } from "playwright";
 
 process.loadEnvFile(".env.local");
 
-/** On while a part answers 500 itself to see the screen name a failure: those are not the app's errors. */
-export const injected = { failures: false };
+/**
+ * On while a part answers 500 itself to see the screen name a failure: those are not the app's
+ * errors. `ids` — made-up ids a part leads the app to (a task its faked answer named): the base's
+ * «no such row» about them is the part's doing, not the app's.
+ */
+export const injected = { failures: false, ids: [] as string[] };
 
 export const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 

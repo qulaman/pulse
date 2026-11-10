@@ -1,0 +1,133 @@
+"use client";
+
+import Link from "next/link";
+import { useMemo } from "react";
+
+import { useDeskScope } from "@/components/desk/DeskScope";
+import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { When } from "@/components/desk/ui/When";
+import { humanAqtobe } from "@/lib/ai/time";
+import { reachOf } from "@/lib/desk/ether";
+import { etherLinesOf, newsWords, shortWhen, type EtherLine } from "@/lib/desk/home";
+import { loadStateOf, worstLoad } from "@/lib/desk/tasks";
+import { useEther, useEtherEvents, useHeldAnnouncements, type Announcement, type EtherEvent } from "@/lib/ether/queries";
+import { shortName } from "@/lib/people/names";
+import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
+import { useNow } from "@/lib/pulse/queries";
+
+import { Aside, BlockLink, BlockNote, DAY_ROW_END, HeadMove, Quiet, RowsBone } from "./parts";
+
+/** How many rows the block shows; the rest is a click away in «Объявления». */
+const SHOWN = 4;
+
+/**
+ * «Эфир» on the desk's home (D-164): the phone's «Эфир» ball — the last announcements with their
+ * reach, «Объявить» puts «всем: » into the order line. Contract frozen with TodayScreen.
+ *
+ * The same feed as the phone and «Объявления» (`useEther`, `useEtherEvents`): what waits for the
+ * delivery window first with the time it goes (D-129), then announcements and good news by time,
+ * as the phone mixes them (D-133). Reach is counted among the people working now, as on the
+ * desk's «Объявления» — «3 из 9», never «10 из 9». A row opens the announcement in «Объявления».
+ */
+export function HomeEther({ onAnnounce }: { onAnnounce: () => void }) {
+  const { role } = useDeskScope();
+  const feed = useEther();
+  const news = useEtherEvents();
+  // only the director reads the outbox (RLS): what still waits for the window
+  const held = useHeldAnnouncements(role === "director");
+  const people = usePeople();
+  const now = useNow(60_000);
+  const team = useMemo(() => (people.data ?? []).filter(isTeamMember), [people.data]);
+  const lines = useMemo(() => etherLinesOf(feed.data ?? [], news.data ?? [], held.data, now, SHOWN), [feed.data, news.data, held.data, now]);
+  // the announcements decide the block; good news without them is still the feed
+  const load = worstLoad([loadStateOf(feed), loadStateOf(news)]);
+  const retry = () => {
+    void feed.refetch();
+    void news.refetch();
+  };
+
+  return (
+    <Aside testId="home-ether">
+      <SectionLabel
+        action={
+          <span className="flex items-center gap-4">
+            {role === "director" ? (
+              <HeadMove pen onPress={onAnnounce} title="Строка поручения начнётся со слова «всем»" testId="home-ether-announce">
+                Объявить
+              </HeadMove>
+            ) : null}
+            <BlockLink href="/desk/ether" testId="home-ether-all">
+              Все объявления →
+            </BlockLink>
+          </span>
+        }
+      >
+        Эфир
+      </SectionLabel>
+      <BlockNote state={load} failed="Эфир не загрузился" now={now} onRetry={retry} />
+      {load.kind === "loading" ? (
+        <RowsBone rows={3} />
+      ) : load.kind === "failed" && lines.length === 0 ? null : lines.length === 0 ? (
+        <div className="desk-list">
+          <Quiet testId="home-ether-empty">Объявлений пока нет — начните поручение со слова «всем», и его получит вся команда</Quiet>
+        </div>
+      ) : (
+        <ul className="desk-list" data-testid="home-ether-list">
+          {lines.map((line) => (
+            <li key={`${line.kind}:${line.item.id}`}>
+              <EtherRow line={line} team={people.data ? team : null} now={now} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </Aside>
+  );
+}
+
+function EtherRow({ line, team, now }: { line: EtherLine<Announcement, EtherEvent>; team: readonly Person[] | null; now: Date }) {
+  if (line.kind === "news") {
+    const { what, points } = newsWords(line.item);
+    const who = shortName(line.item.user?.full_name ?? "Сотрудник");
+    return (
+      <Link href="/desk/ether" prefetch={false} className={`desk-row ${DAY_ROW_END}`} title={`${who} · ${what}`} data-testid="home-ether-news">
+        <When className="text-muted">{shortWhen(new Date(line.at), now)}</When>
+        <span className="min-w-0 truncate">
+          {who}
+          <span className="text-muted"> · {what}</span>
+        </span>
+        <span className="nums text-[13px]" style={{ color: "var(--gold)" }}>
+          {points ? `+${points}` : ""}
+        </span>
+      </Link>
+    );
+  }
+  const item = line.item;
+  // reach among the people working now; the team unknown yet — the count alone, never «3 из 0»
+  const reach = team ? reachOf(item.acks, team) : null;
+  return (
+    <Link
+      href={`/desk/ether?id=${encodeURIComponent(item.id)}`}
+      prefetch={false}
+      className={`desk-row ${DAY_ROW_END}`}
+      title={item.transcript}
+      data-testid="home-ether-row"
+      data-held={line.until ? "" : undefined}
+    >
+      <When className="text-muted">{shortWhen(new Date(line.at), now)}</When>
+      <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{item.transcript}</span>
+      {line.until ? (
+        // waits for the delivery window (D-38): when it goes, in the pen — the director may send it now in «Объявления»
+        <span className="nums whitespace-nowrap text-[13px] text-accent" title={`Ждёт окна доставки: уйдёт ${humanAqtobe(new Date(line.until), now)} — отправить сейчас можно в «Объявлениях»`}>
+          уйдёт {humanAqtobe(new Date(line.until), now).split(" ").at(-1)}
+        </span>
+      ) : reach ? (
+        <span className="nums whitespace-nowrap text-[13px]" title={reach.missing.length > 0 ? `Не ознакомились: ${reach.missing.map((person) => shortName(person.full_name)).join(", ")}` : "Ознакомились все"} data-testid="home-ether-reach">
+          {reach.seen}
+          <span className="text-muted"> из {reach.of}</span>
+        </span>
+      ) : (
+        <span className="nums text-[13px] text-muted">{item.acks.length}</span>
+      )}
+    </Link>
+  );
+}

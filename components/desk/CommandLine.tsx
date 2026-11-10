@@ -7,12 +7,15 @@ import { DeskConfirm } from "@/components/desk/DeskConfirm";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
+import { cancelDeskVoice } from "@/components/desk/voice/control";
+import { MicButton, RecordingHint } from "@/components/desk/voice/MicButton";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { formatWhen } from "@/lib/desk/when";
 import { COMMAND_FIELD_ID } from "@/lib/desk/keys";
 import { matchCommands, matchSections, matchTasks, searchPeople, taskLookup } from "@/lib/desk/palette";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY } from "@/lib/desk/routes";
 import { suggestPeople, wordAtCaret } from "@/lib/desk/suggest";
+import { IN_FLIGHT, VOICE_KEY } from "@/lib/desk/voice";
 import { shortName } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { useComposeStore, type ComposePin } from "@/lib/store/compose";
@@ -22,8 +25,11 @@ import { STAGE_LINE } from "@/lib/voice/stages";
 
 /** Stages the line shows as a thin bar under itself; the phrase is never silently in flight (D-43). */
 const WORKING: ReadonlySet<IngestStage> = new Set(["uploading", "transcribing", "parsing", "sending"]);
-/** Stages that have something to show in the panel: the cards, the question, the failure. */
-const IN_PANEL: ReadonlySet<IngestStage> = new Set(["confirm", "sending", "question", "error"]);
+/**
+ * Stages that have something to show in the panel (D-164): the phrase on its way — from the first
+ * moment, so it never seems to vanish — then the cards, the question, the failure.
+ */
+const IN_PANEL: ReadonlySet<IngestStage> = new Set([...IN_FLIGHT, "confirm", "sending", "question", "error"]);
 
 const LIST_ID = "desk-command-list";
 const SECTIONS = [...DESK_NAV.director, { href: DESK_PROFILE, label: "Профиль", key: DESK_PROFILE_KEY }];
@@ -69,12 +75,20 @@ function rowKey(row: Row): string {
  * Enter opens the form or the «Удалить» dialog instead of sending a «не разобрал» to the parser.
  * The roster and the tasks are asked on the first focus only: asked by the shell at once, they
  * landed before the screen under it hydrated (#418).
+ *
+ * The line speaks too (D-164): the microphone at its right end (or «V» outside a field) records
+ * the order for the pinned person or for whoever the words name — the phone's pipeline, the same
+ * parse. The panel on the right opens the moment a phrase starts — «Слушаю…», «Разбираю…» with
+ * the words — and the parsed order replaces it there.
  */
 export function CommandLine() {
   const router = useRouter();
   const submitText = useIngestStore((state) => state.submitText);
   const stage = useIngestStore((state) => state.stage);
   const reset = useIngestStore((state) => state.reset);
+  const phrase = useIngestStore((state) => state.clientRequestId);
+  // the phrase whose travelling panel was closed: it comes back by itself with the result
+  const [hiddenFor, setHiddenFor] = useState<string | null>(null);
   const [value, setValue] = useState("");
   const [pin, setPin] = useState<ComposePin | null>(null);
   const [caret, setCaret] = useState(0);
@@ -96,7 +110,19 @@ export function CommandLine() {
     { keys: ["Shift Enter"], label: "Открыть карточку человека" },
     { keys: ["Ctrl K"], label: "«новый сотрудник» или «удалить Ерлана» + Enter — действие, не поручение" },
     { keys: ["Esc"], label: "Убрать подсказку, выйти из строки" },
+    { keys: [VOICE_KEY], label: "Сказать поручение голосом (вне поля); закреплённому человеку — ему" },
+    { keys: ["Enter"], label: "Пока идёт запись — готово, на разбор" },
+    { keys: ["Esc"], label: "Пока идёт запись — отменить, ничего не отправлять" },
   ]);
+
+  // the recording has gone to the parser: the person pinned for it is used up, as after Enter
+  useEffect(
+    () =>
+      useIngestStore.subscribe((state, previous) => {
+        if (previous.stage === "recording" && state.stage === "uploading" && state.pinned) setPin(null);
+      }),
+    [],
+  );
 
   // «Дать задачу» on a person's card: one-shot, consumed here (the phone's sheet does the same)
   useEffect(
@@ -196,6 +222,16 @@ export function CommandLine() {
   };
 
   const working = WORKING.has(stage);
+  const recording = stage === "recording";
+  const inPanel = IN_PANEL.has(stage) && !(IN_FLIGHT.has(stage) && !recording && hiddenFor !== null && hiddenFor === phrase);
+  const closePanel = () => {
+    const now = useIngestStore.getState();
+    // × or Esc on the panel: a recording is dropped; a phrase on its way only hides — the parse
+    // cannot be called back, and its result opens the panel again
+    if (now.stage === "recording") void cancelDeskVoice();
+    else if (IN_FLIGHT.has(now.stage)) setHiddenFor(now.clientRequestId);
+    else reset();
+  };
   const submit = () => {
     const text = value.trim();
     if (!text || working) return;
@@ -276,7 +312,8 @@ export function CommandLine() {
             }
             if (event.key === "Backspace" && !value && pin) setPin(null);
           }}
-          placeholder={pin ? "Что сделать и к какому сроку — Enter" : "Кому и что сделать: «Ерлану смета по объекту до пятницы» — Enter"}
+          // while the microphone listens the hint beside it speaks; an example here would be squeezed to a letter
+          placeholder={recording ? "" : pin ? "Что сделать и к какому сроку — Enter" : "Кому и что сделать: «Ерлану смета по объекту до пятницы» — Enter"}
           aria-label="Поручение"
           role="combobox"
           aria-autocomplete="list"
@@ -289,7 +326,9 @@ export function CommandLine() {
           className="min-w-0 flex-1 bg-transparent text-[15px] leading-5 outline-none placeholder:text-text/45"
           style={{ caretColor: "var(--accent)" }}
         />
-        {working ? (
+        {recording ? (
+          <RecordingHint />
+        ) : working ? (
           <span className="shrink-0 text-[12px] font-medium leading-4 text-accent" data-testid="command-stage">
             {STAGE_LINE[stage]}
           </span>
@@ -299,6 +338,7 @@ export function CommandLine() {
             <Kbd>K</Kbd>
           </span>
         )}
+        <MicButton pin={pin} />
       </div>
       {working ? (
         // the bar runs along the sheet's heavy rule: the pen on a pale track, whatever the rule's own ink
@@ -307,8 +347,9 @@ export function CommandLine() {
         </span>
       ) : null}
       {open ? <Palette rows={rows} chosen={current} onHover={setChosen} onAct={act} pins={pins} picked={picked} /> : null}
-      {IN_PANEL.has(stage) ? (
-        <InPanel panelKey="ingest" onClose={reset}>
+      {inPanel ? (
+        // the result claims the panel anew: a task opened over the travelling phrase does not hide it
+        <InPanel panelKey={IN_FLIGHT.has(stage) ? "ingest-flight" : "ingest"} onClose={closePanel}>
           <DeskConfirm />
         </InPanel>
       ) : null}

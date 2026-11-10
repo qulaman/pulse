@@ -17,7 +17,7 @@
  * write is a note made and deleted (notes are private, no push) — skipped while somebody is
  * active on dev in the last 10 minutes.
  *   node node_modules/tsx/dist/cli.mjs scripts/smoke-desk.ts   (APP_URL, SMOKE_OUT to override)
- *   ONLY=tasks,team,errands,reports,calendar,notes,screen,settings,shell,phone,secretary,safari — a part of it
+ *   ONLY=tasks,voice,team,errands,reports,calendar,notes,screen,settings,shell,phone,secretary,safari — a part of it
  * The screens' own steps live in scripts/desk-smoke/* — one file per role of tasks/022.
  */
 import { createClient } from "@supabase/supabase-js";
@@ -30,6 +30,7 @@ import { checkCalendar, checkNotes, checkScreen } from "./desk-smoke/planning";
 import { checkErrands, checkReports, checkSecretary, checkTeam } from "./desk-smoke/people";
 import { checkSettings } from "./desk-smoke/settings";
 import { checkTasks } from "./desk-smoke/tasks";
+import { checkVoice } from "./desk-smoke/voice";
 
 const OUT = process.env.SMOKE_OUT ?? join(process.cwd(), ".smoke-ui", "desk");
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -60,7 +61,10 @@ function watch(page: Page, who: string) {
   };
   page.on("pageerror", (error) => note(`pageerror: ${error.message}`));
   page.on("console", (message) => {
-    if (message.type() === "error" && !(injected.failures && message.text().includes("status of 500"))) note(`console.error: ${message.text()}`);
+    if (message.type() !== "error") return;
+    if (injected.failures && message.text().includes("status of 500")) return;
+    if (injected.ids.some((id) => message.location().url.includes(id))) return;
+    note(`console.error: ${message.text()}`);
   });
 }
 
@@ -552,6 +556,7 @@ async function main() {
     const ctx: Ctx = { page, stamp, shot: shooter(page, "director"), quiet };
     for (const [name, check] of [
       ["tasks", checkTasks],
+      ["voice", checkVoice],
       ["team", checkTeam],
       ["errands", checkErrands],
       ["reports", checkReports],

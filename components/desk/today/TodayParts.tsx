@@ -8,14 +8,11 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import type { MenuItem } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { PersonCell } from "@/components/desk/ui/PersonCell";
-import { QuickErrands } from "@/components/desk/ui/QuickErrands";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
-import type { Tone } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
 import { Icon } from "@/components/tasks/desk/icons";
 import { DraftMark, MiniButton, MoreButton, MoveButton, MoveRow } from "@/components/desk/tasks/RowMoves";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
-import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { isOver, nextEvent, peopleCount, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
 import { isRunning } from "@/lib/calendar/overview";
@@ -23,9 +20,9 @@ import type { CalendarEvent } from "@/lib/calendar/queries";
 import type { TeamDay, TeamDayRow } from "@/lib/daily-report/types";
 import { todayYmd } from "@/lib/datetime/calendar";
 import { decisionLine, decisionParts, type Move } from "@/lib/desk/tasks";
-import { ERRAND_STATUS_WORD, waitedFor, type Errand } from "@/lib/errands/queries";
 import { shortName } from "@/lib/people/names";
 import type { DeskItem } from "@/lib/tasks/desk";
+import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu, isOverdue } from "@/lib/tasks/status-text";
 import { lineOf, type TvEvent } from "@/lib/tv/feed";
 import type { Visit, VisitAnswer } from "@/lib/visits/queries";
@@ -45,7 +42,7 @@ export function WorkList({ children, testId }: { children: ReactNode; testId?: s
 }
 
 /** A way from a block's head to the screen that holds all of it. */
-function BlockLink({ href, children }: { href: string; children: ReactNode }) {
+export function BlockLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} prefetch className="text-[13px] leading-4 text-muted transition-colors hover:text-text">
       {children}
@@ -58,7 +55,7 @@ function BlockLink({ href, children }: { href: string; children: ReactNode }) {
  * `chosen` — open in the panel; `cursor` — under the keyboard's cursor (J/K). Both read as the
  * table's chosen row (journal.css).
  */
-function WorkRow({
+export function WorkRow({
   onOpen,
   onMenu,
   children,
@@ -130,7 +127,6 @@ const EXTRAS_SHOWN = 4;
 const ROW_FULL = "grid-cols-[116px_16px_minmax(0,1fr)_auto_28px]";
 const ROW_COMPACT = "grid-cols-[116px_16px_minmax(0,1fr)_28px]";
 const ROW_LATE = "grid-cols-[116px_16px_minmax(0,1fr)_auto_auto_28px] @max-[640px]:grid-cols-[16px_minmax(0,1fr)_auto_28px]";
-const ROW_TEAM = "grid-cols-[116px_16px_minmax(0,1fr)_84px_16px] @min-[760px]:grid-cols-[116px_16px_minmax(0,1fr)_96px_116px]";
 
 /** The moves of a row, the main one last: the pen's words stand on one vertical down the sheet. */
 const MOVES = "flex-row-reverse";
@@ -402,97 +398,6 @@ export function Overdue({
   );
 }
 
-export type TeamRow = {
-  id: string;
-  name: string;
-  ring: Tone | null;
-  line: string;
-  report: string | null;
-  push: string | null;
-};
-
-/** What a person is at now; the count of the late ones is the one colour here (D-158). */
-function TeamLine({ row }: { row: TeamRow }) {
-  const cut = row.line.indexOf(" · ");
-  if (row.ring !== "danger" || cut < 0) return <>{row.line}</>;
-  return (
-    <>
-      <span className="text-danger">{row.line.slice(0, cut)}</span>
-      {row.line.slice(cut)}
-    </>
-  );
-}
-
-/**
- * «Команда сейчас» (D-154): the trouble first — late, the director's move, a deadline within a day,
- * then the calm and the free; the day's report and a channel that does not reach the person. A
- * row leads to the person's tasks.
- */
-export function TeamNow({
-  rows,
-  total,
-  loading,
-  onOpen,
-  note,
-  failed,
-}: {
-  rows: readonly TeamRow[];
-  total: number;
-  loading: boolean;
-  onOpen: (id: string) => void;
-  /** the people or their load did not load, or are an old copy */
-  note: ReactNode;
-  /** nobody to show: «В команде пока никого» would be a guess */
-  failed: boolean;
-}) {
-  return (
-    <section className="@container flex flex-col gap-1" data-testid="today-team">
-      <SectionLabel action={<BlockLink href="/desk/team">{total > rows.length ? `Вся команда · ${total} →` : "Команда →"}</BlockLink>}>
-        Команда сейчас
-      </SectionLabel>
-      {note}
-      {failed ? null : loading ? (
-        <SkeletonGroup className="desk-list">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="flex h-[34px] items-center">
-              <Bone h={14} w="62%" />
-            </div>
-          ))}
-        </SkeletonGroup>
-      ) : rows.length === 0 ? (
-        <EmptyState title="В команде пока никого" hint="Сотрудники появятся здесь со своей загрузкой — добавить можно в «Команде»" />
-      ) : (
-        <WorkList testId="today-team-list">
-          {rows.map((row) => (
-            <WorkRow key={row.id} testId="today-person" onOpen={() => onOpen(row.id)}>
-              {/* the empty cell is the ring's: the words stand under the titles of the lists above */}
-              <div className={`grid items-center gap-x-3 ${ROW_TEAM}`}>
-                <PersonCell name={row.name} />
-                <span />
-                <span className="truncate text-[13px] text-muted" title={row.line}>
-                  <TeamLine row={row} />
-                </span>
-                <span className="nums truncate text-[13px] text-muted">{row.report ?? ""}</span>
-                {/* on a narrow block the channel's trouble folds to its mark, its words in the hint */}
-                <span className="truncate text-right text-[13px] text-muted" title={row.push ?? undefined}>
-                  {row.push ? (
-                    <>
-                      <span className="@min-[760px]:hidden">×</span>
-                      <span className="@max-[760px]:hidden">{row.push}</span>
-                    </>
-                  ) : (
-                    ""
-                  )}
-                </span>
-              </div>
-            </WorkRow>
-          ))}
-        </WorkList>
-      )}
-    </section>
-  );
-}
-
 /**
  * The day's report of a person in a word: when it came, or that the day closed without it. A
  * report not due yet says nothing here: «Отчёты сегодня» beside it names those still to hand in.
@@ -523,15 +428,19 @@ function Quiet({ children }: { children: ReactNode }) {
   return <p className="py-[7px] text-[13px] leading-5 text-muted">{children}</p>;
 }
 
+/** How many of today's deadlines stand in «Встречи и сроки» before «ещё N в задачах». */
+const DUE_SHOWN = 4;
+
 /**
  * «Встречи и сроки»: the day's meetings in order — the one on now in bold, the past ones quiet —
- * and the deadlines of the director's tasks that fall today.
+ * and the deadlines of the director's tasks that fall today, each its own line that opens the task
+ * (D-164: the phone's calendar ball tells them one by one, not as a count).
  */
 export function Agenda({
   events,
   loading,
-  dueToday,
-  dueLast,
+  due,
+  onOpenTask,
   now,
   note,
   failed,
@@ -542,11 +451,12 @@ export function Agenda({
   note: ReactNode;
   /** no meetings to show: «Встреч сегодня нет» would be a guess */
   failed: boolean;
-  dueToday: number;
-  /** the last deadline of today — «до 18:00 — 3 срока задач» */
-  dueLast: string | null;
+  /** the director's open tasks due today, the earliest first */
+  due: readonly TaskWithPeople[];
+  onOpenTask: (id: string) => void;
   now: Date;
 }) {
+  const dueToday = due.length;
   const today = todayYmd(now);
   const todays = events.filter((event) => ymdOfEvent(event) === today).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const later = todays.length === 0 ? nextEvent(events.filter((event) => ymdOfEvent(event) > today), now) : null;
@@ -581,12 +491,23 @@ export function Agenda({
               );
             })
           )}
-          {dueToday > 0 ? (
+          {due.slice(0, DUE_SHOWN).map((task) => (
+            <li key={task.id}>
+              <button type="button" onClick={() => onOpenTask(task.id)} className={`desk-row w-full text-left ${DAY_ROW}`} data-testid="today-due">
+                <When overdue={isOverdue(task, now)}>{task.deadline ? `до ${humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "")}` : "сегодня"}</When>
+                <span className="min-w-0 truncate" title={task.title}>
+                  {shortName(task.assignee?.full_name ?? "") || "Без исполнителя"}
+                  <span className="text-muted"> · {task.title}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {dueToday > DUE_SHOWN ? (
             <li>
-              <Link href="/desk/tasks?due=today" prefetch className={`desk-row ${DAY_ROW}`} data-testid="today-due">
-                <When>{dueLast ? `до ${humanAqtobe(new Date(dueLast), now).replace(/^сегодня /, "")}` : "сегодня"}</When>
-                <span>
-                  <Num value={dueToday} /> {pluralRu(dueToday, ["срок задачи", "срока задач", "сроков задач"])}
+              <Link href="/desk/tasks?due=today" prefetch className={`desk-row ${DAY_ROW}`} data-testid="today-due-more">
+                <span />
+                <span className="text-muted">
+                  ещё <Num value={dueToday - DUE_SHOWN} /> {pluralRu(dueToday - DUE_SHOWN, ["срок", "срока", "сроков"])} — в «Задачах» →
                 </span>
               </Link>
             </li>
@@ -604,40 +525,34 @@ const ANSWERS: { value: VisitAnswer; label: string; main?: boolean }[] = [
 ];
 
 /**
- * «Приёмная»: the usual requests to the secretary as one click each (D-154), who waits at the door
- * with the phone's three answers (D-96), what the secretary wrote to the screen, and the director's
- * requests on their way — taken by whom, how long ago.
+ * «У двери» (D-164): who waits at the door with the phone's three answers (D-96) and what the
+ * secretary wrote to the screen — the phone's `VisitAsk` and `MessageAsk` under the face. Nobody
+ * there — no block: the requests to the secretary are «Секретарь» below.
  */
 export function Reception({
   visitors,
   messages,
-  errands,
   now,
   onAnswer,
   busyId,
   note,
   failed,
 }: {
-  /** the visitors or the requests did not load, or are an old copy */
+  /** the visitors did not load, or are an old copy */
   note: ReactNode;
-  /** «У двери никого» would be a guess */
   failed: boolean;
   visitors: readonly Visit[];
   messages: readonly Visit[];
-  errands: readonly Errand[];
   now: Date;
   onAnswer: (visit: Visit, answer: VisitAnswer) => void;
   busyId: string | null;
 }) {
-  const quiet = visitors.length === 0 && messages.length === 0 && errands.length === 0;
+  if (visitors.length === 0 && messages.length === 0 && !failed) return null;
   return (
     <Aside testId="today-reception">
-      <SectionLabel action={<BlockLink href="/desk/errands">Заявки →</BlockLink>}>Приёмная</SectionLabel>
+      <SectionLabel>У двери</SectionLabel>
       {note}
       <ul className="desk-list">
-        <li className="empty:hidden">
-          <QuickErrands />
-        </li>
         {visitors.map((visit) => {
           const waiting = visit.status === "waiting";
           return (
@@ -677,25 +592,6 @@ export function Reception({
             </span>
           </li>
         ))}
-        {errands.map((errand) => {
-          const who = shortName(errand.claimed?.full_name ?? "");
-          return (
-            <li key={errand.id}>
-              <Link href={`/desk/errands?e=${encodeURIComponent(errand.id)}`} prefetch={false} className={`desk-row ${DAY_ROW}`} data-testid="today-errand">
-                <When className="text-muted">{waitedFor(errand, now)}</When>
-                <span className="min-w-0 truncate">
-                  {errand.label}
-                  <span className="text-muted"> — {who ? `${ERRAND_STATUS_WORD[errand.status]} · ${who}` : ERRAND_STATUS_WORD[errand.status]}</span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-        {quiet && !failed ? (
-          <li>
-            <Quiet>У двери никого, ваших заявок в работе нет</Quiet>
-          </li>
-        ) : null}
       </ul>
     </Aside>
   );
@@ -712,8 +608,26 @@ function feedTime(at: Date, now: Date): string {
 /**
  * «Лента»: today's moves of the company as the wall tells them — nominal words, never a guessed
  * gender. The wall keeps its last few whatever their day; «Сегодня» shows today's only (D-154).
+ * A line about a task the director gave opens it (D-164: the phone's thought over the face does);
+ * the wall's event carries no id, so the task is found by its title among his own.
  */
-export function Feed({ events, loading, now, note, failed }: { events: readonly TvEvent[]; loading: boolean; now: Date; note: ReactNode; failed: boolean }) {
+export function Feed({
+  events,
+  loading,
+  now,
+  note,
+  failed,
+  taskOf,
+  onOpenTask,
+}: {
+  events: readonly TvEvent[];
+  loading: boolean;
+  now: Date;
+  note: ReactNode;
+  failed: boolean;
+  taskOf: (title: string | null) => string | null;
+  onOpenTask: (id: string) => void;
+}) {
   const today = events.filter((event) => aqtobeDay(lineOf(event, false).at) === aqtobeDay(now));
   return (
     <Aside testId="today-feed">
@@ -729,8 +643,9 @@ export function Feed({ events, loading, now, note, failed }: { events: readonly 
             today.map((event) => {
               const line = lineOf(event, false);
               const words = line.label.charAt(0).toLowerCase() + line.label.slice(1);
-              return (
-                <li key={line.id} className={DAY_ROW}>
+              const taskId = taskOf(line.detail ?? null);
+              const body = (
+                <>
                   <When className="text-muted">{feedTime(line.at, now)}</When>
                   <span className="min-w-0 truncate" title={line.detail ? `${words} · «${line.detail}»` : words}>
                     {shortName(line.name)}
@@ -740,6 +655,17 @@ export function Feed({ events, loading, now, note, failed }: { events: readonly 
                       {line.detail ? ` «${line.detail}»` : ""}
                     </span>
                   </span>
+                </>
+              );
+              return (
+                <li key={line.id}>
+                  {taskId ? (
+                    <button type="button" onClick={() => onOpenTask(taskId)} className={`desk-row w-full text-left ${DAY_ROW}`} data-testid="today-feed-row">
+                      {body}
+                    </button>
+                  ) : (
+                    <div className={DAY_ROW}>{body}</div>
+                  )}
                 </li>
               );
             })
