@@ -19,6 +19,7 @@ import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
 import { PANEL_GROW, PanelCard } from "@/components/pulse/PanelCard";
+import { PointsFlight } from "@/components/pulse/PointsFlight";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeechWith, type Voice } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
@@ -761,6 +762,7 @@ export default function FeedPage() {
               </span>
             </div>
           ) : null}
+          <PointsFlight arrival={arrival.key} />
           {/* right under the face: what the secretary is doing, «на месте», and a little lower
               «Посетитель» — out of the face's band, so the face stays in the middle (D-87 доводка) */}
           {isSecretary && mode === "idle" && !loading ? (

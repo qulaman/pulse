@@ -11,6 +11,7 @@ import { PeriodChips } from "@/components/rating/PeriodChips";
 import { PointsSheet } from "@/components/rating/PointsSheet";
 import { Button } from "@/components/ui/Button";
 import { RatingListBone } from "@/components/ui/PageSkeletons";
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { shortName } from "@/lib/people/names";
 import { initialsOf, usePeople } from "@/lib/people/queries";
 import { useAwardPoints, useRating, type RatingPeriod, type RatingRow } from "@/lib/points/queries";
@@ -28,7 +29,8 @@ function Delta({ value }: { value: number }) {
   );
 }
 
-function Row({
+/** One person's line; `/dev/points` draws it on its own (D-165). */
+export function RatingRowLine({
   row,
   streak,
   canAward,
@@ -80,7 +82,7 @@ function Row({
           </span>
         </span>
         <span className="nums text-[19px] font-semibold leading-6" style={{ color: row.points > 0 ? "var(--gold)" : "var(--text-muted)" }}>
-          {row.points}
+          <RollingNumber value={row.points} />
         </span>
       </button>
       {canAward ? (
@@ -213,7 +215,7 @@ export function RatingList({
           {rows.length > 0 ? (
             <ul className="mt-4 space-y-2">
               {rows.map((row) => (
-                <Row key={row.user_id} row={row} streak={streakOf(row.user_id)} canAward={canAward && pointsEnabled === true} onAward={startAward} onOpen={setOpen} />
+                <RatingRowLine key={row.user_id} row={row} streak={streakOf(row.user_id)} canAward={canAward && pointsEnabled === true} onAward={startAward} onOpen={setOpen} />
               ))}
             </ul>
           ) : null}

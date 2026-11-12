@@ -8,7 +8,7 @@
 
 Что делаем:
 1. **Табло.** Числа очков прокручиваются цифрами, как табло, — `@number-flow/react` за одной своей обёрткой. Пакет можно снять, поменяв один файл.
-2. **Полёт.** При начислении золотое «+N» отрывается от пилюли и летит по дуге в счётчик под именем в шапке — `arc()` из `motion/react`.
+2. **Полёт.** При начислении копия пилюли «+N» отрывается и летит по дуге в счётчик под именем в шапке. Механизм — общий полёт копий `flyInto` из `lib/ui/flyAway.ts` (D-166, D-167): в приложении один механизм полёта, второго не заводим.
 
 Правила:
 - Данные пишутся и показываются сразу; эффект играет поверх и ничего не задерживает (принцип 1a). Счётчик крутится, когда пришёл баланс. Подгонять его под конец полёта не нужно.
@@ -24,14 +24,16 @@
 - `app/(employee)/feed/page.tsx` — строки около `usePointsArrival` и пилюли `face-pill`.
 - `components/HeaderPoints.tsx`, `components/AppHeader.tsx` (где стоит `HeaderPoints`).
 - `lib/points/queries.ts` — `usePointsArrival`; `lib/shop/queries.ts` — `useBalance`.
-- Документация пакета: https://number-flow.barvian.me (React, SSR, `trend`, `animated`, `respectMotionPreference`, `locales`) и https://motion.dev/docs/arc.
+- `lib/ui/flyAway.ts` — `flyInto`, `arcFrames`, `motionWanted`; `lib/ui/flyAway.test.ts`.
+- Документация пакета: https://number-flow.barvian.me (React, SSR, `trend`, `animated`, `respectMotionPreference`, `locales`).
 
 ## Рабочая папка и файлы
 - `Z:\Pulse`, ветка `main`. Worktree не создавать, ветки не переключать, не коммитить.
 - **Трогать только:**
   - `package.json`, `pnpm-lock.yaml`;
   - новые: `components/ui/RollingNumber.tsx`, `components/pulse/PointsFlight.tsx`, `app/dev/points/page.tsx`;
-  - правки: `components/HeaderPoints.tsx`, `app/(employee)/feed/page.tsx` (только подключить полёт), `components/shop/ShopFront.tsx`, `components/rating/RatingList.tsx`, `components/rating/Podium.tsx`, `components/tv/TvLeaders.tsx`, `components/tv/TvRating.tsx`.
+  - правки: `components/HeaderPoints.tsx`, `app/(employee)/feed/page.tsx` (только подключить полёт), `components/shop/ShopFront.tsx`, `components/rating/RatingList.tsx`, `components/rating/Podium.tsx`, `components/tv/TvLeaders.tsx`, `components/tv/TvRating.tsx`;
+  - `lib/ui/flyAway.ts` — только новые необязательные параметры `flyInto` (см. шаг 3); поведение по умолчанию для нынешних полётов карточек не меняется. В `lib/ui/flyAway.test.ts` — тесты на новые параметры; старые тесты не трогать.
 - Доки не трогать: какие фразы в `docs/FRONTEND.md` («Game Feel») и `docs/DESIGN.md` поменять, напиши в отчёте.
 
 ## Шаги
@@ -55,12 +57,13 @@
    - `Podium.tsx`
    - `TvLeaders.tsx` — оба места
    - `TvRating.tsx`
-3. **`components/pulse/PointsFlight.tsx`** (`"use client"`) — слой поверх экрана, `pointer-events: none`, `position: fixed`.
-   - Когда в Ленте играет начисление (тот же `arrival.key`, что включает монету), золотое «+N» стартует от пилюли `face-pill` и летит по `arc()` в счётчик.
-   - Цель — элемент с `data-points-target` на `HeaderPoints`: добавь атрибут. Координаты меряются в момент старта.
-   - Анимируются только `transform` и `opacity` (D-45). Полёт около 0,7 с, в конце «+N» гаснет.
-   - Если цели нет на экране (шапка без очков, у секретаря) или включено «уменьшить движение», полёта нет.
-   - Подключить в `feed/page.tsx` рядом с пилюлей, одной строкой JSX.
+3. **Полёт — `components/pulse/PointsFlight.tsx`** (хук или компонент, `"use client"`).
+   - Когда в Ленте играет начисление (тот же `arrival.key`, что включает монету), копия пилюли `face-pill` летит `flyInto` в счётчик. Сама пилюля остаётся у лица, как сейчас.
+   - Цель — элемент с `data-points-target` на `HeaderPoints`: добавь атрибут.
+   - `flyInto` сейчас рисует карточку: поднятая тень, к цели сжимается до четверти её меньшей стороны. Для очков добавь необязательные параметры, например `lifted: false` (без тени) и `arrivesAs` (размер по прилёте — «+N» долетает читаемым, примерно в высоту цифр счётчика). Умолчания — нынешние.
+   - Длительность около 0,6–0,7 с. Анимируются только `transform` и `opacity` — это `flyInto` уже соблюдает.
+   - «Уменьшить движение» и цель вне экрана (шапка без очков, у секретаря) `flyInto` уже обрабатывает: полёта нет. Проверь это в песочнице, не дублируй.
+   - Подключить в `feed/page.tsx` одной строкой рядом с пилюлей.
 4. **Песочница `app/dev/points/page.tsx`** — смотреть всё без начисления живых очков.
    - Кнопки: `+5`, `−10`, «Заказ −30 (магазин)».
    - На экране: счётчик в шапке, строка рейтинга и полёт от фальшивой пилюли.
@@ -70,11 +73,13 @@
 
 ```powershell
 node node_modules/typescript/bin/tsc --noEmit -p .
-node node_modules/eslint/bin/eslint.js components/ui/RollingNumber.tsx components/pulse/PointsFlight.tsx app/dev/points components/HeaderPoints.tsx "app/(employee)/feed/page.tsx" components/shop/ShopFront.tsx components/rating components/tv/TvLeaders.tsx components/tv/TvRating.tsx
+node node_modules/eslint/bin/eslint.js components/ui/RollingNumber.tsx components/pulse/PointsFlight.tsx app/dev/points components/HeaderPoints.tsx "app/(employee)/feed/page.tsx" components/shop/ShopFront.tsx components/rating components/tv/TvLeaders.tsx components/tv/TvRating.tsx lib/ui/flyAway.ts lib/ui/flyAway.test.ts
 node node_modules/vitest/vitest.mjs run
 node node_modules/tsx/dist/cli.mjs scripts/smoke-stages.ts
-node node_modules/tsx/dist/cli.mjs scripts/smoke-jank.ts
+node node_modules/tsx/dist/cli.mjs scripts/smoke-feed.ts
 ```
+
+`smoke-jank` не запускать: он устарел (строка в IDEAS). `smoke-stages` сам не входит (вход по коду, D-135). Подкладка входа из наряда 030: `C:\Users\Turing\AppData\Local\Temp\claude\c57b3ba00b17341c\4255cbd9-1f11-4c63-88d2-a6f6c431ae0b\scratchpad\030\jankshim.cjs`. Известно красные без правок: `/sent` и `/notes/b/[id]` (строка в IDEAS) — их сравнить с прогоном до правок, новых красных быть не должно.
 
 - **Глазами в песочнице** `/dev/points` — системный Chrome, ширина 390, DPR 3, раскадровка 10 кадров на полёт в свою папку scratchpad:
   - `+5`: «+5» летит дугой в счётчик, счётчик крутится вверх;

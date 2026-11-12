@@ -5,6 +5,7 @@ import { ItemCard } from "@/components/shop/ItemCard";
 import { MyOrders, OrdersQueue } from "@/components/shop/OrderList";
 import { ShopSkeleton } from "@/components/shop/ShopSkeleton";
 import { PageHead } from "@/components/ui/PageHead";
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { useBalance, useCreateOrder, useOrders, useShopItems, type ShopItem } from "@/lib/shop/queries";
 import type { Me } from "@/lib/tasks/queries";
 
@@ -55,7 +56,8 @@ export function ShopFront({ me, pointsEnabled }: { me: Me | undefined; pointsEna
               className="nums mt-0.5 text-[40px] font-bold leading-[44px]"
               style={{ color: "var(--gold)" }}
             >
-              {balance.isLoading ? LOADING_LINE : points}
+              {/* one's own order rolls the balance down; a fall from anything else just changes (D-165) */}
+              {balance.isLoading ? LOADING_LINE : <RollingNumber value={points} rollDown={createOrder.isPending || createOrder.isSuccess} />}
             </p>
             <p className="mt-0.5 text-[13px] leading-4 text-muted">
               {balance.isLoading

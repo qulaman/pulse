@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { tvTime } from "@/lib/tv/clock";
 import { leadersView, type LeaderCard } from "@/lib/tv/leaders";
 import type { TvRatingScene } from "@/lib/tv/queries";
@@ -95,7 +96,7 @@ export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date
                       <TvAvatar name={card.name} src={card.avatar} size={6} />
                       <span className="min-w-0 flex-1 truncate text-[3vh] font-semibold leading-[3.8vh]">{card.name}</span>
                       <span className="shrink-0 text-[3.4vh] font-bold tabular-nums" style={{ color: "var(--gold)" }}>
-                        {card.points}
+                        <RollingNumber value={card.points} />
                       </span>
                     </div>
                   </Holder>
@@ -192,7 +193,7 @@ function PodiumColumn({ card, order }: { card: LeaderCard; order: number }) {
           </p>
           <p className="mt-[0.6vh] flex items-baseline gap-[0.8vh]">
             <span className={`font-bold tabular-nums ${first ? "text-[7vh] leading-[7.4vh]" : "text-[5vh] leading-[5.6vh]"}`} style={{ color: "var(--gold)" }}>
-              {card.points}
+              <RollingNumber value={card.points} />
             </span>
             <span className="text-[2.2vh] text-muted">{card.pointsWord}</span>
           </p>

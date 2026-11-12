@@ -1,5 +1,6 @@
 "use client";
 
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { RatingView } from "@/lib/tv/focus";
 
@@ -46,7 +47,7 @@ export function TvRating({ view, today }: { view: RatingView; today: number }) {
               <div className="min-w-0">
                 <p className="flex items-baseline gap-[1vh]">
                   <span className="text-[6vh] font-bold leading-[6.4vh] tabular-nums" style={{ color: "var(--gold)" }}>
-                    {view.points}
+                    <RollingNumber value={view.points} />
                   </span>
                   <span className="text-[2.4vh] leading-[3vh] text-muted">
                     {pluralRu(view.points, ["очко", "очка", "очков"])}

@@ -162,8 +162,10 @@ const round = (value: number, places = 1) => Number(value.toFixed(places));
  * little as if picked up, curves outwards on the side it stands off the target (to the right when
  * right under it), shrinks to a token of the target's size, turns a little on the way and dissolves
  * as it arrives. Sampled evenly in time, so the curve rides `linear` easing on the compositor.
+ * `arrivesAs` sets the scale it arrives at instead of the token (1 — its own size): «+N» reaches
+ * the counter readable (D-165); the way and the fade stay the same.
  */
-export function arcFrames(from: Box, to: Box, steps = 24): Keyframe[] {
+export function arcFrames(from: Box, to: Box, steps = 24, arrivesAs?: number): Keyframe[] {
   const sx = from.left + from.width / 2;
   const sy = from.top + from.height / 2;
   const dx = to.left + to.width / 2 - sx;
@@ -175,7 +177,7 @@ export function arcFrames(from: Box, to: Box, steps = 24): Keyframe[] {
   // the arc's control point: the middle of the way, pushed off it sideways
   const cx = dx / 2 + (-dy / length) * bulge;
   const cy = dy / 2 + (dx / length) * bulge;
-  const end = Math.min(1, (Math.min(to.width, to.height) * ARRIVES_AS) / Math.max(1, from.width));
+  const end = arrivesAs ?? Math.min(1, (Math.min(to.width, to.height) * ARRIVES_AS) / Math.max(1, from.width));
   const turn = -side * 6;
 
   return Array.from({ length: steps + 1 }, (_, k) => {
@@ -199,8 +201,26 @@ export function arcFrames(from: Box, to: Box, steps = 24): Keyframe[] {
  * A copy of `node` flies along a soft arc into the centre of `target` — a card into the hands of
  * the face (D-167). The card itself stays where it is: it is still in its list, only its state
  * has changed. `onLand` is told when the copy reaches the target (at once when nothing flies).
+ * By default the copy is a card picked up off the page and arrives as a token; «+N» into the
+ * counter of points flies flat and arrives readable (`lifted: false`, `arrivesAs`, D-165).
  */
-export function flyInto(node: HTMLElement, target: HTMLElement, { duration = 450, onLand }: { duration?: number; onLand?: () => void } = {}): void {
+export function flyInto(
+  node: HTMLElement,
+  target: HTMLElement,
+  {
+    duration = 450,
+    lifted = true,
+    arrivesAs,
+    onLand,
+  }: {
+    duration?: number;
+    /** Off the page by a deeper shadow, as a card is picked up; a chip of text flies without one. */
+    lifted?: boolean;
+    /** The scale the copy arrives at (1 — its own size); by default a token of the target's size. */
+    arrivesAs?: number;
+    onLand?: () => void;
+  } = {},
+): void {
   const from = node.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   // nothing to fly from or into: a card or a face that is not on the screen
@@ -212,9 +232,9 @@ export function flyInto(node: HTMLElement, target: HTMLElement, { duration = 450
   const { layer, landed } = openLayer(1, 60);
   const ghost = copyOf(node, from);
   // picked up: off the page by a deeper shadow
-  ghost.style.boxShadow = LIFTED;
+  if (lifted) ghost.style.boxShadow = LIFTED;
   layer.appendChild(ghost);
-  const flight = ghost.animate(arcFrames(from, to), { duration, easing: "linear", fill: "both" });
+  const flight = ghost.animate(arcFrames(from, to, undefined, arrivesAs), { duration, easing: "linear", fill: "both" });
   flight.onfinish = () => {
     ghost.remove();
     landed();
