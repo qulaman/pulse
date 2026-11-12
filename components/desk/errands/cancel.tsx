@@ -67,6 +67,8 @@ export function useCancelErrand(): (errand: Errand) => void {
     toastId = toast(`${errand.label} · отменено`, {
       // the toast outlives the window by a breath, so the button never vanishes under the mouse
       lifetimeMs: UNDO_MS + 400,
+      // …but its bar runs out with the window itself
+      windowMs: UNDO_MS,
       action: {
         label: "Вернуть",
         onClick: () => {

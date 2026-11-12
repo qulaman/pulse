@@ -2,6 +2,19 @@
 
 import { useCallback, useLayoutEffect, useRef, useState, type RefObject, type SetStateAction } from "react";
 
+import { durations, easing } from "@/lib/design/tokens";
+
+let objectEasing: string | null = null;
+
+/**
+ * The object spring (D-166) for WAAPI: `--ease-object` over `--t-object`. A browser that cannot
+ * read a `linear()` curve (it would throw on `animate`) gets the plain `--ease-out` instead.
+ */
+export function objectMotion(): { ms: number; easing: string } {
+  objectEasing ??= CSS.supports("transition-timing-function", easing.object) ? easing.object : easing.out;
+  return { ms: parseInt(durations.object, 10), easing: objectEasing };
+}
+
 /**
  * An animation started inside a long task (the render that opened a sheet, folded a month)
  * takes its start time from a frame clock that task has left behind — and so does the first

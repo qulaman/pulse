@@ -8,6 +8,7 @@ import { DictionaryBody } from "@/components/dictionary/DictionarySkeleton";
 import { Button } from "@/components/ui/Button";
 import { NamesPanel } from "@/components/dictionary/NamesPanel";
 import { WordsPanel } from "@/components/dictionary/WordsPanel";
+import { springs } from "@/lib/design/tokens";
 import type { RosterPerson } from "@/lib/dictionary";
 import { misheardQueryKey, useCompanySettings, useWaitingEdits, wordStatsKey } from "@/lib/dictionary-queries";
 import { DICTIONARY_TABS, type DictionaryTab } from "@/lib/dictionary-tabs";
@@ -17,7 +18,8 @@ import { settingsKey } from "@/lib/settings-query";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
 
-const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
+/** The thumb is a thing: the object spring (D-166). */
+const THUMB = springs.object;
 
 const TITLE: Record<DictionaryTab, string> = { names: "Имена", words: "Слова" };
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Mascot } from "@/components/brand/Mascot";
 import { ConfirmList } from "@/components/confirm/ConfirmList";
 import { SendBar } from "@/components/confirm/SendBar";
+import { useCardFlight } from "@/components/confirm/useCardFlight";
 import { entitiesSummary } from "@/components/confirm/format";
 import { useSendBatch } from "@/components/confirm/useSendBatch";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +14,8 @@ import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
 import { Sheet } from "@/components/ui/Sheet";
 import { toast } from "@/components/ui/Toast";
-import { useIngestStore } from "@/lib/store/ingest";
+import { usePointsEnabled } from "@/lib/points/queries";
+import { isSendable, useIngestStore } from "@/lib/store/ingest";
 
 export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   const entities = useIngestStore((state) => state.entities);
@@ -34,6 +36,9 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
 
   // a draft reopened from another screen sends exactly the way the board does
   const { sendBatch, sendable: sendableCount, countable } = useSendBatch(() => router.replace("/pulse"));
+  // what goes flies up off the screen the moment it goes (D-166)
+  const { root: cardsRoot, fly } = useCardFlight(stage === "sending");
+  const pointsEnabled = usePointsEnabled().data === true;
 
   // Nothing parsed out of a real phrase: the words are shown and there is always a way out —
   // fix the text and parse again, make the words a task by hand, or close.
@@ -104,11 +109,17 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
   }
 
   const handleSend = async (forceNow: boolean) => {
+    const goes = entities.map((entity) => isSendable(entity, pointsEnabled));
     if (sandbox) {
+      // the flight is played and the cards come back: nothing has gone anywhere
+      const back = fly(goes);
+      setTimeout(back, 1200);
       toast("Песочница: отправка отключена");
       return;
     }
-    await sendBatch(forceNow);
+    const sent = sendBatch(forceNow);
+    fly(goes);
+    await sent;
   };
 
   const firstBlocked = entities.findIndex((entity) => entity.blocked === "assignee_unmatched");
@@ -128,7 +139,7 @@ export function ConfirmScreen({ sandbox = false }: { sandbox?: boolean }) {
           }
         />
 
-        <div className="mt-4">
+        <div className="mt-4" ref={cardsRoot}>
           <ConfirmList assigneeIndex={assigneeIndex} onAssigneeIndex={setAssigneeIndex} />
         </div>
       </main>

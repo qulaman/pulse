@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import type { ReactNode, Ref } from "react";
 
 import { AppsIcon, BuildingIcon, PeopleIcon, SparkIcon } from "@/components/settings/icons";
+import { springs } from "@/lib/design/tokens";
 import { SETTINGS_TABS, type SettingsTab } from "@/lib/settings-tabs";
 
 export const SETTINGS_TAB_META: Record<SettingsTab, { title: string; short: string; about: string; icon: ReactNode }> = {
@@ -13,7 +14,8 @@ export const SETTINGS_TAB_META: Record<SettingsTab, { title: string; short: stri
   ai: { title: "ИИ-модель", short: "ИИ", about: "речь, разбор, словарь", icon: <SparkIcon /> },
 };
 
-export const SETTINGS_THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
+/** The lit tile and the bar's thumb are things: the object spring (D-166). */
+export const SETTINGS_THUMB = springs.object;
 
 export function DirtyDot() {
   return <span aria-label="есть несохранённое" className="block h-2 w-2 shrink-0 rounded-full" style={{ background: "var(--accent)" }} />;

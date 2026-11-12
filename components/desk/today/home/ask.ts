@@ -67,6 +67,8 @@ export function askAfterWindow({ action, note, untilMin = null, absence, onSent 
   toastId = toast(graceLine(action.label, note, absence), {
     // the toast outlives the window by a breath, so the button never vanishes under the mouse
     lifetimeMs: GRACE_MS + 400,
+    // …but its bar runs out with the window itself
+    windowMs: GRACE_MS,
     action: {
       label: "Отменить",
       onClick: () => {

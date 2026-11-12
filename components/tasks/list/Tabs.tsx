@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { springs } from "@/lib/design/tokens";
 import { TONE_VAR, type Tone } from "@/lib/tasks/tone";
 import { useBandStuck, useHeaderHeight } from "@/lib/useHeaderHeight";
 
@@ -14,7 +15,8 @@ export type TabItem<K extends string> = {
   alert?: Tone;
 };
 
-const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
+/** The thumb is a thing: the object spring (D-166). */
+const THUMB = springs.object;
 
 /**
  * The three piles of the list as one segmented control (iOS-style): a raised thumb slides

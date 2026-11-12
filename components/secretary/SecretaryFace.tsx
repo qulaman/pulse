@@ -4,11 +4,13 @@ import { motion } from "framer-motion";
 
 import { SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
+import { springs } from "@/lib/design/tokens";
 import { useMascotSeason } from "@/lib/mascot/useSeason";
 
 /** Drawn at this size and scaled to what the screen asks for — the same trick as MascotLever. */
 const BASE = 128;
-const SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+/** The size change rides the Лента's band spring, as MascotLever does (D-166). */
+const SPRING = springs.object;
 
 /**
  * The middle of the secretary's Лента (D-87, D-97): the secretary's own face instead of

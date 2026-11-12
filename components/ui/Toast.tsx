@@ -3,19 +3,28 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { create } from "zustand";
 
-import { fromNextFrame } from "@/components/ui/motion";
+import { fromNextFrame, objectMotion } from "@/components/ui/motion";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 type ToastAction = { label: string; onClick: () => void };
 
-/** `leaving`: dismissed, playing its way out; the store drops it when that ends. */
-type Toast = { id: number; text: string; action?: ToastAction; lifetimeMs: number; leaving?: boolean };
+/**
+ * `at`: when it was raised (the document clock) — its time and its bar both count from there.
+ * `leaving`: dismissed, playing its way out; the store drops it when that ends.
+ */
+type Toast = { id: number; text: string; action?: ToastAction; lifetimeMs: number; windowMs: number; at: number; leaving?: boolean };
 
 type ToastOptions = {
   /** One button on the right — «Отменить» for a deferred action. */
   action?: ToastAction;
   /** How long the toast stays; a toast with an action waits as long as the action can be undone. */
   lifetimeMs?: number;
+  /**
+   * How long the button can still be pressed, when the caller ends that itself before the toast's
+   * own time (an undo window that dismisses its toast, the toast outliving it by a breath): the
+   * bar along the bottom runs out over this. Defaults to `lifetimeMs`.
+   */
+  windowMs?: number;
 };
 
 type ToastState = {
@@ -35,16 +44,17 @@ const useToastStore = create<ToastState>((set) => ({
   toasts: [],
   show: (text, options) => {
     const id = nextId++;
-    set((state) => ({ toasts: [...state.toasts, { id, text, action: options?.action, lifetimeMs: options?.lifetimeMs ?? LIFETIME_MS }] }));
+    const lifetimeMs = options?.lifetimeMs ?? LIFETIME_MS;
+    const raised = { id, text, action: options?.action, lifetimeMs, windowMs: options?.windowMs ?? lifetimeMs, at: performance.now() };
+    set((state) => ({ toasts: [...state.toasts, raised] }));
     return id;
   },
   dismiss: (id) => set((state) => ({ toasts: state.toasts.map((t) => (t.id === id && !t.leaving ? { ...t, leaving: true } : t)) })),
   remove: (id) => set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 }));
 
-/** The way out (`toast-out`, `--t-screen`) and the glide of the ones below into the room it left (`--t-sheet`). */
+/** The way out (`toast-out`, `--t-screen`): faster than the way in (`--t-object`, D-166). */
 const OUT_MS = 150;
-const GLIDE_MS = 280;
 
 /** Callable from anywhere, including outside React (store actions, event handlers). Returns the id. */
 export function toast(text: string, options?: ToastOptions): number {
@@ -60,12 +70,30 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
   const low = Boolean(item.action);
   const dismiss = useToastStore((state) => state.dismiss);
   const remove = useToastStore((state) => state.remove);
+  const timer = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (item.leaving) return;
-    const timer = setTimeout(() => dismiss(item.id), item.lifetimeMs);
-    return () => clearTimeout(timer);
-  }, [dismiss, item.id, item.lifetimeMs, item.leaving]);
+    const left = setTimeout(() => dismiss(item.id), Math.max(0, item.at + item.lifetimeMs - performance.now()));
+    return () => clearTimeout(left);
+  }, [dismiss, item.id, item.at, item.lifetimeMs, item.leaving]);
+
+  // the bar runs out with the button's time, from the moment the toast was raised: the render
+  // that raised it may have taken a while, the time did not wait for it. WAAPI on the
+  // compositor, not a CSS animation: the entrance's `fromNextFrame` holds the toast's own
+  // animations, never this one, and reduced motion keeps it — it is a clock, not a flourish
+  useLayoutEffect(() => {
+    const bar = timer.current;
+    if (!bar) return;
+    const run = bar.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], {
+      duration: item.windowMs,
+      easing: "linear",
+      fill: "forwards",
+    });
+    // the document timeline counts from the same origin as `performance.now()`
+    run.startTime = item.at;
+    return () => run.cancel();
+  }, [item.windowMs, item.at]);
 
   // the way out ends on its own `animationend`; this only catches a tab that runs no animations
   useEffect(() => {
@@ -78,12 +106,11 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
     <div
       ref={node}
       role="status"
-      className="pointer-events-auto flex w-full max-w-lg items-center gap-3 field px-4 py-3 text-[14px] leading-[18px]"
+      className="toast-glass pointer-events-auto flex w-full max-w-lg items-center gap-3 px-4 py-3 text-[14px] leading-[18px]"
       style={{
-        boxShadow: "var(--shadow-raised)",
         animation: item.leaving
           ? `${low ? "toast-out-down" : "toast-out"} ${OUT_MS}ms var(--ease-in) both`
-          : `${low ? "toast-in-up" : "toast-in"} var(--t-instant) var(--ease-out) both`,
+          : `${low ? "toast-in-up" : "toast-in"} var(--t-object) var(--ease-object) both`,
         pointerEvents: item.leaving ? "none" : undefined,
       }}
       onAnimationEnd={(event) => {
@@ -107,6 +134,7 @@ function ToastItem({ item, node }: { item: Toast; node: (el: HTMLDivElement | nu
           {item.action.label}
         </button>
       ) : null}
+      {item.action ? <span ref={timer} aria-hidden className="toast-timer" /> : null}
     </div>
   );
 }
@@ -136,10 +164,12 @@ export function ToastHost() {
       // a new toast arrives with the action that raised it, usually the heaviest render of the tap
       if (was === undefined) el.getAnimations().forEach(fromNextFrame);
       if (still || was === undefined || was === top) continue;
+      // the ones below glide into the room a toast left on the object spring, like any thing (D-166)
+      const glide = objectMotion();
       fromNextFrame(
         el.animate([{ transform: `translateY(${was - top}px)` }, { transform: "translateY(0)" }], {
-          duration: GLIDE_MS,
-          easing: "cubic-bezier(0.2, 0, 0, 1)",
+          duration: glide.ms,
+          easing: glide.easing,
           composite: "add",
         }),
       );

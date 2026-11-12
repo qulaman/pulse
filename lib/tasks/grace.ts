@@ -101,6 +101,8 @@ export function holdForUndo({ id, path, payload, taskId, text }: HoldInput): Pro
     toastId = toast(text, {
       // the toast outlives the window by a breath, so the button never vanishes under the finger
       lifetimeMs: UNDO_MS + 400,
+      // …but its bar runs out with the window itself
+      windowMs: UNDO_MS,
       action: { label: "Отменить", onClick: () => holds.get(id)?.cancel() },
     });
   });

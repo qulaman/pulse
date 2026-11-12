@@ -15,6 +15,7 @@ import {
   type PersonPatch,
   type Role,
 } from "@/lib/people/queries";
+import { springs } from "@/lib/design/tokens";
 import { useKeyboardDock } from "@/lib/ui/keyboard";
 
 const FIELD =
@@ -23,7 +24,8 @@ const FIELD =
 const AVAILABILITIES: Availability[] = ["active", "vacation", "sick"];
 /** Short enough for three segments on a 320px phone; the full words live in AVAILABILITY_LABEL. */
 const AVAILABILITY_SHORT: Record<Availability, string> = { active: "На месте", vacation: "Отпуск", sick: "Больничный" };
-const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
+/** The thumb is a thing: the object spring (D-166). */
+const THUMB = springs.object;
 
 export type PersonDraft = {
   full_name: string;

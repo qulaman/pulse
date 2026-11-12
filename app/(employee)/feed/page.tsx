@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { InstallHint } from "@/components/InstallHint";
+import { springs } from "@/lib/design/tokens";
 import { EtherSection } from "@/components/ether/EtherSection";
 import { ACT_MS, ACT_TOUCH, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
@@ -95,8 +96,8 @@ const CHEER_MS = 1_800;
 const PILL_MS = 4_000;
 /** A pile of events is played one after another, but never more than this far behind. */
 const QUEUE_MAX_MS = 3_000;
-/** The face's spring on a mode change; the words above it and the cards under it ride it too (D-60). */
-const BAND_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+/** The face's spring on a mode change; the words above it and the cards under it ride it too (D-60) — a thing's, no bounce (D-166). */
+const BAND_SPRING = springs.object;
 
 /**
  * Лента — the employee's home (D-62): the same sleeping face in the middle of the

@@ -93,7 +93,7 @@ export function ConfirmList({
 
   return (
     <>
-      <div className="space-y-3">
+      <div className="space-y-3" data-entity-list="">
         {entities.map((entity, index) => (
           <EntityCard
             key={`${entity.kind}-${index}`}

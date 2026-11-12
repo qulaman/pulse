@@ -1,8 +1,9 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 
+import { springs } from "@/lib/design/tokens";
 import { useHydrated } from "@/lib/useHydrated";
 
 export type OrbitId = "tasks" | "messages" | "ether" | "calendar" | "secretary" | "rating";
@@ -21,8 +22,8 @@ const BALL = 60;
 const ORBIT_S = 28;
 /** `orbit-spin` turns twenty times in one iteration (globals.css): an iteration end wakes the main thread. */
 const TURNS = 20;
-/** The same spring the face and its box ride, so the ball lands with them (D-60). */
-const SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+/** The same spring the face and its box ride, so the ball lands with them (D-60); a thing's, no bounce (D-166). */
+const SPRING = springs.object;
 
 const stroke = { fill: "none", stroke: "currentColor", strokeWidth: 1.9, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
@@ -178,10 +179,23 @@ export function OrbitBalls({
                     {ICON[ball.id]}
                     {!quiet ? (
                       <span
-                        className="nums absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 font-display text-[13px] font-bold leading-none text-bg"
+                        className="nums absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center overflow-hidden rounded-full px-1.5 font-display text-[13px] font-bold leading-none text-bg"
                         style={{ background: ball.tone }}
                       >
-                        {ball.count}
+                        {/* a new number comes down from above into the badge, the old one drops out under
+                            it — the eye catches what has changed (D-166); the first one is simply there */}
+                        <AnimatePresence initial={false} mode="popLayout">
+                          <motion.span
+                            key={ball.count}
+                            className="block"
+                            initial={{ y: -14, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 14, opacity: 0, transition: { duration: 0.16, ease: "easeIn" } }}
+                            transition={SPRING}
+                          >
+                            {ball.count}
+                          </motion.span>
+                        </AnimatePresence>
                       </span>
                     ) : null}
                   </span>

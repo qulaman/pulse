@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type Po
 
 import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { TextSheet } from "@/components/voice/TextSheet";
+import { springs } from "@/lib/design/tokens";
 import { haptic } from "@/lib/haptics";
 import { useMascotSeason } from "@/lib/mascot/useSeason";
 import { useComposeStore } from "@/lib/store/compose";
@@ -27,7 +28,7 @@ const USES_KEY = "pulse.lever.uses";
  */
 const BASE = 128;
 /** The face travels with the box around it — one spring for both, or they arrive apart. */
-const SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+const SPRING = springs.object;
 /**
  * The face gives a little under a pulling finger — down towards the typed input, up towards «отмена»
  * while it records — so the gesture is seen working before the finger lets go. A third of the pull
@@ -154,6 +155,8 @@ export function MascotLever({
   const [cancelArmed, setCancelArmed] = useState(false);
   // the voice swells the blob; painted into a CSS variable of the face's wrapper (below)
   const faceRef = useRef<HTMLSpanElement>(null);
+  // the face's button: the voice level lives on it, so the face and the rings round it both read it
+  const leverRef = useRef<HTMLButtonElement>(null);
   const timerRef = useRef<HTMLSpanElement>(null);
 
   // the give under the finger: a motion value, not state — a pointer move must not re-render the face
@@ -180,13 +183,13 @@ export function MascotLever({
   // rate, and every render re-measured the layout group around the face (D-126).
   useEffect(() => {
     if (stage !== "recording") return;
-    const node = faceRef.current;
+    const node = leverRef.current;
     let last = 0;
     const off = subscribeIngestLevel((value) => {
       const now = performance.now();
       if (now - last < 50) return;
       last = now;
-      faceRef.current?.style.setProperty("--mascot-level", Math.min(1, Math.max(0, value)).toFixed(3));
+      leverRef.current?.style.setProperty("--mascot-level", Math.min(1, Math.max(0, value)).toFixed(3));
     });
     return () => {
       off();
@@ -314,6 +317,7 @@ export function MascotLever({
             rides the same spring as the box and never re-draws the SVG mid-flight */}
         <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ y: give }} className="flex items-center justify-center">
           <button
+            ref={leverRef}
             type="button"
             aria-label={recording ? "Идёт запись, отпусти для отправки" : (label ?? (voice ? "Маскот: удержи — говори, тап — задачи, потяни вниз — текст" : "Маскот: тап — дела"))}
             disabled={busy}
@@ -335,7 +339,29 @@ export function MascotLever({
               WebkitTouchCallout: "none",
             }}
           >
-            {/* the only circle left around the face: the accent fill while the microphone is
+            {/* the voice round the face (D-166): two rings swell with how loud it is, the outer one a
+                beat late — an echo. Transform only, eased by the compositor between the level's writes */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full"
+              style={{
+                border: `2px solid color-mix(in srgb, ${cancelArmed ? "var(--danger)" : "var(--accent)"} 55%, transparent)`,
+                opacity: recording ? 1 : 0,
+                transform: "scale(calc(1.03 + var(--mascot-level, 0) * 0.2))",
+                transition: "transform 90ms linear, opacity var(--t-instant) var(--ease-out)",
+              }}
+            />
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-full"
+              style={{
+                border: `1.5px solid color-mix(in srgb, ${cancelArmed ? "var(--danger)" : "var(--accent)"} 28%, transparent)`,
+                opacity: recording ? 1 : 0,
+                transform: "scale(calc(1.1 + var(--mascot-level, 0) * 0.36))",
+                transition: "transform 320ms var(--ease-out), opacity var(--t-instant) var(--ease-out)",
+              }}
+            />
+            {/* the only fill round the face: the accent while the microphone is
                 open. The «hold me» ring is gone — it hung on through the stages after the
                 release and read as «still listening» (owner, D-60 fifth refinement) */}
             <span

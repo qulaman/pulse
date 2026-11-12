@@ -3,9 +3,10 @@
 import { useImperativeHandle, useState, useSyncExternalStore, type Ref } from "react";
 
 import { ConfirmList } from "@/components/confirm/ConfirmList";
+import { useCardFlight } from "@/components/confirm/useCardFlight";
 import { useSendBatch } from "@/components/confirm/useSendBatch";
-import { useDeliveryWindow } from "@/lib/points/queries";
-import { useIngestStore } from "@/lib/store/ingest";
+import { useDeliveryWindow, usePointsEnabled } from "@/lib/points/queries";
+import { isSendable, useIngestStore } from "@/lib/store/ingest";
 import { isWithinDeliveryWindow, WINDOW_OPEN_HOUR } from "@/lib/voice/quietHours";
 
 /** What the face can ask of the cards under it; `true` — the batch is on its way. */
@@ -61,6 +62,15 @@ export function ConfirmInline({ ref }: { ref?: Ref<ConfirmHandle> }) {
   const { sendBatch, sendable, sending } = useSendBatch();
   const [assigneeIndex, setAssigneeIndex] = useState<number | null>(null);
   const firstBlocked = entities.findIndex((entity) => entity.blocked === "assignee_unmatched");
+  const pointsEnabled = usePointsEnabled().data === true;
+  const { root, fly } = useCardFlight(sending);
+
+  /** The batch goes now: what can be sent flies up off the screen (D-166) — the send does not wait for it. */
+  const send = (now: boolean) => {
+    bumpSends();
+    void sendBatch(now);
+    fly(entities.map((entity) => isSendable(entity, pointsEnabled)));
+  };
 
   useImperativeHandle(
     ref,
@@ -68,15 +78,15 @@ export function ConfirmInline({ ref }: { ref?: Ref<ConfirmHandle> }) {
       throwBatch: () => {
         if (sending) return false;
         if (sendable > 0) {
-          bumpSends();
-          void sendBatch(false);
+          send(false);
           return true;
         }
         if (firstBlocked >= 0) setAssigneeIndex(firstBlocked);
         return false;
       },
     }),
-    [firstBlocked, sendBatch, sendable, sending],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `send` reads the latest render's cards
+    [firstBlocked, sendBatch, sendable, sending, entities, pointsEnabled],
   );
 
   // Read after hydration: the server renders «within the window» so both passes match.
@@ -91,7 +101,7 @@ export function ConfirmInline({ ref }: { ref?: Ref<ConfirmHandle> }) {
   const sendHint = useSendHint();
 
   return (
-    <div data-testid="confirm-inline">
+    <div ref={root} data-testid="confirm-inline">
       <ConfirmList assigneeIndex={assigneeIndex} onAssigneeIndex={setAssigneeIndex} />
 
       <div className="mt-3 flex flex-col items-center gap-1 pb-1">
@@ -106,10 +116,7 @@ export function ConfirmInline({ ref }: { ref?: Ref<ConfirmHandle> }) {
         {quiet && sendable > 0 ? (
           <p className="text-center text-[13px] leading-4 text-muted">
             {`Отправлю утром в ${opensAt} · `}
-            <button type="button" className="underline" style={{ color: "var(--accent)" }} onClick={() => {
-              bumpSends();
-              void sendBatch(true);
-            }} disabled={sending}>
+            <button type="button" className="underline" style={{ color: "var(--accent)" }} onClick={() => send(true)} disabled={sending}>
               отправить сейчас
             </button>
           </p>

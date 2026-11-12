@@ -2,12 +2,15 @@
 
 import { motion } from "framer-motion";
 
+import { springs } from "@/lib/design/tokens";
 import type { SpeechTone } from "@/lib/pulse/board";
+
+import { HazeWords } from "./HazeWords";
 
 /** The full face; a smaller one (a panel open) lets the thought down by the difference. */
 const FACE = 128;
 /** The face's own spring when it grows or shrinks: the thought follows it on the same one. */
-const FACE_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+const FACE_SPRING = springs.object;
 
 const TONE_COLOR: Record<SpeechTone, string> = {
   danger: "var(--danger)",
@@ -61,7 +64,10 @@ export function ThoughtBubble({
         style={{ boxShadow: "var(--shadow-raised)" }}
       >
         <span aria-hidden className="absolute left-3 top-[13px] h-2 w-2 rounded-full" style={{ background: color }} />
-        <span className="block pl-4">{text}</span>
+        {/* the cloud pops, then its words come out of the haze one by one (D-166) */}
+        <span className="block pl-4">
+          <HazeWords text={text} delay={0.12} />
+        </span>
       </span>
       {/* the trail: two circles down to the head, the thought's tail */}
       <span aria-hidden className="absolute left-[58%] top-full mt-1 h-3 w-3 rounded-full border border-border bg-surface" />

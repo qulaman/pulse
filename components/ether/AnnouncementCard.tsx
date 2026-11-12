@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { useState } from "react";
 
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
@@ -83,14 +84,33 @@ export function AnnouncementCard({
 
       <div className="mt-4 flex items-center justify-between gap-3">
         {isDirector ? (
-          <button
-            type="button"
-            className="nums text-[14px] leading-[18px] text-accent underline underline-offset-4"
-            onClick={() => setWho(true)}
-          >
-            Ознакомились {count}
-            {teamSize === undefined ? null : `/${teamSize}`}
-          </button>
+          <div className="flex min-w-0 flex-col items-start gap-1.5">
+            <button
+              type="button"
+              className="nums text-[14px] leading-[18px] text-accent underline underline-offset-4"
+              onClick={() => setWho(true)}
+            >
+              Ознакомились {count}
+              {teamSize === undefined ? null : `/${teamSize}`}
+            </button>
+            {/* how far the word has gone round the team, filling up as the card opens (D-166) */}
+            {teamSize ? (
+              <span
+                aria-hidden
+                className="block h-[3px] w-[132px] overflow-hidden rounded-full"
+                style={{ background: "color-mix(in srgb, var(--text-muted) 18%, transparent)" }}
+                data-testid="ether-read-bar"
+              >
+                <motion.span
+                  className="block h-full w-full origin-left rounded-full"
+                  style={{ background: count >= teamSize ? "var(--ok)" : "var(--accent)" }}
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: Math.min(1, count / teamSize) }}
+                  transition={{ duration: 0.8, delay: 0.15, ease: [0.2, 0.7, 0.2, 1] }}
+                />
+              </span>
+            ) : null}
+          </div>
         ) : (
           <span className="nums text-[13px] leading-4 text-muted">Ознакомились {count}</span>
         )}

@@ -18,6 +18,7 @@ import { ConfirmInline, type ConfirmHandle } from "@/components/confirm/ConfirmI
 import { entitiesSummary } from "@/components/confirm/format";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
+import { PanelCard, recede } from "@/components/pulse/PanelCard";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { thoughtAct } from "@/components/pulse/thoughtActs";
@@ -29,6 +30,7 @@ import { ThreadSheet } from "@/components/tasks/thread/ThreadSheet";
 import { useKeptPill } from "@/components/voice/KeptPhrases";
 import { Button } from "@/components/ui/Button";
 import { shortName, useNamesKey } from "@/lib/people/names";
+import { springs } from "@/lib/design/tokens";
 import { useComposeStore } from "@/lib/store/compose";
 import { useHydrated } from "@/lib/useHydrated";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
@@ -87,6 +89,11 @@ const FACE = 128;
 const FACE_SMALL = 88;
 /** The cards band against the words' band while a phrase of several things waits (D-146). */
 const CROWDED_GROW = 8;
+/**
+ * The cards band against the words' band while a ball is open: its card comes up from the bottom
+ * and takes three quarters of the screen, the face and the balls step up (D-166).
+ */
+const PANEL_GROW = 3;
 /** Distance from the face's centre to the balls' centres. */
 const RING_RADIUS = 124;
 /** How long a thought hangs above the head before the face dozes off again. */
@@ -95,9 +102,10 @@ const THOUGHT_MS = 9_000;
 const CHEER_MS = 1_800;
 /**
  * The spring the face rides when the mode changes; the words above it and the cards under it ride
- * the same one, so the three bands move together instead of the outer two jumping (D-60).
+ * the same one, so the three bands move together instead of the outer two jumping (D-60). A
+ * thing's spring: it lands without a bounce (D-166).
  */
-const BAND_SPRING = { type: "spring" as const, stiffness: 260, damping: 26 };
+const BAND_SPRING = springs.object;
 
 /**
  * An open ball is a job the face does by hand while the panel is open (D-82): it ticks off
@@ -377,6 +385,14 @@ export default function PulsePage() {
     setPanel(ball.id);
     setMode("panel");
   };
+  // the card pulled down by its grip: the same step back as a tap on the face
+  const closePanel = () => {
+    setMode("ring");
+    setPanel(null);
+  };
+  // the director is speaking and the phrase is on its way: what he is not looking at steps back
+  // behind the face (D-166) — the words, the balls, the open card, the team at rest
+  const listening = stage === "recording" || stage === "uploading" || stage === "transcribing" || stage === "parsing";
 
   // ---- a question the phrase turned out to be ---------------------------------------------
   const asked = stage === "question" && question ? question : null;
@@ -623,6 +639,9 @@ export default function PulsePage() {
   // send hint went below the tab bar while the top half stood empty. The face goes smaller and
   // up, the cards band takes the screen (D-146); the words above keep room for their line.
   const crowded = confirming && entities.length >= 2;
+  // a ball is open: its panel is a card up from the bottom edge (D-166); a phrase in hand sends it
+  // down for as long as the cards of the phrase are on the screen
+  const cardOpen = mode === "panel" && !phraseInHand;
   const faceSize = mode === "panel" || crowded ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
 
@@ -660,6 +679,54 @@ export default function PulsePage() {
     </>
   );
 
+  // somebody at the door, the secretary's words on the wall: above whatever is open (D-96, D-116)
+  const asks =
+    visitorsWaiting || messagesWaiting ? (
+      <>
+        {visitorsWaiting ? (
+          <VisitAsk
+            visits={visitRows}
+            now={now}
+            // tea or coffee for the guest goes with «Пусть заходит» (D-99)
+            hospitality={(catalogue.data ?? NO_ACTIONS).filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
+            onErrand={() => void errands.refetch()}
+          />
+        ) : null}
+        {messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
+      </>
+    ) : null;
+
+  // what the open ball shows inside its card
+  const panelContent =
+    panel === "tasks" ? (
+      // what waits for the morning still has its closing card (D-139)
+      taskCount === 0 && heldTasks.length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
+      ) : (
+        <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} held={heldTasks} onMore={director.more} />
+      )
+    ) : panel === "messages" ? (
+      messageTasks.length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
+      ) : (
+        <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} onMore={director.more} />
+      )
+    ) : panel === "calendar" ? (
+      events.length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Мероприятий нет. Скажи «планёрка завтра в 10 со всеми».</p>
+      ) : (
+        <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
+      )
+    ) : panel === "rating" ? (
+      <RatingPanel />
+    ) : panel === "ether" ? (
+      (ether.data ?? []).length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>
+      ) : (
+        <EtherSection variant="page" />
+      )
+    ) : null;
+
   return (
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, the assistant's words grow upwards above it and the cards downwards
@@ -668,8 +735,11 @@ export default function PulsePage() {
     // itself is always one screen — no scrollbar appearing and disappearing on a tap (D-60).
     // `data-board` stops the shell growing with its content (globals.css); PulseSkeleton draws
     // the same bands, so the face stands where the skeleton had it.
+    // Clipped sideways only: an open ball's card reaches down under the floating tab bar to the
+    // screen's edge (D-166) — the shell is one screen high, so nothing below it can scroll. `relative`:
+    // a leaving card is popped out in place against the board, not against a band that moves.
     <main
-      className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
+      className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-x-clip overflow-y-visible px-4"
       style={{ overscrollBehaviorY: "contain" }}
       data-mode={mode}
       data-board=""
@@ -680,7 +750,7 @@ export default function PulsePage() {
         {/* above the head: what the assistant says. A mode change moves the band's edge by up to
             110 px: the words glide there on the face's spring instead of jumping in one frame */}
         <motion.div layoutScroll className="no-bar flex min-h-0 flex-1 flex-col overflow-y-auto" data-band="said">
-          <motion.div layout="position" transition={BAND_SPRING} className="mt-auto pb-3 pt-2">
+          <motion.div layout="position" transition={BAND_SPRING} className="mt-auto pb-3 pt-2" style={recede(listening, { scale: false })}>
             <Assistant
               // «не разобрал»: what was heard, in the director's bubble, and the assistant's answer under it
               said={exchange?.said ?? (unparsed ? heard : null)}
@@ -716,7 +786,9 @@ export default function PulsePage() {
                 pose of the face — since D-70 the resting face is a barometer and only sleeps
                 when nothing waits. The team also stays while the director is recording a task
                 he started from somebody's own orb (D-72); the dream does not — a dream is for
-                a face that is not doing anything. */}
+                a face that is not doing anything. While the face listens the team steps back
+                behind it — unless the words are for one of them, who must stay in sight (D-166). */}
+            <div className="pointer-events-none absolute inset-0" style={recede(stage === "recording" && !picked)}>
             <IdleScene
               active={mode === "idle" && (stage === "idle" || stage === "recording")}
               // a face that is looking at somebody is not dreaming
@@ -736,6 +808,7 @@ export default function PulsePage() {
                 setLooking(person);
               }}
             />
+            </div>
             <MascotLever
               state={mascot}
               act={acts.act}
@@ -778,10 +851,11 @@ export default function PulsePage() {
                   initial={{ opacity: 0, x: 12 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 12, transition: { duration: 0.18 } }}
-                  transition={{ type: "spring", stiffness: 300, damping: 28 }}
+                  transition={springs.object}
                 >
-                  {/* a narrow phone keeps the desk a little smaller, so it never touches the edge */}
-                  <div className="origin-top-left [@media(max-width:380px)]:scale-[0.84]">
+                  {/* a narrow phone keeps the desk a little smaller, so it never touches the edge;
+                      words for the face, not for the desk, send it a step back (D-166) */}
+                  <div className="origin-top-left [@media(max-width:380px)]:scale-[0.84]" style={recede(stage === "recording" && !toSecretary, { scale: false })}>
                   <SecretaryDesk
                     attending={asking}
                     scene={deskStage.scene}
@@ -861,7 +935,9 @@ export default function PulsePage() {
             {/* the balls stay mounted while the face sleeps (shrunk into the head), so opening a
                 panel walks them down into the row instead of throwing them away (D-60) */}
             {mode !== "panel" && !phraseInHand ? (
-              <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} />
+              <div className="pointer-events-none absolute inset-0" style={recede(listening)}>
+                <OrbitBalls balls={balls} mode="ring" activeId={null} radius={RING_RADIUS} onPick={pick} hidden={mode === "idle"} />
+              </div>
             ) : null}
             {/* one thought at a time: a new one comes once the old has left */}
             <AnimatePresence mode="wait">
@@ -883,95 +959,64 @@ export default function PulsePage() {
           </div>
         </div>
 
-        {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
-            so a ball walking down from the orbit is never clipped on its way in. */}
+        {/* under the head: the balls in a row, then the cards — or, with a ball open, the ball's card
+            up from the bottom edge (D-166). The row is outside the card and the scroller, so a ball
+            walking down from the orbit is never clipped on its way in. */}
         <div
           className="flex min-h-0 flex-1 flex-col transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none"
-          style={{ flexGrow: crowded ? CROWDED_GROW : 1 }}
+          style={{ flexGrow: crowded ? CROWDED_GROW : cardOpen ? PANEL_GROW : 1 }}
           data-band="cards"
           data-crowded={crowded ? "" : undefined}
         >
-          {mode === "panel" && !phraseInHand ? (
-            <div className="mt-1 w-full shrink-0">
+          {cardOpen ? (
+            <div className="mt-1 w-full shrink-0 pb-2" style={recede(listening)}>
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
             </div>
-          ) : null}
-          {/* the band's top moves with the mode, as the words' bottom does: the cards glide with it */}
-          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
-            {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
-            {confirming ? <ConfirmInline ref={confirmRef} /> : null}
-            {!phraseInHand && visitorsWaiting ? <VisitAsk
-                visits={visitRows}
-                now={now}
-                // tea or coffee for the guest goes with «Пусть заходит» (D-99)
-                hospitality={(catalogue.data ?? NO_ACTIONS).filter((a) => ["tea", "coffee"].includes(sceneOfAction(a)))}
-                onErrand={() => void errands.refetch()}
-              /> : null}
-            {!phraseInHand && messagesWaiting ? <MessageAsk visits={visitRows} now={now} /> : null}
-            {/* service cards only once the face has been tapped — the idle screen is the face alone;
-                with a panel open they wait under it — the panel is what the tap asked for (D-139):
-                moved by flex order, not by another slot, so the cards are not mounted anew */}
-            {!phraseInHand && mode !== "idle" ? (
-              <div className="flex flex-col gap-2 empty:hidden" style={{ order: mode === "panel" ? 1 : 0 }}>
-                {serviceLines}
+          ) : (
+            // the band's top moves with the mode, as the words' bottom does: the cards glide with it
+            <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+              {/* the phrase in hand takes the whole band: its cards, and nothing else to do */}
+              {confirming ? <ConfirmInline ref={confirmRef} /> : null}
+              <div className="flex flex-col gap-2 empty:hidden" style={recede(listening, { scale: false })}>
+                {!phraseInHand ? asks : null}
+                {/* service cards only once the face has been tapped — the idle screen is the face alone */}
+                {!phraseInHand && mode !== "idle" ? serviceLines : null}
               </div>
+            </motion.div>
+          )}
+          {/* popLayout: the leaving card is popped out where it stood against the board and slides
+              down from there, while the face, the balls and the band below already take their places */}
+          <AnimatePresence mode="popLayout">
+            {cardOpen ? (
+              <PanelCard key="card" panelKey={panel ?? ""} receded={listening} label={balls.find((ball) => ball.id === panel)?.label ?? "Панель"} onClose={closePanel}>
+                <div className="flex flex-col gap-2 pt-1">
+                  {asks}
+                  {/* another ball changes what is in the card, not the card: the old content fades up and
+                      out at once (popLayout — the new one does not wait for it), the new one rises into its
+                      place — the service lines with it, so nothing of the old one is left standing over
+                      them; position only — a layout animation of its size squashed the deck inside */}
+                  <div className="relative">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      <motion.div
+                        key={panel}
+                        className="flex flex-col gap-2"
+                        initial={{ opacity: 0, y: 14 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8, transition: { duration: 0.12, ease: "easeOut" } }}
+                        transition={BAND_SPRING}
+                        data-testid="panel"
+                        data-panel={panel}
+                      >
+                        {panelContent}
+                        {/* the panel is what the tap asked for: service lines wait under it (D-139) */}
+                        <div className="flex flex-col gap-2 empty:hidden">{serviceLines}</div>
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </PanelCard>
             ) : null}
-            {/* a panel folding away or giving way to another fades out where it stood (popLayout: the
-                rest does not wait for it); position only — a layout animation of its size squashed the
-                deck inside whenever a card of another height came to the top */}
-            {/* the leaving panel is popped out absolutely, so it needs a positioned parent — this box,
-                not the band: a positioned band comes after the face and covers the team's circles
-                that reach down into it (they stopped taking taps). Empty, it is not there at all. */}
-            <div className="relative empty:hidden">
-            <AnimatePresence mode="popLayout">
-            {mode === "panel" && !phraseInHand ? (
-              <motion.div
-                key={panel}
-                layout="position"
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}
-                transition={BAND_SPRING}
-                data-testid="panel"
-                data-panel={panel}
-              >
-                {panel === "tasks" ? (
-                  // what waits for the morning still has its closing card (D-139)
-                  taskCount === 0 && heldTasks.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Задач нет. Зажми меня и скажи, что нужно сделать.</p>
-                  ) : (
-                    <CardDeck lanes={taskLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} focus={null} held={heldTasks} onMore={director.more} />
-                  )
-                ) : null}
-                {panel === "messages" ? (
-                  messageTasks.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Непрочитанных сообщений нет.</p>
-                  ) : (
-                    <CardDeck lanes={questionLanes} now={now} since={since} actions={actions} companyId={companyId} meId={meId} onReply={openThread} replyLine focus={null} showWork={false} onMore={director.more} />
-                  )
-                ) : null}
-                {panel === "calendar" ? (
-                  events.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">
-                      Мероприятий нет. Скажи «планёрка завтра в 10 со всеми».
-                    </p>
-                  ) : (
-                    <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
-                  )
-                ) : null}
-                {panel === "rating" ? <RatingPanel /> : null}
-                {panel === "ether" ? (
-                  (ether.data ?? []).length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет. Скажи «всем: …».</p>
-                  ) : (
-                    <EtherSection variant="page" />
-                  )
-                ) : null}
-              </motion.div>
-            ) : null}
-            </AnimatePresence>
-            </div>
-          </motion.div>
+          </AnimatePresence>
         </div>
       </LayoutGroup>
       </MotionConfig>

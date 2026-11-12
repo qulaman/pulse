@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
+import { springs } from "@/lib/design/tokens";
 import { haptic } from "@/lib/haptics";
 import { initialsOf } from "@/lib/people/queries";
 import type { Section, Step } from "@/lib/tasks/overview";
@@ -21,8 +22,8 @@ import { StatusGlyph } from "./StatusGlyph";
  * only, DESIGN §2). One card is open at a time, like Things.
  */
 
-/** Crisp, a hint of settle; the card grows in ~300 ms. */
-export const CARD_SPRING = { type: "spring" as const, stiffness: 420, damping: 36, mass: 0.9 };
+/** A card is a thing: the object spring (D-166) — crisp, settled without a bounce in ~300 ms. */
+export const CARD_SPRING = springs.object;
 
 const PAGE = 40;
 

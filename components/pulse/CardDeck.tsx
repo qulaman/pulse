@@ -12,6 +12,7 @@ import { ATTENTION_LANES, hasUnread, LANE_ORDER, quoteTitleOf, workRowLabel, typ
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { BUTTON, pluralRu } from "@/lib/tasks/status-text";
 import { toast } from "@/components/ui/Toast";
+import { springs } from "@/lib/design/tokens";
 import { TaskTile } from "./TaskTile";
 
 /**
@@ -260,7 +261,8 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
 
   return (
     <section aria-label="Стопка задач" className="mt-3" data-testid="deck" data-index={safeIndex} data-count={items.length}>
-      <div className="relative grid" style={{ touchAction: "pan-y" }}>
+      {/* one column no wider than the deck: a long line inside a card is cut, not the card */}
+      <div className="relative grid grid-cols-[minmax(0,1fr)]" style={{ touchAction: "pan-y" }}>
         {/* popLayout: a card that leaves is lifted out of the stack at once, so the deck's height
             and the next card do not wait for its fade */}
         <AnimatePresence mode="popLayout">
@@ -289,7 +291,8 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
                         ? { x: 0, y: 12, scale: 0.94, opacity: 0.7, rotate: 0 }
                         : { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }
               }
-              transition={{ type: "spring", stiffness: 260, damping: 24, delay: role === "next" ? 0.06 : 0 }}
+              // a card is a thing: it lands in the stack without a wobble (D-166)
+              transition={{ ...springs.object, delay: role === "next" ? 0.06 : 0 }}
               drag={isCurrent && !fly}
               dragDirectionLock
               dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
