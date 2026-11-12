@@ -18,7 +18,7 @@ import { ConfirmInline, type ConfirmHandle } from "@/components/confirm/ConfirmI
 import { entitiesSummary } from "@/components/confirm/format";
 import { MascotLever, useLeverHint } from "@/components/pulse/MascotLever";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
-import { PanelCard, recede } from "@/components/pulse/PanelCard";
+import { PANEL_GROW, PanelCard, recede } from "@/components/pulse/PanelCard";
 import { PickCard, type Picked } from "@/components/pulse/PickCard";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { thoughtAct } from "@/components/pulse/thoughtActs";
@@ -89,11 +89,6 @@ const FACE = 128;
 const FACE_SMALL = 88;
 /** The cards band against the words' band while a phrase of several things waits (D-146). */
 const CROWDED_GROW = 8;
-/**
- * The cards band against the words' band while a ball is open: its card comes up from the bottom
- * and takes three quarters of the screen, the face and the balls step up (D-166).
- */
-const PANEL_GROW = 3;
 /** Distance from the face's centre to the balls' centres. */
 const RING_RADIUS = 124;
 /** How long a thought hangs above the head before the face dozes off again. */
@@ -991,28 +986,28 @@ export default function PulsePage() {
               <PanelCard key="card" panelKey={panel ?? ""} receded={listening} label={balls.find((ball) => ball.id === panel)?.label ?? "Панель"} onClose={closePanel}>
                 <div className="flex flex-col gap-2 pt-1">
                   {asks}
-                  {/* another ball changes what is in the card, not the card: the old content fades up and
-                      out at once (popLayout — the new one does not wait for it), the new one rises into its
-                      place — the service lines with it, so nothing of the old one is left standing over
-                      them; position only — a layout animation of its size squashed the deck inside */}
+                  {/* another ball changes what is in the card, not the card: the old content is gone in a
+                      blink (popLayout — the new one does not wait for it, and nothing of it is left over
+                      the service lines), the new one rises into its place; position only — a layout
+                      animation of its size squashed the deck inside */}
                   <div className="relative">
                     <AnimatePresence mode="popLayout" initial={false}>
                       <motion.div
                         key={panel}
-                        className="flex flex-col gap-2"
                         initial={{ opacity: 0, y: 14 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8, transition: { duration: 0.12, ease: "easeOut" } }}
+                        exit={{ opacity: 0, transition: { duration: 0.06, ease: "easeOut" } }}
                         transition={BAND_SPRING}
                         data-testid="panel"
                         data-panel={panel}
                       >
                         {panelContent}
-                        {/* the panel is what the tap asked for: service lines wait under it (D-139) */}
-                        <div className="flex flex-col gap-2 empty:hidden">{serviceLines}</div>
                       </motion.div>
                     </AnimatePresence>
                   </div>
+                  {/* the panel is what the tap asked for: service lines wait under it (D-139) — once for
+                      the card, so a switch of balls does not mount them anew */}
+                  <div className="flex flex-col gap-2 empty:hidden">{serviceLines}</div>
                 </div>
               </PanelCard>
             ) : null}

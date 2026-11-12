@@ -267,6 +267,9 @@ export function TeamPanel({ director }: { director: boolean }) {
             <span className="text-[13px] text-muted">напомнить в</span>
             <TimeInput label="Напомнить про отчёт в" value={report.remind_at} onChange={(remind_at) => setReport({ remind_at })} />
           </SettingRow>
+          <SettingRow id="report-ask" label="Лента просит отчёт с" hint="С этого часа в Ленте сотрудника заметна строка «Отчёт за день не сдан», и лицо зовёт его сдать — без пуша" htmlFor="set-report-ask-at" muted={!report.enabled} changed={report.ask_from !== server.daily_report.ask_from}>
+            <TimeInput id="set-report-ask-at" label="Лента просит отчёт с" value={report.ask_from} onChange={(ask_from) => setReport({ ask_from })} />
+          </SettingRow>
         </SettingsGroup>
       ) : null}
 

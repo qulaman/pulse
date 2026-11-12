@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
 import { DeadlinePill, isUrgentNow, PersonChip, StatusEyebrow, TaskRail } from "@/components/tasks/TaskChrome";
 import { Button } from "@/components/ui/Button";
@@ -72,6 +72,8 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
     afterRemove: href ? undefined : () => router.back(),
   });
   const employee = useEmployeeControls({ actions, companyId, tasks: [task] });
+  // the card itself: on Лента a press answers by sending a copy of it flying (D-167)
+  const card = useRef<HTMLElement>(null);
 
   const urgent = (
     <span className="inline-flex items-center gap-1 rounded-full bg-warn/12 px-2 py-0.5 text-[12px] font-semibold leading-4 text-warn">
@@ -87,6 +89,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
   return (
     <article
+      ref={card}
       className={[
         "card relative overflow-hidden p-4 pl-5 transition-transform duration-[120ms] active:scale-[0.995]",
         dimmed ? "opacity-70" : "",
@@ -177,7 +180,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
 
       <div className={`relative mt-4 gap-2 ${threeKeys ? "grid grid-cols-3" : workKeys ? "grid grid-cols-2" : "flex flex-wrap"}`}>
         {variant === "employee" ? (
-          <EmployeeButtons task={task} onPress={(action) => employee.press(action, task)} />
+          <EmployeeButtons task={task} onPress={(action) => employee.press(action, task, card.current)} />
         ) : (
           <DirectorButtons
             actions={allActionsFor(task, { request: Boolean(request), suggestion: Boolean(suggestion) })}

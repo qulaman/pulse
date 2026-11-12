@@ -3,11 +3,11 @@
 import { useState, type ReactNode } from "react";
 
 import { EventEditor } from "@/components/calendar/EventEditor";
+import { InviteAnswer } from "@/components/calendar/InviteAnswer";
 import { ruleLine, ruleState } from "@/components/recurrence/RecurrenceSection";
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Face } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
-import { Chip } from "@/components/ui/Chip";
 import { isOver, myStatus, rsvpSummary, timeRange, ymdOfEvent } from "@/lib/calendar/agenda";
 import { useDeleteEvent, useRespondEvent } from "@/lib/calendar/mutations";
 import { toneAhead, whenAhead } from "@/lib/calendar/overview";
@@ -15,9 +15,6 @@ import type { CalendarEvent } from "@/lib/calendar/queries";
 import { humanYmd } from "@/lib/datetime/calendar";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 import { TONE_VAR } from "@/lib/tasks/tone";
-
-/** Причины «Не смогу» — те же чипы, что у задачи: короткие и правдивые. */
-const REASONS = ["Занят срочным", "Буду в отъезде", "Болею"];
 
 /** More than this and the list folds behind «Все участники» — «всем» is fifty rows. */
 const SHOWN_PEOPLE = 6;
@@ -54,7 +51,6 @@ export function EventDetails({ event, meId, isDirector, now, onSaved, onDeleted,
   const updateRule = useUpdateRule();
   const rule = event.recurrence_rule_id ? (rules.data?.find((row) => row.id === event.recurrence_rule_id) ?? null) : null;
 
-  const [declining, setDeclining] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [allPeople, setAllPeople] = useState(false);
@@ -76,7 +72,6 @@ export function EventDetails({ event, meId, isDirector, now, onSaved, onDeleted,
 
   const answer = (status: "going" | "declined", reason?: string) => {
     respond.mutate({ eventId: event.id, status, reason });
-    setDeclining(false);
   };
 
   return (
@@ -175,46 +170,7 @@ export function EventDetails({ event, meId, isDirector, now, onSaved, onDeleted,
         ) : null}
       </div>
 
-      {canAnswer ? (
-        declining ? (
-          <div>
-            <p className="text-[13px] leading-4 text-muted">Почему не получится?</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {REASONS.map((reason) => (
-                <Chip key={reason} tone="neutral" onClick={() => answer("declined", reason)}>
-                  {reason}
-                </Chip>
-              ))}
-              <Chip tone="muted" onClick={() => answer("declined")}>
-                Без причины
-              </Chip>
-              <Chip tone="muted" onClick={() => setDeclining(false)}>
-                Назад
-              </Chip>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              // not answered yet: «Буду» is the move, as «Принять» is on a task
-              variant={mine === "declined" ? "secondary" : "primary"}
-              onClick={() => answer("going")}
-              disabled={respond.isPending}
-              data-testid="event-going"
-            >
-              {mine === "going" ? "Буду ✓" : "Буду"}
-            </Button>
-            <Button
-              variant={mine === "declined" ? "danger" : "secondary"}
-              onClick={() => setDeclining(true)}
-              disabled={respond.isPending}
-              data-testid="event-declined"
-            >
-              {mine === "declined" ? "Не смогу ✓" : "Не смогу"}
-            </Button>
-          </div>
-        )
-      ) : null}
+      {canAnswer ? <InviteAnswer mine={mine} onAnswer={answer} disabled={respond.isPending} /> : null}
 
       {isDirector ? (
         confirmDelete ? (

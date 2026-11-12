@@ -7,6 +7,12 @@ import { springs } from "@/lib/design/tokens";
 
 import styles from "./PanelCard.module.css";
 
+/**
+ * The cards band against the words' band while a ball is open, on Пульс and on Лента alike: the
+ * card takes three quarters of the screen, the face and the balls step up (D-166, D-167).
+ */
+export const PANEL_GROW = 3;
+
 /** A pull on the grip past this, or a flick, sends the card back down. */
 const CLOSE_PX = 96;
 const FLICK = 650;
@@ -98,13 +104,19 @@ export function PanelCard({
       >
         <span className="h-1 w-10 rounded-full" style={{ background: "color-mix(in srgb, var(--text) 22%, transparent)" }} />
       </div>
-      <div
+      {/* `layoutScroll`: cards gliding to a new place inside (a card accepted moves down the list,
+          D-167) are measured against the scrolled box, not the page */}
+      <motion.div
         ref={scroller}
+        layoutScroll
         className={`${styles.scroll} no-bar relative min-h-0 flex-1 overflow-y-auto overscroll-contain px-4`}
-        style={{ paddingBottom: "calc(var(--tabbar-space) + 16px)", ...recede(receded) }}
+        style={{ paddingBottom: "calc(var(--tabbar-space) + 16px)", ...recede(receded, { scale: false }) }}
+        initial={false}
+        animate={{ scale: receded ? 0.985 : 1 }}
+        transition={{ duration: 0.36, ease: [0.2, 0, 0, 1] }}
       >
         {children}
-      </div>
+      </motion.div>
     </motion.section>
   );
 }

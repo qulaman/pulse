@@ -161,6 +161,8 @@ Layout читает сессию (`getSessionProfile`), проверяет ро�
 
 ### 7.4. Тосты
 
+Кнопки сотрудника (`components/tasks/list/useEmployeeControls.tsx`): внутри `FlightTargetProvider` (Лента) `press` с узлом карточки играет полёт поверх уже записанного; вне него — без движения (D-167). Отчёт за день в Ленте — `useReportDue(now)` (`lib/daily-report/queries.ts`): `my_daily_report`, `companies.settings->daily_report->>ask_from` и своя `profiles.availability` под RLS (ключ `["daily-report","feed"]`); сдача, ждущая на телефоне (`useSubmitWaiting`), считается сданной, а `useRefreshMyDay` не перечитывает день, пока сдача в пути.
+
 `toast(text, { action?, lifetimeMs?, windowMs? })` и `dismissToast(id)` (`components/ui/Toast.tsx`) зовутся откуда угодно, и вне React. Тост с кнопкой стоит внизу над баром и `--dock-space`, тап его не прячет (D-142); тонкая полоска внизу тает за `windowMs` — время, пока кнопку ещё можно нажать (по умолчанию вся жизнь тоста, D-166).
 
 ## 8. Эфемерное состояние

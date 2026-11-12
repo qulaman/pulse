@@ -31,6 +31,8 @@ describe("greeting", () => {
 describe("quoteTitle", () => {
   it("quotes and trims long titles with an ellipsis", () => {
     expect(quoteTitle("КП по Казхрому")).toBe("«КП по Казхрому»");
+    // quotes inside quotes are „лапки“
+    expect(quoteTitle("Планёрка по объекту «Береке»")).toBe("«Планёрка по объекту „Береке“»");
     const long = quoteTitle("Подготовить коммерческое предложение по Казхрому до конца недели");
     expect(long.length).toBeLessThanOrEqual(38);
     expect(long.endsWith("…»")).toBe(true);

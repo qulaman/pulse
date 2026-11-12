@@ -1,7 +1,7 @@
 "use client";
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { keepPreviousData, useMutation, useMutationState, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
 
 import { toast } from "@/components/ui/Toast";
 import type { Ymd } from "@/lib/datetime/calendar";
@@ -10,6 +10,7 @@ import { dequeue, enqueue, outboxSize, subscribeOutbox } from "@/lib/outbox";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
+import { askFromOf, ASK_FROM_DEFAULT, reportDue, type ReportDue } from "./due";
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "./format";
 import {
   DAILY_REPORT_RPC,
@@ -37,6 +38,8 @@ export const dailyReportKeys = {
   team: ["daily-report", "team"] as const,
   teamDay: (date: Ymd) => ["daily-report", "team", "day", date] as const,
   teamPeriod: (from: Ymd, to: Ymd) => ["daily-report", "team", "period", from, to] as const,
+  /** What Лента needs beside the day: `ask_from` and whether the person is away (D-167). */
+  feed: () => ["daily-report", "feed"] as const,
 };
 
 /** The route that carries the submit (and the outbox's replay of it) to `submit_daily_report`. */
@@ -202,6 +205,78 @@ export function useRefreshAfterReplay() {
       void queryClient.invalidateQueries({ queryKey: dailyReportKeys.history() });
     });
   }, [queryClient]);
+}
+
+type FeedContext = { askFrom: string; away: boolean };
+
+/**
+ * `settings.daily_report.ask_from` and the person's own `availability`, read straight under RLS:
+ * the company row is visible to its members (`companies_select`, like `points_enabled`), one's own
+ * profile always (`profiles_select`). /api/settings is the director's and the secretary's only.
+ * Under the module's key: a settings save (`["daily-report"]`) reads it again.
+ */
+async function readFeedContext(): Promise<FeedContext> {
+  const supabase = createBrowserSupabase();
+  const [company, session] = await Promise.all([
+    supabase.from("companies").select("ask_from:settings->daily_report->>ask_from").limit(1).maybeSingle(),
+    supabase.auth.getSession(),
+  ]);
+  if (company.error) throw new Error(company.error.message);
+  const askFrom = askFromOf((company.data as { ask_from?: unknown } | null)?.ask_from);
+  const userId = session.data.session?.user.id;
+  if (!userId) return { askFrom, away: false };
+  const profile = await supabase.from("profiles").select("availability").eq("id", userId).maybeSingle();
+  if (profile.error) throw new Error(profile.error.message);
+  return { askFrom, away: profile.data?.availability === "vacation" || profile.data?.availability === "sick" };
+}
+
+/**
+ * Where today's report stands for Лента (D-167, `reportDue`): the row in «Дела», the face's call
+ * and the greeting's line read this one answer. `now` — the screen's clock. Until the settings
+ * come, the evening starts at 17:00; a director or the kiosk get no day (`not_team_member`) and
+ * so nothing to show.
+ */
+export function useReportDue(now: Date): ReportDue {
+  const day = useMyDailyReport();
+  // a minute, not five: «в отпуске» set by the director reaches the face soon enough (and on focus)
+  const context = useQuery({ queryKey: dailyReportKeys.feed(), staleTime: 60_000, queryFn: readFeedContext });
+  const askFrom = context.data?.askFrom ?? ASK_FROM_DEFAULT;
+  const away = context.data?.away ?? false;
+  // a submit waiting on the phone is handed in as far as the person is concerned: a read of the day
+  // that comes back without it must not bring «не сдан», the calling face and «Сдать» back (D-130)
+  const waiting = useSubmitWaiting();
+  return useMemo(() => {
+    const due = reportDue(day.data, now, askFrom, away);
+    return waiting && due.show && !due.submitted ? { ...due, submitted: true, asking: false, oneTap: false } : due;
+  }, [day.data, now, askFrom, away, waiting]);
+}
+
+/**
+ * Today's report may hold other tasks now (an order handed in or closed on this screen): read it
+ * again — but never while a submit is on its way, whose provisional report a read would overwrite.
+ */
+export function useRefreshMyDay(): () => void {
+  const queryClient = useQueryClient();
+  return useCallback(() => {
+    if (queryClient.isMutating({ mutationKey: SUBMIT_KEY }) > 0) return;
+    void queryClient.invalidateQueries({ queryKey: dailyReportKeys.myDay() });
+  }, [queryClient]);
+}
+
+/**
+ * A submit is on the phone, not on the server yet — paused offline, retrying a dead network, or
+ * given up on for this session while the outbox keeps it. Any screen's submit: the latest one
+ * decides.
+ */
+export function useSubmitWaiting(): boolean {
+  const states = useMutationState({ filters: { mutationKey: SUBMIT_KEY }, select: (mutation) => mutation.state });
+  const last = states.at(-1);
+  if (!last) return false;
+  return (
+    last.isPaused ||
+    (last.status === "pending" && isNetworkError(last.failureReason)) ||
+    (last.status === "error" && isNetworkError(last.error))
+  );
 }
 
 /**

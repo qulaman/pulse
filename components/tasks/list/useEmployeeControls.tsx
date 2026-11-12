@@ -1,8 +1,9 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
+import { useFlightTarget } from "@/components/feed/FlightTarget";
 import { PeoplePicker } from "@/components/people/PeoplePicker";
 import { AskSheet, CantSheet, ReportSheet } from "@/components/tasks/TaskSheets";
 import { SHEET_CLOSE_MS } from "@/components/ui/Sheet";
@@ -13,6 +14,7 @@ import { NOT_MINE, requestToast } from "@/lib/tasks/lifecycle";
 import { showHandedIn, type TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { TEXT } from "@/lib/tasks/status-text";
+import { flyAway, flyInto } from "@/lib/ui/flyAway";
 
 import type { EmployeeAction } from "./EmployeeTaskCard";
 
@@ -24,6 +26,11 @@ type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; wo
  * «Не могу» and «Выполнено» through their sheets. «Не могу» is the sheet of D-128: more time
  * (the task stays in work), «это не ко мне» with a colleague's name, or a real refusal.
  * One hook, one meaning per button.
+ *
+ * On a screen with a flight target (Лента, D-167) a press that is given its card answers with
+ * motion over data already written: «Принял» sends a copy of the card into the face's hands,
+ * a report handed in sends one up to the director. The card itself never hides — a write that
+ * fails leaves it where it was, and the flight was only ever a copy.
  */
 export function useEmployeeControls({
   actions,
@@ -33,9 +40,12 @@ export function useEmployeeControls({
   actions: TaskActions;
   companyId: string;
   tasks: readonly TaskWithPeople[];
-}): { press: (action: EmployeeAction, task: TaskWithPeople) => void; sheets: ReactNode } {
+}): { press: (action: EmployeeAction, task: TaskWithPeople, card?: HTMLElement | null) => void; sheets: ReactNode } {
   const queryClient = useQueryClient();
+  const flight = useFlightTarget();
   const [sheet, setSheet] = useState<SheetState>(null);
+  // the card «Выполнено» was pressed on: its copy goes up from there once the report is handed in
+  const reportCard = useRef<{ taskId: string; node: HTMLElement } | null>(null);
   // the task the sheets were last opened for: they stay mounted while they slide away
   const [heldId, setHeldId] = useState<string | null>(null);
   const sheetTask = tasks.find((task) => task.id === (sheet?.taskId ?? heldId)) ?? null;
@@ -45,13 +55,27 @@ export function useEmployeeControls({
     setSheet(next);
   };
 
-  const press = (action: EmployeeAction, task: TaskWithPeople) => {
+  /** The report went (or is kept for the network): a copy of the card rises to the director. */
+  const handedIn = (taskId: string) => {
+    const card = reportCard.current;
+    reportCard.current = null;
+    if (!flight || !card || card.taskId !== taskId || !card.node.isConnected) return;
+    // measured now, as the sheet leaves: the copy rises from the card's place under the sheet's
+    // dim (z 50) while it slides away, and is clear of the card by the time the dim is gone
+    flyAway([card.node], { keep: true, z: 49, windUp: false, duration: 480 });
+  };
+
+  const press = (action: EmployeeAction, task: TaskWithPeople, card?: HTMLElement | null) => {
     if (action === "accept") {
       haptic(15);
       actions.transition({ taskId: task.id, toStatus: "accepted" });
       toast("Принято · в работе");
+      // written first; the copy is taken before React redraws the card in its new state
+      const face = flight?.getTarget();
+      if (card && face) flyInto(card, face, { onLand: flight?.onLand });
       return;
     }
+    reportCard.current = action === "complete" && card ? { taskId: task.id, node: card } : null;
     open({ name: action === "complete" ? "report" : action === "decline" ? "cant" : action, taskId: task.id });
   };
 
@@ -120,6 +144,7 @@ export function useEmployeeControls({
                 userId: sheetTask.assignee_id,
                 onKept: (partial) => {
                   showHandedIn(queryClient, sheetTask.id);
+                  handedIn(sheetTask.id);
                   haptic(15);
                   toast(partial ? "Нет связи. Сдам с фото, как появится · не всё" : "Нет связи. Сдам с фото, как появится");
                 },
@@ -137,6 +162,7 @@ export function useEmployeeControls({
                 ? { text: text || undefined, file_path: filePath ?? undefined, partial: partial || undefined }
                 : undefined,
           });
+          handedIn(sheetTask.id);
           haptic(15);
           toast(partial ? "Сдано на проверку · не всё" : "Сдано на проверку директору");
         }}

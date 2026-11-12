@@ -4,14 +4,18 @@ import type { TaskWithPeople } from "@/lib/tasks/queries";
 import type { TaskStatus } from "@/lib/tasks/status-text";
 import type { BoardTask } from "./board";
 import type { EtherPost } from "./ether";
+import { emptyLanes } from "./board";
 import {
   describeForEmployee,
+  employeeOpening,
   employeeEvents,
   employeeFace,
   employeeLoad,
+  employeeWaiting,
   etherEvents,
   onTimeStreak,
   reasonOf,
+  reportPhrase,
   weightiest,
 } from "./employee";
 
@@ -94,12 +98,95 @@ describe("employeeLoad — что лицо держит в покое (D-110)", 
     expect(employeeLoad([row("done"), row("revoked"), row("declined")], NOW, ME).rest).toBe("free");
   });
 
-  it("тап по встревоженному лицу ведёт к причине", () => {
+  it("тап по лицу ведёт к делу, если в руках есть дела (D-167); без дел — шарики", () => {
     expect(reasonOf("todo")).toBe("tasks");
     expect(reasonOf("deadline")).toBe("tasks");
+    expect(reasonOf("report")).toBe("tasks");
+    expect(reasonOf("working")).toBe("tasks");
     expect(reasonOf("unread")).toBe("messages");
-    expect(reasonOf("working")).toBeNull();
+    expect(reasonOf("review")).toBeNull();
     expect(reasonOf("free")).toBeNull();
+  });
+});
+
+describe("employeeLoad — отчёт за день зовёт с ask_from (D-167)", () => {
+  it("несданный отчёт вечером — зовёт, как новое поручение", () => {
+    expect(employeeLoad([], NOW, ME, true, true).rest).toBe("report");
+    expect(employeeFace("report", false)).toBe("calling");
+    expect(employeeLoad([row("accepted"), row("pending_review")], NOW, ME, true, true)).toEqual({ rest: "report", carry: 1, hot: false });
+  });
+
+  it("новое, горящий срок и слово директора — важнее отчёта", () => {
+    expect(employeeLoad([row("sent")], NOW, ME, true, true).rest).toBe("todo");
+    expect(employeeLoad([row("accepted", { deadline: SOON })], NOW, ME, true, true).rest).toBe("deadline");
+    expect(employeeLoad([row("accepted", { last_message: word("m1", 3), seen_seq: 2 })], NOW, ME, true, true).rest).toBe("unread");
+  });
+
+  it("выключенный телеграф не зовёт и про отчёт", () => {
+    expect(employeeLoad([], NOW, ME, false, true).rest).toBe("free");
+    expect(employeeLoad([row("accepted")], NOW, ME, false, true).rest).toBe("working");
+  });
+
+  it("без просьбы об отчёте всё как прежде", () => {
+    expect(employeeLoad([row("accepted")], NOW, ME, true, false).rest).toBe("working");
+    expect(employeeLoad([], NOW, ME).rest).toBe("free");
+  });
+});
+
+describe("employeeWaiting — что ждёт ответа человека (D-167)", () => {
+  const none = { unread: [], unacked: 0, invites: [] };
+  // 2026-09-11 09:30 Aqtobe; the planning meeting at 11:30 the same day
+  const today = { title: "Планёрка", startsAt: "2026-09-11T06:30:00Z" };
+
+  it("ничего не ждёт — фразы нет", () => {
+    expect(employeeWaiting(none, NOW)).toBeNull();
+  });
+
+  it("одно — названо, глагол в единственном числе", () => {
+    expect(employeeWaiting({ ...none, unread: [{ title: "Пропуска на склад" }] }, NOW)).toEqual({
+      text: "Ждёт вас: сообщение директора по «Пропуска на склад».",
+      tone: "warn",
+    });
+    expect(employeeWaiting({ ...none, unacked: 1 }, NOW)).toEqual({ text: "Ждёт вас: новое объявление.", tone: "warn" });
+    expect(employeeWaiting({ ...none, invites: [today] }, NOW)).toEqual({
+      text: "Ждёт вас: приглашение на «Планёрка» в 11:30.",
+      tone: "warn",
+    });
+  });
+
+  it("всё вместе — через запятую и «и», без названий, о первом из них", () => {
+    const phrase = employeeWaiting({ unread: [{ title: "Пропуска" }], unacked: 1, invites: [today] }, NOW);
+    expect(phrase?.text).toBe("Ждут вас: сообщение директора, новое объявление и приглашение на встречу в 11:30.");
+    expect(phrase?.tone).toBe("warn");
+  });
+
+  it("несколько одного рода — считаются, склонения верные", () => {
+    expect(employeeWaiting({ ...none, unread: [{ title: "А" }, { title: "Б" }] }, NOW)?.text).toBe("Ждут вас: 2 сообщения директора.");
+    expect(employeeWaiting({ ...none, unread: Array.from({ length: 5 }, () => ({ title: "А" })) }, NOW)?.text).toBe("Ждут вас: 5 сообщений директора.");
+    expect(employeeWaiting({ ...none, unacked: 2 }, NOW)?.text).toBe("Ждут вас: 2 новых объявления.");
+    expect(employeeWaiting({ ...none, unacked: 5 }, NOW)?.text).toBe("Ждут вас: 5 новых объявлений.");
+    expect(employeeWaiting({ ...none, unacked: 21 }, NOW)?.text).toBe("Ждут вас: 21 новое объявление.");
+    expect(employeeWaiting({ ...none, invites: [today, today, today] }, NOW)?.text).toBe("Ждут вас: 3 приглашения на встречи.");
+  });
+
+  it("время приглашения — коротко: сегодня, завтра, другой день; длинное название обрезано по слову", () => {
+    const tomorrow = { title: "Планёрка", startsAt: "2026-09-12T04:00:00Z" };
+    expect(employeeWaiting({ ...none, invites: [tomorrow] }, NOW)?.text).toBe("Ждёт вас: приглашение на «Планёрка» завтра в 9:00.");
+    const later = { title: "Разбор квартала", startsAt: "2026-09-15T09:00:00Z" };
+    expect(employeeWaiting({ ...none, invites: [later] }, NOW)?.text).toBe("Ждёт вас: приглашение на «Разбор квартала» вт в 14:00.");
+    const long = employeeWaiting({ ...none, unread: [{ title: "Подготовить пропуска на склад для новой бригады монтажников" }] }, NOW);
+    expect(long?.text).toBe("Ждёт вас: сообщение директора по «Подготовить пропуска на склад для…».");
+  });
+});
+
+describe("reportPhrase — вечерняя строка об отчёте (D-167)", () => {
+  it("до ask_from и после сдачи — молчит", () => {
+    expect(reportPhrase(undefined)).toBeNull();
+    expect(reportPhrase({ asking: false, oneTap: true })).toBeNull();
+  });
+  it("не сдан — говорит; в день с задачами подсказывает одну кнопку", () => {
+    expect(reportPhrase({ asking: true, oneTap: false })).toEqual({ text: "Отчёт за день ещё не сдан.", tone: "warn" });
+    expect(reportPhrase({ asking: true, oneTap: true })?.text).toBe("Отчёт за день ещё не сдан — в «Делах» он сдаётся одной кнопкой.");
   });
 });
 
@@ -246,6 +333,19 @@ describe("onTimeStreak — N подряд в срок", () => {
 
   it("сдал вовремя, а директор принял позже срока — всё равно в срок", () => {
     expect(onTimeStreak([closed("2026-09-10T05:00:00Z", "2026-09-10T06:00:00Z", "2026-09-10T12:00:00Z")])).toBe(1);
+  });
+});
+
+describe("employeeOpening — new cases (D-167)", () => {
+  it("everything on review is not «дел нет»", () => {
+    const lanes = { ...emptyLanes(), review: [row("pending_review"), row("pending_review")] };
+    expect(employeeOpening(lanes, NOW, "Ерлан").text).toContain("Всё сдано, на проверке у директора — 2.");
+  });
+  it("with the day's report still to hand in, «всё сделано» is not said", () => {
+    expect(employeeOpening(emptyLanes(), NOW, "Ерлан").text).toContain("Дел нет, всё сделано.");
+    const pending = employeeOpening(emptyLanes(), NOW, "Ерлан", { reportPending: true }).text;
+    expect(pending).toContain("Дел нет.");
+    expect(pending).not.toContain("всё сделано");
   });
 });
 

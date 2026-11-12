@@ -64,7 +64,16 @@ function patchOf(key: SectionKey, draft: CompanySettings, conventions: CompanySe
       return { points_enabled: draft.points_enabled, rating_mode: draft.rating_mode, points_rules: draft.points_rules, ether_events: draft.ether_events };
     case "daily_report": {
       const report = draft.daily_report;
-      return { daily_report: { enabled: report.enabled, workdays: report.workdays, holidays: report.holidays, work_start: report.work_start, remind_at: report.remind_at } };
+      return {
+        daily_report: {
+          enabled: report.enabled,
+          workdays: report.workdays,
+          holidays: report.holidays,
+          work_start: report.work_start,
+          remind_at: report.remind_at,
+          ask_from: report.ask_from,
+        },
+      };
     }
     case "stt":
       return { stt: draft.stt };

@@ -180,12 +180,12 @@ function AckedMark({ fresh }: { fresh: boolean }) {
   const still = useReducedMotion();
   const plays = fresh && !still;
   return (
-    <span className="relative inline-flex min-h-[44px] items-center" data-testid="ether-acked">
+    <span className="relative inline-flex min-h-[44px] items-center px-3" data-testid="ether-acked">
       {plays ? (
         <motion.span
           aria-hidden
-          className="absolute -inset-x-3 inset-y-0 rounded-[12px]"
-          style={{ background: "color-mix(in srgb, var(--ok) 16%, transparent)" }}
+          className="absolute inset-0 rounded-[12px]"
+          style={{ background: "color-mix(in srgb, var(--ok) 30%, transparent)" }}
           initial={{ opacity: 1, scale: 1 }}
           animate={{ opacity: 0, scale: 1.04 }}
           transition={{ duration: 0.55, delay: 0.18, ease: [0.4, 0, 1, 1] }}

@@ -822,8 +822,9 @@ function HolidaysField({ days, onChange }: { days: readonly Ymd[]; onChange: (da
 
 /**
  * The daily report (D-152): on or off, which days are working ones (only they pay +1 and fine a
- * missing report), the company's holidays (D-155 §7), when the day starts (the form's «Пришёл»)
- * and when the reminder goes. Turning it on starts the fines from today — the server does that;
+ * missing report), the company's holidays (D-155 §7), when the day starts (the form's «Пришёл»),
+ * when the reminder goes and from when Лента asks for the report (D-167). Turning it on starts the
+ * fines from today — the server does that;
  * the points live with the other rules. `started_on` and `checked_on` are the server's: never
  * shown, never sent.
  */
@@ -881,6 +882,10 @@ export function DailyReportSection() {
               <Field label="Напомнить в">
                 <TimeField label="Напомнить про отчёт в" value={report.remind_at} step={15} onChange={(remind_at) => set({ remind_at })} />
               </Field>
+              <Field label="Лента просит с">
+                <TimeField label="Лента просит отчёт с" value={report.ask_from} step={15} onChange={(ask_from) => set({ ask_from })} />
+              </Field>
+              <p className="self-end pb-1 text-[13px] leading-4 text-muted">С этого часа Лента сотрудника просит сдать отчёт; пуш — в «Напомнить в»</p>
             </div>
             <p className="text-[13px] leading-[18px] text-muted">
               {draft.points_enabled
@@ -901,6 +906,7 @@ export function DailyReportSection() {
                 holidays: report.holidays,
                 work_start: report.work_start,
                 remind_at: report.remind_at,
+                ask_from: report.ask_from,
               },
             })
           }

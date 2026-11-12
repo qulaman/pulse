@@ -1,4 +1,6 @@
 import type { MascotState } from "@/components/brand/Mascot";
+import { humanAqtobe } from "@/lib/ai/time";
+import type { ReportDue } from "@/lib/daily-report/due";
 import { greeting, quoteTitle } from "./briefing";
 import { hasUnread, isOnBoard, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
 import type { EtherPost } from "./ether";
@@ -28,7 +30,7 @@ function short(words: string): string {
 }
 
 /** The greeting and where things stand for the person: new orders, rework, the rest in work. */
-export function employeeOpening(lanes: Lanes, now: Date, name: string): Phrase {
+export function employeeOpening(lanes: Lanes, now: Date, name: string, { reportPending = false }: { reportPending?: boolean } = {}): Phrase {
   const all = [...lanes.overdue, ...lanes.declined, ...lanes.question, ...lanes.review, ...lanes.work];
   const fresh = all.filter((task) => task.status === "sent").length;
   const rework = all.filter((task) => task.status === "rework").length;
@@ -40,7 +42,11 @@ export function employeeOpening(lanes: Lanes, now: Date, name: string): Phrase {
   if (rework > 0) parts.push(`${rework} на доработке`);
   if (overdue > 0) parts.push(`${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
   if (parts.length === 0) {
-    if (inWork === 0) return { text: `${hello} Дел нет, всё сделано.`, tone: "ok" };
+    // everything handed in is not «дел нет»: the cards wait on review, and «Дела» shows them
+    const onReview = all.filter((task) => task.status === "pending_review").length;
+    if (inWork === 0 && onReview > 0) return { text: `${hello} Всё сдано, на проверке у директора — ${onReview}.`, tone: "ok" };
+    // with the day's report still to hand in, «всё сделано» would argue with the next line (D-167)
+    if (inWork === 0) return { text: reportPending ? `${hello} Дел нет.` : `${hello} Дел нет, всё сделано.`, tone: "ok" };
     return { text: `${hello} ${inWork} ${pluralRu(inWork, ["задача", "задачи", "задач"])} в работе, нового нет.`, tone: "ok" };
   }
   return { text: `${hello} ${parts.join(", ")}.`, tone: overdue > 0 ? "danger" : "warn" };
@@ -105,11 +111,12 @@ export function otherSideOf(task: Pick<BoardTask, "author">): string {
  *   todo      an order to accept or to redo — it calls, the card over its head
  *   deadline  a deadline within the hour or past — it panics over the hot card of its stack
  *   unread    a word of the director not read yet — nervous, an envelope bobs by the head
+ *   report    the evening has come and the day's report is not in (D-167) — it calls, like an order
  *   working   orders in work, nothing burning — it holds the stack and does not sleep
  *   review    everything handed over — an hourglass, a glance up at the director now and then
  *   free      nothing in the hands — the only time it sleeps and dreams
  */
-export type EmployeeRest = "todo" | "deadline" | "unread" | "working" | "review" | "free";
+export type EmployeeRest = "todo" | "deadline" | "unread" | "report" | "working" | "review" | "free";
 
 export type EmployeeLoad = {
   rest: EmployeeRest;
@@ -133,8 +140,10 @@ function burning(task: Pick<BoardTask, "deadline">, now: Date): boolean {
  * unread one is the director's word alone: the person's own open question is not news to them.
  * `worry: false` — the company switched the telegraph off (`settings.mascot_telegraph`, D-133):
  * no calling, panic or nerves, the face shows only what is in its hands.
+ * `reportAsking` — the day's report is due and not in after `ask_from` (`ReportDue.asking`, D-167):
+ * lighter than the director's word, heavier than the stack in the hands.
  */
-export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: string, worry = true): EmployeeLoad {
+export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: string, worry = true, reportAsking = false): EmployeeLoad {
   const carried = tasks.filter(inHands);
   const hot = carried.some((task) => burning(task, now));
   const onBoard = tasks.filter((task) => isOnBoard(task.status));
@@ -144,7 +153,9 @@ export function employeeLoad(tasks: readonly BoardTask[], now: Date, meId: strin
       ? "deadline"
       : worry && onBoard.some((task) => hasUnread(task, meId))
         ? "unread"
-        : carried.length > 0
+        : worry && reportAsking
+          ? "report"
+          : carried.length > 0
           ? "working"
           : onBoard.some((task) => task.status === "pending_review")
             ? "review"
@@ -157,6 +168,7 @@ const REST_FACE: Record<EmployeeRest, MascotState> = {
   todo: "calling",
   deadline: "panicking",
   unread: "nervous",
+  report: "calling",
   working: "working",
   review: "awaiting",
   free: "sleeping",
@@ -167,12 +179,86 @@ export function employeeFace(rest: EmployeeRest, awake: boolean): MascotState {
 }
 
 /**
- * Where a tap on the resting face leads (D-110): a face that is worried about something opens
- * the reason itself — the order to accept, the burning one, the unread word — so the person
- * gets there in one tap instead of face → ball → card. null — the balls, as before.
+ * Where a tap on the resting face leads (D-110, D-167): to the thing in hand — «Дела» when there
+ * is anything to do there (an order to accept, a burning one, the day's report, the stack in
+ * work), «Сообщения» for the director's unread word — so the person gets there in one tap
+ * instead of face → ball → card. null — nothing in hand (all handed over, or free): the balls.
  */
 export function reasonOf(rest: EmployeeRest): "tasks" | "messages" | null {
-  return rest === "todo" || rest === "deadline" ? "tasks" : rest === "unread" ? "messages" : null;
+  switch (rest) {
+    case "todo":
+    case "deadline":
+    case "report":
+    case "working":
+      return "tasks";
+    case "unread":
+      return "messages";
+    default:
+      return null;
+  }
+}
+
+/** What waits for the person's answer, as the screen counts it (D-167). */
+export type EmployeeWaiting = {
+  /** Tasks with the director's word not read yet. */
+  unread: readonly { title: string }[];
+  /** Announcements without the person's «Ознакомился». */
+  unacked: number;
+  /** Meetings the person is invited to and has not answered «Буду / Не смогу». */
+  invites: readonly { title: string; startsAt: string }[];
+};
+
+/** «в 11:30» today, «завтра в 11:30», «пт в 11:30», «14.08 в 11:30» — when, said briefly. */
+function whenSaid(startsAt: string, now: Date): string {
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const [day, time] = humanAqtobe(date, now).split(" ");
+  const clock = time?.startsWith("0") ? time.slice(1) : time;
+  return day === "сегодня" ? `в ${clock}` : `${day} в ${clock}`;
+}
+
+function listRu(parts: readonly string[]): string {
+  return parts.length < 2 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} и ${parts[parts.length - 1]}`;
+}
+
+/**
+ * One short line of what waits for the person's answer (D-167): «Ждут ответа: сообщение директора
+ * по «Пропуска», новое объявление и приглашение на «Планёрка» в 11:30.» One thing of a kind is
+ * named, several are counted; next to things of another kind nothing is named. null — nothing waits.
+ */
+export function employeeWaiting(waiting: EmployeeWaiting, now: Date): Phrase | null {
+  const { unread, unacked, invites } = waiting;
+  // a title is said only when one kind of thing waits: next to others it made the line too long for
+  // the band over an open card, and a title in quotes inside another title read «…«Береке»»
+  const kinds = (unread.length > 0 ? 1 : 0) + (unacked > 0 ? 1 : 0) + (invites.length > 0 ? 1 : 0);
+  const named = kinds === 1;
+  const parts: string[] = [];
+  if (unread.length === 1) parts.push(named ? `сообщение директора по ${quoteTitle(unread[0].title)}` : "сообщение директора");
+  else if (unread.length > 1) parts.push(`${unread.length} ${pluralRu(unread.length, ["сообщение", "сообщения", "сообщений"])} директора`);
+  if (unacked === 1) parts.push("новое объявление");
+  else if (unacked > 1) parts.push(`${unacked} ${pluralRu(unacked, ["новое объявление", "новых объявления", "новых объявлений"])}`);
+  if (invites.length === 1) {
+    const when = whenSaid(invites[0].startsAt, now);
+    parts.push(`приглашение на ${named ? quoteTitle(invites[0].title) : "встречу"}${when ? ` ${when}` : ""}`);
+  } else if (invites.length > 1) {
+    parts.push(`${invites.length} ${pluralRu(invites.length, ["приглашение", "приглашения", "приглашений"])} на встречи`);
+  }
+  if (parts.length === 0) return null;
+  const things = unread.length + Math.max(0, unacked) + invites.length;
+  // «вас», not «ответа»: an announcement waits for «Ознакомился», a word of the director for reading
+  const text = `${things === 1 ? "Ждёт" : "Ждут"} вас: ${listRu(parts)}.`;
+  return { text, tone: "warn" };
+}
+
+/**
+ * The evening line about the day's report (D-167): said once `ask_from` has come and the report
+ * is not in; on a day with tasks — that one button in «Дела» hands it in. null — nothing to say.
+ */
+export function reportPhrase(due: Pick<ReportDue, "asking" | "oneTap"> | null | undefined): Phrase | null {
+  if (!due?.asking) return null;
+  return due.oneTap
+    ? { text: "Отчёт за день ещё не сдан — в «Делах» он сдаётся одной кнопкой.", tone: "warn" }
+    : { text: "Отчёт за день ещё не сдан.", tone: "warn" };
 }
 
 /**

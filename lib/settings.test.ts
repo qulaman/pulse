@@ -102,10 +102,20 @@ describe("the daily report (D-152)", () => {
       holidays: [],
       work_start: "09:00",
       remind_at: "18:00",
+      ask_from: "17:00",
       started_on: null,
       checked_on: null,
     });
     expect(settings.points_rules).toMatchObject({ daily_report: 1, daily_report_missed: 10 });
+  });
+
+  it("«Лента просит отчёт с» (D-167): stored, patched like a clock; a broken one is 17:00, the section survives", () => {
+    expect(parseCompanySettings({ daily_report: { ask_from: "16:30" } }).daily_report.ask_from).toBe("16:30");
+    const broken = parseCompanySettings({ daily_report: { ask_from: "5 pm", workdays: [1, 2, 3, 4, 5, 6] } });
+    expect(broken.daily_report).toMatchObject({ ask_from: "17:00", workdays: [1, 2, 3, 4, 5, 6] });
+    expect(SettingsPatchSchema.parse({ daily_report: { ask_from: "16:45" } }).daily_report).toEqual({ ask_from: "16:45" });
+    expect(SettingsPatchSchema.safeParse({ daily_report: { ask_from: "17:60" } }).success).toBe(false);
+    expect(mergeDailyReport(parseCompanySettings({}).daily_report, { ask_from: "16:00" }, today)).toMatchObject({ ask_from: "16:00", remind_at: "18:00" });
   });
 
   it("keeps what a company stored and fills the rest", () => {

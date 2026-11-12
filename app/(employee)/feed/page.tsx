@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { InstallHint } from "@/components/InstallHint";
 import { springs } from "@/lib/design/tokens";
 import { EtherSection } from "@/components/ether/EtherSection";
+import { FlightTargetProvider } from "@/components/feed/FlightTarget";
+import { ReportDueRow } from "@/components/feed/ReportDueRow";
 import { ACT_MS, ACT_TOUCH, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { Assistant, type AssistantLine } from "@/components/pulse/Assistant";
 import { IdleScene } from "@/components/pulse/IdleScene";
@@ -16,6 +18,7 @@ import { EVENT_ACT, useEmployeeEvents } from "@/components/pulse/useEmployeeEven
 import { CalendarList } from "@/components/calendar/CalendarList";
 import { EventSheet } from "@/components/calendar/EventSheet";
 import { OrbitBalls, type OrbitBall, type OrbitId } from "@/components/pulse/OrbitBalls";
+import { PANEL_GROW, PanelCard } from "@/components/pulse/PanelCard";
 import { ThoughtBubble } from "@/components/pulse/ThoughtBubble";
 import { useSpeechWith, type Voice } from "@/components/pulse/useSpeech";
 import { PushCard } from "@/components/push/PushCard";
@@ -26,6 +29,7 @@ import { ThreadTail } from "@/components/tasks/thread/ThreadTail";
 import { Chip } from "@/components/ui/Chip";
 import { nextEvent, startsSoon, todayCount } from "@/lib/calendar/agenda";
 import { useCalendar, type CalendarEvent } from "@/lib/calendar/queries";
+import { pendingInvites } from "@/lib/calendar/invites";
 import { describeCalendar, nextEventLine } from "@/lib/calendar/say";
 import { ErrandCards, ResultCard } from "@/components/secretary/ErrandCards";
 import { Sheet } from "@/components/ui/Sheet";
@@ -42,6 +46,7 @@ import { useErrandActions, useSetAway } from "@/lib/errands/mutations";
 import { useErrands, useSecretaries, useSecretaryActions, useSecretarySetup, type Errand } from "@/lib/errands/queries";
 import { askedDetails, AWAY_SPANS, awayUntil, daypartOf, deskLine, isAway, quickStreak, RESULTS, sceneOf, todayTally, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { useMascotTelegraph } from "@/lib/points/game";
+import { useRefreshMyDay, useReportDue } from "@/lib/daily-report/queries";
 import { usePointsArrival, usePointsEnabled } from "@/lib/points/queries";
 import type { SecretaryAction } from "@/lib/settings";
 import { describeErrandsForSecretary } from "@/lib/errands/say";
@@ -53,11 +58,13 @@ import {
   employeeFace,
   employeeLoad,
   employeeOpening,
+  employeeWaiting,
   isOpenFor,
   isTodo,
   onTimeStreak,
   otherSideOf,
   reasonOf,
+  reportPhrase,
 } from "@/lib/pulse/employee";
 import { useNow } from "@/lib/pulse/queries";
 import { sortByUrgency, useMe, useMyTasks, usePulseBoard } from "@/lib/tasks/queries";
@@ -98,6 +105,17 @@ const PILL_MS = 4_000;
 const QUEUE_MAX_MS = 3_000;
 /** The face's spring on a mode change; the words above it and the cards under it ride it too (D-60) — a thing's, no bounce (D-166). */
 const BAND_SPRING = springs.object;
+
+/**
+ * The ball open when the person left Лента — for a task's own screen and back, another tab and
+ * back. It outlives the page (not the app): coming back within a few minutes finds the same card
+ * open instead of the face at rest — the person returns to where they were (D-167).
+ */
+let lastOpen: { panel: OrbitId; at: number } | null = null;
+const LAST_OPEN_MS = 10 * 60_000;
+
+/** Where a card taken in hand flies on Лента: the employee's face (D-167). */
+const faceTarget = () => document.querySelector<HTMLElement>('[data-testid="mascot-lever"]');
 
 /**
  * Лента — the employee's home (D-62): the same sleeping face in the middle of the
@@ -162,6 +180,18 @@ export default function FeedPage() {
   const onReview = useMemo(() => sortByUrgency(open.filter((task) => task.status === "pending_review"), now), [open, now]);
   const unread = useMemo(() => open.filter((task) => hasUnread(task, meId)), [open, meId]);
   const unacked = useMemo(() => (ether.data ?? []).filter((item) => !item.acks.some((ack) => ack.user_id === meId)), [ether.data, meId]);
+  // meetings waiting for «Буду / Не смогу» (D-167); a series' weekly invitation is answered in its
+  // row like any other, but it does not nag in the words or colour the ball every week
+  const invites = useMemo(() => pendingInvites(events, meId, now).filter((event) => !event.recurrence_rule_id), [events, meId, now]);
+  // the meetings the person is going to or not answered yet: one declined is not counted on the ball
+  // nor said as the day's next — it stays in the calendar with its «Не смогу» (D-167)
+  const attending = useMemo(
+    () => events.filter((event) => event.participants?.find((person) => person.user_id === meId)?.status !== "declined"),
+    [events, meId],
+  );
+  // the day's report (D-152): a row on top of «Дела» all day; from `ask_from` (17:00) the face calls
+  // for it and the words say it is not in (D-167)
+  const report = useReportDue(now);
 
   // живые заявки секретаря: ничьи и свои принятые — чужая принятая гаснет сама
   const mineErrands = useMemo(
@@ -201,22 +231,36 @@ export default function FeedPage() {
   // the game feel waits for the adaptation gate — the same switch as the points (D-40, D-48)
   const streak = pointsEnabled && desk.phase === "done" ? quickStreak(errandRows, meId, now) : 0;
 
-  const [mode, setMode] = useState<Mode>("idle");
-  const [panel, setPanel] = useState<OrbitId | null>(null);
+  // Back on Лента within a few minutes: the ball that was open is open again. Read once, as the
+  // first state: a return is a client-side navigation (nothing to hydrate), and a full load starts
+  // with this module fresh — `lastOpen` empty, the face at rest, as the server drew it.
+  const [reopened] = useState(() => (lastOpen && Date.now() - lastOpen.at <= LAST_OPEN_MS ? lastOpen.panel : null));
+  const [mode, setMode] = useState<Mode>(reopened ? "panel" : "idle");
+  const [panel, setPanel] = useState<OrbitId | null>(reopened);
+  useEffect(() => {
+    lastOpen = mode === "panel" && panel ? { panel, at: Date.now() } : null;
+  }, [mode, panel]);
   const [wakeKey, setWakeKey] = useState(0);
   // the thread opens over Лента, the face and the balls stay as they were (D-64 §5)
   const [thread, setThread] = useState<{ id: string; title: string } | null>(null);
 
   const balls = useMemo<OrbitBall[]>(
     () => [
-      { id: "tasks", label: "Дела", count: todo.length + inWork.length, tone: lanes.overdue.length > 0 ? "var(--danger)" : todo.length > 0 ? "var(--warn)" : "var(--accent)" },
+      // the report asked for in the evening is a thing to do too: the ball does not stand grey at 0 while the face calls for it
+      {
+        id: "tasks",
+        label: "Дела",
+        count: todo.length + inWork.length + (report.asking ? 1 : 0),
+        tone: lanes.overdue.length > 0 ? "var(--danger)" : todo.length > 0 || report.asking ? "var(--warn)" : "var(--accent)",
+      },
       { id: "messages", label: "Сообщения", count: unread.length, tone: "var(--warn)" },
       { id: "ether", label: "Эфир", count: unacked.length, tone: "var(--gold)" },
       {
         id: "calendar",
         label: "Календарь",
-        count: todayCount(events, now),
-        tone: startsSoon(nextEvent(events, now), now) ? "var(--warn)" : "var(--accent)",
+        // an invitation for tomorrow still has a number on the ball: it waits for an answer
+        count: todayCount(attending, now) || invites.length,
+        tone: invites.length > 0 || startsSoon(nextEvent(attending, now), now) ? "var(--warn)" : "var(--accent)",
       },
       // пятый шарик только у секретаря: «Заявки» — свои и ничьи ещё (D-79)
       ...(isSecretary
@@ -230,7 +274,7 @@ export default function FeedPage() {
           ]
         : []),
     ],
-    [todo.length, inWork.length, lanes.overdue.length, unread.length, unacked.length, events, now, isSecretary, mineErrands],
+    [todo.length, inWork.length, report.asking, lanes.overdue.length, unread.length, unacked.length, attending, now, invites.length, isSecretary, mineErrands],
   );
 
   const [openEvent, setOpenEvent] = useState<CalendarEvent | null>(null);
@@ -261,11 +305,40 @@ export default function FeedPage() {
   }, [thoughtId]);
 
   const lines = useMemo<AssistantLine[]>(() => {
-    if (!speech.line || !speech.line.opening || mode === "idle") return [];
-    // the greeting is followed by the nearest meeting of the day, when there is one
-    const soonest = nextEventLine(events, now);
-    return soonest ? [speech.line, { id: "calendar", text: soonest }] : [speech.line];
-  }, [speech.line, mode, events, now]);
+    if (mode === "idle") return [];
+    // The greeting counts the orders as they are now — a tap on «Принял» or a thought that came
+    // and went does not leave yesterday's count or an empty band (D-167); then, a line each: what
+    // waits for the person — the director's word, an announcement, an invitation — and in the
+    // evening the report not yet in; the nearest meeting closes it. Over an open card the band is
+    // small: the greeting and the one line that matters most; three lines at most otherwise.
+    const opening = employeeOpening(lanes, now, name, { reportPending: report.asking });
+    const waiting = isSecretary
+      ? null
+      : employeeWaiting(
+          {
+            unread: unread.map((task) => ({ title: task.title })),
+            unacked: unacked.length,
+            invites: invites.map((event) => ({ title: event.title, startsAt: event.starts_at })),
+          },
+          now,
+        );
+    const evening = reportPhrase(report);
+    // keyed by the words: a new count comes in out of the haze, the same one stays still
+    const said: AssistantLine[] = [{ id: `opening:${opening.text}`, text: opening.text, tone: opening.tone }];
+    if (mode === "panel") {
+      const first = evening ?? waiting;
+      if (first) said.push({ id: evening ? "report" : "waiting", text: first.text, tone: first.tone });
+      return said;
+    }
+    if (waiting) said.push({ id: "waiting", text: waiting.text, tone: waiting.tone });
+    if (evening) said.push({ id: "report", text: evening.text, tone: evening.tone });
+    // a single invitation is said with its time in the waiting line: the same meeting is not said twice
+    const saidInvite = waiting !== null && invites.length === 1;
+    const next = nextEvent(attending, now);
+    const soonest = next && !(saidInvite && next.id === invites[0]?.id) ? nextEventLine(attending, now) : null;
+    if (soonest && said.length < 3) said.push({ id: "calendar", text: soonest });
+    return said;
+  }, [mode, lanes, now, name, attending, isSecretary, unread, unacked.length, invites, report]);
 
   // The feelings live here, on the side that carries the work (D-70): an unopened order
   // calls (D-69), a deadline within the hour is panic, an unread word from the director
@@ -274,7 +347,7 @@ export default function FeedPage() {
   // sleeps only with empty hands (владелец, 2026-09-17 — Марат спал с пятью делами).
   // the company may switch the worry off (`settings.mascot_telegraph`, D-133, В-5)
   const telegraph = useMascotTelegraph();
-  const load = useMemo(() => employeeLoad(open, now, meId, telegraph), [open, now, meId, telegraph]);
+  const load = useMemo(() => employeeLoad(open, now, meId, telegraph, report.asking), [open, now, meId, telegraph, report.asking]);
   const restFace = employeeFace(load.rest, false);
   // the medal has landed and the points are on (D-40, D-48): a jump with confetti after it
   const [cheering, setCheering] = useState(false);
@@ -291,7 +364,16 @@ export default function FeedPage() {
   // the stack is in the hands whenever the hands are not busy with a ball's job
   const carry = !isSecretary && !panelFace && !cheering && load.carry > 0 ? { count: load.carry, hot: load.hot } : null;
   // a worried face leads to its reason on the tap (D-110); the secretary keeps its own face
-  const reason = isSecretary ? null : reasonOf(load.rest);
+  // Where a tap on the resting face leads (D-110, D-167): what worries it first; with only the work
+  // in hands — an announcement or an invitation waiting for the person comes before it, as the words
+  // say; with nothing in hands — the same, or the balls.
+  const worry = isSecretary ? null : reasonOf(load.rest);
+  const waitsElsewhere: OrbitId | null = unacked.length > 0 ? "ether" : invites.length > 0 ? "calendar" : null;
+  const reason: OrbitId | null = isSecretary
+    ? null
+    : worry === "tasks" && load.rest === "working"
+      ? (waitsElsewhere ?? "tasks")
+      : (worry ?? waitsElsewhere);
 
   // the small things a face does on its own (D-82): asleep, busy with the stack, waiting for
   // the director, glad on the ring — never over a thought, a panel or the celebration
@@ -329,9 +411,12 @@ export default function FeedPage() {
   // each event, each award and each thought plays once: an effect that re-runs for another
   // reason (the motion setting read, the points switch loaded) must not replay the last one
   const playedEvent = useRef(0);
+  const refreshMyDay = useRefreshMyDay();
   useEffect(() => {
     if (!happened.event || playedEvent.current === happened.key) return;
     playedEvent.current = happened.key;
+    // an order taken, handed in or closed changes what today's report holds (D-167)
+    refreshMyDay();
     playInTurn(EVENT_ACT[happened.event]);
     if (happened.event !== "approved" || !pointsEnabled) return;
     // the medal lands first, then the jump; the run of «в срок» is said by the face
@@ -342,7 +427,7 @@ export default function FeedPage() {
       clearTimeout(stop);
       setCheering(false);
     };
-  }, [happened, playInTurn, pointsEnabled]);
+  }, [happened, playInTurn, pointsEnabled, refreshMyDay]);
   // points in (behind the same switch): a coin into the head and «+N» by the face
   const arrival = usePointsArrival(meId, pointsEnabled && !isSecretary);
   const playedArrival = useRef(0);
@@ -407,6 +492,8 @@ export default function FeedPage() {
   };
   // the thought is about something: a tap opens the ball it is about (D-110)
   const thoughtPanel: OrbitId = thought?.source === "ether" ? "ether" : thought?.source === "calendar" ? "calendar" : thought?.source === "errand" ? "secretary" : thought?.message ? "messages" : "tasks";
+  // a ball is open: its panel is a card up from the bottom edge, as on Пульс (D-167)
+  const cardOpen = mode === "panel";
   const faceSize = mode === "panel" ? FACE_SMALL : FACE;
   const box = mode === "ring" ? RING_RADIUS * 2 + 84 : faceSize + 24;
   // a screen nobody has touched for minutes: the secretary stops typing and reads, and the small
@@ -425,13 +512,117 @@ export default function FeedPage() {
   const showTally = isSecretary && mode === "idle" && !loading && tally.total > 0;
   const topInset = isSecretary ? (guarded ? 40 : 0) + (showTally ? 24 : 0) : 0;
 
+  // a ball's card goes back down: the balls orbit again
+  const closePanel = () => {
+    setMode("ring");
+    setPanel(null);
+  };
+
+  // the cards that tell the person the phone is not set up yet — after a tap, never at rest
+  const serviceLines = (
+    <>
+      <PushCard bubble />
+      <InstallHint bubble />
+    </>
+  );
+
+  // what the open ball shows inside its card
+  const panelContent =
+    panel === "tasks" ? (
+      // The report row is mounted once, whatever «Дела» holds — it keeps its state when the list
+      // empties or fills, and it can be the only thing left (the face that calls for it leads here).
+      // Its place is a flex order: under the orders through the day, on top once it is asked for
+      // (`ask_from`, D-167) — a new order in the morning is not pushed down by a quiet line.
+      <div className="flex flex-col gap-3">
+        <div className="empty:hidden" style={{ order: report.evening ? -1 : 1 }}>
+          <ReportDueRow now={now} />
+        </div>
+        {todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
+          <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
+        ) : (
+        // One list, each card keyed by its task: «Принял» moves a card down among those in work and
+        // «Выполнено» under «На проверке» — the same card glides there instead of jumping (D-167),
+        // while its copy flies into the face's hands or up to the director (FlightTargetProvider)
+        <div className="flex flex-col gap-3">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {[...todo, ...inWork, ...onReview].flatMap((task, i, all) => {
+              const review = task.status === "pending_review";
+              const card = (
+                <motion.div
+                  key={task.id}
+                  layout="position"
+                  transition={BAND_SPRING}
+                  exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.18, ease: "easeOut" } }}
+                >
+                  <div className="card-in">
+                    {/* dimmed inside: the fade-in's `both` would hold its own opacity over the class */}
+                    <div className={review ? "opacity-80" : undefined}>
+                      <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
+                    </div>
+                  </div>
+                </motion.div>
+              );
+              return review && all[i - 1]?.status !== "pending_review"
+                ? [
+                    <motion.p key="on-review" layout="position" transition={BAND_SPRING} className="mt-1 px-1 text-[14px] leading-4 text-muted">
+                      На проверке у директора · {onReview.length}
+                    </motion.p>,
+                    card,
+                  ]
+                : [card];
+            })}
+          </AnimatePresence>
+        </div>
+        )}
+        {todo.length + inWork.length + onReview.length > 0 ? (
+          <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted" style={{ order: 2 }}>
+            Все дела ›
+          </Link>
+        ) : null}
+      </div>
+    ) : panel === "messages" ? (
+      unread.length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Новых сообщений от директора нет.</p>
+      ) : (
+        <div className="flex flex-col gap-2">
+          {unread.map((task) => (
+            <MessageRow
+              key={task.id}
+              task={task}
+              companyId={companyId}
+              meId={meId}
+              actions={actions}
+              onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })}
+              onOpen={() => setThread({ id: task.id, title: task.title })}
+            />
+          ))}
+        </div>
+      )
+    ) : panel === "calendar" ? (
+      events.length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
+      ) : (
+        <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
+      )
+    ) : panel === "secretary" ? (
+      <ErrandCards errands={errandRows} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} />
+    ) : panel === "ether" ? (
+      (ether.data ?? []).length === 0 ? (
+        <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
+      ) : (
+        <EtherSection variant="page" />
+      )
+    ) : null;
+
   return (
     // three bands, and the middle one never moves: the face sits in the centre of the screen
     // in every mode, what it says grows upwards above it and the cards downwards under it.
     // The bands scroll inside themselves, so the page itself is always one screen (D-60).
     // `data-board` stops the shell growing with its content (globals.css), as in the skeleton.
+    // Clipped sideways only: an open ball's card reaches down under the floating tab bar to the
+    // screen's edge (D-166, D-167); the shell is one screen high, so nothing below it can scroll.
     <main
-      className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4"
+      className="relative mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-x-clip overflow-y-visible px-4"
       style={{ overscrollBehaviorY: "contain" }}
       data-board=""
       data-mode={mode}
@@ -460,6 +651,8 @@ export default function FeedPage() {
         </div>
       ) : null}
       {/* framer's own motion (the balls, the bands) honours «уменьшить движение» (DESIGN §4) */}
+      {/* a card taken in hand flies into the face; the secretary's face is its own, nothing flies there */}
+      <FlightTargetProvider getTarget={faceTarget} onLand={() => haptic(8)}>
       <MotionConfig reducedMotion="user">
       <LayoutGroup>
         {/* above the head: what the assistant says — it glides with the band's edge on a mode change */}
@@ -513,7 +706,11 @@ export default function FeedPage() {
                         ? "Маскот: тап — открыть дела"
                         : reason === "messages"
                           ? "Маскот: тап — сообщение директора"
-                          : "Маскот: тап — дела, сообщения, эфир, календарь"
+                          : reason === "ether"
+                            ? "Маскот: тап — новое объявление"
+                            : reason === "calendar"
+                              ? "Маскот: тап — ответить на приглашение"
+                              : "Маскот: тап — дела, сообщения, эфир, календарь"
                   }
                 />
               </>
@@ -543,9 +740,14 @@ export default function FeedPage() {
           </div>
         </div>
 
-        {/* under the head: the balls in a row, then the cards. The row is outside the scroller,
-            so a ball walking down from the orbit is never clipped on its way in. */}
-        <div className="flex min-h-0 flex-1 flex-col" data-band="cards">
+        {/* under the head: the balls in a row, then the cards — or, with a ball open, the ball's card
+            up from the bottom edge (D-167, as Пульс since D-166). The row is outside the card and the
+            scroller, so a ball walking down from the orbit is never clipped on its way in. */}
+        <div
+          className="flex min-h-0 flex-1 flex-col transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none"
+          style={{ flexGrow: cardOpen ? PANEL_GROW : 1 }}
+          data-band="cards"
+        >
           {/* right under the resting face: «+5 очков», «🔥 3 подряд в срок» — for a few seconds,
               behind the adaptation gate like the points themselves (D-40, D-110) */}
           {!isSecretary && mode === "idle" && pill ? (
@@ -617,129 +819,71 @@ export default function FeedPage() {
               </div>
             </div>
           ) : null}
-          {mode === "panel" ? (
-            <div className="mt-1 w-full shrink-0">
+          {cardOpen ? (
+            <div className="mt-1 w-full shrink-0 pb-2">
               <OrbitBalls balls={balls} mode="row" activeId={panel} radius={RING_RADIUS} onPick={pick} />
             </div>
-          ) : null}
-          <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
-            {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
-            {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
-            {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
-            {isSecretary && mode === "idle"
-              ? errandRows
-                  .filter(
-                    (e) =>
-                      e.status === "done" &&
-                      e.claimed_by === meId &&
-                      !e.result &&
-                      e.done_at &&
-                      now.getTime() - new Date(e.done_at).getTime() <= 10 * 60_000 &&
-                      !skipped.includes(e.id) &&
-                      RESULTS[sceneOf(e, catalogue.data ?? NO_ACTIONS)].length > 0,
-                  )
-                  .slice(0, 1)
-                  .map((e) => (
-                    <ResultCard key={e.id} errand={e} scene={sceneOf(e, catalogue.data ?? NO_ACTIONS)} onSkip={() => setSkipped((list) => [...list, e.id])} />
-                  ))
-              : null}
-            {/* with a panel open they wait under it: the tap on the face opens «Дела», and the cards
-                stood above the tasks and pushed them off the screen (D-142 on Пульс, D-143 here) —
-                moved by flex order, not by another slot, so they are not mounted anew */}
-            {mode !== "idle" ? (
-              <div className="flex flex-col gap-2 empty:hidden" style={{ order: mode === "panel" ? 1 : 0 }}>
-                <PushCard bubble />
-                <InstallHint bubble />
-              </div>
+          ) : (
+            // the band's top moves with the mode, as the words' bottom does: the cards glide with it
+            <motion.div layout="position" layoutScroll transition={BAND_SPRING} className="no-bar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4 pt-2">
+              {/* the secretary's requests live on the waiting screen itself: «Принял» in one tap */}
+              {isSecretary && mode === "idle" ? <ReceptionCards visits={visitRows} now={now} /> : null}
+              {isSecretary && mode === "idle" ? <DeskCards mine={mineErrands} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
+              {isSecretary && mode === "idle"
+                ? errandRows
+                    .filter(
+                      (e) =>
+                        e.status === "done" &&
+                        e.claimed_by === meId &&
+                        !e.result &&
+                        e.done_at &&
+                        now.getTime() - new Date(e.done_at).getTime() <= 10 * 60_000 &&
+                        !skipped.includes(e.id) &&
+                        RESULTS[sceneOf(e, catalogue.data ?? NO_ACTIONS)].length > 0,
+                    )
+                    .slice(0, 1)
+                    .map((e) => (
+                      <ResultCard key={e.id} errand={e} scene={sceneOf(e, catalogue.data ?? NO_ACTIONS)} onSkip={() => setSkipped((list) => [...list, e.id])} />
+                    ))
+                : null}
+              {/* service cards only once the face has been tapped — the resting screen is the face alone */}
+              {mode !== "idle" ? <div className="flex flex-col gap-2 empty:hidden">{serviceLines}</div> : null}
+            </motion.div>
+          )}
+          {/* popLayout: the leaving card is popped out where it stood against the board and slides
+              down from there, while the face, the balls and the band below already take their places */}
+          <AnimatePresence mode="popLayout">
+            {cardOpen ? (
+              <PanelCard key="card" panelKey={panel ?? ""} receded={false} label={balls.find((ball) => ball.id === panel)?.label ?? "Панель"} onClose={closePanel}>
+                {/* another ball changes what is in the card, not the card: the old content is gone in a
+                    blink (popLayout — the new one does not wait for it, and nothing of it is left over the
+                    service cards), the new one rises into its place; position only, a size animation
+                    squashed the cards */}
+                <div className="relative pt-1">
+                  <AnimatePresence mode="popLayout" initial={false}>
+                    <motion.div
+                      key={panel}
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, transition: { duration: 0.06, ease: "easeOut" } }}
+                      transition={BAND_SPRING}
+                      data-testid="panel"
+                      data-panel={panel}
+                    >
+                      {panelContent}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+                {/* the panel is what the tap asked for: the service cards wait under it (D-143) — once
+                    for the card, so a switch of balls does not mount them anew */}
+                <div className="mt-2 flex flex-col gap-2 empty:hidden">{serviceLines}</div>
+              </PanelCard>
             ) : null}
-            {/* a panel folding away fades out where it stood; position only (a size animation squashed its cards) */}
-            {/* the leaving panel is popped out absolutely, so it needs a positioned parent — this box,
-                not the band: a positioned band comes after the face and covers the team's circles
-                that reach down into it (they stopped taking taps). Empty, it is not there at all. */}
-            <div className="relative empty:hidden">
-            <AnimatePresence mode="popLayout">
-            {mode === "panel" ? (
-              <motion.div
-                key={panel}
-                layout="position"
-                initial={{ opacity: 0, y: 24 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.15, ease: "easeOut" } }}
-                transition={BAND_SPRING}
-                data-testid="panel"
-                data-panel={panel}
-              >
-                {panel === "tasks" ? (
-                  todo.length === 0 && inWork.length === 0 && onReview.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Дел нет. Появится задача — разбужу.</p>
-                  ) : (
-                    <div className="flex flex-col gap-3">
-                      {[...todo, ...inWork].map((task) => (
-                        <div key={task.id} className="card-in">
-                          <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
-                        </div>
-                      ))}
-                      {onReview.length > 0 ? (
-                        <>
-                          <p className="mt-1 px-1 text-[14px] leading-4 text-muted">На проверке у директора · {onReview.length}</p>
-                          {onReview.map((task) => (
-                            // dimmed inside: the fade-in's `both` would hold its own opacity over the class
-                            <div key={task.id} className="card-in">
-                              <div className="opacity-80">
-                                <TaskCard task={task} variant="employee" actions={actions} companyId={companyId} href={`/tasks/${task.id}`} />
-                              </div>
-                            </div>
-                          ))}
-                        </>
-                      ) : null}
-                      <Link href="/tasks" className="min-h-[44px] px-1 text-[14px] leading-[44px] text-muted">
-                        Все дела ›
-                      </Link>
-                    </div>
-                  )
-                ) : null}
-                {panel === "messages" ? (
-                  unread.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Новых сообщений от директора нет.</p>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {unread.map((task) => (
-                        <MessageRow
-                          key={task.id}
-                          task={task}
-                          companyId={companyId}
-                          meId={meId}
-                          actions={actions}
-                          onRead={(seq) => actions.markRead({ taskId: task.id, companyId, seq })}
-                          onOpen={() => setThread({ id: task.id, title: task.title })}
-                        />
-                      ))}
-                    </div>
-                  )
-                ) : null}
-                {panel === "calendar" ? (
-                  events.length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Пока ничего не запланировано.</p>
-                  ) : (
-                    <CalendarList events={events} now={now} meId={meId} onOpen={setOpenEvent} variant="compact" />
-                  )
-                ) : null}
-                {panel === "secretary" ? <ErrandCards errands={errandRows} meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} /> : null}
-                {panel === "ether" ? (
-                  (ether.data ?? []).length === 0 ? (
-                    <p className="py-4 text-center text-[16px] leading-[22px] text-muted">Объявлений пока нет.</p>
-                  ) : (
-                    <EtherSection variant="page" />
-                  )
-                ) : null}
-              </motion.div>
-            ) : null}
-            </AnimatePresence>
-            </div>
-          </motion.div>
+          </AnimatePresence>
         </div>
       </LayoutGroup>
       </MotionConfig>
+      </FlightTargetProvider>
 
       {/* the hint never lies over the secretary's cards */}
       {mode === "idle" && !(isSecretary && (mineErrands.length > 0 || visitRows.some((v) => !v.closed_at))) ? (
@@ -753,7 +897,11 @@ export default function FeedPage() {
               ? "тап — открыть дела"
               : reason === "messages"
                 ? "тап — прочитать сообщение директора"
-                : "тап — дела, сообщения, эфир, календарь"}
+                : reason === "ether"
+                  ? "тап — новое объявление"
+                  : reason === "calendar"
+                    ? "тап — ответить на приглашение"
+                    : "тап — дела, сообщения, эфир, календарь"}
         </p>
       ) : null}
 
@@ -850,11 +998,11 @@ function MessageRow({
       </button>
       <ThreadTail taskId={task.id} meId={meId} enabled />
       <div className="mt-3 flex flex-wrap gap-2">
-        <Chip onClick={() => onRead(last.seq)}>Прочитал</Chip>
+        <Chip className="!min-h-[44px]" onClick={() => onRead(last.seq)}>Прочитал</Chip>
         <button
           type="button"
           onClick={onOpen}
-          className="inline-flex min-h-[34px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text"
+          className="inline-flex min-h-[44px] items-center rounded-full border border-border bg-surface-2 px-3 font-display text-[13px] font-semibold leading-4 text-text"
         >
           Открыть переписку ›
         </button>

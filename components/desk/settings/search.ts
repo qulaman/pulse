@@ -44,6 +44,7 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { id: "report-days", tab: "team", place: "Сотрудники", title: "Рабочие дни", words: "пн пт суббота выходные неделя", director: true },
   { id: "report-holidays", tab: "team", place: "Сотрудники", title: "Праздники компании", words: "выходной наурыз курбан", director: true },
   { id: "report-times", tab: "team", place: "Сотрудники", title: "Начало дня и напоминание об отчёте", words: "пришёл время напомнить", director: true },
+  { id: "report-ask", tab: "team", place: "Сотрудники", title: "Лента просит отчёт с", words: "лента отчёт вечер просит не сдан", director: true },
   // ИИ-модель
   { id: "stt-provider", tab: "ai", place: "ИИ-модель", title: "Распознавание речи — провайдер", words: "stt openai whisper deepgram elevenlabs голос" },
   { id: "stt-language", tab: "ai", place: "ИИ-модель", title: "Язык речи", words: "казахский русский смешанная" },

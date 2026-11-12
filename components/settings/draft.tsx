@@ -40,6 +40,7 @@ function reportKeys(section: CompanySettings["daily_report"]) {
     holidays: section.holidays,
     work_start: section.work_start,
     remind_at: section.remind_at,
+    ask_from: section.ask_from,
   };
 }
 

@@ -29,7 +29,8 @@ export function greeting(now: Date, name: string): string {
 
 /** Long titles are cut at a word, not mid-word («…в магазин…», never «…в магази…»). */
 export function quoteTitle(title: string): string {
-  const clean = title.trim();
+  // quotes inside quotes are „лапки“: «Планёрка по объекту „Береке“», not «…«Береке»»
+  const clean = title.trim().replace(/«/g, "„").replace(/»/g, "“");
   if (clean.length <= TITLE_MAX) return `«${clean}»`;
   const head = clean.slice(0, TITLE_MAX - 1).trimEnd();
   // a head that ends on punctuation already ends on a whole item («…, договориться,»);

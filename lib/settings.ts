@@ -262,7 +262,9 @@ const HolidaysSchema = z
  * `started_on` — the first day a missing report is fined (the first morning tick, or switching the
  * module on); `checked_on` — the last day the morning tick closed (kept here, or a settings save
  * would make the tick look at closed days again). `holidays` — no report is due on them (D-155 §7);
- * a broken list reads as none, never as a broken section.
+ * a broken list reads as none, never as a broken section. `ask_from` — from this time of a working
+ * day Лента asks for the report not handed in yet: the row in «Дела» stands out, the face calls,
+ * the greeting says so (D-167). Only the phone reads it; the push still goes at `remind_at`.
  */
 export const DailyReportSettingsSchema = z.object({
   enabled: z.boolean().default(true),
@@ -270,6 +272,7 @@ export const DailyReportSettingsSchema = z.object({
   holidays: HolidaysSchema.default([]).catch([]),
   work_start: ClockSchema.default("09:00"),
   remind_at: ClockSchema.default("18:00"),
+  ask_from: ClockSchema.default("17:00").catch("17:00"),
   started_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   checked_on: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
 });
@@ -286,6 +289,7 @@ export const DailyReportPatchSchema = z
     holidays: HolidaysSchema,
     work_start: ClockSchema,
     remind_at: ClockSchema,
+    ask_from: ClockSchema,
   })
   .partial();
 

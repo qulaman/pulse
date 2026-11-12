@@ -30,6 +30,7 @@
     "smoke:cleanup": "tsx scripts/smoke-cleanup.ts",
     "smoke:notes": "tsx scripts/smoke-notes.ts",
     "smoke:tasks": "tsx scripts/smoke-tasks.ts",
+    "smoke:feed": "tsx scripts/smoke-feed.ts",
     "smoke:desk": "tsx scripts/smoke-desk.ts",
     "smoke:pick": "tsx scripts/smoke-pick.ts",
     "smoke:team": "tsx scripts/smoke-team.ts",

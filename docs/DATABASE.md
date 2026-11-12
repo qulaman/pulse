@@ -154,7 +154,7 @@
 | `dev_tools` | «Лаборатория» и «Данные», пишет service role | экраны | D-158 |
 | `delivery_window` | `from`, `to`, умолчание 08:00–21:00 | `next_delivery_slot()` | D-38 |
 | `secretary` | кнопки, повтор пуша, телефон охраны | `lib/errands/` | D-79, D-99 |
-| `daily_report` | дни, праздники, часы; `started_on`, `checked_on` — сервера | функции отчёта | D-152, D-155 |
+| `daily_report` | дни, праздники, часы; `ask_from` — с какого часа Лента просит отчёт (читает только телефон, D-167); `started_on`, `checked_on` — сервера | функции отчёта | D-152, D-155, D-167 |
 | `voice_retention` | `closed_days`, `orphan_days` | `lib/voice/retention.ts` | D-155 |
 
 ## 6. RLS
