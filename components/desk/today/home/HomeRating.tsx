@@ -1,5 +1,6 @@
 "use client";
 
+import { Crown, Medal, TrendingUp, Trophy } from "lucide-react";
 import { useMemo } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -12,10 +13,11 @@ import { useRating } from "@/lib/points/queries";
 import { useNow } from "@/lib/pulse/queries";
 import { useTvControl } from "@/lib/tv/mutations";
 
-import { Aside, BlockLink, BlockNote, HeadMove, Quiet, RowsBone } from "./parts";
+import { AllClear, Face, Mark, Meter, rise, Titled } from "./look";
+import { Aside, BlockLink, BlockNote, HeadMove, RowsBone } from "./parts";
 
-/** A row of the five: the place in the margin, the name, what grew since last week, the points. */
-const RATING_ROW = "grid grid-cols-[24px_minmax(0,1fr)_auto_auto] items-baseline gap-x-3 py-[7px] text-[13px] leading-5";
+/** A row of the five: the place in the margin, the name over a bar of the points, what grew since last week, the points. */
+const RATING_ROW = "grid grid-cols-[24px_minmax(0,1fr)_auto_auto] items-center gap-x-3 py-[7px] text-[13px] leading-5";
 
 /** The full rating on the desk: the balances of «Очки и магазин», the week by default. */
 const RATING_HREF = "/desk/settings/points";
@@ -41,6 +43,7 @@ function WeekTop() {
   const now = useNow(60_000);
   const load = loadStateOf(rating);
   const rows = useMemo(() => topOf(rating.data ?? []), [rating.data]);
+  const leader = Math.max(1, ...rows.map((row) => row.points));
 
   return (
     <Aside testId="home-rating">
@@ -61,27 +64,52 @@ function WeekTop() {
           </span>
         }
       >
-        Рейтинг недели
+        <Titled icon={Trophy} ink="gold">
+          Рейтинг недели
+        </Titled>
       </SectionLabel>
       <BlockNote state={load} failed="Рейтинг не загрузился" now={now} onRetry={() => void rating.refetch()} />
       {load.kind === "loading" ? (
         <RowsBone rows={5} wide="64%" />
       ) : load.kind === "failed" ? null : rows.length === 0 ? (
         <div className="desk-list">
-          <Quiet testId="home-rating-empty">За неделю очков пока нет — начислите строкой поручения: «Марату 50 очков за объект»</Quiet>
+          <AllClear icon={Trophy} ink="muted" hint="Начислите строкой поручения: «Марату 50 очков за объект»" testId="home-rating-empty">
+            За неделю очков пока нет
+          </AllClear>
         </div>
       ) : (
         <ol className="desk-list" data-testid="home-rating-list">
-          {rows.map((row) => (
-            <li key={row.user_id} className={RATING_ROW} data-testid="home-rating-row">
-              <span className={`nums text-[13px] ${row.rank <= 3 ? "font-semibold" : "text-muted"}`}>{row.rank}</span>
-              <span className="min-w-0 truncate text-[14px]" title={row.display_name}>
-                {shortName(row.display_name)}
+          {rows.map((row, index) => (
+            <li key={row.user_id} className={`${RATING_ROW} ${rise(index).className}`} style={rise(index).style} data-testid="home-rating-row">
+              {/* the first three wear a crown and medals: the place is seen before it is read */}
+              <span className="flex items-center justify-center">
+                {row.rank === 1 ? (
+                  <Mark icon={Crown} ink="gold" size={16} title="1 место" />
+                ) : row.rank <= 3 ? (
+                  <Mark icon={Medal} ink={row.rank === 2 ? "sky" : "violet"} size={15} title={`${row.rank} место`} />
+                ) : (
+                  <span className="nums text-[13px] text-muted">{row.rank}</span>
+                )}
               </span>
-              <span className="nums text-[12px]" style={{ color: "var(--ok)" }} title={row.delta_vs_prev > 0 ? `На ${row.delta_vs_prev} больше, чем за прошлую неделю` : undefined}>
-                {row.delta_vs_prev > 0 ? `↑${row.delta_vs_prev}` : ""}
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Face name={row.display_name} size={20} ink={row.rank === 1 ? "gold" : undefined} />
+                  <span className={`min-w-0 truncate text-[14px] ${row.rank === 1 ? "font-semibold" : ""}`} title={row.display_name}>
+                    {shortName(row.display_name)}
+                  </span>
+                </span>
+                {/* the points against the leader's: the week's race as bars */}
+                <Meter value={row.points} of={leader} ink="gold" />
               </span>
-              <span className="nums text-right text-[14px] font-semibold" style={{ color: "var(--gold)" }}>
+              <span className="nums inline-flex items-center gap-0.5 text-[12px]" style={{ color: "var(--ok)" }} title={row.delta_vs_prev > 0 ? `На ${row.delta_vs_prev} больше, чем за прошлую неделю` : undefined}>
+                {row.delta_vs_prev > 0 ? (
+                  <>
+                    <TrendingUp size={12} strokeWidth={2.5} aria-hidden />
+                    {row.delta_vs_prev}
+                  </>
+                ) : null}
+              </span>
+              <span className="nums text-right text-[15px] font-semibold" style={{ color: "var(--gold)" }}>
                 {row.points}
               </span>
             </li>

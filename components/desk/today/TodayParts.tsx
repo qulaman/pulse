@@ -1,5 +1,27 @@
 "use client";
 
+import {
+  Activity,
+  AlarmClock,
+  CalendarClock,
+  CalendarDays,
+  Check,
+  CircleCheck,
+  ClipboardCheck,
+  Coffee,
+  DoorOpen,
+  Flag,
+  Gift,
+  Inbox,
+  Megaphone,
+  Play,
+  Send,
+  Sparkles,
+  StickyNote,
+  Timer,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, type MouseEvent, type ReactNode } from "react";
@@ -24,9 +46,11 @@ import { shortName } from "@/lib/people/names";
 import type { DeskItem } from "@/lib/tasks/desk";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { pluralRu, isOverdue } from "@/lib/tasks/status-text";
-import { lineOf, type TvEvent } from "@/lib/tv/feed";
+import { lineOf, type TvEvent, type TvKind } from "@/lib/tv/feed";
 import type { Visit, VisitAnswer } from "@/lib/visits/queries";
 import { waitedSince } from "@/lib/visits/text";
+
+import { AllClear, Face, Live, Mark, Meter, Pill, rise, Titled, type Ink } from "./home/look";
 
 /* -------------------------------------------------------------------------- */
 /* The left column: the director's work                                         */
@@ -415,6 +439,8 @@ export function reportWord(row: TeamDayRow | undefined, now: Date): string | nul
 
 /** A line of the right column: the time or the figure in the margin, the words on one vertical. */
 const DAY_ROW = "grid grid-cols-[84px_minmax(0,1fr)] items-baseline gap-x-3 py-[7px] text-[13px] leading-5";
+/** The same line when it starts with an icon or a face (D-169): centred, an icon has no baseline. */
+const DAY_ROW_MARKED = "grid grid-cols-[84px_minmax(0,1fr)] items-center gap-x-3 py-[7px] text-[13px] leading-5";
 
 function Aside({ children, testId }: { children: ReactNode; testId: string }) {
   return (
@@ -422,10 +448,6 @@ function Aside({ children, testId }: { children: ReactNode; testId: string }) {
       {children}
     </section>
   );
-}
-
-function Quiet({ children }: { children: ReactNode }) {
-  return <p className="py-[7px] text-[13px] leading-5 text-muted">{children}</p>;
 }
 
 /** How many of today's deadlines stand in «Встречи и сроки» before «ещё N в задачах». */
@@ -461,47 +483,44 @@ export function Agenda({
   const todays = events.filter((event) => ymdOfEvent(event) === today).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const later = todays.length === 0 ? nextEvent(events.filter((event) => ymdOfEvent(event) > today), now) : null;
   const known = !loading && !failed;
+  const running = known && todays.some((event) => isRunning(event, now));
   return (
     <Aside testId="today-agenda">
-      <SectionLabel action={<BlockLink href="/desk/calendar">Календарь →</BlockLink>}>Встречи и сроки</SectionLabel>
+      <SectionLabel action={<BlockLink href="/desk/calendar">Календарь →</BlockLink>}>
+        <Titled icon={CalendarClock} ink="sky" live={running}>
+          Встречи и сроки
+        </Titled>
+      </SectionLabel>
       {note}
       {known || dueToday > 0 ? (
         <ul className="desk-list">
           {!known ? null : todays.length === 0 ? (
             <li>
-              <Quiet>{later ? `Встреч сегодня нет · ближайшая ${humanAqtobe(new Date(later.starts_at), now)}, «${later.title}»` : "Встреч сегодня нет"}</Quiet>
+              <AllClear icon={Coffee} ink="sky" hint={later ? `Ближайшая ${humanAqtobe(new Date(later.starts_at), now)} — «${later.title}»` : undefined}>
+                Встреч сегодня нет
+              </AllClear>
             </li>
           ) : (
-            todays.map((event) => {
-              const over = isOver(event, now);
-              const live = isRunning(event, now);
-              return (
-                <li key={event.id}>
-                  <Link href={`/desk/calendar?e=${encodeURIComponent(event.id)}`} prefetch={false} className={`desk-row ${DAY_ROW} ${over ? "text-muted" : ""}`}>
-                    <When>{timeRange(event)}</When>
-                    <span className="flex min-w-0 items-baseline gap-2">
-                      <span className="min-w-0 flex-1 truncate" title={event.title}>
-                        {event.title}
-                        <span className="text-muted"> · {peopleCount(event)} чел.</span>
-                      </span>
-                      {live ? <span className="shrink-0 font-semibold">идёт</span> : null}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })
+            todays.map((event, index) => <MeetingRow key={event.id} event={event} now={now} index={index} />)
           )}
-          {due.slice(0, DUE_SHOWN).map((task) => (
-            <li key={task.id}>
-              <button type="button" onClick={() => onOpenTask(task.id)} className={`desk-row w-full text-left ${DAY_ROW}`} data-testid="today-due">
-                <When overdue={isOverdue(task, now)}>{task.deadline ? `до ${humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "")}` : "сегодня"}</When>
-                <span className="min-w-0 truncate" title={task.title}>
-                  {shortName(task.assignee?.full_name ?? "") || "Без исполнителя"}
-                  <span className="text-muted"> · {task.title}</span>
-                </span>
-              </button>
-            </li>
-          ))}
+          {due.slice(0, DUE_SHOWN).map((task, index) => {
+            const late = isOverdue(task, now);
+            return (
+              <li key={task.id} {...rise(todays.length + index)}>
+                <button type="button" onClick={() => onOpenTask(task.id)} className={`desk-row w-full text-left ${DAY_ROW_MARKED}`} data-testid="today-due" data-overdue={late ? "" : undefined}>
+                  <When overdue={late}>{task.deadline ? `до ${humanAqtobe(new Date(task.deadline), now).replace(/^сегодня /, "")}` : "сегодня"}</When>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Mark icon={late ? AlarmClock : Flag} ink={late ? "pencil" : "pen"} title={late ? "Срок прошёл" : "Срок сегодня"} />
+                    <Face name={task.assignee?.full_name ?? "?"} size={20} />
+                    <span className="min-w-0 truncate" title={task.title}>
+                      {shortName(task.assignee?.full_name ?? "") || "Без исполнителя"}
+                      <span className="text-muted"> · {task.title}</span>
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
           {dueToday > DUE_SHOWN ? (
             <li>
               <Link href="/desk/tasks?due=today" prefetch className={`desk-row ${DAY_ROW}`} data-testid="today-due-more">
@@ -550,17 +569,27 @@ export function Reception({
   if (visitors.length === 0 && messages.length === 0 && !failed) return null;
   return (
     <Aside testId="today-reception">
-      <SectionLabel>У двери</SectionLabel>
+      <SectionLabel>
+        <Titled icon={DoorOpen} ink="pen" live={visitors.some((visit) => visit.status === "waiting")}>
+          У двери
+        </Titled>
+      </SectionLabel>
       {note}
       <ul className="desk-list">
-        {visitors.map((visit) => {
+        {visitors.map((visit, index) => {
           const waiting = visit.status === "waiting";
           return (
-            <li key={visit.id} className={DAY_ROW} data-testid="today-visitor">
+            <li key={visit.id} className={`${DAY_ROW} ${rise(index).className}`} style={rise(index).style} data-testid="today-visitor">
               <When className="text-muted">{waitedSince(visit.created_at, now)}</When>
-              <span className="min-w-0">
-                <span className={`block text-[12px] leading-4 ${waiting ? "text-warn" : "text-muted"}`}>{waiting ? "К вам посетитель" : "Посетитель ждёт"}</span>
-                <span className="block text-[14px] font-medium leading-5 [overflow-wrap:anywhere]">{visit.note?.trim() || "Без имени"}</span>
+              <span className="flex min-w-0 items-center gap-2.5">
+                <Face name={visit.note?.trim() || "?"} size={30} ink={waiting ? "pen" : undefined} />
+                <span className="min-w-0">
+                  <span className={`flex items-center gap-1.5 text-[12px] leading-4 ${waiting ? "text-warn" : "text-muted"}`}>
+                    {waiting ? <Live ink="pen" /> : null}
+                    {waiting ? "К вам посетитель" : "Посетитель ждёт"}
+                  </span>
+                  <span className="block text-[14px] font-medium leading-5 [overflow-wrap:anywhere]">{visit.note?.trim() || "Без имени"}</span>
+                </span>
               </span>
               {/* the three answers take the column's whole width: the sheet's left edge, one line */}
               <span className="col-span-2 mt-1.5 flex items-center gap-1">
@@ -580,12 +609,15 @@ export function Reception({
             </li>
           );
         })}
-        {messages.map((visit) => (
-          <li key={visit.id} className={DAY_ROW} data-testid="today-message">
+        {messages.map((visit, index) => (
+          <li key={visit.id} className={`${DAY_ROW} ${rise(visitors.length + index).className}`} style={rise(visitors.length + index).style} data-testid="today-message">
             <When className="text-muted">{waitedSince(visit.created_at, now)}</When>
             <span className="flex min-w-0 items-baseline gap-2">
               <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
-                <span className="block text-[12px] leading-4 text-muted">Сообщение</span>
+                <span className="flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+                  <Mark icon={StickyNote} ink="pen" size={12} />
+                  Сообщение
+                </span>
                 <span className="block leading-5">{visit.note?.trim() || "Без текста"}</span>
               </span>
               <MiniButton label="Понятно" disabled={busyId === visit.id} onPress={() => onAnswer(visit, "read")} testId="visit-read" />
@@ -629,42 +661,60 @@ export function Feed({
   onOpenTask: (id: string) => void;
 }) {
   const today = events.filter((event) => aqtobeDay(lineOf(event, false).at) === aqtobeDay(now));
+  // the company moved in the last five minutes: the block's tile beats
+  const fresh = today.some((event) => now.getTime() - new Date(event.created_at).getTime() < 5 * 60_000);
   return (
     <Aside testId="today-feed">
-      <SectionLabel>Лента</SectionLabel>
+      <SectionLabel>
+        <Titled icon={Activity} ink="sky" live={fresh}>
+          Лента
+        </Titled>
+      </SectionLabel>
       {note}
       {loading || failed ? null : (
         <ul className="desk-list">
           {today.length === 0 ? (
             <li>
-              <Quiet>Сегодня пока тихо — события дня появятся здесь</Quiet>
+              <AllClear icon={Activity} ink="muted" hint="События дня появятся здесь">
+                Сегодня пока тихо
+              </AllClear>
             </li>
           ) : (
-            today.map((event) => {
+            today.map((event, index) => {
               const line = lineOf(event, false);
-              const words = line.label.charAt(0).toLowerCase() + line.label.slice(1);
+              const kind = FEED_KIND[line.kind];
+              const points = line.kind === "points" && line.amount ? `+${line.amount}` : null;
+              const words = points ? "очки" : line.label.charAt(0).toLowerCase() + line.label.slice(1);
               const taskId = taskOf(line.detail ?? null);
               const body = (
                 <>
                   <When className="text-muted">{feedTime(line.at, now)}</When>
-                  <span className="min-w-0 truncate" title={line.detail ? `${words} · «${line.detail}»` : words}>
-                    {shortName(line.name)}
-                    <span className="text-muted">
-                      {" "}
-                      · {words}
-                      {line.detail ? ` «${line.detail}»` : ""}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Mark icon={kind.icon} ink={kind.ink} title={line.label} />
+                    <span className="min-w-0 flex-1 truncate" title={line.detail ? `${words} · «${line.detail}»` : words}>
+                      {shortName(line.name)}
+                      <span className="text-muted">
+                        {" "}
+                        · {words}
+                        {line.detail ? ` «${line.detail}»` : ""}
+                      </span>
                     </span>
+                    {points ? (
+                      <Pill ink="gold" icon={Sparkles}>
+                        {points}
+                      </Pill>
+                    ) : null}
                   </span>
                 </>
               );
               return (
-                <li key={line.id}>
+                <li key={line.id} {...rise(index)}>
                   {taskId ? (
-                    <button type="button" onClick={() => onOpenTask(taskId)} className={`desk-row w-full text-left ${DAY_ROW}`} data-testid="today-feed-row">
+                    <button type="button" onClick={() => onOpenTask(taskId)} className={`desk-row w-full text-left ${DAY_ROW_MARKED}`} data-testid="today-feed-row">
                       {body}
                     </button>
                   ) : (
-                    <div className={DAY_ROW}>{body}</div>
+                    <div className={DAY_ROW_MARKED}>{body}</div>
                   )}
                 </li>
               );
@@ -676,35 +726,163 @@ export function Feed({
   );
 }
 
+/** What a line of the feed is about, at a glance: its icon and its ink — the colours of the stages. */
+const FEED_KIND: Record<TvKind, { icon: LucideIcon; ink: Ink }> = {
+  task_sent: { icon: Send, ink: "sky" },
+  task_accepted: { icon: Play, ink: "ok" },
+  task_review: { icon: Inbox, ink: "pen" },
+  task_done: { icon: CircleCheck, ink: "ok" },
+  points: { icon: Sparkles, ink: "gold" },
+  announcement: { icon: Megaphone, ink: "pen" },
+  merch: { icon: Gift, ink: "gold" },
+  event: { icon: CalendarDays, ink: "sky" },
+};
+
+/**
+ * A meeting of the day: the time in the margin, its title and how many come; on now — a green dot
+ * breathing, «идёт» and a bar of how much of it has gone; within half an hour — «через N мин» in the
+ * pen; over — quiet, with a tick.
+ */
+function MeetingRow({ event, now, index }: { event: CalendarEvent; now: Date; index: number }) {
+  const over = isOver(event, now);
+  const live = isRunning(event, now);
+  const start = new Date(event.starts_at).getTime();
+  const end = event.ends_at ? new Date(event.ends_at).getTime() : null;
+  const ahead = Math.ceil((start - now.getTime()) / 60_000);
+  const soon = !live && !over && ahead > 0 && ahead <= 30;
+  const length = end ? Math.max(1, Math.round((end - start) / 60_000)) : 0;
+  const gone = end ? Math.max(0, Math.min(length, Math.round((now.getTime() - start) / 60_000))) : 0;
+  return (
+    <li {...rise(index)}>
+      <Link
+        href={`/desk/calendar?e=${encodeURIComponent(event.id)}`}
+        prefetch={false}
+        className={`desk-row ${DAY_ROW_MARKED} ${over ? "text-muted" : ""}`}
+        data-testid="today-meeting"
+        data-live={live ? "" : undefined}
+      >
+        <When>{timeRange(event)}</When>
+        <span className="flex min-w-0 flex-col gap-1.5">
+          <span className="flex min-w-0 items-center gap-2">
+            {live ? <Live ink="ok" /> : over ? <Mark icon={Check} ink="muted" /> : <Mark icon={CalendarClock} ink="sky" />}
+            <span className={`min-w-0 flex-1 truncate ${live ? "font-semibold" : ""}`} title={event.title}>
+              {event.title}
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-[12px] text-muted" title={`Участников: ${peopleCount(event)}`}>
+              <Users size={12} strokeWidth={2.25} aria-hidden />
+              <span className="nums">{peopleCount(event)}</span>
+            </span>
+            {live ? (
+              <Pill ink="ok" testId="today-meeting-live">
+                идёт
+              </Pill>
+            ) : soon ? (
+              <Pill ink="pen" icon={Timer}>
+                через {ahead} мин
+              </Pill>
+            ) : null}
+          </span>
+          {live && end ? <Meter value={gone} of={length} ink="ok" label={`Прошло ${gone} мин из ${length}`} /> : null}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 /** «Отчёты сегодня» when the day did not load: the block stays, with what happened in it. */
 export function ReportsFailed({ note }: { note: ReactNode }) {
   return (
     <Aside testId="today-reports">
-      <SectionLabel>Отчёты сегодня</SectionLabel>
+      <SectionLabel>
+        <Titled icon={ClipboardCheck} ink="ok">
+          Отчёты сегодня
+        </Titled>
+      </SectionLabel>
       {note}
     </Aside>
   );
 }
 
-/** «Отчёты сегодня 6 из 9» (D-152): who has handed in the day, who not yet — the names a click from the reports. */
+/** The ink of a day's report: handed in — green, the day closed without it — the red pencil, not yet — the track. */
+const REPORT_INK: Partial<Record<TeamDayRow["state"], string>> = {
+  submitted: "var(--ok)",
+  missed: "var(--danger)",
+};
+const REPORT_WORD: Partial<Record<TeamDayRow["state"], string>> = {
+  submitted: "сдал отчёт",
+  missed: "нет отчёта",
+  pending: "ещё не сдал",
+};
+
+/**
+ * «Отчёты сегодня 6 из 9» (D-152): who has handed in the day, who not yet — the figure, a bar of one
+ * segment per person in the colour of their report, and the faces of those still to hand in.
+ */
 export function Reports({ day }: { day: TeamDay }) {
   const due = day.rows.filter((row) => row.state === "submitted" || row.state === "pending" || row.state === "missed");
   const handed = due.filter((row) => row.state === "submitted").length;
   const missing = due.filter((row) => row.state !== "submitted");
+  const missed = due.filter((row) => row.state === "missed").length;
+  const all = due.length > 0 && handed === due.length;
+  // handed in first, then not yet, then missed: the bar reads left to right as the day did
+  const order = (row: TeamDayRow) => (row.state === "submitted" ? 0 : row.state === "pending" ? 1 : 2);
+  const bar = [...due].sort((a, b) => order(a) - order(b));
   return (
     <Aside testId="today-reports">
-      <SectionLabel action={<BlockLink href="/desk/reports">Отчёты →</BlockLink>}>Отчёты сегодня</SectionLabel>
+      <SectionLabel action={<BlockLink href="/desk/reports">Отчёты →</BlockLink>}>
+        <Titled icon={ClipboardCheck} ink="ok">
+          Отчёты сегодня
+        </Titled>
+      </SectionLabel>
       <div className="desk-list">
         {!day.workday ? (
-          <Quiet>Сегодня не рабочий день — отчёты не ждём</Quiet>
+          <AllClear icon={Coffee} ink="muted">
+            Сегодня не рабочий день — отчёты не ждём
+          </AllClear>
         ) : due.length === 0 ? (
-          <Quiet>Сегодня отчёт сдавать некому</Quiet>
+          <AllClear icon={Coffee} ink="muted">
+            Сегодня отчёт сдавать некому
+          </AllClear>
         ) : (
-          <div className={DAY_ROW}>
-            <When>
-              {handed} из {due.length}
-            </When>
-            <span className="min-w-0 text-muted">{missing.length > 0 ? `Ещё нет: ${missing.map((row) => shortName(row.full_name)).join(", ")}` : "Сдали все"}</span>
+          <div className="flex flex-col gap-2.5 py-2.5" data-testid="today-reports-day">
+            <div className="flex items-baseline gap-2">
+              <span className="nums desk-figure text-[28px] leading-7" style={{ color: all ? "var(--ok)" : handed > 0 ? "var(--text)" : "var(--text-muted)" }}>
+                {handed}
+              </span>
+              <span className="text-[13px] text-muted">из {due.length} сдали</span>
+              {all ? (
+                <span className="ml-auto">
+                  <Pill ink="ok" icon={CircleCheck}>
+                    все
+                  </Pill>
+                </span>
+              ) : missed > 0 ? (
+                <span className="ml-auto">
+                  <Pill ink="pencil">нет отчёта · {missed}</Pill>
+                </span>
+              ) : null}
+            </div>
+            <span className="flex h-1.5 gap-0.5" role="img" aria-label={`Сдали ${handed} из ${due.length}`}>
+              {bar.map((row, index) => (
+                <span
+                  key={row.user_id}
+                  className="desk-rise h-full flex-1"
+                  title={`${shortName(row.full_name)} — ${REPORT_WORD[row.state] ?? ""}`}
+                  style={{ background: REPORT_INK[row.state] ?? "color-mix(in srgb, var(--text-muted) 28%, transparent)", borderRadius: 1, animationDelay: `${index * 45}ms` }}
+                />
+              ))}
+            </span>
+            {missing.length > 0 ? (
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] leading-5">
+                <span className="text-[12px] text-muted">Ещё нет:</span>
+                {missing.map((row) => (
+                  <span key={row.user_id} className="inline-flex items-center gap-1.5" title={REPORT_WORD[row.state]}>
+                    <Face name={row.full_name} size={18} ink={row.state === "missed" ? "pencil" : undefined} />
+                    <span className={row.state === "missed" ? "text-danger" : ""}>{shortName(row.full_name)}</span>
+                  </span>
+                ))}
+              </span>
+            ) : null}
           </div>
         )}
       </div>

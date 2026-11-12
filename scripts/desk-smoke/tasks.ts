@@ -42,6 +42,9 @@ async function checkToday(ctx: Ctx) {
     const inside = await block.locator('[role="button"], li, [data-testid="desk-empty"], p').count();
     record(`сегодня: блок ${name}`, (await block.count()) === 1 && inside > 0, `элементов ${inside}`);
   }
+  // the right column (D-169): every block wears its icon on a tile of its ink
+  const tiles = await page.locator("#desk-main .desk-tile").count();
+  record("сегодня: у блоков правой колонки — значки", tiles >= 5, `значков ${tiles}`);
   const decisions = await page.getByTestId("today-decision").count();
   const entry = await page.getByTestId("desk-inbox-entry").count();
   record("сегодня: «Разобрать по одной» — только когда есть что разбирать", decisions > 0 ? entry === 1 : true, `решений ${decisions}, кнопка ${entry}`);

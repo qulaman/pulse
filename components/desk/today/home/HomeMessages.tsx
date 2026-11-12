@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCheck, MessageSquareText } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -13,7 +14,8 @@ import { useNow } from "@/lib/pulse/queries";
 import { useMarkRead } from "@/lib/tasks/mutations";
 import { usePulseBoard, type Me } from "@/lib/tasks/queries";
 
-import { Aside, BlockNote, DAY_ROW, HeadMove, Quiet, RowsBone } from "./parts";
+import { AllClear, Face, rise, Titled } from "./look";
+import { Aside, BlockNote, DAY_ROW, HeadMove, RowsBone } from "./parts";
 
 /** How many stand before «…ещё N». */
 const SHOWN = 5;
@@ -22,7 +24,7 @@ const SHOWN = 5;
 const KIND_INK: Record<MessageKind, string> = {
   question: "var(--violet, var(--accent))",
   request: "var(--accent)",
-  word: "var(--text-muted)",
+  word: "var(--violet, var(--accent))",
 };
 
 /**
@@ -65,19 +67,23 @@ export function HomeMessages({ me, onOpenTask }: { me: Me; onOpenTask: (id: stri
           ) : null
         }
       >
-        Сообщения
+        <Titled icon={MessageSquareText} ink="violet" live={messages.length > 0}>
+          Сообщения
+        </Titled>
       </SectionLabel>
       <BlockNote state={load} failed="Сообщения не загрузились" now={now} onRetry={() => void board.refetch()} />
       {load.kind === "loading" ? (
         <RowsBone rows={2} height={50} />
       ) : load.kind === "failed" ? null : messages.length === 0 ? (
         <div className="desk-list">
-          <Quiet testId="home-messages-empty">Непрочитанных слов в задачах нет — вопросы и просьбы о сроке стоят в «Ждут вас»</Quiet>
+          <AllClear icon={CheckCheck} ink="ok" hint="Вопросы и просьбы о сроке стоят в «Ждут вас»" testId="home-messages-empty">
+            Всё прочитано
+          </AllClear>
         </div>
       ) : (
         <ul className="desk-list" data-testid="home-messages-list">
-          {shown.map((message) => (
-            <li key={message.task.id}>
+          {shown.map((message, index) => (
+            <li key={message.task.id} {...rise(index)}>
               <MessageRow message={message} now={now} chosen={openId === message.task.id} onOpen={() => onOpenTask(message.task.id)} />
             </li>
           ))}
@@ -109,14 +115,20 @@ function MessageRow({ message, now, chosen, onOpen }: { message: HomeMessage; no
       data-kind={message.kind}
     >
       <When className="text-muted">{shortWhen(new Date(message.at), now)}</When>
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[12px] leading-4 text-muted">
-          <span className="font-medium" style={{ color: KIND_INK[message.kind] }}>
-            {MESSAGE_KIND_WORD[message.kind]}
-          </span>
-          {who ? ` · ${who}` : ""} · {title}
+      <span className="flex min-w-0 items-start gap-2">
+        {/* who wrote it, as their circle — the place their photo is to take */}
+        <span className="pt-0.5">
+          <Face name={message.who || "?"} size={22} ink="violet" />
         </span>
-        <span className="line-clamp-2 text-[14px] leading-5 text-text [overflow-wrap:anywhere]">{message.text || "—"}</span>
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate text-[12px] leading-4 text-muted">
+            <span className="font-medium" style={{ color: KIND_INK[message.kind] }}>
+              {MESSAGE_KIND_WORD[message.kind]}
+            </span>
+            {who ? ` · ${who}` : ""} · {title}
+          </span>
+          <span className="line-clamp-2 text-[14px] leading-5 text-text [overflow-wrap:anywhere]">{message.text || "—"}</span>
+        </span>
       </span>
     </button>
   );

@@ -1,6 +1,27 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  BellOff,
+  CarTaxiFront,
+  CircleHelp,
+  Clock,
+  Coffee,
+  ConciergeBell,
+  CupSoda,
+  Footprints,
+  GlassWater,
+  Handshake,
+  LoaderCircle,
+  Package,
+  PenLine,
+  Presentation,
+  Printer,
+  Siren,
+  Stethoscope,
+  UtensilsCrossed,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
@@ -20,7 +41,7 @@ import { orderFor, rememberSend, usualNote } from "@/lib/errands/habits";
 import { useErrandLink } from "@/lib/errands/mutations";
 import { askSecretary, cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
 import { errandKeys, useErrandReceipt, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
-import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
+import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine, type DeskScene } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
@@ -28,7 +49,41 @@ import type { Me } from "@/lib/tasks/queries";
 import { receiptLine } from "@/lib/tasks/receipts";
 
 import { askAfterWindow } from "./ask";
+import { INK, Live, Mark, Titled, type Ink } from "./look";
 import { Aside, BlockLink, BlockNote, DAY_ROW_END, Quiet, RowsBone } from "./parts";
+
+/** Each request of the catalogue as a picture (D-169): what the secretary will do, seen before it is read. */
+const SCENE_ICON: Record<DeskScene, LucideIcon | null> = {
+  coffee: Coffee,
+  tea: CupSoda,
+  water: GlassWater,
+  dnd: BellOff,
+  security: Siren,
+  guest: Handshake,
+  meeting: Presentation,
+  doctor: Stethoscope,
+  come: Footprints,
+  taxi: CarTaxiFront,
+  print: Printer,
+  lunch: UtensilsCrossed,
+  courier: Package,
+  // a request of the company's own: its own sign from the catalogue, when it has one
+  other: null,
+};
+const SCENE_INK: Partial<Record<DeskScene, Ink>> = { security: "pencil", dnd: "violet" };
+
+/** The sign of a request: the scene's icon in its ink; a request of the company's own keeps its emoji. */
+function ActionSign({ action }: { action: SecretaryAction }) {
+  const scene = sceneOfAction(action);
+  const Glyph = SCENE_ICON[scene];
+  if (Glyph) return <Mark icon={Glyph} ink={SCENE_INK[scene] ?? "ok"} size={15} />;
+  if (scene === "other" && !action.icon) return <Mark icon={PenLine} ink="ok" size={15} />;
+  return action.icon ? (
+    <span aria-hidden className="self-center text-[13px] leading-none">
+      {action.icon}
+    </span>
+  ) : null;
+}
 
 /** «Охрана» goes on a hold of two seconds, as on the phone (D-101): never one stray click away. */
 const ALARM_HOLD_MS = 2_000;
@@ -56,13 +111,20 @@ const isAlarm = (action: SecretaryAction) => sceneOfAction(action) === "security
  */
 export function HomeSecretary({ me }: { me: Me }) {
   const secretaries = useSecretaries();
+  const errands = useErrands();
   const there = (secretaries.data ?? []).length > 0;
   const now = useNow(30_000);
   const load = loadStateOf(secretaries);
+  // a request of the director's nobody has taken yet: the block's tile beats until somebody does
+  const waiting = useMemo(() => myErrandsOf(errands.data ?? NO_ERRANDS, me.userId).some((errand) => errand.status === "sent"), [errands.data, me.userId]);
 
   return (
     <Aside testId="home-secretary">
-      <SectionLabel action={<BlockLink href="/desk/errands" testId="home-secretary-errands">Заявки →</BlockLink>}>Секретарь</SectionLabel>
+      <SectionLabel action={<BlockLink href="/desk/errands" testId="home-secretary-errands">Заявки →</BlockLink>}>
+        <Titled icon={ConciergeBell} ink="ok" live={there && waiting}>
+          Секретарь
+        </Titled>
+      </SectionLabel>
       <BlockNote state={load} failed="Секретари не загрузились" now={now} onRetry={() => void secretaries.refetch()} />
       {load.kind === "loading" ? (
         <RowsBone rows={3} />
@@ -160,11 +222,7 @@ function Desk({ me, people, now }: { me: Me; people: readonly SecretaryPerson[];
                   data-testid="home-secretary-ask"
                   data-code={action.code}
                 >
-                  {action.icon ? (
-                    <span aria-hidden className="self-center text-[13px] leading-none">
-                      {action.icon}
-                    </span>
-                  ) : null}
+                  <ActionSign action={action} />
                   <span className="truncate">{action.label}</span>
                   {usual.get(action.code) ? <span className="truncate text-[12px] text-muted">· {usual.get(action.code)}</span> : null}
                 </button>
@@ -212,13 +270,17 @@ function Presence({ people, now }: { people: readonly SecretaryPerson[]; now: Da
   const absence = absenceLine(people, now);
   if (absence) {
     return (
-      <p className="py-[7px] text-[12px] leading-4 text-accent" data-testid="home-secretary-away">
+      <p className="flex items-center gap-1.5 py-[7px] text-[12px] leading-4 text-accent" data-testid="home-secretary-away">
+        <Clock size={13} strokeWidth={2.25} aria-hidden />
         {absence} — просьба дождётся
       </p>
     );
   }
   return (
-    <p className="truncate py-[7px] text-[12px] leading-4 text-muted" data-testid="home-secretary-presence">
+    <p className="flex items-center gap-2 truncate py-[7px] text-[12px] leading-4 text-muted" data-testid="home-secretary-presence">
+      {/* somebody is at the desk: a green dot breathes, as a status online */}
+      <Live ink="ok" />
+      <span className="truncate">
       {people.map((person, index) => (
         <span key={person.id}>
           {index > 0 ? ", " : ""}
@@ -227,6 +289,7 @@ function Presence({ people, now }: { people: readonly SecretaryPerson[]; now: Da
         </span>
       ))}
       {people.every((person) => !isAway(person, now)) ? " на месте" : ""}
+      </span>
     </p>
   );
 }
@@ -316,11 +379,9 @@ function AlarmWord({ action, onSend }: { action: SecretaryAction; onSend: () => 
       data-testid="home-secretary-alarm"
       data-holding={holding ? "1" : "0"}
     >
-      {action.icon ? (
-        <span aria-hidden className="self-center text-[13px] leading-none">
-          {action.icon}
-        </span>
-      ) : null}
+      <span className="self-center" style={{ color: INK.pencil }}>
+        <Siren size={15} strokeWidth={2.25} aria-hidden />
+      </span>
       <span>{action.label}</span>
       {/* the hold fills the line under the word from the left; transform only */}
       <span aria-hidden className="absolute inset-x-0 -bottom-0.5 h-px" style={{ background: "color-mix(in srgb, var(--danger) 35%, transparent)" }} />
@@ -377,15 +438,26 @@ function ErrandRow({ errand, now }: { errand: Errand; now: Date }) {
   const state = asks ? (
     // the question is what matters in a narrow column: who asks is in the hint
     <span className="text-accent" title={`${who || "Секретарь"} спрашивает: ${errand.question}`}>
+      <span className="mr-1 inline-flex translate-y-[2px]" style={{ color: INK.violet }}>
+        <CircleHelp size={12} strokeWidth={2.5} aria-hidden />
+      </span>
       вопрос: {errand.question}
     </span>
   ) : errand.status === "accepted" ? (
     <>
-      <span style={{ color: "var(--ok)" }}>в работе{who ? ` · ${who}` : ""}</span>
+      <span style={{ color: "var(--ok)" }}>
+        <span className="mr-1 inline-flex translate-y-[2px]">
+          <LoaderCircle size={12} strokeWidth={2.5} className="desk-spin" aria-hidden />
+        </span>
+        в работе{who ? ` · ${who}` : ""}
+      </span>
       {eta ? <span className={eta.startsWith("опаздывает") ? "text-accent" : "text-muted"}> · {eta}</span> : null}
     </>
   ) : (
     <>
+      <span className="mr-1.5 inline-flex">
+        <Live ink="sky" />
+      </span>
       <span className="text-muted">ждёт, никто не взял</span>
       {/* the receipt of the push while nobody has taken it (principle 8): «не открывал с 9:14», never «не получил» */}
       {receipt ? <span className={receipt.tone === "warn" ? "text-accent" : "text-muted"}> · {receipt.text}</span> : null}

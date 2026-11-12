@@ -1,5 +1,6 @@
 "use client";
 
+import { CheckCheck, Clock, Megaphone, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -15,7 +16,11 @@ import { shortName } from "@/lib/people/names";
 import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
 import { useNow } from "@/lib/pulse/queries";
 
-import { Aside, BlockLink, BlockNote, DAY_ROW_END, HeadMove, Quiet, RowsBone } from "./parts";
+import { AllClear, Face, Mark, Meter, Pill, rise, Titled } from "./look";
+import { Aside, BlockLink, BlockNote, HeadMove, RowsBone } from "./parts";
+
+/** A line of «Эфир»: when in the margin, the words, the reach or the points at the end; icons centre it. */
+const ETHER_ROW = "grid grid-cols-[84px_minmax(0,1fr)_auto] items-center gap-x-3 py-[7px] text-[13px] leading-5";
 
 /** How many rows the block shows; the rest is a click away in «Объявления». */
 const SHOWN = 4;
@@ -62,19 +67,23 @@ export function HomeEther({ onAnnounce }: { onAnnounce: () => void }) {
           </span>
         }
       >
-        Эфир
+        <Titled icon={Megaphone} ink="pen">
+          Эфир
+        </Titled>
       </SectionLabel>
       <BlockNote state={load} failed="Эфир не загрузился" now={now} onRetry={retry} />
       {load.kind === "loading" ? (
         <RowsBone rows={3} />
       ) : load.kind === "failed" && lines.length === 0 ? null : lines.length === 0 ? (
         <div className="desk-list">
-          <Quiet testId="home-ether-empty">Объявлений пока нет — начните поручение со слова «всем», и его получит вся команда</Quiet>
+          <AllClear icon={Megaphone} ink="muted" hint="Начните поручение со слова «всем» — его получит вся команда" testId="home-ether-empty">
+            Объявлений пока нет
+          </AllClear>
         </div>
       ) : (
         <ul className="desk-list" data-testid="home-ether-list">
-          {lines.map((line) => (
-            <li key={`${line.kind}:${line.item.id}`}>
+          {lines.map((line, index) => (
+            <li key={`${line.kind}:${line.item.id}`} {...rise(index)}>
               <EtherRow line={line} team={people.data ? team : null} now={now} />
             </li>
           ))}
@@ -89,15 +98,22 @@ function EtherRow({ line, team, now }: { line: EtherLine<Announcement, EtherEven
     const { what, points } = newsWords(line.item);
     const who = shortName(line.item.user?.full_name ?? "Сотрудник");
     return (
-      <Link href="/desk/ether" prefetch={false} className={`desk-row ${DAY_ROW_END}`} title={`${who} · ${what}`} data-testid="home-ether-news">
+      <Link href="/desk/ether" prefetch={false} className={`desk-row ${ETHER_ROW}`} title={`${who} · ${what}`} data-testid="home-ether-news">
         <When className="text-muted">{shortWhen(new Date(line.at), now)}</When>
-        <span className="min-w-0 truncate">
-          {who}
-          <span className="text-muted"> · {what}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <Face name={line.item.user?.full_name ?? "Сотрудник"} size={20} ink="gold" />
+          <span className="min-w-0 truncate">
+            {who}
+            <span className="text-muted"> · {what}</span>
+          </span>
         </span>
-        <span className="nums text-[13px]" style={{ color: "var(--gold)" }}>
-          {points ? `+${points}` : ""}
-        </span>
+        {points ? (
+          <Pill ink="gold" icon={Sparkles}>
+            +{points}
+          </Pill>
+        ) : (
+          <span />
+        )}
       </Link>
     );
   }
@@ -108,22 +124,39 @@ function EtherRow({ line, team, now }: { line: EtherLine<Announcement, EtherEven
     <Link
       href={`/desk/ether?id=${encodeURIComponent(item.id)}`}
       prefetch={false}
-      className={`desk-row ${DAY_ROW_END}`}
+      className={`desk-row ${ETHER_ROW}`}
       title={item.transcript}
       data-testid="home-ether-row"
       data-held={line.until ? "" : undefined}
     >
       <When className="text-muted">{shortWhen(new Date(line.at), now)}</When>
-      <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{item.transcript}</span>
+      <span className="flex min-w-0 items-center gap-2">
+        <Mark icon={Megaphone} ink="pen" />
+        <span className="line-clamp-2 min-w-0 [overflow-wrap:anywhere]">{item.transcript}</span>
+      </span>
       {line.until ? (
         // waits for the delivery window (D-38): when it goes, in the pen — the director may send it now in «Объявления»
-        <span className="nums whitespace-nowrap text-[13px] text-accent" title={`Ждёт окна доставки: уйдёт ${humanAqtobe(new Date(line.until), now)} — отправить сейчас можно в «Объявлениях»`}>
-          уйдёт {humanAqtobe(new Date(line.until), now).split(" ").at(-1)}
+        <span title={`Ждёт окна доставки: уйдёт ${humanAqtobe(new Date(line.until), now)} — отправить сейчас можно в «Объявлениях»`}>
+          <Pill ink="pen" icon={Clock}>
+            уйдёт {humanAqtobe(new Date(line.until), now).split(" ").at(-1)}
+          </Pill>
         </span>
       ) : reach ? (
-        <span className="nums whitespace-nowrap text-[13px]" title={reach.missing.length > 0 ? `Не ознакомились: ${reach.missing.map((person) => shortName(person.full_name)).join(", ")}` : "Ознакомились все"} data-testid="home-ether-reach">
-          {reach.seen}
-          <span className="text-muted"> из {reach.of}</span>
+        // reach as a bar that fills: green, all of it — a double tick
+        <span
+          className="flex items-center gap-2 whitespace-nowrap text-[13px]"
+          title={reach.missing.length > 0 ? `Не ознакомились: ${reach.missing.map((person) => shortName(person.full_name)).join(", ")}` : "Ознакомились все"}
+          data-testid="home-ether-reach"
+        >
+          {reach.of > 0 && reach.seen >= reach.of ? (
+            <Mark icon={CheckCheck} ink="ok" />
+          ) : (
+            <Meter value={reach.seen} of={reach.of} ink="ok" className="w-10" />
+          )}
+          <span className="nums">
+            {reach.seen}
+            <span className="text-muted"> из {reach.of}</span>
+          </span>
         </span>
       ) : (
         <span className="nums text-[13px] text-muted">{item.acks.length}</span>

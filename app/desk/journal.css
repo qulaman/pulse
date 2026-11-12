@@ -1367,6 +1367,106 @@ html[data-surface="desk"][data-journal] {
     animation: desk-crew-words 160ms var(--ease-out) both;
   }
 
+  /* ---- the right column of «Сегодня» (D-169): an icon and an ink per block, live dots, meters,
+     rows that rise into place (components/desk/today/home/look.tsx). `--tone` is the ink. ---------- */
+  .desk-tile {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 2px;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 18%, transparent);
+    animation: desk-tile-in 480ms cubic-bezier(0.34, 1.5, 0.64, 1) both;
+
+    /* something happening now in the block: a dot beats on the tile's corner */
+    &[data-live]::after {
+      content: "";
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--tone);
+      box-shadow: 0 0 0 2px var(--page);
+      animation: desk-beat 1.6s ease-in-out infinite;
+    }
+  }
+  .desk-live {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--tone);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: var(--tone);
+      animation: desk-ping 2s ease-out infinite;
+    }
+  }
+  .desk-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 16%, transparent);
+  }
+  .desk-meter {
+    position: relative;
+    display: block;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--tone) 20%, transparent);
+
+    & > i {
+      position: absolute;
+      inset: 0;
+      background: var(--tone);
+      transform-origin: left center;
+      transform: scaleX(var(--fill));
+      transition: transform 600ms var(--ease-out);
+      animation: desk-fill 900ms var(--ease-out) both;
+    }
+  }
+  /* a person in the column: the circle of «Люди» (D-168) in small, where a photo is to go */
+  .desk-face {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  .desk-rise {
+    animation: desk-rise 380ms var(--ease-out) both;
+  }
+  /* a request at work: its loader turns, slowly */
+  .desk-spin {
+    animation: desk-spin 1.6s linear infinite;
+  }
+
   /* ---- the wall is a television, not paper: what the room will see keeps the dark tokens --------- */
   [data-testid="desk-wall-frame"],
   [data-testid="wall-preview"],
@@ -1437,10 +1537,63 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
+/* the right column (D-169): a block's tile springs in, a live dot beats or breathes out a ring,
+   a meter fills from nothing, a row rises into its place */
+@keyframes desk-tile-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4) rotate(-12deg);
+  }
+}
+@keyframes desk-beat {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.6);
+  }
+}
+@keyframes desk-ping {
+  0% {
+    opacity: 0.65;
+    transform: scale(1);
+  }
+  80%,
+  100% {
+    opacity: 0;
+    transform: scale(2.8);
+  }
+}
+@keyframes desk-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes desk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes desk-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html[data-surface="desk"][data-journal] .desk-row[data-glow],
   html[data-surface="desk"][data-journal] .desk-crew-card,
-  html[data-surface="desk"][data-journal] .desk-crew-card-body {
+  html[data-surface="desk"][data-journal] .desk-crew-card-body,
+  html[data-surface="desk"][data-journal] .desk-tile,
+  html[data-surface="desk"][data-journal] .desk-tile::after,
+  html[data-surface="desk"][data-journal] .desk-live::after,
+  html[data-surface="desk"][data-journal] .desk-meter > i,
+  html[data-surface="desk"][data-journal] .desk-rise,
+  html[data-surface="desk"][data-journal] .desk-spin {
     animation: none;
   }
 }
