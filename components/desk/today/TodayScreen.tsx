@@ -29,8 +29,10 @@ import { shortName, useNamesKey } from "@/lib/people/names";
 import { isTeamMember, usePeople, type Person } from "@/lib/people/queries";
 import { useOpenDisputes, useResolveDispute } from "@/lib/points/game";
 import type { BoardTask } from "@/lib/pulse/board";
-import { HELD_STATUS } from "@/lib/pulse/board";
+import { HELD_STATUS, hasUnread } from "@/lib/pulse/board";
 import { greeting, quietLine } from "@/lib/pulse/briefing";
+import { lookOf } from "@/lib/idle/look";
+import { tasksOf } from "@/lib/idle/people";
 import { useComposeStore } from "@/lib/store/compose";
 import { usePushHealth } from "@/lib/push/health-query";
 import { ordersWaiting } from "@/lib/shop/format";
@@ -53,7 +55,7 @@ import { HomeMessages } from "./home/HomeMessages";
 import { HomeRating } from "./home/HomeRating";
 import { HomeSecretary } from "./home/HomeSecretary";
 import { LaunchBone, LaunchChecklist, useLaunchGate } from "./LaunchChecklist";
-import { JustSent, PeopleNow, PersonHome, type PersonRow } from "./PeopleNow";
+import { JustSent, PeopleBone, PeopleNow, PersonHome, type PersonRow } from "./PeopleNow";
 import { Agenda, Decisions, Feed, Overdue, Reception, reportWord, Reports, ReportsFailed, type ExtraDecision } from "./TodayParts";
 
 /** How many decisions stand on the screen before «…ещё N — разобрать по одной». */
@@ -104,7 +106,12 @@ export function TodaySkeleton() {
           <div className={LAYOUT}>
             <div className="flex min-w-0 flex-col gap-6">
               <BlockBone rows={4} height={47} />
-              <BlockBone rows={8} height={34} />
+              <div className="flex flex-col gap-1">
+                <div className="flex h-6 items-center">
+                  <Bone h={12} w="22%" />
+                </div>
+                <PeopleBone />
+              </div>
             </div>
             <div className="flex min-w-0 flex-col gap-6">
               <BlockBone rows={3} height={35} label="48%" wide="84%" />
@@ -204,8 +211,8 @@ function TodayView({
   const launching = launch.state !== "off";
 
   const openId = params.get("id");
-  // a person in the panel (`?p=`): the phone's circle of people opened on the home (D-164); a task
-  // opened from there stands over them and gives the panel back when closed
+  // the chosen person (`?p=`): the phone's circle of people opened on the home — their card under
+  // the tiles (D-164, D-168); a task opened from it goes to the panel and the card stays
   const personId = params.get("p");
   const [focus, setFocus] = useState<string | null>(null);
   const openTask = useCallback((id: string) => writeParams({ id }), []);
@@ -359,7 +366,28 @@ function TodayView({
     void orders?.refetch();
   };
 
-  /* ---- the people: the phone's circles — those with work, and the free (D-164) ---- */
+  /* ---- the people: the phone's circles — those with work, and the free (D-164, D-168) ---- */
+  // each person's tasks as the phone's waiting screen reads them off the same board: the circle's
+  // colour, ring and badge (lib/idle/look.ts); a task just accepted has no moment of gold here
+  const crew = useMemo(
+    () =>
+      tasksOf(
+        board.map((task) => ({
+          id: task.id,
+          assignee_id: task.assignee_id,
+          status: task.status,
+          deadline: task.deadline,
+          title: task.title,
+          question: task.question,
+          request: task.time_request && task.time_request.senderId !== me.userId ? task.time_request.proposed : null,
+          decline_reason: task.decline_reason,
+          unread: hasUnread(task, me.userId),
+          scheduled_send_at: task.scheduled_send_at,
+        })),
+        now.getTime(),
+      ),
+    [board, me.userId, now],
+  );
   const byPerson = useMemo(() => {
     const map = new Map<string, TaskWithPeople[]>();
     for (const task of open) {
@@ -388,15 +416,16 @@ function TodayView({
         report: reportWord(reportRows.get(person.id), now),
         push: channel && (channel.state === "off" || channel.state === "broken") ? (channel.state === "off" ? "уведомления не включены" : "пуш не прошёл") : null,
         away: person.availability !== "active",
+        look: lookOf((crew[person.id] ?? []).filter((task) => task.status !== "done")),
       };
     });
-  }, [people.data, loads.data, loadsMissing, health.data, reports.data, byPerson, reasons, now]);
+  }, [people.data, loads.data, loadsMissing, health.data, reports.data, byPerson, reasons, crew, now]);
   const personOf = (id: string | null): Person | null => (id ? ((people.data ?? []).find((p) => p.id === id) ?? null) : null);
   const opened = personOf(personId);
   const give = useCallback((person: Person) => useComposeStore.getState().request("", { id: person.id, name: shortName(person.full_name), address: addressOf(person) }), []);
   const givable = (person: Person | null): person is Person => Boolean(person && person.is_active && person.role !== "director" && person.role !== "tv" && person.id !== me.userId);
   const personMenu = (person: Person): MenuItem[] => [
-    { key: "peek", label: "Открыть здесь", onSelect: () => openPerson(person.id) },
+    { key: "peek", label: "Открыть карточку", onSelect: () => openPerson(person.id) },
     ...(givable(person) ? [{ key: "give", label: "Дать задачу", hint: "T", onSelect: () => give(person) }] : []),
     { key: "tasks", label: "Все дела", onSelect: () => router.push(`/desk/tasks?who=${encodeURIComponent(person.id)}`) },
     { key: "card", label: "Карточка", onSelect: () => router.push(`/desk/team/${encodeURIComponent(person.id)}`) },
@@ -436,9 +465,9 @@ function TodayView({
 
   /* ---- the keys of the screen: J/K the cursor, Enter opens it (or the stack), the row's letters ---- */
   const toGive = givable(opened) ? opened : null;
-  const latest = useRef({ queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give });
+  const latest = useRef({ queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give, personId, closePerson });
   useLayoutEffect(() => {
-    latest.current = { queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give };
+    latest.current = { queue: queue.length, openId, cursor, ids, itemOf, acts, reply, openTask, toGive, give, personId, closePerson };
   });
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -482,6 +511,12 @@ function TodayView({
         setCursor(null);
         return;
       }
+      // the chosen person's card under the tiles: Esc puts it away once nothing above it is open
+      if (event.code === "Escape" && k.personId && !k.openId) {
+        event.preventDefault();
+        k.closePerson();
+        return;
+      }
       const item = k.itemOf(k.cursor);
       if (!item) return;
       if (event.code === "Period") {
@@ -507,9 +542,9 @@ function TodayView({
     { keys: ["O"], label: "Ответить" },
     { keys: ["N"], label: "Напомнить" },
     { keys: ["D"], label: "Срок" },
-    { keys: ["T"], label: "Передать (у человека в панели — дать ему задачу)" },
+    { keys: ["T"], label: "Передать (у выбранного человека — дать ему задачу)" },
     { keys: ["."], label: "Все действия строки (или правый клик)" },
-    { keys: ["Esc"], label: "Убрать курсор, закрыть панель" },
+    { keys: ["Esc"], label: "Убрать курсор, закрыть панель, убрать карточку человека" },
   ]);
 
   const calm = screen.value === null && screen.closedToday === 0;
@@ -609,13 +644,32 @@ function TodayView({
               rows={teamRows}
               loading={peopleLoad.kind === "loading"}
               chosenId={personId}
-              onOpen={openPerson}
+              // the phone's tap: the same circle again puts the card away
+              onOpen={(id) => (id === personId ? closePerson() : openPerson(id))}
               onMenu={onPersonMenu}
               note={noteOf(teamLoad, "Команда не загрузилась", () => {
                 void people.refetch();
                 void loads.refetch();
               })}
               failed={peopleLoad.kind === "failed"}
+              card={
+                opened ? (
+                  <PersonHome
+                    person={opened}
+                    row={teamRows.find((row) => row.id === opened.id) ?? null}
+                    tasks={byPerson.get(opened.id) ?? []}
+                    now={now}
+                    onGive={givable(opened) ? () => give(opened) : null}
+                    onOpenTask={openTask}
+                    menuOf={taskMenu}
+                    onMenu={(task, event) => {
+                      event.preventDefault();
+                      context.open(event, taskMenu(task));
+                    }}
+                    onClose={closePerson}
+                  />
+                ) : null
+              }
             />
           </div>
 
@@ -665,22 +719,6 @@ function TodayView({
       {acts.node}
       {context.node}
 
-      {!openId && opened ? (
-        <InPanel panelKey={`person:${opened.id}`} onClose={closePerson}>
-          <PersonHome
-            person={opened}
-            tasks={byPerson.get(opened.id) ?? []}
-            now={now}
-            onGive={givable(opened) ? () => give(opened) : null}
-            onOpenTask={openTask}
-            menuOf={taskMenu}
-            onMenu={(task, event) => {
-              event.preventDefault();
-              context.open(event, taskMenu(task));
-            }}
-          />
-        </InPanel>
-      ) : null}
       {openId ? (
         <InPanel panelKey={`task:${openId}`} onClose={closeTask}>
           <TaskPanel

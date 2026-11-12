@@ -1329,6 +1329,44 @@ html[data-surface="desk"][data-journal] {
     color: var(--violet);
   }
 
+  /* ---- «Люди» on «Сегодня» (D-168): the phone's circles of people — the sheet's one round thing
+     besides a stage ring, so that a photo can go in it. The circles keep the phone's motion; the
+     chosen one's card opens under the tiles. ------------------------------------------------------- */
+  .desk-crew-tile,
+  .desk-crew-bones {
+    .rounded-full {
+      border-radius: 9999px;
+    }
+  }
+  .desk-crew-tile {
+    /* the initials of a lit circle darken on the light face instead of whitening (CrewCircle) */
+    --crew-ink: var(--ink);
+    border-radius: 2px;
+    outline-offset: -2px;
+
+    /* inside a stage ring a task merely sent has its blue and rework is the employee's move — as in the lists */
+    [data-ring] {
+      --accent: var(--sky) !important;
+    }
+    [data-lead="rework"] {
+      --warn: var(--gold) !important;
+    }
+    &:hover:not(:active) .crew-press {
+      transform: scale(1.05);
+    }
+  }
+  .desk-crew-card {
+    position: relative;
+    background: var(--sheet);
+    border-top: 2px solid var(--pen);
+    border-bottom: 1px solid var(--rule);
+    padding: 14px 16px 8px;
+    animation: desk-crew-card-in 220ms var(--ease-out) both;
+  }
+  .desk-crew-card-body {
+    animation: desk-crew-words 160ms var(--ease-out) both;
+  }
+
   /* ---- the wall is a television, not paper: what the room will see keeps the dark tokens --------- */
   [data-testid="desk-wall-frame"],
   [data-testid="wall-preview"],
@@ -1379,8 +1417,30 @@ html[data-surface="desk"][data-journal] {
   }
 }
 
+/* the chosen person's card opens down from the tiles; another person — only the words change over */
+@keyframes desk-crew-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes desk-crew-words {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  html[data-surface="desk"][data-journal] .desk-row[data-glow] {
+  html[data-surface="desk"][data-journal] .desk-row[data-glow],
+  html[data-surface="desk"][data-journal] .desk-crew-card,
+  html[data-surface="desk"][data-journal] .desk-crew-card-body {
     animation: none;
   }
 }

@@ -48,31 +48,52 @@ async function checkToday(ctx: Ctx) {
   const people = (await page.getByTestId("today-person").count()) + (await page.getByTestId("today-free-person").count());
   if (people > 0) {
     record("сегодня: «Люди» — все люди, занятые и свободные", true, `людей ${people}`);
-    // a person opens in the panel on the home — their tasks and «Дать задачу»; T puts them into the order line
+    // a person is a circle (D-168): a click rings it and opens their card right under the tiles — their
+    // tasks and «Дать задачу»; the same circle again or Esc puts it away; T puts them into the order line
     const first = page.getByTestId("today-free-person").first().or(page.getByTestId("today-person").first()).first();
+    const card = page.getByTestId("today-person-card");
     await first.click();
     const panel = await page.getByTestId("today-person-panel").waitFor({ timeout: 5_000 }).then(() => true, () => false);
     const stayed = page.url().includes("/desk/today");
     await ctx.shot("today-person-panel");
+    const cardBox = await card.boundingBox().catch(() => null);
+    const lastTile = await page.locator("#desk-main [data-person]").last().boundingBox().catch(() => null);
+    const side = await page.getByTestId("desk-panel").count();
+    const chosen = await page.locator("#desk-main [data-person][data-chosen]").count();
+    const round = await first.locator(".rounded-full").first().evaluate((el) => getComputedStyle(el).borderRadius).catch(() => "");
+    const under = Boolean(cardBox && lastTile && cardBox.y >= lastTile.y + lastTile.height - 1);
+    record("сегодня: люди — кружки, выбранный в кольце, карточка под кружками, не в панели", panel && under && side === 0 && chosen === 1 && round === "9999px", `радиус ${round}, выбран ${chosen}, панель ${side}`);
+    await first.click();
+    const toggled = await card.waitFor({ state: "detached", timeout: 2_000 }).then(() => true, () => false);
+    await first.click();
+    await card.waitFor({ timeout: 3_000 }).catch(() => undefined);
+    await page.locator("#desk-main h1").click();
+    await page.keyboard.press("Escape");
+    const escaped = await card.waitFor({ state: "detached", timeout: 2_000 }).then(() => true, () => false);
+    record("сегодня: карточку убирает тот же кружок и Esc", toggled && escaped, `кружок ${toggled}, Esc ${escaped}`);
+    await first.click();
+    await card.waitFor({ timeout: 3_000 }).catch(() => undefined);
     const give = page.getByTestId("today-person-give");
     if (panel && (await give.count())) {
       await page.locator("#desk-main h1").click();
       await page.keyboard.press("KeyT");
       await page.waitForTimeout(300);
       const pinned = await page.getByTestId("command-pin").count();
-      record("сегодня: человек — панель на главной, T — он в строке поручения", stayed && pinned === 1, `плашка ${pinned}`);
+      record("сегодня: человек — карточка на главной, T — он в строке поручения", stayed && pinned === 1, `плашка ${pinned}`);
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");
       // nothing typed: the pin is let go, no order goes anywhere
       await page.getByLabel("Убрать исполнителя").click().catch(() => undefined);
     } else {
-      record("сегодня: человек — панель на главной", panel && stayed, page.url());
+      record("сегодня: человек — карточка на главной", panel && stayed, page.url());
     }
     await page.goto(page.url().replace(/\?.*$/, ""), { waitUntil: "load" });
   } else skip("сегодня: «Люди»", "в команде никого");
   const lateRows = await page.getByTestId("today-overdue-row").count();
   if (decisions + lateRows > 0) {
-    // J — the keyboard's cursor on the first row, nothing opens; Esc takes it off
+    // J — the keyboard's cursor on the first row, nothing opens; Esc takes it off. The page has just
+    // been reloaded: J before the rows land has nothing to walk
+    await page.locator("#desk-main [data-row-key]").first().waitFor({ timeout: 15_000 }).catch(() => undefined);
     await page.locator("#desk-main h1").click();
     await page.keyboard.press("KeyJ");
     await page.waitForTimeout(200);

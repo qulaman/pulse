@@ -61,12 +61,20 @@ export const CrewCircle = memo(function CrewCircle({
   const phase = -(hashOf(id, 3) % TURN_MS);
   const core: CSSProperties = {
     background: `radial-gradient(circle at 32% 26%, color-mix(in srgb, ${tone} 36%, var(--surface-2)), color-mix(in srgb, ${tone} 12%, var(--surface)) 74%)`,
-    color: `color-mix(in srgb, ${tone} 80%, white)`,
+    // `--crew-ink`: a light sheet (the desk's «Сегодня», D-168) darkens the initials instead of whitening them
+    color: `color-mix(in srgb, ${tone} 80%, var(--crew-ink, white))`,
     boxShadow: `inset 0 1px 0 rgba(255,255,255,0.10), inset 0 0 0 1px color-mix(in srgb, ${tone} 40%, transparent), 0 0 22px -6px color-mix(in srgb, ${tone} 75%, transparent)`,
   };
 
   return (
-    <span className="relative block" style={{ width: size, height: size }} data-ring={look.ring} data-badge={look.badge ?? undefined} data-accepted={look.accepted ? "1" : undefined}>
+    <span
+      className="relative block"
+      style={{ width: size, height: size }}
+      data-ring={look.ring}
+      data-lead={look.lead?.status}
+      data-badge={look.badge ?? undefined}
+      data-accepted={look.accepted ? "1" : undefined}
+    >
       <Loops />
       {/* the ring: swings in after a flight, fades over when the stage changes */}
       <span
