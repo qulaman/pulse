@@ -53,8 +53,8 @@ import { dropHandover, peekHandover } from "./handoff";
 import { HeroFacts, type HeroFact } from "./Hero";
 import { useScreenKeys } from "./keys";
 import { LoginBlock } from "./LoginBlock";
-import { PeriodBlock } from "./PeriodBlock";
 import { PersonEditor } from "./PersonEditor";
+import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
 import { addressOf, AVAILABILITY_TONE, Block, Face, GridBone, LoadFailed, roleLine, StateWord, tidy } from "./shared";
 
@@ -292,7 +292,7 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
 }
 
 /** The card read as facts — the same rows the editor turns into fields (a double click edits). */
-function CardFacts({ person, phone, people, onEdit }: { person: Person; phone: string | null; people: Person[]; onEdit?: () => void }) {
+export function CardFacts({ person, phone, people, onEdit }: { person: Person; phone: string | null; people: Person[]; onEdit?: () => void }) {
   const manager = person.manager_id ? people.find((p) => p.id === person.manager_id) : null;
   // who answers to this person — the other side of «Подчиняется»
   const team = people.filter((p) => p.is_active && p.manager_id === person.id && p.id !== person.id);
@@ -358,7 +358,7 @@ function CardFacts({ person, phone, people, onEdit }: { person: Person; phone: s
 }
 
 /** Does their phone hear the work (D-114): the truth in one line and «Прислать проверку» — a real push, pressed by a person only. */
-function PushBlock({ userId }: { userId: string }) {
+export function PushBlock({ userId }: { userId: string }) {
   const health = usePushHealth();
   const test = usePushTest(userId);
   const verdict = health.data?.get(userId);
@@ -662,7 +662,7 @@ export function PersonDesk({ id }: { id: string }) {
             </Block>
 
             {/* a person who left still has their last 30 days */}
-            {director && p.role !== "director" && p.role !== "tv" ? <PeriodBlock personId={p.id} now={now} /> : null}
+            {director && p.role !== "director" && p.role !== "tv" ? <PersonStats person={p} now={now} /> : null}
             {director ? <DirectorLists person={p} meId={me.data.userId} now={now} /> : null}
           </div>
 

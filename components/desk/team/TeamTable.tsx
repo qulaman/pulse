@@ -1,8 +1,9 @@
 "use client";
 
+import { LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
@@ -13,7 +14,7 @@ import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Num } from "@/components/desk/ui/Num";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
-import { SearchField, Select, Toolbar } from "@/components/desk/ui/Toolbar";
+import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
@@ -41,7 +42,10 @@ import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 import { HeroBone, DeskHero, type HeroFact } from "./Hero";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "./keys";
 import { PersonPeek } from "./PersonPeek";
+import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
+import { TeamCard, type CardTab } from "./TeamCard";
+import { TeamGrid, TilesBone, type TileFacts } from "./TeamGrid";
 import { AwayTag, GridBone, LoadTally, ROLE_ORDER, StateWord, addressOf, counted, loadWords, matchesPerson, tidy, useBoxWidth } from "./shared";
 
 const NO_LOADS: Record<string, Load> = {};
@@ -54,6 +58,11 @@ const OPEN_STATUSES: TaskStatus[] = [...NOW_STATUSES, "pending_review", "schedul
 /** Below this width of the table a column steps aside, the least needed first (the panel open, a narrow window). */
 const ROOM: Partial<Record<string, number>> = { login: 900, report: 800, points: 720 };
 const ROWS = '[data-testid="desk-team-table"] [data-row-key]';
+/** The tiles of the grid, in the order they stand (D-172). */
+const TILES = '[data-testid="desk-team-grid"] [data-row-key]';
+
+/** The two faces of «Команда» (D-172): a grid of people with a card under the row, or the table with the panel. */
+type View = "grid" | "list";
 
 /** Whose load counts: a person at work, not the wall or a person who left. */
 const works = (p: Person) => p.is_active && p.role !== "tv";
@@ -168,6 +177,8 @@ function ReportCell({ person, row }: { person: Person; row: TeamDayRow | undefin
 
 type ViewProps = {
   director: boolean;
+  /** the viewer's company: the card's editor saves the photo and the phone under it */
+  companyId: string | undefined;
   /** The viewer: what they may do to a row (lib/people/access). */
   me: Who | null;
   people: Person[] | undefined;
@@ -200,12 +211,18 @@ type ViewProps = {
  * removes (D-160: one «Удалить…» for everybody, the dialog says what it does), N — a new person,
  * F — the search. `?p=<id>&remove=1` opens the dialog — the order line's «удалить Ерлана».
  */
-function TeamTableView({ director, me, people, loading, failed, retrying, onRetry, loads, balances, pointsOn, push, tasks, report, now }: ViewProps) {
+function TeamTableView({ director, companyId, me, people, loading, failed, retrying, onRetry, loads, balances, pointsOn, push, tasks, report, now }: ViewProps) {
   const router = useRouter();
   const setWorking = useSetWorking();
   const [removing, setRemoving] = useState<{ person: Person; mode: RemoveMode } | null>(null);
   const params = useSearchParams();
   const openId = params.get("p");
+  const view: View = params.get("view") === "list" ? "list" : "grid";
+  // the card under the row: which tab, and whose data is being edited — another person opens unedited
+  const [cardTab, setCardTab] = useState<CardTab>("stats");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editing = editingId !== null && editingId === openId;
+  const setEditing = (on: boolean) => setEditingId(on ? openId : null);
   const [showGone, setShowGone] = useState(false);
   const [query, setQuery] = useState("");
   const [role, setRole] = useState<Role | "">("");
@@ -362,7 +379,15 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
     .join(" · ");
 
   /* ---- the moves of a row: the peek, the card, the menu and the letters say the same ---- */
-  const peek = (id: string | null) => router.replace(id ? `/desk/team?p=${id}` : "/desk/team", { scroll: false });
+  const addressOf_ = (id: string | null, face: View = view) => {
+    const next = new URLSearchParams();
+    if (face === "list") next.set("view", "list");
+    if (id) next.set("p", id);
+    const query = next.toString();
+    return query ? `/desk/team?${query}` : "/desk/team";
+  };
+  const peek = (id: string | null) => router.replace(addressOf_(id), { scroll: false });
+  const switchView = (face: View) => router.replace(addressOf_(openId, face), { scroll: false });
   const choose = (id: string) => {
     setSelected(id);
     // the panel follows the choice while it is open
@@ -374,11 +399,25 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
   const givable = (p: Person) => director && works(p) && p.role !== "director" && p.id !== me?.id;
   const editable = (p: Person) => (me ? canEditPerson(me, p) : false);
   const give = (p: Person) => useComposeStore.getState().request("", { id: p.id, name: p.full_name, address: addressOf(p) });
-  const edit = (p: Person) => router.push(`/desk/team/${p.id}?edit=1`);
+  // the grid edits in the card under the row; the table — on the card's page
+  const edit = (p: Person) => {
+    if (view === "list") {
+      router.push(`/desk/team/${p.id}?edit=1`);
+      return;
+    }
+    if (openId !== p.id) peek(p.id);
+    setCardTab("data");
+    setEditingId(p.id);
+  };
   const menuOf = (p: Person): MenuItem[] => {
     const items: MenuItem[] = [
       { key: "open", label: "Открыть карточку", hint: "Enter", onSelect: () => openCard(p.id) },
-      { key: "peek", label: openId === p.id ? "Закрыть панель" : "Посмотреть в панели", hint: "Space", onSelect: () => peek(openId === p.id ? null : p.id) },
+      {
+        key: "peek",
+        label: view === "grid" ? (openId === p.id ? "Закрыть карточку" : "Раскрыть карточку") : openId === p.id ? "Закрыть панель" : "Посмотреть в панели",
+        hint: "Space",
+        onSelect: () => peek(openId === p.id ? null : p.id),
+      },
     ];
     if (givable(p)) items.push({ key: "give", label: "Дать задачу", hint: "T", onSelect: () => give(p) });
     if (director && works(p)) items.push({ key: "tasks", label: "Задачи человека", onSelect: () => router.push(`/desk/tasks?who=${p.id}`) });
@@ -412,13 +451,21 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
   /* ---- the keys: by the physical key, never while a field or a menu has them ---- */
   const chosenId = selected ?? openId;
   useScreenKeys((event) => {
-    const arrow = arrowOf(event);
+    const arrow = arrowOf(event) ?? (view === "grid" ? (event.code === "ArrowRight" ? "down" : event.code === "ArrowLeft" ? "up" : null) : null);
     if (arrow) {
-      // the order on screen, after the table's own sort
-      const keys = [...document.querySelectorAll<HTMLElement>(ROWS)].map((row) => row.dataset.rowKey ?? "");
+      // the order on screen, after the table's own sort (the grid: the tiles in reading order)
+      const keys = [...document.querySelectorAll<HTMLElement>(view === "grid" ? TILES : ROWS)].map((row) => row.dataset.rowKey ?? "");
       const next = stepKey(keys, chosenId, arrow === "down");
-      if (next) choose(next);
+      if (next) {
+        choose(next);
+        document.querySelector<HTMLElement>(`[data-row-key="${CSS.escape(next)}"]`)?.scrollIntoView({ block: "nearest" });
+      }
       return Boolean(next);
+    }
+    // the card under the row goes with Esc (the panel of the table closes by the frame's own Esc)
+    if (event.code === "Escape" && view === "grid" && openId && !editing) {
+      peek(null);
+      return true;
     }
     if (event.code === "KeyN") {
       router.push("/desk/team/new");
@@ -461,15 +508,37 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
     if (asked) router.replace(`/desk/team?p=${asked.id}`, { scroll: false });
   };
   useShortcuts("Команда", [
-    { keys: ["↑", "↓"], label: "Выбрать человека" },
-    { keys: ["Space"], label: "Посмотреть в панели" },
-    { keys: ["Enter"], label: "Открыть карточку" },
-    { keys: ["E"], label: "Изменить карточку" },
+    { keys: view === "grid" ? ["←", "→"] : ["↑", "↓"], label: "Выбрать человека" },
+    { keys: ["Space"], label: view === "grid" ? "Раскрыть карточку под рядом" : "Посмотреть в панели" },
+    { keys: ["Enter"], label: "Открыть полную карточку" },
+    { keys: ["E"], label: view === "grid" ? "Изменить в карточке" : "Изменить карточку" },
+    ...(view === "grid" ? [{ keys: ["Esc"], label: "Закрыть карточку" }] : []),
     ...(director ? [{ keys: ["T"], label: "Дать задачу" }] : []),
     { keys: ["Del"], label: "Удалить (у ушедшего — насовсем)" },
     { keys: ["N"], label: "Новый сотрудник" },
     { keys: ["F"], label: "Поиск по команде" },
   ]);
+
+  // the dashboard of a person (components/desk/team/PersonStats.tsx, D-172)
+  const statsOf = (p: Person): ReactNode => <PersonStats person={p} now={now} />;
+  const factsOf = (p: Person): TileFacts => ({
+    load: load(p) ?? (p.is_active ? undefined : loads[p.id]),
+    report: report?.get(p.id),
+    balance: pointsOn && crew(p) ? (balances[p.id] ?? 0) : null,
+    push: push?.get(p.id),
+  });
+  // the card under the row comes into view when it opens below the fold
+  const opening = useRef(openId);
+  useEffect(() => {
+    if (view !== "grid" || opening.current === openId) return;
+    opening.current = openId;
+    if (!openId) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frame = requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>('[data-testid="team-card"]')?.scrollIntoView({ block: "nearest", behavior: still ? "auto" : "smooth" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [openId, view]);
 
   const count = shown.filter((p) => p.is_active).length;
   const narrowed = Boolean(query || role || filter);
@@ -519,6 +588,31 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
           </span>
         }
       >
+        <SegmentTabs
+          value={view}
+          onChange={switchView}
+          aria-label="Вид"
+          items={[
+            {
+              value: "grid",
+              label: (
+                <span className="inline-flex items-center gap-1.5" data-testid="desk-team-view-grid">
+                  <LayoutGrid size={14} strokeWidth={2.25} aria-hidden />
+                  Сетка
+                </span>
+              ),
+            },
+            {
+              value: "list",
+              label: (
+                <span className="inline-flex items-center gap-1.5" data-testid="desk-team-view-list">
+                  <List size={14} strokeWidth={2.25} aria-hidden />
+                  Список
+                </span>
+              ),
+            },
+          ]}
+        />
         <SearchField ref={search} value={query} onChange={setQuery} placeholder="Имя, должность или как зовут в речи  ·  F" width={340} aria-label="Поиск по команде" />
         <Select value={role} onChange={(event) => setRole(event.target.value as Role | "")} aria-label="Роль" data-testid="desk-team-role">
           <option value="">Все роли</option>
@@ -553,7 +647,68 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
         ) : null}
       </Toolbar>}
       {failed ? null : loading ? (
-        <GridBone columns={director ? 6 : 3} />
+        view === "grid" ? (
+          <TilesBone />
+        ) : (
+          <GridBone columns={director ? 6 : 3} />
+        )
+      ) : view === "grid" ? (
+        shown.length === 0 ? (
+          <EmptyState
+            tone={filter && !query && !role ? "ok" : undefined}
+            title={filter && !query && !role ? `Никого ${FILTER_LABEL[filter]}` : narrowed ? "Никого не нашлось" : "В команде пока никого"}
+            hint={filter ? "Фильтр снимается повторным нажатием на число сверху" : narrowed ? "Поиск — по имени, должности и тому, как человека зовут в речи" : "Добавьте первого — он войдёт по коду из 8 цифр"}
+          />
+        ) : (
+          <TeamGrid
+            groups={groups}
+            director={director}
+            crew={crew}
+            factsOf={factsOf}
+            chosenId={chosenId}
+            openId={opened ? opened.id : null}
+            onOpen={(id) => {
+              setSelected(id);
+              peek(openId === id ? null : id);
+            }}
+            onCard={openCard}
+            onMenu={(id, event) => {
+              const person = byId(id);
+              if (!person) return;
+              choose(id);
+              menu.open(event, menuOf(person));
+            }}
+            card={
+              opened && me ? (
+                <TeamCard
+                  person={opened}
+                  director={director}
+                  crew={crew(opened)}
+                  me={me}
+                  companyId={companyId}
+                  roster={all}
+                  phone={phones.data?.[opened.id] ?? null}
+                  phonesReady={!phones.isPending}
+                  load={load(opened) ?? (opened.is_active ? undefined : loads[opened.id])}
+                  tasks={director ? openTasksOf(opened.id) : NO_TASKS}
+                  push={push?.get(opened.id)}
+                  now={now}
+                  tab={cardTab}
+                  onTab={setCardTab}
+                  editing={editing}
+                  onEditing={setEditing}
+                  onClose={() => peek(null)}
+                  moves={{
+                    give: givable(opened) ? () => give(opened) : undefined,
+                    open: () => openCard(opened.id),
+                    more: tidy(menuOf(opened).filter((item) => item === "separator" || !["open", "peek", "give", "edit"].includes(item.key))),
+                  }}
+                  stats={director && crew(opened) ? statsOf(opened) : null}
+                />
+              ) : null
+            }
+          />
+        )
       ) : (
         <div
           ref={box}
@@ -613,13 +768,22 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
         // the moves of the chosen row only — a hint never names a key that does nothing here
         <p className="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted" data-testid="desk-keys-hint">
           <span>
-            <Kbd>↑</Kbd> <Kbd>↓</Kbd> выбор
+            {view === "grid" ? (
+              <>
+                <Kbd>←</Kbd> <Kbd>→</Kbd>
+              </>
+            ) : (
+              <>
+                <Kbd>↑</Kbd> <Kbd>↓</Kbd>
+              </>
+            )}{" "}
+            выбор
           </span>
           <span>
-            <Kbd>Space</Kbd> в панели
+            <Kbd>Space</Kbd> {view === "grid" ? "карточка под рядом" : "в панели"}
           </span>
           <span>
-            <Kbd>Enter</Kbd> карточка
+            <Kbd>Enter</Kbd> {view === "grid" ? "полная карточка" : "карточка"}
           </span>
           {chosen && editable(chosen) ? (
             <span>
@@ -640,7 +804,7 @@ function TeamTableView({ director, me, people, loading, failed, retrying, onRetr
         </p>
       ) : null}
 
-      {opened ? (
+      {opened && view === "list" ? (
         <InPanel panelKey={`person:${opened.id}`} onClose={() => peek(null)}>
           <PersonPeek
             person={opened}
@@ -697,6 +861,7 @@ function DirectorTeam() {
   return (
     <TeamTableView
       director
+      companyId={me.data?.companyId}
       me={me.data ? { id: me.data.userId, role: me.data.role } : null}
       people={people.data}
       loading={people.isLoading || loads.isLoading}
@@ -728,6 +893,7 @@ function SecretaryTeam() {
   return (
     <TeamTableView
       director={false}
+      companyId={me.data?.companyId}
       me={me.data ? { id: me.data.userId, role: me.data.role } : null}
       people={people.data}
       loading={people.isLoading}

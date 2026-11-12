@@ -1,0 +1,332 @@
+/* ==========================================================================================
+   «Команда» as a grid (D-172, components/desk/team/TeamGrid.tsx, TeamCard.tsx): a tile a person —
+   their circle with the ring of their state, the name, three small facts — and the open person's
+   card right under their row, its notch over the tile. Drawn for «Графит»; the tokens fall back to
+   the app's own so «Журнал» still lays it out.
+   ========================================================================================== */
+
+html[data-surface="desk"] {
+  .team-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+    gap: 12px;
+  }
+  .team-group-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--text-muted);
+
+    .nums {
+      opacity: 0.7;
+    }
+  }
+
+  /* ---- a tile ---- */
+  .team-tile {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 12px 14px;
+    border-radius: 14px;
+    background: var(--raise, var(--surface));
+    box-shadow: 0 0 0 1px var(--rule, var(--border)), var(--lift, 0 0 #0000);
+    text-align: center;
+    cursor: pointer;
+    transition:
+      transform 220ms var(--ease-snap, ease-out),
+      scale 220ms var(--ease-snap, ease-out),
+      box-shadow 180ms linear,
+      background-color 160ms linear;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 0 0 1px var(--line, var(--border)),
+        var(--lift, 0 0 #0000),
+        0 12px 28px -14px rgb(0 0 0 / 0.55);
+    }
+    &:active {
+      scale: 0.97;
+      transition-duration: 70ms;
+    }
+    &[data-chosen] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--accent) 60%, transparent),
+        var(--lift, 0 0 #0000);
+    }
+    /* the open one: lit by the accent, the card hangs from it */
+    &[data-open] {
+      background: color-mix(in srgb, var(--accent) 7%, var(--raise, var(--surface)));
+      box-shadow:
+        0 0 0 2px var(--accent),
+        0 14px 34px -14px color-mix(in srgb, var(--accent) 55%, transparent);
+    }
+    &[data-state="gone"] {
+      opacity: 0.6;
+    }
+  }
+  .team-tile-bone {
+    cursor: default;
+    min-height: 160px;
+  }
+  .team-tile-face {
+    position: relative;
+    display: inline-flex;
+  }
+
+  /* ---- a face: the photo, or the initials on a gradient of the person's own hue ---- */
+  .team-face {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, hsl(var(--h) 46% 36%), hsl(calc(var(--h) + 42) 46% 21%));
+    color: #fff;
+    box-shadow:
+      0 0 0 2px var(--raise, var(--surface)),
+      0 0 0 4px var(--ring, transparent);
+    transition: box-shadow 220ms linear;
+
+    &[data-state="late"] {
+      --ring: var(--danger);
+    }
+    &[data-state="review"] {
+      --ring: var(--warn);
+    }
+    &[data-state="work"] {
+      --ring: var(--ok);
+    }
+    &[data-state="free"] {
+      --ring: color-mix(in srgb, var(--text-muted) 35%, transparent);
+    }
+    &[data-state="away"] {
+      outline: 2px dashed color-mix(in srgb, var(--text-muted) 70%, transparent);
+      outline-offset: 2px;
+    }
+    &[data-state="gone"] {
+      filter: grayscale(1);
+    }
+  }
+  &[data-desk-theme="light"] .team-face {
+    background: linear-gradient(135deg, hsl(var(--h) 62% 88%), hsl(calc(var(--h) + 42) 58% 78%));
+    color: hsl(var(--h) 45% 24%);
+  }
+  .team-face-photo {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+  }
+  .team-face-initials {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  /* the open one's ring breathes out, as the chosen circle on «Сегодня» and the phone (D-84) */
+  .team-tile-pulse {
+    position: absolute;
+    inset: -7px;
+    border: 2px solid var(--accent);
+    border-radius: 9999px;
+    pointer-events: none;
+    animation: pick-pulse 1.6s ease-out infinite;
+  }
+  .team-tile-badge {
+    position: absolute;
+    top: -3px;
+    right: -6px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 9999px;
+    background: var(--danger);
+    box-shadow: 0 0 0 2px var(--raise, var(--surface));
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 20px;
+    animation: crew-pop 360ms var(--ease-out) both;
+  }
+  .team-tile-name {
+    max-width: 100%;
+    margin-top: 12px;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .team-tile-role {
+    max-width: 100%;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 12px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .team-tile-facts {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .team-fact,
+  .team-chip {
+    --tone: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 9999px;
+    color: var(--tone);
+    background: color-mix(in srgb, var(--tone) 13%, transparent);
+    white-space: nowrap;
+
+    &[data-tone="ok"] {
+      --tone: var(--ok);
+    }
+    &[data-tone="danger"] {
+      --tone: var(--danger);
+    }
+    &[data-tone="gold"] {
+      --tone: var(--gold);
+    }
+    &[data-tone="warn"] {
+      --tone: var(--warn);
+    }
+  }
+  .team-fact {
+    height: 22px;
+    padding: 0 7px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .team-chip {
+    height: 26px;
+    padding: 0 10px;
+    font-size: 12.5px;
+    font-weight: 500;
+
+    &[data-tone="muted"] {
+      color: var(--text);
+      background: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule-soft, var(--border));
+
+      svg {
+        color: var(--text-muted);
+      }
+    }
+  }
+
+  /* ---- the card under the row ---- */
+  .team-card-slot {
+    position: relative;
+    grid-column: 1 / -1;
+  }
+  .team-card {
+    position: relative;
+    margin: 8px 0 6px;
+    padding: 22px 24px 20px;
+    border-radius: 16px;
+    background: var(--sheet, var(--surface));
+    box-shadow: var(--shadow-pop, 0 0 0 1px var(--border));
+    animation: team-card-in 340ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+
+    /* the notch: a corner of the sheet pointing up at the open tile */
+    &::before {
+      content: "";
+      position: absolute;
+      top: -7px;
+      left: var(--caret-x, 50%);
+      width: 14px;
+      height: 14px;
+      margin-left: -7px;
+      border-radius: 3px 0 0 0;
+      background: inherit;
+      box-shadow: -1px -1px 0 0 var(--rule, var(--border));
+      transform: rotate(45deg);
+      transition: left 260ms var(--ease-snap, ease-out);
+    }
+  }
+  .team-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 18px;
+  }
+  .team-card-name {
+    overflow: hidden;
+    color: var(--text);
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 28px;
+    letter-spacing: -0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .team-card-line {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .team-card-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .team-card-moves {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .team-card-tabs {
+    margin-top: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--rule-soft, var(--border));
+  }
+  .team-card-body {
+    padding-top: 16px;
+    animation: team-card-body-in 240ms var(--ease-out) both;
+  }
+}
+
+@keyframes team-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.985);
+  }
+}
+@keyframes team-card-body-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] {
+    .team-card,
+    .team-card-body,
+    .team-tile-pulse,
+    .team-tile-badge {
+      animation: none;
+    }
+    .team-tile:hover {
+      transform: none;
+    }
+  }
+}

@@ -12,6 +12,10 @@ import { canManageTeam } from "@/lib/routes";
 import "./journal.css";
 // «Графит» (D-171) over the journal: after it, so a tie of specificity is its
 import "./graphite.css";
+// a person's dashboard in «Команда» (D-172)
+import "./person-stats.css";
+// «Команда» as a grid with a card under the row (D-172)
+import "./team.css";
 
 export const metadata: Metadata = { title: "Pulse" };
 

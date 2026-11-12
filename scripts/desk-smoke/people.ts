@@ -15,6 +15,9 @@ import { open, record, skip, type Ctx } from "./shared";
 
 const UUID = /\/desk\/team\/([0-9a-f-]{36})/;
 const TEAM_ROWS = '[data-testid="desk-team-table"] [data-testid="desk-row"]';
+/** «Команда» as the table (D-172: the grid is the default, «Список» the table). */
+const TEAM_LIST = "/desk/team?view=list";
+const TEAM_TILES = '[data-testid="desk-team-grid"] [data-testid="desk-team-tile"]';
 
 /** The column titles of the desk table under `scope`, lower-cased (CSS upper-cases them) and without the sort marks. */
 async function headsOf(ctx: Ctx, scope: string): Promise<string[]> {
@@ -51,6 +54,7 @@ export async function checkTeam(ctx: Ctx) {
   const { page } = ctx;
   const release = await guardWrites(page);
   try {
+    await teamGrid(ctx);
     await teamTable(ctx);
     await personCard(ctx);
     await newPerson(ctx);
@@ -67,7 +71,7 @@ export async function checkTeam(ctx: Ctx) {
  */
 async function personMoves(ctx: Ctx) {
   const { page } = ctx;
-  await open(page, "/desk/team");
+  await open(page, TEAM_LIST);
   const rows = page.locator(TEAM_ROWS);
   await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
   const employee = rows.filter({ hasText: /Сотрудник|Шустряк|Специалист/ }).first();
@@ -152,7 +156,7 @@ async function personMoves(ctx: Ctx) {
     await guardWrites(first);
     const failing = /\/rest\/v1\/profiles\?/;
     await first.route(failing, (route) => route.abort("failed"));
-    await open(first, "/desk/team");
+    await open(first, TEAM_LIST);
     const retry = first.getByTestId("desk-team-retry");
     const failed = await retry.waitFor({ timeout: 20_000 }).then(() => true, () => false);
     const words = (await first.locator("#desk-main").innerText()).replace(/\s+/g, " ");
@@ -166,9 +170,79 @@ async function personMoves(ctx: Ctx) {
   }
 }
 
-async function teamTable(ctx: Ctx) {
+/**
+ * «Команда» as a grid (D-172): tiles of people; a click opens the card right under the tile's row,
+ * with its tabs — the dashboard for a person at work, the data that turns into the editor in place,
+ * the tasks; the same tile again or Esc closes it. Nothing is saved: the editor is cancelled.
+ */
+async function teamGrid(ctx: Ctx) {
   const { page } = ctx;
   await open(page, "/desk/team");
+  const tiles = page.locator(TEAM_TILES);
+  await tiles.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
+  const count = await tiles.count();
+  record("команда: по умолчанию — сетка плиток, вид «Сетка / Список»", count > 0 && (await page.getByTestId("desk-team-view-list").count()) === 1, `плиток ${count}`);
+  if (count === 0) return skip("команда: карточка под рядом", "в команде никого");
+  await ctx.shot("team-grid");
+
+  // an employee, whose card has the dashboard — the tile says «Сотрудник» or a position of the crew
+  const employee = tiles.filter({ hasText: /Сотрудник|Шустряк|Специалист/ }).first();
+  const tile = (await employee.count()) ? employee : tiles.first();
+  await tile.click();
+  const card = page.getByTestId("team-card");
+  const opened = await card.waitFor({ timeout: 5_000 }).then(() => true, () => false);
+  // the card comes down 10 px into its place: measured once it has landed
+  await page.waitForTimeout(450);
+  const tileBox = await tile.boundingBox();
+  const cardBox = opened ? await card.boundingBox() : null;
+  const under = Boolean(tileBox && cardBox && cardBox.y >= tileBox.y + tileBox.height - 1);
+  const lit = (await tile.getAttribute("data-open")) !== null;
+  record("команда: щелчок по плитке — карточка под её рядом, плитка подсвечена, ?p= в адресе", opened && under && lit && page.url().includes("p="), page.url());
+  await page.waitForTimeout(500);
+  await ctx.shot("team-grid-card");
+
+  const stats = page.getByTestId("seg-stats");
+  if (await stats.count()) {
+    await stats.click();
+    const board = await page.getByTestId("person-stats").waitFor({ timeout: 8_000 }).then(() => true, () => false);
+    const tilesOf = board ? await page.getByTestId("person-stats").locator('[data-testid^="person-stat-"]').count() : 0;
+    record("карточка в сетке: «Показатели» — дашборд человека", board && tilesOf > 0, `плиток ${tilesOf}`);
+    await page.waitForTimeout(1000);
+    await ctx.shot("team-grid-stats");
+  } else {
+    skip("карточка в сетке: «Показатели»", "у этого человека нет дашборда (не сотрудник)");
+  }
+
+  // «Данные»: the facts; «Изменить» turns them into the editor in place — cancelled, nothing saved
+  await page.getByTestId("seg-data").click();
+  const facts = await page.getByTestId("desk-person-facts").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+  const edit = page.getByTestId("team-card-edit");
+  if (await edit.count()) {
+    await edit.click();
+    const editor = await page.getByTestId("desk-person-editor").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    const stayed = page.url().includes("/desk/team?") && !page.url().includes("edit=1");
+    await ctx.shot("team-grid-edit");
+    await page.getByRole("button", { name: "Отменить", exact: true }).click().catch(() => undefined);
+    const back = await page.getByTestId("desk-person-facts").waitFor({ timeout: 5_000 }).then(() => true, () => false);
+    record("карточка в сетке: «Данные» — факты, «Изменить» — редактор прямо в карточке, «Отменить» — обратно", facts && editor && stayed && back, page.url());
+  } else {
+    record("карточка в сетке: «Данные» — факты", facts);
+  }
+
+  // Esc closes the card; the same tile twice opens and closes it
+  await page.locator("#desk-main h1").click();
+  await page.keyboard.press("Escape");
+  const closed = await card.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+  await tile.click();
+  await card.waitFor({ timeout: 5_000 }).catch(() => undefined);
+  await tile.click();
+  const toggled = await card.waitFor({ state: "detached", timeout: 3_000 }).then(() => true, () => false);
+  record("карточка в сетке: Esc и повторный щелчок по плитке закрывают её", closed && toggled, page.url());
+}
+
+async function teamTable(ctx: Ctx) {
+  const { page } = ctx;
+  await open(page, TEAM_LIST);
   const rows = page.locator(TEAM_ROWS);
   await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
   const count = await rows.count();
@@ -179,7 +253,8 @@ async function teamTable(ctx: Ctx) {
     ["имя", "нагрузка", "сейчас", "уведомления"].every((h) => heads.includes(h)) && !heads.some((h) => ["в работе", "просрочено", "на приёмке", "доступность"].includes(h)),
   );
   const box = count ? await rows.first().boundingBox() : null;
-  record("команда: строка 34–36 px", Boolean(box && box.height <= 36), box ? `высота ${Math.round(box.height)}` : "нет строки");
+  // «Графит» gives a row 38 px (D-171), «Журнал» 34
+  record("команда: строка 34–40 px", Boolean(box && box.height <= 40), box ? `высота ${Math.round(box.height)}` : "нет строки");
   const hero = await visible(ctx, "desk-team-hero");
   const heroText = hero ? ((await page.getByTestId("desk-team-hero").innerText()) ?? "").replace(/\s+/g, " ") : "";
   record("команда: герой «на месте» с числами", hero && heroText.includes("на месте"), heroText.slice(0, 120));
@@ -218,7 +293,7 @@ async function teamTable(ctx: Ctx) {
   }
 
   // F puts the caret in the search, which narrows the table (typed, then cleared — nothing else)
-  await open(page, "/desk/team");
+  await open(page, TEAM_LIST);
   await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
   await page.keyboard.press("KeyF");
   const search = page.getByRole("searchbox", { name: "Поиск по команде" });
@@ -279,7 +354,7 @@ async function teamTable(ctx: Ctx) {
 
 async function personCard(ctx: Ctx) {
   const { page } = ctx;
-  await open(page, "/desk/team");
+  await open(page, TEAM_LIST);
   const rows = page.locator(TEAM_ROWS);
   await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
   if ((await rows.count()) === 0) return skip("карточка", "в таблице нет строк");
@@ -351,7 +426,7 @@ async function personCard(ctx: Ctx) {
 
 async function newPerson(ctx: Ctx) {
   const { page } = ctx;
-  await open(page, "/desk/team");
+  await open(page, TEAM_LIST);
   await page.locator(TEAM_ROWS).first().waitFor({ timeout: 15_000 }).catch(() => undefined);
   // somebody already in the team, for the double's warning — read off the first row's name
   const known = ((await page.locator(TEAM_ROWS).first().locator("[title]").first().getAttribute("title").catch(() => null)) ?? "").split(" · ")[0].trim();
@@ -627,7 +702,7 @@ export async function checkSecretary(ctx: Ctx) {
     }
     await ctx.shot("errands");
 
-    await open(page, "/desk/team");
+    await open(page, TEAM_LIST);
     const rows = page.locator(TEAM_ROWS);
     await rows.first().waitFor({ timeout: 15_000 }).catch(() => undefined);
     const heads = await headsOf(ctx, '[data-testid="desk-team-table"]');

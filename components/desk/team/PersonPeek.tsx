@@ -48,7 +48,7 @@ function FactRow({ label, children }: { label: string; children: ReactNode }) {
 }
 
 /** The person's open work, the most urgent first: the stage ring, the title, the deadline (red when late). */
-function OpenTasks({ tasks, personId, now }: { tasks: TaskWithPeople[]; personId: string; now: Date }) {
+export function OpenTasks({ tasks, personId, now }: { tasks: TaskWithPeople[]; personId: string; now: Date }) {
   const shown = tasks.slice(0, 8);
   return (
     <section className="flex flex-col gap-1" data-testid="person-peek-tasks">
