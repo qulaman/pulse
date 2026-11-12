@@ -49,7 +49,7 @@
 
 Менять только записью в `DECISIONS.md` (D-39).
 
-- **Next.js 16 (App Router), React 19, TypeScript strict, Tailwind 4, Framer Motion.**
+- **Next.js 16 (App Router), React 19, TypeScript strict, Tailwind 4, Motion 14 (пакет `motion`, импорт из `motion/react`).**
 - **Состояние.** TanStack Query v5 — всё серверное состояние и оптимистичные обновления. Zustand — только то, что живёт на экране. Обновления вживую — через один хук `useRealtimeQuery` (`docs/FRONTEND.md`).
 - **Supabase**, регион Франкфурт: Postgres с RLS, Auth, Realtime, Storage. Edge Functions и pg_cron не используются. Materialized views не используются — обычные view.
 - **Фоновая работа.** Обработчик `/api/push/sweep`, который зовёт cron Vercel. На нынешнем тарифе он срабатывает раз в сутки; минутный запуск — вопрос В-8. Локально минутный тик даёт `pnpm dev:tick`.

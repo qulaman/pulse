@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 import { pluralRu } from "@/lib/tasks/status-text";
 import { storyCard, taskSteps, type FocusTone, type StoryRow, type TaskStep } from "@/lib/tv/focus";

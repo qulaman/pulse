@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 import { SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";

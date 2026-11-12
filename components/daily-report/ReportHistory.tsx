@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "framer-motion";
+import { LayoutGroup, motion, MotionConfig } from "motion/react";
 import { useState } from "react";
 
 import { CARD_SPRING, CardShell } from "@/components/tasks/list/TaskList";

@@ -1,12 +1,13 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 
 import { AudioOriginal } from "@/components/tasks/AudioOriginal";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
 import { humanAqtobe } from "@/lib/ai/time";
+import { springs } from "@/lib/design/tokens";
 import type { Announcement } from "@/lib/ether/queries";
 import { whenHeld } from "@/lib/tasks/held";
 
@@ -46,6 +47,8 @@ export function AnnouncementCard({
   const [confirming, setConfirming] = useState(false);
   const acked = Boolean(userId && item.acks.some((a) => a.user_id === userId));
   const count = item.acks.length;
+  // read before this card was on the screen: the mark just stands; read here — it answers the tap
+  const [ackedAtMount] = useState(acked);
 
   return (
     <article className="card-in card p-4">
@@ -122,9 +125,7 @@ export function AnnouncementCard({
         ) : null}
         {!isDirector ? (
           acked ? (
-            <span className="text-[14px] leading-[18px]" style={{ color: "var(--ok)" }}>
-              ✓ Ознакомился
-            </span>
+            <AckedMark fresh={!ackedAtMount} />
           ) : (
             <Button onClick={() => onAck(item.id)} disabled={acking}>
               Ознакомился
@@ -167,5 +168,46 @@ export function AnnouncementCard({
         )}
       </Sheet>
     </article>
+  );
+}
+
+/**
+ * «✓ Ознакомился» where the button was (D-167). Just read, it answers the tap: the button's
+ * place glows and fades, the mark pops in on the living spring and its tick draws itself — over
+ * the ack already written. It keeps the button's height, so the card does not move.
+ */
+function AckedMark({ fresh }: { fresh: boolean }) {
+  const still = useReducedMotion();
+  const plays = fresh && !still;
+  return (
+    <span className="relative inline-flex min-h-[44px] items-center" data-testid="ether-acked">
+      {plays ? (
+        <motion.span
+          aria-hidden
+          className="absolute -inset-x-3 inset-y-0 rounded-[12px]"
+          style={{ background: "color-mix(in srgb, var(--ok) 16%, transparent)" }}
+          initial={{ opacity: 1, scale: 1 }}
+          animate={{ opacity: 0, scale: 1.04 }}
+          transition={{ duration: 0.55, delay: 0.18, ease: [0.4, 0, 1, 1] }}
+        />
+      ) : null}
+      <motion.span
+        className="relative inline-flex items-center gap-1.5 text-[14px] font-semibold leading-[18px]"
+        style={{ color: "var(--ok)" }}
+        initial={plays ? { scale: 0.7, opacity: 0 } : false}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ scale: springs.alive, opacity: { duration: 0.12 } }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <motion.path
+            d="M5 12.5l4.5 4.5L19 7.5"
+            initial={plays ? { pathLength: 0 } : false}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 0.3, delay: 0.08, ease: [0.2, 0, 0, 1] }}
+          />
+        </svg>
+        Ознакомился
+      </motion.span>
+    </span>
   );
 }

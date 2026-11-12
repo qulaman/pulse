@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 
 import { focusCard, initialsOfName, ratingView, storyBoard, type FocusLane, type FocusTone } from "@/lib/tv/focus";
 import type { TvFocusEmployee } from "@/lib/tv/queries";

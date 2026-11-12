@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useInView } from "framer-motion";
+import { motion, useInView } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { Mascot, type MascotState } from "@/components/brand/Mascot";

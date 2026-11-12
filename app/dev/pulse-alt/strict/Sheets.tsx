@@ -6,7 +6,7 @@
  * install hint. Each closes back to exactly where the director was.
  */
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import {

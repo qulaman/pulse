@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useState, type ReactNode } from "react";
 
 import { LAB_TABS, type LabTab } from "@/lib/lab/tabs";

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useId, type ReactNode } from "react";
 
 import { SLEEP_COLOR } from "@/components/brand/Mascot";

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { memo } from "react";
 
 import { SketchView } from "@/components/mindboard/SketchView";

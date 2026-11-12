@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect } from "react";
 
 import { markRung, playChime, rungBefore } from "@/lib/tv/chime";

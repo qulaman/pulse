@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useDragControls, type PanInfo } from "framer-motion";
+import { motion, useDragControls, type PanInfo } from "motion/react";
 import { useEffect, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
 
 import { springs } from "@/lib/design/tokens";

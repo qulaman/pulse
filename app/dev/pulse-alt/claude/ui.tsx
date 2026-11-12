@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useDragControls, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, useDragControls, type PanInfo } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import type { Person } from "@/app/dev/pulse-alt/fixtures";

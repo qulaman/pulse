@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 
 import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { useMascotActs } from "@/components/pulse/useMascotActs";

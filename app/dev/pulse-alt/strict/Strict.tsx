@@ -11,7 +11,7 @@
  * Everything lives in memory on fixture data; `?state=` only picks the starting point.
  */
 
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import {

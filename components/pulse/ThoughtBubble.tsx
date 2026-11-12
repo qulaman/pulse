@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 import { springs } from "@/lib/design/tokens";
 import type { SpeechTone } from "@/lib/pulse/board";

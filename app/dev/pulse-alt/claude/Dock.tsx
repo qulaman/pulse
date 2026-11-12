@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { DELIVERY_WINDOW, PEOPLE, SERVICE, STAGES, personById } from "@/app/dev/pulse-alt/fixtures";

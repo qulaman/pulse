@@ -7,7 +7,7 @@
  * seal. Motion is precise: short tweens and one-off scans, never a bounce.
  */
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { hhmm, type Mood } from "@/app/dev/pulse-alt/fixtures";

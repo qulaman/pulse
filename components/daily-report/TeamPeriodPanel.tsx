@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGroup, motion, MotionConfig } from "framer-motion";
+import { LayoutGroup, motion, MotionConfig } from "motion/react";
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { PersonFace } from "@/components/people/PeoplePicker";

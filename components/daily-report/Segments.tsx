@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 const THUMB = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.9 };
 

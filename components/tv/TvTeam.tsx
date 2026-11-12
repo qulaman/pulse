@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, MotionConfig } from "framer-motion";
+import { motion, MotionConfig } from "motion/react";
 
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { TvSummary } from "@/lib/tv/queries";

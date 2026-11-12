@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, type PanInfo, type TargetAndTransition } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo, type TargetAndTransition } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
@@ -162,6 +162,18 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
   }, []);
   const current = items[safeIndex];
 
+  // the turned page leaves to −118 % of the card in pixels: it starts from the finger's pixels, and a
+  // motion 14 spring does not convert px to % (the card stalled at −118 px over the new top card)
+  const [cardWidth, setCardWidth] = useState<number | null>(null);
+  // a callback ref: the stack is not rendered while the deck is empty, a mount effect would miss it
+  const stackRef = useCallback((stack: HTMLDivElement | null) => {
+    if (!stack) return;
+    const observer = new ResizeObserver(([entry]) => setCardWidth(entry.contentRect.width));
+    observer.observe(stack);
+    return () => observer.disconnect();
+  }, []);
+  const prevX = cardWidth === null ? RISE.prev.x : Math.round(-1.18 * cardWidth);
+
   // a tap on a ball: that card comes to the top (derived state: applied once per tap,
   // during render, so a later change of the list never re-jumps)
   const [appliedFocus, setAppliedFocus] = useState<number | null>(null);
@@ -262,7 +274,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
   return (
     <section aria-label="Стопка задач" className="mt-3" data-testid="deck" data-index={safeIndex} data-count={items.length}>
       {/* one column no wider than the deck: a long line inside a card is cut, not the card */}
-      <div className="relative grid grid-cols-[minmax(0,1fr)]" style={{ touchAction: "pan-y" }}>
+      <div ref={stackRef} className="relative grid grid-cols-[minmax(0,1fr)]" style={{ touchAction: "pan-y" }}>
         {/* popLayout: a card that leaves is lifted out of the stack at once, so the deck's height
             and the next card do not wait for its fade */}
         <AnimatePresence mode="popLayout">
@@ -277,7 +289,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
               style={{ zIndex: role === "current" ? 2 : role === "next" ? 1 : 3, touchAction: isCurrent ? "none" : "auto" }}
               // thrown from the face when the deck arrives: from above, small, then settling into the
               // stack; a card uncovered later (a swipe, a card that left) rises from behind
-              initial={arrived ? RISE[role] : { y: -180, scale: 0.4, opacity: 0 }}
+              initial={arrived ? (role === "prev" ? { ...RISE.prev, x: prevX } : RISE[role]) : { y: -180, scale: 0.4, opacity: 0 }}
               // a flown card has already gone (swipe up or down); one that leaves by itself sinks
               exit={fly ? { opacity: 0, transition: { duration: 0 } } : LEAVE}
               animate={
@@ -286,7 +298,7 @@ export function CardDeck({ lanes, now, since, actions, companyId, meId, onReply,
                   : fly === "down"
                     ? { y: 560, opacity: 0, rotate: 4, transition: { duration: 0.22, ease: "easeIn" } }
                     : role === "prev"
-                      ? { x: "-118%", y: 0, scale: 1, opacity: 0, rotate: -8 }
+                      ? { ...RISE.prev, x: prevX }
                       : role === "next"
                         ? { x: 0, y: 12, scale: 0.94, opacity: 0.7, rotate: 0 }
                         : { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }

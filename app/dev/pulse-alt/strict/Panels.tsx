@@ -6,7 +6,7 @@
  * thread, long press or «⋯» — every move); everything else is a strict register with its keys.
  */
 
-import { AnimatePresence, animate, motion, useMotionValue } from "framer-motion";
+import { AnimatePresence, animate, motion, useMotionValue } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {

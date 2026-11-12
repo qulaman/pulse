@@ -5,7 +5,7 @@
  * tap it to start and stop, and when a phrase is parsed the same spot becomes «Отправить» —
  * open → hold → speak → tap, the thumb never travels.
  */
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { C, Icon, MONO, buzz, useReduced } from "./ui";

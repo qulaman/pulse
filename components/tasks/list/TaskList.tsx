@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion, MotionConfig } from "framer-motion";
+import { AnimatePresence, LayoutGroup, LayoutGroupContext, motion, MotionConfig } from "motion/react";
 import Link from "next/link";
 import { useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 

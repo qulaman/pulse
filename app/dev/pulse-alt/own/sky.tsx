@@ -6,7 +6,7 @@
  * word turns dark and rests on the horizon, right above his thumb. When the ground rises (a
  * panel, the confirmation) the sky folds into a band: the same discs in one row.
  */
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import type { ReactNode } from "react";
 
 import type { Mood } from "@/app/dev/pulse-alt/fixtures";

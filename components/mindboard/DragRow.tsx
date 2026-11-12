@@ -1,6 +1,6 @@
 "use client";
 
-import { Reorder, useDragControls } from "framer-motion";
+import { Reorder, useDragControls } from "motion/react";
 import { useState, type ReactNode } from "react";
 
 import { NoteIcon } from "@/components/notes/icons";

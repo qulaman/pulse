@@ -6,7 +6,7 @@
  * «not understood», the answer from the board, the failures, the text line's examples.
  */
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
 
 import { ERRORS, STAGES, UNPARSED, hhmm, personById, type Draft } from "@/app/dev/pulse-alt/fixtures";

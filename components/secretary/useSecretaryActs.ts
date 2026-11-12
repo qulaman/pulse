@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { SEC_ACT_MS, type SecretaryAct } from "@/components/secretary/SecretaryMascot";

@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { SketchView } from "@/components/mindboard/SketchView";
 import { litPoint, wallText, type TvBoardData } from "@/lib/tv/board";

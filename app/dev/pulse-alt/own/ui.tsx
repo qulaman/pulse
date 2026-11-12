@@ -4,7 +4,7 @@
  * Primitives of «Чей ход»: the tokens, one icon set drawn for this screen, the person's disc,
  * the press feedback, sheets and the undo toast. Everything visual the screens share lives here.
  */
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 
 import type { Tone } from "./model";

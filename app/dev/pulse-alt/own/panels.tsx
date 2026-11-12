@@ -5,7 +5,7 @@
  * the secretary's desk. The deck of moves, the messages with one-tap answers, Эфир, the day,
  * the rating, a person's card, the secretary's keys and the door (visitor, her message).
  */
-import { AnimatePresence, motion, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, type PanInfo } from "motion/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import {

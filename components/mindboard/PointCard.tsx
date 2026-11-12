@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, Reorder } from "framer-motion";
+import { AnimatePresence, Reorder } from "motion/react";
 import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 

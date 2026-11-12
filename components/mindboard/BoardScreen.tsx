@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, MotionConfig, Reorder } from "framer-motion";
+import { AnimatePresence, MotionConfig, Reorder } from "motion/react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { NoteIcon } from "@/components/notes/icons";

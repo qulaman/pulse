@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 
 import { COMPANY, TABS, dayLabel, hhmm } from "@/app/dev/pulse-alt/fixtures";
 

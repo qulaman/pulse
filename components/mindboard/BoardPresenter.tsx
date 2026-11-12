@@ -1,7 +1,7 @@
 "use client";
 
 import { useIsMutating, useQueryClient } from "@tanstack/react-query";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useRef, useState, type ReactNode } from "react";
 
 import { Key, Lcd, LcdDim } from "@/components/ui/device/Device";

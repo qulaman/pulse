@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "framer-motion";
+import { AnimatePresence, LayoutGroup, motion, MotionConfig } from "motion/react";
 import { useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { EventCard } from "@/components/calendar/EventCard";

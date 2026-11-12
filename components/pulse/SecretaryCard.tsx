@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";

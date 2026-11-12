@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useTransform, type PanInfo } from "motion/react";
 import { useRef, useState } from "react";
 
 import { LANE_KEYS, at, dayLabel, hhmm, personById, whenLabel, type Task } from "@/app/dev/pulse-alt/fixtures";

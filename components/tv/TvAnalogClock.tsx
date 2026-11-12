@@ -1,6 +1,6 @@
 "use client";
 
-import { useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "motion/react";
 import { useState, useSyncExternalStore } from "react";
 
 import { aqtobeClock, handAngles } from "@/lib/tv/clock";

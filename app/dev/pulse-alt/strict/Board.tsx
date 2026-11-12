@@ -7,7 +7,7 @@
  * figure into the header line and takes the stage.
  */
 
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useRef } from "react";
 
 import { COMPANY, DIRECTOR, EVENTS, GREETING, SECRETARY_MESSAGE, VISITOR, dayLabel, hhmm, minutesAgo, personById } from "@/app/dev/pulse-alt/fixtures";

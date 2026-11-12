@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import { ALL_ACTIONS, PEOPLE, QUICK_ANSWERS, UNDOABLE, at, hhmm, personById, whenLabel, type Draft, type Message } from "@/app/dev/pulse-alt/fixtures";

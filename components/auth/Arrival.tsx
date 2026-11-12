@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type CSSProperties } from "react";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "motion/react";
 
 import { PulseMark } from "@/components/brand/PulseMark";
 import { StillLogo } from "@/components/ui/StillLogo";

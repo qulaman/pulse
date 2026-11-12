@@ -6,7 +6,7 @@
  * assistant's one line of words, what waits for him, and the one key. Depth rises from the
  * ground by a tap; the sky folds into a band and never disappears.
  */
-import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import {

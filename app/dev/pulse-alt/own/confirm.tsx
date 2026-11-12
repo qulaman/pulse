@@ -5,7 +5,7 @@
  * place (text, «Кому?», срок, повтор, «×»). Above, the folded sky shows who will receive what —
  * the «?» disc waits for «Кому?». Nothing leaves until the one key is tapped (D-36).
  */
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useState, type ReactNode } from "react";
 
 import { COMPANY, personById, whenLabel, type Draft } from "@/app/dev/pulse-alt/fixtures";

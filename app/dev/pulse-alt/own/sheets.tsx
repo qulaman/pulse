@@ -5,7 +5,7 @@
  * sheets about the director's own things (a thread, a task's moves, the service lines) in the
  * ground's ink. Closing any of them returns exactly where he was.
  */
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 import {

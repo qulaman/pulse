@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "motion/react";
 import { useMemo, useRef, useState } from "react";
 
 import { Mascot } from "@/components/brand/Mascot";
