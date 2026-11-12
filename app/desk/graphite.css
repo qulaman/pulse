@@ -1,0 +1,1017 @@
+/* ==========================================================================================
+   «Графит» — the desk's modern look (D-171), laid over «Журнал» (journal.css) and switched by
+   `data-graphite` on <html> (DESK_SHEET_SCRIPT, DeskShell; «Прежний вид» in the account menu
+   brings the journal back). The journal's rules stay underneath: this file gives back what the
+   journal took off — radii, depth, icons, faces, motion — and sets its own tokens.
+   - Depth by steps of lightness: a dark window frame, the work area as a rounded panel with a
+     hairline ring and a highlight on its top edge, what floats (the panel, menus, dialogs) on top
+     with a soft shadow and frosted glass.
+   - Neutral greys, one accent (the brand's turquoise), the statuses at one lightness.
+   - One interface face, Inter, with Russian letters and tabular figures; no capitals in labels.
+   - Everything answers the hand: a press sinks, a selection draws its rail, a panel slides in, a
+     screen rises into place. Short (≤ 300 ms), never holding a click; still under «уменьшить
+     движение».
+   `:root` (not `html`) on purpose: one step of specificity over every rule of the journal.
+   ========================================================================================== */
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- the dark face, the desk's default ---- */
+  &[data-desk-theme="dark"] {
+    --chrome: #08090b;
+    --page: #0e0f12;
+    --sheet: #17181c;
+    --raise: #141519;
+    --ink: #f2f3f5;
+    --ink-2: #a3a7af;
+    --ink-3: #7c8089;
+    --rule: rgb(255 255 255 / 0.09);
+    --rule-soft: rgb(255 255 255 / 0.055);
+    --line: rgb(255 255 255 / 0.1);
+    --pen: #2bd9bb;
+    --pencil: #ff6f63;
+    --spine: #08090b;
+    --sky: #52aaff;
+    --violet: #ad94ff;
+    --ok-ink: #45cb7c;
+    --gold-ink: #f59e3b;
+    --warn-ink: #f2bd42;
+    --marker: rgb(43 217 187 / 0.2);
+    --hover: rgb(255 255 255 / 0.045);
+    --selected: rgb(255 255 255 / 0.075);
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.05);
+    --shadow-pop: 0 0 0 1px rgb(255 255 255 / 0.09), inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 6px rgb(0 0 0 / 0.3), 0 14px 36px -6px rgb(0 0 0 / 0.6);
+    --shadow-dialog: 0 0 0 1px rgb(255 255 255 / 0.1), inset 0 1px 0 rgb(255 255 255 / 0.06), 0 8px 20px -6px rgb(0 0 0 / 0.45), 0 30px 80px -12px rgb(0 0 0 / 0.75);
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    --btn-main: linear-gradient(180deg, #ffffff, #e3e4e8);
+    --btn-main-ink: #0c0d10;
+    --btn-main-edge: inset 0 1px 0 #fff, 0 0 0 1px rgb(255 255 255 / 0.16), 0 1px 2px rgb(0 0 0 / 0.5);
+    --btn-main-glow: 0 6px 22px -6px rgb(255 255 255 / 0.32);
+    --surface-2: #1c1d22;
+    --overlay: rgb(0 0 0 / 0.55);
+    color-scheme: dark;
+  }
+
+  /* ---- the light face: the same steps, on paper-white ---- */
+  &[data-desk-theme="light"] {
+    --chrome: #eceef1;
+    --page: #fbfbfc;
+    --sheet: #ffffff;
+    --raise: #ffffff;
+    --ink: #17191c;
+    --ink-2: #5b6068;
+    --ink-3: #80858d;
+    --rule: rgb(15 17 22 / 0.09);
+    --rule-soft: rgb(15 17 22 / 0.06);
+    --line: rgb(15 17 22 / 0.12);
+    --pen: #00836f;
+    --pencil: #c4392f;
+    --spine: #eceef1;
+    --sky: #0a6fd1;
+    --violet: #6f52c4;
+    --ok-ink: #138a45;
+    --gold-ink: #b45a00;
+    --warn-ink: #9e6500;
+    --marker: rgb(0 131 111 / 0.14);
+    --hover: rgb(15 17 22 / 0.04);
+    --selected: rgb(15 17 22 / 0.065);
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.9);
+    --shadow-pop: 0 0 0 1px rgb(15 17 22 / 0.08), 0 4px 12px -2px rgb(15 17 22 / 0.08), 0 18px 40px -8px rgb(15 17 22 / 0.16);
+    --shadow-dialog: 0 0 0 1px rgb(15 17 22 / 0.08), 0 8px 20px -8px rgb(15 17 22 / 0.12), 0 30px 70px -12px rgb(15 17 22 / 0.26);
+    --shadow-card: 0 0 0 1px rgb(15 17 22 / 0.07), 0 1px 2px -1px rgb(15 17 22 / 0.06), 0 2px 6px rgb(15 17 22 / 0.04);
+    --btn-main: linear-gradient(180deg, #2b2e34, #16181b);
+    --btn-main-ink: #ffffff;
+    --btn-main-edge: inset 0 1px 0 rgb(255 255 255 / 0.14), 0 0 0 1px #16181b, 0 1px 2px rgb(15 17 22 / 0.25);
+    --btn-main-glow: 0 6px 18px -6px rgb(15 17 22 / 0.45);
+    --surface-2: #f2f3f5;
+    --overlay: rgb(15 17 22 / 0.22);
+    color-scheme: light;
+  }
+
+  /* ---- the app's tokens read from the steps ---- */
+  & {
+    --bg: var(--page);
+    --surface: var(--raise);
+    --border: var(--rule);
+    --text: var(--ink);
+    --text-muted: var(--ink-2);
+    --ok: var(--ok-ink);
+    --warn: var(--warn-ink);
+    --danger: var(--pencil);
+    --gold: var(--gold-ink);
+    --shadow-raised: var(--shadow-pop);
+    --font-body: var(--font-inter), system-ui, sans-serif;
+    --font-display: var(--font-inter), system-ui, sans-serif;
+    --font-cond: var(--font-inter), system-ui, sans-serif;
+    --font-mono: var(--font-inter), system-ui, sans-serif;
+    --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  body {
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 20px;
+    font-feature-settings: "cv05", "ss03";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  &[data-desk-theme="light"] body {
+    -webkit-font-smoothing: auto;
+  }
+
+  /* ---- type: one face; figures tabular; labels in plain case ------------------------------- */
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+  .nums {
+    font-family: var(--font-body);
+    font-variant-numeric: tabular-nums;
+    font-weight: inherit;
+    letter-spacing: 0;
+  }
+  .desk-figure,
+  .nums.desk-figure,
+  .nums[class*="text-[28px]"],
+  .nums[class*="text-[32px]"],
+  .nums[class*="text-[36px]"],
+  .nums[class*="text-[40px]"],
+  .nums[class*="text-[44px]"],
+  .nums[class*="text-[48px]"],
+  .nums[class*="text-[56px]"] {
+    font-family: var(--font-body);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+  }
+  .desk-label,
+  h2.uppercase,
+  #desk-main .uppercase {
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    letter-spacing: -0.005em;
+    text-transform: none;
+    color: var(--ink);
+  }
+  [role="columnheader"],
+  [role="columnheader"] button,
+  #desk-main [role="columnheader"] .uppercase,
+  #desk-main [role="columnheader"].uppercase {
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--ink-3);
+  }
+  /* a key is a key: a small raised cap */
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    min-width: 20px;
+    padding: 0 5px;
+    border: 0;
+    border-radius: 5px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule), inset 0 -1px 0 rgb(0 0 0 / 0.3);
+    font: 500 11px/20px var(--font-body);
+    color: var(--ink-2);
+  }
+
+  /* ---- radii: they grow with the layer -------------------------------------------------- */
+  [class*="rounded-["] {
+    border-radius: revert-layer;
+  }
+  [class*="rounded-[1px]"],
+  [class*="rounded-[2px]"] {
+    border-radius: 6px;
+  }
+  .rounded-full {
+    border-radius: 9999px;
+  }
+  .rounded-xl {
+    border-radius: 12px;
+  }
+  .rounded-lg {
+    border-radius: 8px;
+  }
+  .rounded-md {
+    border-radius: 6px;
+  }
+  .field {
+    border-radius: 8px;
+  }
+  .card {
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  input[type="radio"],
+  input[type="radio"] + span {
+    border-radius: 50%;
+  }
+
+  /* ---- the frame: the window, and the work area as a panel set into it ------------------- */
+  [data-desk] {
+    background: var(--chrome);
+  }
+  #desk-main {
+    margin: 0 8px 8px 0;
+    border-radius: 14px;
+    background: var(--page);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+    scrollbar-gutter: stable;
+  }
+  &[data-desk-theme="light"] #desk-main {
+    box-shadow: 0 0 0 1px var(--rule), 0 1px 3px rgb(15 17 22 / 0.05);
+  }
+
+  /* the navigation: icons beside the names, a plate that glides to the chosen section */
+  .desk-nav {
+    --text: var(--ink);
+    --text-muted: var(--ink-2);
+    --surface-2: var(--hover);
+    --border: var(--rule);
+    --accent: var(--pen) !important;
+    background: var(--chrome);
+    border-right: 0;
+    padding: 12px 10px 10px 12px;
+
+    &[data-folded] {
+      padding: 12px 8px 10px;
+    }
+    .desk-nav-link {
+      height: 34px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      background: transparent;
+      color: var(--ink-2);
+      transition:
+        color 140ms linear,
+        background-color 140ms linear,
+        scale 220ms var(--ease-snap);
+
+      &:hover {
+        color: var(--ink);
+        background: var(--hover);
+      }
+      &:active {
+        scale: 0.97;
+        transition-duration: 70ms;
+      }
+      &[aria-current="page"] {
+        background: transparent;
+        color: var(--ink);
+        font-weight: 500;
+        border-radius: 8px;
+
+        .desk-nav-icon {
+          color: var(--pen);
+        }
+      }
+    }
+    &:not([data-folded]) .desk-nav-icon {
+      display: inline-flex;
+    }
+    .desk-nav-active {
+      display: block;
+      position: absolute;
+      inset: 0;
+      border-radius: 8px;
+      background: var(--selected);
+      box-shadow: inset 0 0 0 1px var(--rule-soft), var(--lift);
+
+      /* the accent's rail on the left edge rides with the plate */
+      &::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        bottom: 9px;
+        width: 3px;
+        border-radius: 0 3px 3px 0;
+        background: var(--pen);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--pen) 70%, transparent);
+      }
+    }
+    [data-testid="nav-badge"] {
+      min-width: 20px;
+      height: 20px;
+      padding: 0 6px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 20px;
+      background: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule);
+      color: var(--ink-2);
+
+      &[data-tone="danger"] {
+        background: color-mix(in srgb, var(--pencil) 18%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 36%, transparent);
+        color: var(--pencil) !important;
+      }
+      &[data-tone="warn"] {
+        background: color-mix(in srgb, var(--warn-ink) 16%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn-ink) 32%, transparent);
+        color: var(--warn-ink) !important;
+      }
+    }
+    &[data-folded] [data-testid="nav-badge"] {
+      height: 16px;
+      min-width: 16px;
+      padding: 0 4px;
+      font-size: 10px;
+      line-height: 16px;
+    }
+    .desk-nav-foot {
+      padding-right: 0;
+      border-top-color: var(--rule-soft);
+    }
+  }
+  &[data-desk-theme] .desk-nav {
+    border-right: 0;
+    padding-right: 10px;
+
+    .desk-nav-link[aria-current="page"] {
+      background: transparent;
+      color: var(--ink);
+    }
+  }
+
+  /* the head: the order line is a field of its own, lit when it listens */
+  .desk-head,
+  &[data-desk-theme] .desk-head {
+    height: 60px;
+    padding: 0 16px 0 8px;
+    gap: 12px;
+    background: var(--chrome);
+    border-bottom: 0;
+  }
+  .desk-command.field {
+    position: relative;
+    height: 40px;
+    padding: 0 8px 0 14px;
+    gap: 10px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--raise);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+    transition:
+      box-shadow 180ms var(--ease-snap),
+      background-color 180ms linear;
+
+    &:hover {
+      box-shadow: 0 0 0 1px var(--line), var(--lift);
+    }
+    &:focus-within {
+      background: var(--raise);
+      border: 0;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--pen) 16%, transparent),
+        0 10px 32px -10px color-mix(in srgb, var(--pen) 45%, transparent);
+    }
+    > svg {
+      display: block;
+      color: var(--ink-3);
+    }
+    &:focus-within > svg {
+      color: var(--pen);
+    }
+    &::before {
+      content: none;
+    }
+    input {
+      font-size: 14px;
+      caret-color: var(--pen);
+
+      &::placeholder {
+        color: var(--ink-3);
+        opacity: 1;
+      }
+    }
+  }
+
+  /* the screen's frame */
+  .desk-page {
+    gap: 18px;
+    padding: 24px 28px 56px;
+  }
+  .desk-page-title h1 {
+    font: 600 28px/34px var(--font-body);
+    letter-spacing: -0.025em;
+  }
+
+  /* ---- buttons: a body that sinks under the press ---------------------------------------- */
+  :is(.btn-primary, .btn-secondary, .btn-gold, .desk-move, .desk-word, .desk-alias-add, [data-testid="desk-quick-errands"] button, [data-testid="desk-me"], [data-testid="desk-theme"], [data-testid="desk-keys"], [data-testid="desk-nav-fold"]) {
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear,
+      color 140ms linear,
+      box-shadow 180ms linear,
+      opacity 140ms linear;
+
+    &:active:not(:disabled) {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+  }
+  .btn-primary {
+    background: var(--btn-main);
+    color: var(--btn-main-ink);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: var(--btn-main-edge);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+
+    &:hover:not(:disabled) {
+      background: var(--btn-main);
+      box-shadow: var(--btn-main-edge), var(--btn-main-glow);
+      filter: brightness(1.04);
+    }
+  }
+  .btn-secondary {
+    background: var(--surface-2);
+    border: 0;
+    border-radius: 8px;
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+    font-weight: 500;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+      box-shadow: 0 0 0 1px var(--line), var(--lift);
+    }
+  }
+  .btn-gold {
+    background: var(--btn-main);
+    color: var(--btn-main-ink);
+    box-shadow: var(--btn-main-edge);
+  }
+  .font-display {
+    letter-spacing: -0.01em;
+  }
+  /* a row's own move: the accent's soft plate with a ring, filled a little more under the hand */
+  .desk-move {
+    background: color-mix(in srgb, var(--pen) 13%, transparent);
+    border-color: transparent;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 38%, transparent);
+    color: var(--pen);
+    font-weight: 600;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 22%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent);
+    }
+  }
+  /* a task's plain move (MiniButton): a body with a ring; its letter a key cap */
+  .desk-mini {
+    border-radius: 8px;
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear,
+      box-shadow 180ms linear;
+
+    &:active:not(:disabled) {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    &:not(.btn-primary):not(.desk-move) {
+      border-color: transparent;
+      background: var(--surface-2);
+      box-shadow: 0 0 0 1px var(--rule), var(--lift);
+
+      &:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+        box-shadow: 0 0 0 1px var(--line), var(--lift);
+      }
+    }
+  }
+  .desk-cap,
+  [data-testid="desk-task-more"] > .nums {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 18px;
+    min-width: 18px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+    font-size: 10.5px;
+    font-weight: 600;
+    opacity: 0.85;
+  }
+  [data-testid="desk-task-more"] {
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+    }
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+  }
+  /* a word that is a move: a small chip */
+  .desk-word,
+  .desk-alias-add {
+    padding: 5px 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+    color: var(--ink);
+
+    &:hover:not(:disabled) {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--pen) 12%, var(--surface-2));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 42%, transparent);
+    }
+  }
+  /* the focus ring: the accent, offset, drawn at once */
+  .desk-focus:focus-visible,
+  :is(button, a, [role="button"], [role="tab"]):focus-visible {
+    outline: 2px solid var(--pen);
+    outline-offset: 2px;
+  }
+
+  /* the head's round buttons */
+  [data-testid="desk-theme"],
+  [data-testid="desk-keys"] {
+    border-color: transparent;
+    background: var(--raise);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift);
+
+    &:hover {
+      background: var(--surface-2);
+      color: var(--ink);
+    }
+  }
+  [data-testid="desk-me"]:hover {
+    background: var(--hover);
+  }
+
+  /* ---- the toolbar: a track with a gliding plate, fields as small buttons -------------------- */
+  .seg {
+    height: 34px;
+    padding: 2px;
+    gap: 2px;
+    margin-right: 6px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    button {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 7px;
+      background: none;
+      box-shadow: none;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--ink-2);
+      transition:
+        color 140ms linear,
+        scale 220ms var(--ease-snap);
+
+      &:hover {
+        color: var(--ink);
+      }
+      &:active {
+        scale: 0.97;
+        transition-duration: 70ms;
+      }
+      &[aria-selected="true"] {
+        background: none;
+        box-shadow: none;
+        color: var(--ink);
+        font-weight: 600;
+      }
+    }
+    .seg-thumb {
+      background: none;
+      box-shadow: none;
+    }
+    .seg-glider {
+      display: block;
+      position: absolute;
+      inset: 0;
+      border-radius: 7px;
+      background: var(--raise);
+      box-shadow: 0 0 0 1px var(--rule), var(--lift), 0 1px 3px rgb(0 0 0 / 0.25);
+    }
+  }
+  &[data-desk-theme="light"] .seg .seg-glider {
+    background: #fff;
+    box-shadow: 0 0 0 1px var(--rule), 0 1px 3px rgb(15 17 22 / 0.1);
+  }
+  [data-testid="desk-toolbar"] {
+    gap: 8px 10px;
+
+    select.field,
+    .field {
+      height: 34px;
+      padding-left: 10px;
+      border: 0;
+      border-radius: 8px;
+      background-color: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+      font-size: 13px;
+      transition: background-color 140ms linear;
+
+      &:hover {
+        background-color: color-mix(in srgb, var(--ink) 8%, var(--raise));
+        color: var(--ink);
+      }
+    }
+    select.field {
+      padding-right: 28px;
+      background-position: right 8px center;
+    }
+    label.field {
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+    }
+  }
+  .field {
+    background-color: var(--raise);
+    border-color: var(--rule);
+
+    &:focus,
+    &:focus-within {
+      border-color: color-mix(in srgb, var(--pen) 70%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+  }
+
+  /* ---- tables and lists: hover a soft plate, the chosen row draws its rail ------------------- */
+  .desk-grid {
+    overflow: clip;
+    border: 0;
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > [role="row"]:first-child {
+      background: color-mix(in srgb, var(--raise) 86%, transparent);
+      -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      backdrop-filter: blur(14px) saturate(1.4);
+      border-bottom: 1px solid var(--rule);
+      border-radius: 12px 12px 0 0;
+    }
+    .desk-grid-group {
+      padding: 12px 12px 4px;
+      background: none;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    .desk-dot {
+      display: block;
+    }
+  }
+  [role="columnheader"] {
+    padding: 8px 12px;
+  }
+  [role="gridcell"] {
+    padding: 8px 12px;
+    font-size: 13.5px;
+  }
+  .desk-row {
+    position: relative;
+    min-height: 38px;
+    border-bottom-color: var(--rule-soft);
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .desk-row[aria-selected="true"],
+  .desk-row[aria-current="true"],
+  .desk-row[data-cursor] {
+    background: color-mix(in srgb, var(--pen) 9%, transparent);
+    box-shadow: none;
+
+    &::after {
+      content: "";
+      position: absolute;
+      z-index: 2;
+      left: 0;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--pen);
+      box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+      transform-origin: center;
+      animation: graphite-rail 260ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+    }
+  }
+  /* the journal reaches a row's tint into the margin with shadows: in a card the row keeps its box */
+  #desk-main .desk-list .desk-row,
+  [data-desk-tasks] .desk-row,
+  #desk-main .desk-grid .desk-row {
+    &:hover {
+      box-shadow: none;
+    }
+    &[aria-selected="true"],
+    &[aria-current="true"],
+    &[data-cursor],
+    &:focus-visible {
+      background: color-mix(in srgb, var(--pen) 9%, transparent);
+      box-shadow: none;
+    }
+  }
+  .desk-row-over,
+  .desk-row-moves {
+    background: color-mix(in srgb, var(--ink) 4%, var(--raise));
+  }
+  /* a row's tone rail stays inside the card */
+  #desk-main .desk-grid .desk-row > span[aria-hidden]:first-child {
+    left: 0;
+  }
+  .desk-row[aria-selected="true"] .desk-row-moves,
+  .desk-row[aria-current="true"] .desk-row-over,
+  .desk-row[data-cursor] .desk-row-over {
+    background: color-mix(in srgb, var(--pen) 9%, var(--raise));
+  }
+  [data-desk-tasks],
+  #desk-main .desk-grid {
+    [role="columnheader"]:first-child,
+    [role="gridcell"]:first-child,
+    [role="columnheader"]:first-of-type,
+    [role="gridcell"]:first-of-type {
+      padding-left: 12px;
+    }
+    [role="columnheader"]:last-child,
+    [role="gridcell"]:last-child {
+      padding-right: 12px;
+    }
+    .desk-grid-group {
+      padding-inline: 12px;
+    }
+  }
+  [data-desk-tasks] {
+    [role="columnheader"]:nth-child(2),
+    [role="gridcell"]:nth-child(2) {
+      padding-left: 6px;
+    }
+    [data-testid="desk-group-toggle"] svg {
+      position: static;
+    }
+  }
+  .desk-list {
+    border-top-color: var(--rule-soft);
+
+    > * {
+      border-bottom-color: var(--rule-soft);
+    }
+  }
+  /* faces back in the lists and the panel: tomorrow they carry photos */
+  #desk-main .desk-avatar[data-list],
+  [data-testid="desk-panel"] .desk-avatar[data-list] {
+    display: flex;
+  }
+
+  /* ---- what floats: the panel slides in, menus and dialogs come out of their glass ------------- */
+  [data-testid="desk-panel"] {
+    margin: 8px 8px 8px 0;
+    border: 0;
+    border-radius: 14px;
+    background: var(--sheet);
+    box-shadow: var(--shadow-pop);
+    animation: graphite-panel-in 300ms var(--ease-snap) both;
+
+    /* another task opened in the same panel: its content arrives, not the panel */
+    .no-bar > .contents > * {
+      animation: graphite-panel-content 260ms var(--ease-snap) both;
+    }
+  }
+  .desk-dialog,
+  .desk-pop,
+  [data-sheet]:not([data-testid="sketch-pad"]) {
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--sheet) 84%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    backdrop-filter: blur(22px) saturate(1.6);
+    box-shadow: var(--shadow-pop);
+  }
+  .desk-pop {
+    transform-origin: top center;
+    animation: graphite-pop 170ms var(--ease-snap) both;
+  }
+  .desk-dialog {
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--sheet) 92%, transparent);
+    box-shadow: var(--shadow-dialog);
+  }
+  [role="menu"] {
+    padding: 4px;
+
+    [role="menuitem"] {
+      border-radius: 7px;
+      transition: background-color 80ms linear;
+    }
+    [role="separator"] {
+      margin: 4px -4px;
+      border-top-color: var(--rule-soft);
+    }
+  }
+  /* the hover hint: a dark chip, out at once */
+  .pointer-events-none.fixed.z-\[80\] {
+    border: 0;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--sheet) 90%, transparent);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-pop);
+    animation: graphite-pop 120ms var(--ease-snap) both;
+  }
+
+  /* ---- an empty state: a card with its icon on a tile -------------------------------------- */
+  [data-testid="desk-empty"] {
+    padding: 22px 22px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > span[aria-hidden] {
+      display: flex;
+      border-radius: 10px;
+      box-shadow: inset 0 0 0 1px var(--rule);
+    }
+  }
+  [data-testid="desk-load-failed"] [data-testid="desk-empty"] {
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--pencil) 40%, transparent);
+  }
+
+  /* ---- the usual requests and the reactions: colour back, as chips -------------------------- */
+  [data-testid="desk-quick-errands"] {
+    gap: 8px;
+
+    button {
+      height: 32px;
+      padding: 0 12px;
+      border-radius: 9px;
+      background: var(--surface-2);
+      box-shadow: 0 0 0 1px var(--rule);
+      font-weight: 500;
+
+      > span:last-child {
+        box-shadow: none;
+      }
+      > span[aria-hidden] {
+        filter: none;
+        opacity: 1;
+        font-size: 14px;
+      }
+      &:hover {
+        color: var(--ink);
+        background: color-mix(in srgb, var(--pen) 12%, var(--surface-2));
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 42%, transparent);
+
+        > span:last-child {
+          box-shadow: none;
+        }
+      }
+    }
+  }
+  [data-testid="reaction-bar"] [data-reaction] > span {
+    filter: none;
+    opacity: 1;
+  }
+
+  /* ---- «Сегодня»: the blocks are cards on the work area ------------------------------------- */
+  #desk-main
+    :is(
+      [data-testid="today-decisions"],
+      [data-testid="today-overdue"],
+      [data-testid="today-just-sent"],
+      [data-testid="today-team"],
+      [data-testid="today-reception"],
+      [data-testid="home-messages"],
+      [data-testid="today-agenda"],
+      [data-testid="home-secretary"],
+      [data-testid="home-ether"],
+      [data-testid="home-rating"],
+      [data-testid="today-feed"],
+      [data-testid="today-reports"]
+    ) {
+    padding: 14px 16px 12px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > .desk-list,
+    > div > .desk-list {
+      border-top-color: var(--rule-soft);
+    }
+  }
+  #desk-main
+    :is(
+      [data-testid="today-decisions"],
+      [data-testid="today-overdue"],
+      [data-testid="today-team"]
+    )
+    [data-testid="desk-empty"] {
+    padding: 10px 0 4px;
+    background: none;
+    box-shadow: none;
+    border-top: 1px solid var(--rule-soft);
+    border-radius: 0;
+  }
+  /* a block's icon: a quiet tile; only what happens now keeps its colour, on the dot */
+  .desk-tile {
+    background: var(--surface-2);
+    color: var(--ink-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    border-radius: 7px;
+
+    &[data-live]::after {
+      box-shadow: 0 0 0 2px var(--raise);
+    }
+  }
+  /* the moment: the screen's one total as a card lit from its corner by the accent */
+  .desk-total {
+    padding: 18px 20px;
+    border-radius: 16px;
+    background:
+      radial-gradient(120% 160% at 0% 0%, color-mix(in srgb, var(--pen) 11%, transparent), transparent 55%),
+      var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  [data-testid="desk-moment-counters"] > * {
+    border-color: var(--rule);
+  }
+  /* the person's card under the circles (D-168): a floating sheet */
+  .desk-crew-card {
+    border-top: 0;
+    border-bottom: 0;
+    border-radius: 12px;
+    background: var(--sheet);
+    box-shadow: var(--shadow-pop);
+  }
+  /* a date of a task: tabular, quiet; an overdue one keeps the red pencil's stroke */
+  .desk-when {
+    color: inherit;
+  }
+
+  /* the calendar's two marks of today */
+  .desk-today {
+    border-radius: 9999px;
+    background: var(--pen);
+    color: var(--page);
+  }
+}
+
+/* ---- motion of «Графит» -------------------------------------------------------------------- */
+@keyframes graphite-rail {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+}
+@keyframes graphite-panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.985);
+  }
+}
+@keyframes graphite-panel-content {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+@keyframes graphite-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface="desk"][data-journal][data-graphite] {
+    [data-testid="desk-panel"],
+    [data-testid="desk-panel"] .no-bar > .contents > *,
+    .desk-pop,
+    .desk-row::after,
+    .pointer-events-none.fixed.z-\[80\] {
+      animation: none !important;
+    }
+  }
+}

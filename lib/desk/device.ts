@@ -37,10 +37,11 @@ export function clearViewCookie(): string {
 }
 
 /**
- * Before the first paint of a hard load: the desk's sheet and its theme (D-158, D-159); the
+ * Before the first paint of a hard load: the desk's sheet, its theme and its look (D-158, D-159,
+ * D-171: «Графит» unless «Журнал» was chosen); the
  * attributes DeskShell sets in its layout effect come after the phone's tokens have been painted.
  */
-export const DESK_SHEET_SCRIPT = `(function(p,r){if(p==="/desk"||p.indexOf("/desk/")===0){r.dataset.surface="desk";r.dataset.journal="";var t="dark";try{if(localStorage.getItem("pulse.desk.theme")==="light")t="light"}catch(e){}r.dataset.deskTheme=t}})(location.pathname,document.documentElement)`;
+export const DESK_SHEET_SCRIPT = `(function(p,r){if(p==="/desk"||p.indexOf("/desk/")===0){r.dataset.surface="desk";r.dataset.journal="";var t="dark";try{if(localStorage.getItem("pulse.desk.theme")==="light")t="light"}catch(e){}r.dataset.deskTheme=t;var g=1;try{if(localStorage.getItem("pulse.desk.look")==="journal")g=0}catch(e){}if(g)r.dataset.graphite=""}})(location.pathname,document.documentElement)`;
 
 /** Browser only: the phone screens from now on, then a full load so the proxy sees the cookie. */
 export function goPhoneView(to: string): void {

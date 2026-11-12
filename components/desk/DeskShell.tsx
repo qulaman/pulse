@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 
 import { DeskScope } from "@/components/desk/DeskScope";
 import { DeskLinks } from "@/components/desk/ui/DeskLinks";
@@ -11,7 +11,7 @@ import { ShortcutsHelp, useShortcuts, type Shortcut } from "@/components/desk/ui
 import { SideNav, useDeskBadges, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
 import { goPhoneView } from "@/lib/desk/device";
-import { useDeskTheme } from "@/lib/desk/theme";
+import { useDeskLook, useDeskTheme } from "@/lib/desk/theme";
 import { LIST_MIN, NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, PANEL_MIN, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
 import { isCommandKey, focusCommandLine, isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { chordHref, DESK_NAV, DESK_PROFILE_KEY, deskAllows, deskHomeFor, type DeskRole } from "@/lib/desk/routes";
@@ -42,6 +42,42 @@ function useDeskSurface() {
       delete root.dataset.deskTheme;
     };
   }, [theme]);
+  // «Графит» (D-171) over the journal's rules: graphite.css answers to this attribute alone
+  const look = useDeskLook();
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    if (look === "graphite") root.dataset.graphite = "";
+    else delete root.dataset.graphite;
+    return () => {
+      delete root.dataset.graphite;
+    };
+  }, [look]);
+}
+
+/**
+ * The move between sections (D-171): the new screen rises a few pixels and comes up out of
+ * nothing — on the compositor, never holding a click (the screen is there and live from its first
+ * frame). «Журнал» and «уменьшить движение» change the screen in one frame, as before.
+ */
+function useScreenArrival(main: RefObject<HTMLElement | null>, pathname: string) {
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const screen = main.current?.firstElementChild;
+    if (!(screen instanceof HTMLElement)) return;
+    if (!document.documentElement.hasAttribute("data-graphite")) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    screen.animate(
+      [
+        { opacity: 0, transform: "translateY(10px) scale(0.995)" },
+        { opacity: 1, transform: "none" },
+      ],
+      { duration: 280, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+  }, [main, pathname]);
 }
 
 /** How long «G» waits for the section's letter; once its card of letters is up, longer — it is being read. */
@@ -223,6 +259,8 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
   const panelWidth = useSyncExternalStore(subscribeFrame, () => readPanelWidth() ?? PANEL_DEFAULT, () => PANEL_DEFAULT);
   const [chord, setChord] = useState(false);
   const grid = useRef<HTMLDivElement>(null);
+  const main = useRef<HTMLElement>(null);
+  useScreenArrival(main, pathname);
   const navWidth = folded ? NAV_ICONS : NAV_WIDE;
   const toggleNav = () => writeNavFolded(!folded);
   useDeskSurface();
@@ -277,7 +315,7 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
           <div className="flex min-h-0 min-w-0 flex-col">
             <TopBar fullName={me.fullName} role={role} folded={folded} onToggleNav={toggleNav} />
             {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen */}
-            <main id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
+            <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
               {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
             </main>
           </div>

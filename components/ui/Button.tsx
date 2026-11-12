@@ -43,7 +43,8 @@ export function Button({ variant = "primary", size = "md", block, loading, icon,
       aria-busy={loading || undefined}
       className={[
         "relative inline-flex select-none items-center justify-center gap-2 rounded-[12px] font-display tracking-[-0.01em]",
-        "transition-[transform,background-color,box-shadow,color] duration-[120ms] ease-out",
+        // `scale`: Tailwind 4 writes `active:scale-*` into it — without it the press jumped, never sank
+        "transition-[transform,scale,background-color,box-shadow,color] duration-[120ms] ease-out",
         "active:scale-[0.97] disabled:opacity-40 disabled:active:scale-100",
         "focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/35",
         VARIANTS[variant],

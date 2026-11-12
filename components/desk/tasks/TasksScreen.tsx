@@ -26,6 +26,7 @@ import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
 import { appendPage, ARCHIVE_STATUSES, inRange, parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
 import { useDraftTasks } from "@/lib/desk/drafts";
+import { useDeskLook } from "@/lib/desk/theme";
 import { isPlainKey, isTypingTarget } from "@/lib/desk/keys";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useGoneIds, usePeople } from "@/lib/people/queries";
@@ -645,8 +646,10 @@ function TasksView({
     (closedRow(task) ? `закрыта ${closedText(task)}` : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text);
   // under the floor of «Последнее» the columns keep to lower ceilings: their sum never leaves «Что» under its minimum
   const snug = !columnFits("last", bucket);
+  // «Графит» shows the person's circle before the name (D-171): the column keeps room for it
+  const face = useDeskLook() === "graphite" ? 32 : 0;
   const widths = {
-    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96, max: snug ? 120 : 160, extra: 10 }),
+    who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96 + face, max: (snug ? 120 : 160) + face, extra: 10 + face }),
     due: fitColumn([...shown, ...archived].map(dueText), { min: 116, max: archived.length > 0 ? 196 : snug ? 132 : 172, perChar: archived.length > 0 ? 8 : undefined }),
     closed: fitColumn(shown.map(closedText), { min: 116, max: snug ? 136 : 172 }),
     verdict: fitColumn(shown.map((task) => handInVerdict(task)?.text ?? ""), { min: 84, max: snug ? 148 : 180, perChar: 8 }),

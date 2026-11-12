@@ -1,5 +1,21 @@
 "use client";
 
+import {
+  CalendarDays,
+  CircleUser,
+  ConciergeBell,
+  FileText,
+  Inbox,
+  LayoutDashboard,
+  ListChecks,
+  Megaphone,
+  MonitorPlay,
+  NotebookPen,
+  Settings,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -88,28 +104,32 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
   }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, me?.userId, now, orders.data, visits.data]);
 }
 
-const ICON: Record<string, string> = {
-  "/desk/today": "M12 4.5v2M12 17.5v2M4.5 12h2M17.5 12h2M6.7 6.7l1.4 1.4M15.9 15.9l1.4 1.4M6.7 17.3l1.4-1.4M15.9 8.1l1.4-1.4M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6z",
-  "/desk/tasks": "M4 7h2l1.5 1.5L10 6M12 7h8M4 13.5h2l1.5 1.5L10 12.5M12 13.5h8M12 19h8M5.5 19h1",
-  "/desk/inbox": "M4 13h4l1.5 2.5h5L16 13h4M5.5 6h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z",
-  "/desk/team": "M9 11a3.2 3.2 0 1 0 0-6.4A3.2 3.2 0 0 0 9 11zM3 19.5a6 6 0 0 1 12 0M16 11.2a2.8 2.8 0 1 0-.6-5.5M17.5 14a5.5 5.5 0 0 1 3.5 5.5",
-  "/desk/errands": "M5 8h14l-1.2 11a1.5 1.5 0 0 1-1.5 1.3H7.7a1.5 1.5 0 0 1-1.5-1.3zM9 8V6.5a3 3 0 0 1 6 0V8",
-  "/desk/ether": "M4 10v4h3l6 4V6l-6 4zM16.5 9.5a3.5 3.5 0 0 1 0 5M19 7a7 7 0 0 1 0 10",
-  "/desk/reports": "M6 3.5h8.5L19 8v12.5H6zM14.5 3.5V8H19M9 12.5h6.5M9 16h4",
-  "/desk/calendar": "M3.5 5h17v15.5h-17zM3.5 10h17M8 3v4M16 3v4",
-  "/desk/notes": "M6 3.5h7.5L19 9v11.5H6zM13.5 3.5V9H19M9 13h6.5M9 16.5h4",
-  "/desk/screen": "M3 4.5h18v12H3zM8.5 20h7M12 16.5V20",
-  "/desk/settings": "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8",
-  [DESK_PROFILE]: "M12 12a3.6 3.6 0 1 0 0-7.2 3.6 3.6 0 0 0 0 7.2zM4.5 20a7.5 7.5 0 0 1 15 0",
+/** Each section's sign (lucide, D-165): beside the name in the wide navigation, alone when folded. */
+const ICON: Record<string, LucideIcon> = {
+  "/desk/today": LayoutDashboard,
+  "/desk/tasks": ListChecks,
+  "/desk/inbox": Inbox,
+  "/desk/team": Users,
+  "/desk/errands": ConciergeBell,
+  "/desk/ether": Megaphone,
+  "/desk/reports": FileText,
+  "/desk/calendar": CalendarDays,
+  "/desk/notes": NotebookPen,
+  "/desk/screen": MonitorPlay,
+  "/desk/settings": Settings,
+  [DESK_PROFILE]: CircleUser,
 };
 
 function NavIcon({ href }: { href: string }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d={ICON[href] ?? ""} />
-    </svg>
-  );
+  const Glyph = ICON[href] ?? LayoutDashboard;
+  return <Glyph size={17} strokeWidth={1.9} aria-hidden />;
 }
+
+/**
+ * The chosen section's plate (D-171): one element that glides from the section left to the one
+ * chosen, on a spring without overshoot. «Журнал» draws the chosen tab itself and hides it.
+ */
+const NAV_GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 
 /** A count is a number on the binding; only something overdue takes the red pencil. */
 function badgeColors(tone: Tone | undefined) {
@@ -142,25 +162,22 @@ function NavLink({
         aria-current={active ? "page" : undefined}
         aria-label={count ? `${label}, ${count}` : label}
         data-chord={chord}
-        // the chosen section is a tab of the sheet cut into the binding (journal.css): words, no icons;
-        // icons are for the folded navigation, where there is no room for the words
+        // «Журнал»: the chosen section is a tab of the sheet, words alone (journal.css); «Графит»: an
+        // icon beside every name and a plate that glides to the chosen one (graphite.css, D-171)
         className={`desk-focus desk-nav-link group relative flex w-full items-center leading-5 ${folded ? "justify-center px-0" : "gap-2.5 pl-2.5 pr-3.5"}`}
       >
-        {folded ? (
-          <span className="relative">
-            <NavIcon href={href} />
-            {shown ? (
-              // folded: the count rides the icon's corner
-              <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
-                {shown}
-              </span>
-            ) : null}
-          </span>
-        ) : (
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-        )}
+        {active ? <motion.span layoutId="desk-nav-active" aria-hidden className="desk-nav-active" transition={NAV_GLIDE} /> : null}
+        <span className="desk-nav-icon relative z-[1] inline-flex shrink-0">
+          <NavIcon href={href} />
+          {folded && shown ? (
+            <span className="nums absolute -right-2.5 -top-2 min-w-[16px] text-center text-[10px] leading-[15px]" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
+              {shown}
+            </span>
+          ) : null}
+        </span>
+        {folded ? null : <span className="relative z-[1] min-w-0 flex-1 truncate">{label}</span>}
         {!folded && shown ? (
-          <span className="nums text-center" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
+          <span className="nums relative z-[1] text-center" style={badgeColors(tone)} data-testid="nav-badge" data-tone={tone}>
             {shown}
           </span>
         ) : null}

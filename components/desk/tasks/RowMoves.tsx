@@ -44,11 +44,12 @@ export function MiniButton({
         event.stopPropagation();
         onPress(event.currentTarget);
       }}
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
+      // `desk-mini` / `desk-cap`: «Графит» gives the plain word a body and the letter a key cap (D-171)
+      className={`desk-mini inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 ${height} ${look}`}
     >
       {label}
       {keyCap ? (
-        <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
+        <span aria-hidden className="desk-cap nums text-[11px] leading-4 opacity-60">
           {keyCap}
         </span>
       ) : null}

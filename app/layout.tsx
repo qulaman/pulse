@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed, Manrope } from "next/font/google";
+import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed, Inter, Manrope } from "next/font/google";
 
 import { AppUpdate } from "@/components/AppUpdate";
 import { MascotPower } from "@/components/brand/MascotPower";
@@ -31,6 +31,8 @@ const body = Golos_Text({ subsets: ["cyrillic", "latin"], weight: ["400", "500",
 const plexSans = IBM_Plex_Sans({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans", display: "swap", preload: false });
 const plexCond = IBM_Plex_Sans_Condensed({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-cond", display: "swap", preload: false });
 const plexMono = IBM_Plex_Mono({ subsets: ["cyrillic", "latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap", preload: false });
+// «Графит» (D-171): one interface face with Russian letters, tabular figures and a display cut by size
+const inter = Inter({ subsets: ["cyrillic", "cyrillic-ext", "latin"], variable: "--font-inter", display: "swap", preload: false, axes: ["opsz"] });
 
 export const metadata: Metadata = {
   title: "Pulse",
@@ -56,7 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="ru"
-      className={`${display.variable} ${body.variable} ${plexSans.variable} ${plexCond.variable} ${plexMono.variable}`}
+      className={`${display.variable} ${body.variable} ${plexSans.variable} ${plexCond.variable} ${plexMono.variable} ${inter.variable}`}
       // the desk's attributes land before hydration, from the script below
       suppressHydrationWarning
       style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}

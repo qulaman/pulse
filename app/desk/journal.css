@@ -55,7 +55,10 @@ html[data-surface="desk"][data-journal] {
   /* ---- type ---- */
   --font-body: var(--font-plex-sans), system-ui, sans-serif;
   --font-display: var(--font-plex-sans), system-ui, sans-serif;
-  --font-cond: var(--font-plex-cond), var(--font-plex-sans), sans-serif;
+  /* the face by its own name, not `var(--font-plex-cond)`: that one carries next/font's metric
+     fallback — Arial for every letter — so Russian titles came out in Arial with a faked bold
+     instead of falling through to Plex Sans (D-171) */
+  --font-cond: "IBM Plex Sans Condensed", var(--font-plex-sans), sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
   color-scheme: light;
@@ -212,6 +215,13 @@ html[data-surface="desk"][data-journal] {
     }
     &[data-folded] .desk-nav-link[aria-current="page"] {
       border-radius: 2px;
+    }
+    /* «Графит»'s plate and the icons beside the words are its own (D-171) */
+    .desk-nav-active {
+      display: none;
+    }
+    &:not([data-folded]) .desk-nav-icon {
+      display: none;
     }
     [data-testid="nav-badge"] {
       min-width: 0;
@@ -392,6 +402,10 @@ html[data-surface="desk"][data-journal] {
     .seg-thumb {
       background: none;
       border: 0;
+    }
+    /* «Графит»'s gliding plate (D-171): the journal underlines the chosen word instead */
+    .seg-glider {
+      display: none;
     }
   }
 

@@ -10,6 +10,8 @@ import { isDeskRole } from "@/lib/desk/routes";
 import { canManageTeam } from "@/lib/routes";
 
 import "./journal.css";
+// «Графит» (D-171) over the journal: after it, so a tie of specificity is its
+import "./graphite.css";
 
 export const metadata: Metadata = { title: "Pulse" };
 

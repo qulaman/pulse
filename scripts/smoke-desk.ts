@@ -283,10 +283,12 @@ async function checkShell(ctx: Ctx) {
     await page.getByTestId("desk-entity-remove").last().click();
     const left = await page.getByTestId("desk-entity").count();
     record("× убирает сущность из поручения", left === 3, `осталось ${left}`);
-    // the panel's edge is dragged wider and remembered; a double click puts it back
+    // the panel's edge is dragged wider and remembered; a double click puts it back. Measured as its
+    // column: «Графит» floats the panel 8 px off the window's edge (D-171)
+    const panelWidth = (el: Element) => Math.round(el.getBoundingClientRect().width + parseFloat(getComputedStyle(el).marginRight || "0"));
     const edge = page.getByTestId("desk-panel-edge");
     const rect = await edge.boundingBox();
-    const before = await page.getByTestId("desk-panel").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    const before = await page.getByTestId("desk-panel").evaluate(panelWidth);
     if (rect) {
       await page.mouse.move(rect.x + 3, rect.y + 300);
       await page.mouse.down();
@@ -295,12 +297,12 @@ async function checkShell(ctx: Ctx) {
       await page.mouse.up();
     }
     await page.waitForTimeout(200);
-    const after = await page.getByTestId("desk-panel").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    const after = await page.getByTestId("desk-panel").evaluate(panelWidth);
     const stored = await page.evaluate(() => localStorage.getItem("pulse.desk.panel"));
     await ctx.shot("panel-wide");
     await edge.dblclick();
     await page.waitForTimeout(200);
-    const reset = await page.getByTestId("desk-panel").evaluate((el) => Math.round(el.getBoundingClientRect().width));
+    const reset = await page.getByTestId("desk-panel").evaluate(panelWidth);
     record("панель: край тянется мышью (360–720), ширина запоминается, двойной клик — обратно", after - before >= 150 && stored === String(after) && reset === 440, `${before} → ${after} (запомнено ${stored}) → ${reset}`);
     await page.getByTestId("desk-confirm-cancel").click();
     await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 });

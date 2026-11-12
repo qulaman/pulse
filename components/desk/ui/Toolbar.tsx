@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, type ReactNode, type SelectHTMLAttributes } from "react";
+import { motion } from "motion/react";
+import { forwardRef, useId, type ReactNode, type SelectHTMLAttributes } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 
@@ -62,6 +63,9 @@ export function Select({ className = "", children, ...rest }: SelectHTMLAttribut
 
 export type Segment<V extends string> = { value: V; label: ReactNode; count?: number };
 
+/** The chosen tab's plate glides to the next one (D-171): a spring without overshoot. */
+const SEG_GLIDE = { type: "spring", stiffness: 560, damping: 44, mass: 0.8 } as const;
+
 /** Two to five views of one list — «Ждут вас / В работе / Закрытые». */
 export function SegmentTabs<V extends string>({
   value,
@@ -74,6 +78,8 @@ export function SegmentTabs<V extends string>({
   items: Segment<V>[];
   "aria-label"?: string;
 }) {
+  // one plate per control: two tab rows on a screen never pull each other's plate
+  const glide = `seg-${useId()}`;
   return (
     <div role="tablist" aria-label={label} className="seg inline-flex h-9 items-center gap-0.5 rounded-[11px] p-0.5">
       {items.map((item) => {
@@ -86,12 +92,16 @@ export function SegmentTabs<V extends string>({
             aria-selected={active}
             data-testid={`seg-${item.value}`}
             onClick={() => onChange(item.value)}
-            className={`desk-focus flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 outline-none transition-colors duration-[120ms] ${
+            className={`desk-focus relative flex h-8 items-center gap-1.5 rounded-[9px] px-3 font-display text-[13px] font-semibold leading-4 outline-none transition-colors duration-[120ms] ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >
-            {item.label}
-            {item.count !== undefined ? <span className={`nums text-[12px] ${active ? "text-accent" : "text-muted"}`}>{item.count}</span> : null}
+            {/* «Графит»: the plate under the chosen tab, one element gliding between them (graphite.css) */}
+            {active ? <motion.span layoutId={glide} aria-hidden className="seg-glider" transition={SEG_GLIDE} /> : null}
+            <span className="relative z-[1] inline-flex items-center gap-1.5">
+              {item.label}
+              {item.count !== undefined ? <span className={`nums text-[12px] ${active ? "text-accent" : "text-muted"}`}>{item.count}</span> : null}
+            </span>
           </button>
         );
       })}

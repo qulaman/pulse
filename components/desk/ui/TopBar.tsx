@@ -12,7 +12,7 @@ import { useSettled } from "@/components/desk/ui/SideNav";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
 import { goPhoneView } from "@/lib/desk/device";
-import { otherDeskTheme, useDeskTheme, writeDeskTheme } from "@/lib/desk/theme";
+import { otherDeskLook, otherDeskTheme, useDeskLook, useDeskTheme, writeDeskLook, writeDeskTheme } from "@/lib/desk/theme";
 import { DESK_PROFILE, type DeskRole } from "@/lib/desk/routes";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { ROLE_LABEL } from "@/lib/people/queries";
@@ -29,11 +29,14 @@ function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; rol
   const router = useRouter();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const theme = useDeskTheme();
+  const look = useDeskLook();
   const items: MenuItem[] = [
     { key: "profile", label: "Профиль", hint: "G P", onSelect: () => router.push(DESK_PROFILE) },
     { key: "keys", label: "Клавиши", hint: "?", onSelect: openShortcuts },
     ...(onToggleNav ? [{ key: "fold", label: folded ? "Развернуть навигацию" : "Свернуть навигацию", hint: "[", onSelect: onToggleNav }] : []),
     { key: "theme", label: THEME_WORD[otherDeskTheme(theme)], onSelect: () => writeDeskTheme(otherDeskTheme(theme)) },
+    // «Графит» or the ruled «Журнал» (D-171): the two looks side by side, one click apart
+    { key: "look", label: <span data-testid="desk-look">{LOOK_WORD[otherDeskLook(look)]}</span>, onSelect: () => writeDeskLook(otherDeskLook(look)) },
     "separator",
     { key: "phone", label: <span data-testid="phone-view">Телефонная версия</span>, onSelect: () => goPhoneView(homeForRole(role)) },
   ];
@@ -72,6 +75,7 @@ function MeMenu({ fullName, role, folded, onToggleNav }: { fullName: string; rol
 }
 
 const THEME_WORD = { dark: "Тёмная тема", light: "Светлая тема" } as const;
+const LOOK_WORD = { graphite: "Новый вид «Графит»", journal: "Прежний вид «Журнал»" } as const;
 
 /** The sheet's two faces (D-159): one press, remembered by this browser; the icon shows where it leads. */
 function ThemeButton() {
