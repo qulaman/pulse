@@ -29,6 +29,8 @@ const MAX_RECORDING_SEC = 10;
 const MAX_RECORDING_MS = MAX_RECORDING_SEC * 1000;
 /** Five lines of the field (22px each) plus its padding — past that the words scroll. */
 const MAX_FIELD_PX = 5 * 22 + 24;
+/** How long «hold it» stays over the microphone after a tap too short to record (D-173). */
+const HOLD_HINT_MS = 2500;
 
 type Props = {
   taskId: string;
@@ -55,6 +57,9 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   const [cancelArmed, setCancelArmed] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [left, setLeft] = useState(MAX_RECORDING_SEC);
+  // a tap on the microphone records nothing: it says how it works instead of staying silent (D-173)
+  const [holdHint, setHoldHint] = useState(false);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
   const recorder = useRef<Recorder | null>(null);
@@ -113,6 +118,18 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   };
 
   useEffect(() => stopTicking, []);
+
+  const showHoldHint = () => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setHoldHint(true);
+    hintTimer.current = setTimeout(() => setHoldHint(false), HOLD_HINT_MS);
+  };
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
 
   // the row grows with the words instead of handing them a native scrollbar and a resize
   // grip — neither belongs in this design; past five lines the text scrolls with no bar.
@@ -190,7 +207,10 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       toast("Не записалось. Попробуй ещё раз");
       return;
     }
-    if (audio.durationMs < MIN_RECORDING_MS) return;
+    if (audio.durationMs < MIN_RECORDING_MS) {
+      showHoldHint();
+      return;
+    }
 
     const ext = extForMime(audio.mime);
     // the length travels with the message so the player can draw a wave and count the
@@ -218,6 +238,7 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   const onPointerDown = async (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (recording || uploading) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    setHoldHint(false);
     start.current = { x: event.clientX, y: event.clientY };
     armed.current = true;
     const active = createRecorder();
@@ -228,9 +249,10 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       toast(error instanceof MicUnavailableError ? "Микрофон недоступен" : "Нет доступа к микрофону");
       return;
     }
-    // the finger was lifted while permission was still being asked
+    // the finger was lifted while the microphone was still starting (or permission was asked)
     if (!armed.current) {
       active.cancel();
+      showHoldHint();
       return;
     }
     recorder.current = active;
@@ -273,7 +295,8 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
       aria-label={TEXT.photoPick}
       disabled={uploading}
       onClick={() => fileInput.current?.click()}
-      className="flex h-[44px] w-[40px] shrink-0 items-center justify-center rounded-[12px] text-muted transition-transform duration-[120ms] active:scale-[0.94]"
+      // a whole thumb (44 px, D-173); the «+» is named «Добавить фото» for a screen reader
+      className="flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-[12px] text-muted transition-transform duration-[120ms] active:scale-[0.94]"
     >
       {uploading ? (
         <span className="text-[12px] leading-4">…</span>
@@ -366,7 +389,7 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
   );
 
   return (
-    <div className={`flex items-end gap-2 ${inline ? "" : "mx-auto max-w-lg"}`} data-testid="composer">
+    <div className={`relative flex items-end gap-2 ${inline ? "" : "mx-auto max-w-lg"}`} data-testid="composer">
       <input
         ref={fileInput}
         type="file"
@@ -376,6 +399,22 @@ export function Composer({ taskId, companyId, actions, inline = false, micFirst 
         aria-label={TEXT.photoPick}
         onChange={(event) => void pickPhoto(event.target.files?.[0] ?? null)}
       />
+      {/* «hold it», over the microphone where the thumb is — in the field it wrapped and was cut on a
+          360 px phone; the live region below reads it out */}
+      {holdHint ? (
+        <span
+          aria-hidden
+          data-testid="composer-hold-hint"
+          className={`pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-full border border-border bg-surface-2 px-3 py-1.5 text-[13px] font-semibold leading-4 text-text shadow-lg ${
+            micFirst ? "left-0" : "right-0"
+          }`}
+        >
+          {TEXT.holdToRecord}
+        </span>
+      ) : null}
+      <span className="sr-only" aria-live="polite">
+        {holdHint ? TEXT.holdToRecord : ""}
+      </span>
       {/* on a site the thumb finds the microphone first; at a desk the photo does */}
       {micFirst ? voiceOrSend : photoButton}
       {textField}

@@ -1,12 +1,20 @@
 "use client";
 
 import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
+} from "react";
 
 import { Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { TextSheet } from "@/components/voice/TextSheet";
 import { springs } from "@/lib/design/tokens";
-import { haptic } from "@/lib/haptics";
+import { haptic, tapHaptic } from "@/lib/haptics";
 import { useMascotSeason } from "@/lib/mascot/useSeason";
 import { useComposeStore } from "@/lib/store/compose";
 import { subscribeIngestLevel, useIngestStore, type Pin } from "@/lib/store/ingest";
@@ -255,11 +263,20 @@ export function MascotLever({
     [clearHold, pull],
   );
 
-  const onPointerUp = useCallback(async () => {
+  const onPointerUp = useCallback(async (event?: ReactPointerEvent<HTMLButtonElement>) => {
     clearHold();
     pressed.current = false;
     pull.set(0);
+    // a finger's tap ticks here: its touchend is cancelled (below), so the app's click listener that
+    // ticks every other tap never hears one (D-147, D-173); a mouse still clicks and ticks there.
+    // After the tap's own work, as that listener does: a pattern of the tap's own wins
+    const tick = () => {
+      if (event?.pointerType !== "touch") return;
+      const at = Date.now();
+      setTimeout(() => tapHaptic(at), 0);
+    };
     if (!voice) {
+      tick();
       onTap();
       return;
     }
@@ -269,6 +286,7 @@ export function MascotLever({
       return;
     }
     if (!holdFired.current) {
+      tick();
       onTap();
       return;
     }
@@ -284,6 +302,15 @@ export function MascotLever({
     }
     await stopVoice();
   }, [cancelArmed, cancelVoice, clearHold, onTap, stopVoice, voice, setHeld, pull]);
+
+  // Every gesture of the face — tap, hold, pull — is done by the pointer events above, so the click a
+  // browser makes from a finger's touch afterwards is never needed. It was harmful: by the time it
+  // comes the tap has already changed the screen, and the browser aims it anew at the same point —
+  // at the ball that slid under the finger (the «Дела» ball shut the card the tap had just opened)
+  // or a link. A cancelled touchend makes no click, in Chrome and in Safari (D-173).
+  const onTouchEnd = useCallback((event: ReactTouchEvent<HTMLButtonElement>) => {
+    if (event.cancelable) event.preventDefault();
+  }, []);
 
   const onPointerCancel = useCallback(() => {
     clearHold();
@@ -325,6 +352,7 @@ export function MascotLever({
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             onPointerCancel={onPointerCancel}
+            onTouchEnd={onTouchEnd}
             onContextMenu={(event) => event.preventDefault()}
             data-testid="mascot-lever"
             data-recording={recording ? "1" : "0"}

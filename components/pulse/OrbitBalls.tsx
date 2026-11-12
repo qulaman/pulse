@@ -15,6 +15,11 @@ export type OrbitBall = {
   count: number;
   /** A CSS colour: the worst lane behind the tasks, warn for open questions, gold for Эфир. */
   tone: string;
+  /**
+   * Lit in its tone with nothing to count: the evening report asked for lights «Дела» without adding
+   * to the number the tab's badge shows too (D-173).
+   */
+  lit?: boolean;
 };
 
 const BALL = 60;
@@ -132,7 +137,7 @@ export function OrbitBalls({
       {balls.map((ball, i) => {
         const angle = -Math.PI / 2 + (i * 2 * Math.PI) / n;
         const active = activeId === ball.id;
-        const quiet = ball.count === 0;
+        const quiet = ball.count === 0 && !ball.lit;
         return (
           <div
             key={ball.id}
@@ -161,6 +166,7 @@ export function OrbitBalls({
                   aria-pressed={active}
                   data-testid="orbit-ball"
                   data-ball={ball.id}
+                  data-quiet={quiet ? "1" : "0"}
                   className="pointer-events-auto flex flex-col items-center gap-1"
                 >
                   <span
@@ -177,7 +183,7 @@ export function OrbitBalls({
                     }}
                   >
                     {ICON[ball.id]}
-                    {!quiet ? (
+                    {ball.count > 0 ? (
                       <span
                         className="nums absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center overflow-hidden rounded-full px-1.5 font-display text-[13px] font-bold leading-none text-bg"
                         style={{ background: ball.tone }}

@@ -5,6 +5,7 @@ import { greeting, quoteTitle } from "./briefing";
 import { hasUnread, isOnBoard, whoOf, type BoardTask, type Lanes, type Phrase } from "./board";
 import type { EtherPost } from "./ether";
 import { alarmOf, DEADLINE_SOON_MS } from "./mood";
+import { awaitsMyMove } from "@/lib/tasks/my-move";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 /**
@@ -23,6 +24,16 @@ export function isOpenFor(task: Pick<BoardTask, "status">): boolean {
   return task.status === "sent" || task.status === "rework" || task.status === "accepted" || task.status === "in_progress";
 }
 
+/**
+ * The number on Лента's «Дела» ball (D-173): the person's orders waiting for their move — new,
+ * rework, in work past the deadline — by the same rule as the «Дела» tab badge (`awaitsMyMove`),
+ * so the two always show the same number. Orders only: the report the evening asks for lights the
+ * ball, it does not add to the count.
+ */
+export function tasksBallCount(tasks: readonly Pick<BoardTask, "status" | "deadline">[], now: Date): number {
+  return tasks.filter((task) => awaitsMyMove(task, now)).length;
+}
+
 const WORDS_MAX = 80;
 function short(words: string): string {
   const clean = words.trim();
@@ -38,9 +49,12 @@ export function employeeOpening(lanes: Lanes, now: Date, name: string, { reportP
   const overdue = lanes.overdue.length;
   const hello = greeting(now, name);
   const parts: string[] = [];
+  // the first item carries the noun — «1 задача просрочена», not «1 просрочена»; the next ones lean
+  // on it: «1 новая задача, 1 на доработке, 1 просрочена» (D-173)
+  const noun = (n: number) => (parts.length === 0 ? `${pluralRu(n, ["задача", "задачи", "задач"])} ` : "");
   if (fresh > 0) parts.push(`${fresh} ${pluralRu(fresh, ["новая задача", "новые задачи", "новых задач"])}`);
-  if (rework > 0) parts.push(`${rework} на доработке`);
-  if (overdue > 0) parts.push(`${overdue} ${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
+  if (rework > 0) parts.push(`${rework} ${noun(rework)}на доработке`);
+  if (overdue > 0) parts.push(`${overdue} ${noun(overdue)}${pluralRu(overdue, ["просрочена", "просрочены", "просрочено"])}`);
   if (parts.length === 0) {
     // everything handed in is not «дел нет»: the cards wait on review, and «Дела» shows them
     const onReview = all.filter((task) => task.status === "pending_review").length;

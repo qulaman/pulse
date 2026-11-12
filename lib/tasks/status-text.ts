@@ -56,13 +56,15 @@ export const TEXT = {
   emptyTasks: "Открытых дел нет. Новое покажу здесь",
   emptyInbox: "Всё спокойно",
   reworkBanner: "Директор вернул задачу. Комментарий внутри",
+  /** the task's own screen, before its thread is here: the comment is not «inside» — it is this screen (D-173) */
+  reworkReturned: "Директор вернул задачу на доработку",
   underReview: "На проверке у директора",
   revoked: "Отозвано директором",
   transcriptSpoiler: "Что сказал директор",
   original: "Оригинал голосового",
   noDeadline: "без срока",
   urgent: "срочно",
-  askedToast: "Спросил. Директор ответит в треде",
+  askedToast: "Спросил. Директор ответит в переписке",
   askPlaceholder: "Что уточнить?",
   reportTitle: "Что сделано?",
   reportPlaceholder: "Можно без текста — просто отметить выполненным",
@@ -92,6 +94,8 @@ export const TEXT = {
   revokeConfirm: "Отозвать задачу? Сотрудник увидит пометку «отозвано директором»",
   removeConfirm: "Удалить насовсем? Задача исчезнет у всех вместе с перепиской, без следа. Отзыв — мягче: сотрудник видит пометку",
   composerPlaceholder: "Написать…",
+  /** a tap on the microphone shorter than a recording (D-173) */
+  holdToRecord: "Удерживайте, чтобы записать",
   answered: "отвечено",
   question: "вопрос",
   audioFailed: "Не смог открыть аудио, попробуй ещё раз",
@@ -155,6 +159,77 @@ export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string 
 
   if (parts.length === 0) return { tone: "ok", text: TEXT.emptyInbox };
   return { tone: counts.overdue > 0 ? "danger" : "warn", text: parts.join(", ") };
+}
+
+/* -------------------------------------------------------------------------- */
+/* What the status block of the task's screen says from the thread (D-173)     */
+/* -------------------------------------------------------------------------- */
+
+/** A message as the status block reads it — a thread row has all of this. */
+export type WordMessage = {
+  id: string;
+  seq: number;
+  type: string;
+  sender_id: string;
+  content: string | null;
+  meta: unknown;
+  created_at: string;
+};
+
+/** Words, a voice or a photo — what a person said; a status line is not a word. */
+const WORD_TYPES: readonly string[] = ["text", "voice", "photo"];
+
+function flag(message: Pick<WordMessage, "meta">, name: string): boolean {
+  const meta = message.meta;
+  return Boolean(meta && typeof meta === "object" && !Array.isArray(meta) && (meta as Record<string, unknown>)[name] === true);
+}
+
+/**
+ * The newest comment of a return for rework — the director's own words of why. Takes the rows
+ * oldest first, as a thread holds them; a thread row or a board note will do — only the words
+ * and the meta are read.
+ */
+export function reworkCommentOf(messages: readonly Pick<WordMessage, "content" | "meta">[] | undefined): string | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index]!;
+    if (flag(message, "rework_comment") && message.content?.trim()) return message.content.trim();
+  }
+  return null;
+}
+
+/** The banner of a task back for rework: the director's words themselves, not a pointer to them. */
+export function reworkBannerText(comment: string | null | undefined): string {
+  const words = comment?.trim();
+  return words ? `Директор вернул: «${words}»` : TEXT.reworkReturned;
+}
+
+/**
+ * The other side's newest word, while the reader has not seen it: the thread's newest word is
+ * somebody else's and stands above `seenSeq`, the reader's cursor when the screen opened. One's
+ * own last word means the conversation is answered; a return's comment is the rework banner's.
+ * `seenSeq` null — the cursor is not known: the word is shown, but not as new.
+ */
+export function unreadWordOf<M extends WordMessage>(
+  messages: readonly M[] | undefined,
+  meId: string,
+  seenSeq: number | null,
+): { message: M; unread: boolean } | null {
+  for (let index = (messages?.length ?? 0) - 1; index >= 0; index -= 1) {
+    const message = messages![index]!;
+    if (!WORD_TYPES.includes(message.type)) continue;
+    if (message.sender_id === meId || flag(message, "rework_comment")) return null;
+    if (seenSeq !== null && message.seq <= seenSeq) return null;
+    return { message, unread: seenSeq !== null };
+  }
+  return null;
+}
+
+/** A word in one line, as «Дела» shows the last one: «голосовое · …», «фото · …», or the words. */
+export function wordText(message: Pick<WordMessage, "type" | "content">): string {
+  const words = message.content?.trim() ?? "";
+  if (message.type === "voice") return words ? `голосовое · ${words}` : "голосовое";
+  if (message.type === "photo") return words ? `фото · ${words}` : "фото";
+  return words;
 }
 
 /** Русское имя перехода для системной строки треда. */

@@ -543,9 +543,10 @@ export function LastWord({ name, text, at, now, unread }: { name: string; text: 
 }
 
 /**
- * The row under the buttons: the task's own screen, and whatever else the card has to offer.
+ * The card's last row: the task's own screen, and whatever else the card has to offer.
  * Only an open card has this row, so its prefetch is one per card the person opened, not one
  * per card in the list (D-126 п.10): «Открыть задачу» then opens without asking the server (D-136).
+ * A finger-sized link (44 px) that reads as a way in, not a reply: the words and «›» (D-173).
  */
 export function CardFoot({ href, extra }: { href: string; extra?: ReactNode }) {
   return (
@@ -554,9 +555,8 @@ export function CardFoot({ href, extra }: { href: string; extra?: ReactNode }) {
         href={href}
         prefetch
         data-testid="task-thread"
-        className="flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
+        className="flex min-h-[44px] items-center gap-1 rounded-[10px] px-1.5 text-[14px] font-semibold text-accent transition-colors duration-[120ms] active:bg-accent/10"
       >
-        <Icon name="reply" size={16} />
         Открыть задачу
         <Icon name="open" size={13} />
       </Link>

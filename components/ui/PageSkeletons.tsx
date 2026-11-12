@@ -10,7 +10,6 @@
  */
 import { DataTable } from "@/components/admin/DataTable";
 import { TableChips } from "@/components/admin/tables";
-import { ReportEntryRowBone } from "@/components/daily-report/Skeletons";
 import { Mascot } from "@/components/brand/Mascot";
 import { PeriodChips } from "@/components/rating/PeriodChips";
 import { ShopRow } from "@/components/rating/ShopRow";
@@ -117,16 +116,16 @@ function CardColumnBone({ className = "mt-1", count = 4 }: { className?: string;
 }
 
 /**
- * «Задачи» and «Мои дела» before their data (D-83): the page head, the status screen with
- * grey where the numbers go, then only what stands where the data will not move it (D-122).
- * The director's people strip exists only when two people have open work, and the tabs
- * stand under it — so his skeleton stops at the status screen and a column of cards holds
- * the place of both; «Мои дела» has no strip, so its real tabs stand ready (`pending`).
+ * The director's «Задачи» before its data (D-83): the page head, the status screen with grey
+ * where the numbers go, then only what stands where the data will not move it (D-122). The
+ * people strip exists only when two people have open work, and the tabs stand under it — so
+ * the skeleton stops at the status screen and a column of cards holds the place of both.
+ * «Мои дела» has its own (`TasksSkeleton`): the employee's status screen is shaped by the data.
  */
-function CardsSkeleton({ title, director }: { title: string; director: boolean }) {
+function CardsSkeleton({ title }: { title: string }) {
   return (
-    <main className={`mx-auto w-full max-w-lg flex-1 px-4 ${director ? "pb-36" : "pb-24"}`}>
-      <PageHead eyebrow={DATE_BONE} title={title} actions={director ? <HeadButtonBone /> : null} />
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
+      <PageHead eyebrow={DATE_BONE} title={title} actions={<HeadButtonBone />} />
 
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-0.5 pt-3">
         <div className="flex items-center justify-between">
@@ -151,31 +150,15 @@ function CardsSkeleton({ title, director }: { title: string; director: boolean }
         </div>
       </SkeletonGroup>
 
-      {director ? (
-        // where the tabs start when there is no strip (the tabs' 1 px sentinel under mt-2)
-        <CardColumnBone className="mt-[9px]" />
-      ) : (
-        <>
-          {/* «Отчёт за день» under the status screen (D-152) */}
-          <ReportEntryRowBone />
-          <Tabs id="mine" pending value="new" className="mt-2" items={MINE_TABS} />
-          <CardColumnBone />
-        </>
-      )}
+      {/* where the tabs start when there is no strip (the tabs' 1 px sentinel under mt-2) */}
+      <CardColumnBone className="mt-[9px]" />
     </main>
   );
 }
 
-/** The piles of «Мои дела», as EmployeeTasksView names them. */
-const MINE_TABS = [
-  { key: "new", label: "Новые", count: 0 },
-  { key: "working", label: "В работе", count: 0 },
-  { key: "closed", label: "Закрытые", count: 0 },
-] as const;
-
-/** «Задачи» директора: the same page, grey. */
+/** «Задачи» директора: the page, grey. */
 export function SentSkeleton() {
-  return <CardsSkeleton title="Задачи" director />;
+  return <CardsSkeleton title="Задачи" />;
 }
 
 export function TeamListBone() {
@@ -463,8 +446,19 @@ export function BoardSkeleton() {
 }
 
 /** «Мои дела»: the same page as the director's, without the people strip. */
+/**
+ * «Мои дела» stops at its head (D-122): under it the employee's screen is shaped by the orders
+ * themselves (D-173) — one line while orders wait, a red row for a late one, the full screen
+ * otherwise, the report row above the tabs only in the evening — so any bone there would jump.
+ */
 export function TasksSkeleton() {
-  return <CardsSkeleton title="Мои дела" director={false} />;
+  return (
+    <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24">
+      <PageHead eyebrow={DATE_BONE} title="Мои дела" />
+      {/* one placeholder for the rest: the screen fills it, nothing in it is kept */}
+      <CardColumnBone className="mt-3" count={3} />
+    </main>
+  );
 }
 
 /* ---- shared ------------------------------------------------------------------ */

@@ -16,6 +16,7 @@ import {
   onTimeStreak,
   reasonOf,
   reportPhrase,
+  tasksBallCount,
   weightiest,
 } from "./employee";
 
@@ -130,6 +131,54 @@ describe("employeeLoad — отчёт за день зовёт с ask_from (D-16
   it("без просьбы об отчёте всё как прежде", () => {
     expect(employeeLoad([row("accepted")], NOW, ME, true, false).rest).toBe("working");
     expect(employeeLoad([], NOW, ME).rest).toBe("free");
+  });
+});
+
+describe("tasksBallCount — одно число «Дел» (D-173)", () => {
+  const PAST = "2026-09-11T03:00:00Z"; // полтора часа назад
+
+  it("считает новые, доработки и просроченные в работе — как значок вкладки", () => {
+    const day = [
+      row("sent"),
+      row("rework"),
+      row("accepted", { deadline: PAST }),
+      row("accepted", { deadline: LATER }),
+      row("accepted"),
+      row("pending_review", { deadline: PAST }),
+    ];
+    expect(tasksBallCount(day, NOW)).toBe(3);
+  });
+
+  it("дела в работе в срок и на проверке — не число: ход не за человеком", () => {
+    expect(tasksBallCount([row("accepted", { deadline: SOON }), row("pending_review")], NOW)).toBe(0);
+  });
+
+  it("только поручения: отчёт за день числа не меняет, как и значок вкладки", () => {
+    expect(tasksBallCount([row("sent")], NOW)).toBe(1);
+    expect(tasksBallCount([], NOW)).toBe(0);
+  });
+});
+
+describe("employeeOpening — первое в списке называет задачу (D-173)", () => {
+  const lanesWith = (rows: BoardTask[], overdue: BoardTask[] = []) => ({ ...emptyLanes(), work: rows, overdue });
+
+  it("одна просроченная — «1 задача просрочена», не «1 просрочена»", () => {
+    const late = row("accepted", { deadline: "2026-09-11T03:00:00Z" });
+    expect(employeeOpening(lanesWith([], [late]), NOW, "Ерлан").text).toMatch(/Ерлан\. 1 задача просрочена\.$/);
+  });
+
+  it("доработка первой — с существительным, в нужном числе", () => {
+    expect(employeeOpening(lanesWith([row("rework")]), NOW, "Ерлан").text).toMatch(/1 задача на доработке\.$/);
+    expect(employeeOpening(lanesWith([row("rework"), row("rework")]), NOW, "Ерлан").text).toMatch(/2 задачи на доработке\.$/);
+    const late = [1, 2, 3, 4, 5].map(() => row("accepted", { deadline: "2026-09-11T03:00:00Z" }));
+    expect(employeeOpening(lanesWith([row("rework")], late), NOW, "Ерлан").text).toMatch(/1 задача на доработке, 5 просрочено\.$/);
+  });
+
+  it("за новой задачей остальные — без повтора существительного", () => {
+    const late = row("accepted", { deadline: "2026-09-11T03:00:00Z" });
+    expect(employeeOpening(lanesWith([row("sent"), row("rework")], [late]), NOW, "Ерлан").text).toMatch(
+      /1 новая задача, 1 на доработке, 1 просрочена\.$/,
+    );
   });
 });
 

@@ -31,6 +31,7 @@ import { warmRecurrenceRules } from "@/lib/recurrence/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 import type { Database } from "@/lib/supabase/types";
 import { useDebounced } from "@/lib/useDebounced";
+import { myMoveFilter } from "./my-move";
 import { isOverdue, type TaskStatus } from "./status-text";
 import { applyMessageUpdate } from "./thread";
 
@@ -182,10 +183,12 @@ export function useMyTasks(userId: string | undefined) {
 }
 
 /**
- * How many of the employee's tasks wait for «Принял» — the badge on «Дела». A count, not the
- * list: the badge is on every screen, and the list is the person's whole history with its
- * people (D-126). It listens on the list's own socket (and the shared DELETE one), so the
- * number moves on the same events as the list behind it.
+ * How many of the employee's orders wait for their move — new, returned for rework, overdue in
+ * work (`myMoveFilter`, D-173) — the badge on «Дела», the same number as the «Дела» ball on Лента.
+ * A count, not the list: the badge is on every screen, and the list is the person's whole history
+ * with its people (D-126). It listens on the list's own socket (and the shared DELETE one), so the
+ * number moves on the same events as the list behind it; a deadline passing with no event is
+ * picked up on the next read (the app coming back to the front, any change to the person's tasks).
  */
 export function useFreshTaskCount(userId: string | undefined) {
   const key = taskKeys.fresh(userId ?? "");
@@ -198,7 +201,7 @@ export function useFreshTaskCount(userId: string | undefined) {
         .from("tasks")
         .select("id", { count: "exact", head: true })
         .eq("assignee_id", userId as string)
-        .eq("status", "sent");
+        .or(myMoveFilter(new Date()));
       if (error) throw new Error(error.message);
       return count ?? 0;
     },
@@ -650,9 +653,10 @@ async function fetchBoard(assigneeId?: string): Promise<BoardTask[]> {
     .in("status", assigneeId ? [...BOARD_STATUSES] : [...BOARD_STATUSES, HELD_STATUS]);
   if (assigneeId) request = request.eq("assignee_id", assigneeId);
   const { data, error } = await request
-    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128)
+    // the words the board reads: questions, refusals, requests for time, reminders, «не всё» (D-128),
+    // the director's words with a return for rework (D-173)
     .or(
-      "meta->>is_question.eq.true,meta->>decline_reason.eq.true,meta->>time_request.eq.true,meta->>nudge.eq.true,meta->>partial.eq.true",
+      "meta->>is_question.eq.true,meta->>decline_reason.eq.true,meta->>time_request.eq.true,meta->>nudge.eq.true,meta->>partial.eq.true,meta->>rework_comment.eq.true",
       { referencedTable: "notes" },
     )
     .order("created_at", { referencedTable: "notes", ascending: false })

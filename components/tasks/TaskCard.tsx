@@ -13,7 +13,7 @@ import { isWorking, passedWord, untilWords } from "@/lib/tasks/lifecycle";
 import type { QuickAnswer } from "@/lib/tasks/answers";
 import type { TaskActions } from "@/lib/tasks/mutations";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
-import { BUTTON, deadlineLabel, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
+import { BUTTON, deadlineLabel, reworkBannerText, STATUS_LABEL, TEXT } from "@/lib/tasks/status-text";
 import { toneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
 import { AudioOriginal } from "./AudioOriginal";
 import { DeliveryStatus } from "./DeliveryStatus";
@@ -26,7 +26,7 @@ import { useEmployeeControls } from "./list/useEmployeeControls";
 export type TaskCardVariant = "employee" | "director";
 
 /** A board row carries what the task row does not — a request for time, a suggestion (D-128). */
-type CardTask = TaskWithPeople & Partial<Pick<BoardTask, "time_request" | "suggestion" | "nudged_at" | "partial">>;
+type CardTask = TaskWithPeople & Partial<Pick<BoardTask, "time_request" | "suggestion" | "nudged_at" | "partial" | "rework_comment">>;
 
 export type TaskCardProps = {
   task: CardTask;
@@ -140,8 +140,9 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
       ) : null}
 
       {task.source_transcript ? (
-        <details className="group relative mt-3">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
+        <details className="group relative mt-1">
+          {/* a whole row to press, not a 16 px line of words (D-173, 44 px targets) */}
+          <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
             <Icon name="quote" size={14} />
             {TEXT.transcriptSpoiler}
             <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">▾</span>
@@ -236,11 +237,13 @@ function Banner({ tone, icon, children }: { tone: Tone; icon: ReactNode; childre
   );
 }
 
-function StatusBanner({ task, declineReason }: { task: TaskWithPeople; declineReason?: string | null }) {
+function StatusBanner({ task, declineReason }: { task: CardTask; declineReason?: string | null }) {
   if (task.status === "rework") {
+    // the director's own words with the return, when the board has them — not a pointer to
+    // «комментарий внутри» behind a link nobody sees as one (D-173)
     return (
       <Banner tone="warn" icon={<Icon name="rotate" size={15} />}>
-        {TEXT.reworkBanner}
+        <span className="line-clamp-3">{task.rework_comment ? reworkBannerText(task.rework_comment) : TEXT.reworkBanner}</span>
       </Banner>
     );
   }

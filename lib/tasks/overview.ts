@@ -2,7 +2,8 @@ import { aqtobeDay, humanAqtobe } from "@/lib/ai/time";
 import { shortName } from "@/lib/people/names";
 
 import { REASON_ORDER, reasonOf, type DeskReason } from "./desk";
-import { compareTasks, groupTasks, nearestDeadline, type Bucket, type Groupable } from "./grouping";
+import { compareTasks, groupTasks, mostUrgent, nearestDeadline, type Bucket, type Groupable } from "./grouping";
+import { awaitsMyMove } from "./my-move";
 import { isOverdue, pluralRu, SHORT_STATUS, type TaskStatus } from "./status-text";
 import type { Tone } from "./tone";
 
@@ -35,7 +36,7 @@ export type ListTask = Groupable & {
 /** The director's three piles, disjoint: my move, their move, history. */
 export type DirectorTab = "yours" | "working" | "closed";
 
-/** The employee's three piles, disjoint: to accept, in hand, history. */
+/** The employee's three piles, disjoint: to take up (new and returned), in hand, history. */
 export type EmployeeTab = "new" | "working" | "closed";
 
 const CLOSED: readonly TaskStatus[] = ["done", "revoked"];
@@ -50,9 +51,13 @@ export function directorTabOf(task: { status: TaskStatus }, reason: DeskReason |
   return CLOSED.includes(task.status) ? "closed" : "working";
 }
 
-/** Where an employee's task lives: not accepted yet, in hand (handed in included), or over. */
+/**
+ * Where an employee's task lives: to take up, in hand (handed in included), or over. A return for
+ * rework sits with the new ones (D-173): both wait for the person's move — the «to-do» of Лента
+ * (`isTodo`) — and the first card of the pile opens by itself.
+ */
 export function employeeTabOf(task: { status: TaskStatus }): EmployeeTab {
-  if (task.status === "sent") return "new";
+  if (task.status === "sent" || task.status === "rework") return "new";
   if (task.status === "done" || task.status === "revoked" || task.status === "declined") return "closed";
   return "working";
 }
@@ -175,9 +180,16 @@ export function closedTodayCount(
 
 export type Segment = { key: string; label: string; count: number; tone: Tone };
 
-export type Nearest = { id: string; title: string; who: string; at: string };
+/** `late` — its deadline has passed: the row says «Просрочено» (the employee's screen, D-173). */
+export type Nearest = { id: string; title: string; who: string; at: string; late?: boolean };
 
 export type StatusScreen = {
+  /**
+   * The employee's screen (D-173): «compact» — orders wait for the person's move, the screen is one
+   * line (the number and, when one is late, that order) so the cards and «Принял» are in sight;
+   * «lean» — the full screen without the numbers the tabs already say. Absent — the director's.
+   */
+  variant?: "compact" | "lean";
   /** The upper line, in `tone`: what the screen is about right now. */
   eyebrow: string;
   tone: Tone;
@@ -292,27 +304,32 @@ export function directorScreen<T extends ListTask>(
 }
 
 /**
- * The employee's status screen: what to accept first, then what is late, then how much
- * is in hand. Handed-in work is counted but never the headline — it is not their move.
+ * The employee's status screen (D-173). While orders wait for the person's move — a new one, a
+ * return for rework, work past its deadline (`awaitsMyMove`, the rule of the «Дела» badge and the
+ * Лента ball) — it is one line: how many wait and, when one is late, that order by name; the cards
+ * under it say the rest, so «Принял» stays in sight. Otherwise the lean screen: how much is in work
+ * — the «В работе» tab's own number, handed-in work counted in it — and the nearest deadline that is
+ * still the person's to meet. Each fact once: no «открыто», no legend beside the tabs.
  */
 export function employeeScreen<T extends ListTask>(tasks: readonly T[], now: Date = new Date()): StatusScreen {
   let fresh = 0;
-  let overdue = 0;
-  let working = 0;
   let rework = 0;
+  let late = 0;
+  let working = 0;
   let review = 0;
   for (const task of tasks) {
-    if (isOverdue(task, now)) overdue += 1;
-    else if (task.status === "sent") fresh += 1;
+    if (task.status === "sent") fresh += 1;
     else if (task.status === "rework") rework += 1;
-    else if (task.status === "accepted" || task.status === "in_progress") working += 1;
     else if (task.status === "pending_review") review += 1;
+    else if (task.status === "accepted" || task.status === "in_progress") {
+      if (awaitsMyMove(task, now)) late += 1;
+      else working += 1;
+    }
   }
-  // an overdue task that is still new is new first: it waits for «Принял»
-  const newTotal = tasks.filter((task) => task.status === "sent").length;
-  const open = overdue + fresh + working + rework + review;
+  const waiting = fresh + rework + late;
+  const open = waiting + working + review;
   const segments: Segment[] = [
-    { key: "overdue", label: pluralRu(overdue, ["просрочено", "просрочены", "просрочено"]), count: overdue, tone: "danger" as Tone },
+    { key: "overdue", label: pluralRu(late, ["просрочено", "просрочены", "просрочено"]), count: late, tone: "danger" as Tone },
     { key: "new", label: pluralRu(fresh, ["новое", "новых", "новых"]), count: fresh, tone: "accent" as Tone },
     { key: "rework", label: "на доработке", count: rework, tone: "warn" as Tone },
     { key: "working", label: "в работе", count: working, tone: "ok" as Tone },
@@ -320,64 +337,52 @@ export function employeeScreen<T extends ListTask>(tasks: readonly T[], now: Dat
   ].filter((segment) => segment.count > 0);
   const closedToday = closedTodayCount(tasks, now);
   const closedWeek = closedTodayCount(tasks, now, 7);
-  const nearest = nearestOf(tasks, now, () => "");
-  const soon = nearest ? `ближайший срок ${humanAqtobe(new Date(nearest.at), now)}` : "сроков нет";
+  const urgent = mostUrgent(tasks, now);
+  const nearest: Nearest | null = urgent
+    ? { id: urgent.task.id, title: urgent.task.title, who: "", at: urgent.task.deadline as string, late: urgent.late }
+    : null;
+  const base = { segments, open, nearest, closedToday, closedWeek };
 
-  if (newTotal > 0) {
+  if (waiting > 0) {
+    const parts: string[] = [];
+    if (fresh > 0) parts.push(plural(fresh, ["новое", "новых", "новых"]));
+    if (rework > 0) parts.push(`${rework} на доработке`);
+    if (late > 0) parts.push(plural(late, ["просрочено", "просрочены", "просрочено"]));
     return {
-      eyebrow: "Новые поручения",
-      tone: "accent",
-      value: newTotal,
-      label: pluralRu(newTotal, ["новое поручение", "новых поручения", "новых поручений"]),
-      detail: overdue > 0 ? `примите в работу · ${plural(overdue, ["просрочено", "просрочены", "просрочено"])}` : "примите в работу",
-      segments,
-      open,
-      nearest,
-      closedToday,
-      closedWeek,
+      ...base,
+      variant: "compact",
+      eyebrow: late > 0 ? "Срок прошёл" : fresh > 0 ? "Новые поручения" : "На доработке",
+      tone: late > 0 ? "danger" : fresh > 0 ? "accent" : "warn",
+      value: waiting,
+      label: pluralRu(waiting, ["дело ждёт вас", "дела ждут вас", "дел ждут вас"]),
+      detail: parts.join(" · "),
     };
   }
-  if (overdue > 0) {
+  const inWork = working + review;
+  if (working > 0) {
     return {
-      eyebrow: "Срок прошёл",
-      tone: "danger",
-      value: overdue,
-      label: pluralRu(overdue, ["дело просрочено", "дела просрочены", "дел просрочено"]),
-      detail: soon,
-      segments,
-      open,
-      nearest,
-      closedToday,
-      closedWeek,
+      ...base,
+      variant: "lean",
+      eyebrow: "Всё по плану",
+      tone: "ok",
+      value: inWork,
+      label: pluralRu(inWork, ["дело в работе", "дела в работе", "дел в работе"]),
+      detail: review > 0 ? `из них ${review} на проверке у директора` : "",
     };
   }
-  const inHand = working + rework;
-  if (inHand > 0) {
+  if (review > 0) {
     return {
-      eyebrow: "В работе",
-      tone: rework > 0 ? "warn" : "ok",
-      value: inHand,
-      label: pluralRu(inHand, ["дело в работе", "дела в работе", "дел в работе"]),
-      detail: review > 0 ? `${soon} · ${review} на проверке` : soon,
-      segments,
-      open,
-      nearest,
-      closedToday,
-      closedWeek,
+      ...base,
+      variant: "lean",
+      eyebrow: "Ждёт проверки",
+      tone: "ok",
+      value: null,
+      label: `${plural(review, ["дело", "дела", "дел"])} на проверке`,
+      detail: "директор посмотрит и закроет",
     };
   }
-  return {
-    eyebrow: review > 0 ? "Ждёт проверки" : "Всё сделано",
-    tone: "ok",
-    value: null,
-    label: review > 0 ? `${plural(review, ["дело", "дела", "дел"])} на проверке` : "Открытых дел нет",
-    detail: closedToday > 0 ? `Сегодня закрыто: ${closedToday}` : review > 0 ? "директор посмотрит и закроет" : "Новое покажу здесь",
-    segments,
-    open,
-    nearest,
-    closedToday,
-    closedWeek,
-  };
+  // the legend under the empty bar says what got closed today and this week
+  return { ...base, variant: "lean", eyebrow: "Всё сделано", tone: "ok", value: null, label: "Открытых дел нет", detail: "" };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -415,13 +420,21 @@ export type StepState = "done" | "current" | "todo" | "warn" | "bad";
 export type Step = { key: string; label: string; at: string | null; state: StepState };
 
 /**
- * The life of a task in four steps — выдана → в работе → сдана → принята — with the time
- * of each one that happened. The step the task is stuck on is «current»; a detour (a
+ * The life of a task in four steps — выдана → в работе → сдана → закрыта — with the time
+ * of each one that happened. A station always names a stage, never a button's verb (D-173): the
+ * employee's «Принял» stood under a green «Принять», and «Принята» read as their own acceptance
+ * rather than the director's. The step the task is stuck on is «current»; a detour (a
  * return for rework, a refusal, a recall) replaces the step it happened at. `declinedAt` — when
  * a recalled task had been refused first (from its thread): the refusal stays on the way to the
- * recall instead of vanishing behind it (D-142).
+ * recall instead of vanishing behind it (D-142). `forAssignee` — the steps as the person who holds
+ * the task reads them: a new one's current station is «Ждёт вас», not «В работе», which on the
+ * current ring read as taken already (D-173); the director and the desk keep «В работе».
  */
-export function stepsOf(task: ListTask, now: Date = new Date(), { declinedAt = null }: { declinedAt?: string | null } = {}): Step[] {
+export function stepsOf(
+  task: ListTask,
+  now: Date = new Date(),
+  { declinedAt = null, forAssignee = false }: { declinedAt?: string | null; forAssignee?: boolean } = {},
+): Step[] {
   const handed: Step =
     task.status === "scheduled"
       ? { key: "handed", label: "Уйдёт", at: task.scheduled_send_at, state: "current" }
@@ -431,20 +444,27 @@ export function stepsOf(task: ListTask, now: Date = new Date(), { declinedAt = n
 
   switch (task.status) {
     case "scheduled":
-      return [handed, step("work", "В работе", null, "todo"), step("handed_in", "Сдана", null, "todo"), step("closed", "Принята", null, "todo")];
+      return [handed, step("work", "В работе", null, "todo"), step("handed_in", "Сдана", null, "todo"), step("closed", "Закрыта", null, "todo")];
     case "sent":
-      return [handed, step("work", "Принять", null, late("current")), step("handed_in", "Сдана", null, "todo"), step("closed", "Принята", null, "todo")];
+      return [
+        handed,
+        step("work", forAssignee ? "Ждёт вас" : "В работе", null, late("current")),
+        step("handed_in", "Сдана", null, "todo"),
+        step("closed", "Закрыта", null, "todo"),
+      ];
     case "accepted":
     case "in_progress":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдать", null, late("current")), step("closed", "Принята", null, "todo")];
+      // the station still ahead is named by its stage as a process — «Сдача», like «Доработка» and
+      // «Проверка» — not «Сдана», which on the current ring read as handed in already
+      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдача", null, late("current")), step("closed", "Закрыта", null, "todo")];
     case "rework":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Доработка", null, late("warn")), step("closed", "Принята", null, "todo")];
+      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Доработка", null, late("warn")), step("closed", "Закрыта", null, "todo")];
     case "pending_review":
       return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдана", task.completed_at, "done"), step("closed", "Проверка", null, "current")];
     case "done":
-      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдана", task.completed_at, "done"), step("closed", "Принята", closedAtOf(task), "done")];
+      return [handed, step("work", "В работе", task.accepted_at, "done"), step("handed_in", "Сдана", task.completed_at, "done"), step("closed", "Закрыта", closedAtOf(task), "done")];
     case "declined":
-      return [handed, step("work", "Отказ", closedAtOf(task), "bad"), step("handed_in", "Сдана", null, "todo"), step("closed", "Принята", null, "todo")];
+      return [handed, step("work", "Отказ", closedAtOf(task), "bad"), step("handed_in", "Сдана", null, "todo"), step("closed", "Закрыта", null, "todo")];
     case "revoked":
       return [
         handed,
@@ -478,14 +498,17 @@ export const REASON_WORD: Record<DeskReason, string> = {
 /**
  * The state word of a card as its reader needs it. The director: a new task is «не
  * принята» (that is the fact to watch), a scheduled one says when it goes. The employee:
- * handed-in work is «на проверке», a new task asks for the tap. Overdue beats the stage.
+ * handed-in work is «на проверке», a new task asks for the tap; a returned one is «на доработке»
+ * — short, it shares the line with the deadline pill; the director's own words under it say why
+ * (D-173). Overdue beats the stage, except for the employee's two that wait for a move (they sit
+ * with the new ones): their red deadline says it.
  */
 export function statusWord(
   task: { status: TaskStatus; deadline: string | null; scheduled_send_at?: string | null; passed_to?: string | null },
   role: "director" | "employee",
   now: Date = new Date(),
 ): string {
-  if (isOverdue(task, now) && !(role === "employee" && task.status === "sent")) return "просрочена";
+  if (isOverdue(task, now) && !(role === "employee" && (task.status === "sent" || task.status === "rework"))) return "просрочена";
   if (task.status === "revoked" && task.passed_to) return "передана";
   if (role === "director") {
     if (task.status === "sent") return "не принята";

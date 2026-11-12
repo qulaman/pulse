@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TaskStatus } from "./status-text";
-import { bucketOf, groupTasks, nearestDeadline, overdueCount, TIME_BUCKETS, type Groupable } from "./grouping";
+import { bucketOf, groupTasks, mostUrgent, nearestDeadline, overdueCount, TIME_BUCKETS, type Groupable } from "./grouping";
 
 // 2026-09-17 12:00 Aqtobe (UTC+5)
 const NOW = new Date("2026-09-17T07:00:00Z");
@@ -150,6 +150,19 @@ describe("summary", () => {
     ];
     expect(nearestDeadline(rows, NOW)).toBe(at("19"));
     expect(nearestDeadline([task({ deadline: null })], NOW)).toBeNull();
+  });
+
+  it("mostUrgent (D-173): the latest late one first, handed-in work never, else the soonest ahead", () => {
+    const handedIn = task({ status: "pending_review", deadline: at("17", 13) });
+    const soon = task({ status: "accepted", deadline: at("17", 15) });
+    const later = task({ status: "accepted", deadline: at("19") });
+    const lateLess = task({ status: "accepted", deadline: at("17", 10) });
+    const lateMost = task({ status: "accepted", deadline: at("16") });
+    const done = task({ status: "done", deadline: at("15") });
+    expect(mostUrgent([handedIn, later, soon], NOW)).toEqual({ task: soon, late: false });
+    expect(mostUrgent([handedIn, soon, lateLess, lateMost, done], NOW)).toEqual({ task: lateMost, late: true });
+    // only handed-in work with a deadline: nothing is the person's to meet
+    expect(mostUrgent([handedIn, task({ status: "accepted", deadline: null })], NOW)).toBeNull();
   });
 
   it("overdueCount counts only open work past its deadline", () => {

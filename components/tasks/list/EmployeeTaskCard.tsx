@@ -16,13 +16,17 @@ import { CardFoot, CardHead, CardShell, LastWord, Note, Stepper } from "./TaskLi
 
 export type EmployeeAction = "accept" | "ask" | "decline" | "complete";
 
+/** A key of the new order's row: its words' width plus an equal share, as on Лента's card (D-173). */
+const KEY = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";
+
 /**
  * A card of «Мои дела». Closed: the state mark, the title, «when», the state. Open: what
  * the director wrote and said (the recording and the words), a return for rework, the
- * director's last word, the four steps and the buttons of FRONTEND «Состояние задачи →
- * набор кнопок» — Принял / Уточнить / Не могу on a new task (принцип 2), Выполнено /
- * Уточнить / Не могу on work in hand: «Не могу» after «Принял» asks for time, names the
- * right colleague or refuses (D-128). A request still waiting is said on the card.
+ * director's last word, the buttons of FRONTEND «Состояние задачи → набор кнопок» — Принял /
+ * Уточнить / Не могу on a new task (принцип 2), Выполнено / Уточнить / Не могу on work in
+ * hand: «Не могу» after «Принял» asks for time, names the right colleague or refuses (D-128) —
+ * and under them the four steps (D-173: the buttons first, so «Принял» is in sight on a phone).
+ * A request still waiting is said on the card.
  */
 export function EmployeeTaskCard({
   task,
@@ -93,7 +97,9 @@ export function EmployeeTaskCard({
 
         {reaction ? <ReactionBadge code={reaction} points={reactionPoints} className="mt-2" /> : null}
 
-        {task.status === "rework" ? (
+        {/* the head says «на доработке»; the note points to the director's comment only
+            while that comment is not the last word shown right under it (D-173: said once) */}
+        {task.status === "rework" && !(last && lastText && last.sender_id !== meId) ? (
           <Note tone="warn" icon={<Icon name="rotate" size={15} />}>
             {TEXT.reworkBanner}
           </Note>
@@ -123,10 +129,11 @@ export function EmployeeTaskCard({
         {last && lastText ? <LastWord name={lastName} text={lastText} at={last.created_at} now={now} unread={unread} /> : null}
 
         {task.source_audio_path ? <AudioOriginal path={task.source_audio_path} /> : null}
-        {/* a typed order's «transcript» is its own title — only a voice one says something new */}
+        {/* a typed order's «transcript» is its own title — only a voice one says something new;
+            the whole row is the finger's target (44 px, D-173), its words keep their size */}
         {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
-          <details className="group mt-3">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
+          <details className="group mt-1">
+            <summary className="-mx-1.5 flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 rounded-[10px] px-1.5 text-[13px] leading-4 text-muted transition-colors duration-[120ms] active:bg-white/[0.04] [&::-webkit-details-marker]:hidden">
               <Icon name="quote" size={14} />
               {TEXT.transcriptSpoiler}
               <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">
@@ -134,7 +141,7 @@ export function EmployeeTaskCard({
               </span>
             </summary>
             <blockquote
-              className="mt-2 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted"
+              className="mt-1 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted"
               style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}
             >
               «{task.source_transcript}»
@@ -143,19 +150,20 @@ export function EmployeeTaskCard({
         ) : null}
       </div>
 
-      <div className="mt-4">
-        <Stepper steps={stepsOf(task, now)} now={now} deadline={task.deadline} />
-      </div>
-
+      {/* the buttons come before the steps (D-173): «Принял» stays in sight on a phone, and the
+          steps are where the task stands, not what to do. Handed-in work has no buttons: its
+          steps («Сдана · Проверка») say it waits for the director */}
       {task.status === "sent" ? (
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <Button data-testid="task-action-accept" className="!px-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("accept", task)}>
+        // three keys in a row, each as wide as its words plus an equal share of the rest, the icon
+        // close to its word: in equal thirds «Уточнить» ran its icon into the edge at 360 px (D-173)
+        <div className="mt-4 flex gap-2">
+          <Button data-testid="task-action-accept" className={KEY} icon={<Icon name="check" />} onClick={() => onAction("accept", task)}>
             {BUTTON.accept}
           </Button>
-          <Button variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
+          <Button variant="secondary" className={KEY} icon={<Icon name="question" />} onClick={() => onAction("ask", task)}>
             {BUTTON.ask}
           </Button>
-          <Button variant="danger" className="!px-2 whitespace-nowrap" icon={<Icon name="x" />} onClick={() => onAction("decline", task)}>
+          <Button variant="danger" className={KEY} icon={<Icon name="x" />} onClick={() => onAction("decline", task)}>
             {BUTTON.cant}
           </Button>
         </div>
@@ -172,13 +180,12 @@ export function EmployeeTaskCard({
             {BUTTON.cant}
           </Button>
         </div>
-      ) : task.status === "pending_review" ? (
-        <p className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] bg-surface-2/70 text-[14px] text-muted">
-          <Icon name="clock" size={16} />
-          {TEXT.underReview}
-          {task.completed_at ? <span className="nums">· сдано {humanAqtobe(new Date(task.completed_at), now)}</span> : null}
-        </p>
       ) : null}
+
+      <div className="mt-4">
+        {/* the holder's own steps: a new one «Ждёт вас», not «В работе» (D-173) */}
+        <Stepper steps={stepsOf(task, now, { forAssignee: true })} now={now} deadline={task.deadline} />
+      </div>
 
       <CardFoot href={`/tasks/${task.id}`} />
     </CardShell>

@@ -37,8 +37,12 @@ import {
 import type { TaskActions } from "@/lib/tasks/mutations";
 import { closedAtOf, REASON_TONE, REASON_WORD, reasonFor, statusWord, stepsOf, timeLeft } from "@/lib/tasks/overview";
 import type { Me, TaskMessage, TaskWithPeople } from "@/lib/tasks/queries";
-import { BUTTON, isOverdue, TEXT } from "@/lib/tasks/status-text";
+import { BUTTON, isOverdue, reworkBannerText, reworkCommentOf, TEXT, unreadWordOf, wordText, type TaskStatus } from "@/lib/tasks/status-text";
 import { deadlineToneOf, TONE_VAR, type Tone } from "@/lib/tasks/tone";
+import { useSeenAtOpen, WordBubble } from "./WordBubble";
+
+/** Work the assignee still holds: a word from the director on it waits for them (D-173). */
+const IN_HAND: readonly TaskStatus[] = ["sent", "accepted", "in_progress", "rework", "pending_review"];
 
 /** A question the employee asked and nobody has answered — their own words, waiting. */
 function openQuestionOf(messages: TaskMessage[] | undefined, senderId: string): string | null {
@@ -87,6 +91,9 @@ export function TaskDetail({
   wall?: ReactNode;
 }) {
   const isDirector = me.role === "director";
+  // the assignee reading their own order: who and when are said once, at the top (D-173); a
+  // manager opening a subordinate's task and the director keep «О задаче» whole
+  const mine = !isDirector && task.assignee_id === me.userId;
   const question = latestOpenQuestion(messages);
   const declineReason = latestDeclineReason(messages);
   const myQuestion = isDirector ? null : openQuestionOf(messages, me.userId);
@@ -102,6 +109,13 @@ export function TaskDetail({
       ? ([...(messages ?? [])].reverse().find((message) => (message.meta as Record<string, unknown> | null)?.decline_reason === true)?.created_at ?? null)
       : null;
   const reason = isDirector ? reasonFor(task, question, now, Boolean(request)) : null;
+  // D-173: what the reader has to read stands at the top, where the eye lands — the return's
+  // reason in the director's words, and the other side's word they have not seen yet (it used to
+  // sit ~600 px down, in the thread)
+  const reworkComment = !isDirector && task.status === "rework" ? reworkCommentOf(messages) : null;
+  const seenAtOpen = useSeenAtOpen(task.id, mine ? me.userId : undefined);
+  // `undefined` — the cursor is still being asked for (a cold open): the word waits for it
+  const waiting = mine && IN_HAND.includes(task.status) && seenAtOpen !== undefined ? unreadWordOf(messages, me.userId, seenAtOpen) : null;
 
   const director = useDirectorControls({
     base,
@@ -126,6 +140,10 @@ export function TaskDetail({
   const urgentNow = !task.deadline && task.priority === "high" && !closed;
   const deadlineTone = deadlineToneOf(task, now);
   const left = timeLeft(task, now);
+  // a typed order's «transcript» is its own title — only a voice one says something new
+  const spoken = Boolean(task.source_transcript && task.source_transcript.trim() !== task.title.trim());
+  const facts = !mine;
+  const about = Boolean(task.body || task.source_audio_path || spoken || rule);
   const talk = (messages ?? []).filter((message) => message.type !== "status_change" && message.type !== "system").length;
 
   const keys: DeskAction[] = isDirector
@@ -179,11 +197,34 @@ export function TaskDetail({
           <span
             className="nums inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold leading-4"
             style={{
-              color: closed ? "var(--text-muted)" : urgentNow ? "var(--warn)" : task.deadline ? TONE_VAR[deadlineTone === "accent" ? "muted" : deadlineTone] : "var(--text-muted)",
+              color: closed
+                ? "var(--text-muted)"
+                : urgentNow
+                  ? "var(--warn)"
+                  : // handed-in work has met its deadline: the date stays, the alarm goes — as in the list (D-173)
+                    task.deadline && task.status !== "pending_review"
+                    ? TONE_VAR[deadlineTone === "accent" ? "muted" : deadlineTone]
+                    : "var(--text-muted)",
               borderColor: "color-mix(in srgb, currentColor 35%, transparent)",
             }}
           >
-            <Icon name={closed ? "check" : urgentNow ? "flame" : "clock"} size={13} />
+            {/* a tick only for work accepted: a refusal or a recall is not «done» (D-173) */}
+            <Icon
+              name={
+                closed
+                  ? task.status === "done"
+                    ? "check"
+                    : task.status === "declined"
+                      ? "hand"
+                      : task.passed_to
+                        ? "swap"
+                        : "undo"
+                  : urgentNow
+                    ? "flame"
+                    : "clock"
+              }
+              size={13}
+            />
             {closed
               ? humanAqtobe(new Date(closedAtOf(task)), now)
               : task.deadline
@@ -200,7 +241,8 @@ export function TaskDetail({
           {person ? (
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <Face name={person} size={22} />
-              <span className="truncate text-text/90">{isDirector ? person : `от ${person}`}</span>
+              {/* «Поручил» takes the name as it is: «от Тимур Сапаров» wanted a declension (D-173) */}
+              <span className="truncate text-text/90">{isDirector ? person : `Поручил ${person}`}</span>
             </span>
           ) : null}
           {/* when it was handed out is the first step below; only «уйдёт» is news here */}
@@ -220,7 +262,10 @@ export function TaskDetail({
         ) : null}
 
         <div className="mt-4">
-          <Stepper steps={stepsOf(task, now, { declinedAt })} now={now} deadline={task.deadline} />
+          {/* the assignee hears the deadline twice — the pill above and «осталось» below; a third time
+              under the station («Принять до 18:09») read as a deadline to accept by (D-173) */}
+          {/* the holder reads a new one as «Ждёт вас», not «В работе» (D-173) */}
+          <Stepper steps={stepsOf(task, now, { declinedAt, forAssignee: mine })} now={now} deadline={mine ? null : task.deadline} />
         </div>
 
         {/* what waits on this task: the employee's question, a refusal, a return, a recall */}
@@ -257,7 +302,14 @@ export function TaskDetail({
         ) : null}
         {task.status === "rework" ? (
           <Note tone="warn" icon={<Icon name="rotate" size={15} />}>
-            {isDirector ? "На доработке — ждём новый отчёт" : TEXT.reworkBanner}
+            {isDirector ? (
+              "На доработке — ждём новый отчёт"
+            ) : (
+              // what to fix, in the director's words, up to three lines; the whole of it stays in the thread
+              <span className="line-clamp-3" data-testid="rework-reason">
+                {reworkBannerText(reworkComment)}
+              </span>
+            )}
           </Note>
         ) : null}
         {task.status === "revoked" ? (
@@ -271,6 +323,15 @@ export function TaskDetail({
             </Note>
           )
         ) : null}
+        {waiting ? (
+          <WordBubble
+            name={waiting.message.sender?.full_name ?? task.author?.full_name ?? "Директор"}
+            text={wordText(waiting.message)}
+            at={waiting.message.created_at}
+            now={now}
+            unread={waiting.unread}
+          />
+        ) : null}
         {isDirector ? (
           <LifecycleNotes task={task} request={request} suggestion={suggestion} partial={partial} nudgedAt={nudgedAt} now={now} />
         ) : null}
@@ -282,7 +343,7 @@ export function TaskDetail({
         {canReact ? <ReactionBar taskId={task.id} pointsEnabled={pointsEnabled} className="mt-3" /> : null}
         {/* only the assignee answers: a manager opening a subordinate's task reads it, no more */}
         {!isDirector && task.assignee_id === me.userId ? (
-          <EmployeeButtons task={task} onAction={(action) => employee.press(action, task)} now={now} />
+          <EmployeeButtons task={task} onAction={(action) => employee.press(action, task)} />
         ) : null}
 
         {/* the foot: how much time is left, and — for the director — whether the push was seen */}
@@ -302,52 +363,63 @@ export function TaskDetail({
         </div>
       </article>
 
-      {/* what was said and written, and the facts */}
-      <section className="task-card mt-3 rounded-[18px] px-4 py-3.5" data-testid="task-about">
-        <h2 className="font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted">О задаче</h2>
-        {task.body ? <p className="mt-2 whitespace-pre-line text-[15px] leading-[21px] text-text/90">{task.body}</p> : null}
-        {task.source_audio_path ? <AudioOriginal path={task.source_audio_path} /> : null}
-        {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
-          <details className="group mt-3">
-            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
-              <Icon name="quote" size={14} />
-              {TEXT.transcriptSpoiler}
-              <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">
-                ▾
-              </span>
-            </summary>
-            <blockquote
-              className="mt-2 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted"
-              style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}
-            >
-              «{task.source_transcript}»
-            </blockquote>
-          </details>
-        ) : null}
-        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
-          <Fact label="Исполнитель">{task.assignee?.full_name ?? "—"}</Fact>
-          <Fact label="Поручил">{task.author?.full_name ?? "—"}</Fact>
-          <Fact label="Выдана">
-            <span className="nums">{formatAqtobe(new Date(task.created_at))}</span>
-          </Fact>
-          <Fact label="Срок">
-            <span className="nums" style={overdue ? { color: "var(--danger)" } : undefined}>
-              {task.deadline ? formatAqtobe(new Date(task.deadline)) : urgentNow ? "срочно, без времени" : "без срока"}
-            </span>
-          </Fact>
-          {/* made by a repeating order (D-148): when it comes again; the director stops it in «⋯» */}
-          {rule ? (
-            // the rule's line wraps: «раз в две недели по вторникам и четвергам» does not fit a cell
-            <div className="col-span-2 min-w-0" data-testid="task-repeat">
-              <dt className="text-[12px] leading-4 text-muted">Повторяется</dt>
-              <dd className="mt-0.5 text-[14px] leading-[19px]">
-                {ruleLine(rule)}
-                <span className="text-muted"> · {ruleState(rule).text}</span>
-              </dd>
-            </div>
+      {/* what was said and written, and the facts. The assignee's own order keeps only what is said
+          nowhere else — the director's words and the repeat; who, when given and by when stand at the
+          top already (D-173). Nothing left — no card. */}
+      {facts || about ? (
+        <section className="task-card mt-3 rounded-[18px] px-4 py-3.5" data-testid="task-about">
+          <h2 className="font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted">О задаче</h2>
+          {task.body ? <p className="mt-2 whitespace-pre-line text-[15px] leading-[21px] text-text/90">{task.body}</p> : null}
+          {task.source_audio_path ? <AudioOriginal path={task.source_audio_path} /> : null}
+          {spoken ? (
+            <details className="group mt-1">
+              {/* the whole row opens it — a thumb's height (D-173) */}
+              <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-1.5 text-[13px] leading-4 text-muted [&::-webkit-details-marker]:hidden">
+                <Icon name="quote" size={14} />
+                {TEXT.transcriptSpoiler}
+                <span aria-hidden className="ml-auto transition-transform duration-[120ms] group-open:rotate-180">
+                  ▾
+                </span>
+              </summary>
+              <blockquote
+                className="mb-1 border-l-2 pl-3 text-[14px] italic leading-[19px] text-muted"
+                style={{ borderColor: "color-mix(in srgb, var(--accent) 45%, transparent)" }}
+              >
+                «{task.source_transcript}»
+              </blockquote>
+            </details>
           ) : null}
-        </dl>
-      </section>
+          {facts || rule ? (
+            <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+              {facts ? (
+                <>
+                  <Fact label="Исполнитель">{task.assignee?.full_name ?? "—"}</Fact>
+                  <Fact label="Поручил">{task.author?.full_name ?? "—"}</Fact>
+                  <Fact label="Выдана">
+                    <span className="nums">{formatAqtobe(new Date(task.created_at))}</span>
+                  </Fact>
+                  <Fact label="Срок">
+                    <span className="nums" style={overdue ? { color: "var(--danger)" } : undefined}>
+                      {task.deadline ? formatAqtobe(new Date(task.deadline)) : urgentNow ? "срочно, без времени" : "без срока"}
+                    </span>
+                  </Fact>
+                </>
+              ) : null}
+              {/* made by a repeating order (D-148): when it comes again; the director stops it in «⋯» */}
+              {rule ? (
+                // the rule's line wraps: «раз в две недели по вторникам и четвергам» does not fit a cell
+                <div className="col-span-2 min-w-0" data-testid="task-repeat">
+                  <dt className="text-[12px] leading-4 text-muted">Повторяется</dt>
+                  <dd className="mt-0.5 text-[14px] leading-[19px]">
+                    {ruleLine(rule)}
+                    <span className="text-muted"> · {ruleState(rule).text}</span>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+        </section>
+      ) : null}
 
       {/* the conversation — words, photos, voice and the order's own history in one feed */}
       <h2 className="mt-5 flex items-center gap-2 px-1 font-display text-[12px] font-semibold uppercase leading-4 tracking-[0.09em] text-muted">
@@ -372,17 +444,20 @@ export function TaskDetail({
 }
 
 /** The employee's buttons of FRONTEND «Состояние задачи → набор кнопок» — принцип 2, three at most. */
-function EmployeeButtons({ task, onAction, now }: { task: TaskWithPeople; onAction: (action: EmployeeAction) => void; now: Date }) {
+function EmployeeButtons({ task, onAction }: { task: TaskWithPeople; onAction: (action: EmployeeAction) => void }) {
   if (task.status === "sent") {
+    // each key as wide as its words plus an equal share, the icon close to its word: in equal
+    // thirds «Уточнить» touched its border at 360 px (D-173, as Лента's card)
+    const key = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";
     return (
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <Button data-testid="task-action-accept" className="!px-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onAction("accept")}>
+      <div className="mt-4 flex gap-2">
+        <Button data-testid="task-action-accept" className={key} icon={<Icon name="check" />} onClick={() => onAction("accept")}>
           {BUTTON.accept}
         </Button>
-        <Button variant="secondary" className="!px-2 whitespace-nowrap" icon={<Icon name="question" />} onClick={() => onAction("ask")}>
+        <Button variant="secondary" className={key} icon={<Icon name="question" />} onClick={() => onAction("ask")}>
           {BUTTON.ask}
         </Button>
-        <Button variant="danger" className="!px-2 whitespace-nowrap" icon={<Icon name="x" />} onClick={() => onAction("decline")}>
+        <Button variant="danger" className={key} icon={<Icon name="x" />} onClick={() => onAction("decline")}>
           {BUTTON.cant}
         </Button>
       </div>
@@ -405,10 +480,11 @@ function EmployeeButtons({ task, onAction, now }: { task: TaskWithPeople; onActi
   }
   if (task.status === "pending_review") {
     return (
-      <p className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] bg-surface-2/70 text-[14px] text-muted">
+      // one line: when it was handed in is the station «Сдана» and the foot below — said a third
+      // time here it wrapped into two broken columns (D-173)
+      <p className="mt-4 flex min-h-[44px] items-center justify-center gap-2 rounded-[12px] bg-surface-2/70 px-3 text-[14px] text-muted">
         <Icon name="clock" size={16} />
-        {TEXT.underReview}
-        {task.completed_at ? <span className="nums">· сдано {humanAqtobe(new Date(task.completed_at), now)}</span> : null}
+        <span>{TEXT.underReview}</span>
       </p>
     );
   }

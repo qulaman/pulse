@@ -13,6 +13,12 @@ export type TabItem<K extends string> = {
   count: number;
   /** A tab that asks for a move («Ждут вас», «Новые») wears its count as a lit pill. */
   alert?: Tone;
+  /**
+   * A small dot on the count's corner — something inside needs a look (an overdue order, D-173) —
+   * while the number itself stays neutral; `markLabel` is what a screen reader says for it.
+   */
+  mark?: Tone;
+  markLabel?: string;
 };
 
 /** The thumb is a thing: the object spring (D-166). */
@@ -87,7 +93,8 @@ export function Tabs<K extends string>({
                 data-testid={pending ? undefined : `${testIdPrefix}${item.key}`}
                 disabled={pending}
                 onClick={() => onChange?.(item.key)}
-                className={`relative min-h-[40px] rounded-[10px] px-1 font-display font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
+                // a finger-sized tab: 44 px (`minTapTarget`, D-173)
+                className={`relative min-h-[44px] rounded-[10px] px-1 font-display font-semibold leading-[18px] tracking-[-0.01em] transition-colors duration-[120ms] ${
                   many ? "min-w-0 flex-auto text-[13px]" : "text-[14px]"
                 } ${active ? "text-text" : "text-muted active:text-text"}`}
               >
@@ -95,10 +102,20 @@ export function Tabs<K extends string>({
                 <span className={`relative z-[1] flex items-center justify-center whitespace-nowrap ${many ? "gap-1" : "gap-1.5"}`}>
                   {item.label}
                   <span
-                    className={`nums inline-flex h-[19px] items-center justify-center rounded-full text-[12px] leading-none ${many ? "min-w-[14px] px-0.5" : "min-w-[19px] px-1.5"} ${lit ? "font-bold" : "font-semibold opacity-80"}`}
+                    className={`nums relative inline-flex h-[19px] items-center justify-center rounded-full text-[12px] leading-none ${many ? "min-w-[14px] px-0.5" : "min-w-[19px] px-1.5"} ${lit ? "font-bold" : "font-semibold opacity-80"}`}
                     style={lit ? { background: TONE_VAR[item.alert as Tone], color: "var(--bg)" } : undefined}
                   >
                     {pending ? "" : item.count}
+                    {/* on the corner, so the tab is no wider for it */}
+                    {!pending && item.mark ? (
+                      <span
+                        role="img"
+                        aria-label={item.markLabel}
+                        data-testid={`${testIdPrefix}${item.key}-mark`}
+                        className="absolute -right-0.5 -top-0.5 h-[7px] w-[7px] rounded-full"
+                        style={{ background: TONE_VAR[item.mark], boxShadow: "0 0 0 1.5px var(--bg)" }}
+                      />
+                    ) : null}
                   </span>
                 </span>
               </button>

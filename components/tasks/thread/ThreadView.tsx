@@ -19,6 +19,22 @@ const RECEIPT_TONE = { ok: "var(--ok)", warn: "var(--warn)", muted: "var(--text-
 const END_GAP = 12;
 /** The keyboard has stopped sliding and the browser has stopped scrolling for it. */
 const KEYBOARD_SETTLE_MS = 150;
+/** The thread's end this far under the field's edge still counts as «reading the end» (D-173). */
+const NEAR_END_PX = 40;
+
+/**
+ * Whether the thread's old end was in sight: the bottom of the row that was the last one — or, for a
+ * thread that had none, its top — above the field (what is under the field and the tab bar is not in
+ * sight), give or take a few pixels. `true` when the row is gone.
+ */
+function hadEndInSight(list: HTMLElement | null, rowId: string | null, field: HTMLElement | null): boolean {
+  if (!list) return true;
+  const row = rowId ? [...list.querySelectorAll<HTMLElement>("[data-row]")].find((element) => element.dataset.row === rowId) : null;
+  if (rowId && !row) return true;
+  const edge = row ? row.getBoundingClientRect().bottom : list.getBoundingClientRect().top;
+  const seen = field ? field.getBoundingClientRect().top : window.innerHeight;
+  return edge <= seen + NEAR_END_PX;
+}
 
 export type ThreadViewProps = {
   taskId: string;
@@ -85,19 +101,29 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
   // The thread follows its end while new words arrive. In a sheet it also opens there — the
   // sheet is its own scroller. On the task's screen the thread is part of the page, and the
   // page opens at its top, status first: scrolling the window the moment the messages landed
-  // threw the whole screen up under the finger (D-122).
+  // threw the whole screen up under the finger (D-122). There a new word moves the page only when
+  // the reader had the thread's end in sight — reading the conversation: what the network adds
+  // to the copy kept on the phone (D-127), a word that came while the person was away, threw the
+  // reopened screen 344–469 px up within 0.6 s (D-173). «Had in sight» is where the old last
+  // word ends now — exactly where the thread ended before the new one came under it.
   const count = rows.length;
-  const settled = useRef<number | null>(null);
+  const lastId = rows.length > 0 ? rows[rows.length - 1]!.id : null;
+  // the reader's own word always brings the end into sight: a voice note or a photo sent from the
+  // top of the screen has no keyboard to scroll the page, and a send with nothing to see is sent twice
+  const lastIsMine = rows.length > 0 && userId !== undefined && rows[rows.length - 1]!.sender_id === userId;
+  const settled = useRef<{ count: number; lastId: string | null } | null>(null);
   useEffect(() => {
     if (loading) return;
-    if (settled.current === null) {
-      settled.current = count;
+    const before = settled.current;
+    settled.current = { count, lastId };
+    if (before === null) {
       if (compact && count > 0) scrollToEnd();
       return;
     }
-    if (count > settled.current) scrollToEnd();
-    settled.current = count;
-  }, [count, loading, compact, scrollToEnd]);
+    // nothing new at the end: «Показать раньше» put older words in front
+    if (count <= before.count || lastId === before.lastId) return;
+    if (compact || lastIsMine || hadEndInSight(section.current, before.lastId, dock.current)) scrollToEnd();
+  }, [count, lastId, lastIsMine, loading, compact, scrollToEnd]);
   // The keyboard takes half the screen: once it is out and the browser has stopped scrolling to
   // show the field, the last word moves up above the field. Once per keyboard, not on every move
   // of the viewport — the page and the browser took turns scrolling and the screen shook (2026-10-22).
@@ -178,12 +204,13 @@ export function ThreadView({ taskId, companyId, messages, loading, userId, actio
           {loading && rows.length === 0 ? (
             <p className="text-[14px] leading-[18px] text-muted">Загружаю переписку…</p>
           ) : rows.length === 0 ? (
-            <p className="text-[14px] leading-[18px] text-muted">Сообщений пока нет. Вопрос, отчёт или голосовое — сюда</p>
+            // the day's report has its own place (D-152): the thread does not invite it (D-173)
+            <p className="text-[14px] leading-[18px] text-muted">Сообщений пока нет. Вопрос или голосовое — сюда</p>
           ) : (
             rows.map((message, index) => {
               const system = message.type === "status_change" || message.type === "system";
               return (
-                <div key={message.id}>
+                <div key={message.id} data-row={message.id}>
                   {startsNewDay(rows[index - 1], message) ? <DaySeparator label={dayLabel(message.created_at)} /> : null}
                   {system ? (
                     <SystemRow message={message} />

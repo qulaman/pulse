@@ -129,6 +129,27 @@ export function nearestDeadline(tasks: Groupable[], now: Date = new Date()): str
   return soonest;
 }
 
+/**
+ * What the employee's «Ближайший срок» points at (D-173): the order furthest past its deadline
+ * while one is late (`late`), else the soonest deadline ahead. Handed-in work is left out — its
+ * deadline was met and the move is the director's — and so are closed and scheduled orders.
+ */
+export function mostUrgent<T extends Groupable>(tasks: readonly T[], now: Date = new Date()): { task: T; late: boolean } | null {
+  let late: T | null = null;
+  let next: T | null = null;
+  const time = (task: T) => new Date(task.deadline as string).getTime();
+  for (const task of tasks) {
+    if (!task.deadline || CLOSED.includes(task.status) || task.status === "pending_review" || task.status === "scheduled") continue;
+    if (isOverdue(task, now)) {
+      if (!late || time(task) < time(late)) late = task;
+    } else if (time(task) >= now.getTime() && (!next || time(task) < time(next))) {
+      next = task;
+    }
+  }
+  if (late) return { task: late, late: true };
+  return next ? { task: next, late: false } : null;
+}
+
 /** How many of these are past their deadline right now. */
 export function overdueCount(tasks: Groupable[], now: Date = new Date()): number {
   return tasks.filter((task) => isOverdue(task, now)).length;

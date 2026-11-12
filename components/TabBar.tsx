@@ -34,11 +34,13 @@ const ICONS = {
       <polyline points="2,12 7,12 10,5 14,19 17,10 19,12 22,12" />
     </svg>
   ),
+  // Лента is the face's home: the face itself, not a chat bubble — the bubble is «Сообщения» on
+  // the balls, and the same icon in two places sent people to the wrong one (D-173)
   feed: (
     <svg width="24" height="24" viewBox="0 0 24 24" {...stroke} aria-hidden>
-      <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H9l-5 4z" />
-      <line x1="8" y1="8" x2="16" y2="8" />
-      <line x1="8" y1="11.5" x2="13" y2="11.5" />
+      <circle cx="12" cy="12.5" r="8.5" />
+      <ellipse cx="9.2" cy="11.6" rx="1.5" ry="1.9" fill="currentColor" stroke="none" />
+      <ellipse cx="14.8" cy="11.6" rx="1.5" ry="1.9" fill="currentColor" stroke="none" />
     </svg>
   ),
   tasks: (

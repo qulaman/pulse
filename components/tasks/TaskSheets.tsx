@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState, type ReactNode } from "react";
 
+import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { DateTimeField } from "@/components/ui/datetime/DateTimeField";
@@ -36,10 +37,15 @@ export function AskSheet({ open, onClose, onSubmit }: BaseProps & { onSubmit: (t
 
   return (
     <Sheet open={open} onClose={onClose} title={BUTTON.ask}>
+      {/* a question chip goes to the director at once — one tap (принцип 1) — so it wears the send
+          arrow and a thumb's height; the chips of «Не могу» and «Что сделано?» only choose (D-173) */}
       <div className="mb-3 flex flex-wrap gap-2">
         {QUICK_QUESTIONS.map((question) => (
-          <Chip key={question} onClick={() => submit(question)}>
+          <Chip key={question} data-testid="ask-quick" className="!min-h-[44px] !pr-2.5" onClick={() => submit(question)}>
             {question}
+            <span className="text-accent">
+              <Icon name="send" size={15} />
+            </span>
           </Chip>
         ))}
       </div>
@@ -338,10 +344,11 @@ export function ReportSheet({
           {TEXT.reportPartial}
         </Chip>
       </div>
+      {/* no autofocus: the words are optional, and a keyboard popping up would cover «Выполнено» — the
+          one thing most people came for (D-173) */}
       <textarea
         className={FIELD_CLASS}
         rows={3}
-        data-autofocus
         placeholder={partial ? TEXT.reportPartialPlaceholder : TEXT.reportPlaceholder}
         value={text}
         onChange={(event) => setText(event.target.value)}

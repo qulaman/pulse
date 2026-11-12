@@ -114,10 +114,10 @@ describe("tabs", () => {
     expect(directorTabOf({ status: "revoked" }, null)).toBe("closed");
   });
 
-  it("the employee's piles: to accept, in hand, over", () => {
+  it("the employee's piles: to take up (new and returned, D-173), in hand, over", () => {
     expect(employeeTabOf({ status: "sent" })).toBe("new");
+    expect(employeeTabOf({ status: "rework" })).toBe("new");
     expect(employeeTabOf({ status: "accepted" })).toBe("working");
-    expect(employeeTabOf({ status: "rework" })).toBe("working");
     expect(employeeTabOf({ status: "pending_review" })).toBe("working");
     expect(employeeTabOf({ status: "done" })).toBe("closed");
     expect(employeeTabOf({ status: "declined" })).toBe("closed");
@@ -227,38 +227,54 @@ describe("the director's status screen", () => {
   });
 });
 
-describe("the employee's status screen", () => {
-  it("new work first", () => {
-    const screen = employeeScreen([task({ status: "sent" }), task({ status: "sent" }), task({ status: "accepted" })], NOW);
-    expect(screen.eyebrow).toBe("Новые поручения");
-    expect(screen.value).toBe(2);
-    expect(screen.label).toBe("новых поручения");
-    expect(screen.detail).toBe("примите в работу");
-  });
-
-  it("then what is late", () => {
-    const screen = employeeScreen([task({ status: "accepted", deadline: at("16") }), task({ status: "accepted" })], NOW);
-    expect(screen.tone).toBe("danger");
-    expect(screen.value).toBe(1);
-    expect(screen.label).toBe("дело просрочено");
-  });
-
-  it("then what is in hand, handed-in work counted but quiet", () => {
+describe("the employee's status screen (D-173)", () => {
+  it("one line while orders wait for the person: new, returned and late in work, counted as the badge counts them", () => {
+    const late = task({ status: "accepted", deadline: at("16"), title: "Акт сверки" });
     const screen = employeeScreen(
-      [task({ status: "accepted", deadline: at("17", 18) }), task({ status: "rework" }), task({ status: "pending_review" })],
+      [task({ status: "sent" }), task({ status: "rework" }), late, task({ status: "accepted" }), task({ status: "pending_review", deadline: at("17", 9) })],
       NOW,
     );
-    expect(screen.value).toBe(2);
-    expect(screen.tone).toBe("warn");
-    expect(screen.detail).toBe("ближайший срок сегодня 18:00 · 1 на проверке");
-    expect(screen.segments.map((s) => s.key)).toEqual(["rework", "working", "review"]);
+    expect(screen.variant).toBe("compact");
+    expect(screen.value).toBe(3);
+    expect(screen.label).toBe("дела ждут вас");
+    expect(screen.detail).toBe("1 новое · 1 на доработке · 1 просрочено");
+    expect(screen.tone).toBe("danger");
+    // the late one is named, handed-in work (its deadline met) never is
+    expect(screen.nearest).toEqual({ id: late.id, title: "Акт сверки", who: "", at: late.deadline, late: true });
+  });
+
+  it("a new order alone: one line in the colour of new", () => {
+    const fresh = task({ status: "sent", deadline: at("17", 18) });
+    const screen = employeeScreen([fresh], NOW);
+    expect(screen.variant).toBe("compact");
+    expect([screen.value, screen.label, screen.tone]).toEqual([1, "дело ждёт вас", "accent"]);
+    expect(screen.nearest).toMatchObject({ id: fresh.id, late: false });
+  });
+
+  it("nothing waits: the work in hand is the «В работе» tab's own number, handed-in work counted in it", () => {
+    const soon = task({ status: "accepted", deadline: at("17", 18), title: "Каски" });
+    const screen = employeeScreen([soon, task({ status: "accepted" }), task({ status: "pending_review", deadline: at("17", 13) })], NOW);
+    expect(screen.variant).toBe("lean");
+    expect(screen.eyebrow).toBe("Всё по плану");
+    expect(screen.value).toBe(3);
+    expect(screen.label).toBe("дела в работе");
+    expect(screen.detail).toBe("из них 1 на проверке у директора");
+    expect(screen.tone).toBe("ok");
+    // the nearest deadline is the person's own, not the handed-in one at 13:00
+    expect(screen.nearest).toMatchObject({ id: soon.id, title: "Каски", late: false });
+  });
+
+  it("only handed in: a calm check, the director's move", () => {
+    const screen = employeeScreen([task({ status: "pending_review" })], NOW);
+    expect([screen.variant, screen.value, screen.label, screen.detail]).toEqual(["lean", null, "1 дело на проверке", "директор посмотрит и закроет"]);
   });
 
   it("nothing open", () => {
     const screen = employeeScreen([task({ status: "done", closed_at: at("17", 9) })], NOW);
+    expect(screen.variant).toBe("lean");
     expect(screen.value).toBeNull();
     expect(screen.label).toBe("Открытых дел нет");
-    expect(screen.detail).toBe("Сегодня закрыто: 1");
+    expect(screen.closedToday).toBe(1);
   });
 });
 
@@ -281,13 +297,19 @@ describe("peopleLoad", () => {
 describe("stepsOf", () => {
   const states = (t: ListTask) => stepsOf(t, NOW).map((s) => `${s.label}:${s.state}`);
 
-  it("follows the task from handed out to accepted", () => {
-    expect(states(task({ status: "sent" }))).toEqual(["Выдана:done", "Принять:current", "Сдана:todo", "Принята:todo"]);
+  it("follows the task from handed out to closed, stations named by stages, never a button's verb (D-173)", () => {
+    expect(states(task({ status: "sent" }))).toEqual(["Выдана:done", "В работе:current", "Сдана:todo", "Закрыта:todo"]);
+    // the assignee's own view: a new one waits for them, it is not in work yet (D-173)
+    const mine = (t: ListTask) => stepsOf(t, NOW, { forAssignee: true }).map((s) => `${s.label}:${s.state}`);
+    expect(mine(task({ status: "sent" }))).toEqual(["Выдана:done", "Ждёт вас:current", "Сдана:todo", "Закрыта:todo"]);
+    expect(mine(task({ status: "sent", deadline: at("16") }))[1]).toBe("Ждёт вас:bad");
+    // past «Принял» the assignee reads the same stations as the director
+    expect(mine(task({ status: "accepted", accepted_at: at("15", 10) }))).toEqual(states(task({ status: "accepted", accepted_at: at("15", 10) })));
     expect(states(task({ status: "accepted", accepted_at: at("15", 10) }))).toEqual([
       "Выдана:done",
       "В работе:done",
-      "Сдать:current",
-      "Принята:todo",
+      "Сдача:current",
+      "Закрыта:todo",
     ]);
     expect(states(task({ status: "pending_review", accepted_at: at("15", 10), completed_at: at("16", 10) }))).toEqual([
       "Выдана:done",
@@ -295,11 +317,11 @@ describe("stepsOf", () => {
       "Сдана:done",
       "Проверка:current",
     ]);
-    expect(states(task({ status: "done", closed_at: at("17", 9) }))).toEqual(["Выдана:done", "В работе:done", "Сдана:done", "Принята:done"]);
+    expect(states(task({ status: "done", closed_at: at("17", 9) }))).toEqual(["Выдана:done", "В работе:done", "Сдана:done", "Закрыта:done"]);
   });
 
   it("a late step is red, a detour replaces the step it happened at", () => {
-    expect(states(task({ status: "accepted", deadline: at("16") }))[2]).toBe("Сдать:bad");
+    expect(states(task({ status: "accepted", deadline: at("16") }))[2]).toBe("Сдача:bad");
     expect(states(task({ status: "rework" }))[2]).toBe("Доработка:warn");
     expect(states(task({ status: "declined" }))[1]).toBe("Отказ:bad");
     expect(states(task({ status: "revoked" }))[3]).toBe("Отозвана:bad");
@@ -315,6 +337,10 @@ describe("statusWord", () => {
     expect(statusWord(task({ status: "sent", deadline: at("16") }), "employee", NOW)).toBe("новая · примите");
     expect(statusWord(task({ status: "sent", deadline: at("16") }), "director", NOW)).toBe("просрочена");
     expect(statusWord(task({ status: "pending_review" }), "employee", NOW)).toBe("на проверке");
+    // a return sits with the new ones (D-173): «на доработке», late or not — the short word fits beside the pill
+    expect(statusWord(task({ status: "rework" }), "employee", NOW)).toBe("на доработке");
+    expect(statusWord(task({ status: "rework", deadline: at("16") }), "employee", NOW)).toBe("на доработке");
+    expect(statusWord(task({ status: "rework" }), "director", NOW)).toBe("на доработке");
     expect(statusWord(task({ status: "pending_review" }), "director", NOW)).toBe("на приёмке");
     expect(statusWord(task({ status: "scheduled", scheduled_send_at: at("18", 9) }), "director", NOW)).toBe("уйдёт завтра 09:00");
   });

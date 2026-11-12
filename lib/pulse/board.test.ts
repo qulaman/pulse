@@ -115,6 +115,16 @@ describe("toBoardTask", () => {
     expect(task.question_id).toBe("new");
     expect(task.decline_reason).toBe("Занят срочным");
   });
+
+  it("a task back for rework carries the director's newest words with the return (D-173)", () => {
+    const notes = [
+      { id: "w1", content: "Нет доставки", meta: { rework_comment: true }, created_at: "2026-09-10T01:00:00Z" },
+      { id: "w2", content: " Добавь разгрузку ", meta: { rework_comment: true }, created_at: "2026-09-10T02:00:00Z" },
+    ];
+    expect(toBoardTask(row("a", "Смета", "Марат", "rework"), notes).rework_comment).toBe("Добавь разгрузку");
+    // once it is back in work the old words are not the card's to say
+    expect(toBoardTask(row("a", "Смета", "Марат", "accepted"), notes).rework_comment).toBeNull();
+  });
 });
 
 describe("applyTaskChange", () => {
@@ -162,6 +172,13 @@ describe("applyMessage", () => {
     expect(laneOf(opened[0]!, new Date("2026-09-11T05:00:00Z"), ME)).toBe("question");
     const answered = applyMessage(opened, { id: "t1", task_id: "a", content: "", meta: { ...meta, answered_at: "x", answer: "approved" }, created_at: "2026-09-11T04:00:00Z" }, ME) as BoardTask[];
     expect(answered[0]!.time_request).toBeNull();
+  });
+
+  it("the director's words with a return land on the row live (D-173)", () => {
+    const back = [row("a", "КП", "Марат", "rework")];
+    const said = applyMessage(back, { id: "w1", task_id: "a", content: "Нет цены за доставку", meta: { rework_comment: true }, created_at: "2026-09-11T04:00:00Z" }, ME) as BoardTask[];
+    expect(said[0]!.rework_comment).toBe("Нет цены за доставку");
+    expect(applyMessage(said, { id: "w1", task_id: "a", content: "Нет цены за доставку", meta: { rework_comment: true }, created_at: "2026-09-11T04:00:00Z" }, ME)).toBeNull();
   });
 
   it("the employee's own request is not a message to them (D-128)", () => {

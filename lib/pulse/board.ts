@@ -45,6 +45,8 @@ export type BoardTask = TaskWithPeople & {
   nudged_at?: string | null;
   /** The work was handed in as «сделано не всё» (D-128). */
   partial?: boolean;
+  /** The director's newest words with a return for rework — the card says them, not «комментарий внутри» (D-173). */
+  rework_comment?: string | null;
   /** The newest message of the thread that is not a status line — who wrote it and what. */
   last_message: BoardMessage | null;
   /** The reader's own read cursor on the thread (D-61): messages above it are unread. */
@@ -111,6 +113,7 @@ export function toBoardTask(task: TaskWithPeople, notes: BoardNote[], last: Boar
   const sorted = [...notes].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
   const question = sorted.find((note) => isOpenQuestion(note.meta) && note.content);
   const reason = sorted.find((note) => isDeclineNote(note.meta) && note.content);
+  const rework = task.status === "rework" ? sorted.find((note) => metaOf(note.meta).rework_comment === true && note.content?.trim()) : undefined;
   return {
     ...task,
     question: question?.content ?? null,
@@ -121,6 +124,7 @@ export function toBoardTask(task: TaskWithPeople, notes: BoardNote[], last: Boar
     suggestion: task.status === "declined" ? latestSuggestion(notes) : null,
     nudged_at: lastNudgeAt(notes),
     partial: handedInPartly(task, notes),
+    rework_comment: rework?.content?.trim() ?? null,
     last_message: last,
     seen_seq: seenSeq,
   };
@@ -336,6 +340,9 @@ export function applyMessage(
     next = { ...base, nudged_at: message.created_at };
   } else if (isPartialReport(message.meta) && !current.partial) {
     next = { ...base, partial: true };
+  } else if (metaOf(message.meta).rework_comment === true && message.content?.trim() && message.content.trim() !== current.rework_comment) {
+    // the words come with the return itself: the card says them as soon as the task turns to rework (D-173)
+    next = { ...base, rework_comment: message.content.trim() };
   }
 
   if (!next) return null;
