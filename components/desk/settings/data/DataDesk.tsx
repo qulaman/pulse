@@ -1,5 +1,7 @@
 "use client";
 
+import { ChevronLeft, ChevronRight, Copy, RefreshCw } from "lucide-react";
+import { motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { Column, TableSpec } from "@/components/admin/DataTable";
@@ -21,6 +23,9 @@ import { useCompanyTable, type TableRow } from "@/lib/desk/settings-queries";
 import { usePeople } from "@/lib/people/queries";
 
 const SIZES = [50, 100, 200] as const;
+
+/** The chosen table's line glides under the next tab: the toolbar's spring (D-171). */
+const TAB_GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
 const WIDTH_STORE = "pulse:desk-data-widths:";
 const MIN_WIDTH = 56;
 
@@ -140,7 +145,7 @@ function RecordPanel({ spec, row, names, field }: { spec: TableSpec; row: TableR
           );
         })}
       </dl>
-      <Button size="sm" variant="secondary" className="self-start" onClick={() => copy(JSON.stringify(row, null, 2), "запись")}>
+      <Button size="sm" variant="secondary" className="self-start" onClick={() => copy(JSON.stringify(row, null, 2), "запись")} icon={<Copy size={14} strokeWidth={2} />}>
         Скопировать запись как JSON
       </Button>
     </div>
@@ -236,7 +241,7 @@ function Sheet({ spec, rows, names, onOpen, openKey }: { spec: TableSpec; rows: 
       tabIndex={0}
       onKeyDown={onKeyDown}
       data-testid="data-sheet"
-      className="no-bar relative overflow-auto border-t border-text outline-none focus-visible:border-accent"
+      className="data-sheet no-bar relative overflow-auto border-t border-text outline-none focus-visible:border-accent"
       style={{ height: "calc(100dvh - 300px)", minHeight: 320 }}
     >
       <table className="border-separate border-spacing-0 text-left text-[13px] leading-[18px]" style={{ tableLayout: "fixed", width: total }}>
@@ -389,7 +394,7 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
   return (
     <div className="flex w-full min-w-0 flex-col gap-2">
       <PageTitle title="Данные" state={{ text: "таблицы компании как есть — только чтение" }} />
-      <div role="tablist" aria-label="Таблицы" onKeyDown={tabsKey} className="no-bar flex gap-4 overflow-x-auto" data-testid="data-tables">
+      <div role="tablist" aria-label="Таблицы" onKeyDown={tabsKey} className="data-tabs no-bar flex gap-4 overflow-x-auto" data-testid="data-tables">
         {ADMIN_TABLES.map((t) => {
           const active = t.table === table;
           return (
@@ -401,11 +406,12 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
               tabIndex={active ? 0 : -1}
               data-table={t.table}
               onClick={() => pick(t.table)}
-              className={`h-8 shrink-0 whitespace-nowrap text-[14px] leading-5 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+              className={`data-tab relative h-8 shrink-0 whitespace-nowrap text-[14px] leading-5 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
                 active ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"
               }`}
             >
-              {t.title}
+              {active ? <motion.span layoutId="data-tab-line" aria-hidden className="data-tab-line" transition={TAB_GLIDE} /> : null}
+              <span className="relative">{t.title}</span>
             </button>
           );
         })}
@@ -416,11 +422,11 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
             <span className="nums text-[13px] leading-5 text-muted" data-testid="data-range">
               {query.isPending ? "…" : `${formatNum(from)}–${formatNum(to)} из ${formatNum(total)}`}
             </span>
-            <Button size="sm" variant="ghost" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} title="Предыдущая страница · <" aria-label="Предыдущая страница">
-              ‹
+            <Button size="sm" variant="ghost" className="!px-2" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} title="Предыдущая страница · <" aria-label="Предыдущая страница">
+              <ChevronLeft size={16} strokeWidth={2.25} aria-hidden />
             </Button>
-            <Button size="sm" variant="ghost" disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} title="Следующая страница · >" aria-label="Следующая страница">
-              ›
+            <Button size="sm" variant="ghost" className="!px-2" disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} title="Следующая страница · >" aria-label="Следующая страница">
+              <ChevronRight size={16} strokeWidth={2.25} aria-hidden />
             </Button>
             <Select
               aria-label="Строк на странице"
@@ -437,7 +443,7 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
                 </option>
               ))}
             </Select>
-            <Button size="sm" variant="secondary" loading={query.isFetching && !query.isPending} onClick={() => void query.refetch()} title="Прочитать заново · R">
+            <Button size="sm" variant="secondary" loading={query.isFetching && !query.isPending} onClick={() => void query.refetch()} title="Прочитать заново · R" icon={<RefreshCw size={14} strokeWidth={2} />}>
               Обновить
             </Button>
           </>
@@ -450,13 +456,21 @@ export function DataDesk({ initialTable }: { initialTable: string | null }) {
       </Toolbar>
 
       {query.isPending ? (
-        <div className="flex flex-col gap-2 border-t border-text py-3" aria-hidden>
+        <div className="data-bone flex flex-col gap-2 border-t border-text py-3" aria-hidden>
           {Array.from({ length: 8 }, (_, index) => (
             <Bone key={index} h={18} w={`${60 + ((index * 13) % 35)}%`} />
           ))}
         </div>
       ) : query.isError ? (
-        <EmptyState title="Таблица не прочиталась" hint={query.error instanceof Error ? query.error.message : "Проверьте связь и нажмите «Обновить»"} />
+        <EmptyState
+          title="Таблица не прочиталась"
+          hint={query.error instanceof Error ? query.error.message : "Проверьте связь и попробуйте ещё раз"}
+          action={
+            <Button size="sm" variant="secondary" onClick={() => void query.refetch()}>
+              Повторить
+            </Button>
+          }
+        />
       ) : rows.length === 0 ? (
         <EmptyState title={filter.trim() ? "На этой странице такого нет" : "Таблица пуста"} hint={filter.trim() ? "Фильтр ищет только по открытой странице — листайте или снимите его" : undefined} />
       ) : (

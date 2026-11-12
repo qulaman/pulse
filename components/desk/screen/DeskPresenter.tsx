@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
@@ -78,13 +79,21 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
   const words = presenterWords(stage);
   const done = stage.kind === "point" && stage.point.done;
   const hint = mapHint(points.length);
-
+  // how far the meeting has come: the point in the light of all of them
+  const at = stage.kind === "point" ? stage.at + 1 : 0;
 
   return (
-    <section aria-label="Ведущий" className="border-t border-border/60 py-2" data-testid="desk-presenter">
+    <section aria-label="Ведущий" className="screen-presenter border-t border-border/60 py-2" data-testid="desk-presenter">
       <p className="desk-label uppercase" data-testid="presenter-step">
         {words.eyebrow}
       </p>
+      {points.length > 0 ? (
+        <span aria-hidden className="screen-presenter-steps" style={{ "--steps": points.length } as CSSProperties}>
+          {points.map((point, index) => (
+            <i key={point.id} data-done={point.done ? "" : undefined} data-here={index + 1 === at ? "" : undefined} />
+          ))}
+        </span>
+      ) : null}
       <p className="mt-1 line-clamp-2 text-[14px] font-semibold leading-5" style={done ? { opacity: 0.62 } : undefined} aria-live="polite">
         {done ? "✓ " : null}
         {words.headline}
@@ -92,8 +101,8 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
       {words.line ? <p className="truncate text-[12px] leading-4 text-muted">{words.line}</p> : null}
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <Tooltip label="Предыдущий пункт" keys={["←"]}>
-          <Button size="sm" variant="secondary" aria-label="Предыдущий пункт" disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)}>
-            ◀ Назад
+          <Button size="sm" variant="secondary" aria-label="Предыдущий пункт" icon={<ChevronLeft aria-hidden size={15} strokeWidth={2.2} />} disabled={stage.kind !== "point" || stage.at === 0} onClick={() => presenter.step(-1)}>
+            Назад
           </Button>
         </Tooltip>
         <Tooltip label={done ? "Снять отметку" : "Отметить и дальше"} keys={["Ctrl", "Enter"]}>
@@ -101,6 +110,7 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
             size="sm"
             variant={done ? "secondary" : "primary"}
             aria-label={done ? "Снять отметку с пункта" : "Отметить пункт и перейти к следующему"}
+            icon={<Check aria-hidden size={15} strokeWidth={2.4} />}
             disabled={stage.kind !== "point"}
             onClick={mark}
           >
@@ -115,7 +125,8 @@ export function DeskPresenter({ boardId, points, now }: { boardId: string; point
             disabled={stage.kind === "empty" || (stage.kind === "point" && stage.next === null)}
             onClick={() => presenter.step(1)}
           >
-            {stage.kind === "point" ? "Дальше ▶" : "Начать ▶"}
+            {stage.kind === "point" ? "Дальше" : "Начать"}
+            <ChevronRight aria-hidden size={15} strokeWidth={2.2} className="-mr-1" />
           </Button>
         </Tooltip>
         <Button size="sm" variant="ghost" disabled={stage.kind !== "point"} onClick={presenter.clear}>

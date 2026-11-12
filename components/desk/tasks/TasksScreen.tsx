@@ -1,9 +1,11 @@
 "use client";
 
+import { Bell, CalendarClock, Undo2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { InPanel, useDeskPanel } from "@/components/desk/ui/DeskPanel";
 import { Dialog } from "@/components/desk/ui/Dialog";
@@ -89,6 +91,7 @@ import {
   type StatusFilter,
 } from "@/lib/desk/tasks";
 import { DateRangeField } from "./DateRange";
+import { FaceName, useAvatars } from "./Face";
 import { taggedActions, useWidthBucket, writeParams } from "./flow";
 import { FailedScreen, LoadFailure, LoadNote } from "./LoadState";
 import { MomentBar, type MomentCounter } from "./MomentBar";
@@ -107,17 +110,20 @@ export function TasksSkeleton({ moment = true }: { moment?: boolean }) {
   return (
     <DeskPage>
       <PageTitle title="Задачи" />
-      <SkeletonGroup className="flex flex-col gap-3.5" grow>
+      <SkeletonGroup className="tasks-skel flex flex-col gap-3.5" grow>
+        {/* the moment's own box (a card in «Графит»), so nothing moves when it lands */}
         {moment ? (
-          <div className="flex h-11 items-center gap-4">
-            <Bone h={36} w={32} />
-            <Bone h={18} w={240} />
+          <div className="desk-total">
+            <div className="flex h-11 items-center gap-4">
+              <Bone h={36} w={32} />
+              <Bone h={18} w={240} />
+            </div>
           </div>
         ) : null}
-        <div className="flex h-8 items-center">
+        <div className="tasks-skel-bar flex h-8 items-center">
           <Bone h={14} w="56%" />
         </div>
-        <div className="desk-list">
+        <div className="tasks-skel-grid desk-list">
           {Array.from({ length: 10 }, (_, index) => (
             <div key={index} className="flex h-[34px] items-center">
               <Bone h={14} w="72%" />
@@ -204,6 +210,7 @@ function TasksView({
   const pages = useClosedPages(me.userId);
   const people = usePeople();
   const goneIds = useGoneIds();
+  const avatars = useAvatars();
   const now = useMinute();
   const { pointsEnabled } = useDeskScope();
   const panel = useDeskPanel();
@@ -646,8 +653,9 @@ function TasksView({
     (closedRow(task) ? `закрыта ${closedText(task)}` : !task.deadline && task.priority === "high" ? TEXT.urgent : deadlineLabel(task, now).text);
   // under the floor of «Последнее» the columns keep to lower ceilings: their sum never leaves «Что» under its minimum
   const snug = !columnFits("last", bucket);
-  // «Графит» shows the person's circle before the name (D-171): the column keeps room for it
-  const face = useDeskLook() === "graphite" ? 32 : 0;
+  // «Графит» shows the person's face before the name (D-171, D-174): the column keeps room for it
+  const graphite = useDeskLook() === "graphite";
+  const face = graphite ? 30 : 0;
   const widths = {
     who: fitColumn(shown.map((task) => shortName(task.assignee?.full_name)), { min: 96 + face, max: (snug ? 120 : 160) + face, extra: 10 + face }),
     due: fitColumn([...shown, ...archived].map(dueText), { min: 116, max: archived.length > 0 ? 196 : snug ? 132 : 172, perChar: archived.length > 0 ? 8 : undefined }),
@@ -666,14 +674,15 @@ function TasksView({
       title: (
         <span className="sr-only">Отметка</span>
       ),
-      // no room of its own: the mark hangs in the sheet's margin, the table starts on its vertical
-      width: "0px",
+      // the journal: no room of its own — the mark hangs in the sheet's margin, the table starts on
+      // its vertical; «Графит» holds its rows in a card that clips the margin, so the mark has a slot
+      width: graphite ? "28px" : "0px",
       render: (task) => {
         const on = picked.has(task.id);
         return (
           <>
             {/* a marked row is tinted whole — the cell reaches over the row (it is the positioned parent) */}
-            {on ? <span aria-hidden className="pointer-events-none absolute inset-0 bg-accent/[0.07]" /> : null}
+            {on ? <span aria-hidden className="tasks-picked pointer-events-none absolute inset-0 bg-accent/[0.07]" /> : null}
             <button
               type="button"
               role="checkbox"
@@ -681,14 +690,15 @@ function TasksView({
               aria-label={on ? "Снять отметку" : "Отметить"}
               title={`${on ? "Снять отметку" : "Отметить"} · X`}
               data-testid="desk-row-pick"
+              data-on={on ? "" : undefined}
               onClick={(event) => {
                 event.stopPropagation();
                 pickOne(task.id);
                 setSelected(task.id);
               }}
-              className={`absolute -left-[26px] top-1/2 flex h-4 w-4 -translate-y-1/2 items-center justify-center rounded-[2px] border transition-opacity duration-[120ms] after:absolute after:-inset-y-2 after:-left-1 after:-right-2.5 ${
-                on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`
-              }`}
+              className={`tasks-pick flex h-4 w-4 items-center justify-center rounded-[2px] border transition-opacity duration-[120ms] after:absolute ${
+                graphite ? "relative after:-inset-2" : "absolute -left-[26px] top-1/2 -translate-y-1/2 after:-inset-y-2 after:-left-1 after:-right-2.5"
+              } ${on ? "border-accent bg-accent text-bg opacity-100" : `border-muted/60 ${anyPicked ? "opacity-100" : "opacity-0 [.desk-row:hover_&]:opacity-100 focus-visible:opacity-100"}`}`}
             >
               {on ? (
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
@@ -710,7 +720,17 @@ function TasksView({
             sort: (a, b) => (a.assignee?.full_name ?? "").localeCompare(b.assignee?.full_name ?? "", "ru"),
             render: (task) => (
               <span className="block" data-act-for={task.id} data-act="reassign handoff reissue">
-                <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} gone={!closedRow(task) && goneIds.has(task.assignee_id)} />
+                {graphite ? (
+                  <FaceName
+                    id={task.assignee_id}
+                    name={task.assignee?.full_name}
+                    avatar={avatars.get(task.assignee_id)}
+                    muted={closedRow(task)}
+                    gone={!closedRow(task) && goneIds.has(task.assignee_id)}
+                  />
+                ) : (
+                  <PersonCell name={task.assignee?.full_name} size={24} muted={closedRow(task)} gone={!closedRow(task) && goneIds.has(task.assignee_id)} />
+                )}
               </span>
             ),
           },
@@ -726,13 +746,13 @@ function TasksView({
         const unread = row ? hasUnread(row, me.userId) : false;
         return (
           // one line: the title, then the thread's newest word in grey — a row stays 34 px
-          <span className="flex min-w-0 items-center gap-2.5">
+          <span className="tasks-what flex min-w-0 items-center gap-2.5">
             <span className="shrink-0" data-testid="desk-glyph" data-status={task.status} title={stageOf(task, reasons.get(task.id) ?? null, now).text}>
               <StatusGlyph status={task.status} overdue={isOverdue(task, now)} size={16} />
             </span>
             <span className="flex min-w-0 items-baseline gap-2" title={under ? `${task.title}\n${under}` : task.title}>
               <span className={`min-w-0 shrink truncate font-medium ${closedRow(task) ? "text-text/70" : ""}`}>{task.title}</span>
-              {under ? <span className="min-w-0 max-w-[45%] shrink-[2] truncate text-[13px] text-muted">{under}</span> : null}
+              {under ? <span className="tasks-under min-w-0 max-w-[45%] shrink-[2] truncate text-[13px] text-muted">{under}</span> : null}
             </span>
             {task.recurrence_rule_id ? (
               <span className="shrink-0 text-muted" title="Повторяется">
@@ -741,7 +761,7 @@ function TasksView({
             ) : null}
             {drafts.has(task.id) && task.status !== "revoked" ? <DraftMark /> : null}
             {unread ? (
-              <span aria-label="новое сообщение" title="Новое сообщение" className="shrink-0 text-[12px] leading-4 text-accent">
+              <span aria-label="новое сообщение" title="Новое сообщение" className="tasks-unread shrink-0 text-[12px] leading-4 text-accent">
                 новое
               </span>
             ) : null}
@@ -904,9 +924,20 @@ function TasksView({
     // the chosen row folded away lets go of the choice; an open one keeps the panel
     if (!shut && selected && !openId && section.tasks.some((task) => task.id === selected)) setSelected(null);
   };
+  // grouped by the person, «Графит» opens each group with the person's face
+  const personTitle = (section: Section<TaskWithPeople>) => {
+    const id = section.key.slice("person:".length);
+    if (!graphite) return shortName(section.title);
+    return (
+      <span className="tasks-group-face inline-flex items-center gap-2">
+        <TileFace person={{ id, full_name: section.title, avatar_url: avatars.get(id) ?? null }} size={20} />
+        {shortName(section.title)}
+      </span>
+    );
+  };
   const groups: Group<TaskWithPeople>[] = sections.map((section) => ({
     key: section.key,
-    title: section.key.startsWith("person:") ? shortName(section.title) : section.title,
+    title: section.key.startsWith("person:") ? personTitle(section) : section.title,
     tone: section.tone,
     rows: section.tasks,
     collapsed: folded.has(foldKey(section.key)),
@@ -1082,13 +1113,18 @@ function TasksView({
       {anyPicked ? (
         // the marked rows' bar stands at the screen's foot while the table scrolls (принцип 3: no «Принять» here)
         <div className="sticky bottom-4 z-20 flex justify-center" data-testid="desk-bulk-bar">
-          <div className="flex items-center gap-1 rounded-[2px] border border-text bg-surface px-2 py-1">
-            <span className="nums px-2 text-[13px] leading-4">
-              {marked.length} {pluralRu(marked.length, ["отмечена", "отмечены", "отмечено"])}
+          <div className="tasks-bulk flex items-center gap-1 rounded-[2px] border border-text bg-surface px-2 py-1">
+            <span className="tasks-bulk-count nums px-2 text-[13px] leading-4">
+              {/* the figure is keyed: a new count arrives instead of changing in place */}
+              <b key={marked.length} className="tasks-bulk-n font-[inherit]">
+                {marked.length}
+              </b>{" "}
+              {pluralRu(marked.length, ["отмечена", "отмечены", "отмечено"])}
             </span>
-            <span aria-hidden className="h-5 w-px bg-border" />
+            <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />
             <Tooltip label="Тем, кому не напоминали последние полчаса">
               <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-text" disabled={plan.nudge.length === 0} onClick={bulkNudge} data-bulk="nudge">
+                <Bell aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
                 Напомнить <span className="nums text-muted">{plan.nudge.length}</span>
               </Button>
             </Tooltip>
@@ -1101,13 +1137,15 @@ function TasksView({
                 onClick={() => acts.bulk.extend(plan.extend, bulkAnchor("extend"), unpick)}
                 data-bulk="extend"
               >
+                <CalendarClock aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
                 Перенести срок <span className="nums text-muted">{plan.extend.length}</span>
               </Button>
             </Tooltip>
             <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5 !text-danger" disabled={plan.revoke.length === 0} onClick={() => acts.bulk.revoke(plan.revoke, unpick)} data-bulk="revoke">
+              <Undo2 aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
               Отозвать <span className="nums opacity-70">{plan.revoke.length}</span>
             </Button>
-            <span aria-hidden className="h-5 w-px bg-border" />
+            <span aria-hidden className="tasks-bulk-rule h-5 w-px bg-border" />
             <Button size="sm" variant="ghost" className="!min-h-8 !px-2.5" onClick={unpick} data-testid="desk-bulk-clear">
               Снять <Kbd>Esc</Kbd>
             </Button>

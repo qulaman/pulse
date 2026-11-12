@@ -1,5 +1,6 @@
 "use client";
 
+import { Bell, Clock, Mic, Pin } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
@@ -63,7 +64,7 @@ export function NoteDetail() {
       </div>
     );
   }
-  if (!note) return <div className="ml-10 mt-5 h-[320px] w-full max-w-[680px] bg-surface-2/60" aria-hidden />;
+  if (!note) return <div className="ml-10 mt-5 h-[320px] w-full max-w-[680px] rounded-[12px] bg-surface-2/60" aria-hidden />;
 
   if (note.deleted_at === null && !isConverted(note) && note.board_id === null) return <Thought key={note.id} note={note} />;
   return (
@@ -158,7 +159,7 @@ function Thought({ note }: { note: Note }) {
   return (
     <div className="flex min-h-full flex-col" data-testid="desk-note">
       {/* the bar stays on top while a long note scrolls under it */}
-      <div className="sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 border-b border-text bg-bg pl-10 pr-6">
+      <div className="notes-bar sticky top-0 z-10 flex h-12 shrink-0 items-center gap-1 border-b border-text bg-bg pl-10 pr-6">
         <Tooltip label="Поручить кому-то из команды" side="bottom">
           <Button size="sm" icon={<NoteIcon name="task" size={15} />} disabled={empty} onClick={() => setAssigning(true)} data-testid="desk-note-assign">
             Поручить
@@ -205,12 +206,33 @@ function Thought({ note }: { note: Note }) {
         />
       </div>
 
-      <div className="flex w-full max-w-[760px] flex-1 flex-col px-10 pb-16 pt-5">
-        <p className="mb-3 text-[12px] leading-4 text-muted">
-          <When>{humanAqtobe(new Date(note.created_at))}</When>
-          {note.audio_path ? " · голосом" : ""}
-          {note.pinned ? " · закреплена" : ""}
-          {ringing && reminder ? ` · ${reminder}` : ""}
+      <div className="notes-page flex w-full max-w-[760px] flex-1 flex-col px-10 pb-16 pt-5">
+        <p className="notes-meta mb-3 text-[12px] leading-4 text-muted">
+          <span className="notes-meta-item">
+            <Clock aria-hidden size={12} strokeWidth={2.2} />
+            <When>{humanAqtobe(new Date(note.created_at))}</When>
+          </span>
+          {note.audio_path ? (
+            <span className="notes-meta-item">
+              <span className="notes-meta-sep"> · </span>
+              <Mic aria-hidden size={12} strokeWidth={2.2} />
+              голосом
+            </span>
+          ) : null}
+          {note.pinned ? (
+            <span className="notes-meta-item">
+              <span className="notes-meta-sep"> · </span>
+              <Pin aria-hidden size={12} strokeWidth={2.2} />
+              закреплена
+            </span>
+          ) : null}
+          {ringing && reminder ? (
+            <span className="notes-meta-item" data-tone="warn">
+              <span className="notes-meta-sep"> · </span>
+              <Bell aria-hidden size={12} strokeWidth={2.2} />
+              {reminder}
+            </span>
+          ) : null}
         </p>
         <PageEditor
           key={note.id}
@@ -250,7 +272,7 @@ function Thought({ note }: { note: Note }) {
   );
 }
 
-const BAR_BUTTON = "flex h-9 items-center px-2.5 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2";
+const BAR_BUTTON = "notes-bar-button flex h-9 items-center px-2.5 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2";
 
 function Chevron() {
   return (
@@ -288,7 +310,7 @@ function BarIcon({
         disabled={disabled}
         onClick={onClick}
         data-testid={testId}
-        className={`flex h-9 w-9 items-center justify-center transition-colors duration-[120ms] hover:bg-surface-2 disabled:opacity-40 ${
+        className={`notes-bar-icon flex h-9 w-9 items-center justify-center transition-colors duration-[120ms] hover:bg-surface-2 disabled:opacity-40 ${
           active ? "text-accent" : danger ? "text-muted hover:text-danger" : "text-muted hover:text-text"
         }`}
       >

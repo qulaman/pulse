@@ -25,19 +25,20 @@ import { settingsKey } from "@/lib/settings-query";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { useMe } from "@/lib/tasks/queries";
 
-/** The table's place while the dictionary loads: the toolbar's height, then quiet rows. */
+/** The tab's place while the dictionary loads: the check's strip, then the table's rows with their faces and chips. */
 function Loading() {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-6" aria-hidden>
-      <div className="desk-list">
+    <div className="flex flex-col gap-4" aria-hidden>
+      <Bone h={92} />
+      <div className="dict-bone desk-grid desk-list">
         {Array.from({ length: 7 }, (_, index) => (
-          <div key={index} className="flex items-center gap-4 py-2.5">
+          <div key={index} className="flex items-center gap-3 px-3 py-3">
+            <Bone round w={30} h={30} />
             <Bone h={14} w={160} />
-            <Bone h={22} w={index % 2 ? 180 : 120} className="ml-6" />
+            <Bone h={24} w={index % 2 ? 180 : 120} className="ml-12" />
           </div>
         ))}
       </div>
-      <Bone h={160} />
     </div>
   );
 }
@@ -163,13 +164,13 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
         state={
           waiting.count
             ? { text: waiting.count === 1 ? "Правка ждёт связи — уйдёт сама" : `${waiting.count} ${pluralRu(waiting.count, ["правка ждёт", "правки ждут", "правок ждут"])} связи — уйдут сами` }
-            : { text: "как ИИ слышит имена людей и слова компании — сохраняется сразу" }
+            : { text: "как ИИ слышит людей и слова компании · сохраняется сразу" }
         }
+        // the rules of the open tab one click away, on the head: the toolbar keeps its line for the work
+        actions={<GuideButton steps={tab === "names" ? NAMES_STEPS : WORDS_STEPS} />}
       />
       <Toolbar
         end={
-          <>
-          <GuideButton steps={tab === "names" ? NAMES_STEPS : WORDS_STEPS} />
           <SearchField
             ref={search}
             value={query}
@@ -178,7 +179,6 @@ export function DictionaryDesk({ initialTab }: { initialTab: DictionaryTab }) {
             aria-label={tab === "names" ? "Поиск по людям" : "Поиск по словарю"}
             width={240}
           />
-          </>
         }
       >
         <SegmentTabs

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, type RefObject } from "react";
+import { ArrowRight, CircleCheck, MessagesSquare } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, type CSSProperties, type RefObject } from "react";
 
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
@@ -153,16 +154,23 @@ export function TaskPanel({
   }
   const task = desk.task;
   const scope = () => root.current;
+  // the thread's own words, not the lines of its history
+  const said = (desk.messages ?? []).filter((message) => message.type === "text" || message.type === "voice" || message.type === "photo").length;
 
   return (
     // as tall as the panel at least: the answer field stands at its foot even under a short thread
     <div ref={root} className="flex min-h-[calc(100dvh-40px)] flex-col" data-testid="desk-task-panel" data-task-id={taskId} data-desk-task={taskId}>
       {next ? (
-        <div className="mb-3 mr-9 flex items-baseline gap-2 border-b border-border pb-2 text-[13px] leading-5" data-testid="desk-panel-next">
+        <div className="tasks-next mb-3 mr-9 flex items-baseline gap-2 border-b border-border pb-2 text-[13px] leading-5" data-testid="desk-panel-next">
+          <CircleCheck aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-next-icon shrink-0 self-center" />
           <span className="font-semibold">Готово</span>
           {next.id ? (
-            <button type="button" onClick={next.onGo} className="ml-auto font-medium text-accent hover:underline" data-testid="desk-panel-next-go">
-              следующая →
+            <button type="button" onClick={next.onGo} className="ml-auto inline-flex items-center gap-1 font-medium text-accent hover:underline" data-testid="desk-panel-next-go">
+              следующая
+              <ArrowRight aria-hidden size={14} strokeWidth={2.2} className="tasks-ico" />
+              <span className="tasks-journal-only" aria-hidden>
+                →
+              </span>
             </button>
           ) : (
             <span className="ml-auto text-muted">в списке пусто</span>
@@ -173,17 +181,21 @@ export function TaskPanel({
       <TaskHead desk={desk} now={now} scope={scope} />
       <TaskFacts desk={desk} now={now} onWords={() => focusReply(root.current)} />
 
-      <div className="mt-4 border-t border-text pt-3">
+      <div className="tasks-keys mt-4 border-t border-text pt-3">
         <TaskKeys desk={desk} me={me} now={now} pointsEnabled={pointsEnabled} scope={scope} />
       </div>
 
-      <h3 className="desk-label mt-5 uppercase">Переписка</h3>
-      <div className="mb-3 mt-1 border-t border-text pt-1">
+      <h3 className="tasks-thread-head desk-label mt-5 flex items-center gap-2 uppercase">
+        <MessagesSquare aria-hidden size={14} strokeWidth={2} className="tasks-ico" />
+        Переписка
+        {said > 0 ? <span className="tasks-count nums">{said}</span> : null}
+      </h3>
+      <div className="tasks-thread-box mb-3 mt-1 border-t border-text pt-1" style={{ "--thread-bg": "var(--sheet)" } as CSSProperties}>
         <DeskThread taskId={task.id} me={me} messages={desk.messages} loading={desk.messagesLoading} load={desk.threadLoad} onRetry={desk.retry} actions={desk.acts.actions} />
       </div>
 
       {/* the answer field stays in sight while the thread scrolls under it */}
-      <div className="sticky bottom-0 z-[1] -mx-5 mt-auto bg-surface px-5 pb-1 pt-2">
+      <div className="tasks-dock sticky bottom-0 z-[1] -mx-5 mt-auto bg-surface px-5 pb-1 pt-2">
         {task.status === "revoked" ? (
           <p className="pb-2 text-[13px] leading-5 text-muted" data-testid="thread-closed">
             Задача отозвана — переписка закрыта

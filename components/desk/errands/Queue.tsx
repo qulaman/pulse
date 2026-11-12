@@ -1,5 +1,6 @@
 "use client";
 
+import { Check, LoaderCircle, PenLine } from "lucide-react";
 import { Fragment, useEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -9,13 +10,14 @@ import { useDeskPanel } from "@/components/desk/ui/DeskPanel";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { DECLINE_REASONS, useErrandActions, useErrandLink } from "@/lib/errands/mutations";
-import { waitedFor, type Errand } from "@/lib/errands/queries";
-import { atLine, etaLeftMin, etaLine, QUESTIONS, RESULTS, sceneOf, untilLine } from "@/lib/errands/scene";
+import { useSecretarySetup, waitedFor, type Errand } from "@/lib/errands/queries";
+import { atLine, etaLeftMin, etaLine, QUESTIONS, RESULTS, sceneOf, untilLine, urgencyOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
 import { ETAS } from "./ErrandLink";
+import { AlarmGlyph, ErrandTile, PersonFace, WaitClock } from "./look";
 
 /** How long a request done by her keeps asking «Что передать директору?» at the top of the queue. */
 const RESULT_FOR_MS = 15 * 60_000;
@@ -163,23 +165,25 @@ function Meta({ errand, now, mine }: { errand: Errand; now: Date; mine: boolean 
     parts.push(
       errand.answer ? (
         <span key="q">
-          {errand.question} — <span className="text-text">директор: {errand.answer}</span>
+          {errand.question} — <span className="font-medium text-text">директор: {errand.answer}</span>
         </span>
       ) : (
-        <span key="q">спросили: {errand.question} — ждём ответа</span>
+        <span key="q" className="errands-asked">
+          спросили: {errand.question} — ждём ответа
+        </span>
       ),
     );
   }
   if (parts.length === 0) return null;
   return (
-    <p className="truncate text-[12px] leading-4 text-muted">
+    <span className="min-w-0 truncate">
       {parts.map((part, index) => (
         <span key={index}>
-          {index > 0 ? " · " : ""}
+          {" · "}
           {part}
         </span>
       ))}
-    </p>
+    </span>
   );
 }
 
@@ -205,6 +209,8 @@ function QueueRow({
   catalogue,
   chosen,
   busy,
+  arrived,
+  escalateMin,
   moves,
   onOpen,
 }: {
@@ -214,6 +220,8 @@ function QueueRow({
   catalogue: readonly SecretaryAction[];
   chosen: boolean;
   busy: boolean;
+  arrived: boolean;
+  escalateMin: number;
   moves: RowMoves;
   onOpen: () => void;
 }) {
@@ -234,35 +242,39 @@ function QueueRow({
     <div
       role="row"
       aria-selected={chosen}
-      className={`desk-row grid cursor-default grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-x-3 py-px ${alarm ? "desk-queue-alarm" : ""}`}
+      className={`errands-queue-row desk-row ${alarm ? "desk-queue-alarm" : ""}`}
       onClick={open}
       data-testid="desk-errand-card"
       data-status={errand.status}
       data-chosen={chosen ? "" : undefined}
       data-errand-id={errand.id}
+      data-alarm={alarm ? "" : undefined}
+      data-arrived={arrived ? "" : undefined}
     >
-      <span className="nums truncate text-[13px] leading-5 text-muted" title="Сколько ждёт">
-        {waitedFor(errand, now)}
-      </span>
+      <WaitClock text={waitedFor(errand, now)} urgency={alarm && errand.status === "sent" ? 2 : urgencyOf(errand, now, escalateMin)} />
+      {alarm ? (
+        <span aria-hidden className="errands-tile errands-alarm-tile" style={{ width: 34, height: 34 }}>
+          <AlarmGlyph size={18} />
+        </span>
+      ) : (
+        <ErrandTile errand={errand} catalogue={catalogue} size={34} />
+      )}
       <div className="min-w-0">
-        <p className="truncate text-[14px] leading-5">
-          {alarm ? (
-            <span className="font-semibold" style={{ color: "var(--danger)" }}>
-              Вызови охрану!
-            </span>
-          ) : (
-            <span className="font-medium">{errand.label}</span>
-          )}
+        <p className="truncate text-[15px] leading-5">
+          {alarm ? <span className="errands-alarm-word font-semibold">Вызови охрану!</span> : <span className="font-medium">{errand.label}</span>}
+          {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
+        </p>
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap text-[12px] leading-4 text-muted">
+          <PersonFace id={errand.author_id} name={errand.author?.full_name ?? "Директор"} size={16} />
+          <span className="shrink-0 text-text/80">{shortName(errand.author?.full_name ?? "Директор")}</span>
           {!alarm && errand.due_at ? (
-            <span data-testid="errand-due">
-              {" · "}
+            <span className="shrink-0" data-testid="errand-due">
+              {"· "}
               <When overdue={late}>{atLine(errand.due_at, now)}</When>
             </span>
           ) : null}
-          {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
-          <span className="text-muted"> · {shortName(errand.author?.full_name ?? "Директор")}</span>
+          <Meta errand={errand} now={now} mine={taken} />
         </p>
-        <Meta errand={errand} now={now} mine={taken} />
       </div>
       <div className="flex shrink-0 items-center gap-2.5" data-testid="desk-errand-actions">
         {taken && !errand.eta_at && !guard && !alarm ? (
@@ -327,7 +339,7 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
     <div
       role="row"
       aria-selected={chosen}
-      className="desk-row grid cursor-default grid-cols-[80px_minmax(0,1fr)_auto] items-center gap-x-3 py-px"
+      className="errands-queue-row errands-result-row desk-row"
       onClick={(event) => {
         if (!(event.target as HTMLElement).closest("button, input")) onOpen();
       }}
@@ -335,38 +347,48 @@ function ResultRow({ errand, catalogue, chosen, busy, onSend, onDismiss, onOpen 
       data-chosen={chosen ? "" : undefined}
       data-errand-id={errand.id}
     >
-      <span className="text-[13px] leading-5 text-muted">готово</span>
-      <p className="min-w-0 truncate text-[14px] leading-5">
-        <span className="font-medium">{errand.label}</span>
-        <span className="text-muted"> · что передать?</span>
-      </p>
-      <div className="flex shrink-0 items-center justify-end gap-3 text-[13px] leading-5">
-        {typing ? (
-          <div className="w-[280px]">
-            <WordField
-              placeholder="Своими словами…"
-              action="Передать"
-              busy={busy}
-              autoFocus
-              onSend={(text) => {
-                setTyping(false);
-                onSend(text);
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            {results.map((text, index) => (
-              <button key={text} type="button" disabled={busy} onClick={() => onSend(text)} className="desk-word desk-focus">
-                {text}
-                {chosen ? <KeyCap>{String(index + 1)}</KeyCap> : null}
+      <span className="errands-wait" data-urgency="done">
+        <Check size={13} strokeWidth={2.5} aria-hidden />
+        готово
+      </span>
+      <ErrandTile errand={errand} catalogue={catalogue} size={34} />
+      {/* the question on its line, the ready words under it: the row never cuts what she answers */}
+      <div className="flex min-w-0 flex-col gap-1.5 py-0.5">
+        <p className="min-w-0 truncate text-[15px] leading-5">
+          <span className="font-medium">{errand.label}</span>
+          <span className="text-muted"> · что передать директору?</span>
+        </p>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] leading-5">
+          {typing ? (
+            <div className="w-full max-w-[360px]">
+              <WordField
+                placeholder="Своими словами…"
+                action="Передать"
+                busy={busy}
+                autoFocus
+                onSend={(text) => {
+                  setTyping(false);
+                  onSend(text);
+                }}
+              />
+            </div>
+          ) : (
+            <>
+              {results.map((text, index) => (
+                <button key={text} type="button" disabled={busy} onClick={() => onSend(text)} className="desk-word desk-focus">
+                  {text}
+                  {chosen ? <KeyCap>{String(index + 1)}</KeyCap> : null}
+                </button>
+              ))}
+              <button type="button" onClick={() => setTyping(true)} className="flex h-8 items-center gap-1 px-1.5 text-muted hover:text-text">
+                <PenLine size={13} strokeWidth={2.25} aria-hidden />
+                Своими словами
               </button>
-            ))}
-            <button type="button" onClick={() => setTyping(true)} className="text-muted hover:text-text">
-              Своими словами…
-            </button>
-          </>
-        )}
+            </>
+          )}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center justify-end text-[13px] leading-5">
         <button type="button" onClick={onDismiss} className="flex h-8 items-center text-muted hover:text-text" data-testid="desk-errand-result-skip">
           Не нужно
           {chosen ? <KeyCap>Esc</KeyCap> : null}
@@ -405,6 +427,7 @@ export function QueueList({
   now,
   catalogue,
   openId,
+  fresh,
   onOpen,
   onDismiss,
 }: {
@@ -414,13 +437,21 @@ export function QueueList({
   now: Date;
   catalogue: readonly SecretaryAction[];
   openId: string | null;
+  /** Requests that arrived while she looks (`useArrivals`): they rise in with a moment of the accent. */
+  fresh: ReadonlySet<string>;
   onOpen: (id: string) => void;
   onDismiss: (id: string) => void;
 }) {
   const transition = useErrandActions();
   const link = useErrandLink();
   const panel = useDeskPanel();
-  const items: Item[] = [...results.map((errand) => ({ kind: "result" as const, errand })), ...queue.map((errand) => ({ kind: "errand" as const, errand }))];
+  // an alarm nobody has taken stands above everything, «что передать» included: it is chosen first, Enter takes it
+  const alarming = (errand: Errand) => errand.status === "sent" && sceneOf(errand, catalogue) === "security";
+  const items: Item[] = [
+    ...queue.filter(alarming).map((errand) => ({ kind: "errand" as const, errand })),
+    ...results.map((errand) => ({ kind: "result" as const, errand })),
+    ...queue.filter((errand) => !alarming(errand)).map((errand) => ({ kind: "errand" as const, errand })),
+  ];
   // her own work under a line of its own, once something else stands above it
   const firstTaken = items.findIndex((item) => item.kind === "errand" && item.errand.status !== "sent");
   const [chosen, setChosen] = useState<{ id: string; index: number } | null>(null);
@@ -430,6 +461,7 @@ export function QueueList({
   const [ask, setAsk] = useState<{ errand: Errand; anchor: HTMLElement } | null>(null);
   const choose = (id: string) => setChosen({ id, index: Math.max(0, items.findIndex((item) => item.errand.id === id)) });
   const busyOf = (id: string) => (transition.isPending && transition.variables?.id === id) || (link.isPending && link.variables?.id === id);
+  const escalateMin = useSecretarySetup().data?.escalateAfterMin ?? 3;
 
   const movesOf = (errand: Errand): RowMoves => ({
     accept: () => {
@@ -513,12 +545,14 @@ export function QueueList({
 
   return (
     <>
-      <div role="grid" aria-label="Очередь заявок" className="desk-list">
+      <div role="grid" aria-label="Очередь заявок" className="errands-card errands-queue">
         {items.map((item, index) => (
           <Fragment key={`${item.kind}-${item.errand.id}`}>
             {index === firstTaken && index > 0 ? (
-              <div role="row" className="flex h-[30px] items-end pb-1">
-                <span className="desk-label uppercase">В работе</span>
+              <div role="row" className="errands-queue-label">
+                <LoaderCircle size={13} strokeWidth={2.5} aria-hidden className="desk-spin" />
+                <span>В работе у вас</span>
+                <span className="nums">{items.length - firstTaken}</span>
               </div>
             ) : null}
             {item.kind === "result" ? (
@@ -542,6 +576,8 @@ export function QueueList({
                 catalogue={catalogue}
                 chosen={current?.errand.id === item.errand.id || (current === null && openId === item.errand.id)}
                 busy={busyOf(item.errand.id)}
+                arrived={fresh.has(item.errand.id)}
+                escalateMin={escalateMin}
                 moves={movesOf(item.errand)}
                 onOpen={() => {
                   choose(item.errand.id);

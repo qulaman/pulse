@@ -20,7 +20,8 @@ const INK: Record<WallReceipt["tone"], string> = {
  * to the column — the same screen the office sees, by the same data, whether the kiosk is up or
  * not — set in a flat dark bezel: the wall is a television, not paper (D-158). The receipt on its
  * chin is a line of words: plain while the kiosk answers, red «не отвечает с 16:50» once it has
- * gone silent (D-76 §9). Steady, never blinking. Look only: the frame takes no clicks and no focus.
+ * gone silent (D-76 §9), its diode beside it in the same colour (D-174). Steady, never blinking.
+ * Look only: the frame takes no clicks and no focus.
  * The director opening `/tv` signs nothing for the wall — only the kiosk's role writes its
  * heartbeat (`useHeartbeat`).
  */
@@ -38,8 +39,8 @@ export function WallFrame({ receipt, label }: { receipt: WallReceipt | null; lab
   }, []);
 
   return (
-    <figure className="m-0 bg-bg p-2 pb-0" data-testid="desk-wall-frame">
-      <div ref={box} className="relative w-full overflow-hidden bg-black" style={{ aspectRatio: `${WALL_W} / ${WALL_H}` }} data-testid="desk-wall-preview">
+    <figure className="screen-bezel m-0 bg-bg p-2 pb-0" data-testid="desk-wall-frame">
+      <div ref={box} className="screen-glass relative w-full overflow-hidden bg-black" style={{ aspectRatio: `${WALL_W} / ${WALL_H}` }} data-testid="desk-wall-preview">
         <iframe
           src="/tv"
           title="Стена"
@@ -48,7 +49,9 @@ export function WallFrame({ receipt, label }: { receipt: WallReceipt | null; lab
           style={{ width: WALL_W, height: WALL_H, transform: `scale(${scale})`, visibility: scale > 0 ? "visible" : "hidden" }}
         />
       </div>
-      <figcaption className="flex h-9 items-center gap-2.5" data-testid="desk-wall-receipt" data-tone={receipt?.tone ?? "muted"}>
+      <figcaption className="screen-chin flex h-9 items-center gap-2.5" data-testid="desk-wall-receipt" data-tone={receipt?.tone ?? "muted"}>
+        {/* the diode: the receipt's colour, steady — a wall that went silent is red, never blinking */}
+        <span aria-hidden className="screen-diode" />
         <span className="truncate text-[13px] font-medium leading-[18px]" style={{ color: INK[receipt?.tone ?? "muted"] }}>
           {receipt?.text ?? "Связываюсь со стеной…"}
         </span>

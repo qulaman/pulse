@@ -1,0 +1,1590 @@
+/* ==========================================================================================
+   «Задачи», «Разобрать», the task's panel and the order's editor (D-174) — owned by the tasks
+   group of the desk polish wave. Drawn for «Графит» (`:root[…][data-graphite]`, one step of
+   specificity over the journal); under «Журнал» only what keeps the layout stays, decorative
+   icons hide. Keyframes at top level, `tasks-…`; motion off under «уменьшить движение».
+   ========================================================================================== */
+
+/* the journal is print: the screens' small icons are the graphite look's only */
+html[data-surface="desk"][data-journal]:not([data-graphite]) .tasks-ico {
+  display: none;
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- a face in a list: no halo of the card's colour around it ------------------------- */
+  .tasks-face-name .team-face,
+  .tasks-group-face .team-face {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+  &[data-desk-theme="light"] :is(.tasks-face-name, .tasks-group-face) .team-face {
+    box-shadow: inset 0 0 0 1px rgb(15 17 22 / 0.06);
+  }
+
+  /* ====================================================================================== */
+  /* «Задачи»: the director's work list                                                       */
+  /* ====================================================================================== */
+  [data-desk-tasks] {
+    .tasks-face-name {
+      font-size: 13.5px;
+      line-height: 18px;
+    }
+
+    /* the mark's slot: the checkbox shows under the hand, or once anything is marked */
+    [role="columnheader"]:first-child,
+    [role="gridcell"]:first-child {
+      display: flex;
+      align-items: center;
+      padding: 0 0 0 10px;
+    }
+    [role="columnheader"]:nth-child(2),
+    [role="gridcell"]:nth-child(2) {
+      padding-left: 4px;
+    }
+    .tasks-pick {
+      width: 16px;
+      height: 16px;
+      border-radius: 5px;
+      border-color: var(--line);
+      background: var(--raise);
+      box-shadow: var(--lift);
+      transition:
+        opacity 120ms linear,
+        background-color 120ms linear,
+        border-color 120ms linear,
+        scale 200ms var(--ease-snap);
+
+      &:hover {
+        border-color: color-mix(in srgb, var(--pen) 70%, transparent);
+      }
+      &:active {
+        scale: 0.88;
+        transition-duration: 70ms;
+      }
+      &[data-on] {
+        border-color: var(--pen);
+        background: var(--pen);
+        color: var(--page);
+
+        svg {
+          animation: tasks-tick 220ms var(--ease-snap) both;
+        }
+      }
+    }
+    .tasks-picked {
+      background: color-mix(in srgb, var(--pen) 7%, transparent);
+    }
+
+    /* the head over the columns stays above the groups' heads that stick under it */
+    .desk-grid > [role="row"]:first-child {
+      z-index: 3;
+    }
+    /* a group's head: the tone's dot, the words, the count in a pill — it sticks while its rows scroll */
+    .desk-grid-group {
+      position: sticky;
+      top: 33px;
+      z-index: 2;
+      min-height: 36px;
+      padding: 0 12px;
+      gap: 8px;
+      background: color-mix(in srgb, var(--ink) 2.5%, var(--raise));
+      border-top: 1px solid var(--rule-soft);
+      border-bottom: 1px solid var(--rule-soft);
+
+      .desk-dot {
+        width: 7px;
+        height: 7px;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--group-tone, var(--ink-3)) 22%, transparent);
+      }
+      > .nums,
+      button + .nums {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 18px;
+        padding: 0 6px;
+        border-radius: 9999px;
+        background: var(--surface-2);
+        box-shadow: inset 0 0 0 1px var(--rule-soft);
+        color: var(--ink-2);
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 18px;
+        opacity: 1;
+      }
+      [data-testid="desk-group-toggle"] {
+        gap: 8px;
+
+        > svg {
+          color: var(--ink-3);
+          transition: transform 200ms var(--ease-snap);
+        }
+        &:hover > svg {
+          color: var(--ink);
+        }
+      }
+    }
+    [role="rowgroup"] > .desk-grid-group:first-child {
+      border-top: 0;
+    }
+    /* a person's group says who by the face: the grey dot would only repeat it */
+    .desk-grid-group:has(.tasks-group-face) .desk-dot {
+      display: none;
+    }
+
+    /* rows rise into place when a tab, a group or a filter brings them */
+    [role="rowgroup"] > [role="row"] {
+      animation: tasks-row-in 240ms var(--ease-snap) both;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(2) {
+      animation-delay: 10ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(3) {
+      animation-delay: 20ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(4) {
+      animation-delay: 30ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(5) {
+      animation-delay: 40ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(6) {
+      animation-delay: 50ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(7) {
+      animation-delay: 60ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(8) {
+      animation-delay: 70ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(9) {
+      animation-delay: 80ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(10) {
+      animation-delay: 90ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(11) {
+      animation-delay: 100ms;
+    }
+    [role="rowgroup"] > [role="row"]:nth-child(n + 12) {
+      animation-delay: 110ms;
+    }
+    /* a row changed under the eyes (Realtime, a move): a wash of the pen that dries */
+    .desk-row[data-glow]::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background: color-mix(in srgb, var(--pen) 16%, transparent);
+      animation: tasks-glow 1300ms linear both;
+    }
+
+    /* the row's moves under the hand: they come in from the right over a fade of the row */
+    .desk-row-moves {
+      padding-left: 28px;
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 4.5%, var(--raise)) 26px);
+      animation: tasks-moves-in 170ms var(--ease-snap) both;
+
+      .desk-mini {
+        height: 26px;
+        padding: 0 8px;
+        border-radius: 7px;
+        font-size: 12.5px;
+      }
+    }
+    .desk-row[aria-selected="true"] .desk-row-moves {
+      background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--pen) 9%, var(--raise)) 26px);
+    }
+    [data-testid="desk-row-more"] {
+      border-radius: 7px;
+      color: var(--ink-3);
+    }
+    .desk-row:hover [data-testid="desk-row-more"],
+    .desk-row[aria-selected="true"] [data-testid="desk-row-more"] {
+      color: var(--ink);
+    }
+
+    /* «новое»: a word of the employee waits — a lit pill with its dot */
+    .tasks-unread {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      height: 18px;
+      padding: 0 7px 0 6px;
+      border-radius: 9999px;
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 30%, transparent);
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 18px;
+
+      &::before {
+        content: "";
+        width: 5px;
+        height: 5px;
+        border-radius: 9999px;
+        background: currentColor;
+      }
+    }
+  }
+
+  /* the marked rows' bar: glass that floats over the table's foot */
+  .tasks-bulk {
+    gap: 2px;
+    padding: 5px;
+    border: 0;
+    border-radius: 13px;
+    background: color-mix(in srgb, var(--sheet) 80%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+    backdrop-filter: blur(22px) saturate(1.6);
+    box-shadow: var(--shadow-dialog);
+    animation: tasks-bulk-in 280ms var(--ease-snap) both;
+
+    button {
+      border-radius: 9px;
+      font-family: var(--font-body);
+      font-size: 13px;
+      font-weight: 500;
+      transition:
+        background-color 120ms linear,
+        scale 220ms var(--ease-snap);
+
+      &:hover:not(:disabled) {
+        background: var(--hover);
+      }
+      &:active:not(:disabled) {
+        scale: 0.96;
+        transition-duration: 70ms;
+      }
+      .tasks-ico {
+        color: var(--ink-2);
+      }
+      &[data-bulk="revoke"] .tasks-ico {
+        color: currentColor;
+      }
+    }
+  }
+  .tasks-bulk-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px 0 5px;
+    color: var(--ink-2);
+  }
+  .tasks-bulk-n {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 8px;
+    background: var(--pen);
+    color: var(--page);
+    font-size: 12.5px;
+    font-weight: 700;
+    animation: tasks-pop 260ms var(--ease-snap) both;
+  }
+  .tasks-bulk-rule {
+    margin: 0 3px;
+    background: var(--rule);
+  }
+
+  /* ====================================================================================== */
+  /* The task as a document: the panel, and the card of «Разобрать»                           */
+  /* ====================================================================================== */
+  [data-testid="desk-task-panel"] {
+    --thread-bg: var(--sheet);
+  }
+  .tasks-journal-only {
+    display: none;
+  }
+  .tasks-head {
+    .tasks-head-who .tasks-face-name {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 20px;
+    }
+    [data-testid="desk-field-assignee"] {
+      margin-left: -4px;
+      padding: 3px 8px 3px 4px;
+      border-radius: 9999px;
+
+      &:hover {
+        background: var(--hover);
+      }
+    }
+  }
+  /* the stage: a pill in its ink with its dot */
+  .tasks-stage {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 10px 0 9px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, currentColor 12%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 26%, transparent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 24px;
+    white-space: nowrap;
+
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 9999px;
+      background: currentColor;
+    }
+  }
+  .tasks-title {
+    margin-top: 12px;
+    font-size: 22px;
+    font-weight: 650;
+    line-height: 28px;
+    letter-spacing: -0.022em;
+  }
+  .tasks-head[data-large] .tasks-title {
+    margin-top: 10px;
+    font-size: 30px;
+    font-weight: 650;
+    line-height: 36px;
+    letter-spacing: -0.03em;
+  }
+  /* the fields: a property sheet — an icon and a name on the left, the value on the right */
+  .tasks-fields {
+    grid-template-columns: 104px minmax(0, 1fr);
+    row-gap: 6px;
+    margin-top: 14px;
+
+    dt {
+      color: var(--ink-3);
+    }
+    dd {
+      min-height: 22px;
+      align-items: center;
+    }
+    [data-testid="desk-field-deadline"] {
+      margin-block: -2px;
+      padding-block: 2px;
+      border-radius: 7px;
+    }
+  }
+  .tasks-field-icon {
+    display: inline-flex;
+    color: var(--ink-3);
+  }
+
+  /* the steps: a stepper, the line between two nodes drawing itself in */
+  .tasks-path {
+    margin-top: 18px;
+  }
+  .tasks-steps {
+    column-gap: 0;
+  }
+  .tasks-step {
+    position: relative;
+    padding: 30px 8px 0 0;
+
+    .tasks-step-label {
+      margin-top: 0;
+      font-size: 12.5px;
+      line-height: 16px;
+    }
+  }
+  .tasks-step-bar {
+    position: absolute;
+    top: 10px;
+    left: 28px;
+    right: 6px;
+    height: 2px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--bar) 50%, transparent);
+    transform-origin: left center;
+    animation: tasks-bar-in 460ms var(--ease-snap) both;
+    animation-delay: calc(var(--i) * 110ms + 140ms);
+  }
+  .tasks-step[data-next="todo"] .tasks-step-bar {
+    background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 8px);
+  }
+  .tasks-step:last-child .tasks-step-bar {
+    display: none;
+  }
+  .tasks-step-dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    display: flex;
+    width: 22px;
+    height: 22px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    color: var(--thread-bg, var(--sheet));
+    box-shadow: inset 0 0 0 1.5px var(--line);
+    animation: tasks-dot-in 320ms var(--ease-snap) both;
+    animation-delay: calc(var(--i) * 110ms);
+  }
+  .tasks-step[data-state="done"] .tasks-step-dot {
+    background: var(--ink-2);
+    box-shadow: none;
+  }
+  .tasks-step[data-state="bad"] .tasks-step-dot {
+    background: var(--own);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--own) 18%, transparent);
+  }
+  .tasks-step:is([data-state="current"], [data-state="warn"]) .tasks-step-dot {
+    box-shadow:
+      inset 0 0 0 2px var(--own),
+      0 0 0 4px color-mix(in srgb, var(--own) 14%, transparent);
+
+    /* the step the task stands on: its ink at the heart, a calm breath around it */
+    &::after {
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: var(--own);
+    }
+    &::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: 9999px;
+      border: 2px solid var(--own);
+      animation: tasks-breath 2.4s var(--ease-out, ease-out) 600ms infinite;
+    }
+  }
+
+  /* what waits on the task: a tinted card with the icon of what it is */
+  .tasks-callout {
+    position: relative;
+    margin: 12px 0 0;
+    padding: 10px 12px 10px 38px;
+    border-left: 0;
+    border-radius: 11px;
+    background: color-mix(in srgb, var(--tone) 8%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
+    animation: tasks-rise 280ms var(--ease-snap) both;
+
+    &[data-tone="muted"] {
+      background: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule);
+    }
+  }
+  .tasks-callout-icon {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    color: var(--tone);
+  }
+  .tasks-quick {
+    gap: 6px;
+    margin-top: 10px;
+
+    button {
+      height: 30px;
+      padding: 0 10px 0 6px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--raise);
+      box-shadow: 0 0 0 1px var(--rule), var(--lift);
+      transition:
+        background-color 120ms linear,
+        box-shadow 160ms linear,
+        scale 220ms var(--ease-snap);
+
+      &:hover {
+        background: color-mix(in srgb, var(--pen) 12%, var(--raise));
+        box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent), var(--lift);
+      }
+      &:active {
+        scale: 0.96;
+        transition-duration: 70ms;
+      }
+      > span[aria-hidden]:first-child {
+        display: inline-flex;
+        min-width: 18px;
+        height: 18px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 5px;
+        background: var(--surface-2);
+        box-shadow: inset 0 0 0 1px var(--rule);
+        color: var(--ink-2);
+        font-weight: 600;
+      }
+      &:not([data-quick-answer]):not(.desk-move) {
+        padding: 0 8px 0 10px;
+        background: none;
+        box-shadow: none;
+      }
+    }
+  }
+  .tasks-body {
+    margin-top: 14px;
+    color: var(--ink);
+  }
+  .tasks-nudged .tasks-ico {
+    color: var(--ink-3);
+  }
+  .tasks-photo :is(a, .skeleton) {
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px var(--rule), 0 8px 24px -14px rgb(0 0 0 / 0.6);
+
+    img {
+      transition: transform 420ms var(--ease-snap);
+    }
+    &:hover img {
+      transform: scale(1.03);
+    }
+  }
+  .tasks-transcript summary {
+    width: fit-content;
+    margin-left: -8px;
+    padding: 2px 8px;
+    border-radius: 7px;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .tasks-transcript blockquote {
+    margin: 6px 0 0;
+    padding: 8px 12px;
+    border-left: 0;
+    border-radius: 9px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+  }
+
+  /* the director's buttons under a soft rule */
+  .tasks-keys {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top-color: var(--rule-soft);
+  }
+  /* the reaction: a tray of faces that grow under the hand; the lit one pops */
+  [data-testid="reaction-bar"] {
+    width: fit-content;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    > span:first-child {
+      padding: 0 6px 0 8px;
+      color: var(--ink-3);
+    }
+    [data-reaction] {
+      width: 34px;
+      height: 30px;
+      border-radius: 9px;
+      transition:
+        background-color 120ms linear,
+        scale 220ms var(--ease-snap);
+
+      > span {
+        transition: transform 260ms var(--ease-snap);
+      }
+      &:hover {
+        background: var(--hover);
+      }
+      &:hover > span {
+        transform: scale(1.22) translateY(-1px);
+      }
+      &:active {
+        scale: 0.9;
+        transition-duration: 70ms;
+      }
+      &[aria-pressed="true"] {
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold) 50%, transparent);
+
+        > span {
+          animation: tasks-react 460ms var(--ease-snap) both;
+        }
+      }
+    }
+  }
+
+  /* «Готово · следующая →» — a quiet card of done */
+  .tasks-next {
+    align-items: center;
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ok) 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 26%, transparent);
+    animation: tasks-rise 260ms var(--ease-snap) both;
+  }
+  .tasks-next-icon {
+    color: var(--ok);
+  }
+
+  /* ---- the thread: a timeline ---------------------------------------------------------- */
+  .tasks-thread-head {
+    margin-top: 26px;
+
+    .tasks-ico {
+      color: var(--ink-3);
+    }
+  }
+  .tasks-count {
+    display: inline-flex;
+    min-width: 20px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .tasks-thread-box {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 0;
+  }
+  .tasks-thread {
+    position: relative;
+
+    &::before {
+      content: "";
+      position: absolute;
+      top: 12px;
+      bottom: 8px;
+      left: 11.5px;
+      width: 1px;
+      background: var(--rule);
+    }
+  }
+  .tasks-line {
+    position: relative;
+  }
+  .tasks-msg {
+    position: relative;
+    padding-left: 36px;
+    animation: tasks-rise 240ms var(--ease-snap) both;
+
+    &[data-head] {
+      margin-top: 14px;
+    }
+  }
+  .tasks-msg-face {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    display: flex;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 3px var(--thread-bg, var(--sheet));
+
+    .team-face {
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    }
+  }
+  .tasks-event {
+    position: relative;
+    padding-block: 6px;
+    padding-left: 36px;
+    color: var(--ink-3);
+    animation: tasks-rise 240ms var(--ease-snap) both;
+  }
+  .tasks-event-mark {
+    position: absolute;
+    top: 50%;
+    left: 3px;
+    display: flex;
+    width: 18px;
+    height: 18px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    box-shadow:
+      0 0 0 3px var(--thread-bg, var(--sheet)),
+      inset 0 0 0 1px var(--rule);
+    translate: 0 -50%;
+  }
+  .tasks-event[data-status="done"] .tasks-event-mark {
+    color: var(--ok);
+  }
+  .tasks-event:is([data-status="declined"], [data-status="revoked"]) .tasks-event-mark {
+    color: var(--danger);
+  }
+  .tasks-event:is([data-status="pending_review"], [data-status="rework"]) .tasks-event-mark {
+    color: var(--warn);
+  }
+  .tasks-day {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    padding: 0 0 2px 36px;
+    border-top: 0;
+    color: var(--ink-3);
+    font-size: 11.5px;
+    font-weight: 600;
+
+    &::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--rule-soft);
+    }
+  }
+  .tasks-line:first-child .tasks-day,
+  .tasks-earlier + .tasks-line .tasks-day {
+    margin-top: 2px;
+  }
+  .tasks-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 19px;
+    margin: 3px 0 4px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--tone) 13%, transparent);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  .tasks-msg .tasks-photo,
+  .tasks-msg .tasks-voice {
+    margin-top: 6px;
+  }
+  .tasks-receipt {
+    margin-top: 4px;
+
+    .tasks-ico {
+      color: var(--ink-3);
+    }
+  }
+
+  /* the answer field: a raised card that lights up when it has the caret */
+  .tasks-composer {
+    border: 0;
+    border-radius: 13px;
+    background: var(--raise);
+    box-shadow:
+      0 0 0 1px var(--line),
+      var(--lift),
+      0 10px 28px -16px rgb(0 0 0 / 0.55);
+    transition: box-shadow 180ms linear;
+
+    &:focus-within {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--pen) 14%, transparent),
+        0 10px 28px -16px rgb(0 0 0 / 0.55);
+    }
+    &[data-over] {
+      box-shadow:
+        0 0 0 1.5px var(--pen),
+        0 0 0 6px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    textarea {
+      padding: 12px 14px 6px;
+    }
+    > div:last-child {
+      padding: 0 8px 8px;
+
+      > button:first-child {
+        width: 30px;
+        height: 30px;
+        border-radius: 8px;
+      }
+    }
+  }
+  .tasks-send {
+    height: 30px;
+    padding: 0 10px 0 12px;
+    border-radius: 9px;
+    background: var(--pen);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+    color: var(--page);
+    font-weight: 600;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 86%, #fff);
+      box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+    }
+    &:disabled {
+      opacity: 1;
+      background: var(--surface-2);
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+      color: var(--ink-3);
+    }
+  }
+  .tasks-dock {
+    padding-top: 18px;
+    background: linear-gradient(180deg, transparent, var(--thread-bg, var(--sheet)) 16px);
+  }
+  /* the director's buttons have bodies here: the first one stands inside the sheet, not in its margin */
+  .tasks-keys [data-testid="desk-task-keys"] > div > span:first-child {
+    margin-left: 0;
+  }
+  /* «Ещё» beside three moves: the dots alone, so the moves keep one line */
+  .tasks-more-dots {
+    display: none;
+  }
+  [data-testid="desk-task-more"][data-compact] {
+    padding-inline: 8px;
+
+    .tasks-more-word,
+    > .nums {
+      display: none;
+    }
+    .tasks-more-dots {
+      display: inline-flex;
+    }
+  }
+  /* in «Разобрать» the report's photo stands at the right of the words: the moves stay in sight */
+  .tasks-card [data-testid="desk-task-facts"] {
+    display: flow-root;
+  }
+  .tasks-card [data-testid="desk-task-facts"] .tasks-photo {
+    float: right;
+    width: 260px;
+    margin: 14px 0 6px 24px;
+  }
+  /* in the panel the photo of a report is a print, not a poster: the buttons stay in sight */
+  [data-testid="desk-task-panel"] [data-testid="desk-task-facts"] .tasks-photo {
+    max-width: 260px;
+  }
+
+  /* ====================================================================================== */
+  /* «Разобрать»: one decision at a time                                                      */
+  /* ====================================================================================== */
+  /* the frames while the lists land: the same boxes as what lands */
+  .tasks-skel {
+    gap: 18px;
+  }
+  .tasks-skel-bar {
+    height: 34px;
+  }
+  .tasks-skel-grid {
+    overflow: clip;
+    border-top: 0;
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > div {
+      height: 38px;
+      padding: 0 12px;
+      border-bottom-color: var(--rule-soft);
+    }
+  }
+  .tasks-skel-card {
+    padding: 22px 26px;
+    border-radius: 18px;
+    background: var(--sheet);
+    box-shadow: var(--shadow-pop);
+
+    > div {
+      border-top-color: var(--rule-soft);
+    }
+  }
+  .tasks-skel-queue {
+    padding: 12px 10px 10px;
+    border-radius: 16px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    .desk-list {
+      border-top: 0;
+
+      > div {
+        border-bottom: 0;
+      }
+    }
+  }
+  .tasks-progress {
+    margin-top: -4px;
+  }
+  .tasks-progress-track {
+    gap: 4px;
+    height: 4px;
+
+    > i {
+      position: relative;
+      flex: 1;
+      overflow: hidden;
+      border-radius: 4px;
+      background: var(--rule);
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        transform-origin: left center;
+        transform: scaleX(0);
+      }
+      &[data-s="done"]::after {
+        background: var(--ok);
+        transform: none;
+        animation: tasks-seg-fill 520ms var(--ease-snap) both;
+      }
+      &[data-s="now"]::after {
+        background: var(--pen);
+        box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+        transform: none;
+        animation: tasks-seg-fill 320ms var(--ease-snap) both;
+      }
+    }
+  }
+  .tasks-progress-words {
+    color: var(--ink-3);
+  }
+
+  /* the card in hand: a sheet over the page, the rest of the stack peeking out under it */
+  .tasks-card {
+    --thread-bg: var(--sheet);
+    position: relative;
+    isolation: isolate;
+    padding: 22px 26px 22px;
+    animation: tasks-card-next 360ms var(--ease-snap) both;
+
+    &[data-dir="prev"] {
+      animation-name: tasks-card-prev;
+    }
+    /* the sheet's face */
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      border-radius: 18px;
+      background: var(--sheet);
+      box-shadow: var(--shadow-pop);
+    }
+    /* one or two sheets under it, a step narrower each */
+    &[data-behind]::after {
+      content: "";
+      position: absolute;
+      right: 18px;
+      bottom: -9px;
+      left: 18px;
+      z-index: -2;
+      height: 28px;
+      border-radius: 0 0 16px 16px;
+      background: color-mix(in srgb, var(--sheet) 82%, var(--ink) 4%);
+      box-shadow: inset 0 0 0 1px var(--rule);
+    }
+    &[data-behind="2"]::after {
+      box-shadow:
+        inset 0 0 0 1px var(--rule),
+        0 16px 0 -8px color-mix(in srgb, var(--sheet) 60%, var(--page));
+    }
+    .tasks-keys {
+      margin-top: 22px;
+    }
+  }
+  .tasks-reason {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    padding: 4px 12px 4px 10px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--tone) 11%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 26%, transparent);
+    font-size: 13.5px;
+    line-height: 18px;
+  }
+  .tasks-inbox-thread {
+    --thread-bg: var(--page);
+    margin-top: 10px;
+    padding: 0 26px;
+    animation: tasks-rise 320ms var(--ease-snap) 80ms both;
+
+    .tasks-dock {
+      margin-inline: -26px;
+      padding-inline: 26px;
+    }
+  }
+  .tasks-card + .tasks-inbox-thread,
+  [data-testid="desk-inbox-hint"] {
+    padding-inline: 26px;
+  }
+
+  /* the queue beside: a card of who and why, the one in hand on its rail */
+  .tasks-queue {
+    padding: 12px 10px 10px;
+    border-radius: 16px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > div:first-child {
+      padding: 0 6px 4px;
+    }
+    .desk-list {
+      border-top: 0;
+
+      > li {
+        border-bottom: 0;
+        animation: tasks-rise 260ms var(--ease-snap) both;
+      }
+      > li:nth-child(2) {
+        animation-delay: 30ms;
+      }
+      > li:nth-child(3) {
+        animation-delay: 60ms;
+      }
+      > li:nth-child(4) {
+        animation-delay: 90ms;
+      }
+      > li:nth-child(n + 5) {
+        animation-delay: 120ms;
+      }
+    }
+  }
+  .tasks-queue-item {
+    padding: 7px 8px;
+    border-radius: 10px;
+    transition:
+      background-color 120ms linear,
+      scale 220ms var(--ease-snap);
+
+    &:active {
+      scale: 0.98;
+      transition-duration: 70ms;
+    }
+    .team-face {
+      box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+    }
+  }
+  .tasks-queue-reason {
+    color: var(--tone);
+    font-weight: 500;
+  }
+
+  /* «Всё разобрано»: the tick draws itself */
+  .tasks-done [data-testid="desk-empty"] {
+    padding: 26px 26px;
+    border-radius: 18px;
+
+    > span[aria-hidden] {
+      width: 48px;
+      height: 48px;
+      border-radius: 9999px;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 36%, transparent);
+      animation: tasks-pop 420ms var(--ease-snap) both;
+
+      svg {
+        width: 24px;
+        height: 24px;
+      }
+      path {
+        stroke-dasharray: 24;
+        stroke-dashoffset: 24;
+        animation: tasks-draw 460ms var(--ease-snap) 180ms forwards;
+      }
+    }
+    p.font-display {
+      font-size: 18px;
+      line-height: 24px;
+    }
+  }
+  /* ====================================================================================== */
+  /* The order's editor: the words become tasks                                              */
+  /* ====================================================================================== */
+  .tasks-confirm {
+    [data-testid="desk-panel-head"] {
+      background: color-mix(in srgb, var(--sheet) 86%, transparent);
+      -webkit-backdrop-filter: blur(18px) saturate(1.4);
+      backdrop-filter: blur(18px) saturate(1.4);
+      border-bottom-color: var(--rule-soft);
+    }
+    .tasks-confirm-mark {
+      color: var(--ink-3);
+    }
+  }
+  /* what was heard: a quote bubble with the way it came */
+  .tasks-said {
+    margin-top: 8px;
+    padding: 8px 12px;
+    border-radius: 12px 12px 12px 4px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+
+    .tasks-ico {
+      color: var(--pen);
+    }
+  }
+  .tasks-quote {
+    margin-left: 0;
+    padding: 8px 12px;
+    border-left: 0;
+    border-radius: 12px 12px 12px 4px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+  }
+  .tasks-answer {
+    margin-inline: -10px;
+    padding: 6px 10px;
+    border-radius: 9px;
+  }
+
+  /* each entity a card, rising in one after another */
+  .tasks-entities {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 14px;
+    border-bottom: 0;
+
+    > * {
+      border-width: 0;
+    }
+  }
+  .tasks-entity {
+    padding: 10px 14px 14px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow:
+      0 0 0 1px var(--rule),
+      var(--lift);
+    transition: box-shadow 160ms linear;
+    animation: tasks-entity-in 380ms var(--ease-snap) both;
+    animation-delay: calc(var(--i, 0) * 70ms + 40ms);
+
+    &[data-asks] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--tone) 50%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--tone) 10%, transparent),
+        var(--lift);
+    }
+    &[data-removing] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--danger) 55%, transparent),
+        var(--lift);
+    }
+    &:focus-within:not([data-removing]) {
+      box-shadow:
+        0 0 0 1px var(--line),
+        0 12px 30px -16px rgb(0 0 0 / 0.6),
+        var(--lift);
+    }
+    > header {
+      margin-bottom: 4px;
+    }
+    .tasks-entity-body {
+      gap: 8px;
+    }
+  }
+  .tasks-kind {
+    font-size: 13px;
+
+    .tasks-ico {
+      color: var(--ink-2);
+    }
+  }
+  .tasks-entity-status {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, currentColor 13%, transparent);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .tasks-entity-label {
+    color: var(--ink-3);
+  }
+  .tasks-entity-note {
+    padding-left: 72px;
+    color: var(--ink-3);
+  }
+  .tasks-urgent {
+    height: 26px;
+    padding: 0 9px 0 7px;
+    border-radius: 9999px;
+
+    &[data-on] {
+      background: color-mix(in srgb, var(--warn) 14%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 36%, transparent);
+
+      > span[aria-hidden] {
+        animation: tasks-pop 260ms var(--ease-snap) both;
+      }
+    }
+  }
+  .tasks-remove {
+    height: 26px;
+    padding: 0 8px 0 6px;
+    border-radius: 8px;
+
+    &:hover {
+      background: color-mix(in srgb, var(--danger) 12%, transparent);
+    }
+  }
+
+  /* the fields: soft wells that light up with the caret */
+  .tasks-confirm .desk-input {
+    min-height: 36px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:hover {
+      border: 0;
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    &[data-tone="danger"] {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 60%, transparent);
+    }
+    &[data-tone="warn"] {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 60%, transparent);
+    }
+    &:focus,
+    &:focus-within,
+    &[aria-expanded="true"] {
+      border: 0;
+      background: var(--raise);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 15%, transparent);
+    }
+  }
+  .tasks-confirm textarea.desk-input {
+    padding: 8px 10px;
+  }
+  .tasks-confirm [data-testid="desk-entity-what"] {
+    font-weight: 500;
+  }
+  .tasks-confirm select.field {
+    height: 36px;
+    padding-left: 10px;
+    border: 0;
+    border-radius: 9px;
+    background-color: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    &:hover,
+    &:focus {
+      border: 0;
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+  }
+  .tasks-person-face,
+  .tasks-when-icon {
+    display: inline-flex;
+    margin-left: -2px;
+    color: var(--ink-3);
+
+    .team-face {
+      box-shadow: none;
+    }
+  }
+  .tasks-person[data-tone] .tasks-person-face {
+    color: currentColor;
+  }
+  .tasks-person[data-tone="danger"] {
+    color: var(--danger);
+  }
+  .tasks-person[data-tone="warn"] {
+    color: var(--warn);
+  }
+  .tasks-heard-chip {
+    padding: 2px 8px;
+    border-radius: 9999px;
+    background: var(--raise);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+  }
+  .tasks-candidates button {
+    height: 30px;
+    padding: 0 10px 0 5px;
+    border: 0;
+    border-radius: 9999px;
+    background: var(--raise);
+    box-shadow:
+      0 0 0 1px var(--rule),
+      var(--lift);
+    transition:
+      background-color 120ms linear,
+      box-shadow 160ms linear,
+      scale 220ms var(--ease-snap);
+
+    &:hover {
+      background: color-mix(in srgb, var(--pen) 12%, var(--raise));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent);
+    }
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    kbd {
+      order: 3;
+      height: 18px;
+      min-width: 18px;
+      margin-left: 2px;
+    }
+  }
+  .tasks-candidate-face {
+    display: inline-flex;
+
+    .team-face {
+      box-shadow: none;
+    }
+  }
+  /* the people's list under «Кому»: faces before the names */
+  [data-testid="person-options"] .tasks-option {
+    height: 38px;
+    margin: 0 4px;
+    padding: 0 8px;
+    border-radius: 8px;
+
+    .team-face {
+      box-shadow: none;
+    }
+  }
+  .tasks-why {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--warn) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 26%, transparent);
+  }
+
+  /* the foot: glass over the cards; «Отправить» carries its arrow */
+  .tasks-confirm-foot {
+    border-top-color: var(--rule-soft);
+    background: color-mix(in srgb, var(--sheet) 86%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    backdrop-filter: blur(18px) saturate(1.4);
+  }
+  .tasks-confirm-send {
+    min-height: 34px;
+    padding-inline: 14px 12px;
+
+    .tasks-send-icon {
+      transition: transform 220ms var(--ease-snap);
+    }
+    &:hover:not(:disabled) .tasks-send-icon {
+      transform: translateX(2px);
+    }
+  }
+  /* sent: the cards lift off as it goes; a failure brings them back down */
+  .tasks-confirm[data-sending] {
+    .tasks-entity {
+      animation: tasks-entity-send 520ms cubic-bezier(0.55, 0, 0.7, 0.2) both;
+      animation-delay: calc(var(--i, 0) * 60ms);
+    }
+  }
+}
+
+/* the task's steps in the journal: one stroke of its ink over each step's name (D-158) */
+html[data-surface="desk"][data-journal] {
+  /* «Что» squeezed by the panel: the thread's grey word leaves rather than shrink to a sliver */
+  .tasks-what {
+    container: tasks-what / inline-size;
+  }
+  @container tasks-what (max-width: 330px) {
+    .tasks-under {
+      display: none;
+    }
+  }
+  .tasks-step-bar {
+    background: var(--own);
+  }
+  .tasks-step-dot {
+    display: none;
+  }
+  /* the walk through «Разобрать»: a hairline a task; the row keeps its height with or without words */
+  .tasks-progress {
+    min-height: 16px;
+  }
+  .tasks-progress-track {
+    gap: 3px;
+    height: 2px;
+
+    > i {
+      flex: 1;
+      background: var(--rule);
+    }
+    > i[data-s="done"] {
+      background: var(--ink-2);
+    }
+    > i[data-s="now"] {
+      background: var(--pen);
+    }
+  }
+}
+
+/* ---- motion ---------------------------------------------------------------------------- */
+@keyframes tasks-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes tasks-glow {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes tasks-moves-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+@keyframes tasks-tick {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+@keyframes tasks-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+}
+@keyframes tasks-bulk-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+}
+
+@keyframes tasks-bar-in {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes tasks-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+}
+@keyframes tasks-breath {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+@keyframes tasks-rise {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+}
+@keyframes tasks-react {
+  0% {
+    transform: scale(0.6);
+  }
+  45% {
+    transform: scale(1.45) translateY(-3px);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes tasks-seg-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes tasks-card-next {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.985);
+  }
+}
+@keyframes tasks-card-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-28px) scale(0.985);
+  }
+}
+@keyframes tasks-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes tasks-entity-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+@keyframes tasks-entity-send {
+  to {
+    opacity: 0.3;
+    transform: translateY(-16px) scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface="desk"][data-journal][data-graphite] {
+    [data-desk-tasks] [role="rowgroup"] > [role="row"],
+    [data-desk-tasks] .desk-row[data-glow]::before,
+    [data-desk-tasks] .desk-row-moves,
+    [data-desk-tasks] .tasks-pick svg,
+    .tasks-bulk,
+    .tasks-bulk-n,
+    .tasks-step-bar,
+    .tasks-step-dot,
+    .tasks-step-dot::before,
+    .tasks-callout,
+    .tasks-next,
+    .tasks-msg,
+    .tasks-event,
+    [data-testid="reaction-bar"] [data-reaction] > span,
+    .tasks-progress-track > i::after,
+    .tasks-card,
+    .tasks-inbox-thread,
+    .tasks-queue .desk-list > li,
+    .tasks-done [data-testid="desk-empty"] > span[aria-hidden],
+    .tasks-entity,
+    .tasks-confirm[data-sending] .tasks-entity,
+    .tasks-urgent[data-on] > span[aria-hidden] {
+      animation: none;
+    }
+    .tasks-done [data-testid="desk-empty"] > span[aria-hidden] path {
+      animation: none;
+      stroke-dashoffset: 0;
+    }
+    [data-testid="reaction-bar"] [data-reaction]:hover > span,
+    .tasks-photo :is(a, .skeleton):hover img {
+      transform: none;
+    }
+  }
+}

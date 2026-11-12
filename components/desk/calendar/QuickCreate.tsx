@@ -125,7 +125,7 @@ function QuickBody({
 
   return (
     <form
-      className="desk-fields flex flex-col gap-3 p-4"
+      className="cal-quick desk-fields flex flex-col gap-3 p-4"
       data-testid="desk-quick-create"
       onSubmit={(submit) => {
         submit.preventDefault();

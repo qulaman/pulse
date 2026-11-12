@@ -7,6 +7,7 @@ import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { ItemCard } from "@/components/shop/ItemCard";
 import { Button } from "@/components/ui/Button";
+import { formatNum } from "@/lib/desk/format";
 import { useDeleteShopItem, useSaveShopItem, type ItemDraft, type ShopItem } from "@/lib/shop/queries";
 
 const ICONS = ["🎁", "🧥", "🦺", "🏖️", "💰", "☕", "🎟️", "🍽️", "🎧", "⛽", "📱", "🎫"];
@@ -78,7 +79,7 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
           submit();
         }
       }}
-      className="desk-fields grid grid-cols-[minmax(0,1fr)_260px] gap-6"
+      className="item-form desk-fields grid grid-cols-[minmax(0,1fr)_260px] gap-6"
       data-testid="shop-item-form"
     >
       <div className="flex flex-col gap-3">
@@ -105,7 +106,7 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
                 role="radio"
                 aria-checked={icon === emoji}
                 onClick={() => setIcon(emoji)}
-                className="desk-choice w-8 text-center !text-[16px] !leading-none"
+                className="desk-choice item-icon-choice w-8 text-center !text-[16px] !leading-none"
               >
                 {emoji}
               </button>
@@ -133,14 +134,14 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
             />
             <span className="text-[13px] text-muted">очков</span>
             {PRICES.map((p) => (
-              <button key={p} type="button" aria-pressed={priceNumber === p} onClick={() => setPrice(String(p))} className="desk-choice nums px-1">
-                {p}
+              <button key={p} type="button" aria-pressed={priceNumber === p} onClick={() => setPrice(String(p))} className="desk-choice award-chip nums px-1">
+                {formatNum(p)}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="desk-list">
+        <div className="item-toggles desk-list">
         <div className="flex items-center justify-between gap-4 py-2">
           <div className="min-w-0">
             <label htmlFor="item-counted" className="cursor-pointer text-[14px] font-medium leading-5">
@@ -176,9 +177,9 @@ function ItemForm({ item, companyId, onDone }: { item: ShopItem | null; companyI
       </div>
 
       <div className="flex flex-col gap-2">
-        <span className="desk-label uppercase">Так увидит сотрудник</span>
+        <span className="desk-label item-preview-label uppercase">Так увидит сотрудник</span>
         {/* the employee's phone is dark: the card keeps its tokens, as the wall's preview does */}
-        <ul className="desk-phone-look pointer-events-none p-2" aria-label="Предпросмотр">
+        <ul className="desk-phone-look item-preview pointer-events-none p-2" aria-label="Предпросмотр">
           <ItemCard item={preview} />
         </ul>
       </div>

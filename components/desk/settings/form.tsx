@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, type KeyboardEvent, type ReactNode } from "react";
+import { Check, ChevronRight } from "lucide-react";
+import { motion } from "motion/react";
+import Link from "next/link";
+import { useId, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { SectionLabel } from "@/components/desk/ui/SectionLabel";
+import { Select } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { shortName, useNamesKey } from "@/lib/people/names";
 
 /**
- * The desk's settings form (D-154 wave 3, D-158) — a ruled form, not a pile of panels: a group is
- * a label and a line of what it is for over a rule of print, its rows split by hairlines; a row
- * says what it is and why on the left and holds its control on the right. A changed row carries a
- * line of the pen in the margin until it is saved. Controls are sized for a mouse (36 px) and
- * answer the keys a desktop expects: ↑/↓ step a number or a time, ←/→ move a choice, Space flips a
- * switch.
+ * The desk's settings form (D-154 wave 3, D-158, D-174). A group is a card — its title and a line
+ * of what it is for on top, its settings under it split by hairlines; a setting says what it is
+ * and why on the left and holds its control on the right (or under the words: a list, a table).
+ * A changed row carries a line of the accent on its left edge until it is saved. Controls are
+ * sized for a mouse (36 px) and answer the keys a desktop expects: ↑/↓ step a number or a time,
+ * ←/→ move a choice, Space flips a switch. Under «Журнал» (journal.css) the same markup is a
+ * ruled form: a label over a rule of print, no card (app/desk/settings.css draws both).
  */
 
 /** A person in a ruled list: one line, the name and after it the position in the second voice. */
@@ -28,37 +32,51 @@ export function PersonLine({ name, sub }: { name: string; sub?: string | null })
   );
 }
 
-/** A row's anchor in the page: the settings search lands here (`set-<id>`). */
+/**
+ * A row's anchor in the page: the settings search lands here (`set-<id>`). A control in a row has an
+ * id of its own (`ctl-…`): a label pointing at a row's anchor would reach the row, not the control.
+ */
 export const rowAnchor = (id: string) => `set-${id}`;
 
 const FOCUS = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45";
 
+/**
+ * A group of settings as a card. `tone="danger"` — the end of a tab where a choice cannot be taken
+ * back (the sound deleted after a shorter term): a red ring and the words say so before «Сохранить».
+ */
 export function SettingsGroup({
   id,
   title,
   about,
   action,
+  tone,
   children,
 }: {
   id: string;
   title: string;
   about?: ReactNode;
-  /** On the right of the label: a link to where the rest of it lives. */
+  /** On the right of the title: a link to where the rest of it lives. */
   action?: ReactNode;
+  tone?: "danger";
   children: ReactNode;
 }) {
   return (
-    <section id={rowAnchor(id)} data-settings-group={id} aria-label={title} className="scroll-mt-6">
-      <SectionLabel action={action}>{title}</SectionLabel>
-      {about ? <p className="mb-1 max-w-[620px] text-[13px] leading-[18px] text-muted">{about}</p> : null}
-      <div className="desk-list">{children}</div>
+    <section id={rowAnchor(id)} data-settings-group={id} data-tone={tone} aria-label={title} className="set-card scroll-mt-6">
+      <header className="set-card-head">
+        <div className="min-w-0 flex-1">
+          <h2 className="set-card-title">{title}</h2>
+          {about ? <p className="set-card-about">{about}</p> : null}
+        </div>
+        {action ? <div className="set-card-action">{action}</div> : null}
+      </header>
+      <div className="set-card-rows desk-list">{children}</div>
     </section>
   );
 }
 
 /**
  * One setting: the words on the left, the control on the right. `changed` — the draft differs from
- * what is saved: a 2 px line of the pen in the margin says so before «Сохранить».
+ * what is saved: a 2 px line of the accent on the row's edge says so before «Сохранить».
  */
 export function SettingRow({
   id,
@@ -85,30 +103,25 @@ export function SettingRow({
   const words = (
     <div className="min-w-0">
       {htmlFor ? (
-        <label htmlFor={htmlFor} className="cursor-pointer text-[14px] font-medium leading-5">
+        <label htmlFor={htmlFor} className="set-row-label cursor-pointer">
           {label}
         </label>
       ) : (
-        <p className="text-[14px] font-medium leading-5">{label}</p>
+        <p className="set-row-label">{label}</p>
       )}
-      {hint ? <p className="mt-0.5 max-w-[520px] text-[13px] leading-[18px] text-muted">{hint}</p> : null}
+      {hint ? <p className="set-row-hint">{hint}</p> : null}
     </div>
   );
   return (
-    <div
-      id={rowAnchor(id)}
-      data-setting={id}
-      data-changed={changed ? "" : undefined}
-      className={`relative scroll-mt-24 py-2 transition-opacity duration-[120ms] ${muted ? "opacity-55" : ""}`}
-    >
-      {changed ? <span aria-hidden className="absolute inset-y-1.5 -left-3 w-[2px] bg-accent" /> : null}
+    <div id={rowAnchor(id)} data-setting={id} data-changed={changed ? "" : undefined} data-muted={muted ? "" : undefined} className="set-row relative scroll-mt-24">
+      {changed ? <span aria-hidden className="set-row-mark" /> : null}
       {stack ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {words}
           {children}
         </div>
       ) : (
-        <div className="grid min-h-8 grid-cols-[minmax(120px,1fr)_minmax(0,auto)] items-center gap-6">
+        <div className="grid min-h-8 grid-cols-[minmax(160px,1fr)_minmax(0,auto)] items-center gap-6">
           {words}
           <div className="flex min-w-0 items-center justify-end gap-2">{children}</div>
         </div>
@@ -117,7 +130,7 @@ export function SettingRow({
   );
 }
 
-/** On / off: the desk's small ruled box (journal.css); Space or Enter flips it, the label's click too. */
+/** On / off: a pill that slides under «Графит», the desk's small ruled box under «Журнал»; Space or Enter flips it, the label's click too. */
 export function Switch({
   id,
   checked,
@@ -140,14 +153,14 @@ export function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
+      className="set-switch relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
     >
       <span aria-hidden className="absolute transition-transform duration-[120ms]" />
     </button>
   );
 }
 
-/** A small box for a list of on/off items (the parser's kinds): the whole line is the target. */
+/** A small box for a list of on/off items (the parser's kinds): the whole line is the target, the tick draws itself. */
 export function CheckLine({ checked, onChange, label, hint, disabled = false }: { checked: boolean; onChange: (value: boolean) => void; label: string; hint?: string; disabled?: boolean }) {
   return (
     <button
@@ -156,20 +169,12 @@ export function CheckLine({ checked, onChange, label, hint, disabled = false }: 
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`flex min-h-8 items-center gap-2.5 text-left text-[14px] leading-5 transition-colors duration-[120ms] hover:bg-surface-2/60 disabled:cursor-default disabled:hover:bg-transparent ${FOCUS}`}
+      className={`set-check flex min-h-9 items-center gap-2.5 text-left text-[14px] leading-5 transition-colors duration-[120ms] disabled:cursor-default ${FOCUS}`}
     >
-      <span
-        aria-hidden
-        className="flex h-4 w-4 shrink-0 items-center justify-center border transition-colors duration-[120ms]"
-        style={{
-          background: checked ? (disabled ? "var(--surface-2)" : "var(--text)") : "transparent",
-          borderColor: checked && !disabled ? "var(--text)" : "var(--text-muted)",
-          color: disabled ? "var(--text-muted)" : "var(--bg)",
-        }}
-      >
+      <span aria-hidden className="set-check-box flex h-4 w-4 shrink-0 items-center justify-center" data-on={checked ? "" : undefined}>
         {checked ? (
           <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m2.5 6.2 2.3 2.3L9.5 3.8" />
+            <path d="m2.5 6.2 2.3 2.3L9.5 3.8" pathLength={1} className="set-check-tick" />
           </svg>
         ) : null}
       </span>
@@ -195,7 +200,7 @@ export function NumberInput({
   max = 1000,
   unit,
   label,
-  width = 96,
+  width = 104,
 }: {
   id?: string;
   value: number;
@@ -266,7 +271,7 @@ export function readClock(raw: string): string | null {
 /**
  * A time on the Aqtobe wall clock, typed the way it is said — «9», «930», «18:00» — or stepped:
  * ↑/↓ by `step` minutes, Shift — by an hour. Enter or leaving the field settles it; a time that
- * cannot be read puts the last one back.
+ * cannot be read puts the last one back (and says so on the field while it is typed).
  */
 export function TimeInput({ id, value, onChange, label, step = 15 }: { id?: string; value: string; onChange: (value: string) => void; label: string; step?: number }) {
   const [text, setText] = useState<string | null>(null);
@@ -301,6 +306,7 @@ export function TimeInput({ id, value, onChange, label, step = 15 }: { id?: stri
       inputMode="numeric"
       aria-label={label}
       aria-invalid={bad || undefined}
+      title={bad ? "Так время не прочитать: 9, 930 или 18:00 — иначе останется прежнее" : undefined}
       value={text ?? value}
       placeholder="00:00"
       onChange={(event) => setText(event.target.value)}
@@ -322,6 +328,7 @@ export function TextInput({
   maxLength,
   width = 320,
   className = "",
+  invalid = false,
 }: {
   id?: string;
   value: string;
@@ -331,12 +338,15 @@ export function TextInput({
   maxLength?: number;
   width?: number | string;
   className?: string;
+  /** What is typed cannot be saved as it is: the field says so with its ring, the row's hint in words. */
+  invalid?: boolean;
 }) {
   return (
     <input
       id={id}
       type="text"
       aria-label={label}
+      aria-invalid={invalid || undefined}
       value={value}
       placeholder={placeholder}
       maxLength={maxLength}
@@ -349,11 +359,16 @@ export function TextInput({
 
 export type Choice<V extends string | number> = { value: V; label: ReactNode };
 
+/** The plate under the chosen option glides to the next one: the toolbar's spring (D-171). */
+const SEG_GLIDE = { type: "spring", stiffness: 560, damping: 44, mass: 0.8 } as const;
+
 /**
  * One of two to five, side by side (a radio group in the look of the desk's segments): a click,
- * or ←/→ while it has focus — the choice moves with the focus.
+ * or ←/→ while it has focus — the choice moves with the focus, the plate glides after it.
  */
 export function Segmented<V extends string | number>({ id, value, onChange, items, label }: { id?: string; value: V; onChange: (value: V) => void; items: Choice<V>[]; label: string }) {
+  // one plate per control: two segments of one form never pull each other's plate
+  const glide = `set-seg-${useId()}`;
   const at = Math.max(
     0,
     items.findIndex((item) => item.value === value),
@@ -367,7 +382,7 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
     buttons[next]?.focus();
   };
   return (
-    <div id={id} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="seg inline-flex h-9 items-center gap-0.5 p-0.5">
+    <div id={id} role="radiogroup" aria-label={label} onKeyDown={onKeyDown} className="seg set-seg inline-flex h-9 items-center gap-0.5 p-0.5">
       {items.map((item, index) => {
         const active = index === at;
         return (
@@ -378,11 +393,12 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
             aria-checked={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(item.value)}
-            className={`flex h-8 items-center whitespace-nowrap px-3 text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${FOCUS} ${
+            className={`relative flex h-8 items-center whitespace-nowrap px-3 text-[13px] font-semibold leading-4 transition-colors duration-[120ms] ${FOCUS} ${
               active ? "seg-thumb text-text" : "text-muted hover:text-text"
             }`}
           >
-            {item.label}
+            {active ? <motion.span layoutId={glide} aria-hidden className="seg-glider" transition={SEG_GLIDE} /> : null}
+            <span className="relative z-[1]">{item.label}</span>
           </button>
         );
       })}
@@ -390,7 +406,7 @@ export function Segmented<V extends string | number>({ id, value, onChange, item
   );
 }
 
-/** The browser's select in the desk's field (its chevron is ours, globals.css). */
+/** A choice from a list, in the desk's own select (the system's stays inside, carrying the value). */
 export function SelectInput<V extends string>({
   id,
   value,
@@ -407,33 +423,30 @@ export function SelectInput<V extends string>({
   width?: number;
 }) {
   return (
-    <select
-      id={id}
-      aria-label={label}
-      value={value}
-      onChange={(event) => onChange(event.target.value as V)}
-      className="field h-9 min-w-0 cursor-pointer pl-3 text-[14px] leading-5"
-      style={{ width }}
-    >
-      {items.map((item) => (
-        <option key={item.value} value={item.value}>
-          {item.label}
-        </option>
-      ))}
-    </select>
+    <span className="inline-flex min-w-0 max-w-full" style={{ width }}>
+      <Select id={id} aria-label={label} value={value} onChange={(event) => onChange(event.target.value as V)} className="w-full">
+        {items.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </Select>
+    </span>
   );
 }
 
 /**
  * The one bar of a tab with edits (D-154 wave 3): what is unsaved, «Отменить» and «Сохранить» with
- * its key — the form's closing rule, stuck to the bottom of the window while the form is longer
- * than the window. Gone when there is nothing to save.
+ * its key — under «Графит» a floating bar that rises at the foot of the window, under «Журнал» the
+ * form's closing rule; stuck to the bottom of the window either way. Gone when there is nothing to
+ * save.
  */
 export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes: string[]; saving: boolean; onSave: () => void; onReset: () => void; blocked?: string | null }) {
   if (changes.length === 0) return null;
   return (
-    <div className="sticky bottom-0 z-10 bg-bg pb-3" data-testid="settings-savebar">
-      <div className="card-in flex items-center gap-3 border-t border-text pt-2">
+    <div className="set-savebar-dock sticky bottom-0 z-10 bg-bg pb-3" data-testid="settings-savebar">
+      <div className="set-savebar card-in flex items-center gap-3 border-t border-text pt-2" role="status">
+        <span aria-hidden className="set-savebar-dot" data-blocked={blocked ? "" : undefined} />
         <p className="min-w-0 flex-1 truncate text-[14px] leading-5">
           <span className="font-medium">Не сохранено:</span> <span className="text-muted">{changes.join(", ")}</span>
           {blocked ? <span className="text-warn"> · {blocked}</span> : null}
@@ -445,7 +458,7 @@ export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes
           <Kbd>Ctrl</Kbd>
           <Kbd>S</Kbd>
         </span>
-        <Button size="sm" loading={saving} disabled={Boolean(blocked)} onClick={onSave} data-testid="settings-save">
+        <Button size="sm" loading={saving} disabled={Boolean(blocked)} onClick={onSave} data-testid="settings-save" icon={<Check size={15} strokeWidth={2.5} />}>
           Сохранить
         </Button>
       </div>
@@ -455,5 +468,15 @@ export function SaveBar({ changes, saving, onSave, onReset, blocked }: { changes
 
 /** A line under a group: where the rest of it lives on the desk. */
 export function GroupNote({ children }: { children: ReactNode }) {
-  return <p className="text-[13px] leading-[18px] text-muted">{children}</p>;
+  return <p className="set-note text-[13px] leading-[18px] text-muted">{children}</p>;
+}
+
+/** A link on a group's head to the screen where the rest of it lives — words and an arrow. */
+export function GroupLink({ href, children, testId }: { href: string; children: ReactNode; testId?: string }) {
+  return (
+    <Link href={href} data-testid={testId} className="set-link inline-flex items-center gap-0.5 text-[13px] font-medium">
+      {children}
+      <ChevronRight size={14} strokeWidth={2.25} aria-hidden className="set-link-arrow" />
+    </Link>
+  );
 }

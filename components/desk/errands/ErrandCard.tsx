@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { BellRing, CircleHelp, Heart } from "lucide-react";
 
 import { TONE_VAR } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
@@ -15,59 +15,58 @@ import { receiptLine } from "@/lib/tasks/receipts";
 import { CancelErrandButton } from "./cancel";
 import { ErrandActions } from "./ErrandActions";
 import { DirectorLink, SecretaryLink } from "./ErrandLink";
+import { AlarmGlyph, ErrandTile, PersonFace } from "./look";
 import { STATUS_TONE, STATUS_WORD, canCancel, canThank } from "./words";
 
-/** The request itself: who asked and how long ago, what, by when, the note, the question and its answer. */
-function ErrandBody({ errand, now, catalogue, big = false }: { errand: Errand; now: Date; catalogue: readonly SecretaryAction[]; big?: boolean }) {
+/** The request itself: its scene's tile, what, by when, the note; who asked and how long ago; the question and its answer. */
+function ErrandBody({ errand, now, catalogue }: { errand: Errand; now: Date; catalogue: readonly SecretaryAction[] }) {
   // a namesake gets the surname's initial once the roster has come (D-146)
   useNamesKey();
   const alarm = sceneOf(errand, catalogue) === "security";
-  const eta = errand.claimed_by ? etaLine(etaLeftMin(errand, now)) : null;
   const late = Boolean(errand.due_at) && isActive(errand) && new Date(errand.due_at as string) < now;
   return (
-    <>
-      <p className="text-[12px] leading-4 text-muted">
-        {shortName(errand.author?.full_name ?? "Директор")} · {isActive(errand) ? waitedFor(errand, now) : humanAqtobe(new Date(errand.created_at), now)}
-        {errand.until_at ? ` · ${untilLine(errand.until_at)}` : ""}
-      </p>
-      <p className={`mt-0.5 ${big ? "desk-figure text-[22px] leading-7" : "text-[16px] font-semibold leading-[22px]"}`} style={alarm ? { color: "var(--danger)" } : undefined}>
-        {alarm && isActive(errand) ? "Вызови охрану!" : errand.label}
-        {/* «к 18:00» (D-106 §8): the time it is needed by, beside the request itself */}
-        {!alarm && errand.due_at ? (
-          <span className="text-[15px]" data-testid="errand-due">
-            {" · "}
-            <When overdue={late}>{atLine(errand.due_at, now)}</When>
-          </span>
-        ) : null}
-      </p>
-      {errand.note ? <p className="mt-0.5 text-[14px] leading-5 text-muted">{errand.note}</p> : null}
-      {eta && errand.status === "accepted" ? <p className="mt-0.5 text-[12px] leading-4 text-muted">Обещано: {eta}</p> : null}
-      {errand.question ? (
-        <p className="mt-1 text-[13px] leading-[18px]">
-          <span className="text-muted">{errand.question} — </span>
-          {errand.answer ? (
-            <span className="font-semibold">Директор: {errand.answer}</span>
-          ) : (
-            <span className="text-muted">ждём ответа</span>
-          )}
+    <div className="flex items-start gap-3.5">
+      {alarm && isActive(errand) ? (
+        <span aria-hidden className="errands-tile errands-alarm-tile" style={{ width: 44, height: 44 }}>
+          <AlarmGlyph size={22} />
+        </span>
+      ) : (
+        <ErrandTile errand={errand} catalogue={catalogue} size={44} muted={errand.status === "cancelled"} />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[12px] leading-4 text-muted">
+          {shortName(errand.author?.full_name ?? "Директор")} · {isActive(errand) ? waitedFor(errand, now) : humanAqtobe(new Date(errand.created_at), now)}
+          {errand.until_at ? ` · ${untilLine(errand.until_at)}` : ""}
         </p>
-      ) : null}
-    </>
+        <p className="desk-figure mt-0.5 text-[22px] leading-7 [overflow-wrap:anywhere]" style={alarm ? { color: "var(--danger)" } : undefined}>
+          {alarm && isActive(errand) ? "Вызови охрану!" : errand.label}
+          {/* «к 18:00» (D-106 §8): the time it is needed by, beside the request itself */}
+          {!alarm && errand.due_at ? (
+            <span className="text-[15px] font-medium" data-testid="errand-due">
+              {" · "}
+              <When overdue={late}>{atLine(errand.due_at, now)}</When>
+            </span>
+          ) : null}
+        </p>
+        {errand.note ? <p className="mt-0.5 text-[14px] leading-5 text-muted">{errand.note}</p> : null}
+        <p className="mt-2">
+          <span className="errands-status" data-status={errand.status} style={{ color: TONE_VAR[STATUS_TONE[errand.status]] }}>
+            {STATUS_WORD[errand.status]}
+          </span>
+          {errand.decline_reason ? <span className="text-[13px] text-muted"> · {errand.decline_reason}</span> : null}
+        </p>
+      </div>
+    </div>
   );
 }
 
-/** «Спасибо ♥» — a reaction, not a state; the RPC keeps the first one (D-97). */
+/** «Спасибо» — a reaction, not a state; the RPC keeps the first one (D-97). */
 export function ThankButton({ errand }: { errand: Errand }) {
   const thank = useThankErrand();
   return (
-    <button
-      type="button"
-      className="text-[13px] leading-4 text-muted hover:text-text disabled:opacity-40"
-      disabled={thank.isPending}
-      onClick={() => thank.mutate(errand.id)}
-      data-testid="desk-errand-thank"
-    >
-      Спасибо ♥
+    <button type="button" className="errands-thank desk-focus" disabled={thank.isPending} onClick={() => thank.mutate(errand.id)} data-testid="desk-errand-thank">
+      <Heart size={13} strokeWidth={2.25} aria-hidden />
+      Спасибо
     </button>
   );
 }
@@ -78,23 +77,75 @@ function Receipt({ errand, now }: { errand: Errand; now: Date }) {
   const line = receiptLine(receipt.data, now);
   if (!line) return null;
   return (
-    <p className={`text-[13px] leading-4 ${line.tone === "muted" ? "text-muted" : ""}`}>Секретарю: {line.text}</p>
+    <p className="errands-receipt" data-tone={line.tone}>
+      <BellRing size={14} strokeWidth={2.25} aria-hidden />
+      <span>Секретарю: {line.text}</span>
+    </p>
   );
 }
 
-function Fact({ label, children }: { label: string; children: ReactNode }) {
+type Step = { key: string; word: string; at: string | null; who?: { id: string | null; name: string } | null; note?: string | null; state: "done" | "now" | "next" | "off" };
+
+/** The request's way as steps: asked, taken, done — or where it stopped (declined, cancelled). */
+function stepsOf(errand: Errand, now: Date): Step[] {
+  const author = { id: errand.author_id, name: errand.author?.full_name ?? "Директор" };
+  const taker = errand.claimed_by ? { id: errand.claimed_by, name: errand.claimed?.full_name ?? "Секретарь" } : null;
+  const asked: Step = { key: "asked", word: "Попросили", at: errand.created_at, who: author, state: "done" };
+  if (errand.status === "declined") {
+    return [asked, { key: "declined", word: "Не смогли", at: errand.updated_at, who: taker, note: errand.decline_reason, state: "off" }];
+  }
+  if (errand.status === "cancelled") {
+    return [asked, ...(errand.accepted_at ? [{ key: "taken", word: "Взяли", at: errand.accepted_at, who: taker, state: "done" as const }] : []), { key: "cancelled", word: "Отменили", at: errand.updated_at, state: "off" }];
+  }
+  const eta = etaLine(etaLeftMin(errand, now));
+  return [
+    asked,
+    errand.status === "sent"
+      ? { key: "taken", word: "Взяли", at: null, note: "ещё никто не взял", state: "now" }
+      : { key: "taken", word: "Взяли", at: errand.accepted_at, who: taker, state: "done" },
+    errand.status === "done"
+      ? { key: "done", word: "Готово", at: errand.done_at, note: errand.result ? `передали: «${errand.result}»` : null, state: "done" }
+      : { key: "done", word: "Готово", at: null, note: errand.status === "accepted" ? (eta ?? "в работе") : null, state: errand.status === "accepted" ? "now" : "next" },
+  ];
+}
+
+/** The way of a request as a vertical line of steps, each with its time and whose hand. */
+function Steps({ errand, now }: { errand: Errand; now: Date }) {
+  const steps = stepsOf(errand, now);
   return (
-    <div className="flex min-h-[34px] items-baseline gap-3 py-[7px]">
-      <dt className="w-28 shrink-0 text-[13px] leading-5 text-muted">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[14px] leading-5">{children}</dd>
-    </div>
+    <ol className="errands-steps" aria-label="Как шла заявка">
+      {steps.map((step, index) => (
+        <li key={step.key} data-state={step.state} style={{ animationDelay: `${index * 60}ms` }}>
+          <span aria-hidden className="errands-step-dot" />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="text-[14px] font-medium leading-5">{step.word}</span>
+              {step.at ? <When className="nums shrink-0 text-[12px] text-muted">{humanAqtobe(new Date(step.at), now)}</When> : null}
+            </span>
+            {step.who || step.note ? (
+              <span className="flex min-w-0 items-center gap-1.5 text-[12px] leading-4 text-muted">
+                {step.who ? (
+                  <>
+                    <PersonFace id={step.who.id} name={step.who.name} size={16} />
+                    <span className="truncate">{shortName(step.who.name)}</span>
+                  </>
+                ) : null}
+                {step.who && step.note ? " · " : null}
+                {step.note ? <span className="min-w-0 truncate">{step.note}</span> : null}
+              </span>
+            ) : null}
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 /**
- * A request in the right-hand panel (`?e=`, where a push leads): everything about it — its
- * state, who took it, the reason, what was passed back — and the viewer's own actions: the
- * secretary's buttons, the director's «спасибо», «Отменить» for the one who asked.
+ * A request in the right-hand panel (`?e=`, where a push leads; D-174): what it is, its way as
+ * steps — asked, taken, done, each with its time and whose hand, the promise and what was passed
+ * back — the push's receipt, and the viewer's own moves: the secretary's buttons, the director's
+ * «спасибо», «Отменить» for the one who asked.
  */
 export function ErrandDetails({
   errand,
@@ -111,33 +162,20 @@ export function ErrandDetails({
   catalogue: readonly SecretaryAction[];
   pointsOn: boolean;
 }) {
-  const who = shortName(errand.claimed?.full_name ?? "");
   return (
-    <div className="flex flex-col gap-4 pr-8" data-testid="desk-errand-details">
-      <div>
-        <ErrandBody errand={errand} now={now} catalogue={catalogue} big />
-      </div>
-      <dl className="desk-list">
-        <Fact label="Статус">
-          <span style={{ color: TONE_VAR[STATUS_TONE[errand.status]] }}>{STATUS_WORD[errand.status]}</span>
-          {who ? ` · ${who}` : ""}
-          {errand.decline_reason ? ` · ${errand.decline_reason}` : ""}
-        </Fact>
-        <Fact label="Попросили">
-          <When>{humanAqtobe(new Date(errand.created_at), now)}</When>
-        </Fact>
-        {errand.accepted_at ? (
-          <Fact label="Взяли">
-            <When>{humanAqtobe(new Date(errand.accepted_at), now)}</When>
-          </Fact>
-        ) : null}
-        {errand.done_at ? (
-          <Fact label="Готово">
-            <When>{humanAqtobe(new Date(errand.done_at), now)}</When>
-          </Fact>
-        ) : null}
-        {errand.result ? <Fact label="Передали">{errand.result}</Fact> : null}
-      </dl>
+    <div className="errands-details flex flex-col gap-5 pr-8" data-testid="desk-errand-details">
+      <ErrandBody errand={errand} now={now} catalogue={catalogue} />
+      {/* the director's side answers the question itself (DirectorLink); the secretary reads it here */}
+      {viewer === "secretary" && errand.question ? (
+        <p className="errands-qa">
+          <CircleHelp size={14} strokeWidth={2.25} aria-hidden />
+          <span className="min-w-0">
+            <span className="text-muted">{errand.question} — </span>
+            {errand.answer ? <span className="font-semibold">директор: {errand.answer}</span> : <span className="text-muted">ждём ответа</span>}
+          </span>
+        </p>
+      ) : null}
+      <Steps errand={errand} now={now} />
       {viewer === "director" ? <DirectorLink errand={errand} now={now} /> : null}
       {viewer === "director" ? <Receipt errand={errand} now={now} /> : null}
       {canCancel(errand, meId) ? <CancelErrandButton errand={errand} /> : null}
@@ -147,9 +185,14 @@ export function ErrandDetails({
           <SecretaryLink errand={errand} meId={meId} catalogue={catalogue} />
         </>
       ) : canThank(errand, now, pointsOn) ? (
-        <ThankButton errand={errand} />
+        <div>
+          <ThankButton errand={errand} />
+        </div>
       ) : errand.thanked_at ? (
-        <p className="text-[13px] leading-4 text-muted">Спасибо отправлено ♥</p>
+        <p className="errands-thanked">
+          <Heart size={13} strokeWidth={2.25} aria-hidden />
+          Спасибо отправлено
+        </p>
       ) : null}
     </div>
   );

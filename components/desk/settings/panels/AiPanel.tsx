@@ -1,9 +1,11 @@
 "use client";
 
+import { BookText, FlaskConical } from "lucide-react";
 import Link from "next/link";
 
 import { CheckLine, Segmented, SelectInput, SettingRow, SettingsGroup, Switch, TextInput, TimeInput } from "@/components/desk/settings/form";
 import { useDevTools } from "@/components/desk/settings/SettingsFrame";
+import { Select } from "@/components/desk/ui/Toolbar";
 import { useDraft } from "@/components/settings/draft";
 import { PARSER_KIND_LABEL, PARSER_KINDS, REQUIRED_KIND, type ParserKind } from "@/lib/ai/kinds/names";
 import { usePeople } from "@/lib/people/queries";
@@ -48,8 +50,8 @@ const stepsOf = (steps: number[], value: number) => [...new Set([...steps, value
  */
 function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved: Convention[]; onChange: (index: number, patch: Partial<Convention>) => void }) {
   return (
-    <div className="desk-cells" data-testid="settings-conventions">
-      <div className="desk-label grid grid-cols-[180px_minmax(0,1fr)_76px_140px] items-center gap-4 border-b border-text pb-1 uppercase">
+    <div className="set-conventions desk-cells" data-testid="settings-conventions">
+      <div className="set-conventions-head desk-label grid grid-cols-[180px_minmax(0,1fr)_76px_150px] items-center gap-4 border-b border-text pb-1 uppercase">
         <span>Когда</span>
         <span>Как говорите · через «/»</span>
         <span>Время</span>
@@ -62,26 +64,21 @@ function ConventionsTable({ rows, saved, onChange }: { rows: Convention[]; saved
         const changed = !before || !same(before, row);
         const steps = [...new Set([...CONFIDENCE_STEPS, row.confidence])].sort((a, b) => a - b);
         return (
-          <div key={row.key ?? index} className="relative grid grid-cols-[180px_minmax(0,1fr)_76px_140px] items-center gap-4 border-b border-border/60 py-0.5 last:border-b-0">
-            {changed ? <span aria-hidden className="absolute inset-y-1 -left-3 w-[2px] bg-accent" /> : null}
+          <div key={row.key ?? index} className="set-conventions-row relative grid grid-cols-[180px_minmax(0,1fr)_76px_150px] items-center gap-4 border-b border-border/60 py-0.5 last:border-b-0">
+            {changed ? <span aria-hidden className="set-row-mark" /> : null}
             <span className="min-w-0 text-[14px] leading-5">
               {label}
               {row.day === "friday" ? <span className="block text-[12px] leading-4 text-muted">пятница этой недели</span> : null}
             </span>
             <TextInput label={`${label}: как говорите`} value={row.phrase} width="100%" placeholder="как говорите, через «/»" onChange={(phrase) => onChange(index, { phrase })} />
             <TimeInput label={`${label}: время`} value={row.time} onChange={(time) => onChange(index, { time })} />
-            <select
-              aria-label={`${label}: уверенность`}
-              value={String(row.confidence)}
-              onChange={(event) => onChange(index, { confidence: Number(event.target.value) })}
-              className="field h-9 w-full cursor-pointer pl-0 text-[13px] leading-5"
-            >
+            <Select aria-label={`${label}: уверенность`} value={String(row.confidence)} onChange={(event) => onChange(index, { confidence: Number(event.target.value) })} className="w-full text-[13px]">
               {steps.map((step) => (
                 <option key={step} value={String(step)}>
                   {step.toFixed(1)} · {step < 0.8 ? "проверить" : "уверенно"}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         );
       })}
@@ -120,11 +117,11 @@ export function AiPanel() {
   const models = PARSER_MODELS.map((m) => ({ value: m as string, label: PARSER_MODEL_LABEL[m] ?? m }));
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <SettingsGroup id="stt" title="Распознавание речи" about="Как Pulse переводит голос в текст. Выбрано по проверке на живых записях: без нужды не меняйте.">
-        <SettingRow id="stt-provider" label="Основной провайдер" htmlFor="set-stt-provider" changed={stt.provider !== server.stt.provider}>
+        <SettingRow id="stt-provider" label="Основной провайдер" htmlFor="ctl-stt-provider" changed={stt.provider !== server.stt.provider}>
           <SelectInput
-            id="set-stt-provider"
+            id="ctl-stt-provider"
             label="Основной провайдер"
             value={stt.provider}
             width={420}
@@ -132,9 +129,9 @@ export function AiPanel() {
             items={STT_PROVIDERS.map((p) => ({ value: p, label: STT_PROVIDER_LABEL[p] }))}
           />
         </SettingRow>
-        <SettingRow id="stt-fallback" label="Запасной провайдер" hint="Если основной не ответил" htmlFor="set-stt-fallback" changed={stt.fallback !== server.stt.fallback}>
+        <SettingRow id="stt-fallback" label="Запасной провайдер" hint="Если основной не ответил" htmlFor="ctl-stt-fallback" changed={stt.fallback !== server.stt.fallback}>
           <SelectInput
-            id="set-stt-fallback"
+            id="ctl-stt-fallback"
             label="Запасной провайдер"
             value={(stt.fallback ?? "") as SttProviderKey | ""}
             width={420}
@@ -156,20 +153,20 @@ export function AiPanel() {
       </SettingsGroup>
 
       <SettingsGroup id="parser" title="Разбор поручений" about="Модель читает транскрипт и раскладывает его на задачи, объявления и очки.">
-        <SettingRow id="parser-model" label="Основная модель" htmlFor="set-parser-model" changed={parser.model !== server.parser.model}>
-          <SelectInput id="set-parser-model" label="Основная модель" value={parser.model} width={420} onChange={(model) => setParser({ model })} items={models} />
+        <SettingRow id="parser-model" label="Основная модель" htmlFor="ctl-parser-model" changed={parser.model !== server.parser.model}>
+          <SelectInput id="ctl-parser-model" label="Основная модель" value={parser.model} width={420} onChange={(model) => setParser({ model })} items={models} />
         </SettingRow>
         <SettingRow
           id="parser-escalate"
           label="Перепроверять сильной моделью"
           hint="Длинные монологи и сомнительные исполнители уходят на вторую модель"
-          htmlFor="set-parser-escalate"
+          htmlFor="ctl-parser-escalate"
           changed={parser.escalate !== server.parser.escalate}
         >
-          <Switch id="set-parser-escalate" label="Перепроверять сильной моделью" checked={parser.escalate} onChange={(escalate) => setParser({ escalate })} />
+          <Switch id="ctl-parser-escalate" label="Перепроверять сильной моделью" checked={parser.escalate} onChange={(escalate) => setParser({ escalate })} />
         </SettingRow>
-        <SettingRow id="parser-escalation-model" label="Модель для перепроверки" htmlFor="set-parser-escalation" muted={!parser.escalate} changed={parser.escalation_model !== server.parser.escalation_model}>
-          <SelectInput id="set-parser-escalation" label="Модель для перепроверки" value={parser.escalation_model} width={420} onChange={(escalation_model) => setParser({ escalation_model })} items={models} />
+        <SettingRow id="parser-escalation-model" label="Модель для перепроверки" htmlFor="ctl-parser-escalation" muted={!parser.escalate} changed={parser.escalation_model !== server.parser.escalation_model}>
+          <SelectInput id="ctl-parser-escalation" label="Модель для перепроверки" value={parser.escalation_model} width={420} onChange={(escalation_model) => setParser({ escalation_model })} items={models} />
         </SettingRow>
         <SettingRow id="parser-kinds" label="Что модель различает" hint="Выключенного вида модель не знает: ни правил, ни примеров. Поручения — всегда" stack changed={!same(kinds, server.parser.kinds ?? PARSER_KINDS)}>
           <div className="grid grid-cols-2 gap-x-8" data-testid="settings-parser-kinds">
@@ -187,8 +184,9 @@ export function AiPanel() {
         </SettingRow>
         {devTools ? (
           <SettingRow id="parser-rules" label="Правила компании" hint={rules?.text ? `Действует версия ${rules.version}. Меняются только после проверки на корпусе` : "Своих нет — разбор идёт по ядру промпта"}>
-            <Link href="/desk/settings/lab?tab=parser" data-testid="settings-parser-rules" className="text-[13px] font-medium underline underline-offset-2">
-              Открыть в Лаборатории →
+            <Link href="/desk/settings/lab?tab=parser" data-testid="settings-parser-rules" className="set-open btn-secondary inline-flex h-9 items-center gap-2 px-3 text-[13px] font-semibold">
+              <FlaskConical size={15} strokeWidth={2} aria-hidden />
+              Открыть в Лаборатории
             </Link>
           </SettingRow>
         ) : null}
@@ -200,8 +198,9 @@ export function AiPanel() {
           label="Имена и слова"
           hint={`${people.data ? `${names} ${pluralRu(names, ["имя", "имени", "имён"])}` : "имена"} · ${words ? `${words} ${pluralRu(words, ["слово", "слова", "слов"])}` : "слов нет"}`}
         >
-          <Link href="/desk/settings/dictionary" data-testid="settings-dictionary" className="text-[13px] font-medium underline underline-offset-2">
-            Открыть словарь →
+          <Link href="/desk/settings/dictionary" data-testid="settings-dictionary" className="set-open btn-secondary inline-flex h-9 items-center gap-2 px-3 text-[13px] font-semibold">
+            <BookText size={15} strokeWidth={2} aria-hidden />
+            Открыть словарь
           </Link>
         </SettingRow>
       </SettingsGroup>
@@ -216,7 +215,13 @@ export function AiPanel() {
         </SettingRow>
       </SettingsGroup>
 
-      <SettingsGroup id="retention" title="Хранение записей" about="Тексты и расшифровки остаются навсегда; удаляется только звук. Запись «в корпус» из Лаборатории не удаляется.">
+      {/* the one place in the settings where a choice deletes: a shorter term takes the sound away for good */}
+      <SettingsGroup
+        id="retention"
+        title="Хранение записей"
+        tone="danger"
+        about="Тексты и расшифровки остаются навсегда; удаляется только звук. Срок короче — записи старше него удалятся при ближайшей уборке, вернуть их нельзя. Запись «в корпус» из Лаборатории не удаляется."
+      >
         <SettingRow id="retention-closed" label="После закрытия дела" hint="Сколько хранить голосовое, когда задача закрыта" changed={retention.closed_days !== savedRetention.closed_days}>
           <Segmented label="Хранить после закрытия дела" value={retention.closed_days} onChange={(closed_days) => update({ voice_retention: { ...retention, closed_days } })} items={stepsOf(CLOSED_STEPS, retention.closed_days)} />
         </SettingRow>

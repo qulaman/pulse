@@ -311,8 +311,9 @@
       box-shadow: inset 0 0 0 1px var(--rule);
       color: var(--ink-2);
 
+      /* the badge's inline paint (SideNav `badgeColors`) is the journal's solid red: the plate wins here */
       &[data-tone="danger"] {
-        background: color-mix(in srgb, var(--pencil) 18%, transparent);
+        background: color-mix(in srgb, var(--pencil) 18%, transparent) !important;
         box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 36%, transparent);
         color: var(--pencil) !important;
       }
@@ -580,6 +581,7 @@
       border-radius: 7px;
       background: none;
       box-shadow: none;
+      white-space: nowrap;
       font-family: var(--font-body);
       font-size: 13px;
       font-weight: 500;
@@ -698,6 +700,11 @@
       background: var(--hover);
     }
   }
+  /* a table's rows rise into place in order as they arrive (`--i` from DataGrid, D-174) */
+  .desk-grid .desk-row:not([data-glow]) {
+    animation: graphite-row-in 300ms var(--ease-snap) both;
+    animation-delay: calc(var(--i, 0) * 18ms);
+  }
   .desk-row[aria-selected="true"],
   .desk-row[aria-current="true"],
   .desk-row[data-cursor] {
@@ -799,6 +806,13 @@
       animation: graphite-panel-content 260ms var(--ease-snap) both;
     }
   }
+  /* the head of what the panel shows sticks over the sheet's own colour, frosted — no band of another grey */
+  [data-testid="desk-panel-head"] {
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    -webkit-backdrop-filter: blur(14px);
+    backdrop-filter: blur(14px);
+    border-bottom-color: var(--rule-soft);
+  }
   .desk-dialog,
   .desk-pop,
   [data-sheet]:not([data-testid="sketch-pad"]) {
@@ -839,6 +853,108 @@
     backdrop-filter: blur(16px);
     box-shadow: var(--shadow-pop);
     animation: graphite-pop 120ms var(--ease-snap) both;
+  }
+
+  /* ---- the order line's suggestions (Ctrl K): a glass list that drops from the field (D-174) ---- */
+  [data-testid="command-palette"] {
+    top: calc(100% + 10px);
+    border: 0;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--sheet) 86%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    box-shadow: var(--shadow-dialog) !important;
+    transform-origin: top left;
+    animation: graphite-pop 160ms var(--ease-snap) both;
+
+    [role="listbox"] {
+      padding: 6px;
+    }
+    .desk-label {
+      padding: 8px 10px 4px;
+      color: var(--ink-3);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    [role="option"] {
+      position: relative;
+      height: 38px;
+      border-radius: 8px;
+      transition: background-color 60ms linear;
+
+      &[aria-selected="true"] {
+        background: var(--selected);
+
+        &::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 9px;
+          bottom: 9px;
+          width: 3px;
+          border-radius: 0 3px 3px 0;
+          background: var(--pen);
+        }
+      }
+    }
+    > div:last-child {
+      padding: 8px 14px;
+      border-top-color: var(--rule-soft);
+      background: color-mix(in srgb, var(--raise) 55%, transparent);
+    }
+  }
+
+  /* ---- a switch: a pill with a knob that slides, everywhere on the desk (D-174) ---- */
+  button[role="switch"]:has(> span[aria-hidden]:only-child) {
+    width: 36px;
+    height: 20px;
+    border-radius: 9999px;
+    background: var(--surface-2) !important;
+    box-shadow: inset 0 0 0 1px var(--rule) !important;
+    transition:
+      background-color 160ms linear,
+      box-shadow 160ms linear,
+      scale 220ms var(--ease-snap);
+
+    > span {
+      top: 2px;
+      left: 0 !important;
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      background: var(--ink-2) !important;
+      box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+      transform: translateX(2px) !important;
+      transition:
+        transform 220ms var(--ease-snap),
+        background-color 160ms linear;
+    }
+    &[aria-checked="true"] {
+      background: var(--pen) !important;
+      box-shadow: none !important;
+
+      > span {
+        background: #fff !important;
+        transform: translateX(18px) !important;
+      }
+    }
+    &:active:not(:disabled) {
+      scale: 0.94;
+      transition-duration: 70ms;
+    }
+  }
+  /* the desk's own select in a form row: the journal's flush-left field is a field with a body here */
+  .desk-form-row .desk-select-button {
+    padding-left: 12px;
+  }
+
+  /* ---- a toast: the floating layer's glass and shadow, a little tighter than the phone's ---- */
+  .toast-glass {
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--sheet) 86%, transparent);
+    box-shadow: var(--shadow-pop);
+    font-size: 13.5px;
   }
 
   /* ---- an empty state: a card with its icon on a tile -------------------------------------- */
@@ -965,9 +1081,16 @@
     background: var(--sheet);
     box-shadow: var(--shadow-pop);
   }
-  /* a date of a task: tabular, quiet; an overdue one keeps the red pencil's stroke */
-  .desk-when {
-    color: inherit;
+  /* a segmented choice without a gliding plate (a toggle, a step choice): its chosen one still stands out */
+  .seg button:is([aria-selected="true"], [aria-pressed="true"]):not(:has(.seg-glider)) {
+    background: var(--raise);
+    box-shadow: 0 0 0 1px var(--rule), var(--lift), 0 1px 3px rgb(0 0 0 / 0.25);
+  }
+  /* the dark islands that keep the phone's or the wall's own tokens: «Графит»'s steps are read off theirs */
+  :is(.desk-phone-look, [data-testid="desk-wall-frame"], [data-testid="wall-preview"]) {
+    --raise: var(--surface);
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.05);
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.04);
   }
 
   /* the calendar's two marks of today */
@@ -975,6 +1098,46 @@
     border-radius: 9999px;
     background: var(--pen);
     color: var(--page);
+  }
+}
+
+/* ---- the desk's own select (D-174, components/desk/ui/Toolbar.tsx): both looks. The system's
+   select stays inside, unseen and untouchable, carrying the value, the label and the test id ---- */
+html[data-surface="desk"] {
+  .desk-select-native {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    pointer-events: none;
+  }
+  .desk-select-chevron {
+    color: var(--text-muted);
+    transition: transform 160ms var(--ease-out);
+  }
+  .desk-select[data-open] .desk-select-chevron {
+    transform: rotate(180deg);
+  }
+  .desk-select-option {
+    color: var(--text);
+
+    &[data-active] {
+      background: var(--surface-2);
+    }
+    &[aria-selected="true"] {
+      font-weight: 600;
+    }
+  }
+}
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .desk-select-option[data-active] {
+    background: var(--selected);
+  }
+  .desk-select[data-open] .desk-select-button {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
   }
 }
 
@@ -997,6 +1160,12 @@
     transform: translateX(10px);
   }
 }
+@keyframes graphite-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
 @keyframes graphite-pop {
   from {
     opacity: 0;
@@ -1010,6 +1179,7 @@
     [data-testid="desk-panel"] .no-bar > .contents > *,
     .desk-pop,
     .desk-row::after,
+    .desk-grid .desk-row,
     .pointer-events-none.fixed.z-\[80\] {
       animation: none !important;
     }

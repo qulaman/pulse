@@ -16,7 +16,8 @@ async function signOut() {
 /**
  * The desk's profile (D-153, D-154 wave 3): who is signed in, the account, this computer's
  * notifications and the director's rules, how this computer shows the desk, the sessions and
- * signing out — a computer's account page (`ProfileDesk`), not the phone's rows.
+ * signing out — a computer's account page (`ProfileDesk`), not the phone's rows: the page's own
+ * contents on the left, a card a subject on the right (D-174).
  */
 export default async function DeskProfilePage() {
   const profile = await getSessionProfile();
@@ -27,7 +28,7 @@ export default async function DeskProfilePage() {
   const email = typeof data?.claims.email === "string" && data.claims.email ? data.claims.email : null;
 
   return (
-    <DeskPage width="narrow">
+    <DeskPage>
       <ProfileDesk userId={profile.userId} fullName={profile.fullName} role={profile.role} company={brand.name} email={email} signOut={signOut} />
     </DeskPage>
   );

@@ -1,9 +1,10 @@
 "use client";
 
+import { CalendarPlus, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-import { GroupNote, NumberInput, Segmented, SettingRow, SettingsGroup, Switch, TimeInput } from "@/components/desk/settings/form";
+import { GroupLink, GroupNote, NumberInput, Segmented, SettingRow, SettingsGroup, Switch, TimeInput } from "@/components/desk/settings/form";
 import { Popover } from "@/components/desk/ui/Popover";
 import { useDraft } from "@/components/settings/draft";
 import { Button } from "@/components/ui/Button";
@@ -32,7 +33,7 @@ function holidayLabel(ymd: Ymd, thisYear: number): string {
 /** The working days as seven toggles — Monday first; the last one on cannot go off (a week without a working day asks nothing). */
 function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days: number[]) => void }) {
   return (
-    <div role="group" aria-label="Рабочие дни" className="seg inline-flex h-9 items-center gap-0.5 p-0.5">
+    <div role="group" aria-label="Рабочие дни" className="seg set-days inline-flex h-9 items-center gap-0.5 p-0.5">
       {WEEKDAYS_SHORT_RU.map((label, index) => {
         const day = index + 1;
         const on = days.includes(day);
@@ -45,7 +46,7 @@ function Weekdays({ days, onChange }: { days: readonly number[]; onChange: (days
               if (on && days.length === 1) return;
               onChange(on ? days.filter((d) => d !== day) : [...days, day].sort((a, b) => a - b));
             }}
-            className={`flex h-8 w-7 items-center justify-center text-[13px] font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
+            className={`set-day flex h-8 w-7 items-center justify-center text-[13px] font-semibold leading-4 transition-colors duration-[120ms] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45 ${
               on ? "seg-thumb text-text" : "text-muted/70 hover:text-text"
             }`}
           >
@@ -77,15 +78,15 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
         {upcoming.map((day) => {
           const label = holidayLabel(day, year);
           return (
-            <span key={day} className="nums inline-flex h-6 items-center text-[13px] leading-4">
+            <span key={day} className="set-chip nums inline-flex h-6 items-center text-[13px] leading-4">
               {label}
               <button
                 type="button"
                 aria-label={`Убрать праздник ${label}`}
                 onClick={() => onChange(days.filter((d) => d !== day))}
-                className="flex h-6 w-5 items-center justify-center text-[14px] leading-none text-muted hover:text-danger"
+                className="set-chip-x flex h-6 w-5 items-center justify-center text-muted hover:text-danger"
               >
-                ×
+                <X size={13} strokeWidth={2.25} aria-hidden />
               </button>
             </span>
           );
@@ -94,14 +95,14 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
         {past ? <span className="text-[13px] leading-5 text-muted">· и ещё {past} {pluralRu(past, ["прошедший", "прошедших", "прошедших"])}</span> : null}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="secondary" onClick={(event) => setAnchor(anchor ? null : event.currentTarget)} aria-expanded={Boolean(anchor)}>
-          + День…
+        <Button size="sm" variant="secondary" onClick={(event) => setAnchor(anchor ? null : event.currentTarget)} aria-expanded={Boolean(anchor)} icon={<CalendarPlus size={15} strokeWidth={2} />}>
+          День…
         </Button>
         {years.map((y) => {
           const kz = kzFixedHolidays(y);
           return (
-            <Button key={y} size="sm" variant="ghost" disabled={kz.every((day) => days.includes(day))} onClick={() => add(kz)}>
-              + Праздники Казахстана {y}
+            <Button key={y} size="sm" variant="ghost" disabled={kz.every((day) => days.includes(day))} onClick={() => add(kz)} icon={<Plus size={14} strokeWidth={2.25} />}>
+              Праздники Казахстана {y}
             </Button>
           );
         })}
@@ -125,7 +126,7 @@ function Holidays({ days, onChange }: { days: readonly Ymd[]; onChange: (days: Y
 /** A reaction's price: its name, the points it pays. */
 function ReactionPrice({ code, value, onChange }: { code: (typeof REACTION_CODES)[number]; value: number; onChange: (value: number) => void }) {
   return (
-    <label className="flex items-center gap-2.5 border-b border-border/60 py-0.5">
+    <label className="set-price flex items-center gap-2.5 border-b border-border/60 py-0.5">
       <span className="min-w-0 flex-1 text-[14px] leading-5">{REACTION_LABEL[code]}</span>
       <NumberInput label={`Очков за ${REACTION_LABEL[code]}`} value={value} max={100000} unit="очк." width={110} onChange={onChange} />
     </label>
@@ -147,21 +148,15 @@ export function TeamPanel({ director }: { director: boolean }) {
   const off = !draft.points_enabled;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <SettingsGroup
         id="points"
         title="Очки и рейтинг"
         about="Очки начисляются сами за задачи, отчёты и реакции; директор добавляет свои. Тратятся в магазине."
-        action={
-          director ? (
-            <Link href="/desk/settings/points" className="text-[13px] font-medium underline underline-offset-2">
-              Балансы и магазин
-            </Link>
-          ) : null
-        }
+        action={director ? <GroupLink href="/desk/settings/points">Балансы и магазин</GroupLink> : null}
       >
-        <SettingRow id="points-enabled" label="Очки включены" hint="Без них нет рейтинга, начислений и штрафов; магазин работает" htmlFor="set-points-enabled" changed={draft.points_enabled !== server.points_enabled}>
-          <Switch id="set-points-enabled" label="Очки включены" checked={draft.points_enabled} onChange={(points_enabled) => update({ points_enabled })} />
+        <SettingRow id="points-enabled" label="Очки включены" hint="Без них нет рейтинга, начислений и штрафов; магазин работает" htmlFor="ctl-points-enabled" changed={draft.points_enabled !== server.points_enabled}>
+          <Switch id="ctl-points-enabled" label="Очки включены" checked={draft.points_enabled} onChange={(points_enabled) => update({ points_enabled })} />
         </SettingRow>
         <SettingRow id="rating-mode" label="Кто видит рейтинг целиком" hint="Директор всегда видит полный список" muted={off} changed={draft.rating_mode !== server.rating_mode}>
           <Segmented
@@ -193,14 +188,14 @@ export function TeamPanel({ director }: { director: boolean }) {
           id="points-late"
           label="Штраф за просрочку"
           hint="Не снимается с тех, кто в отпуске или на больничном. Сотрудник может оспорить"
-          htmlFor="set-points-late"
+          htmlFor="ctl-points-late"
           muted={off}
           changed={rules.late_on !== saved.late_on || rules.late !== saved.late}
         >
           <span className={rules.late_on ? "" : "pointer-events-none opacity-40"}>
             <NumberInput label="Очков штрафа за просрочку" value={rules.late} unit="очк." onChange={(late) => setRules({ late })} />
           </span>
-          <Switch id="set-points-late" label="Штраф за просрочку" checked={rules.late_on} onChange={(late_on) => setRules({ late_on })} />
+          <Switch id="ctl-points-late" label="Штраф за просрочку" checked={rules.late_on} onChange={(late_on) => setRules({ late_on })} />
         </SettingRow>
       </SettingsGroup>
 
@@ -215,7 +210,7 @@ export function TeamPanel({ director }: { director: boolean }) {
 
       <SettingsGroup id="points-reactions" title="Реакция директора на задачу" about="Реакция платит свою цену; 0 — реакция без очков. Сменил реакцию — разница доплачивается или списывается.">
         <SettingRow id="points-reactions-prices" label="Цена реакций" stack muted={off} changed={!same(rules.reactions, saved.reactions)}>
-          <div className="desk-cells grid grid-cols-2 gap-x-8">
+          <div className="set-prices desk-cells grid grid-cols-2 gap-x-8">
             {REACTION_CODES.map((code) => (
               <ReactionPrice key={code} code={code} value={rules.reactions[code]} onChange={(value) => setRules({ reactions: { ...rules.reactions, [code]: value } })} />
             ))}
@@ -224,11 +219,11 @@ export function TeamPanel({ director }: { director: boolean }) {
       </SettingsGroup>
 
       <SettingsGroup id="points-ether" title="В Эфир — всей команде" about="Хорошие новости, которые видит вся команда. Минусы в Эфир не попадают никогда.">
-        <SettingRow id="ether-merch" label="Выдача наград" hint="«Айгуль — Брендовая куртка» после «Выдал»" htmlFor="set-ether-merch" muted={off} changed={draft.ether_events.merch !== server.ether_events.merch}>
-          <Switch id="set-ether-merch" label="Выдача наград в Эфир" checked={draft.ether_events.merch} onChange={(merch) => update({ ether_events: { ...draft.ether_events, merch } })} />
+        <SettingRow id="ether-merch" label="Выдача наград" hint="«Айгуль — Брендовая куртка» после «Выдал»" htmlFor="ctl-ether-merch" muted={off} changed={draft.ether_events.merch !== server.ether_events.merch}>
+          <Switch id="ctl-ether-merch" label="Выдача наград в Эфир" checked={draft.ether_events.merch} onChange={(merch) => update({ ether_events: { ...draft.ether_events, merch } })} />
         </SettingRow>
-        <SettingRow id="ether-praise" label="Похвала директора" hint="При «Начислить» можно снять галочку «Сказать в Эфире»" htmlFor="set-ether-praise" muted={off} changed={draft.ether_events.praise !== server.ether_events.praise}>
-          <Switch id="set-ether-praise" label="Похвала директора в Эфир" checked={draft.ether_events.praise} onChange={(praise) => update({ ether_events: { ...draft.ether_events, praise } })} />
+        <SettingRow id="ether-praise" label="Похвала директора" hint="При «Начислить» можно снять галочку «Сказать в Эфире»" htmlFor="ctl-ether-praise" muted={off} changed={draft.ether_events.praise !== server.ether_events.praise}>
+          <Switch id="ctl-ether-praise" label="Похвала директора в Эфир" checked={draft.ether_events.praise} onChange={(praise) => update({ ether_events: { ...draft.ether_events, praise } })} />
         </SettingRow>
       </SettingsGroup>
 
@@ -237,11 +232,7 @@ export function TeamPanel({ director }: { director: boolean }) {
           id="report"
           title="Ежедневный отчёт"
           about="В конце дня сотрудник пишет, когда пришёл и ушёл и чем занимался; задачи дня попадают в отчёт сами."
-          action={
-            <Link href="/desk/reports" className="text-[13px] font-medium underline underline-offset-2">
-              Читать отчёты
-            </Link>
-          }
+          action={<GroupLink href="/desk/reports">Читать отчёты</GroupLink>}
         >
           <SettingRow
             id="report-enabled"
@@ -251,11 +242,11 @@ export function TeamPanel({ director }: { director: boolean }) {
                 ? "Выключите — ни напоминаний, ни очков, ни штрафов"
                 : "Штрафы начнутся с сегодняшнего дня, не задним числом; штрафуем только тех, кто уже сдал хотя бы один отчёт"
             }
-            htmlFor="set-report-enabled-switch"
+            htmlFor="ctl-report-enabled-switch"
             changed={report.enabled !== server.daily_report.enabled}
           >
             {/* the row itself is `set-report-enabled` (the search lands there): the switch has an id of its own */}
-            <Switch id="set-report-enabled-switch" label="Отчёты включены" checked={report.enabled} onChange={(enabled) => setReport({ enabled })} />
+            <Switch id="ctl-report-enabled-switch" label="Отчёты включены" checked={report.enabled} onChange={(enabled) => setReport({ enabled })} />
           </SettingRow>
           <SettingRow id="report-days" label="Рабочие дни" hint="В другие дни отчёт сдать можно — без очков и без штрафа" muted={!report.enabled} changed={!same(report.workdays, server.daily_report.workdays)}>
             <Weekdays days={report.workdays} onChange={(workdays) => setReport({ workdays })} />
@@ -263,13 +254,13 @@ export function TeamPanel({ director }: { director: boolean }) {
           <SettingRow id="report-holidays" label="Праздники" hint="В эти дни отчёт не нужен: ни +, ни напоминания, ни штрафа. Курбан айт и переносы выходных добавьте сами" stack muted={!report.enabled} changed={!same(report.holidays, server.daily_report.holidays)}>
             <Holidays days={report.holidays} onChange={(holidays) => setReport({ holidays })} />
           </SettingRow>
-          <SettingRow id="report-times" label="День начинается · напомнить" hint="Начало дня — подсказка «Пришёл» в форме; напоминание — пуш тем, кто не сдал" htmlFor="set-report-start" muted={!report.enabled} changed={report.work_start !== server.daily_report.work_start || report.remind_at !== server.daily_report.remind_at}>
-            <TimeInput id="set-report-start" label="День начинается в" value={report.work_start} onChange={(work_start) => setReport({ work_start })} />
+          <SettingRow id="report-times" label="День начинается · напомнить" hint="Начало дня — подсказка «Пришёл» в форме; напоминание — пуш тем, кто не сдал" htmlFor="ctl-report-start" muted={!report.enabled} changed={report.work_start !== server.daily_report.work_start || report.remind_at !== server.daily_report.remind_at}>
+            <TimeInput id="ctl-report-start" label="День начинается в" value={report.work_start} onChange={(work_start) => setReport({ work_start })} />
             <span className="text-[13px] text-muted">напомнить в</span>
             <TimeInput label="Напомнить про отчёт в" value={report.remind_at} onChange={(remind_at) => setReport({ remind_at })} />
           </SettingRow>
-          <SettingRow id="report-ask" label="Лента просит отчёт с" hint="С этого часа в Ленте сотрудника заметна строка «Отчёт за день не сдан», и лицо зовёт его сдать — без пуша" htmlFor="set-report-ask-at" muted={!report.enabled} changed={report.ask_from !== server.daily_report.ask_from}>
-            <TimeInput id="set-report-ask-at" label="Лента просит отчёт с" value={report.ask_from} onChange={(ask_from) => setReport({ ask_from })} />
+          <SettingRow id="report-ask" label="Лента просит отчёт с" hint="С этого часа в Ленте сотрудника заметна строка «Отчёт за день не сдан», и лицо зовёт его сдать — без пуша" htmlFor="ctl-report-ask-at" muted={!report.enabled} changed={report.ask_from !== server.daily_report.ask_from}>
+            <TimeInput id="ctl-report-ask-at" label="Лента просит отчёт с" value={report.ask_from} onChange={(ask_from) => setReport({ ask_from })} />
           </SettingRow>
         </SettingsGroup>
       ) : null}

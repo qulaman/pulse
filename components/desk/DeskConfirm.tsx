@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, AudioLines, CircleHelp, Keyboard, SendHorizontal, TriangleAlert, ScanText } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
@@ -276,9 +277,12 @@ export function DeskConfirm() {
     const again = source === "voice" && SPEAK_AGAIN.has(code);
     const canRetry = retryFrom !== null || !again;
     return (
-      <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="error" data-code={code}>
+      <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="error" data-code={code}>
         <PanelHeader>
-          <h2 className="desk-task-title text-[21px] leading-[26px] text-danger">{failureTitle(code)}</h2>
+          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px] text-danger">
+            <TriangleAlert aria-hidden size={20} strokeWidth={2.2} className="tasks-ico shrink-0" />
+            {failureTitle(code)}
+          </h2>
           <p className="mt-1 text-[14px] leading-5" data-testid="desk-confirm-error">
             {error?.message || mic || ERROR_LINE[code] || "Что-то пошло не так — повторить?"}
           </p>
@@ -316,9 +320,12 @@ export function DeskConfirm() {
 
   if (stage === "question") {
     return (
-      <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="question">
+      <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="question">
         <PanelHeader>
-          <h2 className="desk-task-title text-[21px] leading-[26px]">{reply && !reply.understood ? "Не понял вопрос" : "Отвечаю"}</h2>
+          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px]">
+            <CircleHelp aria-hidden size={20} strokeWidth={2.2} className="tasks-ico tasks-confirm-mark shrink-0" />
+            {reply && !reply.understood ? "Не понял вопрос" : "Отвечаю"}
+          </h2>
         </PanelHeader>
         <Quote text={question || transcript} />
         {reply ? (
@@ -332,10 +339,16 @@ export function DeskConfirm() {
                   href={`/desk/tasks?id=${id}`}
                   prefetch={false}
                   data-testid="desk-answer-task"
-                  className="desk-focus group -mx-2 flex items-baseline gap-3 rounded-[2px] px-2 py-1 text-[14px] leading-5 text-text/90 transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+                  className="tasks-answer desk-focus group -mx-2 flex items-baseline gap-3 rounded-[2px] px-2 py-1 text-[14px] leading-5 text-text/90 transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
                 >
                   <span className="min-w-0 flex-1">{line}</span>
-                  <span className="shrink-0 text-[12px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100">Открыть →</span>
+                  <span className="inline-flex shrink-0 items-center gap-1 self-center text-[12px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] group-hover:opacity-100 group-focus-visible:opacity-100">
+                    Открыть
+                    <ArrowRight aria-hidden size={13} strokeWidth={2.2} className="tasks-ico" />
+                    <span aria-hidden className="tasks-journal-only">
+                      →
+                    </span>
+                  </span>
                 </Link>
               ) : (
                 <p key={index} className={`text-[14px] leading-5 ${index === 0 ? "font-semibold" : "text-text/90"}`}>
@@ -361,9 +374,12 @@ export function DeskConfirm() {
   if (entities.length === 0) {
     const text = draft ?? transcript;
     return (
-      <section className="flex flex-col gap-3" data-testid="desk-confirm" data-state="empty">
+      <section className="tasks-confirm flex flex-col gap-3" data-testid="desk-confirm" data-state="empty">
         <PanelHeader>
-          <h2 className="desk-task-title text-[21px] leading-[26px]">Не разобрал</h2>
+          <h2 className="desk-task-title flex items-center gap-2 text-[21px] leading-[26px]">
+            <ScanText aria-hidden size={20} strokeWidth={2.2} className="tasks-ico tasks-confirm-mark shrink-0" />
+            Не разобрал
+          </h2>
           <p className="mt-1 text-[14px] leading-5 text-muted">Не нашёл здесь ни задач, ни объявлений. Поправьте слова и разберу заново — или сделаю из них задачу.</p>
         </PanelHeader>
         <textarea
@@ -415,33 +431,40 @@ export function DeskConfirm() {
   const label = sendable > 0 && sendable < countable ? `Отправить ${sendable} из ${countable}` : "Отправить";
 
   return (
-    <section ref={section} className="flex min-h-full flex-col" data-testid="desk-confirm" data-state="confirm">
+    <section ref={section} className="tasks-confirm flex min-h-full flex-col" data-testid="desk-confirm" data-state="confirm" data-sending={sending ? "" : undefined}>
       <PanelHeader>
         <h2 className="desk-task-title text-[19px] leading-6">Понял так: {entitiesSummary(entities)}</h2>
         {transcript ? (
-          <p className="mt-1 line-clamp-2 text-[13px] leading-[18px] text-muted" title={transcript}>
-            «{transcript}»
+          // what was heard or typed, with the way it came: the voice or the keys
+          <p className="tasks-said mt-1 flex items-start gap-2 text-[13px] leading-[18px] text-muted" title={transcript}>
+            {source === "voice" ? (
+              <AudioLines aria-hidden size={14} strokeWidth={2.2} className="tasks-ico mt-0.5 shrink-0" />
+            ) : (
+              <Keyboard aria-hidden size={14} strokeWidth={2.2} className="tasks-ico mt-0.5 shrink-0" />
+            )}
+            <span className="line-clamp-2 min-w-0">«{transcript}»</span>
           </p>
         ) : null}
       </PanelHeader>
 
-      <div className="divide-y divide-border border-b border-border" data-testid="desk-entities">
+      <div className="tasks-entities divide-y divide-border border-b border-border" data-testid="desk-entities">
         {entities.map((entity, index) => (
           <EntityEditor key={`${entity.kind}-${index}`} entity={entity} index={index} ctx={ctx} onPatch={(patch) => editEntity(index, patch)} onRemove={() => removeEntity(index)} />
         ))}
       </div>
 
       {why || blank || waiting > 0 ? (
-        <p className="mt-2 text-[13px] leading-5 text-warn" data-testid="desk-confirm-why">
+        <p className="tasks-why mt-2 text-[13px] leading-5 text-warn" data-testid="desk-confirm-why">
           {why || (blank ? "Пустой текст не уйдёт — допишите или уберите строку." : `Ждёт исполнителя: ${waiting}. Остальное уйдёт.`)}
         </p>
       ) : null}
 
       <div className="flex-1" />
-      <footer className="sticky -bottom-6 -mx-5 -mb-6 mt-4 border-t border-text bg-surface px-5 pb-4 pt-3">
+      <footer className="tasks-confirm-foot sticky -bottom-6 -mx-5 -mb-6 mt-4 border-t border-text bg-surface px-5 pb-4 pt-3">
         <div className="flex items-center gap-2">
-          <Button size="sm" disabled={!canSend} loading={sending} onClick={() => void sendBatch(false)} data-testid="desk-confirm-send" className="whitespace-nowrap">
+          <Button size="sm" disabled={!canSend} loading={sending} onClick={() => void sendBatch(false)} data-testid="desk-confirm-send" className="tasks-confirm-send whitespace-nowrap">
             {label}
+            <SendHorizontal aria-hidden size={15} strokeWidth={2.2} className="tasks-ico tasks-send-icon" />
           </Button>
           <Button size="sm" variant="secondary" disabled={sending} onClick={reset} data-testid="desk-confirm-cancel">
             Отменить
@@ -466,5 +489,5 @@ export function DeskConfirm() {
 }
 
 function Quote({ text }: { text: string }): ReactNode {
-  return <p className="-ml-3 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">«{text}»</p>;
+  return <p className="tasks-quote -ml-3 border-l-2 border-border pl-2.5 text-[13px] leading-5 text-muted">«{text}»</p>;
 }

@@ -1,7 +1,9 @@
 "use client";
 
+import { UserRound } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Popover } from "@/components/desk/ui/Popover";
 import { searchPeople } from "@/lib/desk/palette";
@@ -71,7 +73,11 @@ export function PersonField({
   };
 
   return (
-    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2" data-tone={!value && !open ? tone : undefined} aria-expanded={open}>
+    <div ref={setBox} className="tasks-person desk-input relative flex h-9 items-center gap-2" data-tone={!value && !open ? tone : undefined} aria-expanded={open}>
+      {/* «Графит»: the chosen person's face at the field's start, an empty one asks with a silhouette */}
+      <span aria-hidden className="tasks-ico tasks-person-face shrink-0">
+        {value && name && query === null ? <TileFace person={{ id: value, full_name: name, avatar_url: null }} size={20} /> : <UserRound size={15} strokeWidth={2} />}
+      </span>
       <input
         value={query ?? name ?? ""}
         placeholder={value ? (name ?? "") : placeholder}
@@ -134,8 +140,11 @@ export function PersonField({
                   onMouseMove={() => {
                     if (!on) setActive(index);
                   }}
-                  className={`flex h-[34px] cursor-default items-center gap-2.5 px-3 ${on ? "bg-surface-2" : ""}`}
+                  className={`tasks-option flex h-[34px] cursor-default items-center gap-2.5 px-3 ${on ? "bg-surface-2" : ""}`}
                 >
+                  <span aria-hidden className="tasks-ico shrink-0">
+                    <TileFace person={{ id: option.person.id, full_name: option.person.full_name, avatar_url: null }} size={22} />
+                  </span>
                   <span className="min-w-0 truncate text-[14px] leading-5">{option.person.full_name}</span>
                   {option.person.position ? <span className="min-w-0 truncate text-[12px] leading-4 text-muted">{option.person.position}</span> : null}
                   {option.person.id === value ? <span className="ml-auto shrink-0 text-[12px] text-muted">сейчас</span> : on ? <span className="ml-auto shrink-0"><Kbd>Enter</Kbd></span> : null}

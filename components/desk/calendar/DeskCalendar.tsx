@@ -2,7 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { CalendarRange, ChevronLeft, ChevronRight, Diamond, MonitorUp, Plus } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -298,6 +299,29 @@ export function DeskCalendar() {
   const loading = (head.isLoading && !head.data) || (tail.isLoading && !tail.data);
   const title = view === "week" ? weekTitle(first, last) : monthTitle(month);
 
+  // another week slides in from the side it lies on, another view rises into place; the data are
+  // already drawn under it — the motion never holds the grid back (principle 1a)
+  const stage = useRef<HTMLDivElement>(null);
+  const shown = useRef<{ view: CalendarView; first: Ymd } | null>(null);
+  useLayoutEffect(() => {
+    const was = shown.current;
+    shown.current = { view, first };
+    const node = stage.current;
+    if (!was || !node || (was.view === view && was.first === first)) return;
+    if (typeof node.animate !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const frames =
+      was.view !== view
+        ? [
+            { opacity: 0, transform: "translateY(10px) scale(0.995)" },
+            { opacity: 1, transform: "none" },
+          ]
+        : [
+            { opacity: 0.35, transform: `translateX(${compareYmd(first, was.first) > 0 ? 28 : -28}px)` },
+            { opacity: 1, transform: "none" },
+          ];
+    node.animate(frames, { duration: was.view !== view ? 280 : 220, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" });
+  }, [view, first]);
+
   return (
     <DeskPage>
       <PageTitle
@@ -308,7 +332,7 @@ export function DeskCalendar() {
             <>
               <CalendarOnWallButton />
               <Tooltip label="Новая встреча" keys={["N"]} side="bottom">
-                <Button size="sm" onClick={() => newMeeting()} data-testid="desk-event-new">
+                <Button size="sm" icon={<Plus size={15} strokeWidth={2.2} aria-hidden />} onClick={() => newMeeting()} data-testid="desk-event-new">
                   Новая встреча
                 </Button>
               </Tooltip>
@@ -333,13 +357,13 @@ export function DeskCalendar() {
           </>
         }
       >
-        <h2 className="desk-figure min-w-[160px] text-[20px] leading-6" data-testid="desk-calendar-title">
+        <h2 className="cal-title desk-figure min-w-[160px] text-[20px] leading-6" data-testid="desk-calendar-title">
           {title}
         </h2>
-        <div className="flex items-center">
+        <div className="cal-nav flex items-center">
           <ArrowButton label={view === "week" ? "Прошлая неделя" : "Прошлый месяц"} hint="←" onClick={() => step(-1)} back />
           <Tooltip label="Сегодня" keys={["T"]} side="bottom">
-            <Button size="sm" variant="ghost" className="!min-h-8 !px-2 !text-[14px]" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
+            <Button size="sm" variant="ghost" className="cal-today-button !min-h-8 !px-2 !text-[14px]" disabled={day === today} onClick={() => go({ d: today })} data-testid="desk-calendar-today">
               Сегодня
             </Button>
           </Tooltip>
@@ -348,7 +372,8 @@ export function DeskCalendar() {
       </Toolbar>
 
       {/* the grid first: the column beside it gives way on a narrower screen */}
-      <div className="grid grid-cols-[minmax(0,1fr)_clamp(224px,18vw,280px)] items-start gap-8">
+      <div className="cal-layout grid grid-cols-[minmax(0,1fr)_clamp(224px,18vw,280px)] items-start gap-8">
+        <div ref={stage} className="cal-stage min-w-0">
         {loading ? (
           <Bone h={view === "week" ? 628 : 640} />
         ) : view === "week" ? (
@@ -370,6 +395,7 @@ export function DeskCalendar() {
             }
             ghost={quick ? { slot: quick.slot, title: quick.title } : null}
             busy={busyDays}
+            openId={card?.anchor ? openId : null}
           />
         ) : (
           <MonthGrid
@@ -379,13 +405,15 @@ export function DeskCalendar() {
             now={now}
             meId={meId}
             onOpen={open}
+            openId={card?.anchor ? openId : null}
             month={month}
             onDay={(ymd) => go({ d: ymd, view: "week" }, true)}
             onNew={isDirector ? (ymd) => newMeeting({ day: ymd }) : null}
             deadlines={showDeadlines ? marks : null}
           />
         )}
-        <CalendarAside upcoming={upcoming.data ?? EMPTY} now={now} meId={meId} onOpen={open} />
+        </div>
+        <CalendarAside upcoming={upcoming.data ?? EMPTY} now={now} meId={meId} onOpen={open} openId={card?.anchor ? openId : null} />
       </div>
 
       <EventCard
@@ -439,11 +467,13 @@ function DeadlinesToggle({ on, count, tone, onToggle }: { on: boolean; count: nu
       onClick={onToggle}
       title="Сроки открытых задач на этих днях · клавиша D"
       data-testid="desk-deadlines-toggle"
-      className={`mr-3 flex h-8 items-center gap-1.5 text-[14px] leading-5 transition-colors duration-[120ms] ${on ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"}`}
+      data-tone={tone}
+      className={`cal-deadlines mr-3 flex h-8 items-center gap-1.5 text-[14px] leading-5 transition-colors duration-[120ms] ${on ? "font-semibold text-text shadow-[inset_0_-2px_0_var(--text)]" : "text-muted hover:text-text"}`}
     >
+      <Diamond aria-hidden size={13} strokeWidth={2.2} className="cal-deadlines-icon" />
       Сроки задач
       {count > 0 ? (
-        <span className="nums text-[12px]" style={{ color: tone === "danger" ? "var(--danger)" : undefined }}>
+        <span className="cal-deadlines-count nums text-[12px]" style={{ color: tone === "danger" ? "var(--danger)" : undefined }}>
           {count}
         </span>
       ) : null}
@@ -459,11 +489,9 @@ function ArrowButton({ label, hint, onClick, back = false }: { label: string; hi
         type="button"
         aria-label={label}
         onClick={onClick}
-        className="flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
+        className="cal-arrow flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d={back ? "m15 6-6 6 6 6" : "m9 6 6 6-6 6"} />
-        </svg>
+        {back ? <ChevronLeft aria-hidden size={17} strokeWidth={2} /> : <ChevronRight aria-hidden size={17} strokeWidth={2} />}
       </button>
     </Tooltip>
   );
@@ -494,6 +522,8 @@ function CalendarOnWallButton() {
     <Button
       size="sm"
       variant="secondary"
+      icon={onWall ? <CalendarRange size={15} aria-hidden /> : <MonitorUp size={15} aria-hidden />}
+      className={onWall ? "cal-on-wall" : ""}
       aria-pressed={onWall}
       disabled={control.isPending}
       data-testid="desk-calendar-on-wall"

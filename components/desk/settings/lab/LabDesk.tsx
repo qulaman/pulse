@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowUpRight } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { SelectInput, SettingRow, SettingsGroup, Switch } from "@/components/desk/settings/form";
@@ -248,12 +249,12 @@ function ModelsBench() {
     <div className="flex flex-col gap-8">
       <ModelsForm settings={settings} />
       <section className="flex flex-col gap-2" aria-label="По моделям">
-        <h2 className="desk-label uppercase">По моделям · среднее на вызов</h2>
+        <h2 className="lab-head desk-label uppercase">По моделям · среднее на вызов</h2>
         <DataGrid aria-label="Сравнение моделей" columns={statColumns} rows={stats} rowKey={(s) => s.model} empty={<EmptyState title="Вызовов ещё не было" hint="Надиктуйте или напишите поручение — здесь появится цена каждой модели" />} />
       </section>
       <section className="flex flex-col gap-2" aria-label="Расходы по распознаваниям">
         <div className="flex items-baseline gap-2">
-          <h2 className="desk-label uppercase">Распознавания · последние {rows.length}, новые сверху</h2>
+          <h2 className="lab-head desk-label uppercase">Распознавания · последние {rows.length}, новые сверху</h2>
           <span className="text-[12px] leading-4 text-muted">Enter или двойной клик: счёт целиком</span>
         </div>
         <DataGrid
@@ -268,7 +269,7 @@ function ModelsBench() {
           empty={<EmptyState title="Пока ни одного распознавания" hint="Надиктуйте или напишите поручение" />}
         />
       </section>
-      <p className="text-[12px] leading-4 text-muted">
+      <p className="lab-prices text-[12px] leading-4 text-muted">
         Цены за 1M токенов (вход / кэш / выход):{" "}
         {Object.entries(prices.models)
           .map(([m, p]) => `${short(m)} $${p.input} / $${p.cacheRead} / $${p.output}`)
@@ -288,7 +289,7 @@ function ModelsBench() {
 function LabTopStrip() {
   const forAll = useLabForAll();
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border/60 pb-2">
+    <div className="lab-strip flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border/60 pb-2">
       <label htmlFor="lab-for-all" className="flex cursor-pointer items-center gap-3">
         <Switch id="lab-for-all" label="Лаборатория для всех" checked={forAll.on ?? false} disabled={forAll.on === null} onChange={forAll.set} />
         <span className="text-[14px] font-medium leading-5">Лаборатория для всех</span>
@@ -302,9 +303,10 @@ function LabTopStrip() {
             target="_blank"
             rel="noreferrer"
             title="Откроется в новой вкладке"
-            className="px-2 py-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
+            className="lab-shelf-link inline-flex items-center gap-1 px-2 py-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
           >
-            {page.title} ↗
+            {page.title}
+            <ArrowUpRight size={13} strokeWidth={2.25} aria-hidden />
           </a>
         ))}
       </span>
@@ -348,7 +350,7 @@ export function LabDesk({ initialTab }: { initialTab: LabTab }) {
   ]);
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-4">
+    <div className="lab-screen flex w-full min-w-0 flex-col gap-4">
       <PageTitle
         title="Лаборатория"
         state={{ text: "модели, разбор и себестоимость" }}
@@ -362,19 +364,19 @@ export function LabDesk({ initialTab }: { initialTab: LabTab }) {
         }
       />
       {visited.has("models") ? (
-        <section hidden={tab !== "models"} aria-label="Модели" className="flex flex-col gap-6">
+        <section hidden={tab !== "models"} aria-label="Модели" className="lab-tab flex flex-col gap-6">
           <LabTopStrip />
           <ModelsBench />
         </section>
       ) : null}
       {visited.has("parser") ? (
         // the phone's bench in a reading column; its fields at the desk's size
-        <section hidden={tab !== "parser"} aria-label="Парсер" className="desk-bench max-w-[880px] [&_input.field]:min-h-9 [&_input.field]:text-[14px] [&_select.field]:min-h-9 [&_select.field]:text-[14px]">
+        <section hidden={tab !== "parser"} aria-label="Парсер" className="lab-tab desk-bench max-w-[880px] [&_input.field]:min-h-9 [&_input.field]:text-[14px] [&_select.field]:min-h-9 [&_select.field]:text-[14px]">
           <ParserPanel />
         </section>
       ) : null}
       {visited.has("costs") ? (
-        <section hidden={tab !== "costs"} aria-label="Себестоимость" className="desk-bench max-w-[880px]">
+        <section hidden={tab !== "costs"} aria-label="Себестоимость" className="lab-tab desk-bench max-w-[880px]">
           <CostReport />
         </section>
       ) : null}

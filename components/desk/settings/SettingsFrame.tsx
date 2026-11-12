@@ -1,5 +1,7 @@
 "use client";
 
+import { AppWindow, BookText, BrainCircuit, Building2, Database, FlaskConical, Sparkles, Users, type LucideIcon } from "lucide-react";
+import { motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
@@ -51,9 +53,25 @@ function walkNav(event: KeyboardEvent<HTMLElement>) {
   items[(at + (event.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]?.focus();
 }
 
+/** The icon beside each section's name (D-174: «Графит» only — the journal keeps the words). */
+const NAV_ICON: Record<string, LucideIcon> = {
+  company: Building2,
+  app: AppWindow,
+  team: Users,
+  ai: BrainCircuit,
+  dictionary: BookText,
+  lab: FlaskConical,
+  data: Database,
+  points: Sparkles,
+};
+
+/** The chosen item's plate glides from the last one: the toolbar's spring, no overshoot (D-171). */
+const NAV_GLIDE = { type: "spring", stiffness: 520, damping: 42, mass: 0.8 } as const;
+
 function NavItem({
   href,
   label,
+  icon,
   active,
   dirty = false,
   testId,
@@ -62,12 +80,14 @@ function NavItem({
 }: {
   href: string;
   label: string;
+  icon: string;
   active: boolean;
   dirty?: boolean;
   testId: string;
   keyHint?: string;
   onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
 }) {
+  const Icon = NAV_ICON[icon];
   return (
     <Link
       href={href}
@@ -77,16 +97,26 @@ function NavItem({
       data-settings-nav=""
       data-dirty={dirty ? "" : undefined}
       title={keyHint ? `${label} · ${keyHint}` : label}
-      // words only (D-158): the chosen screen is marked by a line of the pen in the margin
-      className={`group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
+      // «Журнал»: words only (D-158), the chosen one marked by a line of the pen in the margin;
+      // «Графит»: an icon, and a plate with the accent's rail gliding to the chosen one (settings.css)
+      className={`set-nav-item group relative flex h-8 items-center gap-2.5 text-[14px] leading-5 outline-none transition-colors duration-[120ms] focus-visible:ring-2 focus-visible:ring-accent/45 ${
         active ? "font-semibold text-text" : "text-muted hover:text-text"
       }`}
     >
-      {active ? <span aria-hidden className="absolute inset-y-1 -left-3 w-[2px] bg-accent" /> : null}
-      <span className="min-w-0 flex-1 truncate">{label}</span>
-      {dirty ? <DirtyDot /> : null}
+      {active ? (
+        <motion.span layoutId="settings-nav-plate" aria-hidden className="set-nav-plate" transition={NAV_GLIDE}>
+          <span className="set-nav-rail absolute inset-y-1 -left-3 w-[2px] bg-accent" />
+        </motion.span>
+      ) : null}
+      {Icon ? <Icon size={16} strokeWidth={2} aria-hidden className="set-nav-icon relative shrink-0" /> : null}
+      <span className="relative min-w-0 flex-1 truncate">{label}</span>
+      {dirty ? (
+        <span className="relative">
+          <DirtyDot />
+        </span>
+      ) : null}
       {keyHint && !dirty ? (
-        <span aria-hidden className="nums text-[11px] font-semibold text-muted/0 transition-colors duration-[120ms] group-hover:text-muted/70">
+        <span aria-hidden className="set-nav-key nums relative text-[11px] font-semibold text-muted/0 transition-colors duration-[120ms] group-hover:text-muted/70">
           {keyHint}
         </span>
       ) : null}
@@ -156,7 +186,7 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
   };
 
   return (
-    <nav aria-label="Разделы настроек" data-testid="settings-subnav" className="sticky top-4 w-[176px] shrink-0 self-start" onKeyDown={walkNav}>
+    <nav aria-label="Разделы настроек" data-testid="settings-subnav" className="set-nav sticky top-4 w-[188px] shrink-0 self-start" onKeyDown={walkNav}>
       <div
         className="desk-fields mb-3"
         onKeyDownCapture={(event) => {
@@ -180,20 +210,21 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
           }}
           placeholder="Найти настройку"
           aria-label="Найти настройку"
-          width={176}
+          width={188}
         />
       </div>
       {results ? (
         <Results results={results} at={at} onPick={pick} onHover={setAt} />
       ) : (
         <>
-          <SectionLabel>Настройки</SectionLabel>
-          <div className="flex flex-col">
+          <SectionLabel className="set-nav-label">Настройки</SectionLabel>
+          <div className="set-nav-list flex flex-col">
             {SETTINGS_TABS.map((key, index) => (
               <NavItem
                 key={key}
                 href={`/desk/settings?tab=${key}`}
                 label={SETTINGS_TAB_META[key].title}
+                icon={key}
                 active={current === key}
                 dirty={dirty[key]}
                 testId={`settings-nav-${key}`}
@@ -207,24 +238,26 @@ function SettingsNav({ searchRef }: { searchRef: RefObject<HTMLInputElement | nu
               />
             ))}
           </div>
-          <SectionLabel className="mt-4">Ещё</SectionLabel>
-          <div className="flex flex-col">
+          <SectionLabel className="set-nav-label mt-4">Ещё</SectionLabel>
+          <div className="set-nav-list flex flex-col">
             <NavItem
               href="/desk/settings/dictionary"
               label="Словарь"
+              icon="dictionary"
               active={within(pathname, "/desk/settings/dictionary")}
               testId="settings-nav-dictionary"
             />
             {devTools ? (
-              <NavItem href="/desk/settings/lab" label="Лаборатория" active={within(pathname, "/desk/settings/lab")} testId="settings-nav-lab" />
+              <NavItem href="/desk/settings/lab" label="Лаборатория" icon="lab" active={within(pathname, "/desk/settings/lab")} testId="settings-nav-lab" />
             ) : null}
             {devTools ? (
-              <NavItem href="/desk/settings/data" label="Данные" active={within(pathname, "/desk/settings/data")} testId="settings-nav-data" />
+              <NavItem href="/desk/settings/data" label="Данные" icon="data" active={within(pathname, "/desk/settings/data")} testId="settings-nav-data" />
             ) : null}
             {director ? (
               <NavItem
                 href="/desk/settings/points"
                 label="Очки и магазин"
+                icon="points"
                 active={within(pathname, "/desk/settings/points")}
                 testId="settings-nav-points"
               />
@@ -287,7 +320,7 @@ function FrameBody({ children }: { children: ReactNode }) {
   ]);
   return (
     <PageSearchContext.Provider value={register}>
-      <div className="flex w-full gap-10 px-8 pb-12 pt-4">
+      <div className="set-frame flex w-full gap-10 px-8 pb-12 pt-4" data-settings-frame="">
         <SettingsNav searchRef={settingsSearch} />
         <DeskLinks className="min-w-0 flex-1">{children}</DeskLinks>
       </div>

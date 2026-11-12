@@ -133,11 +133,14 @@ function SecretaryCalls() {
   const visits = useVisits(settled);
   const rows = visits.data ?? [];
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 [&_button.card-in]:min-h-[40px] [&_button.card-in]:text-[14px]" data-testid="desk-secretary-calls">
+    <div className="@container flex min-w-0 flex-1 items-center gap-2 [&_button.card-in]:min-h-[40px] [&_button.card-in]:text-[14px]" data-testid="desk-secretary-calls">
       <span className="mr-1 text-[13px] leading-4 text-muted">Директору:</span>
       <VisitorButton visits={rows} />
       <MessageButton visits={rows} />
-      <DirectorBusyLine />
+      {/* whether he is free: whole or not at all — a narrow head cut it down to «[» (D-174) */}
+      <span className="hidden min-w-0 @min-[520px]:inline-flex">
+        <DirectorBusyLine />
+      </span>
     </div>
   );
 }

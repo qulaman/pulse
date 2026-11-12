@@ -170,7 +170,7 @@ function FormBody({
 
   return (
     <form
-      className="desk-fields flex flex-col gap-3"
+      className="cal-form desk-fields flex flex-col gap-3"
       data-testid="desk-event-form"
       onSubmit={(submit) => {
         submit.preventDefault();

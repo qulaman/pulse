@@ -1,27 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import {
-  BellOff,
-  CarTaxiFront,
-  CircleHelp,
-  Clock,
-  Coffee,
-  ConciergeBell,
-  CupSoda,
-  Footprints,
-  GlassWater,
-  Handshake,
-  LoaderCircle,
-  Package,
-  PenLine,
-  Presentation,
-  Printer,
-  Siren,
-  Stethoscope,
-  UtensilsCrossed,
-  type LucideIcon,
-} from "lucide-react";
+import { CircleHelp, Clock, ConciergeBell, LoaderCircle, Siren } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
@@ -41,7 +21,7 @@ import { orderFor, rememberSend, usualNote } from "@/lib/errands/habits";
 import { useErrandLink } from "@/lib/errands/mutations";
 import { askSecretary, cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
 import { errandKeys, useErrandReceipt, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
-import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine, type DeskScene } from "@/lib/errands/scene";
+import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
@@ -49,40 +29,22 @@ import type { Me } from "@/lib/tasks/queries";
 import { receiptLine } from "@/lib/tasks/receipts";
 
 import { askAfterWindow } from "./ask";
-import { INK, Live, Mark, Titled, type Ink } from "./look";
+import { SCENE_ICON, SCENE_INK } from "@/components/desk/errands/look";
+
+import { INK, Live, Mark, Titled } from "./look";
 import { Aside, BlockLink, BlockNote, DAY_ROW_END, Quiet, RowsBone } from "./parts";
 
-/** Each request of the catalogue as a picture (D-169): what the secretary will do, seen before it is read. */
-const SCENE_ICON: Record<DeskScene, LucideIcon | null> = {
-  coffee: Coffee,
-  tea: CupSoda,
-  water: GlassWater,
-  dnd: BellOff,
-  security: Siren,
-  guest: Handshake,
-  meeting: Presentation,
-  doctor: Stethoscope,
-  come: Footprints,
-  taxi: CarTaxiFront,
-  print: Printer,
-  lunch: UtensilsCrossed,
-  courier: Package,
-  // a request of the company's own: its own sign from the catalogue, when it has one
-  other: null,
-};
-const SCENE_INK: Partial<Record<DeskScene, Ink>> = { security: "pencil", dnd: "violet" };
-
-/** The sign of a request: the scene's icon in its ink; a request of the company's own keeps its emoji. */
+/** The sign of a request: the scene's icon in its ink (one map with «Заявки», D-174); a request of the company's own keeps its emoji. */
 function ActionSign({ action }: { action: SecretaryAction }) {
   const scene = sceneOfAction(action);
-  const Glyph = SCENE_ICON[scene];
-  if (Glyph) return <Mark icon={Glyph} ink={SCENE_INK[scene] ?? "ok"} size={15} />;
-  if (scene === "other" && !action.icon) return <Mark icon={PenLine} ink="ok" size={15} />;
-  return action.icon ? (
-    <span aria-hidden className="self-center text-[13px] leading-none">
-      {action.icon}
-    </span>
-  ) : null;
+  if (scene === "other" && action.icon) {
+    return (
+      <span aria-hidden className="self-center text-[13px] leading-none">
+        {action.icon}
+      </span>
+    );
+  }
+  return <Mark icon={SCENE_ICON[scene]} ink={SCENE_INK[scene] ?? "ok"} size={15} />;
 }
 
 /** «Охрана» goes on a hold of two seconds, as on the phone (D-101): never one stray click away. */

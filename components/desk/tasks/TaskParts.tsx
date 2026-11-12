@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Ban, CalendarClock, Check, CircleCheck, CircleX, Clock, Ellipsis, Hourglass, MessageCircleQuestion, Repeat, RotateCcw, Send, TriangleAlert, Undo2, X } from "lucide-react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Menu } from "@/components/desk/ui/Menu";
@@ -24,9 +25,11 @@ import { closedAtOf, stepsOf, timeLeft, type Step } from "@/lib/tasks/overview";
 import type { DeliveryRow } from "@/lib/tasks/receipts";
 import type { Me, TaskWithPeople } from "@/lib/tasks/queries";
 import { deadlineLabel, TEXT } from "@/lib/tasks/status-text";
+import { useDeskLook } from "@/lib/desk/theme";
 
 import { deliveryLine, handInVerdict, keyOfAction, stageOf, type Line } from "@/lib/desk/tasks";
 import { focusComposer } from "./DeskThread";
+import { FaceName, useAvatars } from "./Face";
 import { MiniButton } from "./RowMoves";
 import type { DeskTask } from "./useDeskTask";
 
@@ -98,10 +101,17 @@ function FieldButton({
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+function Field({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <>
-      <dt className="text-[13px] leading-5 text-muted">{label}</dt>
+      <dt className="tasks-field-label flex min-w-0 items-center gap-1.5 text-[13px] leading-5 text-muted">
+        {icon ? (
+          <span aria-hidden className="tasks-ico tasks-field-icon shrink-0">
+            {icon}
+          </span>
+        ) : null}
+        <span className="truncate">{label}</span>
+      </dt>
       <dd className="flex min-w-0 flex-wrap items-baseline gap-x-2 text-[13px] leading-5">{children}</dd>
     </>
   );
@@ -117,7 +127,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   const held = delivery.data ? heldLine(delivery.data.held, now) : null;
   if (held) {
     return (
-      <Field label="Доставка">
+      <Field label="Доставка" icon={<Send size={13} strokeWidth={2} />}>
         <span className="flex items-center gap-1.5 text-muted" data-testid="desk-receipt">
           {held} ·
           <button type="button" className="text-accent underline-offset-2 hover:underline" onClick={onSendNow} data-testid="send-now">
@@ -129,7 +139,7 @@ function Receipt({ task, now, onSendNow }: { task: TaskWithPeople; now: Date; on
   }
   const line = task.status === "sent" ? deliveryLine(task, delivery.data?.receipt, now) : null;
   return line ? (
-    <Field label="Доставка">
+    <Field label="Доставка" icon={<Send size={13} strokeWidth={2} />}>
       <ToneLine line={line} testId="desk-receipt" />
     </Field>
   ) : null;
@@ -142,20 +152,34 @@ function stepInk(step: Step): string {
   return step.state === "current" && step.key === "closed" ? "var(--warn)" : "var(--text)";
 }
 
-/** The four steps of a task in one quiet line (выдана → в работе → сдана → принята), each with its time. */
+/**
+ * The four steps of a task (выдана → в работе → сдана → принята), each with its time. The journal
+ * draws them as one quiet line of strokes; «Графит» as a stepper — a node a step, done ones ticked,
+ * the one the task stands on ringed in its ink, the line between them drawing itself in.
+ */
 function Path({ desk, now }: { desk: DeskTask; now: Date }) {
   const task = desk.task as TaskWithPeople;
   const steps = stepsOf(task, now, { declinedAt: desk.signals.declinedAt });
   return (
-    <ol className="grid grid-cols-4 gap-1" data-testid="task-steps">
-      {steps.map((step) => {
+    <ol className="tasks-steps grid grid-cols-4 gap-1" data-testid="task-steps">
+      {steps.map((step, index) => {
         const pending = step.state === "current" || step.state === "warn" || step.state === "bad";
         const due = pending && !step.at && task.deadline && step.key !== "closed" ? task.deadline : null;
         const time = step.at ? humanAqtobe(new Date(step.at), now).replace(/^сегодня /, "") : due ? `до ${humanAqtobe(new Date(due), now).replace(/^сегодня /, "")}` : "";
+        const next = steps[index + 1];
         return (
-          <li key={step.key} className="min-w-0">
-            <span aria-hidden className="block h-[2px]" style={{ background: stepInk(step) }} />
-            <span className={`mt-1 block truncate text-[12px] leading-4 ${pending ? "font-semibold" : step.state === "todo" ? "text-muted" : ""}`} style={pending ? { color: stepInk(step) } : undefined}>
+          <li
+            key={step.key}
+            className="tasks-step min-w-0"
+            data-state={step.state}
+            data-next={next?.state}
+            style={{ "--own": stepInk(step), "--bar": next ? stepInk(next) : "transparent", "--i": index } as CSSProperties}
+          >
+            <span aria-hidden className="tasks-step-bar block h-[2px]" />
+            <span aria-hidden className="tasks-step-dot">
+              {step.state === "done" ? <Check size={11} strokeWidth={3} /> : step.state === "bad" ? <X size={11} strokeWidth={3} /> : null}
+            </span>
+            <span className={`tasks-step-label mt-1 block truncate text-[12px] leading-4 ${pending ? "font-semibold" : step.state === "todo" ? "text-muted" : ""}`} style={pending ? { color: stepInk(step) } : undefined}>
               {step.label}
             </span>
             <span className="nums block h-4 truncate text-[11px] leading-4 text-muted">{time}</span>
@@ -190,29 +214,40 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
   const from = (target: HTMLElement) => ({ at: target, scope: scope?.() ?? null });
   // the pen and the pencil are for what waits on the director; a stage on its way stays in print
   const stageInk = stage.tone === "danger" ? "var(--danger)" : desk.reason ? TONE_VAR[stage.tone] : "var(--text-muted)";
+  // «Графит» puts the person's face before the name, as the table does (D-174)
+  const graphite = useDeskLook() === "graphite";
+  const avatars = useAvatars();
+  const who = graphite ? (
+    <FaceName id={task.assignee_id} name={task.assignee?.full_name} avatar={avatars.get(task.assignee_id)} size={26} gone={gone} full />
+  ) : (
+    <PersonCell name={task.assignee?.full_name} gone={gone} />
+  );
   return (
-    <header>
+    <header className="tasks-head" data-large={large ? "" : undefined}>
       {/* the panel's «×» stands in the corner: the first line leaves it room */}
       <div className={`flex items-center gap-3 ${large ? "" : "pr-9"}`}>
-        <div className="min-w-0 flex-1">
+        <div className="tasks-head-who min-w-0 flex-1">
           {canPass ? (
             <FieldButton label="Передать другому" keys={["T"]} taskId={task.id} act="reassign handoff" onPress={(target) => desk.acts.press("reassign", task, from(target))} testId="desk-field-assignee">
-              <PersonCell name={task.assignee?.full_name} gone={gone} />
+              {who}
             </FieldButton>
           ) : (
-            <PersonCell name={task.assignee?.full_name} gone={gone} />
+            who
           )}
         </div>
         {large ? null : (
-          <span className="desk-label shrink-0 uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
+          <span className="tasks-stage desk-label shrink-0 uppercase" style={{ color: stageInk }} data-testid="desk-task-stage">
             {stage.text}
           </span>
         )}
       </div>
-      <h2 className={`desk-task-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
+      <h2 className={`desk-task-title tasks-title mt-2 [overflow-wrap:anywhere] ${large ? "text-[28px] leading-8" : "text-[21px] leading-[26px]"}`}>{task.title}</h2>
 
-      <dl className="mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">
-        <Field label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}>
+      <dl className="tasks-fields mt-3 grid grid-cols-[76px_minmax(0,1fr)] gap-x-3 gap-y-1" data-testid="desk-task-fields">
+        <Field
+          label={closed ? (task.status === "done" ? "Принята" : "Закрыта") : "Срок"}
+          icon={closed ? task.status === "done" ? <CircleCheck size={13} strokeWidth={2} /> : <CircleX size={13} strokeWidth={2} /> : <CalendarClock size={13} strokeWidth={2} />}
+        >
           {closed ? (
             <span className="nums">{humanAqtobe(new Date(closedAtOf(task)), now)}</span>
           ) : canDate ? (
@@ -237,13 +272,13 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
           ) : null}
         </Field>
         {task.status === "scheduled" && task.scheduled_send_at ? (
-          <Field label="Уйдёт">
+          <Field label="Уйдёт" icon={<Clock size={13} strokeWidth={2} />}>
             <span className="nums">{humanAqtobe(new Date(task.scheduled_send_at), now)}</span>
           </Field>
         ) : null}
         {task.status !== "revoked" && task.status !== "scheduled" ? <Receipt task={task} now={now} onSendNow={() => desk.acts.press("sendNow", task)} /> : null}
         {desk.rule ? (
-          <Field label="Повтор">
+          <Field label="Повтор" icon={<Repeat size={13} strokeWidth={2} />}>
             <span className="inline-flex min-w-0 items-center gap-1.5" data-testid="desk-task-repeat">
               <span className="truncate">{ruleLine(desk.rule)}</span>
               {desk.rule.is_active ? null : <span className="text-muted">· остановлен</span>}
@@ -252,7 +287,7 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
         ) : null}
       </dl>
 
-      <div className="mt-3">
+      <div className="tasks-path mt-3">
         <Path desk={desk} now={now} />
       </div>
     </header>
@@ -263,10 +298,23 @@ export function TaskHead({ desk, now, large = false, scope }: { desk: DeskTask; 
 /* What was said and what waits                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** One note of what waits on a task: a stroke of its ink in the margin, the words on the sheet's vertical (D-158). */
-export function Callout({ tone, children, testId }: { tone: Tone; children: ReactNode; testId?: string }) {
+/**
+ * One note of what waits on a task: in the journal a stroke of its ink in the margin, the words on
+ * the sheet's vertical (D-158); in «Графит» a tinted card with the icon of what it is (D-174).
+ */
+export function Callout({ tone, icon, children, testId }: { tone: Tone; icon?: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <div className="-ml-3 mt-3 border-l-2 pl-2.5 text-[13px] leading-5" style={{ borderColor: TONE_VAR[tone] }} data-testid={testId}>
+    <div
+      className="tasks-callout -ml-3 mt-3 border-l-2 pl-2.5 text-[13px] leading-5"
+      style={{ borderColor: TONE_VAR[tone], "--tone": TONE_VAR[tone] } as CSSProperties}
+      data-tone={tone}
+      data-testid={testId}
+    >
+      {icon ? (
+        <span aria-hidden className="tasks-ico tasks-callout-icon">
+          {icon}
+        </span>
+      ) : null}
       {children}
     </div>
   );
@@ -283,7 +331,7 @@ function QuickReplies({ desk, now, onWords }: { desk: DeskTask; now: Date; onWor
   const words = wantsWords(question);
   const chip = "inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms]";
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1" data-testid="quick-answers">
+    <div className="tasks-quick mt-2 flex flex-wrap items-center gap-1" data-testid="quick-answers">
       {answers.map((answer, index) => (
         <button
           key={answer.label}
@@ -320,22 +368,22 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
       : undefined;
   return (
     <div data-testid="desk-task-facts">
-      {task.body ? <p className="mt-3 max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{task.body}</p> : null}
+      {task.body ? <p className="tasks-body mt-3 max-w-[76ch] whitespace-pre-line text-[14px] leading-5 [overflow-wrap:anywhere]">{task.body}</p> : null}
 
       {question ? (
-        <Callout tone="warn" testId="desk-question">
+        <Callout tone="warn" icon={<MessageCircleQuestion size={15} strokeWidth={2} />} testId="desk-question">
           <p className="text-text">«{question}»</p>
           <QuickReplies desk={desk} now={now} onWords={onWords} />
         </Callout>
       ) : null}
       {task.status === "declined" ? (
-        <Callout tone="danger">
+        <Callout tone="danger" icon={<Ban size={15} strokeWidth={2} />}>
           <span className="text-text">Отказ{declineReason ? `: ${declineReason}` : " без причины"}</span>
           {suggestion ? <span className="block text-muted">Предлагает передать: {suggestion.name}</span> : null}
         </Callout>
       ) : null}
       {request && isWorking(task.status) ? (
-        <Callout tone="warn">
+        <Callout tone="warn" icon={<Hourglass size={15} strokeWidth={2} />}>
           <span className="text-text">
             Просит срок {untilWords(request.proposed, now)}
             {request.words ? ` · «${request.words}»` : ""}
@@ -344,40 +392,41 @@ export function TaskFacts({ desk, now, onWords }: { desk: DeskTask; now: Date; o
         </Callout>
       ) : null}
       {task.status === "rework" ? (
-        <Callout tone="muted">
+        <Callout tone="muted" icon={<RotateCcw size={15} strokeWidth={2} />}>
           <span className="text-text">На доработке — ждём новый отчёт</span>
         </Callout>
       ) : null}
       {partial && task.status === "pending_review" ? (
-        <Callout tone="warn">
+        <Callout tone="warn" icon={<TriangleAlert size={15} strokeWidth={2} />}>
           <span className="text-text">Сдано не всё — что осталось, в отчёте</span>
         </Callout>
       ) : null}
       {task.status === "revoked" ? (
-        <Callout tone="muted">
+        <Callout tone="muted" icon={<Undo2 size={15} strokeWidth={2} />}>
           <span className="text-text">{task.passed_to ? passedWord(task.passed?.full_name) : TEXT.revoked}</span>
         </Callout>
       ) : null}
       {nudgedAt && isWorking(task.status) ? (
-        <p className="mt-2 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
+        <p className="tasks-nudged mt-2 flex items-center gap-1.5 text-[13px] leading-5 text-muted" data-testid="nudged">
+          <Clock aria-hidden size={13} strokeWidth={2} className="tasks-ico" />
           Напомнили <span className="nums">{humanAqtobe(new Date(nudgedAt), now)}</span>
         </p>
       ) : null}
 
       {photo ? (
-        <div className="mt-3 max-w-[360px]" data-testid="desk-task-photo">
+        <div className="tasks-photo mt-3 max-w-[360px]" data-testid="desk-task-photo">
           <p className="text-[12px] leading-4 text-muted">Фото к отчёту</p>
           <PhotoMessage messageId={photo.id} />
         </div>
       ) : null}
 
       {task.source_audio_path ? (
-        <div className="mt-3 max-w-[360px]">
+        <div className="tasks-audio mt-3 max-w-[360px]">
           <AudioOriginal path={task.source_audio_path} />
         </div>
       ) : null}
       {task.source_transcript && task.source_transcript.trim() !== task.title.trim() ? (
-        <details className="group mt-3">
+        <details className="tasks-transcript group mt-3">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] leading-5 text-muted hover:text-text [&::-webkit-details-marker]:hidden">
             {TEXT.transcriptSpoiler}
             <span aria-hidden className="transition-transform duration-[120ms] group-open:rotate-180">
@@ -478,10 +527,13 @@ export function TaskKeys({ desk, me, now, pointsEnabled, scope }: { desk: DeskTa
           title="Все действия · ."
           data-testid="desk-task-more"
           data-desk-more={task.id}
+          // three moves fill the panel's line: «Графит» keeps the dots, the word would push «Ещё» onto a line of its own
+          data-compact={desk.keys.length >= 3 ? "" : undefined}
           onClick={(event) => setMenuAt(menuAt ? null : event.currentTarget)}
           className={MORE_WORD}
         >
-          Ещё
+          <Ellipsis aria-hidden size={16} strokeWidth={2.2} className="tasks-ico tasks-more-dots" />
+          <span className="tasks-more-word">Ещё</span>
           <span aria-hidden className="nums text-[11px] leading-4 opacity-60">
             .
           </span>

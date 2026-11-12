@@ -110,21 +110,26 @@ function resetOf(key: SectionKey, server: CompanySettings): Partial<CompanySetti
   }
 }
 
-/** The shape of a tab while the settings load: its groups under their rules, nothing that will jump. */
+/** The shape of a tab while the settings load: its cards and their rows, nothing that will jump. */
 function PanelBone() {
   return (
-    <div className="flex flex-col gap-8" aria-hidden>
+    <div className="flex flex-col gap-6" aria-hidden>
       {[3, 2].map((rows, group) => (
-        <div key={group}>
-          <Bone h={16} w={140} className="mb-2" />
-          <div className="desk-list">
+        <div key={group} className="set-card">
+          <div className="set-card-head">
+            <div className="flex flex-col gap-1.5">
+              <Bone h={16} w={140} />
+              <Bone h={12} w={320} />
+            </div>
+          </div>
+          <div className="set-card-rows desk-list">
             {Array.from({ length: rows }, (_, index) => (
-              <div key={index} className="flex items-center justify-between gap-6 py-3">
+              <div key={index} className="set-row flex items-center justify-between gap-6">
                 <div className="flex flex-col gap-1.5">
                   <Bone h={14} w={180} />
                   <Bone h={12} w={280} />
                 </div>
-                <Bone h={36} w={index % 2 ? 36 : 220} />
+                <Bone h={index % 2 ? 20 : 36} w={index % 2 ? 36 : 220} />
               </div>
             ))}
           </div>
@@ -183,7 +188,8 @@ function Panels({ tab, visited, director }: { tab: SettingsTab; visited: Readonl
     <>
       {SETTINGS_TABS.map((key) =>
         visited.has(key) ? (
-          <section key={key} id={`desk-settings-panel-${key}`} data-testid={`desk-settings-panel-${key}`} aria-label={SETTINGS_TAB_META[key].title} hidden={key !== tab}>
+          // `hidden` takes the panel out of the page and back: its cards rise into place on every visit (settings.css)
+          <section key={key} id={`desk-settings-panel-${key}`} data-testid={`desk-settings-panel-${key}`} aria-label={SETTINGS_TAB_META[key].title} hidden={key !== tab} className="set-panel">
             {key === "company" ? <CompanyPanel /> : key === "app" ? <AppPanel /> : key === "team" ? <TeamPanel director={director} /> : <AiPanel />}
           </section>
         ) : null,
@@ -202,7 +208,8 @@ function landOn(id: string) {
     [{ backgroundColor: "color-mix(in srgb, var(--accent) 16%, transparent)" }, { backgroundColor: "transparent" }],
     { duration: 1600, easing: "ease-out" },
   );
-  row.querySelector<HTMLElement>("input, select, button, a[href]")?.focus({ preventScroll: true });
+  // the desk's select keeps the system's one inside, unseen: the caret goes to its button
+  row.querySelector<HTMLElement>("input, select:not(.desk-select-native), button, a[href]")?.focus({ preventScroll: true });
   return true;
 }
 

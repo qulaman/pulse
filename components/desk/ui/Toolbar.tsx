@@ -1,9 +1,23 @@
 "use client";
 
+import { Check, ChevronDown } from "lucide-react";
 import { motion } from "motion/react";
-import { forwardRef, useId, type ReactNode, type SelectHTMLAttributes } from "react";
+import {
+  Children,
+  forwardRef,
+  Fragment,
+  isValidElement,
+  useId,
+  useReducer,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type SelectHTMLAttributes,
+} from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Popover } from "@/components/desk/ui/Popover";
 
 /** A row of the desk's controls over a table: tabs and filters on the left, counts and actions on the right. */
 export function Toolbar({ children, end }: { children: ReactNode; end?: ReactNode }) {
@@ -52,12 +66,173 @@ export const SearchField = forwardRef<HTMLInputElement, { value: string; onChang
   },
 );
 
-/** The browser's own select in our field recipe (its chevron is ours, globals.css). */
-export function Select({ className = "", children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+type Choice = { value: string; label: ReactNode; text: string; disabled: boolean };
+
+/** The words of a node: an option's label for type-ahead and titles. */
+function textOf(node: ReactNode): string {
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (isValidElement(node)) return textOf((node.props as { children?: ReactNode }).children);
+  return "";
+}
+
+/** The `<option>`s a caller wrote, through arrays and fragments. */
+function choicesOf(children: ReactNode): Choice[] {
+  const out: Choice[] = [];
+  Children.forEach(children, (child) => {
+    if (!isValidElement(child)) return;
+    const props = child.props as { value?: string | number; children?: ReactNode; disabled?: boolean };
+    if (child.type === "option") {
+      out.push({ value: String(props.value ?? textOf(props.children)), label: props.children, text: textOf(props.children), disabled: Boolean(props.disabled) });
+    } else if (child.type === Fragment) {
+      out.push(...choicesOf(props.children));
+    }
+  });
+  return out;
+}
+
+/**
+ * A choice of a few (D-174): the desk's own list instead of the system's — a field with the chosen
+ * word and a chevron, and under it a glass list with a tick at the chosen one; ↑/↓, Enter, Esc and
+ * the first letters work as in a select. The caller writes a plain `<select>`'s props and
+ * `<option>`s: the real select stays inside, unseen, and carries the value, `onChange`, the label
+ * and the test id — a pick sets it and fires its own `change`, so every screen and every check
+ * (`selectOption`) works as before.
+ */
+export function Select({ className = "", children, value, defaultValue, onChange, disabled, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+  const native = useRef<HTMLSelectElement>(null);
+  const [button, setButton] = useState<HTMLButtonElement | null>(null);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  // the native select may change on its own (a check's `selectOption`, an uncontrolled default)
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+  const typed = useRef({ text: "", at: 0 });
+  const listId = useId();
+  const choices = choicesOf(children);
+  const current = value !== undefined ? String(value) : (native.current?.value ?? (defaultValue !== undefined ? String(defaultValue) : (choices[0]?.value ?? "")));
+  const chosenAt = Math.max(0, choices.findIndex((choice) => choice.value === current));
+  const chosen = choices[chosenAt];
+  const block = /(^|\s)w-full(\s|$)/.test(className);
+  const label = rest["aria-label"];
+
+  const pick = (next: string) => {
+    setOpen(false);
+    button?.focus({ preventScroll: true });
+    const el = native.current;
+    if (!el || el.value === next) return;
+    el.value = next;
+    // React hears a select's own `change`: the caller's onChange runs as if the system list had been used
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    redraw();
+  };
+  const show = () => {
+    setActive(chosenAt);
+    setOpen(true);
+  };
+  const step = (from: number, by: number) => {
+    for (let i = 1; i <= choices.length; i += 1) {
+      const at = (from + by * i + choices.length * 4) % choices.length;
+      if (!choices[at]?.disabled) return at;
+    }
+    return from;
+  };
+  const onKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!open) return show();
+      setActive((at) => step(at, event.key === "ArrowDown" ? 1 : -1));
+      return;
+    }
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      if (!open) return show();
+      const choice = choices[active];
+      if (choice && !choice.disabled) pick(choice.value);
+      return;
+    }
+    if (event.key === "Home" || event.key === "End") {
+      if (!open) return;
+      event.preventDefault();
+      setActive(event.key === "Home" ? step(-1, 1) : step(choices.length, -1));
+      return;
+    }
+    // the first letters find a choice, as in the system's list
+    if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      const now = Date.now();
+      typed.current = { text: (now - typed.current.at < 700 ? typed.current.text : "") + event.key.toLowerCase(), at: now };
+      const found = choices.findIndex((choice) => !choice.disabled && choice.text.toLowerCase().startsWith(typed.current.text));
+      if (found >= 0) {
+        if (open) setActive(found);
+        else pick(choices[found].value);
+      }
+    }
+  };
+
   return (
-    <select {...rest} className={`field h-9 cursor-pointer pl-3 text-[14px] leading-5 ${className}`}>
-      {children}
-    </select>
+    <span className={`desk-select relative inline-flex max-w-full align-middle ${block ? "w-full" : ""}`} data-open={open ? "" : undefined}>
+      <select
+        ref={native}
+        {...rest}
+        value={value}
+        defaultValue={defaultValue}
+        disabled={disabled}
+        onChange={(event) => {
+          onChange?.(event);
+          redraw();
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="desk-select-native"
+      >
+        {children}
+      </select>
+      <button
+        ref={setButton}
+        type="button"
+        disabled={disabled}
+        // the select-only combobox of WAI-ARIA: the focus stays here, the list says which choice is active
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={open ? listId : undefined}
+        aria-activedescendant={open ? `${listId}-${active}` : undefined}
+        title={rest.title ?? (label ? `${label}: ${chosen?.text ?? ""}` : undefined)}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKey}
+        className={`field desk-select-button flex h-9 cursor-pointer items-center gap-2 pl-3 pr-2.5 text-left text-[14px] leading-5 disabled:cursor-default disabled:opacity-50 ${className}`}
+        data-select-for={rest.id}
+      >
+        <span className="min-w-0 flex-1 truncate">{chosen?.label ?? ""}</span>
+        <ChevronDown size={14} strokeWidth={2.25} aria-hidden className="desk-select-chevron shrink-0" />
+      </button>
+      <Popover open={open} onClose={() => setOpen(false)} anchor={button} matchAnchor role="presentation" className="desk-select-pop">
+        <div id={listId} role="listbox" aria-label={label} className="flex max-h-[min(60vh,360px)] flex-col overflow-y-auto p-1">
+          {choices.map((choice, index) => {
+            const on = index === chosenAt;
+            return (
+              <button
+                key={`${choice.value}:${index}`}
+                id={`${listId}-${index}`}
+                type="button"
+                role="option"
+                aria-selected={on}
+                disabled={choice.disabled}
+                tabIndex={-1}
+                onMouseEnter={() => setActive(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => pick(choice.value)}
+                className="desk-select-option flex h-8 w-full shrink-0 items-center gap-2 rounded-[7px] px-2.5 text-left text-[13px] leading-4 disabled:opacity-40"
+                data-active={index === active ? "" : undefined}
+              >
+                <span className="min-w-0 flex-1 truncate">{choice.label}</span>
+                {on ? <Check size={14} strokeWidth={2.5} aria-hidden className="shrink-0 text-accent" /> : <span aria-hidden className="w-[14px] shrink-0" />}
+              </button>
+            );
+          })}
+        </div>
+      </Popover>
+    </span>
   );
 }
 

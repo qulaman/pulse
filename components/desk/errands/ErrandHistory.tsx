@@ -1,5 +1,6 @@
 "use client";
 
+import { Heart } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
@@ -19,20 +20,24 @@ import { loadStateOf } from "@/lib/desk/tasks";
 import { CLOSED_ERRANDS, isActive, useErrandArchive, useErrandCounts, useSecretaries, type ClosedErrandStatus, type Errand, type ErrandFilter } from "@/lib/errands/queries";
 import { atLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
+import type { SecretaryAction } from "@/lib/settings";
 
 import { DateRangeField } from "../tasks/DateRange";
 import { writeParams } from "../tasks/flow";
 import { LoadFailure, LoadNote } from "../tasks/LoadState";
 import { arrowOf, stepKey, useScreenKeys } from "../team/keys";
 import { ThankButton } from "./ErrandCard";
+import { ErrandTile, PersonFace } from "./look";
 import { canThank, lower, STATUS_TONE, STATUS_WORD } from "./words";
 
-/** A request in a table cell: the label, the note after it, the time it is needed by. */
-export function ErrandWhat({ errand, now }: { errand: Errand; now: Date }) {
+/** A request in a table cell: its scene's icon, the label, the note after it, the time it is needed by. */
+export function ErrandWhat({ errand, now, catalogue }: { errand: Errand; now: Date; catalogue: readonly SecretaryAction[] }) {
   const late = Boolean(errand.due_at) && isActive(errand) && new Date(errand.due_at as string) < now;
   return (
-    <span className="block truncate" title={[errand.label, errand.note, errand.result ? `передано: ${errand.result}` : null].filter(Boolean).join(" · ")}>
-      {errand.label}
+    <span className="flex min-w-0 items-center gap-2.5" title={[errand.label, errand.note, errand.result ? `передано: ${errand.result}` : null].filter(Boolean).join(" · ")}>
+      <ErrandTile errand={errand} catalogue={catalogue} size={24} muted={errand.status === "cancelled"} />
+      <span className="min-w-0 truncate">
+      <span className="font-medium">{errand.label}</span>
       {errand.due_at ? (
         <>
           {" · "}
@@ -41,20 +46,31 @@ export function ErrandWhat({ errand, now }: { errand: Errand; now: Date }) {
       ) : null}
       {errand.note ? <span className="text-muted"> · {errand.note}</span> : null}
       {errand.result ? <span className="text-muted"> · «{errand.result}»</span> : null}
+      </span>
     </span>
   );
 }
 
-/** A request's state in a table cell: the word, who took it, why not. */
-export function ErrandWord({ errand }: { errand: Errand }) {
-  const who = shortName(errand.claimed?.full_name ?? "");
+/** A request's state in a table cell: a dot and the word, who took it — their circle — and why not. */
+export function ErrandWord({ errand, taker = true, compact = false }: { errand: Errand; taker?: boolean; compact?: boolean }) {
+  // the secretary's own history: every row is hers, her name says nothing
+  const who = taker ? shortName(errand.claimed?.full_name ?? "") : "";
   // the secretary asked and waits for the director: the row says so, the panel answers (D-99)
   const asks = Boolean(errand.question && !errand.answer) && (errand.status === "sent" || errand.status === "accepted");
+  const tone = TONE_VAR[asks ? "accent" : STATUS_TONE[errand.status]];
   return (
-    <span className="block min-w-0 truncate">
-      <span style={{ color: TONE_VAR[asks ? "accent" : STATUS_TONE[errand.status]] }}>{asks ? "спрашивает" : STATUS_WORD[errand.status]}</span>
-      {who ? <span className="text-muted"> · {who}</span> : null}
-      {errand.decline_reason ? <span className="text-muted"> · {lower(errand.decline_reason)}</span> : null}
+    <span className="flex min-w-0 items-center gap-2" title={errand.decline_reason ?? undefined}>
+      <span className="errands-status" data-status={asks ? "asks" : errand.status} style={{ color: tone }}>
+        {asks ? "спрашивает" : STATUS_WORD[errand.status]}
+      </span>
+      {who ? (
+        <span className="flex min-w-0 items-center gap-1.5 text-muted" title={errand.claimed?.full_name ?? who}>
+          <PersonFace id={errand.claimed_by} name={errand.claimed?.full_name ?? who} size={18} />
+          {/* a reason takes the room: the circle stays for who */}
+          {errand.decline_reason || compact ? null : <span className="truncate">{who}</span>}
+        </span>
+      ) : null}
+      {errand.decline_reason && !compact ? <span className="min-w-0 truncate text-muted">· {lower(errand.decline_reason)}</span> : null}
     </span>
   );
 }
@@ -76,6 +92,7 @@ export function ErrandHistory({
   onOpen,
   now,
   pointsOn,
+  catalogue,
 }: {
   viewer: "director" | "secretary";
   meId: string;
@@ -83,6 +100,7 @@ export function ErrandHistory({
   onOpen: (id: string) => void;
   now: Date;
   pointsOn: boolean;
+  catalogue: readonly SecretaryAction[];
 }) {
   const director = viewer === "director";
   const params = useSearchParams();
@@ -135,13 +153,21 @@ export function ErrandHistory({
   });
   useShortcuts("Заявки · история", [{ keys: ["F"], label: "Поиск по истории" }]);
 
+  // the panel takes the room: the words keep theirs, the state says itself by its word and a circle
+  const narrow = Boolean(openId);
   const columns: Column<Errand>[] = [
-    { key: "what", title: "Что", sort: (a, b) => a.label.localeCompare(b.label, "ru"), render: (e) => <ErrandWhat errand={e} now={now} /> },
-    { key: "state", title: "Статус", width: "minmax(150px,220px)", sort: (a, b) => a.status.localeCompare(b.status), render: (e) => <ErrandWord errand={e} /> },
+    { key: "what", title: "Что", sort: (a, b) => a.label.localeCompare(b.label, "ru"), render: (e) => <ErrandWhat errand={e} now={now} catalogue={catalogue} /> },
+    {
+      key: "state",
+      title: "Статус",
+      width: narrow ? "minmax(100px,140px)" : "minmax(170px,250px)",
+      sort: (a, b) => a.status.localeCompare(b.status),
+      render: (e) => <ErrandWord errand={e} taker={director} compact={narrow} />,
+    },
     {
       key: "at",
       title: "Когда",
-      width: "148px",
+      width: narrow ? "130px" : "148px",
       sort: (a, b) => a.created_at.localeCompare(b.created_at),
       render: (e) => <When className="text-muted">{humanAqtobe(new Date(e.created_at), now)}</When>,
     },
@@ -153,7 +179,14 @@ export function ErrandHistory({
             width: "104px",
             align: "right",
             render: (e) =>
-              canThank(e, now, pointsOn) ? <ThankButton errand={e} /> : e.thanked_at ? <span className="text-[13px] text-muted" title="Спасибо отправлено">спасибо</span> : null,
+              canThank(e, now, pointsOn) ? (
+                <ThankButton errand={e} />
+              ) : e.thanked_at ? (
+                <span className="errands-thanked" title="Спасибо отправлено">
+                  <Heart size={13} strokeWidth={2.25} aria-hidden />
+                  спасибо
+                </span>
+              ) : null,
           },
         ] satisfies Column<Errand>[])
       : []),

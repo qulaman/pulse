@@ -3,7 +3,7 @@
 import { onlineManager, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 
 import { DeskPresenter } from "@/components/desk/screen/DeskPresenter";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -159,8 +159,8 @@ export function DeskBoard() {
   if (me.isLoading || notes.isLoading || boards.isLoading || !me.data) {
     return (
       <div className="w-full max-w-[860px] px-10 pt-4" aria-hidden>
-        <span className="block h-[34px] w-1/2 bg-surface-2/70" />
-        <span className="mt-6 block h-[320px] bg-surface-2/50" />
+        <span className="block h-[34px] w-1/2 rounded-[8px] bg-surface-2/70" />
+        <span className="mt-6 block h-[320px] rounded-[14px] bg-surface-2/50" />
       </div>
     );
   }
@@ -384,8 +384,8 @@ export function DeskBoard() {
   };
 
   return (
-    <div className="flex w-full max-w-[860px] flex-col gap-3 px-10 pb-16 pt-4" data-testid="desk-board">
-      <header className="flex items-start justify-between gap-4">
+    <div className="notes-board-page flex w-full max-w-[860px] flex-col gap-3 px-10 pb-16 pt-4" data-testid="desk-board">
+      <header className="notes-board-head flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {renaming ? (
             <TitleField
@@ -406,9 +406,20 @@ export function DeskBoard() {
             </Tooltip>
           )}
           <p className="mt-0.5 text-[14px] leading-5 text-muted">
-            {onWall ? <span className="font-medium text-text">На стене{until ? ` до ${tvTime(until)}` : ""} · </span> : null}
+            {onWall ? <span className="notes-board-onwall font-medium text-text">На стене{until ? ` до ${tvTime(until)}` : ""} · </span> : null}
             {stateLine}
           </p>
+          {/* how far the board has come: the ticked points of all, a meter that fills as the meeting goes */}
+          {summary.total > 0 ? (
+            <div className="notes-progress" title={`Отмечено ${summary.done} из ${summary.total}`}>
+              <span aria-hidden className="notes-meter notes-meter-wide" style={{ "--done": summary.done / summary.total } as CSSProperties}>
+                <i />
+              </span>
+              <span className="nums">
+                {summary.done} из {summary.total}
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2 pt-1">
           {onWall ? (
@@ -421,7 +432,7 @@ export function DeskBoard() {
               На стену
             </Button>
           )}
-          <MenuButton items={menuItems} label="Все действия с доской" align="end" width={300} className="flex h-9 w-9 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text">
+          <MenuButton items={menuItems} label="Все действия с доской" align="end" width={300} className="notes-board-more-button flex h-9 w-9 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
               <circle cx="5.5" cy="12" r="1.7" />
               <circle cx="12" cy="12" r="1.7" />
@@ -436,7 +447,7 @@ export function DeskBoard() {
 
       <Outline rows={rows} phone={phone} hearing={heard} numbers={numbers} spot={spot} onWall={onWall} taskOf={(row) => (row.converted_task_id ? taskById.get(row.converted_task_id) : undefined)} actions={actions} autoStart={rows.length === 0} />
 
-      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted">
+      <p className="notes-board-keys mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] leading-4 text-muted">
         <span className="inline-flex items-center gap-1">
           <Kbd>Enter</Kbd> строка
         </span>

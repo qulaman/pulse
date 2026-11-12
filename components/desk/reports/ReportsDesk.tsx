@@ -1,5 +1,6 @@
 "use client";
 
+import { Download, Printer } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Toolbar } from "@/components/desk/ui/Toolbar";
+import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { useMinute } from "@/components/tasks/list/TaskList";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
@@ -25,12 +27,11 @@ import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
 
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
-import { DayStepper, DayView } from "./DayView";
+import { DayStepper, DayView, type DayShow } from "./DayView";
 import { PeriodControls, PeriodView } from "./PeriodView";
 import { PrintSheet, saveCsv } from "./PrintSheet";
 
 type Tab = "day" | "period";
-type DayShow = "all" | "owe" | "in";
 type PeriodShow = "all" | "gaps" | "clean";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -208,12 +209,14 @@ export function ReportsDesk() {
   };
   const handOut = (
     <>
-      <Button size="sm" variant="ghost" disabled={shownCount === 0 || waiting} onClick={download} data-testid="desk-report-csv">
+      <Button size="sm" variant="secondary" icon={<Download size={15} strokeWidth={2} aria-hidden />} disabled={shownCount === 0 || waiting} onClick={download} data-testid="desk-report-csv">
         Скачать для Excel
       </Button>
-      <Button size="sm" variant="ghost" disabled={shownCount === 0 || waiting} onClick={() => window.print()} data-testid="desk-report-print">
-        Печать
-      </Button>
+      <Tooltip label="Распечатать то, что на экране" keys={["Ctrl P"]} side="bottom">
+        <Button size="sm" variant="secondary" icon={<Printer size={15} strokeWidth={2} aria-hidden />} disabled={shownCount === 0 || waiting} onClick={() => window.print()} data-testid="desk-report-print">
+          Печать
+        </Button>
+      </Tooltip>
     </>
   );
 
@@ -264,8 +267,9 @@ export function ReportsDesk() {
         />
       ) : !hydrated ? (
         <SkeletonGroup grow>
-          <Bone h={48} w={520} />
-          <Bone h={320} className="mt-5" />
+          <Bone h={132} />
+          <Bone h={36} w={520} className="mt-3.5" />
+          <Bone h={320} className="mt-3.5" />
         </SkeletonGroup>
       ) : (
         <div className="flex flex-col gap-3.5" data-testid="desk-reports">
@@ -275,7 +279,7 @@ export function ReportsDesk() {
                 <Toolbar
                   end={
                     <>
-                      <span className="nums text-[13px] leading-4 text-muted">{day.data ? `${shownDay.length} из ${dayRows.length}` : " "}</span>
+                      <span className="nums reports-count text-[13px] leading-4 text-muted">{day.data ? `${shownDay.length} из ${dayRows.length}` : " "}</span>
                       {handOut}
                     </>
                   }
@@ -303,12 +307,15 @@ export function ReportsDesk() {
                 setQuery("");
                 setDayShow("all");
               }}
+              show={dayShow}
+              onShow={setDayShow}
               selectedId={chosenId}
               openId={openId}
               onSelect={choose}
               onOpen={open}
               onClose={() => address({ p: null })}
               pointsOn={pointsEnabled}
+              now={now}
             />
           ) : (
             <PeriodView
@@ -316,7 +323,7 @@ export function ReportsDesk() {
                 <Toolbar
                   end={
                     <>
-                      <span className="nums text-[13px] leading-4 text-muted">{period.data ? `${shownPeriod.length} из ${periodRows.length}` : " "}</span>
+                      <span className="nums reports-count text-[13px] leading-4 text-muted">{period.data ? `${shownPeriod.length} из ${periodRows.length}` : " "}</span>
                       {handOut}
                     </>
                   }

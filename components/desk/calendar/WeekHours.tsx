@@ -6,8 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as 
 import { Popover } from "@/components/desk/ui/Popover";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
-import { hhmm, isOver, myStatus, timeRange } from "@/lib/calendar/agenda";
-import { isRunning } from "@/lib/calendar/overview";
+import { hhmm, timeRange } from "@/lib/calendar/agenda";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { humanYmd, parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 import { busyMinutes, type BusyBlock } from "@/lib/desk/busy";
@@ -15,7 +14,9 @@ import { shortName } from "@/lib/people/names";
 import { pluralRu } from "@/lib/tasks/status-text";
 
 import { loudest, type DeadlineMark } from "./deadlines";
+import { Faces } from "./Faces";
 import { hmAt, minutesAt, SNAP_MIN, slotOf, type Slot } from "./slots";
+import { meetingState, type MeetingState } from "./state";
 import { fitMarks, HOUR_PX, hourRange, layoutDay, wallOf, yOf, type Placed } from "./week";
 
 /** Names on a meeting before «+N». */
@@ -55,6 +56,8 @@ type Props = {
   ghost: { slot: Slot; title: string } | null;
   /** The secretary's layer: when the director is busy, nothing about what with; null — not hers. */
   busy: Map<Ymd, BusyBlock[]> | null;
+  /** The meeting whose card is open: its block stands raised over the grid. */
+  openId: string | null;
 };
 
 /** A press that moved less than this is a click. */
@@ -77,16 +80,18 @@ function ahead(slot: Slot, first: number | null): Slot | null {
 }
 
 /**
- * The week as hours (D-154): a column a day under its date, the hours 08:00–20:00 down the left
- * (wider when a meeting or a deadline on screen lies outside), today's date stamped in print and
- * the line of now across its column. A meeting is a flat block where the clock puts it, as tall as
- * it lasts, with a line of print on its left — the pen when it waits for this person's answer, a
- * hairline when it is over; meetings that overlap stand side by side. An empty week still shows
- * its hours — the structure of the days to fill. Deadlines are words on the sheet, stacked from
- * their hours; what does not fit goes behind «+N», a list beside the day. For the secretary the
- * director's busy time is a hatched stretch under her own meetings, without a word about them.
+ * The week as hours (D-154, D-174): a living week — a column a day under its date, the hours
+ * 08:00–20:00 down the left (wider when a meeting or a deadline on screen lies outside), today's
+ * column lit and its date stamped, the time already gone a shade darker, the line of now across
+ * the week (bold in today's column, its clock in the margin) gliding on as the minutes go. A
+ * meeting is a block where the clock puts it, as tall as it lasts, in the colour of what it is to
+ * this person (`meetingState`): ahead, on now, waiting for an answer, refused, over; the open one
+ * stands raised. Meetings that overlap stand side by side. An empty week still shows its hours —
+ * the structure of the days to fill. Deadlines are chips on the sheet, stacked from their hours;
+ * what does not fit goes behind «+N», a list beside the day. For the secretary the director's busy
+ * time is a hatched stretch under her own meetings, without a word about them.
  */
-export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, onSlot, ghost, busy }: Props) {
+export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, onSlot, ghost, busy, openId }: Props) {
   const events = days.flatMap((ymd) => byDay.get(ymd) ?? []);
   const marks = deadlines ? days.flatMap((ymd) => deadlines.get(ymd) ?? []) : [];
   const { from, to } = hourRange(events, [...marks.map((mark) => mark.minutes), ...(busy ? busyMinutes(busy) : [])]);
@@ -185,37 +190,40 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
   });
 
   return (
-    <div className="min-w-0 overflow-clip border-t border-text" data-testid="desk-calendar-week" data-hours={`${from}-${to}`}>
-      <div className="sticky top-0 z-30 grid border-b border-text bg-bg" style={{ gridTemplateColumns: COLUMNS }}>
+    <div className="cal-week min-w-0 overflow-clip border-t border-text" data-testid="desk-calendar-week" data-hours={`${from}-${to}`}>
+      <div className="cal-week-head sticky top-0 z-30 grid border-b border-text bg-bg" style={{ gridTemplateColumns: COLUMNS }}>
         <span aria-hidden />
         {days.map((ymd, index) => (
-          <DayHead key={ymd} ymd={ymd} index={index} today={today} />
+          <DayHead key={ymd} ymd={ymd} index={index} today={today} count={(byDay.get(ymd) ?? []).length} />
         ))}
       </div>
 
-      <div ref={body} className="relative grid" style={{ gridTemplateColumns: COLUMNS, height }} data-testid="desk-week-hours">
-        <div aria-hidden className="relative">
+      <div ref={body} className="cal-week-body relative grid" style={{ gridTemplateColumns: COLUMNS, height }} data-testid="desk-week-hours">
+        <div aria-hidden className="cal-gutter relative">
           {hours.map((hour) => {
             // the last line is the grid's edge; an hour near the clock of now gives way to it
             if (hour === to) return null;
             if (nowY !== null && Math.abs(clock.minutes - hour * 60) < NOW_LABEL_ROOM_MIN) return null;
             return (
-              <span key={hour} className="nums absolute right-2 text-[11px] leading-4 text-muted" style={{ top: hour === from ? 3 : yOf(hour * 60, from) - 8 }}>
+              <span key={hour} className="cal-hour nums absolute right-2 text-[11px] leading-4 text-muted" style={{ top: hour === from ? 3 : yOf(hour * 60, from) - 8 }}>
                 {pad(hour)}:00
               </span>
             );
           })}
           {nowY !== null ? (
-            <span className="nums absolute right-2 text-[11px] leading-4 text-text" style={{ top: nowY - 8 }} data-testid="desk-now-time">
+            // moved by a transform: the clock glides to its next minute, the hours around it stay put
+            <span className="cal-now-time nums absolute right-1.5 top-0 text-[11px] leading-4 text-text" style={{ transform: `translateY(${nowY - 8}px)` }} data-testid="desk-now-time">
               {pad(Math.floor(clock.minutes / 60))}:{pad(clock.minutes % 60)}
             </span>
           ) : null}
         </div>
 
-        {days.map((ymd) => (
+        {days.map((ymd, index) => (
           <DayColumn
             key={ymd}
             ymd={ymd}
+            index={index}
+            today={today}
             from={from}
             height={height}
             events={byDay.get(ymd) ?? []}
@@ -225,6 +233,7 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
             nowY={ymd === clock.ymd ? nowY : null}
             meId={meId}
             onOpen={onOpen}
+            openId={openId}
             creating={Boolean(onSlot)}
             onPress={pressDay(ymd)}
             onHover={hoverDay(ymd)}
@@ -233,16 +242,25 @@ export function WeekHours({ days, byDay, today, now, meId, onOpen, deadlines, on
             ghost={drawn?.slot.ymd === ymd ? drawn : null}
           />
         ))}
+
+        {/* now across the whole week, faint: the days around today are read against the same minute */}
+        {nowY !== null ? <span aria-hidden className="cal-now-week pointer-events-none absolute right-0 top-0 z-[4]" style={{ left: GUTTER, transform: `translateY(${nowY}px)` }} /> : null}
       </div>
     </div>
   );
 }
 
-function DayHead({ ymd, index, today }: { ymd: Ymd; index: number; today: Ymd }) {
+function DayHead({ ymd, index, today, count }: { ymd: Ymd; index: number; today: Ymd; count: number }) {
   const isToday = ymd === today;
   const past = ymd < today;
   return (
-    <div className="flex h-10 items-center gap-2 border-l border-border/60 px-2">
+    <div
+      className="cal-day-head flex h-10 items-center gap-2 border-l border-border/60 px-2"
+      data-today={isToday ? "" : undefined}
+      data-past={past ? "" : undefined}
+      data-weekend={index >= 5 ? "" : undefined}
+      title={count > 0 ? `${count} ${pluralRu(count, ["встреча", "встречи", "встреч"])}` : undefined}
+    >
       <span className="desk-label uppercase">{WEEKDAYS_SHORT_RU[index]}</span>
       {/* today is a date stamped in print: the one solid mark on the head of the week */}
       <span className={`nums desk-figure flex h-6 min-w-6 items-center justify-center px-1 text-[17px] leading-none ${isToday ? "desk-today" : past ? "text-muted" : ""}`}>{parseYmd(ymd)!.day}</span>
@@ -252,6 +270,8 @@ function DayHead({ ymd, index, today }: { ymd: Ymd; index: number; today: Ymd })
 
 function DayColumn({
   ymd,
+  index,
+  today,
   from,
   height,
   events,
@@ -261,6 +281,7 @@ function DayColumn({
   nowY,
   meId,
   onOpen,
+  openId,
   creating,
   onPress,
   onHover,
@@ -269,6 +290,9 @@ function DayColumn({
   ghost,
 }: {
   ymd: Ymd;
+  /** 0 = Monday: the weekend is shaded, the blocks of a day arrive a beat after the day before. */
+  index: number;
+  today: Ymd;
   from: number;
   /** The grid's height, the foot the marks must stay above. */
   height: number;
@@ -279,6 +303,7 @@ function DayColumn({
   nowY: number | null;
   meId: string;
   onOpen: (event: CalendarEvent, element: HTMLElement) => void;
+  openId: string | null;
   creating: boolean;
   onPress: (event: ReactMouseEvent<HTMLElement>) => void;
   onHover: (event: ReactMouseEvent<HTMLElement>) => void;
@@ -302,20 +327,28 @@ function DayColumn({
     <section
       aria-label={ymd}
       data-testid="desk-week-day"
-      className="relative min-w-0 select-none border-l border-border/60"
+      className="cal-day relative min-w-0 select-none border-l border-border/60"
+      data-today={ymd === today ? "" : undefined}
+      data-past={ymd < today ? "" : undefined}
+      data-weekend={index >= 5 ? "" : undefined}
       onMouseDown={creating ? onPress : undefined}
       onMouseMove={creating ? onHover : undefined}
       onMouseLeave={creating ? onLeave : undefined}
-      style={{
-        // the hour lines: one hairline at the top of every hour
-        backgroundImage: "linear-gradient(to bottom, var(--rule-soft) 1px, transparent 1px)",
-        backgroundSize: `100% ${HOUR_PX}px`,
-      }}
+      style={
+        {
+          // the hour lines: one hairline at the top of every hour
+          backgroundImage: "linear-gradient(to bottom, var(--rule-soft) 1px, transparent 1px)",
+          backgroundSize: `100% ${HOUR_PX}px`,
+          "--day": index,
+        } as CSSProperties
+      }
     >
+      {/* the part of today already gone, a shade darker — scaled, not resized, as the minutes go */}
+      {nowY !== null ? <span aria-hidden className="cal-gone pointer-events-none absolute inset-x-0 top-0" style={{ height, transform: `scaleY(${Math.max(0, Math.min(1, nowY / height))})` }} /> : null}
       {hover !== null ? (
         <span
           aria-hidden
-          className="nums pointer-events-none absolute inset-x-[3px] z-[5] flex items-start px-2 pt-1 text-[11px] leading-4 text-accent"
+          className="cal-slot-hint nums pointer-events-none absolute inset-x-[3px] z-[5] flex items-start px-2 pt-1 text-[11px] leading-4 text-accent"
           style={{ top: yOf(hover, from) + 1, height: HOUR_PX / 2 - 2, background: "color-mix(in srgb, var(--accent) 6%, transparent)" }}
           data-testid="desk-slot-hint"
         >
@@ -326,7 +359,7 @@ function DayColumn({
         <DirectorBusy key={block.start} block={block} from={from} />
       ))}
       {placed.map((item) => (
-        <HourEvent key={item.event.id} item={item} from={from} now={now} meId={meId} onOpen={onOpen} />
+        <HourEvent key={item.event.id} item={item} from={from} now={now} meId={meId} onOpen={onOpen} open={item.event.id === openId} />
       ))}
       {ghost ? <Ghost slot={ghost.slot} title={ghost.title} from={from} /> : null}
       {marks.slice(0, fit.shown).map((mark, index) => (
@@ -334,8 +367,9 @@ function DayColumn({
       ))}
       {fit.moreTop !== null ? <DeadlinesMore marks={marks.slice(fit.shown)} top={fit.moreTop} ymd={ymd} now={now} /> : null}
       {nowY !== null ? (
-        <div aria-hidden className="pointer-events-none absolute inset-x-0 z-20" style={{ top: nowY }} data-testid="desk-now-line">
+        <div aria-hidden className="cal-now pointer-events-none absolute inset-x-0 top-0 z-20" style={{ transform: `translateY(${nowY}px)` }} data-testid="desk-now-line">
           <span className="desk-now absolute inset-x-0 -top-px h-[2px]" />
+          <span className="cal-now-dot" />
         </div>
       ) : null}
     </section>
@@ -347,7 +381,7 @@ function DirectorBusy({ block, from }: { block: BusyBlock; from: number }) {
   const height = Math.max(20, ((block.end - block.start) * HOUR_PX) / 60 - 2);
   return (
     <div
-      className="desk-busy pointer-events-none absolute inset-x-[3px] z-[5] overflow-hidden px-2 py-1 text-[11px] leading-4 text-muted"
+      className="desk-busy cal-busy pointer-events-none absolute inset-x-[3px] z-[5] overflow-hidden px-2 py-1 text-[11px] leading-4 text-muted"
       style={{ top: yOf(block.start, from) + 1, height }}
       data-testid="desk-director-busy"
     >
@@ -361,29 +395,35 @@ function DirectorBusy({ block, from }: { block: BusyBlock; from: number }) {
   );
 }
 
-/** The one word a meeting owes this person: an answer still to give. */
-function owesAnswer(event: CalendarEvent, meId: string, now: Date): boolean {
-  return event.author_id !== meId && !isOver(event, now) && myStatus(event, meId) === "invited";
-}
+/** What the state says in words, for a screen reader and the hint: the colour says it to the eye. */
+const STATE_WORDS: Partial<Record<MeetingState, string>> = {
+  running: "идёт",
+  owes: "нужен ответ",
+  declined: "вы не сможете",
+  over: "прошла",
+};
 
 /** Who comes, in words: the ones who have not refused, three names and «+N». */
 function Who({ event }: { event: CalendarEvent }) {
   const names = event.participants.filter((p) => p.status !== "declined").flatMap((p) => (p.person?.full_name ? [p.person.full_name] : []));
   if (names.length === 0) return null;
   return (
-    <span className="min-w-0 truncate text-[11px] leading-4 text-muted" title={names.join(", ")}>
+    <span className="cal-who min-w-0 truncate text-[11px] leading-4 text-muted" title={names.join(", ")}>
       {names.slice(0, NAMES).map((name) => shortName(name)).join(", ")}
       {names.length > NAMES ? ` +${names.length - NAMES}` : ""}
     </span>
   );
 }
 
-/** A meeting on the grid: what, when, who — flat, the line on its left says whose move it is. */
-function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: number; now: Date; meId: string; onOpen: (event: CalendarEvent, element: HTMLElement) => void }) {
+/**
+ * A meeting on the grid: what, when, who — a block in the colour of what it is to this person (a
+ * rail on its left and a wash of the same colour), the faces of who comes once it is tall enough.
+ * The open one (`open`) stands raised while its card is beside it.
+ */
+function HourEvent({ item, from, now, meId, onOpen, open }: { item: Placed; from: number; now: Date; meId: string; onOpen: (event: CalendarEvent, element: HTMLElement) => void; open: boolean }) {
   const { event } = item;
-  const over = isOver(event, now);
-  const running = isRunning(event, now);
-  const owes = owesAnswer(event, meId, now);
+  const state = meetingState(event, meId, now);
+  const words = STATE_WORDS[state];
   const top = yOf(item.start, from) + 1;
   const height = Math.max(20, ((item.end - item.start) * HOUR_PX) / 60 - 2);
   // on each line, not on the block: the block's second column must start past its edge, out of sight
@@ -392,14 +432,12 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
   const tall = height >= 76;
   // the words matter more than the time, which the grid already says: a short title leaves room for
   // it, a long one takes it (the block's column wraps: what does not fit leaves whole, not half a line)
-  const titleLines = Math.max(1, Math.floor((height - 8 - (tall ? 16 : 0)) / 16));
+  const titleLines = Math.max(1, Math.floor((height - 8 - (tall ? 22 : 0)) / 16));
   const style: CSSProperties = {
     top,
     height,
     left: `calc(${(item.lane / item.lanes) * 100}% + 2px)`,
     width: `calc(${100 / item.lanes}% - ${item.lanes > 1 ? 3 : 6}px)`,
-    // the pen: this person's answer is owed; print: the norm; a meeting that is over keeps a hairline
-    borderLeftColor: owes ? "var(--accent)" : over ? "var(--border)" : "var(--sky)",
   };
 
   return (
@@ -408,30 +446,32 @@ function HourEvent({ item, from, now, meId, onOpen }: { item: Placed; from: numb
       onClick={(click) => onOpen(event, click.currentTarget)}
       data-testid="desk-event"
       data-event-id={event.id}
-      title={`${timeRange(event)} · ${event.title}${event.location ? ` · ${event.location}` : ""}`}
-      className={`absolute z-10 flex flex-col flex-wrap content-start overflow-hidden border border-l-2 border-border/60 py-1 pl-2 text-left transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
-        over ? "text-muted" : running ? "bg-surface-2" : "bg-surface"
-      }`}
+      data-state={state}
+      data-open={open ? "" : undefined}
+      aria-expanded={open}
+      title={`${timeRange(event)} · ${event.title}${event.location ? ` · ${event.location}` : ""}${words ? ` · ${words}` : ""}`}
+      className="cal-event absolute z-10 flex flex-col flex-wrap content-start overflow-hidden border border-l-2 border-border/60 py-1 pl-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       style={style}
     >
-      {owes ? <span className="sr-only">нужен ответ</span> : null}
+      {words ? <span className="sr-only">{words}</span> : null}
       {compact ? (
         <span className={`w-full truncate ${edge} text-[12px] leading-4`}>
-          <When className="text-muted">{hhmm(event.starts_at)}</When> <span className="font-semibold">{event.title}</span>
+          <When className="cal-event-time">{hhmm(event.starts_at)}</When> <span className="cal-event-title font-semibold">{event.title}</span>
         </span>
       ) : (
         <>
-          <span className={`w-full ${edge} text-[12px] font-semibold leading-4`} style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
+          <span className={`cal-event-title w-full ${edge} text-[12px] font-semibold leading-4`} style={{ display: "-webkit-box", WebkitBoxOrient: "vertical", WebkitLineClamp: titleLines, overflow: "hidden" }}>
             {event.title}
           </span>
-          <span className={`w-full truncate ${edge} text-[11px] leading-4 text-muted`}>
+          <span className={`cal-event-time w-full truncate ${edge} text-[11px] leading-4`}>
             <When>{timeRange(event)}</When>
             {event.location ? ` · ${event.location}` : ""}
           </span>
           {tall ? (
-            <span className={`mt-auto flex min-h-[16px] w-full ${edge} items-center justify-between gap-1`}>
+            <span className={`mt-auto flex min-h-[20px] w-full ${edge} items-center justify-between gap-1`}>
+              <Faces event={event} size={18} max={4} className="cal-event-faces" />
               <Who event={event} />
-              {owes ? <span aria-hidden className="shrink-0 text-[11px] font-medium leading-4 text-warn">нужен ответ</span> : null}
+              {state === "owes" ? <span aria-hidden className="cal-event-ask shrink-0 text-[11px] font-medium leading-4 text-warn">нужен ответ</span> : null}
             </span>
           ) : null}
         </>
@@ -447,7 +487,7 @@ function Ghost({ slot, title, from }: { slot: Slot; title: string; from: number 
   return (
     <div
       aria-hidden
-      className="pointer-events-none absolute inset-x-[3px] z-[25] flex flex-col overflow-hidden border border-l-2 border-accent bg-surface px-2 py-1"
+      className="cal-ghost pointer-events-none absolute inset-x-[3px] z-[25] flex flex-col overflow-hidden border border-l-2 border-accent bg-surface px-2 py-1"
       style={{ top, height }}
       data-testid="desk-slot-ghost"
     >
@@ -503,7 +543,7 @@ function DeadlinesMore({ marks, top, ymd, now }: { marks: DeadlineMark[]; top: n
         onClick={(click) => setAnchor(anchor ? null : click.currentTarget)}
         data-testid="desk-deadline-more"
         data-tone={loudest(marks)}
-        className="absolute inset-x-[3px] z-[15] flex items-center gap-1.5 overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+        className="cal-mark cal-mark-more absolute inset-x-[3px] z-[15] flex items-center gap-1.5 overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
         style={{ top, height: MORE_H }}
       >
         <span aria-hidden className="h-[6px] w-[6px] shrink-0 rotate-45" style={{ background: ink }} />
@@ -551,7 +591,7 @@ function DeadlineChip({ mark, top }: { mark: DeadlineMark; top: number }) {
       data-testid="desk-deadline"
       data-tone={mark.tone}
       title={markTitle(mark)}
-      className="absolute inset-x-[3px] z-[15] flex flex-col justify-center overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+      className="cal-mark absolute inset-x-[3px] z-[15] flex flex-col justify-center overflow-hidden bg-bg px-1 text-[11px] leading-[14px] transition-colors duration-[120ms] hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
       style={{ top, height: MARK_H }}
     >
       <span className="flex min-w-0 items-center gap-1.5">

@@ -1,7 +1,10 @@
 "use client";
 
+import { Megaphone, X } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
+import { Switch } from "@/components/desk/settings/form";
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Button } from "@/components/ui/Button";
@@ -13,7 +16,7 @@ const REASONS = ["за скорость", "за качество", "за ини�
 /** Who the dialog opens for: a person picked from a row, or nobody yet (the screen's own button). */
 export type AwardFor = { userId?: string };
 
-export type AwardPerson = { id: string; name: string; sub?: string | null };
+export type AwardPerson = { id: string; name: string; sub?: string | null; avatar?: string | null };
 
 const fold = (text: string) => text.toLowerCase().replace(/ё/g, "е").trim();
 
@@ -72,7 +75,8 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
 
   return (
     <div className="relative">
-      <div className="field flex h-9 items-center gap-2">
+      <div className="field award-who flex h-9 items-center gap-2">
+        {chosen ? <TileFace person={{ id: chosen.id, full_name: chosen.name, avatar_url: chosen.avatar ?? null }} size={22} /> : null}
         <input
           id="award-who"
           aria-label="Кому"
@@ -103,14 +107,14 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
               onChange("");
               setOpen(true);
             }}
-            className="flex h-6 w-6 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+            className="award-clear flex h-6 w-6 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
           >
-            ×
+            <X size={14} strokeWidth={2.25} aria-hidden />
           </button>
         ) : null}
       </div>
       {open && !chosen ? (
-        <ul id="award-who-list" role="listbox" className="absolute inset-x-0 top-[calc(100%+4px)] z-10 max-h-[240px] overflow-y-auto border border-text bg-surface py-1" style={{ boxShadow: "var(--shadow-raised)" }}>
+        <ul id="award-who-list" role="listbox" className="award-list absolute inset-x-0 top-[calc(100%+4px)] z-10 max-h-[240px] overflow-y-auto border border-text bg-surface py-1" style={{ boxShadow: "var(--shadow-raised)" }}>
           {found.length === 0 ? <li className="px-3 py-2 text-[13px] text-muted">Никого с таким именем</li> : null}
           {found.map((person, index) => (
             <li key={person.id} role="option" aria-selected={index === at}>
@@ -120,8 +124,10 @@ function PersonPicker({ people, value, onChange, autoFocus, next }: { people: Aw
                 onMouseEnter={() => setAt(index)}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => take(person)}
-                className={`flex h-9 w-full items-center gap-2.5 px-3 text-left text-[14px] leading-5 ${index === at ? "bg-surface-2" : ""}`}
+                className={`award-option flex h-9 w-full items-center gap-2.5 px-3 text-left text-[14px] leading-5 ${index === at ? "bg-surface-2" : ""}`}
+                data-active={index === at ? "" : undefined}
               >
+                <TileFace person={{ id: person.id, full_name: person.name, avatar_url: person.avatar ?? null }} size={24} />
                 <span className="min-w-0 flex-1 truncate">{person.name}</span>
                 {person.sub ? <span className="truncate text-[12px] text-muted">{person.sub}</span> : null}
               </button>
@@ -153,7 +159,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
   return (
     <form
-      className="desk-fields flex flex-col gap-3"
+      className="award-form desk-fields flex flex-col gap-3"
       onSubmit={(event) => {
         event.preventDefault();
         submit();
@@ -192,7 +198,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
           />
           <span className="mr-2 text-[13px] text-muted">очков</span>
           {PRESETS.map((preset) => (
-            <button key={preset} type="button" aria-pressed={amount === preset} onClick={() => setAmountText(String(preset))} className="desk-choice nums px-1">
+            <button key={preset} type="button" aria-pressed={amount === preset} onClick={() => setAmountText(String(preset))} className="desk-choice award-chip nums px-1">
               +{preset}
             </button>
           ))}
@@ -202,7 +208,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
 
       <div>
         <Label htmlFor="award-reason">За что</Label>
-        <div className="flex flex-wrap gap-x-4">
+        <div className="award-chips flex flex-wrap gap-x-4">
           {REASONS.map((item) => {
             const on = reason === item && !custom.trim();
             return (
@@ -214,7 +220,7 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
                   setReason(item);
                   setCustom("");
                 }}
-                className="desk-choice"
+                className="desk-choice award-chip"
               >
                 {item}
               </button>
@@ -225,12 +231,13 @@ function AwardForm({ initialUser, people, onDone }: { initialUser?: string; peop
       </div>
 
       {amount > 0 ? (
-        <label className="flex cursor-pointer items-center gap-2.5 text-[14px] leading-5" data-testid="award-public">
-          <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} className="h-4 w-4 shrink-0 accent-[var(--accent)]" />
-          <span>
+        <div className="award-public flex items-center gap-3 text-[14px] leading-5" data-testid="award-public">
+          <Megaphone size={16} strokeWidth={2} aria-hidden className="award-public-icon shrink-0 text-muted" />
+          <label htmlFor="award-public-switch" className="min-w-0 flex-1 cursor-pointer">
             Сказать в Эфире <span className="text-muted">· команда увидит похвалу, без пуша</span>
-          </span>
-        </label>
+          </label>
+          <Switch id="award-public-switch" label="Сказать в Эфире" checked={isPublic} onChange={setIsPublic} />
+        </div>
       ) : null}
 
       <div className="flex items-center justify-end gap-2 pt-1">

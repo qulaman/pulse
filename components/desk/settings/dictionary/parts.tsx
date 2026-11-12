@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleHelp, Plus, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Popover } from "@/components/desk/ui/Popover";
@@ -9,7 +10,9 @@ export function Pill({ label, fresh, waiting, onRemove }: { label: string; fresh
   return (
     <span
       title={waiting ? "Ждёт связи — сохранится само" : undefined}
-      className={`inline-flex h-6 max-w-full items-center whitespace-nowrap text-[14px] leading-5 ${waiting ? "text-muted" : fresh ? "text-accent" : ""}`}
+      className={`dict-pill inline-flex h-6 max-w-full items-center whitespace-nowrap text-[14px] leading-5 ${waiting ? "text-muted" : fresh ? "text-accent" : ""}`}
+      data-fresh={fresh ? "" : undefined}
+      data-waiting={waiting ? "" : undefined}
     >
       {waiting ? (
         <svg width="11" height="11" viewBox="0 0 16 16" aria-label="ждёт связи" className="mr-1 shrink-0">
@@ -27,9 +30,9 @@ export function Pill({ label, fresh, waiting, onRemove }: { label: string; fresh
             event.stopPropagation();
             onRemove();
           }}
-          className="flex h-5 w-4 shrink-0 items-center justify-center text-[14px] leading-none text-muted opacity-0 transition-opacity duration-[120ms] hover:text-danger focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+          className="dict-pill-x flex h-5 w-4 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[120ms] hover:text-danger focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
         >
-          ×
+          <X size={12} strokeWidth={2.5} aria-hidden />
         </button>
       ) : null}
     </span>
@@ -47,9 +50,9 @@ export function OfferPill({ label, onTake, disabled }: { label: string; onTake: 
       }}
       disabled={disabled}
       aria-label={`Добавить «${label}»`}
-      className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[14px] leading-5 text-accent hover:underline disabled:opacity-40"
+      className="dict-offer inline-flex h-6 items-center gap-1 whitespace-nowrap text-[14px] leading-5 text-accent hover:underline disabled:opacity-40"
     >
-      <span aria-hidden>+</span>
+      <Plus size={13} strokeWidth={2.5} aria-hidden />
       {label}
     </button>
   );
@@ -62,13 +65,13 @@ export function OfferPill({ label, onTake, disabled }: { label: string; onTake: 
  */
 export function Strip({ title, count, about, children, testId }: { title: string; count?: number; about?: ReactNode; children: ReactNode; testId?: string }) {
   return (
-    <section className="desk-fields" data-testid={testId} aria-label={title}>
-      <div className="flex items-baseline gap-2">
-        <h2 className="desk-label uppercase">{title}</h2>
-        {count ? <span className="nums text-[12px] leading-4 text-muted">{count}</span> : null}
+    <section className="dict-strip desk-fields" data-testid={testId} aria-label={title}>
+      <div className="dict-strip-head flex items-baseline gap-2">
+        <h2 className="dict-strip-title desk-label uppercase">{title}</h2>
+        {count ? <span className="dict-strip-count nums text-[12px] leading-4 text-muted">{count}</span> : null}
         {about ? <p className="min-w-0 truncate text-[13px] leading-[18px] text-muted">{about}</p> : null}
       </div>
-      <div className="mt-0.5">{children}</div>
+      <div className="dict-strip-body mt-0.5">{children}</div>
     </section>
   );
 }
@@ -86,15 +89,16 @@ export function GuideButton({ steps }: { steps: GuideStep[] }) {
         aria-label="Как это работает"
         title="Как это работает"
         onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
-        className="whitespace-nowrap text-[13px] leading-5 text-muted transition-colors duration-[120ms] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
+        className="dict-guide inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] leading-5 text-muted transition-colors duration-[120ms] hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/45"
       >
+        <CircleHelp size={15} strokeWidth={2} aria-hidden className="dict-guide-icon" />
         Как это работает
       </button>
       <Popover open={Boolean(anchor)} onClose={() => setAnchor(null)} anchor={anchor} align="end" width={420} label="Как это работает">
         <ol className="flex max-h-[70vh] flex-col gap-3 overflow-y-auto p-4">
           {steps.map((step, index) => (
             <li key={step.title} className="flex gap-2.5">
-              <span aria-hidden className="nums w-4 shrink-0 text-[13px] leading-[18px] text-muted">
+              <span aria-hidden className="dict-step nums w-4 shrink-0 text-[13px] leading-[18px] text-muted">
                 {index + 1}
               </span>
               <div className="min-w-0">

@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Bell, Check, MonitorUp, Pin } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { DataGrid, type Column, type Group } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
@@ -21,6 +22,8 @@ import { binCards } from "@/lib/mindboard/branch";
 import { boardOnWall, defaultTitle, splitBoards, summariesOf, summaryLine, type BoardSummary } from "@/lib/mindboard/list";
 import { useCreateBoard, useDeleteBoard, useFinishBoard, usePinBoard, usePurgeBoards, useRestoreBoard } from "@/lib/mindboard/mutations";
 import { useBoards, type MindBoard } from "@/lib/mindboard/queries";
+import { pointLabel } from "@/lib/mindboard/sketch";
+import { branchesOf } from "@/lib/mindboard/tree";
 import {
   awaitsReminder,
   awaitsWords,
@@ -50,6 +53,30 @@ export type NotesTab = "notes" | "boards" | "converted" | "trash";
 
 const TABS: readonly NotesTab[] = ["notes", "boards", "converted", "trash"];
 const EMPTY: Note[] = [];
+/** The first points a board's card shows of it: a glance at the canvas, not the canvas. */
+const PREVIEW_POINTS = 3;
+
+/** A point as the board's card shows it: its first line (a drawing says so), ticked or not. */
+type PreviewPoint = { id: string; label: string; done: boolean };
+
+/** The first points of every board, in their order — from the one notes cache. */
+function previewsOf(rows: readonly Note[]): Map<string, PreviewPoint[]> {
+  const byBoard = new Map<string, Note[]>();
+  for (const row of rows) {
+    if (row.board_id === null || row.deleted_at !== null) continue;
+    const list = byBoard.get(row.board_id) ?? [];
+    list.push(row);
+    byBoard.set(row.board_id, list);
+  }
+  return new Map(
+    [...byBoard].map(([id, list]) => [
+      id,
+      branchesOf(list)
+        .slice(0, PREVIEW_POINTS)
+        .map(({ point }) => ({ id: point.id, label: firstLine(pointLabel(point.text, point.sketch)), done: point.done_at !== null })),
+    ]),
+  );
+}
 
 /** The phone's `?tab` (`active`, D-102) and the desk's own words lead to the same view. */
 function tabOf(value: string | null): NotesTab {
@@ -145,6 +172,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   const piles = useMemo(() => splitBoards(boards.data ?? [], now, wallBoardId), [boards.data, now, wallBoardId]);
   const liveIds = useMemo(() => new Set([...piles.live, ...piles.finished].map((board) => board.id)), [piles]);
   const summaries = useMemo(() => summariesOf(rows), [rows]);
+  const previews = useMemo(() => previewsOf(rows), [rows]);
   const titleOf = useMemo(() => new Map((boards.data ?? []).map((board) => [board.id, board.title])), [boards.data]);
   const split = useMemo(() => splitNotes(rows, now, liveIds), [rows, now, liveIds]);
   // the bin by branches (D-121): sub-points that left with their point ride on its card
@@ -416,7 +444,8 @@ export function NotesDesk({ children }: { children: ReactNode }) {
     {
       key: "when",
       title: "",
-      width: "112px",
+      // each row sizes its own: the words of the note take what the date leaves
+      width: "max-content",
       align: "right",
       render: ({ note, group }) => (
         // «В деле» says when the thought became something, the feed — when it was had
@@ -439,11 +468,11 @@ export function NotesDesk({ children }: { children: ReactNode }) {
       title: "Доска",
       render: (board) => (
         <span className="block" onContextMenu={(event) => menu.open(event, boardMenuItems(board, { pin: pinBoard, finish: finishBoard, onBin: binBoard, onRename: () => setRenamingBoard(board) }))}>
-          <BoardLine board={board} summary={summaries.get(board.id)} onWall={boardOnWall(tv, board.id, now)} query={query} />
+          <BoardLine board={board} summary={summaries.get(board.id)} points={previews.get(board.id) ?? []} onWall={boardOnWall(tv, board.id, now)} query={query} />
         </span>
       ),
     },
-    { key: "when", title: "", width: "104px", align: "right", render: (board) => <When className="whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</When> },
+    { key: "when", title: "", width: "max-content", align: "right", render: (board) => <When className="whitespace-nowrap text-[12px] text-muted">{whenRu(board.updated_at, now)}</When> },
     { key: "menu", title: "", width: "44px", align: "center", render: (board) => <BoardRowMenu board={board} me={me.data} onBin={binBoard} /> },
   ];
   const boardGroups: Group<MindBoard>[] = [
@@ -467,8 +496,8 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   return (
     <NotesDeskContext.Provider value={value}>
       <div className="absolute inset-0 grid grid-cols-[400px_minmax(0,1fr)]" data-testid="desk-notes">
-        <section className="flex min-h-0 flex-col border-r border-border" aria-label="Список заметок">
-          <div className="desk-fields flex flex-col gap-2 pb-2 pl-8 pr-6 pt-4">
+        <section className="notes-side flex min-h-0 flex-col border-r border-border" aria-label="Список заметок">
+          <div className="notes-side-head desk-fields flex flex-col gap-2 pb-2 pl-8 pr-6 pt-4">
             {/* the one filled button of the screen: «Новая…» until a note is open, then the note's own «Поручить» */}
             <PageTitle
               title="Заметки"
@@ -510,7 +539,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
           </div>
 
           {/* a list, not a table: the grid's column titles are not drawn here */}
-          <div className="min-h-0 flex-1 overflow-y-auto pb-6 pl-8 pr-6 [&_[role=grid]>[role=row]:first-child]:hidden" data-testid="desk-notes-list" data-notes-list="">
+          <div className="notes-list min-h-0 flex-1 overflow-y-auto pb-6 pl-8 pr-6 [&_[role=grid]>[role=row]:first-child]:hidden" data-testid="desk-notes-list" data-notes-list="" data-tab={tab}>
             {value.loading ? (
               <ListBones />
             ) : tab === "boards" ? (
@@ -602,7 +631,7 @@ export function NotesDesk({ children }: { children: ReactNode }) {
           </div>
         </section>
 
-        <section className="relative min-h-0 overflow-y-auto" aria-label="Заметка">
+        <section className="notes-main relative min-h-0 overflow-y-auto" aria-label="Заметка">
           {children}
         </section>
       </div>
@@ -622,62 +651,96 @@ export function NotesDesk({ children }: { children: ReactNode }) {
   );
 }
 
-/** A row of the list: the first line with its mark (pinned, spoken), the next one or the reminder. */
+/**
+ * A row of the list — in «Графит» a card (D-174): the first line with its marks (pinned, spoken),
+ * then a preview of what follows (two lines), or the reminder that waits.
+ */
 function NoteLine({ note, now, query }: { note: Note; now: Date; query: string }) {
   const head = firstLine(note.text);
   const rest = restLines(note.text).replace(/\s*\n\s*/g, " ");
   const ringing = awaitsReminder(note);
   const mark = note.pinned ? "pin" : note.audio_path ? "wave" : null;
   return (
-    <span className="block min-w-0" data-note-id={note.id}>
+    <span className="notes-line block min-w-0" data-note-id={note.id}>
       <span className="flex min-w-0 items-center gap-1.5">
-        <span className="min-w-0 truncate font-medium">
+        <span className="notes-line-head min-w-0 truncate font-medium">
           <Marked text={head || (awaitsWords(note) ? "Голосовая заметка" : "Без текста")} query={query} />
         </span>
         {mark ? (
-          <span aria-hidden className="shrink-0 text-muted">
+          <span aria-hidden className="notes-line-mark shrink-0 text-muted" data-mark={mark}>
             <NoteIcon name={mark} size={12} />
           </span>
         ) : null}
       </span>
-      {ringing ? (
-        <span className="nums flex items-center gap-1 truncate text-[12px] leading-4 text-muted">
-          <NoteIcon name="bell" size={11} />
-          {reminderRu(note, now)}
-        </span>
-      ) : rest ? (
-        <span className="block truncate text-[12px] leading-4 text-muted">
+      {rest ? (
+        <span className="notes-line-rest block truncate text-[12px] leading-4 text-muted" data-ringing={ringing ? "" : undefined}>
           <Marked text={rest} query={query} />
+        </span>
+      ) : null}
+      {ringing ? (
+        <span className="notes-line-bell nums flex items-center gap-1 truncate text-[12px] leading-4 text-muted">
+          <Bell aria-hidden size={11} strokeWidth={2.2} />
+          {reminderRu(note, now)}
         </span>
       ) : null}
     </span>
   );
 }
 
-function BoardLine({ board, summary, onWall, query }: { board: MindBoard; summary: BoardSummary | undefined; onWall: boolean; query: string }) {
+/**
+ * A board in the list — in «Графит» a small canvas (D-174): the title, «на стене» while it is up,
+ * its first points as they stand on it (the number, or the tick), and a meter of what is ticked.
+ */
+function BoardLine({ board, summary, points, onWall, query }: { board: MindBoard; summary: BoardSummary | undefined; points: PreviewPoint[]; onWall: boolean; query: string }) {
+  const total = summary?.total ?? 0;
+  const done = summary?.done ?? 0;
   return (
-    <span className="block min-w-0" data-board-id={board.id}>
-      <span className={`block truncate font-medium ${board.finished_at ? "text-muted" : ""}`}>
-        <Marked text={board.title} query={query} />
+    <span className="notes-board block min-w-0" data-board-id={board.id} data-finished={board.finished_at ? "" : undefined}>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <span className={`notes-board-title block min-w-0 truncate font-medium ${board.finished_at ? "text-muted" : ""}`}>
+          <Marked text={board.title} query={query} />
+        </span>
+        {onWall ? (
+          <span className="notes-wall-chip shrink-0" title="Сейчас на стене">
+            <MonitorUp aria-hidden size={11} strokeWidth={2.2} />
+            на стене
+          </span>
+        ) : null}
       </span>
-      <span className="flex items-center gap-1.5 truncate text-[12px] leading-4 text-muted">
+      <span className="notes-board-summary flex items-center gap-1.5 truncate text-[12px] leading-4 text-muted">
         {board.pinned_at && !board.finished_at ? (
-          <span title="Закреплена">
-            <NoteIcon name="pin" size={11} />
+          <span title="Закреплена" className="notes-board-pin">
+            <Pin aria-hidden size={11} strokeWidth={2.2} />
           </span>
         ) : null}
         <span className="truncate">{summaryLine(summary)}</span>
-        {onWall ? <span className="shrink-0 font-medium text-text">· на стене</span> : null}
+        {onWall ? <span className="notes-board-wall-words shrink-0 font-medium text-text">· на стене</span> : null}
       </span>
+      {points.length > 0 ? (
+        <span aria-hidden className="notes-board-canvas">
+          {points.map((point, index) => (
+            <span key={point.id} className="notes-board-point" data-done={point.done ? "" : undefined}>
+              <i>{point.done ? <Check size={9} strokeWidth={3} /> : index + 1}</i>
+              <span className="truncate">{point.label || "Без текста"}</span>
+            </span>
+          ))}
+          {total > points.length ? <span className="notes-board-more nums">ещё {total - points.length}</span> : null}
+        </span>
+      ) : null}
+      {total > 0 ? (
+        <span aria-hidden className="notes-meter" style={{ "--done": done / total } as CSSProperties}>
+          <i />
+        </span>
+      ) : null}
     </span>
   );
 }
 
 function ListBones() {
   return (
-    <div className="flex flex-col gap-2" aria-hidden>
+    <div className="notes-bones flex flex-col gap-2" aria-hidden>
       {Array.from({ length: 8 }, (_, index) => (
-        <span key={index} className="block h-[44px] bg-surface-2/70" />
+        <span key={index} className="block h-[44px] rounded-[10px] bg-surface-2/70" />
       ))}
     </div>
   );

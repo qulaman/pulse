@@ -1,3 +1,5 @@
+import { Bell, CalendarDays, CircleHelp, Megaphone, Repeat, Send, SquareCheck, Star, StickyNote, type LucideIcon } from "lucide-react";
+
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import type { Entity } from "@/lib/ai/schema";
 
@@ -12,6 +14,19 @@ export const KIND_LABEL: Record<Entity["kind"], string> = {
   note: "Заметка",
   points: "Очки",
   query: "Вопрос",
+};
+
+/** The mark of a kind in the head of its card in the editor («Графит»). */
+export const KIND_ICON: Record<Entity["kind"], LucideIcon> = {
+  task: SquareCheck,
+  delegation: Send,
+  recurrence: Repeat,
+  event: CalendarDays,
+  announcement: Megaphone,
+  reminder: Bell,
+  note: StickyNote,
+  points: Star,
+  query: CircleHelp,
 };
 
 /** The kinds that go to a person. */

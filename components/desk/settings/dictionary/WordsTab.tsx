@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import { ChevronDown, Plus, Tags, Trash2, X } from "lucide-react";
+import { useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type RefObject } from "react";
 
 import { OfferPill, Strip, type GuideStep } from "@/components/desk/settings/dictionary/parts";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { MenuButton, useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
+import { Select } from "@/components/desk/ui/Toolbar";
 import { CleanupSheet } from "@/components/dictionary/CleanupSheet";
 import { ImportSheet } from "@/components/dictionary/ImportSheet";
 import { SpellingSheet } from "@/components/dictionary/SpellingSheet";
@@ -249,7 +251,7 @@ export function WordsTab({
             }}
           />
         ) : (
-          <span className={`relative flex items-center gap-1.5 ${fresh.has(fact.key) ? "text-accent" : fact.stale ? "text-muted" : ""}`}>
+          <span className={`dict-word relative flex items-center gap-1.5 ${fresh.has(fact.key) ? "text-accent" : fact.stale ? "text-muted" : ""}`} data-fresh={fresh.has(fact.key) ? "" : undefined}>
             {waiting.words.has(fact.key) ? <span className="text-[12px] text-muted">ждёт связи ·</span> : null}
             <span className="truncate font-medium" title={fact.word}>
               {fact.word}
@@ -268,12 +270,10 @@ export function WordsTab({
           items={kindItems(fact)}
           align="start"
           width={200}
-          className="inline-flex h-6 items-center gap-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
+          className="dict-kind inline-flex h-6 items-center gap-1 text-[13px] text-muted transition-colors duration-[120ms] hover:text-text"
         >
           {kindLabel(kinds, fact.kind)}
-          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
-            <path d="M2 3.5 5 6.5 8 3.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronDown size={12} strokeWidth={2.25} aria-hidden />
         </MenuButton>
       ),
     },
@@ -287,8 +287,11 @@ export function WordsTab({
         !fact.usage ? (
           <span className="text-muted/60">…</span>
         ) : fact.usage.count > 0 && fact.usage.lastAt ? (
-          <span className="whitespace-nowrap">
-            <span className="nums">{timesLine(fact.usage.count)}</span> <span className="text-muted">· {whenLine(fact.usage.lastAt)}</span>
+          <span className="dict-heard inline-flex items-center justify-end gap-2 whitespace-nowrap">
+            <span aria-hidden className="dict-heard-bar" style={{ "--share": Math.max(0.08, fact.usage.count / heardMax) } as CSSProperties} />
+            <span>
+              <span className="nums">{timesLine(fact.usage.count)}</span> <span className="text-muted">· {whenLine(fact.usage.lastAt)}</span>
+            </span>
           </span>
         ) : (
           <span className="text-muted">{fact.stale ? `не было ${STALE_DAYS} дней` : "пока не было"}</span>
@@ -312,13 +315,14 @@ export function WordsTab({
   ];
 
   const suggestions = stats.data?.suggestions ?? [];
+  const heardMax = Math.max(1, ...facts.map((f) => f.usage?.count ?? 0));
   const share = Math.min(1, vocabulary.length / VOCABULARY_SOFT_MAX);
   const long = vocabulary.length > VOCABULARY_SOFT_MAX;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
         {/* the field: a word with its type, or a pasted list — and what Enter will do, said before it */}
-        <section className="desk-fields" data-testid="words-add">
+        <section className="dict-addbar desk-fields" data-testid="words-add">
           <div className="flex items-center gap-2">
             <input
               ref={addRef}
@@ -338,22 +342,17 @@ export function WordsTab({
               }}
               placeholder="Новое слово или список через запятую"
               aria-label="Новое слово или список"
-              className="field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
+              className="dict-addbar-field field h-9 min-w-0 flex-1 text-[14px] leading-5 outline-none"
             />
-            <select
-              aria-label="Тип нового слова"
-              value={kind ?? ""}
-              onChange={(event) => setKind(event.target.value || null)}
-              className="field h-9 w-[170px] cursor-pointer text-[14px] leading-5"
-            >
+            <Select aria-label="Тип нового слова" value={kind ?? ""} onChange={(event) => setKind(event.target.value || null)} className="w-[170px]">
               {kinds.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.label}
                 </option>
               ))}
               <option value="">{NO_KIND_LABEL}</option>
-            </select>
-            <Button size="sm" disabled={!(entries.length > 1 || plan.add.length > 0)} onClick={submit}>
+            </Select>
+            <Button size="sm" disabled={!(entries.length > 1 || plan.add.length > 0)} onClick={submit} icon={<Plus size={15} strokeWidth={2.5} />}>
               Добавить
             </Button>
           </div>
@@ -405,9 +404,9 @@ export function WordsTab({
               )}
             </p>
             {/* the budget: the list's length is the STT prompt's length (D-53, D-55) */}
-            <span className="flex shrink-0 items-center gap-2" data-testid="words-budget" title={long ? `Больше ${VOCABULARY_SOFT_MAX} — распознавание начинает ошибаться чаще` : undefined}>
-              <span aria-hidden className="h-1 w-24 overflow-hidden bg-surface-2">
-                <span className="block h-full" style={{ width: `${Math.max(share * 100, vocabulary.length ? 3 : 0)}%`, background: long ? "var(--warn)" : "var(--text)" }} />
+            <span className="dict-budget flex shrink-0 items-center gap-2" data-testid="words-budget" data-long={long ? "" : undefined} title={long ? `Больше ${VOCABULARY_SOFT_MAX} — распознавание начинает ошибаться чаще` : undefined}>
+              <span aria-hidden className="dict-budget-track h-1 w-24 overflow-hidden bg-surface-2">
+                <span className="dict-budget-fill block h-full" style={{ width: `${Math.max(share * 100, vocabulary.length ? 3 : 0)}%`, background: long ? "var(--warn)" : "var(--text)" }} />
               </span>
               <span className={`nums text-[13px] leading-4 ${long ? "text-warn" : "text-muted"}`}>
                 {vocabulary.length} из {VOCABULARY_SOFT_MAX}
@@ -418,9 +417,9 @@ export function WordsTab({
 
         {suggestions.length ? (
           <Strip title="Часто встречается" count={suggestions.length} about="звучат в ваших записях, но их нет в словаре — добавьте, если распознавание их путает" testId="words-suggest">
-            <ul className="flex flex-wrap gap-x-5 gap-y-1.5">
+            <ul className="dict-suggest flex flex-wrap gap-x-5 gap-y-1.5">
               {suggestions.map((s) => (
-                <li key={s.key} className="flex items-center gap-2">
+                <li key={s.key} className="dict-suggest-item flex items-center gap-2">
                   <span className="text-[14px] font-medium leading-5">{s.word}</span>
                   <span className="text-[12px] leading-4 text-muted">
                     {timesLine(s.count)} · {whenLine(s.lastAt)}
@@ -433,9 +432,9 @@ export function WordsTab({
                     aria-label={`Не предлагать «${s.word}»`}
                     title="Не предлагать"
                     onClick={() => dismiss.mutate(s.keys)}
-                    className="-ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+                    className="dict-x -ml-1 flex h-6 w-6 shrink-0 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
                   >
-                    ×
+                    <X size={14} strokeWidth={2.25} aria-hidden />
                   </button>
                 </li>
               ))}
@@ -443,16 +442,16 @@ export function WordsTab({
           </Strip>
         ) : null}
 
-        <div className="-mb-3 flex items-center gap-2">
-          <h2 className="desk-label uppercase">В словаре</h2>
+        <div className="dict-table-head -mb-3 flex items-center gap-2">
+          <h2 className="dict-strip-title desk-label uppercase">В словаре</h2>
           <span className="nums text-[12px] leading-4 text-muted">{shown.length === facts.length ? facts.length : `${shown.length} из ${facts.length}`}</span>
           <span className="ml-auto flex items-center gap-1">
             {stale.length ? (
-              <Button size="sm" variant="ghost" onClick={() => setCleanup(true)} data-testid="words-cleanup" title={`Никто не произносил ${STALE_DAYS} дней — подсказка распознаванию несёт их зря`}>
+              <Button size="sm" variant="ghost" onClick={() => setCleanup(true)} data-testid="words-cleanup" title={`Никто не произносил ${STALE_DAYS} дней — подсказка распознаванию несёт их зря`} icon={<Trash2 size={14} strokeWidth={2} />}>
                 Не встречались · {stale.length} — убрать…
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" onClick={() => setTypesOpen(true)}>
+            <Button size="sm" variant="ghost" onClick={() => setTypesOpen(true)} icon={<Tags size={14} strokeWidth={2} />}>
               Типы слов…
             </Button>
           </span>
@@ -470,6 +469,7 @@ export function WordsTab({
         >
           <DataGrid
             aria-label="Слова словаря"
+            className="dict-grid"
             columns={columns}
             rows={shown}
             rowKey={(fact) => fact.key}

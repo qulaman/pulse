@@ -1,15 +1,17 @@
 "use client";
 
+import { ArrowRight, Bell, LogOut, MonitorSmartphone, PanelLeft, Smartphone } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
 import { NotifyRules } from "@/app/desk/profile/NotifyRules";
 import { PulseMark } from "@/components/brand/PulseMark";
+import { CopyButton } from "@/components/desk/team/fields";
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { usePushTest } from "@/components/push/usePushTest";
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { PageTitle } from "@/components/desk/ui/PageTitle";
-import { SectionLabel } from "@/components/desk/ui/SectionLabel";
-import { SettingGroup, SettingRow } from "@/components/desk/ui/SettingRow";
 import { openShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
@@ -18,7 +20,7 @@ import { goPhoneView } from "@/lib/desk/device";
 import { readNavFolded, subscribeFrame, writeNavFolded } from "@/lib/desk/frame";
 import { useChangePassword } from "@/lib/desk/shell-queries";
 import { dropMedia, listMedia } from "@/lib/media/pending";
-import { ROLE_LABEL, useRevokeSessions } from "@/lib/people/queries";
+import { ROLE_LABEL, usePeople, useRevokeSessions } from "@/lib/people/queries";
 import { enablePush, forgetThisDevice, pushPlatform, pushState, thisDeviceEndpoint, type PushState } from "@/lib/push/client";
 import { pushBlocker, pushEnabledToast } from "@/lib/push/words";
 import { homeForRole, type Role } from "@/lib/routes";
@@ -26,17 +28,19 @@ import { pluralRu } from "@/lib/tasks/status-text";
 import { BUILD, versionLabel } from "@/lib/version";
 import { dropPhrase, listPhrases } from "@/lib/voice/kept";
 
-const PUSH_WORDS: Record<PushState, { text: string; tone: string }> = {
-  granted: { text: "Включены", tone: "var(--ok)" },
-  denied: { text: "Запрещены в браузере", tone: "var(--danger)" },
-  default: { text: "Выключены", tone: "var(--text-muted)" },
-  unsupported: { text: "Браузер не умеет", tone: "var(--text-muted)" },
-  no_keys: { text: "Не настроены на сервере", tone: "var(--text-muted)" },
+import { ProfileCard, ProfileNav, ProfileRow, StateBadge, type ProfileSection } from "./parts";
+
+const PUSH_WORDS: Record<PushState, { text: string; tone: "ok" | "danger" | "muted" }> = {
+  granted: { text: "Включены", tone: "ok" },
+  denied: { text: "Запрещены в браузере", tone: "danger" },
+  default: { text: "Выключены", tone: "muted" },
+  unsupported: { text: "Браузер не умеет", tone: "muted" },
+  no_keys: { text: "Не настроены на сервере", tone: "muted" },
 };
 
 const TEST_TONE = { ok: "var(--ok)", warn: "var(--danger)", muted: "var(--text-muted)" } as const;
 
-/** «Пароль»: a button that opens the form right in the row; Enter saves, Esc closes. */
+/** «Пароль»: the card opens its form in place; Enter saves, Esc closes; what is wrong is said under the fields. */
 function PasswordSetting() {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
@@ -49,8 +53,8 @@ function PasswordSetting() {
     setRepeat("");
     setError(null);
   };
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = (event?: FormEvent) => {
+    event?.preventDefault();
     if (password.length < 6) return setError("Не короче 6 символов");
     if (password !== repeat) return setError("Пароли не совпадают");
     setError(null);
@@ -62,68 +66,95 @@ function PasswordSetting() {
       onError: (failure) => setError(failure.message),
     });
   };
+  // said while typing, once there is something to say: short, or the two differ
+  const live = password && password.length < 6 ? "Ещё не короче 6 символов" : repeat && repeat !== password ? "Пока не совпадают" : null;
   return (
-    <SettingRow
-      label="Пароль"
-      hint="Для входа по почте на этом и других компьютерах"
-      testId="desk-profile-password"
-      below={
-        open ? (
-          <form
-            onSubmit={submit}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.stopPropagation();
-                close();
-              }
-            }}
-            className="flex flex-wrap items-start gap-2"
-          >
-            <input
-              type="password"
-              autoComplete="new-password"
-              placeholder="Новый пароль"
-              aria-label="Новый пароль"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              autoFocus
-              className="desk-input h-9 w-[220px] px-2.5 text-[14px] outline-none placeholder:text-muted"
-            />
-            <input
-              type="password"
-              autoComplete="new-password"
-              placeholder="Ещё раз"
-              aria-label="Повтор пароля"
-              value={repeat}
-              onChange={(event) => setRepeat(event.target.value)}
-              className="desk-input h-9 w-[220px] px-2.5 text-[14px] outline-none placeholder:text-muted"
-            />
-            <Button size="sm" type="submit" loading={change.isPending} disabled={!password || !repeat}>
-              Сохранить
-            </Button>
-            <Button size="sm" variant="ghost" onClick={close}>
-              Отмена
-            </Button>
-            {error ? (
-              <p role="alert" className="w-full text-[13px] leading-5 text-danger">
-                {error}
-              </p>
-            ) : null}
-          </form>
-        ) : null
-      }
+    <form
+      onSubmit={submit}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && open) {
+          event.stopPropagation();
+          close();
+        }
+      }}
     >
-      {open ? null : (
-        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
-          Сменить пароль
-        </Button>
-      )}
-    </SettingRow>
+      <ProfileCard
+        id="profile-password"
+        testId="desk-profile-password"
+        title="Пароль"
+        description="Для входа по почте на этом и других компьютерах. Телефон входит по коду и пароля не спрашивает."
+        note={
+          open ? (
+            error ? (
+              <span role="alert" className="text-danger">
+                {error}
+              </span>
+            ) : live ? (
+              <span>{live}</span>
+            ) : password && repeat ? (
+              <span className="text-ok">Можно сохранять</span>
+            ) : (
+              <span>
+                Не короче 6 символов · <Kbd>Enter</Kbd> сохранить · <Kbd>Esc</Kbd> отменить
+              </span>
+            )
+          ) : (
+            "Старый пароль перестанет работать сразу"
+          )
+        }
+        actions={
+          open ? (
+            <>
+              <Button size="sm" variant="ghost" onClick={close}>
+                Отмена
+              </Button>
+              <Button size="sm" type="submit" loading={change.isPending} disabled={!password || !repeat}>
+                Сохранить
+              </Button>
+            </>
+          ) : (
+            <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+              Сменить пароль
+            </Button>
+          )
+        }
+      >
+        {open ? (
+          <div className="profile-fields">
+            <label className="profile-field">
+              <span>Новый пароль</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                aria-label="Новый пароль"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoFocus
+                className="field h-9 w-full px-3 text-[14px] outline-none"
+                aria-invalid={Boolean(error) || undefined}
+              />
+            </label>
+            <label className="profile-field">
+              <span>Ещё раз</span>
+              <input
+                type="password"
+                autoComplete="new-password"
+                aria-label="Повтор пароля"
+                value={repeat}
+                onChange={(event) => setRepeat(event.target.value)}
+                className="field h-9 w-full px-3 text-[14px] outline-none"
+                aria-invalid={Boolean(error) || undefined}
+              />
+            </label>
+          </div>
+        ) : null}
+      </ProfileCard>
+    </form>
   );
 }
 
 /** This browser's push (D-114): where it stands, one click to switch it on, «Проверить» — a real push and its fate. */
-function PushSetting() {
+function PushSetting({ director }: { director: boolean }) {
   const [state, setState] = useState<PushState | null>(null);
   const [busy, setBusy] = useState(false);
   const test = usePushTest();
@@ -151,34 +182,43 @@ function PushSetting() {
   const words = state ? PUSH_WORDS[state] : null;
   const blocker = state && state !== "granted" && state !== "default" ? pushBlocker(state, pushPlatform()) : null;
   return (
-    <SettingRow
-      label="Уведомления в этом браузере"
-      hint={blocker ?? "Пуш приходит, даже когда вкладка закрыта, — пока браузер запущен"}
+    <ProfileCard
+      id="profile-push"
       testId="desk-profile-push"
-    >
-      {words ? (
-        <span className="text-[13px]" style={{ color: words.tone }}>
-          {words.text}
-        </span>
-      ) : null}
-      {state === "default" ? (
-        <Button size="sm" loading={busy} onClick={() => void enable()}>
-          Включить
-        </Button>
-      ) : null}
-      {state === "granted" ? (
-        <>
-          {test.verdict ? (
-            <span className="max-w-[200px] truncate text-[12px]" style={{ color: TEST_TONE[test.verdict.tone] }} title={test.verdict.text}>
-              {test.verdict.text}
-            </span>
-          ) : null}
-          <Button size="sm" variant="secondary" disabled={test.busy} onClick={() => void test.run()}>
-            Проверить
+      title="Уведомления в этом браузере"
+      description={blocker ?? "Пуш приходит, даже когда вкладка закрыта, — пока браузер запущен."}
+      note={
+        test.verdict ? (
+          <span style={{ color: TEST_TONE[test.verdict.tone] }} title={test.verdict.text}>
+            {test.verdict.text}
+          </span>
+        ) : state === "granted" ? (
+          "«Проверить» пришлёт настоящий пуш и скажет, дошёл ли он"
+        ) : null
+      }
+      actions={
+        state === "default" ? (
+          <Button size="sm" loading={busy} onClick={() => void enable()}>
+            Включить
           </Button>
-        </>
-      ) : null}
-    </SettingRow>
+        ) : state === "granted" ? (
+          <Button size="sm" variant="secondary" disabled={test.busy} onClick={() => void test.run()}>
+            {test.busy ? "Проверяю…" : "Проверить"}
+          </Button>
+        ) : null
+      }
+    >
+      <div className="profile-device">
+        <span className="profile-device-icon" aria-hidden>
+          <Bell size={18} strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-medium leading-5">Этот компьютер</p>
+          <p className="text-[12px] leading-4 text-muted">{director ? "Задачи, ответы и заявки — по правилам ниже" : "Заявки и напоминания — сразу, задачи — в рабочие часы компании"}</p>
+        </div>
+        {words ? <StateBadge tone={words.tone}>{words.text}</StateBadge> : <span className="skeleton block h-[26px] w-[96px] rounded-full bg-surface-2" />}
+      </div>
+    </ProfileCard>
   );
 }
 
@@ -203,8 +243,8 @@ function OthersSetting({ userId }: { userId: string }) {
     );
   };
   return (
-    <SettingRow label="Другие устройства" hint="Телефон забыт дома, планшет отдан — вход закроется везде, кроме этого компьютера" testId="desk-profile-others">
-      <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+    <ProfileRow label="Другие устройства" hint="Телефон забыт дома, планшет отдан — вход закроется везде, кроме этого компьютера" testId="desk-profile-others">
+      <Button size="sm" variant="secondary" icon={<MonitorSmartphone size={15} strokeWidth={2} aria-hidden />} onClick={() => setOpen(true)}>
         Выйти на других устройствах
       </Button>
       <Dialog open={open} onClose={close} title="Выйти на других устройствах?" width="sm">
@@ -223,7 +263,7 @@ function OthersSetting({ userId }: { userId: string }) {
           </Button>
         </div>
       </Dialog>
-    </SettingRow>
+    </ProfileRow>
   );
 }
 
@@ -271,8 +311,8 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
   const held = waitingWords(waiting.phrases, waiting.files);
 
   return (
-    <SettingRow label="Выйти из аккаунта" hint="Задачи, сообщения и очки останутся на месте" testId="desk-profile-signout">
-      <Button size="sm" variant="secondary" onClick={show}>
+    <ProfileRow label="Выйти из аккаунта" hint="Задачи, сообщения и очки останутся на месте" testId="desk-profile-signout">
+      <Button size="sm" variant="secondary" icon={<LogOut size={15} strokeWidth={2} aria-hidden />} onClick={show}>
         Выйти
       </Button>
       <Dialog open={open} onClose={() => !pending && setOpen(false)} title="Выйти из аккаунта?" width="sm">
@@ -300,7 +340,7 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
           </Button>
         </form>
       </Dialog>
-    </SettingRow>
+    </ProfileRow>
   );
 }
 
@@ -308,38 +348,64 @@ function SignOutSetting({ action, userId }: { action: () => Promise<void>; userI
 function ViewSettings({ role }: { role: Role }) {
   const folded = useSyncExternalStore(subscribeFrame, () => readNavFolded() ?? false, () => false);
   return (
-    <SettingGroup className="desk-settings" testId="desk-profile-view">
-      <SettingRow label="Боковая навигация" hint={<span className="inline-flex items-center gap-1">Свернуть и развернуть — клавиша <Kbd>[</Kbd></span>}>
-        <SegmentTabs
-          aria-label="Боковая навигация"
-          value={folded ? "icons" : "wide"}
-          onChange={(value) => writeNavFolded(value === "icons")}
-          items={[
-            { value: "wide", label: "С подписями" },
-            { value: "icons", label: "Только значки" },
-          ]}
-        />
-      </SettingRow>
-      <SettingRow label="Клавиши" hint="Все сочетания этого экрана и рабочего стола">
-        <Button size="sm" variant="secondary" onClick={openShortcuts}>
-          Показать
-          <Kbd>?</Kbd>
-        </Button>
-      </SettingRow>
-      <SettingRow label="Телефонная версия" hint="Этот компьютер будет показывать экраны телефона, пока в профиле телефонной версии не нажать «Версия для компьютера»">
-        <Button size="sm" variant="secondary" onClick={() => goPhoneView(homeForRole(role))} data-testid="desk-profile-phone">
-          Открыть
-        </Button>
-      </SettingRow>
-    </SettingGroup>
+    <ProfileCard id="profile-view" testId="desk-profile-view" title="Рабочий стол" description="Как этот компьютер показывает Pulse. Запоминается в этом браузере.">
+      <div className="profile-rows">
+        <ProfileRow
+          label={
+            <span className="inline-flex items-center gap-2">
+              <PanelLeft size={15} strokeWidth={2} className="text-muted" aria-hidden />
+              Боковая навигация
+            </span>
+          }
+          hint={<span className="inline-flex items-center gap-1">Свернуть и развернуть — клавиша <Kbd>[</Kbd></span>}
+        >
+          <SegmentTabs
+            aria-label="Боковая навигация"
+            value={folded ? "icons" : "wide"}
+            onChange={(value) => writeNavFolded(value === "icons")}
+            items={[
+              { value: "wide", label: "С подписями" },
+              { value: "icons", label: "Только значки" },
+            ]}
+          />
+        </ProfileRow>
+        <ProfileRow
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Kbd>?</Kbd>
+              Клавиши
+            </span>
+          }
+          hint="Все сочетания этого экрана и рабочего стола"
+        >
+          <Button size="sm" variant="secondary" onClick={openShortcuts}>
+            Показать
+          </Button>
+        </ProfileRow>
+        <ProfileRow
+          label={
+            <span className="inline-flex items-center gap-2">
+              <Smartphone size={15} strokeWidth={2} className="text-muted" aria-hidden />
+              Телефонная версия
+            </span>
+          }
+          hint="Этот компьютер будет показывать экраны телефона, пока в профиле телефонной версии не нажать «Версия для компьютера»"
+        >
+          <Button size="sm" variant="secondary" onClick={() => goPhoneView(homeForRole(role))} data-testid="desk-profile-phone">
+            Открыть
+          </Button>
+        </ProfileRow>
+      </div>
+    </ProfileCard>
   );
 }
 
 /**
- * The desk's profile (D-153, D-154 wave 3, D-158): a computer's account page, not the phone's list
- * of 58 px rows — who is signed in beside the title, the account, this browser's notifications and
- * the director's rules as a table, the sessions, how this computer shows the desk, signing out;
- * every setting a label on the left and its control on the right, under one ruled sheet.
+ * The desk's profile (D-153, D-154 wave 3, D-158, D-174): a computer's account page, laid out as
+ * settings read on Vercel — who is signed in on top; on the left the page's own contents that
+ * follow the scroll; on the right a card a subject, each with its title, what it is for, the
+ * control, and a foot with a note and the card's action: the account, the password, this
+ * browser's notifications and the director's rules, how this computer shows the desk, the sessions.
  */
 export function ProfileDesk({
   userId,
@@ -357,60 +423,82 @@ export function ProfileDesk({
   signOut: () => Promise<void>;
 }) {
   const director = role === "director";
+  const people = usePeople();
+  const avatar = people.data?.find((person) => person.id === userId)?.avatar_url ?? null;
+  const sections: ProfileSection[] = [
+    { id: "profile-account", label: "Аккаунт" },
+    { id: "profile-password", label: "Пароль" },
+    { id: "profile-push", label: "Уведомления" },
+    ...(director ? [{ id: "profile-rules", label: "Что присылать" }, { id: "profile-when", label: "Когда и как" }] : []),
+    { id: "profile-view", label: "Рабочий стол" },
+    { id: "profile-sessions", label: "Сеансы" },
+  ];
   return (
-    <div className="flex flex-col gap-6" data-testid="desk-profile">
-      <div data-testid="desk-profile-who">
+    <div className="profile flex flex-col gap-6" data-testid="desk-profile">
+      <div className="profile-who" data-testid="desk-profile-who">
         <PageTitle title="Профиль" state={{ text: `${ROLE_LABEL[role]} · ${company}` }} />
       </div>
 
-      <section className="flex flex-col gap-1">
-        <SectionLabel>Аккаунт</SectionLabel>
-        <SettingGroup className="desk-settings">
-          <SettingRow label="Имя" hint="Так вас видят в задачах и на стене">
-            <span className="text-[14px]">{fullName}</span>
-          </SettingRow>
-          {email ? (
-            <SettingRow label="Почта" hint="Вход на компьютере — по почте и паролю">
-              <span className="text-[14px]">{email}</span>
-            </SettingRow>
-          ) : null}
+      <div className="profile-layout">
+        <aside className="profile-aside">
+          <ProfileNav sections={sections} />
+        </aside>
+
+        <div className="profile-main">
+          <ProfileCard
+            id="profile-account"
+            title="Аккаунт"
+            description="Так вас видят в задачах, в «Команде» и на стене."
+            note={director ? "Имя, должность и фото меняются в вашей карточке" : "Имя и фото меняет директор в «Команде»"}
+            actions={
+              director ? (
+                <Link href={`/desk/team/${userId}`} className="profile-link">
+                  Открыть карточку
+                  <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
+                </Link>
+              ) : null
+            }
+          >
+            <div className="profile-identity">
+              <TileFace person={{ id: userId, full_name: fullName, avatar_url: avatar }} size={64} />
+              <div className="min-w-0 flex-1">
+                <p className="profile-identity-name">{fullName}</p>
+                <p className="profile-identity-line">
+                  {ROLE_LABEL[role]} · {company}
+                </p>
+              </div>
+            </div>
+            {email ? (
+              <div className="profile-rows">
+                <ProfileRow label="Почта" hint="Вход на компьютере — по почте и паролю">
+                  <span className="text-[14px]">{email}</span>
+                  <CopyButton text={() => email} label="Скопировать почту" done="Скопировал почту" />
+                </ProfileRow>
+              </div>
+            ) : null}
+          </ProfileCard>
+
           <PasswordSetting />
-        </SettingGroup>
-      </section>
+          <PushSetting director={director} />
+          {director ? <NotifyRules meId={userId} /> : null}
+          <ViewSettings role={role} />
 
-      <section className="flex flex-col gap-1">
-        <SectionLabel>Уведомления на этом компьютере</SectionLabel>
-        <SettingGroup className="desk-settings">
-          <PushSetting />
-        </SettingGroup>
-      </section>
+          <ProfileCard id="profile-sessions" title="Сеансы" description="Где открыт ваш вход. Выход здесь не трогает задачи и историю.">
+            <div className="profile-rows">
+              <OthersSetting userId={userId} />
+              <SignOutSetting action={signOut} userId={userId} />
+            </div>
+          </ProfileCard>
 
-      {director ? (
-        <section className="flex flex-col gap-1">
-          <NotifyRules meId={userId} />
-        </section>
-      ) : null}
-
-      <section className="flex flex-col gap-1">
-        <SectionLabel>Рабочий стол</SectionLabel>
-        <ViewSettings role={role} />
-      </section>
-
-      <section className="flex flex-col gap-1">
-        <SectionLabel>Сеансы</SectionLabel>
-        <SettingGroup className="desk-settings">
-          <OthersSetting userId={userId} />
-          <SignOutSetting action={signOut} userId={userId} />
-        </SettingGroup>
-      </section>
-
-      <footer className="flex items-center gap-3 opacity-50">
-        <PulseMark />
-        <span className="nums text-[12px] leading-4 text-muted">
-          версия {versionLabel(BUILD)}
-          {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
-        </span>
-      </footer>
+          <footer className="profile-version">
+            <PulseMark />
+            <span className="nums text-[12px] leading-4 text-muted">
+              версия {versionLabel(BUILD)}
+              {BUILD.at && BUILD.sha ? ` · ${BUILD.sha}` : ""}
+            </span>
+          </footer>
+        </div>
+      </div>
     </div>
   );
 }

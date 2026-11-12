@@ -1,7 +1,8 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
@@ -18,12 +19,14 @@ import { useDismiss } from "@/components/ui/datetime/PickerShell";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { addDaysYmd, dayName, hoursText, isoWeekday, PERIOD_MAX_DAYS, percentText, rangeText, shortHm, type PeriodKind } from "@/lib/daily-report/format";
 import type { TeamPeriod, TeamPeriodRow } from "@/lib/daily-report/types";
-import { compactYmd, daysBetween, parseYmd, type Ymd } from "@/lib/datetime/calendar";
+import { compactYmd, daysBetween, parseYmd, todayYmd, type Ymd } from "@/lib/datetime/calendar";
 import { formatNum, pointsTone } from "@/lib/desk/format";
 
-import { DeskHero, HeroBone } from "../team/Hero";
+import { TileFace } from "../team/TeamGrid";
 import { useBoxWidth } from "../team/shared";
 import { LoadFailed, STEP } from "./DayView";
+import { usePeriodMarks, type PeriodMarks } from "./marks";
+import { AxisHead, axisOf, DayCells, minutesOfHm, PanelLine, ReportsHero, ReportsHeroBone, ShareBar, TimeBar, WeekGrid, Who } from "./parts";
 
 type Day = TeamPeriod["days"][number];
 
@@ -41,9 +44,9 @@ const KINDS: { value: PeriodKind; label: string }[] = [
 const LETTERS = ["", "пн", "вт", "ср", "чт", "пт", "сб", "вс"] as const;
 
 /** Below this width of the table the column steps aside — the least needed first (a narrow window, the panel open). */
-const ROOM: Partial<Record<string, number>> = { total: 1000, late: 920, left: 840, arrived: 780, count: 700 };
+const ROOM: Partial<Record<string, number>> = { total: 1130, late: 1080, left: 960, arrived: 900, count: 820, days: 560 };
 
-const STRIP_H = 44;
+const STRIP_H = 52;
 
 /** Under two weeks — every weekday; longer — the Mondays' dates, so the labels never collide. */
 function tick(date: string, count: number): string {
@@ -52,10 +55,11 @@ function tick(date: string, count: number): string {
 }
 
 /**
- * The team's period day by day as thin columns (D-154, D-158): reports handed in from the baseline
- * in print, the missed ones on top in the red pencil, a gap between days and between both — a
- * picture of the rhythm in one line of the sheet, never a wall of blocks. Days off are dimmed; a
- * day says its numbers under the mouse.
+ * The team's period day by day as thin columns (D-154, D-158, D-174): reports handed in from the
+ * baseline in green, the missed ones on top in the red pencil, a gap between days and between both
+ * — a picture of the rhythm in one line, never a wall of blocks. The columns grow from the baseline
+ * as they arrive; the one under the mouse stays lit, the rest step back. Days off are dimmed; a day
+ * says its numbers under the mouse and opens on a click.
  */
 function DayColumns({ days, now, onDay }: { days: readonly Day[]; now: Date; onDay: (date: Ymd) => void }) {
   const max = Math.max(1, ...days.map((day) => day.submitted + day.missed));
@@ -63,11 +67,12 @@ function DayColumns({ days, now, onDay }: { days: readonly Day[]; now: Date; onD
   const width = n <= 7 ? 22 : n <= 14 ? 16 : n <= 31 ? 10 : 5;
   const gap = n <= 14 ? 8 : n <= 31 ? 4 : 2;
   // the mouse's column is wider than the stroke drawn in it
-  const bar = Math.max(4, Math.round(width * 0.55));
+  const bar = Math.max(3, Math.round(width * 0.55));
+  const today = todayYmd(now);
   return (
-    <div className="flex flex-col gap-1" data-testid="desk-period-strip">
-      <div className="flex items-end border-b border-text" style={{ height: STRIP_H, gap }}>
-        {days.map((day) => {
+    <div className="reports-strip" data-testid="desk-period-strip">
+      <div className="reports-strip-plot" style={{ height: STRIP_H, gap }}>
+        {days.map((day, index) => {
           const total = day.submitted + day.missed;
           const words = `${dayName(day.date, now)} · сдали ${day.submitted} · не сдали ${day.missed} · задач ${day.handed_over}`;
           return (
@@ -76,14 +81,18 @@ function DayColumns({ days, now, onDay }: { days: readonly Day[]; now: Date; onD
                 type="button"
                 aria-label={`${dayName(day.date, now)}: сдали ${day.submitted}, не сдали ${day.missed}${day.workday ? "" : ", выходной"} — открыть день`}
                 onClick={() => onDay(day.date)}
-                className="flex h-full shrink-0 cursor-pointer flex-col justify-end gap-px hover:opacity-70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                style={{ width, opacity: day.workday ? undefined : 0.45 }}
+                className="reports-strip-col"
+                style={{ width, "--bar": `${bar}px`, "--i": Math.min(index, 40) } as CSSProperties}
                 data-day={day.date}
+                data-off={day.workday ? undefined : ""}
+                data-today={day.date === today ? "" : undefined}
               >
-                {total === 0 ? null : (
+                {total === 0 ? (
+                  <span className="reports-strip-nil" />
+                ) : (
                   <>
-                    {day.missed > 0 ? <span className="block self-center" style={{ width: bar, height: `${(day.missed / max) * 100}%`, background: TONE_VAR.danger }} /> : null}
-                    {day.submitted > 0 ? <span className="block self-center" style={{ width: bar, height: `${(day.submitted / max) * 100}%`, background: TONE_VAR.ok }} /> : null}
+                    {day.missed > 0 ? <span className="reports-strip-seg" data-tone="danger" style={{ height: `${(day.missed / max) * 100}%` }} /> : null}
+                    {day.submitted > 0 ? <span className="reports-strip-seg" data-tone="ok" style={{ height: `${(day.submitted / max) * 100}%` }} /> : null}
                   </>
                 )}
               </button>
@@ -93,7 +102,7 @@ function DayColumns({ days, now, onDay }: { days: readonly Day[]; now: Date; onD
       </div>
       <div className="flex" style={{ gap }} aria-hidden>
         {days.map((day) => (
-          <span key={day.date} className="nums shrink-0 overflow-visible whitespace-nowrap text-center text-[11px] leading-[14px] text-muted" style={{ width }}>
+          <span key={day.date} className="nums reports-strip-tick" data-today={day.date === today ? "" : undefined} style={{ width }}>
             {tick(day.date, n)}
           </span>
         ))}
@@ -113,13 +122,13 @@ function DayPick({ label, value, max, min, now, onPick }: { label: string; value
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((was) => !was)}
-        className={`field nums flex h-8 items-center gap-1.5 px-2 text-[14px] leading-5 ${open ? "border-accent" : ""}`}
+        className={`field nums flex h-8 items-center gap-1.5 px-2.5 text-[13px] leading-5 ${open ? "border-accent" : ""}`}
       >
         <span className="text-muted">{label}</span>
         {compactYmd(value, now)}
       </button>
       {open ? (
-        <div className="card absolute left-0 top-[calc(100%+6px)] z-20 w-[320px] p-3" style={{ boxShadow: "var(--shadow-raised)" }}>
+        <div className="desk-pop card absolute left-0 top-[calc(100%+6px)] z-20 w-[320px] p-3" style={{ boxShadow: "var(--shadow-raised)" }}>
           <Calendar
             value={value}
             min={min}
@@ -192,21 +201,21 @@ export function PeriodControls({
       {kind === "custom" ? (
         <RangePicker range={range} today={today} now={now} onRange={onRange} />
       ) : (
-        <div className="flex items-center gap-1">
+        <div className="reports-stepper flex items-center gap-1">
           <button type="button" className={STEP} aria-label={`Предыдущий период: ${unit}`} title="Раньше (←)" onClick={() => onStep(-1)} data-testid="desk-period-prev">
             <Icon name="left" size={16} />
           </button>
-          <span className="nums min-w-[132px] text-center text-[14px] leading-5" data-testid="desk-period-dates">
+          <span key={range.from} className="reports-stepper-title nums min-w-[136px] text-center text-[14px] font-semibold leading-5" data-testid="desk-period-dates">
             {rangeText(range.from, range.to)}
           </span>
           <button type="button" className={STEP} aria-label={`Следующий период: ${unit}`} title="Позже (→)" disabled={atToday} onClick={() => onStep(1)}>
             <Icon name="right" size={16} />
           </button>
           {atToday ? (
-            <span className="ml-1 w-[72px] text-right text-[13px] leading-4 text-muted">по сегодня</span>
+            <span className="ml-1 w-[76px] text-right text-[13px] leading-4 text-muted">по сегодня</span>
           ) : (
             <Tooltip label="Последние дни по сегодня" keys={["T"]}>
-              <Button size="sm" variant="ghost" className="ml-1 !min-h-8 w-[72px] !justify-end !px-0" onClick={onToday}>
+              <Button size="sm" variant="ghost" className="ml-1 !min-h-8 w-[76px] !justify-end !px-0" onClick={onToday}>
                 По сегодня
               </Button>
             </Tooltip>
@@ -217,73 +226,113 @@ export function PeriodControls({
   );
 }
 
-function PanelFact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex min-h-[34px] items-baseline justify-between gap-3 py-[7px]">
-      <dt className="text-[14px] leading-5 text-muted">{label}</dt>
-      <dd className="nums text-[14px] leading-5">{children}</dd>
-    </div>
-  );
+/** «9:05» of minutes of the day. */
+function clock(minutes: number): string {
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
 /**
- * One person's period in the right-hand panel: every column of the table, even those a narrow
- * window has put aside, read top to bottom — the share and the days, the hours, the tasks, the
- * points; then the way to their last day and to the card.
+ * One person's period in the right-hand panel (D-174): the face, the share handed in large with
+ * its bar, the days as a calendar, the usual working day as a bar on the clock, then every column
+ * of the table read top to bottom; the way to their last day and to the card.
  */
-function PeriodPanel({ row, period, onDay, now }: { row: TeamPeriodRow; period: TeamPeriod; onDay: (date: Ymd) => void; now: Date }) {
+function PeriodPanel({ row, period, marks, onDay, now }: { row: TeamPeriodRow; period: TeamPeriod; marks: PeriodMarks | undefined; onDay: (date: Ymd) => void; now: Date }) {
   const tone = rateTone(row.submit_rate);
+  const from = minutesOfHm(row.avg_arrived);
+  const to = minutesOfHm(row.avg_left);
+  const axis = axisOf([{ from, to }], [7 * 60, 21 * 60]);
   return (
-    <div className="flex flex-col gap-4 pr-8" data-testid="desk-period-panel">
-      <div className="min-w-0">
-        <p className="desk-figure truncate text-[22px] leading-7">{row.full_name}</p>
-        <p className="truncate text-[13px] leading-[18px] text-muted">{[row.position, rangeText(period.from, period.to)].filter(Boolean).join(" · ")}</p>
-      </div>
-      <div className="flex items-baseline gap-3">
-        <span className="nums desk-figure text-[32px] leading-9" style={tone ? { color: TONE_VAR[tone] } : undefined}>
-          {percentText(row.submit_rate)}
-        </span>
-        <span className="text-[13px] leading-[18px] text-muted">
-          отчётов сдано · {row.submitted} из {row.submitted + row.missed}
-          {row.missed > 0 ? <span style={{ color: TONE_VAR.danger }}> · пропущено {row.missed}</span> : null}
-        </span>
-      </div>
-      <dl className="desk-list">
-        <PanelFact label="Приход, в среднем">{row.avg_arrived ? shortHm(row.avg_arrived) : "—"}</PanelFact>
-        <PanelFact label="Уход, в среднем">{row.avg_left ? shortHm(row.avg_left) : "—"}</PanelFact>
-        <PanelFact label="Часов в день">{row.avg_hours === null ? "—" : hoursText(row.avg_hours)}</PanelFact>
-        <PanelFact label="Часов всего">{row.hours_total ? hoursText(row.hours_total) : "—"}</PanelFact>
-        <PanelFact label="Задач сдано · принято">
+    <article className="reports-doc flex flex-col gap-5 pr-8" data-testid="desk-period-panel">
+      <header className="flex items-center gap-3.5">
+        <TileFace person={{ id: row.user_id, full_name: row.full_name, avatar_url: row.avatar_url }} size={52} />
+        <div className="min-w-0">
+          <p className="reports-doc-name truncate">{row.full_name}</p>
+          <p className="truncate text-[13px] leading-[18px] text-muted">{[row.position, rangeText(period.from, period.to)].filter(Boolean).join(" · ")}</p>
+        </div>
+      </header>
+
+      <section className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-3">
+          <span className="nums reports-doc-figure" style={tone ? { color: TONE_VAR[tone] } : undefined}>
+            {percentText(row.submit_rate)}
+          </span>
+          <span className="text-[13px] leading-[18px] text-muted">
+            отчётов сдано · {row.submitted} из {row.submitted + row.missed}
+          </span>
+        </div>
+        <ShareBar
+          label={`Сдано ${row.submitted}, не сдано ${row.missed}`}
+          parts={[
+            { key: "in", value: row.submitted, label: "сдано", tone: "ok" },
+            { key: "missed", value: row.missed, label: "пропущено", tone: "danger" },
+          ]}
+        />
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h3 className="reports-doc-label">По дням</h3>
+        <WeekGrid days={period.days} marks={marks?.get(row.user_id)} today={todayYmd(now)} now={now} />
+      </section>
+
+      {from !== null && to !== null ? (
+        <section className="reports-doc-day" aria-label="Обычный день">
+          <h3 className="reports-doc-label">Обычный день · в среднем за сданные</h3>
+          <dl className="reports-doc-times">
+            <div>
+              <dt>Приход</dt>
+              <dd className="nums">{shortHm(row.avg_arrived)}</dd>
+            </div>
+            <div>
+              <dt>Уход</dt>
+              <dd className="nums">{shortHm(row.avg_left)}</dd>
+            </div>
+            <div>
+              <dt>В день</dt>
+              <dd className="nums">{row.avg_hours === null ? "—" : hoursText(row.avg_hours)}</dd>
+            </div>
+          </dl>
+          <TimeBar axis={axis} from={from} to={to} size="doc" label={`Обычно с ${clock(from)} до ${clock(to)}`} />
+          <AxisHead axis={axis} />
+        </section>
+      ) : null}
+
+      <dl className="reports-lines">
+        <PanelLine label="Часов всего">{row.hours_total ? hoursText(row.hours_total) : "—"}</PanelLine>
+        <PanelLine label="Задач сдано · принято">
           {row.handed_over} · {row.closed}
-        </PanelFact>
-        <PanelFact label="В срок · после срока">
+        </PanelLine>
+        <PanelLine label="В срок · после срока">
           {row.on_time} · <span style={row.late > 0 ? { color: TONE_VAR.danger } : undefined}>{row.late}</span>
-        </PanelFact>
-        <PanelFact label="Очки за отчёты">
+        </PanelLine>
+        <PanelLine label="Очки за отчёты">
           <span className={row.points > 0 ? "" : "text-muted"}>{formatNum(row.points, { signed: true })}</span>
-        </PanelFact>
+        </PanelLine>
       </dl>
-      <div className="flex flex-wrap items-center gap-2">
+
+      <div className="flex flex-wrap items-center gap-3">
         <Button size="sm" variant="secondary" onClick={() => onDay(period.to)}>
           Отчёт за {dayName(period.to, now).toLowerCase()}
         </Button>
-        <Link href={`/desk/team/${row.user_id}`} className="text-[13px] leading-4 text-muted hover:text-text">
-          Карточка сотрудника →
+        <Link href={`/desk/team/${row.user_id}`} className="reports-doc-link">
+          Карточка сотрудника
+          <ArrowRight size={14} strokeWidth={2.25} aria-hidden />
         </Link>
       </div>
-    </div>
+    </article>
   );
 }
 
 function PeriodBone() {
   return (
     <>
-      <HeroBone />
-      <SkeletonGroup grow className="desk-list">
+      <ReportsHeroBone bar={false} />
+      <SkeletonGroup grow className="reports-bone-rows">
         {Array.from({ length: 7 }, (_, i) => (
-          <div key={i} className="flex h-[34px] items-center gap-6">
-            <Bone h={14} w="22%" />
-            <Bone h={14} w="8%" />
+          <div key={i} className="flex h-[48px] items-center gap-5 px-3">
+            <Bone round w={28} h={28} />
+            <Bone h={14} w="18%" />
+            <Bone h={14} w="6%" />
+            <Bone h={12} w="20%" />
             <Bone h={14} w="30%" />
           </div>
         ))}
@@ -297,9 +346,10 @@ const byName = (a: TeamPeriodRow, b: TeamPeriodRow) => a.full_name.localeCompare
 const byRate = (a: TeamPeriodRow, b: TeamPeriodRow) => (a.submit_rate ?? 2) - (b.submit_rate ?? 2) || byName(a, b);
 
 /**
- * «Отчёты → Период» on the desk (D-152, D-154; wave 3, D-158): the total — the share of reports,
- * the work that moved, the days as thin columns (a click opens that day); the people as a sortable
- * table, the worst share first — a row opens the person's period in the panel.
+ * «Отчёты → Период» on the desk (D-152, D-154; wave 3, D-158; D-174): the total — the share of
+ * reports, the work that moved, the days as thin columns (a click opens that day); the people as a
+ * sortable table, the worst share first, each with their days as a line of cells — a row opens the
+ * person's period in the panel.
  */
 export function PeriodView({
   period,
@@ -338,38 +388,47 @@ export function PeriodView({
   now: Date;
 }) {
   const [box, width] = useBoxWidth();
+  const marks = usePeriodMarks(period?.from ?? "", period?.to ?? "", Boolean(period));
   if (!period) return failed ? <LoadFailed onRetry={onRetry} /> : <PeriodBone />;
   const t = period.totals;
   const rows = period.rows.filter(filter).sort(byRate);
   const open = openId ? (period.rows.find((row) => row.user_id === openId) ?? null) : null;
+  const today = todayYmd(now);
+  const marksLoading = marks.isLoading || marks.isPlaceholderData;
 
   const columns: Column<TeamPeriodRow>[] = [
     {
       key: "who",
       title: "Сотрудник",
-      width: "minmax(160px,1.4fr)",
+      width: "minmax(190px,1.3fr)",
       sort: byName,
-      render: (row) => <span className="block truncate">{row.full_name}</span>,
+      render: (row) => <Who id={row.user_id} name={row.full_name} avatar={row.avatar_url} sub={row.position} />,
     },
     {
       key: "rate",
       title: "Сдача",
-      width: "80px",
+      width: "64px",
       align: "right",
       sort: (a, b) => (a.submit_rate ?? -1) - (b.submit_rate ?? -1),
       render: (row) => {
         const tone = rateTone(row.submit_rate);
         return (
-          <span className="nums" style={tone ? { color: TONE_VAR[tone] } : undefined}>
+          <span className="nums font-medium" style={tone ? { color: TONE_VAR[tone] } : undefined}>
             {percentText(row.submit_rate)}
           </span>
         );
       },
     },
     {
+      key: "days",
+      title: "По дням",
+      width: "minmax(120px,1fr)",
+      render: (row) => <DayCells days={period.days} marks={marks.data?.get(row.user_id)} today={today} now={now} loading={marksLoading} />,
+    },
+    {
       key: "count",
-      title: "Сдал",
-      width: "96px",
+      title: "Сдано",
+      width: "84px",
       align: "right",
       sort: (a, b) => a.submitted - b.submitted,
       render: (row) => (
@@ -381,7 +440,7 @@ export function PeriodView({
     {
       key: "arrived",
       title: "Приход",
-      width: "84px",
+      width: "68px",
       align: "right",
       sort: (a, b) => (a.avg_arrived ?? "~").localeCompare(b.avg_arrived ?? "~"),
       render: (row) => (row.avg_arrived ? <When>{shortHm(row.avg_arrived)}</When> : <span className="text-muted/40">—</span>),
@@ -389,7 +448,7 @@ export function PeriodView({
     {
       key: "left",
       title: "Уход",
-      width: "72px",
+      width: "60px",
       align: "right",
       sort: (a, b) => (a.avg_left ?? "").localeCompare(b.avg_left ?? ""),
       render: (row) => (row.avg_left ? <When>{shortHm(row.avg_left)}</When> : <span className="text-muted/40">—</span>),
@@ -397,23 +456,23 @@ export function PeriodView({
     {
       key: "hours",
       title: <span title="В среднем за сданный день">Часы в день</span>,
-      width: "132px",
+      width: "116px",
       align: "right",
       sort: (a, b) => (a.avg_hours ?? -1) - (b.avg_hours ?? -1),
-      render: (row) => (row.avg_hours === null ? <span className="text-muted/40">—</span> : <span className="nums">{hoursText(row.avg_hours)}</span>),
+      render: (row) => (row.avg_hours === null ? <span className="text-muted/40">—</span> : <span className="nums whitespace-nowrap">{hoursText(row.avg_hours)}</span>),
     },
     {
       key: "total",
       title: "Всего",
-      width: "84px",
+      width: "88px",
       align: "right",
       sort: (a, b) => a.hours_total - b.hours_total,
-      render: (row) => (row.hours_total ? <span className="nums text-muted">{hoursText(row.hours_total)}</span> : <span className="text-muted/40">—</span>),
+      render: (row) => (row.hours_total ? <span className="nums whitespace-nowrap text-muted">{hoursText(row.hours_total)}</span> : <span className="text-muted/40">—</span>),
     },
     {
       key: "tasks",
       title: <span title="Сдано / принято">Задачи</span>,
-      width: "88px",
+      width: "80px",
       align: "right",
       sort: (a, b) => a.handed_over - b.handed_over,
       render: (row) => (
@@ -427,40 +486,40 @@ export function PeriodView({
     {
       key: "late",
       title: <span title="Сданные позже дедлайна">После срока</span>,
-      width: "148px",
+      width: "118px",
       align: "right",
       sort: (a, b) => a.late - b.late,
-      render: (row) => <Num value={row.late} />,
+      render: (row) => <Num value={row.late} tone="danger" />,
     },
   ];
   if (pointsOn) {
     columns.push({
       key: "points",
       title: "Очки",
-      width: "72px",
+      width: "64px",
       align: "right",
       sort: (a, b) => a.points - b.points,
       render: (row) => <Num value={row.points} signed tone={pointsTone(row.points)} />,
     });
   }
 
+  const rate = t.submit_rate === null ? null : Math.round(t.submit_rate * 100);
   return (
-    <div className="flex flex-col gap-3.5 transition-opacity duration-[150ms]" style={{ opacity: stale ? 0.55 : 1 }} aria-busy={stale || undefined} data-testid="desk-reports-period">
-      <DeskHero
+    <div className="reports-view flex flex-col gap-3.5" data-stale={stale ? "" : undefined} aria-busy={stale || undefined} data-testid="desk-reports-period">
+      <ReportsHero
         testId="desk-period-hero"
-        value={percentText(t.submit_rate)}
-        tone={rateTone(t.submit_rate)}
+        figure={rate === null ? { value: 0, empty: true } : { value: rate, suffix: "%", tone: rateTone(t.submit_rate) === "danger" ? "danger" : null }}
         title="отчётов сдано"
-        sub={`сдали ${t.submitted} · не сдали ${t.missed} · ${rangeText(period.from, period.to)}`}
-        facts={[
-          { key: "handed", value: t.handed_over, label: "сдано задач" },
-          { key: "closed", value: t.closed, label: "принято" },
-          { key: "hours", value: Math.round(t.hours_total), label: "часов" },
+        sub={`сдали ${formatNum(t.submitted)} · не сдали ${formatNum(t.missed)} · ${rangeText(period.from, period.to)}`}
+        notes={[
+          { key: "handed", label: "Сдано задач", value: <Num value={t.handed_over} /> },
+          { key: "closed", label: "Принято", value: <Num value={t.closed} /> },
+          { key: "hours", label: "Часов", value: <Num value={Math.round(t.hours_total)} /> },
         ]}
         aside={<DayColumns days={period.days} now={now} onDay={onDay} />}
       />
       {filters}
-      <div ref={box}>
+      <div ref={box} className="reports-table">
         <DataGrid
           aria-label="Сотрудники за период"
           columns={columns.filter((column) => width === 0 || width >= (ROOM[column.key] ?? 0))}
@@ -489,7 +548,11 @@ export function PeriodView({
       </div>
       {openId ? (
         <InPanel panelKey={`report-period:${openId}`} onClose={onClose}>
-          {open ? <PeriodPanel row={open} period={period} onDay={onDay} now={now} /> : <p className="pr-8 text-[14px] leading-5 text-muted">Этого человека нет в отчётах за этот период.</p>}
+          {open ? (
+            <PeriodPanel row={open} period={period} marks={marks.data} onDay={onDay} now={now} />
+          ) : (
+            <p className="pr-8 text-[14px] leading-5 text-muted">Этого человека нет в отчётах за этот период.</p>
+          )}
         </InPanel>
       ) : null}
     </div>

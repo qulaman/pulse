@@ -1,6 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { Cast, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -55,12 +56,12 @@ import {
   type CalendarView,
   type ClockStyle,
   type RatingView,
-  type TvScene,
 } from "@/lib/tv/state";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 
+import { SceneCards, type SceneKey } from "./SceneCards";
 import { BoardsPick, ConnectDialog, PeoplePick, Section, SettingRow, Switch, TaskPick, Visits } from "./ScreenParts";
 import { WallFrame } from "./WallFrame";
 
@@ -74,8 +75,6 @@ function useTick(): Date {
   return now;
 }
 
-/** «По кругу» stands in the row of scenes as the sixth way the wall can look. */
-type SceneKey = TvScene | "round";
 /** Nothing of a row is lit: the thing is not on the wall right now. */
 const NONE = "none";
 
@@ -213,19 +212,19 @@ export function DeskScreen() {
         actions={
           <>
             <Tooltip label="Стена загрузится заново — если зависла или не обновилась" side="bottom">
-              <Button size="sm" variant="ghost" onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload">
+              <Button size="sm" variant="ghost" icon={<RotateCw aria-hidden size={14} strokeWidth={2.1} />} onClick={() => show({ reload: true }, "Экран перезапускается")} data-testid="desk-screen-reload">
                 Перезапустить
               </Button>
             </Tooltip>
-            <Button size="sm" variant="secondary" onClick={() => setConnecting(true)} data-testid="desk-screen-connect">
+            <Button size="sm" variant="secondary" icon={<Cast aria-hidden size={15} strokeWidth={2} />} onClick={() => setConnecting(true)} data-testid="desk-screen-connect">
               Подключить экран
             </Button>
           </>
         }
       />
 
-      <div className="grid grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] items-start gap-8">
-        <div className="flex min-w-0 flex-col gap-5">
+      <div className="screen-layout grid grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] items-start gap-8">
+        <div className="screen-main flex min-w-0 flex-col gap-5">
           <WallFrame receipt={loading ? null : receipt} label={screens.length === 1 ? screens[0].full_name : screens.length > 1 ? `${screens.length} экрана` : null} />
 
           <Visits
@@ -236,9 +235,12 @@ export function DeskScreen() {
             onAnswer={(visit, value) => answer.mutate({ id: visit.id, answer: value })}
           />
 
-          <section className="flex flex-col" data-testid="desk-screen-now">
-            <SectionLabel className="mb-0.5">Сейчас на стене</SectionLabel>
-            <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-t border-text pb-2.5 pt-2">
+          <section className="screen-now flex flex-col" data-testid="desk-screen-now" data-tone={loading ? "muted" : receipt.tone} data-mode={mode}>
+            <SectionLabel className="screen-now-label mb-0.5">
+              <span aria-hidden className="screen-now-dot" />
+              Сейчас на стене
+            </SectionLabel>
+            <div className="screen-now-body flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-t border-text pb-2.5 pt-2">
               <div className="min-w-0 flex-1">
                 {loading ? (
                   <Bone h={28} w="55%" />
@@ -281,20 +283,21 @@ export function DeskScreen() {
                 ) : null}
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-1" data-testid="desk-screen-scenes">
-              <SegmentTabs<SceneKey>
-                aria-label="Заставка на стене"
+            <div className="screen-now-scenes border-t border-border/60 pt-3" data-testid="desk-screen-scenes">
+              <SceneCards
                 value={sceneValue}
-                onChange={pickScene}
-                items={sceneOrder.map((value, index) => ({ value, label: <KeyLabel label={value === "round" ? "По кругу" : SCENE_LABEL[value]} hint={String(index + 1)} /> }))}
+                // what the office sees this minute: the screensaver, unless a person, an order or a board is up instead
+                live={connected && mode === "ether" ? scene : null}
+                onPick={pickScene}
+                items={sceneOrder.map((value, index) => ({ value, label: value === "round" ? "По кругу" : SCENE_LABEL[value], hint: String(index + 1) }))}
               />
             </div>
           </section>
 
           {wall.boardId ? (
-            <section className="flex flex-col" data-testid="desk-screen-cartridge">
+            <section className="screen-cartridge flex flex-col" data-testid="desk-screen-cartridge">
               <SectionLabel className="mb-0.5">Доска на стене</SectionLabel>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-text py-2">
+              <div className="screen-cartridge-body flex flex-wrap items-center justify-between gap-3 border-t border-text py-2">
                 <div className="min-w-0">
                   <p className="truncate text-[17px] font-semibold leading-6">{wall.board ? wall.board.title : wall.loading ? "" : "Доска другого директора"}</p>
                   <p className="nums text-[13px] leading-[18px] text-muted">
@@ -303,7 +306,7 @@ export function DeskScreen() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {mine ? (
-                    <Link href={`/desk/notes/b/${wall.boardId}`} className="inline-flex min-h-[36px] items-center px-3 text-[13px] font-medium text-text hover:underline">
+                    <Link href={`/desk/notes/b/${wall.boardId}`} className="screen-link inline-flex min-h-[36px] items-center px-3 text-[13px] font-medium text-text hover:underline">
                       Открыть
                     </Link>
                   ) : null}
@@ -342,7 +345,7 @@ export function DeskScreen() {
           ) : null}
         </div>
 
-        <div className="flex min-w-0 flex-col gap-6" data-testid="desk-screen-panel">
+        <div className="screen-panel flex min-w-0 flex-col gap-6" data-testid="desk-screen-panel">
           <Section title="Вид на стене" testId="desk-screen-look">
             <SettingRow label="Часы">
               <SegmentTabs<ClockStyle>
@@ -452,12 +455,3 @@ export function DeskScreen() {
   );
 }
 
-/** A segment's word with its key, quiet until hovered — the mouse teaches the keyboard. */
-function KeyLabel({ label, hint }: { label: string; hint: string }) {
-  return (
-    <span className="group/key inline-flex items-center gap-1.5">
-      {label}
-      <span className="nums text-[10px] font-semibold text-muted/60 transition-colors duration-[120ms] group-hover/key:text-muted">{hint}</span>
-    </span>
-  );
-}

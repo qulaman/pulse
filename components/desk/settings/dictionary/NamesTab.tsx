@@ -1,9 +1,11 @@
 "use client";
 
+import { CircleCheck, CircleHelp, CircleSlash, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { NamesTable, type NamesFilter } from "@/components/desk/settings/dictionary/NamesTable";
 import { Strip, type GuideStep } from "@/components/desk/settings/dictionary/parts";
+import { Select } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
@@ -59,20 +61,26 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
 
   return (
     <Strip title="Проверить имя" about="как говорите вслух, в любом падеже — что поймёт ИИ">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-      <input
-        type="search"
-        value={spoken}
-        onChange={(event) => {
-          setSpoken(event.target.value);
-          setTo("");
-        }}
-        placeholder="Имя, как в речи"
-        aria-label="Имя, как в речи"
-        className="field h-9 w-[240px] text-[14px] leading-5 outline-none"
-      />
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <label className="dict-check-field relative flex items-center">
+        <Search size={15} strokeWidth={2} aria-hidden className="dict-check-icon pointer-events-none absolute left-3 hidden text-muted" />
+        <input
+          type="search"
+          value={spoken}
+          onChange={(event) => {
+            setSpoken(event.target.value);
+            setTo("");
+          }}
+          placeholder="Имя, как в речи"
+          aria-label="Имя, как в речи"
+          className="field h-9 w-[240px] text-[14px] leading-5 outline-none"
+        />
+      </label>
       {result ? (
-        <div role="status" className="flex min-w-0 flex-1 gap-2">
+        <div role="status" className="dict-verdict flex min-w-0 flex-1 items-center gap-2" data-kind={result.kind}>
+          <span aria-hidden className="dict-verdict-icon hidden">
+            {result.kind === "sure" ? <CircleCheck size={16} strokeWidth={2.25} /> : result.kind === "none" ? <CircleSlash size={16} strokeWidth={2.25} /> : <CircleHelp size={16} strokeWidth={2.25} />}
+          </span>
           <p className="min-w-0 flex-1 text-[13px] leading-[18px]">
             {result.kind === "sure" ? (
               <>
@@ -99,7 +107,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
       ) : null}
       {result && result.kind !== "sure" && result.teach ? (
         <div className="flex items-center gap-2">
-          <select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="field h-8 w-[220px] cursor-pointer text-[13px] leading-5">
+          <Select aria-label={`Кого вы зовёте «${form}»`} value={target} onChange={(event) => setTo(event.target.value)} className="dict-teach w-[220px] text-[13px]">
             <option value="" disabled>
               Кого так зовёте?
             </option>
@@ -108,7 +116,7 @@ function NameCheckBlock({ people, matching, lockedIds, onAdded }: { people: Rost
                 {p.full_name}
               </option>
             ))}
-          </select>
+          </Select>
           <Button size="sm" variant="secondary" disabled={!target} onClick={give}>
             Запомнить
           </Button>
@@ -128,9 +136,9 @@ function MisheardBlock({ items, lockedIds, onAdded }: { items: Misheard[]; locke
   if (!visible.length) return null;
   return (
     <Strip title="Из ваших записей" count={visible.length} about="ИИ не узнал эти имена, и вы выбрали человека сами — запомнить?" testId="dictionary-misheard">
-      <ul className="desk-list grid grid-cols-2 gap-x-8">
+      <ul className="dict-misheard desk-list grid grid-cols-2 gap-x-8">
         {visible.map((item) => (
-          <li key={item.key} className="flex items-center gap-2 py-1">
+          <li key={item.key} className="dict-misheard-item flex items-center gap-2 py-1">
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-medium leading-5">«{item.form}»</p>
               <p className="truncate text-[12px] leading-4 text-muted">
@@ -154,9 +162,9 @@ function MisheardBlock({ items, lockedIds, onAdded }: { items: Misheard[]; locke
               aria-label={`Не запоминать «${item.form}»`}
               title="Не запоминать"
               onClick={() => dismiss.mutate([item.key])}
-              className="flex h-6 w-6 shrink-0 items-center justify-center text-[15px] leading-none text-muted hover:bg-surface-2 hover:text-text"
+              className="dict-x flex h-6 w-6 shrink-0 items-center justify-center text-muted hover:bg-surface-2 hover:text-text"
             >
-              ×
+              <X size={14} strokeWidth={2.25} aria-hidden />
             </button>
           </li>
         ))}
@@ -184,7 +192,7 @@ export function NamesTab({ people, me, matching, query, filter }: { people: Pers
       <MisheardBlock items={misheard.data ?? []} lockedIds={locked} onAdded={markFresh} />
       <div className="flex min-w-0 flex-col gap-2">
         <NamesTable people={people} canEdit={canEdit} query={query} filter={filter} fresh={fresh} waiting={waiting.aliases} onAdded={markFresh} />
-        <p className="text-[12px] leading-4 text-muted">
+        <p className="dict-foot text-[12px] leading-4 text-muted">
           {people.length} {pluralRu(people.length, ["человек", "человека", "человек"])} · уволенных и экранов здесь нет
           {people.length > HINT_MAX_PEOPLE ? `. Распознаванию подсказываются ${HINT_MAX_PEOPLE}, кому вы чаще ставите задачи; остальных узнаёт разбор поручений` : ""}
         </p>

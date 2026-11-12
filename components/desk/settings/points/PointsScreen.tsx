@@ -1,5 +1,6 @@
 "use client";
 
+import { Plus, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -84,7 +85,7 @@ export function PointsScreen() {
     () =>
       (people.data ?? [])
         .filter((person) => person.is_active && person.role !== "director" && person.role !== "tv")
-        .map((person) => ({ id: person.id, name: person.full_name, sub: person.position }))
+        .map((person) => ({ id: person.id, name: person.full_name, sub: person.position, avatar: person.avatar_url }))
         .sort((a, b) => a.name.localeCompare(b.name, "ru")),
     [people.data],
   );
@@ -135,17 +136,23 @@ export function PointsScreen() {
     ) : null;
 
   return (
-    <div className="flex w-full min-w-0 flex-col gap-3">
+    <div className="pts-screen flex w-full min-w-0 flex-col gap-4">
       <PageTitle
         title="Очки и магазин"
         state={enabled.isPending || on ? null : { text: "Очки выключены — начислять нельзя, магазин работает" }}
         actions={
           <>
-            <Link href="/desk/settings?tab=team&focus=points-enabled" className="px-2 text-[13px] font-medium text-muted hover:text-text" data-testid="points-rules-link" title="Режим рейтинга и правила — во вкладке «Сотрудники»">
+            <Link
+              href="/desk/settings?tab=team&focus=points-enabled"
+              className="pts-rules-link inline-flex h-9 items-center gap-1.5 px-2.5 text-[13px] font-medium text-muted hover:text-text"
+              data-testid="points-rules-link"
+              title="Режим рейтинга и правила — во вкладке «Сотрудники»"
+            >
+              <SlidersHorizontal size={15} strokeWidth={2} aria-hidden />
               Правила очков
             </Link>
             {/* the button always starts at «Кому»: a name typed after it must never land in the sum */}
-            <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице">
+            <Button size="sm" disabled={!on} onClick={() => setAward({})} data-testid="points-award" title="Начислить · N — выбранному в таблице" icon={<Plus size={15} strokeWidth={2.5} />}>
               Начислить
             </Button>
           </>
@@ -168,25 +175,28 @@ export function PointsScreen() {
         />
       </Toolbar>
 
-      {view === "people" ? (
-        <BalancesTable
-          period={period}
-          canAward={on}
-          selected={chosen}
-          onSelect={setChosen}
-          onAward={(userId) => setAward({ userId })}
-          onHistory={(userId) => {
-            setWho(userId);
-            setView("history");
-          }}
-        />
-      ) : view === "disputes" ? (
-        <DisputesList />
-      ) : view === "history" ? (
-        <LedgerTable who={who} search={query} />
-      ) : (
-        <ShopDesk />
-      )}
+      {/* each section rises into place when it is opened (settings.css) */}
+      <div key={view} className="pts-view">
+        {view === "people" ? (
+          <BalancesTable
+            period={period}
+            canAward={on}
+            selected={chosen}
+            onSelect={setChosen}
+            onAward={(userId) => setAward({ userId })}
+            onHistory={(userId) => {
+              setWho(userId);
+              setView("history");
+            }}
+          />
+        ) : view === "disputes" ? (
+          <DisputesList />
+        ) : view === "history" ? (
+          <LedgerTable who={who} search={query} />
+        ) : (
+          <ShopDesk />
+        )}
+      </div>
 
       <AwardDialog target={award} people={team} onClose={() => setAward(null)} />
     </div>

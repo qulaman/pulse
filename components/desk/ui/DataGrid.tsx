@@ -204,7 +204,7 @@ export function DataGrid<T>({
                   <span className="nums text-[12px] leading-4 text-muted/70">{group.rows.length}</span>
                 </div>
               ) : null}
-              {(group.collapsed ? [] : group.rows).map((row) => {
+              {(group.collapsed ? [] : group.rows).map((row, index) => {
                 const key = rowKey(row);
                 const selected = key === selectedKey;
                 const tone = rowTone?.(row);
@@ -217,7 +217,8 @@ export function DataGrid<T>({
                     data-testid="desk-row"
                     data-glow={glow === key ? "" : undefined}
                     className="desk-row relative grid min-h-[40px] cursor-default items-center border-b border-border/50 last:border-b-0"
-                    style={{ gridTemplateColumns: template }}
+                    // `--i`: the row's place, for a list that rises into place in order (D-174)
+                    style={{ gridTemplateColumns: template, "--i": Math.min(index, 14) } as CSSProperties}
                     onClick={(event) => {
                       onSelect?.(row);
                       // the row's own buttons and links keep their click

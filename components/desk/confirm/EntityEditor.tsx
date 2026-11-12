@@ -1,11 +1,13 @@
 "use client";
 
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { X } from "lucide-react";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-import { hasAssignee, KIND_LABEL, chosenId, mainField } from "@/components/desk/confirm/kinds";
+import { hasAssignee, KIND_ICON, KIND_LABEL, chosenId, mainField } from "@/components/desk/confirm/kinds";
 import { PeopleField, PersonField, type PickPerson } from "@/components/desk/confirm/PersonField";
 import { EventRepeatField, RecurrenceFields } from "@/components/desk/confirm/RepeatFields";
 import { WhenField } from "@/components/desk/confirm/WhenField";
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
@@ -15,8 +17,8 @@ import { describeParticipants, type EntityPatch } from "@/lib/store/ingest";
 /** One line of the editor: the field's name on the left, its control on the right. */
 function Field({ label, children, align = "center" }: { label: string; children: ReactNode; align?: "center" | "start" }) {
   return (
-    <div className={`grid grid-cols-[60px_minmax(0,1fr)] gap-x-3 ${align === "center" ? "items-center" : "items-start"}`}>
-      <span className={`text-[13px] leading-5 text-muted ${align === "start" ? "pt-[7px]" : ""}`}>{label}</span>
+    <div className={`tasks-entity-field grid grid-cols-[60px_minmax(0,1fr)] gap-x-3 ${align === "center" ? "items-center" : "items-start"}`}>
+      <span className={`tasks-entity-label text-[13px] leading-5 text-muted ${align === "start" ? "pt-[7px]" : ""}`}>{label}</span>
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -72,7 +74,8 @@ function UrgentSwitch({ on, onChange }: { on: boolean; onChange: (on: boolean) =
         aria-label="Срочно"
         onClick={() => onChange(!on)}
         data-testid="desk-entity-urgent"
-        className={`desk-focus flex h-6 items-center gap-1.5 rounded-[2px] px-1.5 text-[13px] leading-none transition-colors duration-[120ms] hover:bg-surface-2 ${on ? "font-semibold text-warn" : "text-muted hover:text-text"}`}
+        data-on={on ? "" : undefined}
+        className={`tasks-urgent desk-focus flex h-6 items-center gap-1.5 rounded-[2px] px-1.5 text-[13px] leading-none transition-colors duration-[120ms] hover:bg-surface-2 ${on ? "font-semibold text-warn" : "text-muted hover:text-text"}`}
       >
         <span aria-hidden className={`flex h-3.5 w-3.5 items-center justify-center rounded-[2px] border ${on ? "border-warn bg-warn" : "border-current"}`}>
           {on ? (
@@ -128,6 +131,7 @@ export function EntityEditor({
   const [removing, setRemoving] = useState(false);
   const hintId = useId();
 
+  const Mark = KIND_ICON[entity.kind];
   const status = removing
     ? { text: "эта строка не уйдёт", tone: "var(--danger)" }
     : needsPerson
@@ -147,13 +151,23 @@ export function EntityEditor({
       aria-label={`${KIND_LABEL[entity.kind]} ${n}`}
       data-testid="desk-entity"
       data-kind={entity.kind}
-      className="flex flex-col gap-1 pb-3 pt-2"
-      style={{ opacity: muted ? 0.6 : 1 }}
+      data-removing={removing ? "" : undefined}
+      data-asks={status && !removing && status.tone !== "var(--text-muted)" ? "" : undefined}
+      className="tasks-entity flex flex-col gap-1 pb-3 pt-2"
+      style={{ opacity: muted ? 0.6 : 1, "--i": index, "--tone": status?.tone } as CSSProperties}
     >
       <header className="flex h-7 items-center gap-2">
-        <span className="desk-label uppercase">{KIND_LABEL[entity.kind]}</span>
+        <span className="tasks-kind desk-label flex items-center gap-1.5 uppercase">
+          <Mark aria-hidden size={14} strokeWidth={2.2} className="tasks-ico" />
+          {KIND_LABEL[entity.kind]}
+        </span>
         {status ? (
-          <span id={removing ? hintId : undefined} className="min-w-0 truncate text-[13px] font-medium leading-4" style={{ color: status.tone }} data-testid={removing ? "desk-entity-remove-hint" : undefined}>
+          <span
+            id={removing ? hintId : undefined}
+            className="tasks-entity-status min-w-0 truncate text-[13px] font-medium leading-4"
+            style={{ color: status.tone }}
+            data-testid={removing ? "desk-entity-remove-hint" : undefined}
+          >
             {status.text}
           </span>
         ) : null}
@@ -171,13 +185,14 @@ export function EntityEditor({
           onFocus={() => setRemoving(true)}
           onBlur={() => setRemoving(false)}
           data-testid="desk-entity-remove"
-          className="desk-focus -mr-1.5 flex h-6 items-center rounded-[2px] px-1.5 text-[13px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-danger"
+          className="tasks-remove desk-focus -mr-1.5 flex h-6 items-center gap-1 rounded-[2px] px-1.5 text-[13px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-danger"
         >
+          <X aria-hidden size={13} strokeWidth={2.4} className="tasks-ico" />
           Убрать
         </button>
       </header>
 
-      <div className="flex flex-col gap-1 transition-opacity duration-[120ms]" style={{ opacity: removing ? 0.35 : 1 }}>
+      <div className="tasks-entity-body flex flex-col gap-1 transition-opacity duration-[120ms]" style={{ opacity: removing ? 0.35 : 1 }}>
         {hasAssignee(entity) ? (
           <Field label="Кому" align={ambiguous && candidates.length > 0 ? "start" : "center"}>
             <PersonField
@@ -192,7 +207,7 @@ export function EntityEditor({
               testId="desk-entity-who"
             />
             {ambiguous && candidates.length > 0 ? (
-              <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <div className="tasks-candidates mt-1.5 flex flex-wrap items-center gap-1">
                 {candidates.slice(0, 4).map((candidate, at) => (
                   <button
                     key={candidate.user_id}
@@ -201,6 +216,9 @@ export function EntityEditor({
                     className="desk-focus flex h-7 items-center gap-1.5 rounded-[2px] border border-border px-2 text-[13px] font-medium leading-4 transition-colors duration-[120ms] hover:bg-surface-2"
                   >
                     {ctx.digitsFor === index ? <Kbd>{at + 1}</Kbd> : null}
+                    <span aria-hidden className="tasks-ico tasks-candidate-face">
+                      <TileFace person={{ id: candidate.user_id, full_name: candidate.full_name, avatar_url: null }} size={20} />
+                    </span>
                     {shortName(candidate.full_name)}
                   </button>
                 ))}
@@ -317,9 +335,9 @@ export function EntityEditor({
           </Field>
         ) : null}
 
-        {entity.kind === "announcement" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Уйдёт всем в Эфир</p> : null}
-        {entity.kind === "note" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Заметка — видите только вы</p> : null}
-        {entity.kind === "reminder" ? <p className="pl-[72px] pt-1 text-[12px] leading-4 text-muted">Напоминание придёт вам</p> : null}
+        {entity.kind === "announcement" ? <p className="tasks-entity-note pl-[72px] pt-1 text-[12px] leading-4 text-muted">Уйдёт всем в Эфир</p> : null}
+        {entity.kind === "note" ? <p className="tasks-entity-note pl-[72px] pt-1 text-[12px] leading-4 text-muted">Заметка — видите только вы</p> : null}
+        {entity.kind === "reminder" ? <p className="tasks-entity-note pl-[72px] pt-1 text-[12px] leading-4 text-muted">Напоминание придёт вам</p> : null}
       </div>
     </article>
   );

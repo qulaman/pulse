@@ -1,7 +1,10 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent } from "react";
+import { ArrowUp, Ban, Check, CheckCheck, CircleDot, Clock, Inbox, Paperclip, RotateCcw, Send, Undo2, type LucideIcon } from "lucide-react";
+import { useEffect, useRef, useState, type ClipboardEvent, type CSSProperties, type DragEvent } from "react";
+
+import { TileFace } from "@/components/desk/team/TeamGrid";
 
 import { messageFlags } from "@/components/tasks/TaskThread";
 import { PhotoMessage } from "@/components/tasks/PhotoMessage";
@@ -23,6 +26,7 @@ import { dayLabel, messageState, startsNewDay, withoutPassedRevoke } from "@/lib
 import { fitHeight } from "@/lib/ui/fitHeight";
 import { useUpdateHold } from "@/lib/update/client";
 
+import { useAvatars } from "./Face";
 import { LoadNote } from "./LoadState";
 
 /** Eight lines of the field, then the words scroll. */
@@ -42,6 +46,19 @@ function tagOf(message: TaskMessage): { text: string; tone: "warn" | "danger" | 
 
 const TAG_COLOR = { warn: "var(--warn)", danger: "var(--danger)", muted: "var(--text-muted)" } as const;
 
+/** The mark of a line of the order's history on the thread's rail («Графит»). */
+const EVENT_ICON: Partial<Record<TaskStatus, LucideIcon>> = {
+  sent: Send,
+  scheduled: Clock,
+  accepted: Check,
+  in_progress: Check,
+  pending_review: Inbox,
+  done: CheckCheck,
+  rework: RotateCcw,
+  declined: Ban,
+  revoked: Undo2,
+};
+
 /** «0:07» of a voice kept on the computer for want of network. */
 function durationOf(message: TaskMessage): number | null {
   const value = (message.meta as { duration_ms?: unknown } | null)?.duration_ms;
@@ -56,8 +73,12 @@ function keptHere(message: TaskMessage): boolean {
 function HistoryLine({ message }: { message: TaskMessage }) {
   const status = messageFlags(message).newStatus as TaskStatus | null;
   const label = message.type === "system" ? (message.content ?? "Изменение") : status ? (DESK_STATUS_LABEL[status] ?? status) : "Статус изменён";
+  const Mark = (status && EVENT_ICON[status]) || CircleDot;
   return (
-    <p className="flex items-baseline gap-2 py-1 text-[12px] leading-4 text-muted" data-testid="system-row">
+    <p className="tasks-event flex items-baseline gap-2 py-1 text-[12px] leading-4 text-muted" data-testid="system-row" data-status={status ?? undefined}>
+      <span aria-hidden className="tasks-ico tasks-event-mark">
+        <Mark size={10} strokeWidth={2.6} />
+      </span>
       <span className="min-w-0 truncate">{label}</span>
       <span className="nums shrink-0">{humanAqtobe(new Date(message.created_at)).replace(/^сегодня /, "")}</span>
     </p>
@@ -90,6 +111,7 @@ export function DeskThread({
   actions: TaskActions;
 }) {
   const queryClient = useQueryClient();
+  const avatars = useAvatars();
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const receipt = useThreadReceipt(taskId, true, me.userId);
@@ -117,10 +139,12 @@ export function DeskThread({
   if (rows.length === 0) return <p className="py-2 text-[13px] leading-5 text-muted">Переписки пока нет — вопрос, отчёт или фото появятся здесь</p>;
 
   return (
-    <div className="flex flex-col" data-testid="thread">
+    // «Графит» draws the thread as a timeline: a rail down the left, a face where a person's run
+    // opens, the order's history as marks on the rail (D-174); the journal keeps one column of words
+    <div className="tasks-thread flex flex-col" data-testid="thread">
       <LoadNote state={load} failed="Новые сообщения не загрузились" onRetry={onRetry} className="pb-1" />
       {rows.length >= THREAD_PAGE && hasMore ? (
-        <button type="button" onClick={() => void showEarlier()} disabled={loadingMore} className="mb-2 self-start py-1 text-[12px] leading-4 text-muted hover:text-text">
+        <button type="button" onClick={() => void showEarlier()} disabled={loadingMore} className="tasks-earlier mb-2 self-start py-1 text-[12px] leading-4 text-muted hover:text-text">
           {loadingMore ? "Загружаю…" : "Показать раньше"}
         </button>
       ) : null}
@@ -132,17 +156,29 @@ export function DeskThread({
         const mine = message.sender_id === me.userId;
         const state = messageState(message);
         const tag = system ? null : tagOf(message);
+        const name = mine ? me.fullName : (message.sender?.full_name ?? "");
         return (
-          <div key={message.id}>
+          <div key={message.id} className="tasks-line">
             {day ? (
-              <p className={`text-[12px] leading-4 text-muted ${index > 0 ? "mt-3 border-t border-border pt-1" : "pt-1"}`} data-testid="day-separator">
-                {dayLabel(message.created_at)}
+              <p className={`tasks-day text-[12px] leading-4 text-muted ${index > 0 ? "mt-3 border-t border-border pt-1" : "pt-1"}`} data-testid="day-separator">
+                <span>{dayLabel(message.created_at)}</span>
               </p>
             ) : null}
             {system ? (
               <HistoryLine message={message} />
             ) : (
-              <div className={`group/message ${head ? "mt-1.5" : ""} ${state === "pending" ? "opacity-60" : ""}`} data-testid="message-row" data-state={state}>
+              <div
+                className={`tasks-msg group/message ${head ? "mt-1.5" : ""} ${state === "pending" ? "opacity-60" : ""}`}
+                data-testid="message-row"
+                data-state={state}
+                data-head={head ? "" : undefined}
+                data-mine={mine ? "" : undefined}
+              >
+                {head ? (
+                  <span aria-hidden className="tasks-ico tasks-msg-face">
+                    <TileFace person={{ id: message.sender_id, full_name: name || "—", avatar_url: avatars.get(message.sender_id) ?? null }} size={24} />
+                  </span>
+                ) : null}
                 <div className="min-w-0">
                   {head ? (
                     <p className="flex items-baseline gap-2 text-[13px] leading-5">
@@ -152,7 +188,7 @@ export function DeskThread({
                     </p>
                   ) : null}
                   {tag ? (
-                    <p className="text-[12px] font-medium leading-4" style={{ color: TAG_COLOR[tag.tone] }}>
+                    <p className="tasks-tag text-[12px] font-medium leading-4" data-tone={tag.tone} style={{ color: TAG_COLOR[tag.tone], "--tone": TAG_COLOR[tag.tone] } as CSSProperties}>
                       {tag.text}
                     </p>
                   ) : null}
@@ -163,12 +199,12 @@ export function DeskThread({
                     </p>
                   ) : null}
                   {message.type === "photo" && message.file_path && state === "sent" ? (
-                    <div className="max-w-[340px]">
+                    <div className="tasks-photo max-w-[340px]">
                       <PhotoMessage messageId={message.id} />
                     </div>
                   ) : null}
                   {message.type === "voice" && message.file_path && state === "sent" ? (
-                    <div className="mt-1 max-w-[300px]">
+                    <div className="tasks-voice mt-1 max-w-[300px]">
                       <VoiceMessage messageId={message.id} durationMs={durationOf(message)} />
                     </div>
                   ) : null}
@@ -178,7 +214,8 @@ export function DeskThread({
                     </button>
                   ) : null}
                   {line && lastMine?.id === message.id && state === "sent" ? (
-                    <p className="mt-0.5 text-[12px] leading-4 text-muted" data-testid="thread-receipt">
+                    <p className="tasks-receipt mt-0.5 flex flex-wrap items-center gap-x-1 text-[12px] leading-4 text-muted" data-testid="thread-receipt">
+                      <CheckCheck aria-hidden size={13} strokeWidth={2.2} className="tasks-ico shrink-0" />
                       {line.text}
                       {/* at night the words wait for the morning — unless the director says «now» (D-129) */}
                       {line.held ? (
@@ -329,7 +366,8 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
       }}
       onDragLeave={() => setOver(false)}
       onDrop={onDrop}
-      className={`rounded-[2px] border transition-colors duration-[120ms] focus-within:border-accent ${over ? "border-dashed border-accent" : "border-border"}`}
+      data-over={over ? "" : undefined}
+      className={`tasks-composer rounded-[2px] border transition-colors duration-[120ms] focus-within:border-accent ${over ? "border-dashed border-accent" : "border-border"}`}
     >
       <input ref={file} type="file" accept="image/*" className="hidden" aria-label="Приложить фото" onChange={(event) => void sendPhoto(event.target.files?.[0])} />
       <textarea
@@ -360,9 +398,7 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
           {uploading ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-r-transparent" />
           ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.9-8.9a3.7 3.7 0 0 1 5.2 5.2l-8.9 8.9a1.8 1.8 0 0 1-2.6-2.6l8.2-8.2" />
-            </svg>
+            <Paperclip size={16} strokeWidth={1.9} aria-hidden />
           )}
         </button>
         <span className="min-w-0 flex-1 truncate text-[12px] leading-4 text-muted">{uploading ? "Отправляю фото…" : draft.trim() ? "Enter — отправить" : ""}</span>
@@ -370,10 +406,11 @@ function Composer({ taskId, me, actions, placeholder = "Ответить…", on
           type="button"
           onClick={sendText}
           disabled={!draft.trim()}
-          className="desk-move inline-flex h-7 items-center rounded-[2px] border px-2 text-[13px] leading-4 transition-opacity duration-[120ms] disabled:opacity-30"
+          className="tasks-send desk-move inline-flex h-7 items-center gap-1.5 rounded-[2px] border px-2 text-[13px] leading-4 transition-opacity duration-[120ms] disabled:opacity-30"
           data-testid="desk-composer-send"
         >
           Отправить
+          <ArrowUp aria-hidden size={14} strokeWidth={2.4} className="tasks-ico" />
         </button>
       </div>
     </div>

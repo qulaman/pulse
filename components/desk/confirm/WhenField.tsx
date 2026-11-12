@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarClock } from "lucide-react";
 import { useId, useMemo, useRef, useState } from "react";
 
 import { Chevron } from "@/components/desk/confirm/PersonField";
@@ -58,7 +59,10 @@ export function WhenField({
   const shown = value ? formatWhen(value, now) : "";
 
   return (
-    <div ref={setBox} className="desk-input relative flex h-9 items-center gap-2" data-tone={open ? undefined : tone} aria-expanded={open}>
+    <div ref={setBox} className="tasks-when desk-input relative flex h-9 items-center gap-2" data-tone={open ? undefined : tone} aria-expanded={open}>
+      <span aria-hidden className="tasks-ico tasks-when-icon shrink-0">
+        <CalendarClock size={15} strokeWidth={2} />
+      </span>
       <input
         value={text ?? shown}
         placeholder={emptyText}
@@ -105,7 +109,11 @@ export function WhenField({
         data-testid={testId}
         className={`min-w-0 flex-1 bg-transparent text-[14px] leading-5 outline-none ${value && text === null ? "nums" : ""} ${tone === "danger" ? "placeholder:text-danger" : "placeholder:text-muted"}`}
       />
-      {heard && text === null ? <span className="max-w-[45%] shrink truncate text-[12px] leading-4 text-muted" title={`Услышал: «${heard}»`}>„{heard}“</span> : null}
+      {heard && text === null ? (
+        <span className="tasks-heard-chip max-w-[45%] shrink truncate text-[12px] leading-4 text-muted" title={`Услышал: «${heard}»`}>
+          „{heard}“
+        </span>
+      ) : null}
       <span aria-hidden className="pointer-events-none shrink-0 text-muted">
         <Chevron />
       </span>

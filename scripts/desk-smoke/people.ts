@@ -511,17 +511,45 @@ export async function checkErrands(ctx: Ctx) {
 
     // a closed request opens in the panel and goes with Esc — a click on the row, not on «Спасибо»
     const row = page.locator(`${history} [role="gridcell"]`).first();
-    if ((await row.count()) === 0) return skip("заявки: панель", "закрытых заявок нет");
-    await row.click();
-    const panel = await visible(ctx, "desk-errand-details", 8_000);
-    record("заявки: строка открывает заявку в панели (?e=)", panel && page.url().includes("e="), page.url());
-    await ctx.shot("errands-panel");
-    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("Escape");
-    const closed = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
-    // the panel goes at once, the address a moment later (the router's replace)
-    const cleared = await page.waitForURL((url) => !url.searchParams.has("e"), { timeout: 5_000 }).then(() => true, () => false);
-    record("заявки: Esc закрывает панель и снимает ?e=", closed && cleared, page.url());
+    if ((await row.count()) === 0) {
+      skip("заявки: панель", "закрытых заявок нет");
+    } else {
+      await row.click();
+      const panel = await visible(ctx, "desk-errand-details", 8_000);
+      record("заявки: строка открывает заявку в панели (?e=)", panel && page.url().includes("e="), page.url());
+      await ctx.shot("errands-panel");
+      await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+      await page.keyboard.press("Escape");
+      const closed = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+      // the panel goes at once, the address a moment later (the router's replace)
+      const cleared = await page.waitForURL((url) => !url.searchParams.has("e"), { timeout: 5_000 }).then(() => true, () => false);
+      record("заявки: Esc закрывает панель и снимает ?e=", closed && cleared, page.url());
+    }
+
+    // «Объявления» (D-174): the feed of cards or its empty state; a card opens in the panel from the
+    // keys (↓, Enter) and goes with Esc — nothing is acknowledged, sent or deleted
+    await open(page, "/desk/ether");
+    const cards = page.locator('[data-testid="ether-table"] [data-row-key]');
+    const empty = page.locator('[data-testid="desk-empty"]');
+    await Promise.any([cards.first().waitFor({ timeout: 10_000 }), empty.first().waitFor({ timeout: 10_000 })]).catch(() => undefined);
+    const count = await cards.count();
+    const quiet = count === 0 && (await empty.first().isVisible().catch(() => false));
+    record("объявления: лента карточек или пустое состояние словами", count > 0 || quiet, `карточек ${count}`);
+    await ctx.shot("ether");
+    if (count === 0) {
+      skip("объявления: карточка в панели с клавиатуры", "объявлений нет");
+    } else {
+      await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+      await page.keyboard.press("ArrowDown");
+      await page.keyboard.press("Enter");
+      const opened = await visible(ctx, "ether-panel", 8_000);
+      const read = await page.getByTestId("ether-read").isVisible().catch(() => false);
+      record("объявления: ↓ и Enter открывают карточку в панели (?id=), в ней кто ознакомился", opened && read && page.url().includes("id="), page.url());
+      await ctx.shot("ether-panel");
+      await page.keyboard.press("Escape");
+      const gone = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
+      record("объявления: Esc закрывает панель", gone);
+    }
   } finally {
     await release();
   }
@@ -538,7 +566,8 @@ export async function checkReports(ctx: Ctx) {
   const rows = page.locator('[data-testid="desk-reports-day"] [data-testid="desk-row"]');
   const count = await rows.count();
   const heads = await headsOf(ctx, '[data-testid="desk-reports-day"]');
-  record("отчёты «День»: люди таблицей", count > 0 && ["кто", "пришёл", "ушёл", "задачи", "чем занимался"].every((h) => heads.includes(h)), `строк ${count}; ${heads.join(" | ")}`);
+  // D-174: the day's bar between «Приход» and «Уход», words without a gender
+  record("отчёты «День»: люди таблицей, день полосой между приходом и уходом", count > 0 && ["кто", "приход", "уход", "задачи", "что сделано"].every((h) => heads.includes(h)), `строк ${count}; ${heads.join(" | ")}`);
   await ctx.shot("reports-day");
 
   // the people's filter: F and words, then «Сдали» — looked at, then all again
@@ -556,6 +585,19 @@ export async function checkReports(ctx: Ctx) {
     await page.getByTestId("seg-all").first().click();
     await page.waitForTimeout(300);
     record("отчёты «День»: поиск человека (F) и «Сдали» сужают таблицу", none && handed <= count && (await rows.count()) === count, `сдали ${handed} из ${count}`);
+    // the hero's legend is the same filter: «сдали» narrows, a second press shows everybody again (D-174)
+    const legend = page.getByTestId("reports-share-in");
+    if (await legend.count()) {
+      await legend.click();
+      await page.waitForTimeout(300);
+      const byLegend = await rows.count();
+      const pressed = (await legend.getAttribute("aria-pressed")) === "true";
+      await legend.click();
+      await page.waitForTimeout(300);
+      record("отчёты «День»: легенда итога — тот же фильтр", pressed && byLegend === handed && (await rows.count()) === count, `${byLegend} → ${await rows.count()}`);
+    } else {
+      skip("отчёты «День»: легенда итога", "сегодня никто не сдал");
+    }
   }
 
   // a row opens the whole report in the panel (?p=), Esc closes it

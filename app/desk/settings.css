@@ -1,0 +1,2231 @@
+/* ==========================================================================================
+   «Настройки» on the desk (D-174) — components/desk/settings/**: the settings' own navigation, the
+   four tabs as cards of settings with one floating save bar, «Очки и магазин» as the game's
+   office, «Словарь» as a data tool, the developers' «Лаборатория» and «Данные».
+   Two looks: under «Журнал» (html[data-surface="desk"][data-journal]) the same markup lays out as
+   the ruled form it was; «Графит» (…[data-graphite]) draws the cards, the plates and the motion.
+   Keyframes at the top level, `settings-…`; still under «уменьшить движение».
+   ========================================================================================== */
+
+/* ---- «Журнал»: the ruled form, and what both looks share --------------------------------- */
+html[data-surface="desk"][data-journal] {
+  /* the navigation: words only, the chosen one marked by the pen's line in the margin (D-158) */
+  .set-nav-icon {
+    display: none;
+  }
+  .set-nav-plate {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* a group: its label over a rule of print, the rows under it */
+  .set-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .set-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .set-card-about {
+    max-width: 620px;
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+  }
+  .set-card-action {
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .set-row {
+    padding: 8px 0;
+  }
+  .set-row[data-muted] {
+    opacity: 0.55;
+  }
+  .set-row-label {
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+  .set-row-hint {
+    max-width: 520px;
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--text-muted);
+  }
+  .set-row-mark {
+    position: absolute;
+    top: 6px;
+    bottom: 6px;
+    left: -12px;
+    width: 2px;
+    background: var(--accent);
+  }
+  .set-link {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .set-link-arrow {
+    display: none;
+  }
+
+  /* a checkbox: the journal's square, print when on */
+  .set-check-box {
+    border: 1px solid var(--text-muted);
+    color: var(--bg);
+
+    &[data-on] {
+      background: var(--text);
+      border-color: var(--text);
+    }
+  }
+  .set-check:disabled .set-check-box[data-on] {
+    background: var(--surface-2);
+    border-color: var(--text-muted);
+    color: var(--text-muted);
+  }
+
+  /* the colour: the system's own well */
+  .set-swatch {
+    display: inline-flex;
+  }
+
+  /* the quiet hours as a day: a hairline, the hours of delivery in print */
+  .set-dayline {
+    position: relative;
+    padding-bottom: 16px;
+  }
+  .set-dayline-track {
+    position: relative;
+    height: 6px;
+    background: var(--rule-soft, var(--border));
+  }
+  .set-dayline-on {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: var(--text);
+  }
+  .set-dayline-ticks {
+    position: absolute;
+    inset: 10px 0 0;
+    font-size: 11px;
+    line-height: 14px;
+    color: var(--text-muted);
+
+    > span {
+      position: absolute;
+      transform: translateX(-50%);
+
+      &:first-child {
+        transform: none;
+      }
+      &:last-child {
+        transform: translateX(-100%);
+      }
+    }
+  }
+
+  /* how the company looks: a dark window as the phone and the wall show it */
+  .set-brand-preview {
+    display: flex;
+    width: 320px;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 2px;
+    background: #0e0f12;
+    color: #f1f0ea;
+  }
+  .set-brand-bar {
+    display: flex;
+    height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    background: #08090b;
+  }
+  .set-brand-letter {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+    background: rgb(255 255 255 / 0.1);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .set-brand-button {
+    flex-shrink: 0;
+    padding: 3px 9px;
+    background: var(--brand);
+    color: #08090b;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .set-brand-login {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: 12px 14px 14px;
+  }
+
+  /* the director's buttons as they will stand on his screen */
+  .set-errand-chip {
+    display: inline-flex;
+    height: 28px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border: 1px solid var(--rule, var(--border));
+    font-size: 13px;
+    line-height: 16px;
+  }
+
+  /* the save bar's dot is «Графит»'s */
+  .set-savebar-dot {
+    display: none;
+  }
+}
+
+/* ---- «Графит»: cards, plates, motion ------------------------------------------------------ */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* the navigation: an icon, a plate under the chosen section that glides to the next one */
+  .set-nav {
+    width: 200px;
+  }
+  .set-nav-label {
+    min-height: 24px;
+    padding-left: 10px;
+  }
+  #desk-main .set-nav-label h2 {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: 0;
+    color: var(--ink-3);
+  }
+  .set-nav-list {
+    gap: 1px;
+    margin-top: 2px;
+  }
+  .set-nav-item {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--ink-2);
+    font-weight: 500;
+    transition:
+      color 140ms linear,
+      background-color 140ms linear,
+      scale 220ms var(--ease-snap);
+
+    &:hover {
+      color: var(--ink);
+      background: var(--hover);
+    }
+    &:active {
+      scale: 0.97;
+      transition-duration: 70ms;
+    }
+    &[aria-current="page"] {
+      color: var(--ink);
+      font-weight: 500;
+      background: transparent;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: 1px;
+      box-shadow: none;
+    }
+  }
+  .set-nav-icon {
+    display: inline-flex;
+    color: var(--ink-3);
+    transition: color 140ms linear;
+  }
+  .set-nav-item:hover .set-nav-icon {
+    color: var(--ink-2);
+  }
+  .set-nav-item[aria-current="page"] .set-nav-icon {
+    color: var(--pen);
+  }
+  .set-nav-plate {
+    position: absolute;
+    inset: 0;
+    border-radius: 8px;
+    background: var(--selected);
+    box-shadow:
+      inset 0 0 0 1px var(--rule-soft),
+      var(--lift);
+    pointer-events: none;
+  }
+  .set-nav-rail {
+    top: 9px;
+    bottom: 9px;
+    left: 0;
+    border-radius: 0 2px 2px 0;
+    background: var(--pen);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 70%, transparent);
+  }
+  .set-nav [data-testid="settings-search-results"] {
+    gap: 2px;
+
+    button {
+      padding: 6px 10px;
+      border-radius: 8px;
+      transition: background-color 80ms linear;
+    }
+    [aria-selected="true"] button {
+      background: var(--selected);
+    }
+  }
+
+  /* a group is a card: its title and what it is for on top, the settings under it */
+  .set-card {
+    position: relative;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .set-panel:not([hidden]) .set-card {
+    animation: settings-rise 340ms var(--ease-snap) both;
+
+    &:nth-child(2) {
+      animation-delay: 40ms;
+    }
+    &:nth-child(3) {
+      animation-delay: 80ms;
+    }
+    &:nth-child(4) {
+      animation-delay: 120ms;
+    }
+    &:nth-child(5) {
+      animation-delay: 160ms;
+    }
+    &:nth-child(n + 6) {
+      animation-delay: 200ms;
+    }
+  }
+  .set-card-head {
+    margin: 0;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .set-card-title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    color: var(--ink);
+  }
+  .set-card-about {
+    margin-top: 3px;
+    color: var(--ink-2);
+    line-height: 19px;
+  }
+  .set-card-rows {
+    border-top: 0;
+
+    > * {
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    > :last-child {
+      border-bottom: 0;
+    }
+  }
+  .set-row {
+    padding: 14px 20px;
+    transition: opacity 140ms linear;
+  }
+  .set-row[data-muted] {
+    opacity: 0.5;
+  }
+  .set-row-hint {
+    color: var(--ink-2);
+  }
+  .set-row-mark {
+    top: 12px;
+    bottom: 12px;
+    left: 0;
+    border-radius: 0 2px 2px 0;
+    background: var(--pen);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 55%, transparent);
+    transform-origin: center;
+    animation: settings-mark 260ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  }
+  .set-link {
+    padding: 4px 6px 4px 8px;
+    margin: -4px -6px -4px 0;
+    border-radius: 7px;
+    color: var(--ink-2);
+    text-decoration: none;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      color: var(--ink);
+      background: var(--hover);
+    }
+  }
+  .set-link-arrow {
+    display: inline-block;
+    transition: transform 180ms var(--ease-snap);
+  }
+  .set-link:hover .set-link-arrow {
+    transform: translateX(2px);
+  }
+  .set-note {
+    padding: 0 4px;
+    color: var(--ink-3);
+  }
+
+  /* the end of a tab where a choice cannot be taken back: a red ring, its head tinted */
+  .set-card[data-tone="danger"] {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--pencil) 42%, transparent),
+      var(--lift);
+
+    .set-card-head {
+      border-radius: 14px 14px 0 0;
+      background: color-mix(in srgb, var(--pencil) 6%, transparent);
+      border-bottom-color: color-mix(in srgb, var(--pencil) 22%, transparent);
+    }
+    .set-card-title {
+      color: var(--pencil);
+    }
+  }
+
+  /* fields in a card: a well set into the card, the accent's ring when it has the caret */
+  .set-card .field {
+    border: 0;
+    border-radius: 8px;
+    background-color: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:hover {
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    &:focus,
+    &:focus-within {
+      background-color: var(--raise);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &[aria-invalid="true"] {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--warn-ink) 80%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--warn-ink) 14%, transparent);
+    }
+    &::placeholder,
+    input::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+  .set-card .desk-select-button.field,
+  .set-card .desk-cells .field:not(.set-actions-icon) {
+    padding-left: 12px;
+  }
+  .set-card .desk-select[data-open] .desk-select-button.field {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+      0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
+  }
+
+  /* on / off: a pill whose knob slides with a spring; the accent when on */
+  .set-switch[role="switch"]:has(> span[aria-hidden]:only-child) {
+    width: 36px;
+    height: 20px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 16%, transparent) !important;
+    box-shadow: inset 0 0 0 1px var(--rule) !important;
+    transition:
+      background-color 180ms linear,
+      box-shadow 180ms linear;
+
+    > span {
+      top: 2px;
+      left: 0 !important;
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      background: #fff !important;
+      box-shadow:
+        0 1px 2px rgb(0 0 0 / 0.35),
+        0 0 0 0.5px rgb(0 0 0 / 0.08);
+      transform: translateX(2px) !important;
+      transition: transform 240ms cubic-bezier(0.3, 1.35, 0.5, 1);
+    }
+    &[aria-checked="true"] {
+      background: var(--pen) !important;
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 60%, #000 10%) !important;
+
+      > span {
+        transform: translateX(18px) !important;
+      }
+    }
+    &:active:not(:disabled) > span {
+      width: 19px;
+    }
+    &[aria-checked="true"]:active:not(:disabled) > span {
+      transform: translateX(15px) !important;
+    }
+  }
+
+  /* a checkbox: a rounded box, the accent when on, the tick draws itself */
+  .set-check {
+    margin-inline: -8px;
+    padding-inline: 8px;
+    border-radius: 8px;
+
+    &:hover:not(:disabled) {
+      background: var(--hover);
+    }
+  }
+  .set-check-box {
+    border-radius: 5px;
+    background: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--line);
+    color: #fff;
+    transition:
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      scale 200ms var(--ease-snap);
+
+    &[data-on] {
+      background: var(--pen);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, #000 10%);
+    }
+  }
+  &[data-desk-theme="dark"] .set-check-box[data-on] {
+    color: #062a23;
+  }
+  .set-check:active:not(:disabled) .set-check-box {
+    scale: 0.9;
+  }
+  .set-check:disabled .set-check-box[data-on] {
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-3);
+  }
+  .set-check-tick {
+    stroke-dasharray: 1;
+    animation: settings-tick 240ms var(--ease-snap) both;
+  }
+
+  /* the working days: each one a plate of its own when it is on */
+  .set-days .set-day {
+    width: 34px;
+    padding: 0;
+    border-radius: 7px;
+    color: var(--ink-3);
+    font-weight: 500;
+    transition:
+      color 140ms linear,
+      background-color 160ms linear,
+      box-shadow 160ms linear,
+      scale 220ms var(--ease-snap);
+
+    &[aria-pressed="true"] {
+      background: var(--raise);
+      box-shadow:
+        0 0 0 1px var(--rule),
+        var(--lift),
+        0 1px 3px rgb(0 0 0 / 0.25);
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+  &[data-desk-theme="light"] .set-days .set-day[aria-pressed="true"] {
+    background: #fff;
+    box-shadow:
+      0 0 0 1px var(--rule),
+      0 1px 3px rgb(15 17 22 / 0.1);
+  }
+
+  /* a day off, a word: a chip with its ×, quiet until the hand comes */
+  .set-chip {
+    height: 28px;
+    gap: 2px;
+    padding: 0 4px 0 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    animation: settings-pop 220ms var(--ease-snap) both;
+  }
+  .set-chip-x {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    transition:
+      background-color 100ms linear,
+      color 100ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--pencil) 14%, transparent);
+    }
+  }
+
+  /* the colour: a round well of it; the system's picker opens under the click */
+  .set-swatch {
+    position: relative;
+    display: inline-flex;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--swatch);
+    box-shadow:
+      0 0 0 1px var(--rule),
+      inset 0 0 0 2px color-mix(in srgb, #fff 18%, transparent);
+    cursor: pointer;
+    transition: scale 220ms var(--ease-snap);
+
+    &:hover {
+      scale: 1.06;
+    }
+    &:active {
+      scale: 0.94;
+      transition-duration: 70ms;
+    }
+    &:focus-within {
+      box-shadow:
+        0 0 0 2px var(--raise),
+        0 0 0 4px var(--pen);
+    }
+    input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+    }
+  }
+
+  /* the logo's well: the one place a file can be dropped (its dashes) */
+  .set-logo-well {
+    width: 148px;
+    height: 40px;
+    border-radius: 10px;
+    background: #0e0f12 !important;
+    transition:
+      border-color 140ms linear,
+      scale 200ms var(--ease-snap);
+
+    &[data-over] {
+      scale: 1.04;
+    }
+  }
+
+  /* how the company looks */
+  .set-brand-preview {
+    border-radius: 12px;
+    box-shadow:
+      0 0 0 1px rgb(255 255 255 / 0.08),
+      0 10px 28px -12px rgb(0 0 0 / 0.6);
+  }
+  .set-brand-bar {
+    border-bottom: 1px solid rgb(255 255 255 / 0.06);
+  }
+  .set-brand-letter {
+    border-radius: 7px;
+  }
+  .set-brand-button {
+    border-radius: 6px;
+    transition: background-color 200ms linear;
+  }
+
+  /* the quiet hours as a day: the hours of delivery lit in the accent, drawn from the left */
+  .set-row-wide {
+    padding-top: 6px;
+    padding-bottom: 18px;
+  }
+  .set-dayline-track {
+    height: 8px;
+    overflow: hidden;
+    border-radius: 9999px;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 calc(100% / 24 - 1px), var(--rule-soft) calc(100% / 24 - 1px) calc(100% / 24)),
+      color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  .set-dayline-on {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--pen) 70%, transparent), var(--pen));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--pen) 45%, transparent);
+    transform-origin: left center;
+    animation: settings-grow 640ms var(--ease-snap) 120ms both;
+  }
+  .set-dayline-ticks {
+    color: var(--ink-3);
+  }
+
+  /* the secretary's buttons: a small table of fields, the chips as the director will see them */
+  .set-actions-head,
+  .set-conventions-head {
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--rule-soft) !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    color: var(--ink-3) !important;
+  }
+  .set-actions-row,
+  .set-conventions-row {
+    padding-block: 5px;
+    border-bottom-color: var(--rule-soft) !important;
+  }
+  .set-conventions-row .set-row-mark {
+    left: -20px;
+    top: 10px;
+    bottom: 10px;
+  }
+  .set-actions-icon.field {
+    padding: 0;
+  }
+  .set-icon-button {
+    border-radius: 7px;
+    color: var(--ink-3);
+    transition:
+      opacity 120ms linear,
+      background-color 100ms linear,
+      color 100ms linear,
+      scale 200ms var(--ease-snap);
+
+    &:active:not(:disabled) {
+      scale: 0.9;
+      transition-duration: 70ms;
+    }
+  }
+  .set-errand-chip {
+    display: inline-flex;
+    height: 30px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border-radius: 9px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+    animation: settings-pop 220ms var(--ease-snap) both;
+  }
+
+  /* what a reaction pays: two columns of rows */
+  .set-price {
+    padding-block: 5px;
+    border-bottom-color: var(--rule-soft) !important;
+  }
+
+  /* a way out of the settings (the dictionary, the lab): a button with its icon */
+  .set-open {
+    border-radius: 8px;
+    color: var(--ink);
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear,
+      box-shadow 180ms linear;
+
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    svg {
+      color: var(--ink-2);
+    }
+  }
+
+  /* the one bar of unsaved edits: a glass bar that rises at the foot of the window */
+  .set-savebar-dock {
+    padding: 18px 0 18px;
+    background: transparent;
+    pointer-events: none;
+  }
+  .set-savebar {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 8px 8px 8px 16px;
+    border-top: 0;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--sheet) 88%, transparent);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    backdrop-filter: blur(22px) saturate(1.5);
+    box-shadow: var(--shadow-dialog);
+    pointer-events: auto;
+    animation: settings-bar-in 300ms var(--ease-snap) both;
+
+    .btn-primary {
+      min-height: 34px;
+    }
+  }
+  .set-savebar-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--pen);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--pen) 18%, transparent);
+    animation: settings-breathe 2.4s ease-in-out infinite;
+
+    &[data-blocked] {
+      background: var(--warn-ink);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn-ink) 18%, transparent);
+    }
+  }
+}
+
+/* ---- «Очки и магазин»: the game's office (components/desk/settings/points/*) ------------------ */
+html[data-surface="desk"][data-journal] {
+  /* the economy in one card: the total, thirty days by day, the week's three, what waits */
+  .pts-hero {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .pts-hero-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 18px 36px;
+  }
+  .pts-hero-total {
+    flex: 0 0 auto;
+    min-width: 200px;
+  }
+  .pts-hero-label {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  .pts-hero-figure {
+    margin: 4px 0 2px;
+    font-size: 44px;
+    line-height: 48px;
+  }
+  .pts-hero-days {
+    flex: 1 1 260px;
+    min-width: 220px;
+  }
+  .pts-chart {
+    margin-top: 10px;
+  }
+  .pts-chart-bars {
+    display: flex;
+    height: 64px;
+    align-items: flex-end;
+    gap: 3px;
+  }
+  .pts-chart-bar {
+    flex: 1 1 0;
+    min-width: 2px;
+    background: var(--gold);
+    opacity: 0.7;
+
+    &[data-zero] {
+      background: var(--rule, var(--border));
+      opacity: 1;
+    }
+    &[data-today] {
+      opacity: 1;
+    }
+  }
+  .pts-chart-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 6px;
+    font-size: 11px;
+    line-height: 14px;
+    color: var(--text-muted);
+  }
+  .pts-leaders {
+    flex: 0 0 auto;
+  }
+  .pts-leaders-list {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+  }
+  .pts-leader {
+    display: flex;
+    min-width: 48px;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+  }
+  .pts-leader-face {
+    position: relative;
+    display: inline-flex;
+  }
+  .pts-leader-place {
+    position: absolute;
+    right: -5px;
+    bottom: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 2px var(--bg);
+    color: var(--text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+
+    &[data-place="1"] {
+      background: var(--gold);
+      color: #1a1205;
+    }
+  }
+  .pts-leader-name {
+    max-width: 72px;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pts-leader-points {
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    color: var(--gold);
+  }
+  .pts-hero-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--rule-soft, var(--border));
+  }
+  .pts-fact {
+    display: flex;
+    min-width: 72px;
+    flex-direction: column;
+    padding: 0 16px;
+    border-left: 1px solid var(--rule-soft, var(--border));
+
+    &:first-child {
+      padding-left: 0;
+      border-left: 0;
+    }
+  }
+  .pts-fact-value {
+    font-size: 20px;
+    line-height: 24px;
+  }
+  .pts-fact-label {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .pts-wait {
+    display: inline-flex;
+    height: 36px;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 6px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 16px;
+
+    &:hover {
+      color: var(--text);
+    }
+    &[data-on] {
+      color: var(--warn);
+    }
+  }
+  .pts-wait-icon {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    align-items: center;
+    justify-content: center;
+  }
+  .pts-wait-value {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .pts-wait[data-on] .pts-wait-value {
+    color: var(--warn);
+  }
+  .pts-wait:not([data-on]) .pts-wait-value {
+    color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+  }
+
+  /* the balances: a bar of what each holds against the richest, the figure after it */
+  .pts-balance {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+  .pts-balance-track {
+    position: relative;
+    height: 6px;
+    min-width: 40px;
+    flex: 1 1 auto;
+    overflow: hidden;
+    background: var(--rule-soft, var(--border));
+  }
+  .pts-balance-bar {
+    position: absolute;
+    inset: 0;
+    background: var(--gold);
+    transform: scaleX(var(--share, 0));
+    transform-origin: left center;
+  }
+  .pts-balance-figure {
+    min-width: 76px;
+    text-align: right;
+  }
+  .pts-rank[data-top] {
+    color: var(--gold);
+    font-weight: 600;
+  }
+  .pts-ring {
+    rotate: -90deg;
+
+    circle {
+      fill: none;
+      stroke-width: 2.5;
+    }
+  }
+  .pts-ring-track {
+    stroke: var(--rule, var(--border));
+  }
+  .pts-ring-arc {
+    stroke: var(--ok);
+    stroke-linecap: round;
+    stroke-dasharray: var(--pct, 0) 100;
+  }
+
+  /* the ledger's plate of an amount, where a line came from */
+  .pts-amount {
+    display: inline-flex;
+    justify-content: flex-end;
+  }
+  .pts-source {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    white-space: nowrap;
+
+    svg {
+      flex-shrink: 0;
+      opacity: 0.8;
+    }
+  }
+
+  /* a dispute: the person's words as a quote over the director's moves */
+  .pts-dispute-quote {
+    position: relative;
+    margin: 4px 0 6px;
+    padding-left: 22px;
+  }
+  .pts-dispute-mark {
+    position: absolute;
+    top: 3px;
+    left: 0;
+    color: var(--text-muted);
+  }
+
+  /* the shop: the queue's status words, the rewards as a shelf of cards */
+  .pts-status {
+    color: var(--text-muted);
+
+    &[data-tone="warn"] {
+      color: var(--warn);
+    }
+    &[data-tone="accent"] {
+      color: var(--accent);
+    }
+  }
+  .pts-reward-icon {
+    display: inline-flex;
+    width: 26px;
+    height: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    line-height: 1;
+  }
+  .pts-shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(208px, 1fr));
+    gap: 12px;
+  }
+  .pts-item {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px 16px 12px;
+    border: 1px solid var(--rule, var(--border));
+    text-align: left;
+
+    &[data-hidden] {
+      opacity: 0.6;
+    }
+  }
+  .pts-item-top {
+    display: flex;
+    width: 100%;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .pts-item-icon {
+    display: flex;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    background: var(--surface-2);
+    font-size: 24px;
+    line-height: 1;
+  }
+  .pts-item-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  .pts-item-edit {
+    margin-left: auto;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity 120ms linear;
+  }
+  .pts-item:hover .pts-item-edit,
+  .pts-item:focus-visible .pts-item-edit {
+    opacity: 1;
+  }
+  .pts-item-title {
+    width: 100%;
+    margin-top: 12px;
+    overflow: hidden;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .pts-item-about {
+    display: -webkit-box;
+    width: 100%;
+    min-height: 32px;
+    margin-top: 2px;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+  }
+  .pts-item-price {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-top: 10px;
+    color: var(--gold);
+
+    .nums {
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 24px;
+    }
+  }
+  .pts-item-unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-muted);
+  }
+  .pts-item-facts {
+    display: flex;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--rule-soft, var(--border));
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--text-muted);
+
+    [data-tone="warn"] {
+      color: var(--warn);
+    }
+  }
+  .pts-item-add {
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 120px;
+    border-style: dashed;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-weight: 500;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+  .pts-item-bone {
+    min-height: 180px;
+  }
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .pts-screen > .pts-view {
+    animation: settings-rise 300ms var(--ease-snap) both;
+  }
+  .pts-rules-link {
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+
+  /* the hero: a card lit from its corner by the gold of the reward, not the accent */
+  .pts-hero.desk-total {
+    gap: 16px;
+    padding: 20px 22px 16px;
+    background:
+      radial-gradient(110% 150% at 0% 0%, color-mix(in srgb, var(--gold-ink) 10%, transparent), transparent 55%),
+      var(--raise);
+  }
+  .pts-hero-label {
+    color: var(--ink-2);
+  }
+  .pts-hero-figure {
+    letter-spacing: -0.035em;
+    animation: settings-rise 420ms var(--ease-snap) both;
+  }
+  .pts-chart-bar {
+    border-radius: 3px 3px 1px 1px;
+    background: color-mix(in srgb, var(--gold-ink) 62%, transparent);
+    opacity: 1;
+    transform-origin: bottom center;
+    transition: background-color 120ms linear;
+    animation: pts-bar 560ms var(--ease-snap) both;
+
+    &[data-zero] {
+      background: color-mix(in srgb, var(--ink) 9%, transparent);
+    }
+    &[data-today] {
+      background: var(--gold-ink);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--gold-ink) 45%, transparent);
+    }
+    &:hover {
+      background: var(--gold-ink);
+    }
+  }
+  .pts-chart-axis {
+    color: var(--ink-3);
+  }
+  .pts-leader {
+    animation: settings-pop 320ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  .pts-leader-place {
+    box-shadow: 0 0 0 2px var(--raise);
+
+    &[data-place="2"] {
+      background: #c9ced6;
+      color: #16181b;
+    }
+    &[data-place="3"] {
+      background: #c98b5a;
+      color: #1a1006;
+    }
+  }
+  .pts-hero-foot {
+    border-top-color: var(--rule-soft);
+  }
+  .pts-fact {
+    border-left-color: var(--rule);
+  }
+  .pts-wait {
+    padding: 0 10px 0 6px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow:
+      0 0 0 1px var(--rule-soft),
+      var(--lift);
+    color: var(--ink-2);
+    transition:
+      scale 240ms var(--ease-snap),
+      background-color 140ms linear,
+      box-shadow 160ms linear,
+      color 140ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+      color: var(--ink);
+    }
+    &:active {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    &[data-on] {
+      background: color-mix(in srgb, var(--warn-ink) 13%, transparent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--warn-ink) 38%, transparent);
+      color: var(--warn-ink);
+    }
+  }
+  .pts-wait-icon {
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+  }
+  .pts-wait[data-on] .pts-wait-icon {
+    background: color-mix(in srgb, var(--warn-ink) 18%, transparent);
+  }
+  .pts-wait-arrow {
+    opacity: 0.55;
+    transition: transform 180ms var(--ease-snap);
+  }
+  .pts-wait:hover .pts-wait-arrow {
+    transform: translateX(2px);
+  }
+
+  /* the balances */
+  .pts-balances .desk-row {
+    min-height: 52px;
+  }
+  .pts-balance-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 7%, transparent);
+  }
+  .pts-balance-bar {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--gold-ink) 55%, transparent), var(--gold-ink));
+    animation: pts-fill 620ms var(--ease-snap) both;
+  }
+  .pts-row-award {
+    border-radius: 7px;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .pts-ring-arc {
+    animation: pts-ring 640ms var(--ease-snap) 160ms both;
+  }
+
+  /* the ledger: the day as a title, the plate of each amount */
+  .pts-ledger .desk-grid-group {
+    padding-top: 14px;
+
+    > span:first-of-type {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0;
+      text-transform: none;
+      color: var(--ink);
+    }
+  }
+  .pts-amount {
+    min-width: 52px;
+    height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+
+    &[data-sign="plus"] {
+      background: color-mix(in srgb, var(--gold-ink) 13%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--gold-ink) 26%, transparent);
+    }
+  }
+  .pts-source {
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    font-size: 12.5px;
+  }
+
+  /* the disputes: one card each */
+  .pts-disputes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 0;
+
+    > * {
+      border-bottom: 0;
+    }
+  }
+  .pts-dispute {
+    gap: 8px;
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 320ms var(--ease-snap) both;
+  }
+  .pts-dispute-quote {
+    padding: 10px 12px 10px 34px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+  }
+  .pts-dispute-mark {
+    top: 13px;
+    left: 12px;
+    color: var(--ink-3);
+  }
+  .pts-dispute .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--rule);
+
+    &:focus {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+
+  /* the shop */
+  #desk-main .pts-shop-head h2 {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .pts-status {
+    display: inline-flex;
+    height: 24px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    font-size: 12.5px;
+    font-weight: 500;
+
+    &[data-tone="warn"] {
+      background: color-mix(in srgb, var(--warn-ink) 14%, transparent);
+    }
+    &[data-tone="accent"] {
+      background: color-mix(in srgb, var(--pen) 13%, transparent);
+    }
+  }
+  .pts-reward-icon {
+    border-radius: 7px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+  }
+  .pts-item {
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    cursor: pointer;
+    transition:
+      transform 220ms var(--ease-snap),
+      scale 220ms var(--ease-snap),
+      box-shadow 180ms linear,
+      background-color 160ms linear;
+    animation: settings-rise 340ms var(--ease-snap) both;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow:
+        0 0 0 1px var(--line),
+        var(--lift),
+        0 14px 30px -16px rgb(0 0 0 / 0.6);
+    }
+    &:active {
+      scale: 0.97;
+      transition-duration: 70ms;
+    }
+    &[data-chosen] {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        var(--lift);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: 2px;
+    }
+  }
+  &[data-desk-theme="light"] .pts-item:hover {
+    box-shadow:
+      0 0 0 1px var(--line),
+      0 14px 30px -16px rgb(15 17 22 / 0.28);
+  }
+  .pts-item-icon {
+    border-radius: 12px;
+    background:
+      radial-gradient(100% 100% at 30% 20%, color-mix(in srgb, var(--gold-ink) 16%, transparent), transparent 70%),
+      var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    transition: scale 260ms cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .pts-item:hover .pts-item-icon {
+    scale: 1.06;
+  }
+  .pts-item-flag {
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+  }
+  .pts-item-price {
+    color: var(--gold-ink);
+  }
+  .pts-item-facts {
+    border-top-color: var(--rule-soft);
+    color: var(--ink-3);
+  }
+  .pts-item-add {
+    border: 1px dashed var(--line);
+    background: transparent;
+    box-shadow: none;
+    color: var(--ink-2);
+
+    &:hover {
+      background: var(--hover);
+      box-shadow: none;
+    }
+  }
+}
+
+/* ---- «Словарь», the dialogs of the points, «Лаборатория», «Данные» -------------------------- */
+html[data-surface="desk"][data-journal] {
+  /* the journal keeps the dictionary's words: the icons are «Графит»'s */
+  .dict-verdict-icon,
+  .dict-check-icon {
+    display: none;
+  }
+  .data-tab-line {
+    display: none;
+  }
+  .dict-heard-bar {
+    display: none;
+  }
+}
+
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- the dictionary: strips as cards over the table they feed ---- */
+  .dict-strip,
+  .dict-addbar {
+    padding: 14px 18px 16px;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 320ms var(--ease-snap) both;
+  }
+  .dict-strip-head {
+    margin-bottom: 8px;
+  }
+  #desk-main .dict-strip-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .dict-strip-count {
+    display: inline-flex;
+    height: 18px;
+    align-items: center;
+    padding: 0 6px;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+  .dict-table-head {
+    margin-bottom: -6px;
+    padding: 0 2px;
+  }
+  #desk-main .dict-table-head .dict-strip-title {
+    font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .dict-strip .field,
+  .dict-addbar .field,
+  .dict-grid .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 3.5%, var(--raise));
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:hover {
+      box-shadow: inset 0 0 0 1px var(--line);
+    }
+    &:focus,
+    &:focus-within {
+      background-color: var(--raise);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+  .dict-check-field {
+    .dict-check-icon {
+      display: block;
+      z-index: 1;
+      color: var(--ink-3);
+    }
+    .field {
+      padding-left: 34px;
+    }
+  }
+  .dict-verdict-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--ink-3);
+    animation: settings-pop 220ms var(--ease-snap) both;
+  }
+  .dict-verdict[data-kind="sure"] .dict-verdict-icon {
+    color: var(--ok-ink);
+  }
+  .dict-verdict[data-kind="check"] .dict-verdict-icon,
+  .dict-verdict[data-kind="ask"] .dict-verdict-icon {
+    color: var(--warn-ink);
+  }
+  .dict-misheard {
+    gap: 4px 24px;
+    border-top: 0;
+
+    > * {
+      border-bottom: 0;
+    }
+  }
+  .dict-misheard-item {
+    padding: 6px 8px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+  }
+  .dict-x {
+    border-radius: 6px;
+    transition:
+      background-color 100ms linear,
+      color 100ms linear;
+  }
+
+  /* the budget: the list's length is the recognition prompt's length */
+  .dict-budget-track {
+    width: 112px;
+    height: 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+  .dict-budget-fill {
+    border-radius: 9999px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--pen) 60%, transparent), var(--pen)) !important;
+    transform-origin: left center;
+    animation: pts-fill 620ms var(--ease-snap) both;
+  }
+  .dict-budget[data-long] .dict-budget-fill {
+    background: var(--warn-ink) !important;
+  }
+
+  /* what the speech keeps using: chips with their facts */
+  .dict-suggest {
+    gap: 8px;
+  }
+  .dict-suggest-item {
+    height: 34px;
+    padding: 0 4px 0 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    animation: settings-pop 240ms var(--ease-snap) both;
+  }
+
+  /* the tables: faces, names as chips, offers in the accent */
+  .dict-grid .desk-row {
+    min-height: 50px;
+  }
+  .dict-pills {
+    gap: 6px;
+  }
+  .dict-pill {
+    height: 26px;
+    padding: 0 9px;
+    border-radius: 7px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    font-size: 13px;
+    transition:
+      background-color 140ms linear,
+      box-shadow 140ms linear,
+      padding 140ms var(--ease-snap);
+
+    &:has(.dict-pill-x) {
+      padding-right: 4px;
+    }
+    &[data-fresh] {
+      background: color-mix(in srgb, var(--pen) 12%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 40%, transparent);
+      animation: settings-pop 260ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+    }
+    &[data-waiting] {
+      background: transparent;
+      box-shadow: inset 0 0 0 1px var(--line);
+      border: 0;
+    }
+  }
+  .dict-pill-x {
+    width: 18px;
+    height: 18px;
+    margin-left: 2px;
+    border-radius: 5px;
+    transition:
+      opacity 120ms linear,
+      background-color 100ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--pencil) 16%, transparent);
+    }
+  }
+  .dict-add {
+    height: 26px;
+    padding: 0 9px 0 7px;
+    border-radius: 7px;
+    box-shadow: inset 0 0 0 1px var(--line);
+    border: 0;
+    transition:
+      opacity 120ms linear,
+      background-color 100ms linear,
+      color 100ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .dict-offers {
+    gap: 6px;
+  }
+  .dict-offer {
+    height: 26px;
+    padding: 0 9px 0 7px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--pen) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 34%, transparent);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--pen);
+    transition:
+      background-color 120ms linear,
+      scale 200ms var(--ease-snap);
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 16%, transparent);
+      text-decoration: none;
+    }
+    &:active:not(:disabled) {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+  }
+  .dict-shared {
+    margin-top: 6px;
+    color: var(--warn-ink);
+  }
+  .dict-note {
+    color: var(--warn-ink);
+  }
+  .dict-word {
+    font-size: 14px;
+  }
+  .dict-kind {
+    height: 26px;
+    padding: 0 7px 0 9px;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--ink) 5%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    color: var(--ink-2);
+
+    &:hover {
+      background: var(--hover);
+      color: var(--ink);
+    }
+  }
+  .dict-heard-bar {
+    position: relative;
+    display: block;
+    width: 44px;
+    height: 4px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink) 8%, transparent);
+
+    &::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: color-mix(in srgb, var(--pen) 80%, transparent);
+      transform: scaleX(var(--share, 0));
+      transform-origin: left center;
+      animation: pts-fill 560ms var(--ease-snap) both;
+    }
+  }
+  .dict-guide {
+    height: 34px;
+    padding: 0 10px;
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .dict-step {
+    display: inline-flex;
+    width: 20px;
+    height: 20px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 9999px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .dict-foot {
+    padding: 0 4px;
+    color: var(--ink-3);
+  }
+
+  /* ---- the dialogs of the points: «Начислить» and a reward ---- */
+  .award-form .field,
+  .item-form .field {
+    border: 0;
+    border-radius: 8px;
+    padding-left: 12px;
+    background-color: color-mix(in srgb, var(--ink) 4%, var(--sheet));
+    box-shadow: inset 0 0 0 1px var(--rule);
+    transition:
+      box-shadow 140ms linear,
+      background-color 140ms linear;
+
+    &:focus,
+    &:focus-within {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
+    &::placeholder,
+    input::placeholder {
+      color: var(--ink-3);
+      font-style: normal;
+      opacity: 1;
+    }
+  }
+  .item-form .field + .field {
+    margin-top: 8px;
+  }
+  .award-form .desk-label,
+  .item-form .desk-label {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .award-who {
+    padding-left: 8px;
+  }
+  .award-clear {
+    border-radius: 6px;
+  }
+  .award-list {
+    padding: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--sheet) 94%, transparent);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    backdrop-filter: blur(20px) saturate(1.5);
+    box-shadow: var(--shadow-pop) !important;
+    transform-origin: top center;
+    animation: graphite-pop 160ms var(--ease-snap) both;
+  }
+  .award-option {
+    height: 38px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: transparent;
+
+    &[data-active] {
+      background: var(--selected);
+    }
+  }
+  .award-chips {
+    gap: 6px;
+  }
+  .award-form .desk-choice,
+  .item-form .award-chip {
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    transition:
+      background-color 120ms linear,
+      box-shadow 140ms linear,
+      color 120ms linear,
+      scale 200ms var(--ease-snap);
+
+    &:hover {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--ink) 8%, var(--sheet));
+    }
+    &:active {
+      scale: 0.95;
+      transition-duration: 70ms;
+    }
+    &[aria-pressed="true"] {
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 55%, transparent);
+      color: var(--ink);
+      font-weight: 600;
+    }
+  }
+  .award-form .award-chip + .award-chip,
+  .item-form .award-chip + .award-chip {
+    margin-left: 0;
+  }
+  .award-public {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--ink) 3.5%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+  }
+  .item-icon-choice {
+    width: 38px !important;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+    transition:
+      background-color 120ms linear,
+      box-shadow 140ms linear,
+      scale 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+
+    &:hover {
+      scale: 1.08;
+    }
+    &[aria-checked="true"] {
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 14%, transparent);
+    }
+  }
+  .item-toggles {
+    padding: 0 14px;
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--ink) 3%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    > * {
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    > :last-child {
+      border-bottom: 0;
+    }
+  }
+  /* the employee's phone is dark in both faces of the desk: its card takes the phone's steps too */
+  .item-preview {
+    --raise: #121a23;
+    --lift: inset 0 1px 0 rgb(255 255 255 / 0.04);
+    --shadow-card: 0 0 0 1px rgb(255 255 255 / 0.07), inset 0 1px 0 rgb(255 255 255 / 0.04);
+    border-radius: 16px;
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+
+  /* ---- the lab: the strip as a card, the shelf as links with their arrow ---- */
+  .lab-tab:not([hidden]) {
+    animation: settings-rise 300ms var(--ease-snap) both;
+  }
+  .lab-strip {
+    padding: 12px 16px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .lab-shelf-link {
+    height: 30px;
+    border-radius: 8px;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  /* the phone's benches (the parser's rules, the cost): their cards are «Графит»'s cards again */
+  .lab-tab.desk-bench .card {
+    padding: 16px 20px 18px;
+    border-top: 0;
+  }
+  .lab-tab.desk-bench .card + .card {
+    margin-top: 4px;
+  }
+  .lab-tab.desk-bench [class*="rounded-[12px]"].bg-surface-2 {
+    padding-inline: 12px;
+    border-top: 0;
+    border-radius: 10px;
+    background: var(--surface-2);
+  }
+  #desk-main .lab-head {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+  .lab-prices {
+    padding: 0 4px;
+    color: var(--ink-3);
+  }
+
+  /* ---- the data: tabs with a gliding line, the sheet as a card ---- */
+  .data-tabs {
+    gap: 2px;
+    padding: 2px 2px 0;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .data-tab {
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 8px 8px 0 0;
+    box-shadow: none !important;
+    font-weight: 500;
+    transition:
+      color 120ms linear,
+      background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover);
+    }
+    &[aria-selected="true"] {
+      font-weight: 600;
+    }
+  }
+  .data-tab-line {
+    position: absolute;
+    display: block;
+    right: 8px;
+    bottom: 0;
+    left: 8px;
+    height: 2px;
+    border-radius: 2px 2px 0 0;
+    background: var(--pen);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+  }
+  .data-sheet {
+    border: 0;
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: settings-rise 280ms var(--ease-snap) both;
+
+    &:focus-visible {
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 60%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--pen) 14%, transparent);
+    }
+    th {
+      border-bottom-color: var(--rule) !important;
+      border-right-color: var(--rule-soft) !important;
+      background: color-mix(in srgb, var(--raise) 88%, transparent);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    td {
+      border-color: var(--rule-soft);
+    }
+    tbody tr {
+      transition: background-color 80ms linear;
+    }
+    tbody tr:hover {
+      background: var(--hover);
+    }
+    td.outline {
+      border-radius: 4px;
+      outline-color: var(--pen);
+      background: color-mix(in srgb, var(--pen) 8%, transparent);
+    }
+  }
+  #desk-main .data-sheet th {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .data-bone {
+    border-top: 0;
+  }
+}
+
+/* ---- motion -------------------------------------------------------------------------------- */
+@keyframes settings-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes settings-mark {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+}
+@keyframes settings-tick {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes settings-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+@keyframes settings-grow {
+  from {
+    opacity: 0.4;
+    transform: scaleX(0);
+  }
+}
+@keyframes settings-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+@keyframes pts-bar {
+  from {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+@keyframes pts-fill {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* the arc is a dash of `--pct` (pathLength 100): an offset of the same length hides it, 0 shows it whole */
+@keyframes pts-ring {
+  from {
+    stroke-dashoffset: var(--pct, 0);
+  }
+}
+@keyframes settings-breathe {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .set-card,
+    .set-row-mark,
+    .set-check-tick,
+    .set-chip,
+    .set-errand-chip,
+    .set-dayline-on,
+    .set-savebar,
+    .set-savebar-dot,
+    .pts-view,
+    .pts-hero-figure,
+    .pts-chart-bar,
+    .pts-leader,
+    .pts-balance-bar,
+    .pts-ring-arc,
+    .pts-dispute,
+    .pts-item,
+    .dict-strip,
+    .dict-addbar,
+    .dict-verdict-icon,
+    .dict-budget-fill,
+    .dict-suggest-item,
+    .dict-pill,
+    .dict-heard-bar::after,
+    .award-list,
+    .lab-tab,
+    .data-sheet {
+      animation: none !important;
+    }
+    .pts-item:hover {
+      transform: none;
+    }
+    .set-switch > span,
+    .set-dayline-on,
+    .set-link-arrow {
+      transition: none !important;
+    }
+  }
+}

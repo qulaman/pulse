@@ -1,16 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Dialog } from "@/components/desk/ui/Dialog";
-import { PersonLine } from "@/components/desk/settings/form";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SearchField } from "@/components/desk/ui/Toolbar";
 import { LoginCodePanel } from "@/components/people/LoginCodePanel";
 import { Button } from "@/components/ui/Button";
 import { ANSWERS } from "@/components/visits/VisitAsk";
 import type { MindBoard } from "@/lib/mindboard/queries";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import type { Person } from "@/lib/people/queries";
 import { ROLE_LABEL } from "@/lib/people/queries";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
@@ -26,14 +27,14 @@ const ON_WALL = new Set(["sent", "accepted", "in_progress", "rework", "pending_r
 
 const lower = (text: string) => text.toLowerCase().replace(/ё/g, "е");
 
-/** A block of the panel: the section's label over a rule of print, its controls under the rule. */
+/** A block of the panel: the section's label over a rule of print, its controls under the rule — in «Графит» a card. */
 export function Section({ title, children, testId, end }: { title: string; children: ReactNode; testId?: string; end?: ReactNode }) {
   return (
-    <section className="flex flex-col" data-testid={testId}>
-      <SectionLabel action={end} className="mb-0.5">
+    <section className="screen-card flex flex-col" data-testid={testId}>
+      <SectionLabel action={end} className="screen-card-title mb-0.5">
         {title}
       </SectionLabel>
-      <div className="desk-list">{children}</div>
+      <div className="screen-card-body desk-list">{children}</div>
     </section>
   );
 }
@@ -41,7 +42,7 @@ export function Section({ title, children, testId, end }: { title: string; child
 /** A setting of the wall: its name on the left, its control on the right. */
 export function SettingRow({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
-    <div className="flex min-h-9 items-center justify-between gap-3">
+    <div className="screen-setting flex min-h-9 items-center justify-between gap-3">
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="text-[14px] leading-5">{label}</span>
         {hint ? <span className="truncate text-[12px] leading-4 text-muted">{hint}</span> : null}
@@ -62,26 +63,64 @@ export function Switch({ on, onToggle, label, testId, disabled }: { on: boolean;
       disabled={disabled}
       onClick={onToggle}
       data-testid={testId}
-      className="relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
+      className="screen-switch relative shrink-0 transition-colors duration-[120ms] disabled:opacity-40"
     >
       <span aria-hidden className="absolute transition-transform duration-[120ms]" />
     </button>
   );
 }
 
+/** Ten minutes on the wall: a person or an order goes up for that long (D-123). */
+const FOCUS_MINUTES = 10;
+
+/** What is left of the ten minutes, as a ring that empties — beside the words that say it. */
+function MinutesRing({ minutes }: { minutes: number }) {
+  const part = Math.max(0, Math.min(1, minutes / FOCUS_MINUTES));
+  return (
+    <svg aria-hidden viewBox="0 0 16 16" width="14" height="14" className="screen-ring">
+      <circle cx="8" cy="8" r="6" fill="none" strokeWidth="2.2" className="screen-ring-track" />
+      <circle cx="8" cy="8" r="6" fill="none" strokeWidth="2.2" pathLength={100} strokeDasharray="100" strokeLinecap="round" className="screen-ring-left" style={{ "--left": 100 - part * 100 } as CSSProperties} />
+    </svg>
+  );
+}
+
 /** A row of a pick list: the thing, and the word of what it is doing on the wall. */
-function PickRow({ children, lit, onClick, testId, note }: { children: ReactNode; lit: boolean; onClick: () => void; testId: string; note?: string | null }) {
+function PickRow({ children, lit, onClick, testId, note, minutes }: { children: ReactNode; lit: boolean; onClick: () => void; testId: string; note?: string | null; minutes?: number }) {
   return (
     <button
       type="button"
       onClick={onClick}
       data-testid={testId}
       aria-pressed={lit}
-      className={`flex min-h-9 w-full items-center gap-2 border-b border-border/60 pr-1 text-left transition-colors duration-[120ms] last:border-b-0 hover:bg-surface-2/60 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : "pl-0"}`}
+      data-lit={lit ? "" : undefined}
+      className={`screen-pick-row flex min-h-9 w-full items-center gap-2 border-b border-border/60 pr-1 text-left transition-colors duration-[120ms] last:border-b-0 hover:bg-surface-2/60 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : "pl-0"}`}
     >
       <span className="min-w-0 flex-1">{children}</span>
-      {note ? <span className={`nums shrink-0 text-[12px] leading-4 ${lit ? "text-accent" : "text-muted"}`}>{note}</span> : null}
+      {note ? (
+        <span className={`screen-pick-note nums flex shrink-0 items-center gap-1.5 text-[12px] leading-4 ${lit ? "text-accent" : "text-muted"}`}>
+          {lit && minutes !== undefined ? <MinutesRing minutes={minutes} /> : null}
+          {note}
+        </span>
+      ) : null}
     </button>
+  );
+}
+
+/** A person of the pick list: the face, the name, what they do. */
+function PersonPickLine({ person }: { person: Person }) {
+  // re-reads the company's names, so «Ерлан» becomes «Ерлан Б.» once the roster has come
+  useNamesKey();
+  const sub = person.position || ROLE_LABEL[person.role];
+  return (
+    <span className="flex min-w-0 items-center gap-2.5">
+      <span className="screen-pick-face">
+        <TileFace person={person} size={26} />
+      </span>
+      <span className="block min-w-0 truncate text-[14px] leading-5" title={person.full_name}>
+        {shortName(person.full_name)}
+        {sub ? <span className="text-[12px] text-muted"> · {sub}</span> : null}
+      </span>
+    </span>
   );
 }
 
@@ -98,8 +137,8 @@ export function PeoplePick({ people, activeId, minutes, onPick }: { people: Pers
         {shown.map((person) => {
           const lit = person.id === activeId;
           return (
-            <PickRow key={person.id} lit={lit} testId="desk-screen-person" note={lit ? `на стене · ${minutes} мин` : null} onClick={() => onPick(person)}>
-              <PersonLine name={person.full_name} sub={person.position || ROLE_LABEL[person.role]} />
+            <PickRow key={person.id} lit={lit} testId="desk-screen-person" note={lit ? `на стене · ${minutes} мин` : null} minutes={minutes} onClick={() => onPick(person)}>
+              <PersonPickLine person={person} />
             </PickRow>
           );
         })}
@@ -122,7 +161,7 @@ export function TaskPick({ tasks, activeId, minutes, onPick }: { tasks: TaskWith
         {shown.map((task) => {
           const lit = task.id === activeId;
           return (
-            <PickRow key={task.id} lit={lit} testId="desk-screen-task" note={lit ? `на стене · ${minutes} мин` : SHORT_STATUS[task.status]} onClick={() => onPick(task)}>
+            <PickRow key={task.id} lit={lit} testId="desk-screen-task" note={lit ? `на стене · ${minutes} мин` : SHORT_STATUS[task.status]} minutes={minutes} onClick={() => onPick(task)}>
               <span className="block truncate text-[14px] leading-5">
                 {task.title}
                 {task.assignee?.full_name ? <span className="text-[12px] text-muted"> · {task.assignee.full_name}</span> : null}
@@ -170,7 +209,7 @@ export function BoardsPick({
         const lit = board.id === wallId;
         const week = board.id === weekId;
         return (
-          <li key={board.id} className={`flex min-h-11 items-center gap-1 border-b border-border/60 last:border-b-0 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
+          <li key={board.id} data-lit={lit ? "" : undefined} className={`screen-board-row flex min-h-11 items-center gap-1 border-b border-border/60 last:border-b-0 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
             <span className="min-w-0 flex-1">
               <Link href={`/desk/notes/b/${board.id}`} className="block truncate text-[14px] leading-5 hover:underline">
                 {board.title}
@@ -213,11 +252,11 @@ export function Visits({
 }) {
   if (visitors.length + messages.length === 0) return null;
   return (
-    <div className="desk-list" data-testid="desk-screen-visits">
+    <div className="screen-visits desk-list" data-testid="desk-screen-visits">
       {visitors.map((visit) => {
         const waiting = visit.status === "waiting";
         return (
-          <article key={visit.id} className={`py-2.5 ${waiting ? "pl-3 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
+          <article key={visit.id} className={`screen-visit py-2.5 ${waiting ? "pl-3 shadow-[inset_2px_0_0_var(--accent)]" : ""}`} data-waiting={waiting ? "" : undefined}>
             <p className="text-[12px] leading-4 text-muted">
               {waiting ? "К вам посетитель" : "Посетитель ждёт"} · {waitedSince(visit.created_at, now)}
               {waiting ? " · на стене поверх всего" : ""}
@@ -241,7 +280,7 @@ export function Visits({
         );
       })}
       {messages.map((message) => (
-        <article key={message.id} className="py-2.5 pl-3 shadow-[inset_2px_0_0_var(--accent)]">
+        <article key={message.id} className="screen-visit py-2.5 pl-3 shadow-[inset_2px_0_0_var(--accent)]" data-waiting="">
           <p className="text-[12px] leading-4 text-muted">Сообщение секретаря · {waitedSince(message.created_at, now)} · на стене поверх всего</p>
           <p className="mt-0.5 text-[15px] font-semibold leading-5 [overflow-wrap:anywhere]">{message.note?.trim()}</p>
           <div className="mt-2">

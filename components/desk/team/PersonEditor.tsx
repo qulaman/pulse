@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { Select, SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -48,6 +48,15 @@ function hasManager(role: Role): boolean {
 
 type Field = "full_name" | "phone" | "email" | "password";
 
+/** What the form holds right now — for a picture of the card being made beside it (`preview`). */
+export type EditorView = {
+  draft: DeskDraft;
+  photo: PhotoDraft;
+  /** The login: an email and a password were asked for, not the code. */
+  withEmail: boolean;
+  problems: Partial<Record<Field, string>>;
+};
+
 /** What is wrong with the draft, field by field — said under the field, not as a dead button. */
 function problemsOf(draft: DeskDraft, mode: "create" | "edit", withEmail: boolean): Partial<Record<Field, string>> {
   const problems: Partial<Record<Field, string>> = {};
@@ -61,12 +70,21 @@ function problemsOf(draft: DeskDraft, mode: "create" | "edit", withEmail: boolea
   return problems;
 }
 
-/** The section of a long form: its label over ruled lines. */
-function Plane({ title, children, end }: { title?: string; children: ReactNode; end?: ReactNode }) {
+/**
+ * A step of the new card (D-174): its number — a check once the step holds nothing wrong — and its
+ * title over a card of ruled lines.
+ */
+function Plane({ step, title, done, hint, children }: { step: number; title: string; done: boolean; hint?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-1.5">
-      {title ? <SectionLabel action={end}>{title}</SectionLabel> : null}
-      <div className="desk-list">{children}</div>
+    <section className="newp-step" data-done={done ? "" : undefined}>
+      <header className="newp-step-head">
+        <span className="newp-step-mark" aria-hidden>
+          {done ? <Check size={13} strokeWidth={3} /> : step}
+        </span>
+        <h2 className="newp-step-title">{title}</h2>
+        {hint ? <span className="newp-step-hint">{hint}</span> : null}
+      </header>
+      <div className="newp-step-body desk-list">{children}</div>
     </section>
   );
 }
@@ -99,6 +117,7 @@ export function PersonEditor({
   pending,
   onSubmit,
   onCancel,
+  preview,
 }: {
   initial: DeskDraft;
   /** Whose form this is: a draft that left without a word waits under this key. */
@@ -118,6 +137,8 @@ export function PersonEditor({
   /** Resolves when saved; the draft then becomes the new baseline. `leaving` — the form goes elsewhere right after, stay put. */
   onSubmit: (draft: DeskDraft, photo: PhotoDraft, options: { leaving: boolean }) => Promise<unknown>;
   onCancel?: () => void;
+  /** Creating: the card being made, drawn beside the form from what it holds (NewPersonDesk). */
+  preview?: (view: EditorView) => ReactNode;
 }) {
   const uid = useId();
   const ids = { name: `${uid}-name`, position: `${uid}-position`, phone: `${uid}-phone`, aliases: `${uid}-aliases`, role: `${uid}-role`, manager: `${uid}-manager`, email: `${uid}-email`, password: `${uid}-password` };
@@ -289,7 +310,7 @@ export function PersonEditor({
   const personRows = person ? (
     <>
       <FormRow label="Фото" hint="Обрежу в квадрат и сожму. Сохранится вместе с карточкой">
-        <PhotoField name={draft.full_name} current={photoUrl} value={photo} onChange={setPhoto} />
+        <PhotoField id={draftKey} name={draft.full_name} current={photoUrl} value={photo} onChange={setPhoto} />
       </FormRow>
       <FormRow label="Должность" htmlFor={ids.position}>
         <input id={ids.position} className={INPUT} value={draft.position} onChange={(e) => set({ position: e.target.value })} placeholder="Например, бухгалтер" autoComplete="off" />
@@ -498,67 +519,82 @@ export function PersonEditor({
     );
   }
 
+  // a step is whole when nothing in it is wrong: the name typed, the phone (if any) readable; the login chosen
+  const aboutDone = draft.full_name.trim().length >= 2 && !problems.full_name && !problems.phone;
+  const loginDone = !withEmail || (!problems.email && !problems.password);
   return (
-    <form ref={form} noValidate onSubmit={onFormSubmit} className="desk-fields flex flex-col gap-5" data-testid="desk-person-editor">
-      <Plane title={person ? "О человеке" : "Экран"}>
-        {nameRow}
-        {personRows}
-        {roleRows}
-      </Plane>
-      {person ? (
-        <Plane title="Вход">
-          <FormRow
-            label="Как войдёт"
-            hint={
-              withEmail ? (
-                "Почта и первый пароль — для входа с компьютера. Пароль покажу ещё раз после «Добавить»"
-              ) : (
-                <span data-testid="new-person-code-hint">После «Добавить» покажу код из 8 цифр и QR — почта и пароль не нужны</span>
-              )
-            }
-          >
-            <div className="self-start">
-              <SegmentTabs<"code" | "email">
-                aria-label="Как войдёт"
-                value={withEmail ? "email" : "code"}
-                onChange={(next) => {
-                  setWithEmail(next === "email");
-                  // a fresh ready password each time the email is asked for
-                  if (next === "email" && !(draft.password ?? "")) set({ password: generatePassword() });
-                }}
-                items={[
-                  { value: "code", label: "По коду" },
-                  { value: "email", label: "Почта и пароль" },
-                ]}
-              />
-            </div>
-          </FormRow>
-          {withEmail ? (
-            <>
-              <FormRow label="Почта" htmlFor={ids.email} error={errorOf("email")}>
-                <input
-                  id={ids.email}
-                  type="email"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  spellCheck={false}
-                  className={INPUT}
-                  value={draft.email}
-                  onChange={(e) => set({ email: e.target.value })}
-                  onBlur={touch("email")}
-                  placeholder="Например, name@company.kz"
-                  aria-invalid={Boolean(errorOf("email"))}
-                  data-testid="new-person-email"
-                />
+    <form ref={form} noValidate onSubmit={onFormSubmit} className={`desk-fields newp ${preview ? "newp-with-preview" : ""}`} data-testid="desk-person-editor">
+      <div className="newp-main">
+        {person ? (
+          <>
+            <Plane step={1} title="О человеке" done={aboutDone} hint="Обязательно только имя">
+              {nameRow}
+              {personRows}
+            </Plane>
+            <Plane step={2} title="Роль" done>
+              {roleRows}
+            </Plane>
+            <Plane step={3} title="Вход" done={loginDone}>
+              <FormRow
+                label="Как войдёт"
+                hint={
+                  withEmail ? (
+                    "Почта и первый пароль — для входа с компьютера. Пароль покажу ещё раз после «Добавить»"
+                  ) : (
+                    <span data-testid="new-person-code-hint">После «Добавить» покажу код из 8 цифр и QR — почта и пароль не нужны</span>
+                  )
+                }
+              >
+                <div className="self-start">
+                  <SegmentTabs<"code" | "email">
+                    aria-label="Как войдёт"
+                    value={withEmail ? "email" : "code"}
+                    onChange={(next) => {
+                      setWithEmail(next === "email");
+                      // a fresh ready password each time the email is asked for
+                      if (next === "email" && !(draft.password ?? "")) set({ password: generatePassword() });
+                    }}
+                    items={[
+                      { value: "code", label: "По коду" },
+                      { value: "email", label: "Почта и пароль" },
+                    ]}
+                  />
+                </div>
               </FormRow>
-              <FormRow label="Первый пароль" htmlFor={ids.password} error={errorOf("password")} hint="Читается вслух и набирается без смены раскладки; свой человек поставит в «Профиле»">
-                <PasswordInput id={ids.password} value={draft.password ?? ""} onChange={(password) => set({ password })} />
-              </FormRow>
-            </>
-          ) : null}
-        </Plane>
-      ) : null}
-      {footer}
+              {withEmail ? (
+                <>
+                  <FormRow label="Почта" htmlFor={ids.email} error={errorOf("email")}>
+                    <input
+                      id={ids.email}
+                      type="email"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      className={INPUT}
+                      value={draft.email}
+                      onChange={(e) => set({ email: e.target.value })}
+                      onBlur={touch("email")}
+                      placeholder="Например, name@company.kz"
+                      aria-invalid={Boolean(errorOf("email"))}
+                      data-testid="new-person-email"
+                    />
+                  </FormRow>
+                  <FormRow label="Первый пароль" htmlFor={ids.password} error={errorOf("password")} hint="Читается вслух и набирается без смены раскладки; свой человек поставит в «Профиле»">
+                    <PasswordInput id={ids.password} value={draft.password ?? ""} onChange={(password) => set({ password })} />
+                  </FormRow>
+                </>
+              ) : null}
+            </Plane>
+          </>
+        ) : (
+          <Plane step={1} title="Экран" done={aboutDone}>
+            {nameRow}
+            {roleRows}
+          </Plane>
+        )}
+        {footer}
+      </div>
+      {preview ? <aside className="newp-aside">{preview({ draft, photo, withEmail, problems })}</aside> : null}
       {dialogs}
     </form>
   );

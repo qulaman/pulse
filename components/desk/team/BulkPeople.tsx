@@ -2,7 +2,8 @@
 
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { ClipboardPaste } from "lucide-react";
+import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
 
 import { CheckLine } from "@/components/desk/settings/form";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
@@ -250,9 +251,10 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
   ].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex flex-col gap-5" onKeyDown={onKeyDown} data-testid="bulk-people">
-      <section className="flex flex-col gap-1.5">
-        <label htmlFor="bulk-text" className="desk-label uppercase">
+    <div className="bulk flex flex-col gap-5" onKeyDown={onKeyDown} data-testid="bulk-people">
+      <section className="bulk-paste flex flex-col gap-2">
+        <label htmlFor="bulk-text" className="bulk-paste-label">
+          <ClipboardPaste size={15} strokeWidth={2} aria-hidden />
           Строки из Excel или текста
         </label>
         <textarea
@@ -270,7 +272,7 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
         <p className="text-[12px] leading-4 text-muted">ФИО, должность, телефон. Между ними — табуляция, «;» или «,». Строку с заголовками столбцов пропущу, телефон найду в любом столбце.</p>
       </section>
 
-      <section className="flex items-center gap-3">
+      <section className="bulk-role flex items-center gap-3">
         <label htmlFor="bulk-role" className="text-[13px] font-medium leading-5 text-muted">
           Роль всего списка
         </label>
@@ -291,7 +293,7 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
         </section>
       ) : null}
 
-      <div className="sticky bottom-0 z-[2] flex flex-wrap items-center gap-3 border-t border-[var(--text)] bg-bg py-2.5" data-testid="bulk-bar">
+      <div className="bulk-bar sticky bottom-0 z-[2] flex flex-wrap items-center gap-3 py-2.5" data-testid="bulk-bar">
         {phase === "edit" ? (
           <>
             <Button size="sm" onClick={() => void start()} disabled={toAdd.length === 0 || tooMany} data-testid="bulk-add">
@@ -324,8 +326,8 @@ export function BulkPeople({ editor, people, onBusy }: { editor: Role; people: r
             <span className="nums text-[14px] leading-5" role="status" data-testid="bulk-progress">
               Добавляю {Math.min(progress.done + 1, Math.max(progress.total, 1))} из {progress.total}
             </span>
-            <span aria-hidden className="h-0.5 min-w-[120px] flex-1 bg-border">
-              <span className="block h-full bg-[var(--text)]" style={{ width: `${progress.total ? (progress.done / progress.total) * 100 : 0}%` }} />
+            <span aria-hidden className="bulk-progress min-w-[120px] flex-1">
+              <span style={{ "--done": progress.total ? progress.done / progress.total : 0 } as CSSProperties} />
             </span>
           </>
         ) : (

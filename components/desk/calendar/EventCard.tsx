@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AlignLeft, CalendarClock, MapPin, Repeat } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { Popover, type Anchor } from "@/components/desk/ui/Popover";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
@@ -16,6 +17,10 @@ import { humanYmd } from "@/lib/datetime/calendar";
 import { shortName } from "@/lib/people/names";
 import { useRecurrenceRules, useUpdateRule } from "@/lib/recurrence/queries";
 
+import { AnswersBar } from "./CalendarAside";
+import { Face } from "./Faces";
+import { answersOf, meetingState, type MeetingState } from "./state";
+
 /** The reasons of «Не смогу» — the phone card's own. */
 const REASONS = ["Занят срочным", "Буду в отъезде", "Болею"];
 /** People shown before «ещё N». */
@@ -25,6 +30,13 @@ const WIDTH = 384;
 const ORDER: Record<string, number> = { declined: 0, invited: 1, going: 2 };
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** The card's word for what the meeting is to this person; nothing for an ordinary one ahead. */
+const STATE_CHIP: Partial<Record<MeetingState, string>> = {
+  over: "Прошла",
+  owes: "Нужен ваш ответ",
+  declined: "Вы не сможете",
+};
 
 /**
  * A meeting opened on the desk (wave 3): a card beside its block, as a desktop calendar opens
@@ -117,16 +129,27 @@ function CardBody({
     setDeclining(false);
   };
 
+  const state = meetingState(event, meId, now);
+  const chip = STATE_CHIP[state];
+  const answers = answersOf(event);
+
   return (
-    <div className="flex max-h-[min(72vh,600px)] flex-col" data-testid="desk-event-card" data-event-id={event.id}>
-      <div className="flex items-start gap-2 px-4 pb-2 pt-3">
+    <div className="cal-card flex max-h-[min(72vh,600px)] flex-col" data-testid="desk-event-card" data-event-id={event.id} data-state={state}>
+      <div className="cal-card-head flex items-start gap-2 px-4 pb-2 pt-3">
         <div className="min-w-0 flex-1">
+          {live || chip ? (
+            <span className="cal-card-chip" data-state={state}>
+              {live ? <span aria-hidden className="cal-card-live" /> : null}
+              {live ? capitalize(when) : chip}
+            </span>
+          ) : null}
           <h2 className="text-[17px] font-semibold leading-6 [overflow-wrap:anywhere]">{event.title}</h2>
-          <p className="mt-0.5 text-[13px] leading-[18px] text-muted">
+          <p className="cal-card-when mt-0.5 flex items-center gap-1.5 text-[13px] leading-[18px] text-muted">
+            <CalendarClock aria-hidden size={14} strokeWidth={2} className="cal-card-icon shrink-0" />
             <When>
               {capitalize(humanYmd(ymdOfEvent(event), now))} · {timeRange(event)}
             </When>
-            {live ? <When className="ml-1.5 text-text">{when}</When> : null}
+            {live ? <When className="cal-card-when-live ml-1.5 text-text">{when}</When> : null}
           </p>
         </div>
         <div className="-mr-1.5 flex shrink-0 items-center">
@@ -152,12 +175,12 @@ function CardBody({
         {event.location || rule ? (
           <div className="flex flex-col gap-1 text-[13px] leading-[18px]">
             {event.location ? (
-              <Line word="Где">
+              <Line word="Где" icon={<MapPin aria-hidden size={14} strokeWidth={2} />}>
                 <span className="[overflow-wrap:anywhere]">{event.location}</span>
               </Line>
             ) : null}
             {rule ? (
-              <Line word="Повтор">
+              <Line word="Повтор" icon={<Repeat aria-hidden size={14} strokeWidth={2} />}>
                 <span className="min-w-0 flex-1">
                   {ruleLine(rule)}
                   <span className="text-muted"> · {ruleState(rule).text}</span>
@@ -182,29 +205,37 @@ function CardBody({
           </div>
         ) : null}
 
-        {event.body ? <p className="whitespace-pre-line text-[13px] leading-5 [overflow-wrap:anywhere]">{event.body}</p> : null}
+        {event.body ? (
+          <p className="cal-card-body flex gap-2 whitespace-pre-line text-[13px] leading-5 [overflow-wrap:anywhere]">
+            <AlignLeft aria-hidden size={14} strokeWidth={2} className="cal-card-icon mt-[3px] shrink-0" />
+            <span className="min-w-0">{event.body}</span>
+          </p>
+        ) : null}
         {event.audio_path ? <AudioOriginal path={event.audio_path} /> : null}
 
-        <section>
+        <section className="cal-card-people">
           <div className="flex items-baseline justify-between gap-3 pb-1">
             <h3 className="desk-label uppercase">Участники</h3>
             <span className="text-[12px] leading-4 text-muted">{rsvpSummary(event)}</span>
           </div>
+          {event.participants.length > 1 ? <AnswersBar {...answers} /> : null}
           <ul className="desk-list" data-testid="desk-event-people-list">
             {shown.map((person) => {
               const name = person.person?.full_name ?? "Сотрудник";
-              const state =
-                person.user_id === event.author_id
-                  ? { text: "созвал", color: "var(--text-muted)" }
+              const author = person.user_id === event.author_id;
+              const answer =
+                author
+                  ? { text: "созвал", color: "var(--text-muted)", tone: "muted" }
                   : person.status === "going"
-                    ? { text: "будет", color: "var(--ok)" }
+                    ? { text: "будет", color: "var(--ok)", tone: "ok" }
                     : person.status === "declined"
-                      ? { text: "не сможет", color: "var(--danger)" }
+                      ? { text: "не сможет", color: "var(--danger)", tone: "danger" }
                       : person.user_id === meId && !over
-                        ? { text: "нужен ваш ответ", color: "var(--warn)" }
-                        : { text: "ждём ответа", color: "var(--text-muted)" };
+                        ? { text: "нужен ваш ответ", color: "var(--warn)", tone: "warn" }
+                        : { text: "ждём ответа", color: "var(--text-muted)", tone: "wait" };
               return (
-                <li key={person.user_id} className="flex min-h-8 items-center gap-2 py-0.5">
+                <li key={person.user_id} className="cal-person flex min-h-8 items-center gap-2 py-0.5">
+                  <Face person={person} size={26} ring author={author} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[13px] leading-[18px]" title={name}>
                       {shortName(name)}
@@ -212,8 +243,8 @@ function CardBody({
                     </span>
                     {person.status === "declined" && person.reason ? <span className="block truncate text-[12px] leading-4 text-muted">{person.reason}</span> : null}
                   </span>
-                  <span className="shrink-0 text-[12px] font-medium leading-4" style={{ color: state.color }}>
-                    {state.text}
+                  <span className="cal-answer shrink-0 text-[12px] font-medium leading-4" data-tone={answer.tone} style={{ color: answer.color } as CSSProperties}>
+                    {answer.text}
                   </span>
                 </li>
               );
@@ -228,7 +259,7 @@ function CardBody({
       </div>
 
       {confirming ? (
-        <div ref={confirmBox} className="border-t border-text px-4 py-3" data-testid="desk-event-confirm">
+        <div ref={confirmBox} className="cal-card-confirm border-t border-text px-4 py-3" data-testid="desk-event-confirm">
           <p className="text-[14px] font-semibold leading-5">Удалить встречу?</p>
           <p className="mt-0.5 text-[12px] leading-4 text-muted">
             {/* who already knew gets «Отмена»; a past meeting just leaves the calendar */}
@@ -252,7 +283,7 @@ function CardBody({
           </div>
         </div>
       ) : canAnswer ? (
-        <div className="border-t border-border px-4 py-3">
+        <div className="cal-card-foot border-t border-border px-4 py-3">
           {declining ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="mr-1 text-[12px] leading-4 text-muted">Почему?</span>
@@ -293,7 +324,7 @@ function IconButton({ label, keys, onClick, children, testId, danger = false }: 
         aria-label={label}
         onClick={onClick}
         data-testid={testId}
-        className={`flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 ${danger ? "hover:text-danger" : "hover:text-text"}`}
+        className={`cal-icon-button flex h-8 w-8 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 ${danger ? "hover:text-danger" : "hover:text-text"}`}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           {children}
@@ -303,11 +334,14 @@ function IconButton({ label, keys, onClick, children, testId, danger = false }: 
   );
 }
 
-/** A fact of the meeting: its word in the margin, its value beside it. */
-function Line({ word, children }: { word: string; children: ReactNode }) {
+/** A fact of the meeting: its word in the margin (its icon in «Графит»), its value beside it. */
+function Line({ word, icon, children }: { word: string; icon: ReactNode; children: ReactNode }) {
   return (
-    <p className="grid grid-cols-[56px_minmax(0,1fr)] items-baseline gap-2">
-      <span className="desk-label uppercase">{word}</span>
+    <p className="cal-fact grid grid-cols-[56px_minmax(0,1fr)] items-baseline gap-2">
+      <span className="desk-label uppercase cal-fact-word">{word}</span>
+      <span className="cal-fact-icon" title={word}>
+        {icon}
+      </span>
       <span className="flex min-w-0 items-start gap-2">{children}</span>
     </p>
   );

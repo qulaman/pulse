@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { Check, KeyRound } from "lucide-react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
 import { Kbd } from "@/components/desk/ui/Kbd";
@@ -25,7 +26,7 @@ import {
 } from "@/lib/people/queries";
 
 import { CopyButton, INPUT, PasswordInput } from "./fields";
-import { Block } from "./shared";
+import { CardSection } from "./Hero";
 
 /** The login a new person was created with (B.3): a code to issue at once, or the email and the first password. */
 export type Handed = { email: string | null; password: string | null };
@@ -43,7 +44,7 @@ function left(ms: number): string {
 
 function Line({ label, value, action }: { label: string; value: ReactNode; action?: ReactNode }) {
   return (
-    <div className="flex min-h-[34px] items-center gap-3 py-px">
+    <div className="login-line">
       <span className="w-[116px] shrink-0 text-[13px] leading-5 text-muted">{label}</span>
       <span className="min-w-0 flex-1 truncate text-[14px] leading-5">{value}</span>
       {action}
@@ -61,9 +62,9 @@ function ErrorLine({ text }: { text: string | null }) {
 }
 
 const CHECK = (
-  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden className="shrink-0">
-    <path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
+  <span className="login-landed-mark" aria-hidden>
+    <Check size={18} strokeWidth={2.75} />
+  </span>
 );
 
 /**
@@ -130,7 +131,10 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
             : "Последний код так и не ввели"
         : null;
     return (
-      <div className="flex items-start gap-4 py-2" data-testid="desk-code-idle">
+      <div className="login-idle" data-testid="desk-code-idle">
+        <span className="login-key" aria-hidden>
+          <KeyRound size={18} strokeWidth={2} />
+        </span>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-semibold leading-5">Код входа</p>
           <p className="mt-0.5 text-[13px] leading-[18px] text-muted">
@@ -158,7 +162,7 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   if (landed) {
     return (
-      <div className="flex items-center gap-2.5 py-2" data-testid="code-landed">
+      <div className="login-landed" data-testid="code-landed">
         {CHECK}
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-semibold leading-5">{tv ? "Экран подключён" : "Вход выполнен"}</p>
@@ -175,7 +179,7 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   if (expired) {
     return (
-      <div className="flex items-center gap-4 py-2" data-testid="code-expired">
+      <div className="login-expired" data-testid="code-expired">
         <p className="min-w-0 flex-1 text-[14px] leading-5">Код сгорел — его не ввели за 15 минут.</p>
         <ErrorLine text={error} />
         <Button size="sm" variant="secondary" className="desk-move" loading={issue.isPending} onClick={() => doIssue.current(person.id)} data-testid="code-issue">
@@ -187,21 +191,29 @@ function CodePanel({ person, autoIssue, onDone, focus }: { person: Person; autoI
 
   const message = () => codeMessage({ name: person.full_name, company: issued.code.company, code: issued.code.code, expiresAt: issued.code.expires_at, url: issued.code.link });
   return (
-    <div className="flex flex-col gap-3 py-3" data-testid="desk-code-issued">
+    <div className="login-issued" data-testid="desk-code-issued">
       <div className="flex items-start gap-4">
-        {tv ? null : <QrCode text={issued.code.link} size={176} label={`QR-код: вход в ${issued.code.company}`} />}
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 pt-1">
-          <p className="desk-label uppercase">Код входа</p>
+        {tv ? null : (
+          <span className="login-qr">
+            <QrCode text={issued.code.link} size={164} label={`QR-код: вход в ${issued.code.company}`} />
+          </span>
+        )}
+        <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
+          <p className="text-[12px] font-medium leading-4 text-muted">Код входа</p>
           <div className="flex items-center gap-1">
-            <span className="nums select-all whitespace-nowrap text-[26px] leading-8" data-testid="code-value">
+            <span className="nums login-code select-all whitespace-nowrap" data-testid="code-value">
               {formatCode(issued.code.code)}
             </span>
             <CopyButton text={() => issued.code.code} label="Скопировать код" done="Скопировал код" />
           </div>
+          <span className="login-timer" aria-hidden>
+            <span style={{ "--left": Math.max(0, Math.min(1, leftMs / (CODE_TTL_SECONDS * 1000))) } as CSSProperties} />
+          </span>
           <p className="text-[13px] leading-[18px] text-muted" data-testid="code-left">
             действует ещё <When>{left(leftMs)}</When>
           </p>
-          <p className="text-[13px] leading-[18px]" data-testid="code-waiting">
+          <p className="login-waiting text-[13px] leading-[18px]" data-testid="code-waiting">
+            <span className="login-waiting-dot" aria-hidden />
             Ждёт входа…
           </p>
         </div>
@@ -230,7 +242,7 @@ function FreshCredentials({ person, email, password, onDone }: { person: Person;
   const first = person.full_name.split(/\s+/)[0] || person.full_name;
   const message = () => loginMessage({ name: person.full_name, email, password, url: window.location.origin });
   return (
-    <div className="flex flex-col gap-2 py-3" data-testid="desk-login-fresh">
+    <div className="login-fresh flex flex-col gap-2" data-testid="desk-login-fresh">
       <p className="text-[14px] font-semibold leading-5">{first} — в команде</p>
       <dl className="desk-list" data-testid="credentials">
         <div className="flex min-h-[34px] items-center gap-3">
@@ -332,8 +344,8 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
   if (!manage && !fresh) return null;
 
   return (
-    <Block title="Вход" testId="desk-login">
-      <section ref={box} className="desk-list scroll-mt-24" data-testid="desk-login-code" data-focus={focus ? "" : undefined}>
+    <CardSection id="person-login" title="Вход" testId="desk-login">
+      <section ref={box} className="login-box scroll-mt-24" data-testid="desk-login-code" data-focus={focus ? "" : undefined}>
         {freshCredentials ? <FreshCredentials person={person} email={freshCredentials.email} password={freshCredentials.password} onDone={() => setFresh(null)} /> : null}
         {manage || !freshCredentials ? (
           <CodePanel
@@ -376,8 +388,8 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
                 )
               }
             />
-            <div className="flex min-h-[34px] items-center justify-between gap-3 py-px">
-              <span className="min-w-0 truncate text-[13px] leading-5 text-muted">Потерял телефон?</span>
+            <div className="login-line justify-between">
+              <span className="min-w-0 truncate text-[13px] leading-5 text-muted">Телефон потерян?</span>
               <Button
                 size="sm"
                 variant="ghost"
@@ -504,6 +516,6 @@ export function LoginBlock({ person, handed, manage, focus = false }: { person: 
           </div>
         </div>
       </Dialog>
-    </Block>
+    </CardSection>
   );
 }

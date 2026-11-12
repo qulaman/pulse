@@ -16,6 +16,12 @@ import "./graphite.css";
 import "./person-stats.css";
 // «Команда» as a grid with a card under the row (D-172)
 import "./team.css";
+// the desk polish wave (D-174): one file a screen group, each owned by one hand
+import "./tasks.css";
+import "./errands.css";
+import "./planning.css";
+import "./reports.css";
+import "./settings.css";
 
 export const metadata: Metadata = { title: "Pulse" };
 

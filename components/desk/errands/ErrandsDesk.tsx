@@ -1,16 +1,14 @@
 "use client";
 
+import { ArrowLeft, BellRing, CheckCheck, Clock, CloudOff, History } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { useDeskScope } from "@/components/desk/DeskScope";
-import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { Kbd } from "@/components/desk/ui/Kbd";
-import { Num } from "@/components/desk/ui/Num";
 import { DeskPage, PageTitle } from "@/components/desk/ui/PageTitle";
-import { QuickErrands } from "@/components/desk/ui/QuickErrands";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import type { Tone } from "@/components/desk/ui/tone";
@@ -19,10 +17,11 @@ import { MessageAsk } from "@/components/visits/MessageAsk";
 import { ReceptionCards } from "@/components/visits/ReceptionCards";
 import { VisitAsk } from "@/components/visits/VisitAsk";
 import { Button } from "@/components/ui/Button";
+import { RollingNumber } from "@/components/ui/RollingNumber";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { humanAqtobe } from "@/lib/ai/time";
 import { useErrandLink, useSetAway } from "@/lib/errands/mutations";
-import { STALE_MS } from "@/lib/errands/pending";
+import { STALE_MS, usePendingErrands } from "@/lib/errands/pending";
 import {
   isActive,
   useErrand,
@@ -34,7 +33,6 @@ import {
   type Errand,
 } from "@/lib/errands/queries";
 import { absenceLine, AWAY_SPANS, awayUntil, deskFocus, etaLeftMin, etaLine, isAway, isYesNo, sceneOf, untilLine } from "@/lib/errands/scene";
-import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount, type ErrandTally } from "@/lib/errands/stats";
 import { shortName, useNamesKey } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
 import type { SecretaryAction } from "@/lib/settings";
@@ -44,12 +42,17 @@ import { useVisits } from "@/lib/visits/queries";
 import { awaitingDirector, reception, unreadMessages } from "@/lib/visits/text";
 
 import { writeParams } from "../tasks/flow";
-import { DeskHero, HeroBone } from "../team/Hero";
+import { HeroBone } from "../team/Hero";
 import { arrowOf, onControl, stepKey, useScreenKeys } from "../team/keys";
 import { useCancelErrand } from "./cancel";
 import { ErrandDetails } from "./ErrandCard";
-import { ErrandHistory, ErrandWhat, ErrandWord } from "./ErrandHistory";
+import { ErrandHistory } from "./ErrandHistory";
+import { DeskFaces, ErrandsHero } from "./Hero";
+import { LiveBoard } from "./Live";
+import { AlarmGlyph, ErrandTile, PersonFace, useArrivals } from "./look";
+import { QuickAsk } from "./Quick";
 import { KeyCap, QueueList, WordField, resultsOf } from "./Queue";
+import { ErrandStats } from "./Stats";
 import { STATUS_WORD, canCancel, cancelWord, lower, today } from "./words";
 
 const NO_ACTIONS: SecretaryAction[] = [];
@@ -57,7 +60,10 @@ const NO_ERRANDS: Errand[] = [];
 
 /* ---- the secretary ----------------------------------------------------------------------- */
 
-/** «На месте» / «Не на месте до 14:00» (D-99): the secretary's own row, and who of the others is there. */
+/**
+ * «На месте» / «Не на месте до 14:00» (D-99) as a card: her own circle ringed green while she is
+ * there, dimmed with a dashed ring while away; «Отойти» in four chips; who of the others is there.
+ */
 function Presence({ meId, now }: { meId: string; now: Date }) {
   const secretaries = useSecretaries();
   const setAway = useSetAway(meId);
@@ -67,44 +73,144 @@ function Presence({ meId, now }: { meId: string; now: Date }) {
   const others = list.filter((p) => p.id !== meId);
 
   return (
-    <section className="flex flex-col gap-1" data-testid="desk-presence" data-away={away ? "1" : "0"}>
-      <SectionLabel>Я</SectionLabel>
-      <div className="desk-list">
-        <div className="flex min-h-[34px] items-center gap-2 py-px">
-          <p className="min-w-0 flex-1 text-[14px] font-semibold leading-5">{away && me?.away_until ? `Не на месте ${untilLine(me.away_until)}` : "На месте"}</p>
-          {away ? (
-            <Button size="sm" variant="secondary" className="desk-move !min-h-8" onClick={() => setAway.mutate(null)}>
-              Я на месте
-            </Button>
-          ) : null}
+    <section className="errands-card flex flex-col gap-3" data-testid="desk-presence" data-away={away ? "1" : "0"}>
+      <div className="flex items-center gap-3">
+        <span className="relative inline-flex">
+          <PersonFace id={meId} name={me?.full_name ?? ""} size={40} ring={away ? null : "ok"} away={away} />
+          {away ? null : <span aria-hidden className="errands-presence" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold leading-5">{away && me?.away_until ? `Не на месте ${untilLine(me.away_until)}` : "На месте"}</p>
+          <p className="text-[12px] leading-4 text-muted">{away ? "просьбы уходят тем, кто на месте" : "просьбы директора приходят вам"}</p>
         </div>
-        <div className="flex min-h-[34px] flex-wrap items-baseline gap-x-3 gap-y-1 py-[7px] text-[14px] leading-5">
-          <span className="text-muted">Отойти:</span>
-          {AWAY_SPANS.map((span) => (
-            <button key={span.label} type="button" onClick={() => setAway.mutate(awayUntil(span.min))} className="desk-word desk-focus">
-              {span.label.replace(/^На /, "")}
-            </button>
-          ))}
-        </div>
-        <p className="py-1.5 text-[12px] leading-4 text-muted">Пока вас нет, просьбы директора уходят тем, кто на месте; если никого — ждут вас.</p>
-        {others.map((person) => (
-          <div key={person.id} className="flex min-h-[34px] items-center justify-between gap-2 text-[14px] leading-5">
-            <span className="truncate">{shortName(person.full_name)}</span>
-            <span className="shrink-0 text-muted">{isAway(person, now) ? `не на месте ${untilLine(person.away_until as string)}` : "на месте"}</span>
-          </div>
+        {away ? (
+          <Button size="sm" variant="secondary" className="desk-move !min-h-8" onClick={() => setAway.mutate(null)}>
+            Я на месте
+          </Button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5 text-[13px] leading-5">
+        <span className="mr-0.5 inline-flex items-center gap-1 text-muted">
+          <Clock size={13} strokeWidth={2.25} aria-hidden />
+          Отойти
+        </span>
+        {AWAY_SPANS.map((span) => (
+          <button key={span.label} type="button" onClick={() => setAway.mutate(awayUntil(span.min))} className="desk-word desk-focus">
+            {span.label.replace(/^На /, "")}
+          </button>
         ))}
       </div>
+      <p className="text-[12px] leading-4 text-muted">Пока вас нет, просьбы директора уходят тем, кто на месте; если никого — ждут вас.</p>
+      {others.length > 0 ? (
+        <ul className="errands-card-rows">
+          {others.map((person) => {
+            const gone = isAway(person, now);
+            return (
+              <li key={person.id} className="flex min-h-[36px] items-center gap-2.5 text-[13px] leading-[18px]">
+                <PersonFace id={person.id} name={person.full_name} size={24} ring={gone ? null : "ok"} away={gone} />
+                <span className="min-w-0 flex-1 truncate font-medium">{shortName(person.full_name)}</span>
+                <span className="shrink-0 text-muted">{gone ? `не на месте ${untilLine(person.away_until as string)}` : "на месте"}</span>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </section>
   );
 }
 
+/** What she closed today: the request's icon, what was passed back, how it ended, when. */
+function ClosedToday({ rows, now, catalogue, openId, onOpen }: { rows: readonly Errand[]; now: Date; catalogue: readonly SecretaryAction[]; openId: string | null; onOpen: (id: string) => void }) {
+  return (
+    <section className="errands-card flex flex-col gap-2" data-testid="desk-errands-today">
+      <div className="flex min-h-7 items-center gap-2">
+        <h2 className="desk-label text-[13px] font-semibold leading-[18px]">Сегодня закрыто</h2>
+        {rows.length > 0 ? <span className="nums text-[12px] leading-4 text-muted">{rows.length}</span> : null}
+        <button type="button" onClick={() => writeParams({ view: "history" })} className="desk-word desk-focus ml-auto inline-flex items-center gap-1 text-[12px] leading-4" data-testid="desk-errands-all">
+          <History size={13} strokeWidth={2.25} aria-hidden />
+          Вся история
+        </button>
+      </div>
+      {rows.length === 0 ? (
+        <p className="py-1 text-[13px] leading-5 text-muted">Пока ничего.</p>
+      ) : (
+        <ul className="errands-card-rows">
+          {rows.map((errand) => (
+            <li key={errand.id}>
+              <button
+                type="button"
+                onClick={() => onOpen(errand.id)}
+                aria-current={openId === errand.id ? "true" : undefined}
+                className="errands-closed desk-focus"
+                data-status={errand.status}
+              >
+                <ErrandTile errand={errand} catalogue={catalogue} size={24} muted={errand.status !== "done"} />
+                <span className="min-w-0 flex-1 truncate">
+                  {errand.label}
+                  {errand.result ? <span className="text-muted"> · «{errand.result}»</span> : null}
+                </span>
+                <span className="errands-closed-word">{STATUS_WORD[errand.status]}</span>
+                <When className="nums shrink-0 text-[12px] text-muted">{humanAqtobe(new Date(errand.done_at ?? errand.created_at), now).replace(/^сегодня /, "")}</When>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/** The requests did not come: the total says so in words, never «всё спокойно» over nothing. */
+function LoadFailedHero({ busy, onRetry }: { busy: boolean; onRetry: () => void }) {
+  return (
+    <ErrandsHero
+      tone="warn"
+      lead={
+        <span className="errands-figure-tile" data-tone="warn">
+          <CloudOff size={24} strokeWidth={2.25} aria-hidden />
+        </span>
+      }
+      title="Заявки не загрузились"
+      sub="Проверьте связь — экран обновится сам, как только она будет"
+      aside={
+        <Button size="sm" variant="secondary" loading={busy} onClick={onRetry} data-testid="desk-errands-retry">
+          Повторить
+        </Button>
+      }
+    />
+  );
+}
+
+/** The secretary's total: how many wait for her as a figure, a tick when it is calm, the siren at an alarm. */
+function QueueFigure({ alarm, value }: { alarm: boolean; value: number }) {
+  if (alarm) {
+    return (
+      <span className="errands-figure-tile" data-tone="danger">
+        <AlarmGlyph size={24} />
+      </span>
+    );
+  }
+  if (value === 0) {
+    return (
+      <span className="errands-figure-tile" data-tone="ok">
+        <CheckCheck size={24} strokeWidth={2.25} aria-hidden />
+      </span>
+    );
+  }
+  return (
+    <span className="errands-figure-tile" data-tone="wait">
+      <RollingNumber value={value} className="nums desk-figure text-[28px] leading-none" />
+    </span>
+  );
+}
+
 /**
- * The secretary's desk (tasks/022 B.4, D-154; wave 3, D-158): the total — how many wait for her
- * and how many are in her hands; the queue — the visitors still at her desk and the live requests,
- * nobody's and her own, as one ruled list worked from the keyboard (QueueList); «Что передать
- * директору?» after «Готово» stays at its top; her presence and what was closed today on the
- * right. Her own history is a second view, on an explicit word (`?view=history`): the queue stays
- * the screen's main business and the total stays over both, an alarm included.
+ * The secretary's desk (tasks/022 B.4, D-154; wave 3, D-158; D-174): the total — how many wait for
+ * her and how many are in her hands, the alarm in the red pencil; the queue — the visitors still at
+ * her desk and the live requests, nobody's and her own, as a board of cards worked from the keyboard
+ * (QueueList); «Что передать директору?» after «Готово» stays at its top; her presence and what was
+ * closed today on the right. Her own history is a second view, on an explicit word
+ * (`?view=history`): the queue stays the screen's main business and the total stays over both.
  */
 function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; openId: string | null; onOpen: (id: string) => void; history: boolean }) {
   const now = useNow(30_000);
@@ -125,6 +231,11 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
       .sort((a, b) => rank(a) - rank(b) || a.created_at.localeCompare(b.created_at));
   }, [rows, meId, actions]);
   const results = resultsOf(rows, meId, now, actions, dismissed);
+  // held by the screen, not the list: the first request into an empty queue arrives too
+  const fresh = useArrivals(
+    queue.map((errand) => errand.id),
+    !errands.isLoading,
+  );
   const closedToday = rows.filter((e) => !isActive(e) && today(e.created_at, now));
   const guests = reception(visits.data ?? []);
   const waiting = queue.filter((e) => e.status === "sent").length;
@@ -149,10 +260,11 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
       <PageTitle title="Заявки" />
       {errands.isLoading ? (
         <HeroBone />
+      ) : errands.isError && !errands.data ? (
+        <LoadFailedHero busy={errands.isFetching} onRetry={() => void errands.refetch()} />
       ) : (
-        <DeskHero
-          testId="desk-errands-hero"
-          value={waiting > 0 ? waiting : mine > 0 ? mine : undefined}
+        <ErrandsHero
+          lead={<QueueFigure alarm={alarm} value={waiting > 0 ? waiting : mine} />}
           tone={alarm ? "danger" : null}
           title={
             alarm
@@ -160,7 +272,7 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
               : waiting > 0
                 ? `${pluralRu(waiting, ["ждёт", "ждут", "ждут"])} ответа`
                 : mine > 0
-                  ? "в работе"
+                  ? `${pluralRu(mine, ["заявка", "заявки", "заявок"])} в работе`
                   : "Всё спокойно"
           }
           sub={
@@ -171,25 +283,29 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
           aside={
             history ? (
               <Button size="sm" variant="secondary" onClick={() => writeParams({ view: null, from: null, to: null })} data-testid="desk-errands-queue-back">
-                К очереди
+                <ArrowLeft size={14} strokeWidth={2.25} aria-hidden className="mr-1.5" />К очереди
               </Button>
             ) : null
           }
         />
       )}
       {history ? (
-        <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} />
+        <ErrandHistory viewer="secretary" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={false} catalogue={actions} />
       ) : (
         /* two columns while the screen's own width allows — the panel takes 440 px of the window */
         <div className="@container">
-          <div className="grid items-start gap-x-10 gap-y-6 @min-[900px]:grid-cols-[minmax(0,1fr)_296px]">
-            <section className="flex min-w-0 flex-col gap-1" data-testid="desk-errand-queue">
+          <div className="grid items-start gap-x-6 gap-y-6 @min-[900px]:grid-cols-[minmax(0,1fr)_312px]">
+            <section className="flex min-w-0 flex-col gap-2" data-testid="desk-errand-queue">
               <SectionLabel count={errands.isLoading ? undefined : queue.length + guests.length}>Очередь</SectionLabel>
-              {guests.length > 0 ? <ReceptionCards visits={visits.data ?? []} now={now} /> : null}
+              {guests.length > 0 ? (
+                <div className="errands-reception">
+                  <ReceptionCards visits={visits.data ?? []} now={now} />
+                </div>
+              ) : null}
               {errands.isLoading ? (
-                <SkeletonGroup grow>
-                  <Bone h={34} />
-                  <Bone h={34} className="mt-px" />
+                <SkeletonGroup grow className="errands-card flex flex-col gap-px">
+                  <Bone h={58} />
+                  <Bone h={58} />
                 </SkeletonGroup>
               ) : queue.length === 0 && results.length === 0 && guests.length === 0 ? (
                 <EmptyState tone="ok" title="Новая просьба встанет сюда сама" hint="И с клавиатуры: Enter — принял, N — не могу, Q — уточнить, ↑ ↓ — выбор" />
@@ -201,49 +317,16 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
                   now={now}
                   catalogue={actions}
                   openId={openId}
+                  fresh={fresh}
                   onOpen={onOpen}
                   onDismiss={(id) => setDismissed((was) => new Set(was).add(id))}
                 />
               ) : null}
             </section>
 
-            <aside className="flex min-w-0 flex-col gap-6">
+            <aside className="flex min-w-0 flex-col gap-4">
               <Presence meId={meId} now={now} />
-              <section className="flex flex-col gap-1" data-testid="desk-errands-today">
-                <SectionLabel
-                  count={closedToday.length}
-                  action={
-                    <button type="button" onClick={() => writeParams({ view: "history" })} className="desk-word desk-focus text-[13px] leading-4" data-testid="desk-errands-all">
-                      Вся история
-                    </button>
-                  }
-                >
-                  Сегодня закрыто
-                </SectionLabel>
-                {closedToday.length === 0 ? (
-                  <p className="border-t border-text py-[7px] text-[14px] leading-5 text-muted">Пока ничего.</p>
-                ) : (
-                  <ul className="desk-list">
-                    {closedToday.map((errand) => (
-                      <li key={errand.id}>
-                        <button
-                          type="button"
-                          onClick={() => onOpen(errand.id)}
-                          className={`flex min-h-[34px] w-full items-center justify-between gap-3 text-left text-[14px] leading-5 hover:bg-surface-2/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${openId === errand.id ? "bg-accent/5" : ""}`}
-                        >
-                          <span className="min-w-0 truncate">
-                            {errand.label}
-                            {errand.result ? <span className="text-muted"> · «{errand.result}»</span> : null}
-                          </span>
-                          <span className="shrink-0 text-[13px] text-muted">
-                            {STATUS_WORD[errand.status]} · <When>{humanAqtobe(new Date(errand.created_at), now).replace(/^сегодня /, "")}</When>
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <ClosedToday rows={closedToday} now={now} catalogue={actions} openId={openId} onOpen={onOpen} />
             </aside>
           </div>
         </div>
@@ -255,7 +338,7 @@ function SecretaryErrands({ meId, openId, onOpen, history }: { meId: string; ope
 
 /* ---- the director ------------------------------------------------------------------------ */
 
-type Moment = { tone: Tone | null; title: string; sub: string; asking?: Errand; nudge?: Errand };
+type Moment = { tone: Tone | null; title: string; sub: string; asking?: Errand; nudge?: Errand; busyId?: string | null };
 
 /**
  * What is going on at the secretary's desk, in one line for the director's hero: a question that
@@ -266,7 +349,7 @@ function momentOf(active: readonly Errand[], guests: number, catalogue: readonly
   const asking = active.find((e) => e.question && !e.answer);
   if (asking) {
     const who = shortName(asking.claimed?.full_name ?? "") || "Секретарь";
-    return { tone: "accent", title: `${who} спрашивает: «${asking.question}»`, sub: `${asking.label} · ${waitedFor(asking, now)}`, asking };
+    return { tone: "accent", title: `${who} спрашивает: «${asking.question}»`, sub: `${asking.label} · ${waitedFor(asking, now)}`, asking, busyId: asking.claimed_by };
   }
   if (guests > 0) return { tone: "accent", title: "Вас ждут у секретаря", sub: "Посетитель или сообщение — ответ ниже" };
   const focus = deskFocus(active, null, catalogue, now);
@@ -283,43 +366,21 @@ function momentOf(active: readonly Errand[], guests: number, catalogue: readonly
     };
   }
   if (focus.errand) {
-    const who = shortName(focus.errand.claimed?.full_name ?? "") || "секретарь";
+    const who = shortName(focus.errand.claimed?.full_name ?? "") || "Секретарь";
     const eta = etaLine(etaLeftMin(focus.errand, now));
     return {
       tone: "ok",
       title: `Сейчас у секретаря: ${lower(focus.errand.label)}`,
-      sub: [`${who} взял${focus.errand.accepted_at ? ` ${humanAqtobe(new Date(focus.errand.accepted_at), now).replace(/^сегодня /, "в ")}` : ""}`, eta]
+      // who has it and since when, no guessed gender (docs/DESIGN.md): «Марат · взято в 17:04»
+      sub: [who, focus.errand.accepted_at ? `взято ${humanAqtobe(new Date(focus.errand.accepted_at), now).replace(/^сегодня /, "в ")}` : null, eta]
         .filter(Boolean)
         .join(" · "),
+      busyId: focus.errand.claimed_by,
     };
   }
   const absent = absenceLine(secretaries, now);
   if (absent) return { tone: null, title: absent.charAt(0).toUpperCase() + absent.slice(1), sub: "Просьба подождёт — уйдёт, как только кто-то вернётся" };
   return { tone: null, title: "Секретарь свободен", sub: "Попросите в один клик — или строкой поручения сверху" };
-}
-
-/**
- * «Отменить» in the row of a live request: quiet until the row is hovered or chosen, as the row
- * buttons of the desk are; a false alarm is not left to be found.
- */
-function RowCancel({ errand, onCancel }: { errand: Errand; onCancel: (errand: Errand) => void }) {
-  const hidden = errand.urgent ? "" : "opacity-0 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100 focus-visible:opacity-100";
-  return (
-    <button
-      type="button"
-      className={`text-[13px] font-semibold leading-4 transition-opacity duration-[120ms] ${hidden}`}
-      style={{ color: errand.urgent ? "var(--danger)" : "var(--text-muted)" }}
-      title="Отменить заявку · клавиша X, когда она открыта"
-      onClick={(event) => {
-        // the row's click would open the panel for what is leaving the list
-        event.stopPropagation();
-        onCancel(errand);
-      }}
-      data-testid="desk-errand-cancel"
-    >
-      {cancelWord(errand)}
-    </button>
-  );
 }
 
 /** The secretary's question answered right in the hero: «Да» / «Нет» (Y / N) for a yes-or-no one, or a word. */
@@ -351,40 +412,6 @@ function HeroAnswer({ errand, onOpen }: { errand: Errand; onOpen: () => void }) 
   );
 }
 
-/** Thirty days in numbers: how many, how fast, what nobody took, and who did what. */
-function Stats({ rows, tally, average, unclaimed }: { rows: readonly Errand[]; tally: ErrandTally[]; average: number | null; unclaimed: number }) {
-  const tallyColumns: Column<ErrandTally>[] = [
-    { key: "name", title: "Кто", render: (t) => <span className="block truncate">{shortName(t.name)}</span> },
-    { key: "taken", title: "Взято", width: "60px", align: "right", sort: (a, b) => a.taken - b.taken, render: (t) => <span className="nums">{t.taken}</span> },
-    { key: "done", title: "Готово", width: "68px", align: "right", sort: (a, b) => a.done - b.done, render: (t) => <span className="nums">{t.done}</span> },
-    {
-      key: "declined",
-      title: "Отказ",
-      width: "64px",
-      align: "right",
-      sort: (a, b) => a.declined - b.declined,
-      render: (t) => <Num value={t.declined} tone="danger" />,
-    },
-  ];
-  const line = (label: string, value: string) => (
-    <div className="flex min-h-[34px] items-baseline justify-between gap-3 py-[7px]">
-      <dt className="text-[14px] leading-5 text-muted">{label}</dt>
-      <dd className={`nums text-[14px] leading-5 ${value === "0" || value === "—" ? "text-muted" : ""}`}>{value}</dd>
-    </div>
-  );
-  return (
-    <aside className="flex min-w-0 flex-col gap-1" data-testid="desk-errands-stats">
-      <SectionLabel>За 30 дней</SectionLabel>
-      <dl className="desk-list">
-        {line(pluralRu(rows.length, ["Заявка", "Заявки", "Заявок"]), String(rows.length))}
-        {line("Попросил → готово, в среднем", average === null ? "—" : humanMinutes(average))}
-        {line("Никто не взял", String(unclaimed))}
-      </dl>
-      {tally.length > 0 ? <DataGrid aria-label="Кто сколько взял" className="mt-5" columns={tallyColumns} rows={tally} rowKey={(t) => t.name} empty={null} /> : null}
-    </aside>
-  );
-}
-
 /**
  * The director's errands (tasks/022 B.4, D-154; wave 3): the hero — what is going on at the
  * secretary's desk now, the secretary's question answered right there (Y / N or a word), «Напомнить
@@ -405,11 +432,15 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
   const rows = history.data ?? NO_ERRANDS;
   const visitRows = visits.data ?? [];
   const active = rows.filter(isActive).sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const tally = tallyByPerson(rows);
-  const unclaimed = unclaimedCount(rows);
-  const average = averageDoneMinutes(rows);
+  const actions = catalogue.data ?? NO_ACTIONS;
+  const pending = usePendingErrands((state) => state.pending.length);
   const guests = awaitingDirector(visitRows).length + unreadMessages(visitRows).length;
-  const moment = momentOf(active, guests, catalogue.data ?? NO_ACTIONS, secretaries.data ?? [], now);
+  const moment = momentOf(active, guests, actions, secretaries.data ?? [], now);
+  // held by the screen, not the board: the first request onto an empty board arrives too
+  const fresh = useArrivals(
+    active.map((errand) => errand.id),
+    !history.isLoading,
+  );
 
   useScreenKeys((event) => {
     const arrow = arrowOf(event);
@@ -439,20 +470,16 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
     { keys: ["Ctrl K"], label: "Попросить строкой: «чай без сахара»" },
   ]);
 
-  const liveColumns: Column<Errand>[] = [
-    { key: "what", title: "Что", render: (e) => <ErrandWhat errand={e} now={now} /> },
-    { key: "state", title: "Статус", width: "minmax(160px,220px)", render: (e) => <ErrandWord errand={e} /> },
-    { key: "waited", title: "Ждёт", width: "100px", align: "right", render: (e) => <span className="nums">{waitedFor(e, now)}</span> },
-    { key: "cancel", title: "", width: "136px", align: "right", render: (e) => (canCancel(e, meId) ? <RowCancel errand={e} onCancel={cancel} /> : null) },
-  ];
   return (
     <DeskPage>
       <PageTitle title="Заявки" />
       {history.isLoading ? (
         <HeroBone />
+      ) : history.isError && !history.data ? (
+        <LoadFailedHero busy={history.isFetching} onRetry={() => void history.refetch()} />
       ) : (
-        <DeskHero
-          testId="desk-errands-hero"
+        <ErrandsHero
+          lead={<DeskFaces people={secretaries.data ?? []} busyId={moment.busyId ?? null} now={now} />}
           tone={moment.tone}
           title={moment.title}
           sub={moment.sub}
@@ -466,6 +493,7 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
                   onClick={() => moment.nudge && link.mutate({ fn: "errand_nudge", id: moment.nudge.id })}
                   data-testid="desk-errand-nudge"
                 >
+                  <BellRing size={14} strokeWidth={2.25} aria-hidden className="mr-1.5" />
                   Напомнить ещё раз
                 </Button>
                 {canCancel(moment.nudge, meId) ? (
@@ -478,49 +506,55 @@ function DirectorErrands({ meId, openId, onOpen }: { meId: string; openId: strin
           }
         >
           {moment.asking ? <HeroAnswer errand={moment.asking} onOpen={() => moment.asking && onOpen(moment.asking.id)} /> : null}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1" data-testid="desk-errands-quick">
-            <span className="desk-label uppercase">Попросить</span>
-            <QuickErrands limit={5} />
+          <div className="errands-hero-ask flex flex-wrap items-center gap-x-3 gap-y-2" data-testid="desk-errands-quick">
+            <span className="text-[13px] font-medium leading-[18px] text-muted">Попросить</span>
+            <QuickAsk limit={6} />
             {/* the order line's errand matcher (D-79 §9): a short phrase of a catalogue button, no name in it */}
             <span className="ml-auto flex items-center gap-1.5 text-[12px] leading-4 text-muted">
               или строкой: «чай без сахара» <Kbd>Ctrl K</Kbd>
             </span>
           </div>
-        </DeskHero>
+        </ErrandsHero>
       )}
 
-      {active.length > 0 || guests > 0 ? (
-        <section className="@container flex flex-col gap-1" data-testid="desk-errands-now">
+      {active.length > 0 || guests > 0 || pending > 0 ? (
+        <section className="@container flex flex-col gap-2" data-testid="desk-errands-now">
           <SectionLabel count={active.length + guests}>Сейчас</SectionLabel>
           {guests > 0 ? (
-            <div className="desk-list">
+            <div className="errands-guests">
               <VisitAsk visits={visitRows} now={now} />
               <MessageAsk visits={visitRows} now={now} />
             </div>
           ) : null}
-          {active.length > 0 ? (
-            <DataGrid
-              aria-label="Заявки сейчас"
-              columns={liveColumns}
-              rows={active}
-              rowKey={(e) => e.id}
-              selectedKey={openId}
-              onSelect={(e) => onOpen(e.id)}
-              rowTone={(e) => (e.question && !e.answer ? "accent" : null)}
-              empty={null}
-            />
-          ) : null}
+          <LiveBoard active={active} meId={meId} now={now} catalogue={actions} openId={openId} fresh={fresh} onOpen={onOpen} onCancel={cancel} />
         </section>
       ) : null}
 
       <div className="@container">
-        <div className="grid items-start gap-x-10 gap-y-6 @min-[980px]:grid-cols-[minmax(0,1fr)_296px]">
-          <ErrandHistory viewer="director" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={pointsEnabled} />
-          {history.isLoading ? null : <Stats rows={rows} tally={tally} average={average} unclaimed={unclaimed} />}
+        <div className="grid items-start gap-x-6 gap-y-6 @min-[980px]:grid-cols-[minmax(0,1fr)_312px]">
+          <ErrandHistory viewer="director" meId={meId} openId={openId} onOpen={onOpen} now={now} pointsOn={pointsEnabled} catalogue={actions} />
+          {/* a failed read shows no zeros: the hero above says it in words */}
+          {history.isLoading ? <StatsBone /> : history.isError && !history.data ? null : <ErrandStats rows={rows} now={now} catalogue={actions} />}
         </div>
       </div>
-      <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={catalogue.data ?? NO_ACTIONS} pointsOn={pointsEnabled} />
+      <ErrandPanel rows={rows} openId={openId} viewer="director" meId={meId} now={now} catalogue={actions} pointsOn={pointsEnabled} />
     </DeskPage>
+  );
+}
+
+/** The thirty days' card while the history loads: its height, nothing jumps when it lands. */
+function StatsBone() {
+  return (
+    <div className="errands-card flex flex-col gap-4" aria-hidden>
+      <Bone h={18} w="40%" />
+      <div className="grid grid-cols-3 gap-2">
+        <Bone h={52} />
+        <Bone h={52} />
+        <Bone h={52} />
+      </div>
+      <Bone h={64} />
+      <Bone h={96} />
+    </div>
   );
 }
 

@@ -1,15 +1,17 @@
 "use client";
 
+import { Plus, Users } from "lucide-react";
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 
 import { OfferPill, Pill } from "@/components/desk/settings/dictionary/parts";
+import { TileFace } from "@/components/desk/team/TeamGrid";
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
-import { PersonLine } from "@/components/desk/settings/form";
 import { toast } from "@/components/ui/Toast";
 import { ALIAS_MAX, byRussian, entryKey, nameReport, planAliases, type NameReport, type RosterPerson } from "@/lib/dictionary";
 import { useEditAliases } from "@/lib/dictionary-queries";
+import { shortName, useNamesKey } from "@/lib/people/names";
 import type { Person } from "@/lib/people/queries";
 
 export type NamesFilter = "all" | "suggest" | "shared";
@@ -17,6 +19,23 @@ export type NamesFilter = "all" | "suggest" | "shared";
 type Line = { person: Person; roster: RosterPerson; report: NameReport; editable: boolean };
 
 const quoted = (list: string[]) => list.map((s) => `«${s}»`).join(", ");
+
+/** A person of the dictionary: their circle, the name, the position under it. */
+function Who({ person }: { person: Person }) {
+  // re-reads the company's names, so «Ерлан» becomes «Ерлан Б.» once the roster has come
+  useNamesKey();
+  return (
+    <span className="flex min-w-0 items-center gap-3">
+      <TileFace person={person} size={30} />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate text-[14px] font-medium leading-5" title={person.full_name}>
+          {shortName(person.full_name)}
+        </span>
+        {person.position ? <span className="truncate text-[12px] leading-4 text-muted">{person.position}</span> : null}
+      </span>
+    </span>
+  );
+}
 
 /** What the add field will do with its text, said before Enter: a skipped form is never a silent no-op. */
 function planNotes(plan: ReturnType<typeof planAliases>): string[] {
@@ -62,10 +81,10 @@ function AddField({ line, people, onDone, onAdded }: { line: Line; people: Roste
         }}
         placeholder="Жаке, главбух — Enter добавит, Esc закроет"
         aria-label={`Как ещё зовут: ${line.person.full_name}`}
-        className="field h-8 w-full max-w-[420px] px-2 text-[13px] leading-5 outline-none"
+        className="dict-add-field field h-8 w-full max-w-[420px] px-2 text-[13px] leading-5 outline-none"
       />
       {notes.map((note) => (
-        <span key={note} className="text-[12px] leading-4 text-warn">
+        <span key={note} className="dict-note text-[12px] leading-4 text-warn">
           {note}
         </span>
       ))}
@@ -166,19 +185,20 @@ export function NamesTable({
     {
       key: "person",
       title: "Человек",
-      width: "280px",
+      width: "minmax(190px,1fr)",
       sort: (a, b) => byRussian(a.person.full_name, b.person.full_name),
-      render: (line) => <PersonLine name={line.person.full_name} sub={line.person.position} />,
+      render: (line) => <Who person={line.person} />,
     },
     {
       key: "names",
       title: "Как зовут вслух",
+      width: "minmax(0,1.6fr)",
       sort: (a, b) => a.person.aliases.length - b.person.aliases.length,
       render: (line) => {
         const aliases = [...line.person.aliases].sort(byRussian);
         return (
           <div>
-            <div className="flex flex-wrap items-center gap-x-1.5">
+            <div className="dict-pills flex flex-wrap items-center gap-x-1.5">
               {aliases.map((alias) => (
                 <Pill
                   key={alias}
@@ -196,14 +216,16 @@ export function NamesTable({
                     event.stopPropagation();
                     open(line);
                   }}
-                  className="inline-flex h-6 items-center text-[13px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
+                  className="dict-add inline-flex h-6 items-center gap-1 text-[13px] leading-4 text-muted opacity-0 transition-opacity duration-[120ms] hover:text-text focus-visible:opacity-100 [.desk-row:hover_&]:opacity-100 [.desk-row[aria-selected=true]_&]:opacity-100"
                 >
-                  + имя
+                  <Plus size={12} strokeWidth={2.5} aria-hidden />
+                  имя
                 </button>
               ) : null}
             </div>
             {line.report.shared.map((s) => (
-              <p key={s.alias} className="text-[12px] leading-4 text-muted">
+              <p key={s.alias} className="dict-shared flex items-center gap-1.5 text-[12px] leading-4 text-muted">
+                <Users size={12} strokeWidth={2.25} aria-hidden className="shrink-0" />
                 «{s.alias}» есть и у: {s.people.join(", ")} — ИИ спросит, кого
               </p>
             ))}
@@ -226,11 +248,11 @@ export function NamesTable({
     {
       key: "offer",
       title: "Стоит добавить",
-      width: "260px",
+      width: "minmax(150px,1fr)",
       sort: (a, b) => a.report.suggestions.length - b.report.suggestions.length,
       render: (line) =>
         line.editable && line.report.suggestions.length ? (
-          <div className="flex flex-wrap gap-x-3">
+          <div className="dict-offers flex flex-wrap gap-x-3">
             {line.report.suggestions.map((suggestion) => (
               <OfferPill key={suggestion} label={suggestion} disabled={line.person.aliases.length >= ALIAS_MAX} onTake={() => take(line, [suggestion])} />
             ))}
@@ -254,6 +276,7 @@ export function NamesTable({
     >
       <DataGrid
         aria-label="Имена людей"
+        className="dict-grid"
         columns={columns}
         rows={shown}
         rowKey={(line) => line.person.id}

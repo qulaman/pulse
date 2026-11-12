@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight, Bell, BellOff, CalendarOff, ClipboardCheck, Phone } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -50,13 +51,14 @@ import { deskDraftOf, deskPatchOf } from "./draft";
 import { NextWithoutLogin } from "./NextWithoutLogin";
 import { CopyButton, FormRow } from "./fields";
 import { dropHandover, peekHandover } from "./handoff";
-import { HeroFacts, type HeroFact } from "./Hero";
+import { CardSection, HeroFacts, SectionTabs, type HeroFact, type PageSectionLink } from "./Hero";
 import { useScreenKeys } from "./keys";
 import { LoginBlock } from "./LoginBlock";
 import { PersonEditor } from "./PersonEditor";
 import { PersonStats } from "./PersonStats";
 import { RemoveDialog, type RemoveMode } from "./RemoveDialog";
-import { addressOf, AVAILABILITY_TONE, Block, Face, GridBone, LoadFailed, roleLine, StateWord, tidy } from "./shared";
+import { addressOf, AVAILABILITY_TONE, GridBone, LoadFailed, loadWords, roleLine, StateWord, tidy } from "./shared";
+import { TileFace, tileState } from "./TeamGrid";
 
 const OPEN: TaskStatus[] = ["scheduled", "sent", "accepted", "in_progress", "rework"];
 const CLOSED: TaskStatus[] = ["done", "declined", "revoked"];
@@ -71,30 +73,106 @@ function messageLine(m: PersonMessage): string {
   return m.content?.trim() ?? "";
 }
 
-/** «Сотрудник · Снабженец · в отпуске» — the line beside the name: the role, and a state only when there is one. */
-function personLine(person: Person): string {
-  const state = !person.is_active ? "не в команде" : person.role !== "tv" && person.availability !== "active" ? AVAILABILITY_LABEL[person.availability].toLowerCase() : null;
-  return [roleLine(person), state].filter(Boolean).join(" · ");
+/** A person who gets the work — the dashboard, the load and the ring are theirs (the grid's rule). */
+function isCrew(person: Person): boolean {
+  return person.role !== "director" && person.role !== "tv";
+}
+
+/** The ring of the face, the director's: read from the team's loads. */
+function LoadedFace({ person, size }: { person: Person; size: number }) {
+  const loads = useTeamLoads();
+  return <TileFace person={person} size={size} state={tileState(person, loads.data?.[person.id], isCrew(person))} />;
+}
+
+/** The load in words, as the grid's card says it. */
+function LoadChip({ person }: { person: Person }) {
+  const loads = useTeamLoads();
+  if (!loads.data) return null;
+  const load = loads.data[person.id];
+  return (
+    <span className="team-chip" data-tone={(load?.overdue ?? 0) > 0 ? "danger" : (load?.active ?? 0) > 0 ? "ok" : "muted"}>
+      {loadWords(load)}
+    </span>
+  );
+}
+
+/** Their phone does not hear the work: said at the top, where it is seen before a task is given. */
+function DeafChip({ personId }: { personId: string }) {
+  const health = usePushHealth();
+  const push = health.data?.get(personId);
+  if (!push || (push.state !== "off" && push.state !== "broken")) return null;
+  return (
+    <span className="team-chip" data-tone="danger" title="Пока пуши не доходят, человек узнаёт о задачах, только открыв Pulse">
+      <BellOff size={13} strokeWidth={2.25} aria-hidden />
+      {push.state === "broken" ? "пуш не прошёл" : "уведомления не включены"}
+    </span>
+  );
 }
 
 /**
- * The card's total, one line of the sheet (D-154, D-158): the photo as in a personnel file, and
- * what the director reads (`children`: the load as numbers, today's report). The spoken forms are
- * the card's, below — said once. Nothing to show — no line.
+ * The person at the top of their page (D-174), in the language of the grid's card: the big circle
+ * with the ring of their state, the name, the position and the role, the chips — away, the load,
+ * the phone, a deaf phone — and the moves on the right; for the director, under them, the load as
+ * numbers that lead to «Задачи», the points and today's report.
  */
-function Identity({ person, children }: { person: Person; children?: ReactNode }) {
-  if (!person.avatar_url && !children) return null;
+function PersonHero({
+  person,
+  director,
+  phone,
+  pushKnown,
+  moves,
+  children,
+}: {
+  person: Person;
+  director: boolean;
+  phone: string | null;
+  /** the push health is the editor's to read */
+  pushKnown: boolean;
+  moves: ReactNode;
+  children?: ReactNode;
+}) {
+  const works = person.is_active && person.role !== "tv";
+  const away = works && person.availability !== "active";
+  const line = [roleLine(person), person.is_active ? null : "не в команде"].filter(Boolean).join(" · ");
   return (
-    <section className="flex items-center gap-4" data-testid="desk-person-identity">
-      <span className={`empty:hidden ${person.is_active ? "" : "opacity-55"}`}>
-        <Face person={person} size={64} />
-      </span>
-      <div className="min-w-0 flex-1">{children}</div>
+    <section className="person-hero" data-testid="desk-person-identity" data-gone={person.is_active ? undefined : ""}>
+      <div className="person-hero-top">
+        <span className="person-hero-face">
+          {director && works ? <LoadedFace person={person} size={88} /> : <TileFace person={person} size={88} state={tileState(person, undefined, false)} />}
+        </span>
+        <div className="person-hero-who">
+          <h1 className="person-hero-name" title={person.full_name}>
+            {person.full_name}
+          </h1>
+          <p className="person-hero-line">{line}</p>
+          <p className="person-hero-chips">
+            {away ? (
+              <span className="team-chip" data-tone="muted">
+                <CalendarOff size={13} strokeWidth={2.25} aria-hidden />
+                {AVAILABILITY_LABEL[person.availability].toLowerCase()}
+              </span>
+            ) : null}
+            {director && works && isCrew(person) ? <LoadChip person={person} /> : null}
+            {phone && person.role !== "tv" ? (
+              <span className="team-chip" data-tone="muted">
+                <Phone size={13} strokeWidth={2.25} aria-hidden />
+                <a href={phoneHref(phone)} className="nums hover:underline">
+                  {phone}
+                </a>
+                <CopyButton text={() => phone} label="Скопировать телефон" done="Скопировал телефон" />
+              </span>
+            ) : null}
+            {pushKnown && works ? <DeafChip personId={person.id} /> : null}
+          </p>
+        </div>
+        <div className="person-hero-moves">{moves}</div>
+      </div>
+      {children ? <div className="person-hero-stats">{children}</div> : null}
     </section>
   );
 }
 
-/** Today's report in one line, leading to «Отчёты»: «сдан в 18:04» / «ещё не сдан». */
+/** Today's report as a tile beside the load, leading to «Отчёты»: «сдан в 18:04» / «ещё не сдан». */
 function TodayReport({ personId, companyId, now }: { personId: string; companyId: string | undefined; now: Date }) {
   const settings = useCompanySettings();
   const day = useTeamDailyReportDay(todayYmd(now), companyId, settings.data?.daily_report.enabled === true);
@@ -111,28 +189,26 @@ function TodayReport({ personId, companyId, now }: { personId: string; companyId
             ? "на больничном"
             : "в отпуске";
   return (
-    <Link
-      href={`/desk/reports?p=${personId}`}
-      className="inline-flex items-baseline gap-1.5 text-[13px] leading-5 text-muted hover:text-text"
-      data-testid="desk-person-report"
-    >
-      Отчёт за сегодня:
-      <span className="text-text" style={row.state === "missed" ? { color: "var(--danger)" } : undefined}>
-        {text}
+    <Link href={`/desk/reports?p=${personId}`} className="person-report" data-state={row.state} data-testid="desk-person-report">
+      <ClipboardCheck size={16} strokeWidth={2.25} className="person-report-icon" aria-hidden />
+      <span className="flex min-w-0 flex-col">
+        <span className="person-report-value">{text}</span>
+        <span className="person-report-label">отчёт за сегодня</span>
       </span>
-      <span aria-hidden>→</span>
+      <ArrowRight size={14} strokeWidth={2.25} className="person-report-arrow" aria-hidden />
     </Link>
   );
 }
 
-/** The director's total: how loaded as numbers that lead to the tasks, the points, today's report. */
-function DirectorHero({ person, companyId, pointsOn, now }: { person: Person; companyId: string | undefined; pointsOn: boolean; now: Date }) {
+/** The director's numbers of the hero: the load that leads to the tasks, the points, today's report. */
+function DirectorFacts({ person, companyId, pointsOn, now }: { person: Person; companyId: string | undefined; pointsOn: boolean; now: Date }) {
   const loads = useTeamLoads();
   const balances = useTeamBalances(pointsOn);
   const load = loads.data?.[person.id];
   const works = person.is_active && person.role !== "tv";
   // a director's card shows the load only when somebody did give them a task
   const loaded = works && (person.role !== "director" || (load?.active ?? 0) > 0);
+  if (!loaded) return null;
   const tasksOf = `/desk/tasks?who=${person.id}`;
   const balance = balances.data?.[person.id] ?? 0;
   const facts: HeroFact[] = [
@@ -145,20 +221,16 @@ function DirectorHero({ person, companyId, pointsOn, now }: { person: Person; co
     facts.push({ key: "points", value: balance, label: "очков", tone: pointsTone(balance), href: "/desk/settings/points", title: "Очки и рейтинг" });
   }
   return (
-    <Identity person={person}>
-      {loaded ? (
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          {loads.isLoading ? (
-            <span className="skeleton block h-[44px] w-[280px] rounded-[2px] bg-surface-2" />
-          ) : loads.isLoadingError ? (
-            <LoadFailed what="нагрузку" onRetry={() => void loads.refetch()} />
-          ) : (
-            <HeroFacts facts={facts} />
-          )}
-          <TodayReport personId={person.id} companyId={companyId} now={now} />
-        </div>
-      ) : null}
-    </Identity>
+    <>
+      {loads.isLoading ? (
+        <span className="skeleton block h-[58px] w-[420px] max-w-full rounded-[10px] bg-surface-2" />
+      ) : loads.isLoadingError ? (
+        <LoadFailed what="нагрузку" onRetry={() => void loads.refetch()} />
+      ) : (
+        <HeroFacts facts={facts} className="person-facts" />
+      )}
+      <TodayReport personId={person.id} companyId={companyId} now={now} />
+    </>
   );
 }
 
@@ -223,20 +295,23 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
   return (
     <>
       {loaded || tasks.length > 0 ? (
-        <Block
+        <CardSection
+          id="person-tasks"
           title="Задачи"
           count={review.length + open.length}
           testId="desk-person-tasks"
+          bare
           end={
             <>
               {closed.length > 0 ? (
-                <button type="button" className="text-[12px] font-medium leading-4 text-muted hover:text-text" onClick={() => setShowClosed((v) => !v)} aria-expanded={showClosed}>
+                <button type="button" className="person-section-move" onClick={() => setShowClosed((v) => !v)} aria-expanded={showClosed}>
                   {showClosed ? "Скрыть закрытые" : `Закрытые · ${closed.length}`}
                 </button>
               ) : null}
               {tasks.length > 0 ? (
-                <Link href={`/desk/tasks?who=${person.id}`} className="text-[12px] font-medium leading-4 text-muted hover:text-text">
-                  Все в «Задачах» →
+                <Link href={`/desk/tasks?who=${person.id}`} className="person-section-move">
+                  Все в «Задачах»
+                  <ArrowRight size={13} strokeWidth={2.25} aria-hidden />
                 </Link>
               ) : null}
             </>
@@ -257,10 +332,10 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
               empty={<EmptyState tone={works ? "ok" : undefined} title="Открытых задач нет" hint={givable ? "«Дать задачу» (T) — и строка поручения уже знает, кому" : undefined} />}
             />
           )}
-        </Block>
+        </CardSection>
       ) : null}
 
-      <Block title="Последние сообщения" testId="desk-person-messages">
+      <CardSection id="person-messages" title="Последние сообщения" count={shown.length} testId="desk-person-messages">
         {messages.isLoading ? (
           <SkeletonGroup>
             <Bone h={34} />
@@ -268,15 +343,15 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
         ) : messages.isLoadingError ? (
           <LoadFailed what="сообщения" onRetry={() => void messages.refetch()} />
         ) : shown.length === 0 ? (
-          <p className="text-[13px] leading-[18px] text-muted">Пока ни одного сообщения в задачах</p>
+          <p className="person-empty">Пока ни одного сообщения в задачах</p>
         ) : (
-          <ul className="desk-list">
+          <ul className="person-messages">
             {shown.map((m) => (
               <li key={m.id}>
                 <button
                   type="button"
                   onClick={() => openTask(m.task_id)}
-                  className="grid min-h-[34px] w-full grid-cols-[minmax(0,3fr)_minmax(0,2fr)_auto] items-baseline gap-x-4 py-[6px] text-left hover:bg-surface-2/55 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
+                  className="person-message grid w-full grid-cols-[minmax(0,3fr)_minmax(0,2fr)_auto] items-baseline gap-x-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40"
                 >
                   <span className="truncate text-[14px] leading-5">{messageLine(m)}</span>
                   <span className="truncate text-[13px] leading-5 text-muted">{m.task?.title ?? "Задача"}</span>
@@ -286,7 +361,7 @@ function DirectorLists({ person, meId, now }: { person: Person; meId: string; no
             ))}
           </ul>
         )}
-      </Block>
+      </CardSection>
     </>
   );
 }
@@ -299,7 +374,7 @@ export function CardFacts({ person, phone, people, onEdit }: { person: Person; p
   const muted = (text: string) => <span className="text-muted">{text}</span>;
   return (
     <div
-      className={`desk-list ${onEdit ? "cursor-text" : ""}`}
+      className={`desk-list person-facts-list ${onEdit ? "cursor-text" : ""}`}
       onDoubleClick={onEdit}
       title={onEdit ? "Двойной щелчок — изменить" : undefined}
       data-testid="desk-person-facts"
@@ -364,51 +439,62 @@ export function PushBlock({ userId }: { userId: string }) {
   const verdict = health.data?.get(userId);
   // the red pencil for a push that failed; a phone without pushes is said in plain print
   const tone: Tone = !verdict || verdict.state === "idle" ? "muted" : verdict.state === "broken" ? "danger" : "ok";
+  const deaf = verdict && (verdict.state === "off" || verdict.state === "broken");
   return (
-    <Block title="Уведомления" testId="desk-person-push">
-      <div className="desk-list">
-        <div className="flex min-h-[44px] items-center gap-3 py-1">
-          <span className="min-w-0 flex-1 text-[14px] leading-5">
+    <CardSection id="person-push" title="Уведомления" testId="desk-person-push">
+      <div className="person-push" data-tone={tone}>
+        <span className="person-push-icon" aria-hidden>
+          {deaf ? <BellOff size={17} strokeWidth={2} /> : <Bell size={17} strokeWidth={2} />}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-medium leading-5">
             <StateWord tone={tone}>{verdict?.text ?? "…"}</StateWord>
           </span>
-          <Button size="sm" variant="secondary" disabled={test.busy} onClick={() => void test.run()} data-testid="desk-push-test">
-            {test.busy ? "Проверяю…" : "Прислать проверку"}
-          </Button>
-        </div>
-        {verdict && verdict.state !== "ok" ? (
-          <p className="py-2 text-[12px] leading-[17px] text-muted">
-            Пока пуши не доходят, человек узнаёт о задачах, только открыв Pulse. Попросите открыть Pulse на телефоне и нажать «Включить уведомления»; на iPhone — сначала «На экран „Домой“».
-          </p>
-        ) : null}
-        {test.verdict ? (
-          <p
-            className="py-2 text-[13px] leading-4"
-            style={{ color: test.verdict.tone === "ok" ? "var(--ok)" : test.verdict.tone === "warn" ? "var(--danger)" : "var(--text-muted)" }}
-          >
-            {test.verdict.text}
-          </p>
-        ) : null}
+          <span className="block text-[12px] leading-4 text-muted">Пуши о задачах на телефон человека</span>
+        </span>
+        <Button size="sm" variant="secondary" disabled={test.busy} onClick={() => void test.run()} data-testid="desk-push-test">
+          {test.busy ? "Проверяю…" : "Прислать проверку"}
+        </Button>
       </div>
-    </Block>
+      {verdict && verdict.state !== "ok" ? (
+        <p className="person-push-note">
+          Пока пуши не доходят, человек узнаёт о задачах, только открыв Pulse. Попросите открыть Pulse на телефоне и нажать «Включить уведомления»; на iPhone — сначала «На экран „Домой“».
+        </p>
+      ) : null}
+      {test.verdict ? (
+        <p
+          className="person-push-note"
+          style={{ color: test.verdict.tone === "ok" ? "var(--ok)" : test.verdict.tone === "warn" ? "var(--danger)" : "var(--text-muted)" }}
+        >
+          {test.verdict.text}
+        </p>
+      ) : null}
+    </CardSection>
   );
 }
 
 function PersonBone() {
   return (
     <DeskPage>
-      <SkeletonGroup>
-        <Bone h={16} w={90} />
-        <Bone h={30} w={260} className="mt-2" />
-      </SkeletonGroup>
-      <Bone h={44} w={360} />
-      <div className="grid gap-10 min-[1180px]:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
+      <Bone h={16} w={90} />
+      <div className="person-hero" aria-hidden>
+        <div className="person-hero-top">
+          <Bone round w={88} h={88} />
+          <SkeletonGroup>
+            <Bone h={28} w={260} />
+            <Bone h={14} w={180} className="mt-2" />
+            <Bone h={24} w={220} className="mt-3" />
+          </SkeletonGroup>
+        </div>
+      </div>
+      <div className="grid gap-x-8 gap-y-6 min-[1180px]:grid-cols-[minmax(0,1fr)_minmax(360px,420px)]">
         <SkeletonGroup grow>
-          <Bone h={200} />
+          <Bone h={240} />
           <Bone h={200} className="mt-6" />
         </SkeletonGroup>
         <SkeletonGroup>
-          <Bone h={200} />
-          <Bone h={100} className="mt-6" />
+          <Bone h={220} />
+          <Bone h={96} className="mt-6" />
         </SkeletonGroup>
       </div>
     </DeskPage>
@@ -564,69 +650,78 @@ export function PersonDesk({ id }: { id: string }) {
     });
   }
 
+  const crew = isCrew(p);
+  // the page's sections as tabs that lead: only where the page is long — the director's look at a person at work
+  const tabs: PageSectionLink[] =
+    director && works && crew
+      ? [
+          { id: "person-card", label: "Данные" },
+          { id: "person-stats", label: "Показатели" },
+          { id: "person-tasks", label: "Задачи" },
+          { id: "person-messages", label: "Сообщения" },
+        ]
+      : [];
+  const moves = (
+    <>
+      {givable ? (
+        <Tooltip label="Строка поручения уже знает, кому" keys={["T"]} side="bottom">
+          {/* the fill is the screen's one: while a form or a code is open, theirs */}
+          <Button size="sm" variant={editing || focusLogin ? "secondary" : "primary"} data-testid="desk-person-give" onClick={give}>
+            Дать задачу
+          </Button>
+        </Tooltip>
+      ) : null}
+      {access && !p.is_active ? (
+        <Button size="sm" variant="secondary" loading={setWorking.isPending} onClick={revive} data-testid="desk-person-revive">
+          {kiosk ? "Включить экран" : "Вернуть в команду"}
+        </Button>
+      ) : null}
+      {mayEdit && !editing ? (
+        <Tooltip label="Изменить карточку" keys={["E"]} side="bottom">
+          <Button size="sm" variant="secondary" onClick={() => setEditing(true)} data-testid="desk-person-edit">
+            Изменить
+          </Button>
+        </Tooltip>
+      ) : null}
+      {more.length > 0 ? (
+        <MenuButton
+          items={tidy(more)}
+          label="Ещё"
+          className="flex h-9 w-9 items-center justify-center rounded-[8px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          ⋯
+        </MenuButton>
+      ) : null}
+    </>
+  );
+
   return (
     <DeskPage>
-      <div className="flex flex-col">
-        <nav aria-label="Путь" className="text-[13px] leading-5">
-          <Link href={`/desk/team?p=${p.id}`} className="text-muted hover:text-text" data-testid="desk-person-back">
-            Команда
-          </Link>
-          <span aria-hidden className="px-1.5 text-muted/60">
-            ›
-          </span>
-        </nav>
-        <PageTitle
-          title={p.full_name}
-          state={{ text: personLine(p) }}
-          actions={
-            <>
-              {givable ? (
-                <Tooltip label="Строка поручения уже знает, кому" keys={["T"]} side="bottom">
-                  {/* the fill is the screen's one: while a form or a code is open, theirs */}
-                  <Button size="sm" variant={editing || focusLogin ? "secondary" : "primary"} data-testid="desk-person-give" onClick={give}>
-                    Дать задачу
-                  </Button>
-                </Tooltip>
-              ) : null}
-              {access && !p.is_active ? (
-                <Button size="sm" variant="secondary" loading={setWorking.isPending} onClick={revive} data-testid="desk-person-revive">
-                  {kiosk ? "Включить экран" : "Вернуть в команду"}
-                </Button>
-              ) : null}
-              {mayEdit && !editing ? (
-                <Tooltip label="Изменить карточку" keys={["E"]} side="bottom">
-                  <Button size="sm" variant="secondary" onClick={() => setEditing(true)} data-testid="desk-person-edit">
-                    Изменить
-                  </Button>
-                </Tooltip>
-              ) : null}
-              {more.length > 0 ? (
-                <MenuButton
-                  items={tidy(more)}
-                  label="Ещё"
-                  className="flex h-9 w-9 items-center justify-center rounded-[2px] text-[18px] leading-none text-muted hover:bg-surface-2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
-                >
-                  ⋯
-                </MenuButton>
-              ) : null}
-            </>
-          }
-        />
-      </div>
-      {director ? <DirectorHero person={p} companyId={me.data.companyId} pointsOn={pointsEnabled} now={now} /> : <Identity person={p} />}
+      <nav aria-label="Путь" className="person-crumbs">
+        <Link href={`/desk/team?p=${p.id}`} data-testid="desk-person-back">
+          Команда
+        </Link>
+        <span aria-hidden>›</span>
+        <span className="truncate text-text">{p.full_name}</span>
+      </nav>
+      <PersonHero person={p} director={director} phone={phone} pushKnown={mayEdit} moves={moves}>
+        {director ? <DirectorFacts person={p} companyId={me.data.companyId} pointsOn={pointsEnabled} now={now} /> : null}
+      </PersonHero>
+      {tabs.length > 0 ? <SectionTabs sections={tabs} label="Оглавление карточки" /> : null}
       {/* two columns while the screen's own width allows — the panel takes 440 px of the window */}
       <div className="@container">
-        <div className="grid items-start gap-x-10 gap-y-6 @min-[920px]:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]" data-testid="desk-person">
-          <div className="flex min-w-0 flex-col gap-6">
-            <Block
+        <div className="person-columns grid items-start gap-x-8 gap-y-7 @min-[920px]:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]" data-testid="desk-person">
+          <div className="flex min-w-0 flex-col gap-7">
+            <CardSection
+              id="person-card"
               title="Карточка"
               testId="desk-person-card"
-              end={editing ? <span className="text-[12px] leading-4 text-muted">правка</span> : null}
+              end={editing ? <span className="person-editing-tag">правка</span> : null}
             >
               {!mayEdit ? (
                 <>
                   <CardFacts person={p} phone={phone} people={roster} />
-                  <p className="text-[12px] leading-4 text-muted">Карточку директора меняет только директор</p>
+                  <p className="person-note">Карточку директора меняет только директор</p>
                 </>
               ) : editing && phones.isPending ? null : editing ? (
                 <PersonEditor
@@ -659,14 +754,18 @@ export function PersonDesk({ id }: { id: string }) {
               ) : (
                 <CardFacts person={p} phone={phone} people={roster} onEdit={() => setEditing(true)} />
               )}
-            </Block>
+            </CardSection>
 
             {/* a person who left still has their last 30 days */}
-            {director && p.role !== "director" && p.role !== "tv" ? <PersonStats person={p} now={now} /> : null}
+            {director && crew ? (
+              <div id="person-stats" className="person-anchor">
+                <PersonStats person={p} now={now} />
+              </div>
+            ) : null}
             {director ? <DirectorLists person={p} meId={me.data.userId} now={now} /> : null}
           </div>
 
-          <div className="flex min-w-0 flex-col gap-6">
+          <div className="person-side flex min-w-0 flex-col gap-7">
             {/* a login just created is handed over even where it cannot be managed later (a new director); who left has none */}
             {p.is_active && (manageLogin || handed) ? <LoginBlock person={p} handed={handed} manage={manageLogin} focus={focusLogin} /> : null}
             {p.is_active && manageLogin ? <NextWithoutLogin personId={p.id} /> : null}
