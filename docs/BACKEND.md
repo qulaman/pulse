@@ -1,389 +1,288 @@
 # BACKEND.md — серверный слой Pulse
 
-Что это: серверный слой Pulse как он есть в коде (route handlers, RPC, подсистема доставки, тик, env) — для агентов, работающих с бэкендом. **Арбитр — `DECISIONS.md`, читать с раздела «Сейчас действует».** Схема БД — `docs/DATABASE.md`. Промпты/evals — `docs/AI.md`. Провижининг инстансов — `docs/SETUP.md`.
+Серверная часть как она есть в коде: роуты `app/api/`, `proxy.ts`, личность и права, голосовой конвейер со стороны сервера, доставка уведомлений, тик, вход по коду, сервер консоли разработчиков. Для того, кто меняет этот слой. Таблицы, политики и тела RPC — `docs/DATABASE.md`; промпт, STT и evals — `docs/AI.md`; среды и деплой — `docs/SETUP.md`; экраны — `docs/FRONTEND.md`. Где документ расходится с кодом, прав код (D-132). Бэкенд — route handlers, RPC из миграций и один Vercel cron; Edge Functions и pg_cron не используются (G.20c).
 
-Метки: `[есть]`, `[за флагом: settings.<ключ>]`. Документ описывает построенное; идеи непостроенного — `IDEAS.md`, смена способа реализации — решением в `DECISIONS.md`.
+## Карта
 
-Бэкенд = Next.js route handlers (`/app/api/*`) + Postgres-функции (RPC) в миграциях + один Vercel cron (`vercel.json` → `/api/push/sweep`, §10; на Hobby — раз в сутки). Supabase Edge Functions, pg_cron и pg_net не подключены (папки `supabase/functions` нет, G.20c). Service role key — только на сервере.
+- `app/api/` — 80 роутов, папка на модуль; `app/api/ops/` — консоль. `proxy.ts` — cookie и редиректы страниц.
+- `lib/auth.ts`, `lib/api/handler.ts`, `lib/api/respond.ts` — личность, обёртка роута, ответы.
+- `lib/supabase/server.ts` (cookie вызывающего), `lib/supabase/service.ts` (service role), `lib/supabase/client.ts` (браузер), `lib/supabase/types.ts` (типы); `lib/roster.ts` — ростер и настройки компании.
+- `lib/push/send.ts` — воркер, `lib/push/policy.ts` — транспорт, `lib/push/prefs.ts` — правила директора, `lib/push/client.ts` — браузерная сторона.
+- `lib/voice/retention.ts` — чистка голоса; `lib/voice/api.ts` — клиент голосовых роутов.
+- `lib/login-code/` — код входа; `lib/people/access.ts` — кто кому меняет вход и карточку; `lib/ops/` — консоль.
+- `lib/env.schema.ts`, `lib/env.ts`, `lib/env.public.ts` — окружение; `vercel.json` — регион и cron.
 
 ## 0. Незыблемые правила слоя
 
-1. **Атомарность.** Любая многотабличная операция — ТОЛЬКО Postgres-функция `security definer` в миграции, через `supabase.rpc()` (supabase-js транзакций не умеет). Route handler = auth → zod-валидация → вызов RPC → маппинг ошибки. Многие RPC клиент зовёт напрямую под своим JWT, без роута-обёртки (§3).
-2. **Идемпотентность.** `client_request_id uuid` (генерирует клиент, переживает ретраи) обязателен на ВСЕХ мутирующих эндпоинтах. Регистр — `ingest_batches` (`unique(company_id, client_request_id)`, `insert ... on conflict do nothing`); при дубле RPC возвращает сохранённый `result` (те же id), ничего не создавая. Исключения по решению — абсолютное состояние или удаление, повтор безвреден: `tv_control` (D-76 §3), `respond_event` (D-78 §6); `delete_task` и `purge_closed_tasks` (уже удалённое — «ок, ничего не удалено»), `set_event_participants`, `update_company_settings`, `update_company_profile` (D-155 п.4, И-88); `voice_keep` — «в корпус» да/нет (D-155 п.3). Без ключа в коде также функции из §3 с пометкой «без `client_request_id`».
-3. **Переходы статусов задач — только через RPC**, никаких `update tasks set status=...` из клиента.
-4. **Формат ошибки** (все эндпоинты): `{ "error": { "code": "snake_case", "message_ru": "текст пользователю" } }`, доп. поля (`audio_path`, `transcript`) — рядом с `error` (`lib/api/respond.ts`). Коды AI-конвейера — §9.
-5. **SaaS (D-134, пересматривает V-02):** одна БД и один деплой на всех клиентов; отдельный инстанс — опция поставки, код тот же. Код клиент-агностичен — никаких ветвлений «если клиент X» и допущения «в базе одна компания»; все настраиваемые числа и клиентский брендинг (D-44) — в `company.settings` (env один на всех). `company_id`+RLS — граница между клиентами и ролями внутри компании. **Service role обходит RLS — каждый запрос под ним фильтрует по `company_id` профиля.** Новый клиент — `pnpm seed:client` (см. `docs/SETUP.md` §5). Места кода, которые ещё считают «одна компания в базе», — D-134 п. 6.
+1. **Атомарность.** Многотабличная операция — только функция `security definer` через `rpc()`: supabase-js транзакций не умеет.
+2. **Идемпотентность.** Мутация несёт `client_request_id` с клиента, повтор отдаёт первый результат (принцип 7); как — §1.
+3. **Статус задачи меняет только RPC** (`transition_task`, `revoke_task`, `send_task_now`, `reassign_task`, `request_deadline`), не `update` из браузера или роута. Матрицу §7 держит триггер `trg_task_status_guard`.
+4. **Формат ошибки**: `{ "error": { "code": "snake_case", "message_ru": "текст человеку" } }` (`apiError`), дополнительные поля (`audio_path`, `transcript`) — рядом с `error`.
+5. **Одна база на всех клиентов (D-134).** Граница — `company_id` и RLS; код не ветвится по клиенту и не предполагает одну компанию; настраиваемое — в `company.settings` (D-44). Service role сужена до компании вызывающего (§1).
+6. **Триггеры не зовут HTTP.** Уведомление — строка outbox, отправляет только воркер (G.20c, D-114).
+7. **Секреты только на сервере**; тело запроса и ключи в логи не пишутся.
 
-## 1. Auth и модель проверки прав
+## 1. Личность, права, устройство роута
 
-Вход — **одноразовый код** (D-135): директор или секретарь на карточке человека (или человек сам себе — «Войти на другом устройстве») выдаёт 8 цифр на 15 минут, человек вводит их на экране входа, сервер проверяет код и сам создаёт его сессию Supabase: `auth.admin.generateLink({type:'magiclink'})` → `verifyOtp({type:'magiclink', token_hash})` через cookie-клиент — письмо не уходит, cookie ставятся ответом. Email + пароль Supabase Auth остаются (G.21): директор, секретарь, кто уже входит паролем. Людей заводит директор или секретарь (`POST /api/people`, D-104) — без почты и пароля человек получает служебный адрес `p-<uuid>@people.invalid` (`lib/people/email.ts`, в интерфейсе не показывается) и пароль, которого никто не знает; пароль человеку задаёт директор или секретарь на карточке (`/api/people/:id/password`), свой сотрудник меняет в профиле через `auth.updateUser` (G.20b). Ключ HMAC кодов и адресов — `LOGIN_CODE_SECRET`, без него — производный от ключа service role (`lib/login-code/server.ts`).
+**Личность.** `getSessionProfile(req)` берёт токен из `Authorization: Bearer` (скрипты), иначе из cookie, проверяет JWT через `getClaims()` и читает свою строку `profiles` под этим токеном: нет — `401 unauthorized`, `is_active = false` — `403 inactive`; `requireRole` — `403 forbidden`. Роли: `director`, `manager`, `employee`, `shopkeeper`, `secretary`, `tv`; наборы `ADMIN_ROLES` (директор и секретарь, D-104) и `TEAM_ROLES` — `lib/routes.ts`.
 
-**Отозванный вход перестаёт работать сразу** (D-135): помощники политик `auth_company_id()` / `auth_role()` отвечают только работающему человеку с живой сессией (`auth_session_live()` — `session_id` токена есть в `auth.sessions`), своя строка `profiles` — тоже только при живой сессии; поэтому `getSessionProfile` отозванному отвечает 401, уволенному — 403 `inactive`, а прямые чтения из браузера пусты с первого запроса, не через час жизни токена. «Выйти со всех устройств» — RPC `revoke_sessions` через `/api/people/:id/sessions`; увольнение делает то же триггером. Собственные строки по `auth.uid()` (заметки, push-устройства, курсоры прочтения) отозванный токен читает до истечения — не дольше часа. Открытый экран узнаёт об отзыве сам: `SessionWatch` в корневом layout при возврате в приложение и раз в 5 минут зовёт `/api/me` и на 401/403 уходит на экран входа.
+Отзыв входа действует сразу (D-135): `auth_company_id()` и `auth_role()` отвечают только работающему с живой сессией (`auth_session_live()`), своя строка `profiles` без неё тоже не читается — отозванный получает `401`, уволенный `403`. Свои строки по `auth.uid()` отозванный токен читает до истечения, не дольше часа. `SessionWatch` в браузере зовёт `/api/me` при возврате и раз в 5 минут.
 
-`lib/auth.ts`:
+`proxy.ts` работает только для страниц (matcher исключает адреса API): обновляет cookie, без сессии ведёт на `/login`, с `/` — домой по роли, директора и секретаря с компьютера — на `/desk` (D-153), `/ops` отдаёт `lib/ops/proxy.ts`. Роуты API проверяют личность сами.
 
-```ts
-getSessionProfile(req?): Promise<{ userId, companyId, role, isActive, fullName }> // Bearer-токен или cookies; 401 unauthorized, 403 inactive
-requireRole(profile, ...roles: Role[]): void                                      // 403 forbidden
-```
+**Под чьей личностью идёт запрос.** `userSupabase(req)` несёт токен вызывающего — его RLS, RPC сами проверяют роль и компанию. `createServiceSupabase()` — service role, без RLS. Всё, что меняет состояние компании, идёт под вызывающим: RPC задач, визитов, отчёта, настроек, правил пушей, вставка заявки, имена и фото человека. Service role — только там, куда RLS не пускает: Storage, `auth.admin`, `ai_logs` и `inbox_items` конвейера, `ai_logs` для «Лаб» и словаря, свои подписки и доставки, карточка человека, `lib/roster.ts`, тик. Правило: каждый такой запрос сужен до `company_id` профиля или `user_id` вызывающего; чужое и несуществующее дают одно «не найдено»; право на файл решает чтение под вызывающим, service role лишь подписывает URL. Исключение: `/api/company/logo` и `PATCH /api/lab` пишут `companies.settings` напрямую по компании вызывающего, мимо `update_company_settings`.
 
-`lib/api/handler.ts` — обёртка всех роутов:
+**Шаблон роута** — `withAuth(roles, fn, schema?)`: по очереди личность, роль (`'any'` — любой работающий), JSON и zod (почти везде `strictObject`), затем `fn({ req, profile, body, params })`. Провал JSON или схемы — `400 validation_error`, `AuthError` — его статус, прочее — `console.error` и `500 internal`. Id пути роут проверяет сам (`z.uuid()` или `z.guid()`: id сида не RFC 4122), мусор — `404`. Ошибку RPC (`raise exception '<код>'`) роут узнаёт по коду в `error.message`, незнакомая — `500`. Роуты задач с ключом отвечают `{ result, duplicate }`. `after()` нужен только чтобы отправить пуши после ответа: колбэк возвращает промис `kickDeliveries()`, и платформа держит функцию до конца отправки (D-125).
 
-```ts
-withAuth(roles: Role[] | 'any', fn, schema?)   // auth → zod тела (400 validation_error) → fn; прочие исключения → 500 internal
-userSupabase(req)                              // клиент с JWT вызывающего: RPC идут под его ролью и RLS
-```
+Без `withAuth`: `/api/me` (тот же контракт), `/api/company/logo` (multipart), `/api/auth/code` (без сессии, §13), `/api/push/sweep` (секрет cron, §10), `/api/health` и `/api/version` (публичные), роуты `app/api/ops/` (§14). Лимитов частоты нет, кроме входа по коду.
 
-`'any'` = любой активный профиль. Без `withAuth`: `/api/company/logo` (multipart; те же `getSessionProfile` + `requireRole`), `/api/me`, `/api/health`, `/api/version`, `/api/push/sweep` (секрет cron). Роли: `director | manager | employee | shopkeeper | secretary | tv` (`secretary` — D-79).
+**Идемпотентность.** Ключ один на намерение, рождается на клиенте и живёт до ответа: TanStack Query возобновляет мутацию, `lib/outbox.ts` хранит POST и досылает при запуске (до 24 ч), фраза ждёт в IndexedDB (`lib/voice/kept.ts`, D-130). У фразы ключ один от `upload-url` до `confirm`. Повтор сервер узнаёт: RPC — по `ingest_batches` (сохранённый результат и `duplicate: true`); роуты, пишущие сами, — по уникальному индексу (`errands`, `inbox_items`, `profiles.client_request_id`); `parse` — по удачной строке `ai_logs`; проверка пушей — по `crid` в `meta`; правила парсера — по `parser_rules.request_id`; консоль — по журналу. Без ключа — мутации, повтор которых безвреден: абсолютное состояние или множество (ответ на визит, настройки, словарь, правила пушей, фото, отзыв сессий) и удаление (`delete_task`, `purge_closed_tasks`).
 
-Лимитов частоты запросов нет: ни `company.settings.limits`, ни счётчиков в БД.
+**Роуты.** «Все» — любой работающий профиль, «Д» — директор, «Д, С» — директор и секретарь, «К» — `TEAM_ROLES`.
 
-### Таблица «эндпоинт → роль»
+| Путь | Метод | Кто | Что | Чем |
+|---|---|---|---|---|
+| `/api/voice/upload-url` | POST | все | URL загрузки записи | Storage, `inbox_items` |
+| `/api/voice/transcribe` | POST | Д | распознать фразу | `transcribe()` |
+| `/api/voice/parse` | POST | Д | разобрать фразу | `parseTranscript()` |
+| `/api/voice/confirm` | POST | Д | сохранить пачку | `confirm_voice_batch` |
+| `/api/voice/audio-url` | GET | все | URL записи | Storage |
+| `/api/tasks/[id]/transition` | POST | все | переход статуса | `transition_task` |
+| `/api/tasks/[id]/revoke` | POST | Д | отозвать | `revoke_task` |
+| `/api/tasks/[id]/send-now` | POST | Д | отправить отложенную | `send_task_now` |
+| `/api/tasks/[id]/deadline` | POST | Д | срок | `extend_task_deadline` |
+| `/api/tasks/[id]/reassign` | POST | Д | передать другому | `reassign_task` |
+| `/api/tasks/[id]/deadline-request` | POST | исполнитель | просить срок | `request_deadline` |
+| `/api/tasks/[id]/deadline-answer` | POST | Д | ответ на просьбу | `answer_deadline_request` |
+| `/api/tasks/[id]/nudge` | POST | Д | напомнить | `nudge_task` |
+| `/api/tasks/[id]/delete` | POST | Д | удалить | `delete_task` |
+| `/api/tasks/purge` | POST | Д | удалить закрытые | `purge_closed_tasks` |
+| `/api/errands` | POST | Д | заявка секретарю | `errands` |
+| `/api/visits` | POST | секретарь | посетитель, сообщение | `announce_visit` |
+| `/api/visits/[id]/answer` | POST | Д | ответ на визит | `answer_visit` |
+| `/api/daily-report` | POST | К | сдать отчёт | `submit_daily_report` |
+| `/api/files/upload-url` | POST | все | URL загрузки фото | Storage |
+| `/api/files/url` | GET | все | URL файла сообщения | Storage |
+| `/api/push/subscribe` | POST, DELETE | все | подписка браузера | `push_subscriptions` |
+| `/api/push/devices` | GET, PATCH, DELETE | Д | свои устройства | `push_subscriptions` |
+| `/api/push/test` | POST, GET | все; другому — Д, С | проверка пушей | outbox |
+| `/api/push/kick` | POST | все | пинок воркера | `kickDeliveries()` |
+| `/api/push/badge` | GET | все | число на иконке | `tasks` |
+| `/api/push/seen` | POST | все | «увидел» | outbox |
+| `/api/push/acted` | POST | все | «Прочитал» из шторки | `mark_thread_read` |
+| `/api/push/sweep` | GET, POST | cron | тик | §10 |
+| `/api/me` | GET | сессия | свой профиль | `getSessionProfile` |
+| `/api/me/notifications` | GET, PUT | Д | правила пушей | `set_notify_prefs` |
+| `/api/people` | POST | Д, С | новый человек | `auth.admin` |
+| `/api/people/[id]` | GET, DELETE | Д, С | удалима ли карточка, открытые задачи (`?history=1` — история по видам для диалога «Удалить…», D-160); удалить карточку без истории | `auth.admin` |
+| `/api/people/[id]/avatar` | PUT, DELETE | Д, С | фото | `profiles` |
+| `/api/people/[id]/login-code` | POST, GET | себе — все; другому — Д, С | код входа | `issue_login_code` |
+| `/api/people/[id]/sessions` | POST | себе — все; другому — Д, С | выйти везде | `revoke_sessions` |
+| `/api/people/[id]/password` | POST | Д, С | пароль | `auth.admin` |
+| `/api/people/[id]/login` | GET, PATCH | Д, С | почта входа | `auth.admin` |
+| `/api/auth/code` | POST | без сессии | вход по коду | `redeem_login_code` |
+| `/api/company` | GET, PATCH | Д, С | название, бренд | `update_company_profile`, `update_company_settings` |
+| `/api/company/logo` | POST | Д, С | логотип | бакет `brand` |
+| `/api/settings` | GET, PATCH | Д, С | настройки | `update_company_settings` |
+| `/api/settings/vocabulary` | POST | Д, С | слова словаря | `applyVocabularyEdit` |
+| `/api/dictionary/kinds` | POST | Д, С | типы слов | `applyKindEdit` |
+| `/api/dictionary/aliases` | POST | Д, С | формы имени | `profiles` |
+| `/api/dictionary/words` | GET, POST | Д, С | частота слов | `ai_logs` |
+| `/api/dictionary/misheard` | GET, POST | Д, С | «как услышано — кто» | `collectMisheard` |
+| `/api/lab` | GET, PATCH | Д, С | цена разборов; модели | `lib/ai/pricing.ts` |
+| `/api/lab/recordings` | POST | Д | записи «в корпус» | `voice_kept` |
+| `/api/lab/parser` | GET, PUT | Д, С | «Правила компании» | `update_company_settings` |
+| `/api/lab/parser/try` | POST | Д, С | проба правил | `parseTranscript()` |
+| `/api/lab/parser/eval` | POST | Д, С | часть прогона корпуса | `lib/ai/evals/stamp.ts` |
+| `/api/health` | GET | публично | жив ли деплой | |
+| `/api/version` | GET | публично | сборка (D-115) | `lib/version.ts` |
 
-| Эндпоинт | Метод | Роль | Что |
-|---|---|---|---|
-| `/api/voice/upload-url` | POST | любая | `{ext: webm\|m4a\|mp4, context: director_input\|task_message, client_request_id, recorded_at?}` → signed upload URL в бакет `voice`; для `director_input` — строка `inbox_items` с `recorded_at` (§2, D-130) |
-| `/api/voice/transcribe` | POST | director | §2 |
-| `/api/voice/parse` | POST | director | §2 |
-| `/api/voice/confirm` | POST | director | §2 |
-| `/api/voice/audio-url` | GET | любая | `?path=` → signed URL оригинала на 10 мин; доступ решает RLS: путь должен быть `source_audio_path` видимой задачи или `audio_path` объявления |
-| `/api/tasks/:id/transition` | POST | любая (право перехода проверяет `trg_task_status_guard`) | `{to_status, reason?, comment?, suggest_assignee_id?, report?: {text?, file_path?, partial?}, client_request_id}` → `transition_task`; при `accepted` закрывает квитанцию `task_sent` (`acted_at`, D-32); ошибки подсказки — `404 assignee_not_found`, `409 same_assignee` (D-128) |
-| `/api/tasks/:id/revoke` | POST | director | `{client_request_id}` → `revoke_task` (D-01) |
-| `/api/tasks/:id/send-now` | POST | director | `{client_request_id}` → `send_task_now` (D-129): отложенная задача уходит сейчас, её слова команде, ждущие окна, — с ней; затем `kickDeliveries()` |
-| `/api/tasks/:id/deadline` | POST | director | `{deadline_iso \| null, client_request_id}` → `extend_task_deadline` («Срок», D-51 п.3, D-128) |
-| `/api/tasks/:id/reassign` | POST | director | `{assignee_id, change_deadline?, deadline_iso?, note?, client_request_id}` → `reassign_task` (D-80 §5, D-128); `400 bad_deadline` — срок в прошлом |
-| `/api/tasks/:id/deadline-request` | POST | любая (просит только исполнитель — RPC, `403`) | `{proposed_iso, words?, client_request_id}` → `request_deadline` (D-128); `400 bad_deadline`, `409 invalid_transition` |
-| `/api/tasks/:id/deadline-answer` | POST | director | `{approve, client_request_id}` → `answer_deadline_request` (D-128); `409 no_request` — просьбы уже нет |
-| `/api/tasks/:id/nudge` | POST | director | `{client_request_id}` → `nudge_task` (D-128); ответ `{too_soon, last_at, deliver_after}` — второй тап в течение 30 мин пуша не шлёт |
-| `/api/tasks/:id/delete` | POST | director | → `delete_task` (D-58) |
-| `/api/tasks/purge` | POST | director | → `purge_closed_tasks` (D-58) |
-| `/api/errands` | POST | director | `{kind, note?, client_request_id, audio_path?, source_transcript?, inbox_item_id?, until_min?, due_at?}` → вставка `errands` под RLS; `label` берётся из `settings.secretary.actions`, неизвестный код — `400 unknown_kind`; `kind: "free"` — просьба своими словами (надпись — первые слова, D-99 §8); `urgent` сервер ставит сам по сцене `security`; `until_min` → `until_at`; `due_at` (ISO, минута — сутки вперёд, иначе `400 bad_due`) → «к 18:00» (D-106 §8); дубль ключа → `{errand, duplicate: true}` — строка первой просьбы (D-79, D-99, D-106 §2) |
-| `/api/visits` | POST | secretary | `{note?, client_request_id, kind?: 'visitor' \| 'message'}` → RPC `announce_visit`; пуш `visit_arrived` / `visit_message` директорам сразу (D-96, D-116); у сообщения `note` обязателен |
-| `/api/visits/:id/answer` | POST | director | `{answer: 'invited' \| 'wait' \| 'declined' \| 'read'}` → RPC `answer_visit`; «invited» включает гостя на час; `read` — «Понятно» на сообщение (D-116); пуш `visit_answered` автору сразу (D-96) |
-| `/api/daily-report` | POST | команда (`TEAM_ROLES`) | «Сдать отчёт» (D-152): `{arrived_at, left_at, summary, client_request_id}` → RPC `submit_daily_report` под сессией вызывающего → `SubmitDailyReportResult`; роут, а не прямой RPC, чтобы сдача без сети ждала в outbox (`lib/outbox.ts`); `403 not_team_member`, `409 daily_report_disabled`, `400 bad_times / summary_required / summary_too_long`. Остальное модуля — RPC напрямую из `lib/daily-report/queries.ts` (§3) |
-| магазин | — | — | роутов нет: клиент зовёт RPC `create_shop_order`, `cancel_shop_order`, `set_shop_order_status` напрямую (D-71); права и идемпотентность — внутри функций. Ассортимент (`shop_items`) директор и завхоз правят upsert'ом под RLS с заранее выданным id |
-| `/api/push/subscribe` | POST, DELETE | любая | POST `{endpoint, keys: {p256dh, auth}, user_agent?, replaces?}` — адрес этого браузера, service role строго от имени вызывающего: тот же человек — обновление (выключатель устройства сохраняется), другой — подписка переходит к нему; `replaces` — прежний адрес из `pushsubscriptionchange`. DELETE `{endpoint}` — выход из аккаунта (D-114) |
-| `/api/push/devices` | GET, PATCH, DELETE | director | свои устройства: список с последним исходом, PATCH `{id, enabled}` — «присылать сюда», DELETE `{id}` (D-114) |
-| `/api/push/test` | POST, GET | любая | POST `{client_request_id, user_id?}` — «Проверить»: строка `test` в outbox и пинок; чужой телефон — только director/secretary своей компании. GET `?id=` — судьба проверки (`status`, `sent_at`, `seen_at`, `last_error`) (D-114) |
-| `/api/push/kick` | POST | любая | пинок воркера после записи мимо API-роутов (сообщение, кнопки секретаря, ответ на мероприятие, магазин) → `after(kickDeliveries)`, 202 (D-114) |
-| `/api/push/badge` | GET | любая | число на иконке: директору — на приёмке + отказы, остальным — новые + на доработке (под своим RLS) |
-| `/api/me/notifications` | GET, PUT | director | правила пушей директора целиком: GET — с дефолтами (`lib/push/prefs.ts`), PUT — zod → RPC `set_notify_prefs` (D-114) |
-| `/api/push/seen` | POST | любая | «увидел» (D-32): `{delivery_id}` из SW при показе уведомления; без `delivery_id` (открытие приложения) — все незакрытые строки человека |
-| `/api/push/acted` | POST | любая | «Прочитал» из шторки (D-64): `{delivery_id}` своей доставки → `mark_thread_read` до `meta.last_seq` под токеном пользователя |
-| `/api/push/sweep` | GET, POST | — (`Authorization: Bearer <CRON_SECRET>`) | минутный тик §10 (Vercel cron шлёт GET) |
-| `/api/files/upload-url` | POST | любая | `{ext: jpg\|png\|webp, client_request_id}` → signed upload URL в бакет `photos`, путь `{company}/{user}/{client_request_id}.{ext}` (G.20b); объект этого ключа уже есть — `{signed_url: "", stored: true}`, повтор идёт дальше (D-130) |
-| `/api/files/url` | GET | любая | `?message_id=` → signed URL файла сообщения на 10 мин; доступ решает RLS `task_messages`, бакет по типу: `photo` → `photos`, `voice` → `voice`; путь в Storage клиент не называет |
-| `/api/people` | POST | director, secretary (D-104) | создаёт auth-пользователя через admin API service role + профиль (роли — весь enum, в т.ч. `secretary`, `tv`); `email` и `password` необязательны — без них служебный адрес и случайный пароль, вход по коду (D-135); директора добавляет только директор — `403`; при провале профиля auth-пользователь удаляется; `409 email_exists` |
-| `/api/people/:id/login-code` | POST, GET | любой — себе; director, secretary — человеку своей компании по `canResetLogin` (D-135) | POST `{client_request_id?}` → `201 {code, expires_at, link, company, name}`: 8 цифр есть только в этом ответе, прежний открытый код человека отменяется; `link` — `/c/<slug>` компании или `/login` (для QR); `409 duplicate` (тот же запрос), `409 inactive`, `429 too_many_codes`. GET — последний код человека без самого кода: `state` `none|open|used|expired|cancelled`, `issued_at, expires_at, used_at, device, issued_by` (имя), `link` — шторка опрашивает его раз в 2 с, пока ждёт входа |
-| `/api/auth/code` | POST | без сессии (D-135) | `{code, client_request_id, device?}` → `redeem_login_code` (лимиты: адрес, устройство, вся база) → сессия человека в cookie этого ответа → `200 {ok, brand:{name, logoUrl, accent}}` (для анимации входа). Неверный, просроченный, использованный код — одно сообщение `400 bad_code`; `429 too_many`; POST с чужим `Origin` — `403`; сессия не создалась — код возвращается (`release_login_code`), `502` |
-| `/api/people/:id/sessions` | POST | любой — себе; director, secretary — человеку своей компании, директору — только он сам (D-135) | `{keep_current?, keep_endpoint?}` → RPC `revoke_sessions` под личностью вызывающего: сессии, push-подписки, открытые коды; `keep_current` — себе «на других устройствах» (этот телефон и его пуши остаются) → `{sessions, devices}`; `403 forbidden`, `404` |
-| `/api/people/:id/password` | POST | director, secretary (D-104) | `{password}` (6–72) через service role; только своя компания, вход директора меняет только он сам — `403` (G.20b, `canResetLogin`) |
-| `/api/people/:id/login` | GET, PATCH | director, secretary (D-104) | GET — почта входа и `last_sign_in_at` («ни разу не входил») из `auth.users` service role'ом; PATCH `{email}` — исправить почту без второго аккаунта; права те же, что у пароля (`403`), `409 email_exists` |
-| `/api/company` | GET, PATCH | director, secretary (D-104) | название (RPC `update_company_profile`) и `settings.brand` (`accent`, `tagline`, `logo_url` через `update_company_settings`), G.20d |
-| `/api/company/logo` | POST | director, secretary (D-104) | multipart ≤2 МБ, PNG/JPEG/WebP/SVG → публичный бакет `brand/{company}/logo-*.ext`, URL — в `settings.brand.logo_url` |
-| `/api/settings` | GET, PATCH | director, secretary (D-104) | D-48: секции `stt`, `parser`, `vocabulary`, `conventions` (D-15), `matching` (D-16), `points_enabled`, `rating_mode`, `points_rules`, `ether_events`, `mascot_seasons`, `mascot_telegraph` (D-133), `delivery_window`, `secretary` (D-79), `brand`, `daily_report` (D-152); PATCH дополняет присланную секцию текущими значениями и сливает через RPC `update_company_settings`; `daily_report.started_on` и `daily_report.checked_on` пишет только сервер — включение модуля (выкл → вкл) ставит `started_on` сегодня (Asia/Aqtobe), `checked_on` пишет утренний тик, присланное с телефона отбрасывается (`mergeDailyReport`) |
-| `/api/settings/vocabulary` | POST | director, secretary | D-111: `{add?, remove?, kind?, set_kind?: {word, kind}, rename?: {from, to}}` — слова в словарь и из него, тип, исправленное написание; сервер применяет `applyVocabularyEdit` к сохранённым `settings.vocabulary` и `vocabulary_meta` (тип, кто, когда), множество — повтор безвреден, id запроса не нужен; больше 200 — 422 `vocabulary_full`, написание, которое уже есть, — 409 `vocabulary_conflict`; ответ — настройки целиком |
-| `/api/dictionary/kinds` | POST | director, secretary | D-111 §19: одна правка типов слов — `{op: "add", id, label}` / `{op: "rename", id, label}` / `{op: "remove", id, move_to}` / `{op: "move", id, index}`; сервер применяет `applyKindEdit` к `settings.word_kinds` и `vocabulary_meta` (слова удалённого типа — в `move_to` или «Без типа»); имя, которое есть у другого типа, 13-й тип — 409 `kind_conflict`; id нового типа приходит с экрана — повтор безвреден |
-| `/api/dictionary/words` | GET, POST | director, secretary | D-111 §16: GET — `{days, phrases, usage, suggestions}`: сколько раз каждое слово встретилось в разобранных фразах за 30 дней и названия, которых нет в словаре (`lib/dictionary-usage.ts`), `ai_logs` — серверным ключом в пределах компании, наружу только числа и слова; POST `{dismiss: [key]}` — спрятать предложения для всех (`settings.dictionary.dismissed_words`, до 200) |
-| `/api/dictionary/aliases` | POST | director, secretary | D-111: `{person_id, add?, remove?}` — формы имени человека; сервер перечитывает строку и сливает под RLS вызывающего (строка директора секретарю недоступна — 403 `not_permitted`); множество — повтор из очереди безвреден |
-| `/api/dictionary/misheard` | GET, POST | director, secretary | D-111, вторая волна: GET — уроки подтверждённых разборов за 30 дней (`collectMisheard`): только пары «форма → человек», счёт и дата, без текстов — `ai_logs` читается серверным ключом в пределах компании; POST `{dismiss: [key]}` — спрятать пары для всех (`settings.dictionary.dismissed`, до 200) |
-| `/api/lab` | GET, PATCH | director, secretary (D-63) | GET — последние 400 строк `ai_logs` (stt/parse) с ценой по `lib/ai/pricing.ts`; PATCH — секции `stt`, `parser` service-клиентом |
-| `/api/lab/recordings` | POST | director (D-155 п.3) | чтение, не мутация: `{ crids }` → `{ recordings: [{ crid, path, kept }] }` — записи строк «Лаб» (`inbox_items` по `client_request_id`) и отметка «в корпус» (`voice_kept`); до миграции `20261103121000` — `recordings: null` |
-| `/api/lab/parser` | GET, PUT | director, secretary (D-138) | GET — промпт ровно как уйдёт в разбор, ростер, примеры, счёт токенов, версии правил, список корпуса; PUT `{ text, client_request_id, pieces }` — новая версия «Правил компании» в `settings.parser_rules` через `update_company_settings` от имени вызывающего; непустой текст — только с подписанными частями прогона всего корпуса этого текста на модели компании и с порогами CLI (`422 eval_forged / eval_stale / eval_incomplete / eval_gate`), тот же текст — `409 unchanged`, повтор `client_request_id` — прежний ответ |
-| `/api/lab/parser/try` | POST | director, secretary (D-138) | фраза → сущности с черновиком правил и с действующими (ростер, конвенции, матчер компании; `run` — другая модель для сравнения); ничего не пишет, в `ai_logs` тоже |
-| `/api/lab/parser/eval` | POST | director, secretary (D-138) | до 8 кейсов корпуса с черновиком правил → подписанная часть прогона `{ payload, stamp }` (`lib/ai/evals/stamp.ts`); ничего не пишет |
-| `/api/me` | GET | любая сессия | `{profile}` |
-| `/api/health` | GET | публичный | liveness `{ok, version, time}`, без БД |
-| `/api/version` | GET | публичный | сборка сервера `{id, sha, at, compat}` — с ней телефон сверяет свою (D-115); `no-store`, без БД |
+Неочевидное:
 
-### Консоль разработчиков (D-157)
-
-`/api/ops/*` — вне компаний, контракт в `lib/ops/contract.ts` и `tasks/029-ops-console.md`. Обёртка `withOps` (`lib/ops/handler.ts`), а не `withAuth`: хост, `Origin` обязателен на записи, клиент на cookie консоли, zod, затем билет. Граница — в базе: чтения `ops_*` идут под JWT разработчика и начинаются с `ops.assert`, запись `ops_*` доступна только service role и гасит билет `ops_ticket`. Коды ошибок базы в ответы переводит `lib/ops/guard.ts`: `ops_denied` — 401, `ops_fresh_required` — 428. Клиент `opsFetch` на 428 сам спрашивает код и повторяет запрос с тем же `client_request_id`. Доступ выдаёт `pnpm ops:grant <email> [--revoke] [--reset-mfa]`.
+- `/api/errands`: надпись — из каталога `settings.secretary.actions`, у `kind: free` — первые слова фразы; тревогу (`urgent`) сервер ставит сам по сцене `security`.
+- `POST /api/people`: секретарь не создаёт директора; без почты — служебный адрес `.invalid` и вход по коду; провал профиля удаляет созданный вход.
+- `PATCH /api/settings` дополняет секцию текущими значениями: `update_company_settings` заменяет секцию целиком.
+- `PUT /api/lab/parser` сохраняет непустые правила только с подписанным прогоном корпуса, прошедшим пороги (D-138).
 
 ## 2. Голосовой конвейер
 
-Метрика (D-43): **p50 ≤ 6 с / p90 ≤ 10 с** от отпускания кнопки до интерактивных карточек подтверждения (на доске Пульса, D-60; `/confirm` — запасной экран). Голосовое уходит одним blob после отпускания (G.23); кусками во время речи — не построено. Латентность по этапам пишется в `ai_logs` (`stt_ms`, `parse_ms`, `latency_ms`).
+Путь фразы: `upload-url`, загрузка браузером прямо в Storage, `transcribe`, `parse`, подтверждение, `confirm`. Запись лежит в Storage раньше любого вызова AI (принцип 5). Текст одной строкой идёт сразу в `parse`.
 
-Без экрана подтверждения сохраняются только заметки (D-75 §4: фраза из одних заметок сразу уходит в `/api/voice/confirm`, тост «Записал» с «Отменить»; диктовка на экране «Заметки» — строкой `notes` под RLS, см. `note_id` ниже) и заявки секретарю (D-79 §9: матчер в `/api/voice/parse` → `/api/errands`).
+**`upload-url`**: вход `{ ext, context: director_input|task_message, client_request_id, recorded_at? }`, ответ `{ audio_path, signed_url, token, inbox_id? }`. Путь в бакете `voice` — `{company_id}/{user_id}/{client_request_id}.{ext}`, политики бакета держатся за сегменты пути. Объект уже лежит — `stored: true` с пустым URL, клиент идёт дальше (D-95). Для `director_input` вставляется строка `inbox_items`. Голосовое в треде не распознаётся (D-66): клиент сам вставляет `task_messages` с `type: voice`.
 
-### POST /api/voice/upload-url
-Вход: `{ ext, context: 'director_input'|'task_message', client_request_id }`.
-Выход: `{ audio_path, signed_url, token, inbox_id? }`. Путь в бакете `voice` строго `{company_id}/{user_id}/{client_request_id}.{ext}`. Клиент грузит НАПРЯМУЮ в Storage по signed upload URL — лимит тела Vercel 4.5 МБ не участвует. Для `director_input` роут заводит (или находит по `client_request_id`) строку `inbox_items` со статусом `recorded`. Политики бакета — по сегментам пути (DATABASE.md). Объект этого ключа уже в Storage (прошлая загрузка дошла, ответ потерялся) — `{ audio_path, signed_url: '', token: '', stored: true }`, клиент загрузку пропускает и идёт дальше (D-95): повтор не падает навсегда.
+**`transcribe`** — только директор и `director_input`; `audio_path` обязан начинаться с `{company}/{user}/` вызывающего. Провайдеры — `settings.stt` компании, подсказка — ростер до 60 человек и `settings.vocabulary` (D-55), ретраи — внутри `transcribe()` (G.18). Исходы: `502 stt_failed` с `audio_path`; не-речь по стражу `lib/ai/stt-guard.ts` — `200` с `transcript: null` и `code: "empty_transcript"`; успех — `{ transcript, audio_path, stt_provider, latency_ms, suspicious }`. Каждый вызов провайдера пишет строку `ai_logs`. С `note_id` (диктовка в «Заметках», D-81) слова пишутся в заметку, если её текст ещё пуст.
 
-### POST /api/voice/transcribe
-`export const maxDuration = 60`.
-Вход: `{ audio_path, context: 'director_input', client_request_id, duration_ms?, note_id? }`. Аудио уже в Storage — тело запроса без бинарных данных; `audio_path` обязан начинаться с `{company}/{user}/` вызывающего.
-Выход: `{ transcript, audio_path, stt_provider, latency_ms, suspicious }`; guard отбраковал не-речь — `200 { transcript: null, code: 'empty_transcript', guard }`, парсер не вызывается (D-52 §1).
+**`parse`** `{ transcript, audio_path?, source: voice|typed|shared, client_request_id, suspicious?, assignee_id? }`:
 
-STT — только через `lib/ai/stt.ts`:
+1. Удачный разбор этого ключа в `ai_logs` — возвращается он.
+2. Матчер (`lib/errands/matcher.ts`, D-79): короткая фраза без имени, совпавшая с кнопкой каталога, при секретаре на месте — `{ entities: [], errand, model: "matcher" }`.
+3. Модель из `settings.parser` (`docs/AI.md`). Отказ — `422 parse_refused`, сбой — `502 parse_failed`, оба с `transcript`.
+4. `lib/ai/postprocess.ts`: модель называет исполнителя, id ставит сервер (D-56); `suspicious` снижает уверенность до 0,5; `assignee_id`, выбранный до фразы, ставит `lib/ai/pin.ts` (D-84).
+5. Строка `ai_logs`, `inbox_items` в `parsed`. Ответ `{ entities, model, escalated, latency_ms }`.
 
-```ts
-transcribe(audio: Buffer, mime: string, opts: { language, vocabularyHints }, providers?, policy?): Promise<{ text, provider, durationMs? }>
-```
+**`confirm`** `{ client_request_id, source, audio_path?, transcript, parsed_entities, confirmed_entities, force_now?, inbox_id?, note_id? }`: служебные поля карточек срезаются; `editDiff` даёт `was_edited` и `edit_fields` (D-35); уволенный исполнитель — `400 assignee_inactive`; `confirm_voice_batch` под личностью директора сохраняет пачку одной транзакцией и кладёт задачи вне окна в `scheduled`; при `force_now` объявления отпускает `send_announcements_now` (D-129); `after()` шлёт пуши. Ответ `{ result, duplicate }`, в `result` — id по видам, `skipped`, `scheduled`.
 
-Провайдеры — из `settings.stt` (`provider` / `fallback`: `openai | whisper1 | deepgram | elevenlabs`, `language: auto | ru`); основной — `gpt-4o-transcribe`, ElevenLabs Scribe — только запасной (D-53). Подсказка — ростер не больше 60 самых адресуемых людей + `settings.vocabulary` (D-55; формат — docs/AI.md). Ретраи — G.18: основной 10 с → запасной 10 с → пауза 1 с → один повтор основного → `502 stt_failed` с `audio_path`; 4xx кроме 408/429 — сразу. Ретрай с фронта — по сохранённому `audio_path`, без перезаписи.
+**`audio-url?path=`** — путь своей компании и видимая вызывающему строка с этой записью (`tasks`, `announcements`, `notes`, `events`), иначе `403`; URL на 600 с.
 
-**Голосовые в треде не распознаются (D-66, заменяет D-64 §4)** — роут принимает только `context='director_input'` и только роль директора. Сообщение-голос остаётся звуком: клиент кладёт аудио в Storage по signed URL (`context='task_message'` у upload-url, строка `inbox_items` не заводится) и вставляет `task_messages(type='voice', file_path=audio_path, content=null, meta.duration_ms)`; транскрипта у него нет и не будет.
+## 3. RPC: из роутов и прямо из браузера
 
-`context='director_input'` + `note_id` (диктофон «Заметок», D-81): клиент кладёт аудио в Storage, вставляет строку `notes(text='', audio_path, inbox_item_id, client_request_id)` под RLS и зовёт transcribe с её `note_id`; роут дописывает `text` и `raw_transcript` service-клиентом, сузив запись до `user_id` вызывающего и того же `audio_path`, причём `text` — только пока он пустой (директор мог вписать слова руками раньше STT), `raw_transcript` — в любом случае. Парсер не вызывается. STT упал или guard отбраковал — заметка остаётся с голосом без слов, «Распознать» на карточке зовёт transcribe снова.
+Многие RPC браузер зовёт сам, под своим JWT: права, компания и идемпотентность проверяются внутри функции; после записи, рождающей пуш, клиент обычно зовёт `kickPush()` (§4). Прямые вызовы: тред — `mark_thread_read`; очки — `award_points`, `react_to_task`, `dispute_points`, `resolve_points_dispute`, `fn_rating`; магазин — `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`; календарь — `respond_event`, `edit_event`, `delete_event`; заявки — `transition_errand`, `thank_errand`, `errand_eta`, `errand_ask`, `errand_answer`, `errand_result`, `errand_nudge`; визиты — `close_visit`, `director_busy`; отчёт — `my_daily_report`, `my_daily_report_history`, `team_daily_report_day`, `team_daily_report_period`; Эфир — `send_announcements_now`; стена — `tv_*`; доски — `mind_board_copy`; команда — `push_health`; «Лаб» — `voice_keep`. Что они делают — `docs/DATABASE.md`.
 
-### POST /api/voice/parse
-`export const maxDuration = 60`.
-Вход: `{ transcript, audio_path?, source: 'voice'|'typed'|'shared', client_request_id, suspicious?, assignee_id? }`. Текст одной строкой идёт сюда же — один парсер на все входы. Web Share Target не построен (D-36); значение `shared` схема принимает.
+## 4. Доставка уведомлений
 
-Порядок:
-1. **Идемпотентность:** удачный разбор с тем же `client_request_id` уже есть в `ai_logs` → возвращается он, модель не зовётся.
-2. **Матчер заявок до модели (D-79 §9, `lib/errands/matcher.ts`):** при активном секретаре фраза до трёх слов без имени из ростера, совпавшая с `label`/`synonyms` каталога, → `{ entities: [], errand, model: 'matcher' }`; ни токена, ни подтверждения.
-3. **Модель** `settings.parser.model` (дефолт `claude-haiku-4-5`), **structured outputs** собственной JSON Schema (G.17) — невалидный JSON исключён схемой, **repair-retry не существует**. Эскалация на `settings.parser.escalation_model` по триггерам G.17, если `settings.parser.escalate`. DeepSeek — только сравнение в «Лаб» (D-63). Сейчас Claude зовётся через `@anthropic-ai/sdk` напрямую, без Vercel AI SDK (G.6): structured outputs и `cache_control` промпта задаются параметрами API провайдера без прослойки.
-4. **Постобработка** (`lib/ai/postprocess.ts`): модель называет исполнителя именем, id ставит сервер (D-56) через `lib/matchName.ts` по порогам `settings.matching` (D-16, D-54); минус очков голосом и очки из `shared` блокируются (D-30, D-36); `suspicious` от transcribe — потолок уверенности исполнителя 0.5 и жёлтый чип.
-5. **Закреплённый исполнитель (D-84, `lib/ai/pin.ts`):** `assignee_id` — человек, выбранный до фразы (кружок на экране ожидания, «Дать задачу» на карточке); сервер ставит его всем сущностям с одним исполнителем, кроме той, где модель узнала другое, произнесённое вслух имя.
+**Outbox** — `notification_deliveries`. Строки вставляют триггеры и RPC в транзакции производителя (строку `test` — роут проверки), слова (`meta.title`, `body`, `url`, `tag`) пишет база. Пуш задачи рождается только при вставке в `sent` или переходе в `sent`; сообщения одного треда, пока первая строка ждёт, схлопываются в неё.
 
-Выход: `{ entities, model, escalated, latency_ms }`; строка `ai_logs` (`kind='parse'`), `inbox_items` → `parsed`. Ошибки: `422 parse_refused`, `502 parse_failed` (§9). Контракт сущностей — `lib/ai/schema.ts` (`EntitySchema`; модели уходит `ModelEntitySchema`), промпт, few-shot, конвенции времени (D-15) и evals — `docs/AI.md`; копия контракта здесь не ведётся. Ничего не выдумывать: нет исполнителя/дедлайна → `null`.
+**Воркер** — `sweepDeliveries()` в `lib/push/send.ts`, под service role:
 
-`kind:'query'` — вопрос к данным: роута `/api/voice/query` нет, ответы на Пульсе детерминированные (D-51 п.4, `lib/pulse/answers.ts`), `confirm_voice_batch` вопрос не сохраняет.
+1. Нет VAPID-ключей — строки остаются `queued`: квитанция не подделывается.
+2. `claim_deliveries(50)` захватывает строки `queued`, `mode = now`, `attempts < 3`, `deliver_after <= now()` без захвата или с захватом старше 2 минут (`for update skip locked`): пинок и тик не шлют один пуш дважды.
+3. По 8 строк одновременно, на включённые подписки получателя. Нет подписок — `failed`, `no_subscription`. Жизнь вида вышла (`ttlLeft()`, от `max(created_at, deliver_after)`) — `failed`, `expired`. Иначе web-push с TTL, равным остатку жизни.
+4. `404` или `410` — подписка удаляется; другой отказ, включая `403`, пишется в подписку и её не удаляет: `403` бывает при неверном ключе самого деплоя (D-125).
+5. Дошло хоть куда-то — `sent`, `sent_at`. Нет — `attempts + 1` и снова `queued`, на третьей попытке `failed`.
+6. Пачки идут, пока очередь не пуста или не кончился бюджет: пинок — 8 с, тик — 40 с.
 
-### POST /api/voice/confirm
-Вход: `{ client_request_id, source, audio_path?, transcript, parsed_entities, confirmed_entities, force_now?, inbox_id?, note_id? }`.
-Handler: auth → zod (служебные поля карточек `assignee`, `participants`, `blocked` срезаются) → `editDiff(parsed, confirmed)` даёт `was_edited` / `edit_fields` (D-35) → `rpc('confirm_voice_batch', { payload, client_request_id })` под JWT директора → `after(kickDeliveries)` (§4).
+В нагрузке (`pushPayload()`) — слова, `url`, `tag` (одна задача — один пузырь), `delivery_id`, `task_id`; строка директора с `private` уходит без слов.
 
-`confirm_voice_batch(payload jsonb, client_request_id uuid, p_now timestamptz default now()) returns jsonb` (security definer, только director):
-1. `insert into ingest_batches ... on conflict do nothing`; при конфликте — сохранённый `result` + `duplicate: true`.
-2. В одной транзакции по видам: `task` / `delegation` → `tasks` (N копий с общим `group_id`, D-02; без исполнителя — `assignee_required`; исполнитель задачи, повтора и очков проверяется в самой RPC — работающий человек этой компании, не `tv`, иначе `assignee_inactive` одним кодом и для уволенного, и для чужого: RPC зовут и через PostgREST в обход роута, tasks/023); `announcement` → `announcements`; `reminder` → заметка с `remind_at` (D-95; ключ ответа `reminder_ids` — id заметок); `event` → `events` + `event_participants` (автор — `going`, «всем» материализуется составом компании; без времени — `event_time_required`, D-78); `note` → `notes` (D-75); `recurrence` → `recurrence_rules` полями правила (`every`, `interval_n`, `weekdays`, `month_day`, `at_time` = `due_time`, голос фразы), первый день и `next_run_at` считает триггер `recurrence_rules_schedule` (D-148); `event` с `repeat` ≠ `none` — ещё и правило серии (`target = 'event'`, время, длительность, место, напоминание, участники; встреча получает `recurrence_rule_id / recurrence_on`); `points` → `point_transactions` только при `points_enabled` и сумме ≠ 0 (минус — как сказано, D-137), иначе в `skipped` (D-48); `query` → в `skipped`.
-3. Окно доставки (D-38): задача с явным `scheduled_send_at` или вне `settings.delivery_window` (если нет `force_now`) → статус `scheduled` с `scheduled_send_at` = открытие окна. Выпуск `scheduled → sent` — минутный тик `publish_due_scheduled` (§10, D-114).
-4. Триггеры БД вставляют строки в `notification_deliveries` (§4) — HTTP из транзакции не зовётся.
-5. `confirmed_entities`, `was_edited`, `edit_fields` — в строку `ai_logs` разбора того же `client_request_id` (метрика «доля правок», D-35); `inbox_items` → `confirmed`; заметка `note_id` → `converted_*` (D-75 §5).
+**Пинок** — `kickDeliveries()` через `after()`, отправляет весь готовый хвост очереди. Зовут: `/api/voice/confirm`, `/api/tasks/[id]/transition`, `send-now`, `deadline`, `reassign`, `deadline-request`, `deadline-answer`, `nudge`, `/api/errands`, `/api/visits`, `/api/visits/[id]/answer`, `/api/push/test`. Записи мимо роутов (тред, кнопки секретаря, встречи, магазин, Эфир, досылка из офлайна) зовут `/api/push/kick` через `kickPush()`. Страховка — тик.
 
-Выход: `{ result: { task_ids, announcement_ids, reminder_ids, recurrence_ids, note_ids, event_ids, point_ids, skipped, scheduled }, duplicate }`. Ошибки: `400 assignee_required`, `400 assignee_inactive`, `400 event_time_required`, `403 forbidden`.
+**Транспорт** — `RULES` в `lib/push/policy.ts`: по виду события срок жизни у push-сервиса и срочность. Работа (новая задача, доработка, отзыв, сообщение, на приёмку, отказ) — 24 ч, громко; хорошие новости (принято, срок продлён, реакция, готовый заказ) — тихо; «скоро срок» и «скоро встреча» — 1 ч; заявки и визиты секретаря — 20–30 мин; тревога (`meta.urgent`) — 5 мин, громко всегда; вид вне таблицы — 12 ч.
 
-### POST /api/voice/query
-Не построено; идея — IDEAS.md (И-3).
+**Окно и тихие часы.** Когда строка может уйти, решает база при вставке, триггером `trg_notification_deliveries_deliver_after`. Всем, кроме директора, — окно компании `settings.delivery_window` (по умолчанию 08:00–21:00 Asia/Aqtobe, D-38): что может подождать (отклик на задачу, сообщения исполнителю, Эфир, календарь, магазин), получает `deliver_after = next_delivery_slot(...)`; новая задача, напоминания о встречах и заметках, заявки и визиты идут сразу. Задача вне окна пуша не рождает: она лежит `scheduled`, тик выпускает её при открытии окна. Директору — его правила «Уведомления» в профиле (`lib/push/prefs.ts`, D-114): режим по категории («Сразу», «Тихо», «Сводкой», «Не присылать»), своя тишина, встречи, важные люди; тревога и системные не настраиваются; `set_notify_prefs` перестраивает ждущую очередь.
 
-## 3. RPC-функции (контракт транзакций)
+**Квитанции** директору (принцип 8): «отправлено» — `sent_at`; «увидел» — `seen_at`; «принял» — `acted_at`. `POST /api/push/seen` шлёт service worker с `delivery_id` при показе уведомления и открытое приложение без id (закрывает все строки человека). «Принял» задачи ставит `/api/tasks/[id]/transition` при переходе в `accepted` строкам `task_sent`; «принял» сообщения — `mark_thread_read`, в том числе из шторки через `/api/push/acted`. Web Push не подтверждает доставку, поэтому индикатор говорит «не открывал с 9:14», а не «не получил» (D-32).
 
-Все — `security definer`, в миграциях, проверяют роль вызывающего через `auth_role()` / `auth_company_id()`; `execute` отозван у `public`/`anon`. Полный список с сигнатурами — DATABASE.md «Атомарные операции».
-
-| Функция | Сигнатура | Поведение |
-|---|---|---|
-| `confirm_voice_batch` | `(payload jsonb, client_request_id uuid, p_now timestamptz) → jsonb` | §2 |
-| `transition_task` | `(task_id uuid, to_status task_status, payload jsonb, client_request_id uuid) → jsonb` | Единая точка переходов; матрицу §7 по роли проверяет `trg_task_status_guard`; ошибки `invalid_transition`, `task_not_found`. `payload`: `reason` («Не могу» → строка треда `meta.decline_reason`), `comment` (доработка → `meta.rework_comment`), `report: {text?, file_path?, partial?}` (сдача → строка треда `meta.report`, тип `photo` при файле, `partial` — «Сделано не всё», пуш «На приёмку · … · не всё»; в той же транзакции, D-64 §3; outbox её пропускает — о сдаче говорит `pending_review`), `suggest_assignee_id` (отказ «Это к другому» → `meta.suggest_assignee_id/suggest_name`, пуш директора говорит причину и «предлагает: Имя»; себя нельзя — `same_assignee`). «Не могу» с доработки — шагами стража `rework → accepted → declined` в одной транзакции (D-128) |
-| `revoke_task` | `(task_id uuid, client_request_id uuid) → jsonb` | D-01: только director; статус до `done`/`revoked` (в т.ч. `declined` — «Отменить») → `revoked`, у сотрудника карточка «отозвано директором»; `scheduled` — физический delete (никому не доставлена) |
-| `send_task_now` | `(task_id uuid, client_request_id uuid) → jsonb` | D-129: только director; `scheduled` → `sent` (гард пускает директора), `scheduled_send_at` = сейчас; строки outbox задачи в очереди с `deliver_after` в будущем, адресованные не директору, — `deliver_after = now()`. Отложенные пуши самого директора (D-114) не трогает. Ответ `{task_id, status, released}` |
-| `send_announcements_now` | `(announcement_ids uuid[], client_request_id uuid) → jsonb` | D-129: только director; отложенные окном пуши объявлений уходят сейчас. Зовут карточка Эфира и `/api/voice/confirm` при `force_now` для объявлений пачки. Ответ `{released}` |
-| `extend_task_deadline` | `(task_id uuid, new_deadline timestamptz, client_request_id uuid) → jsonb` | «Срок» (D-51 п.3, D-128): только director, открытая задача (`sent, accepted, in_progress, rework, pending_review`); новый срок или `null` («Срок снят»). Строка треда честно говорит, куда сдвинулось: «Срок продлён до …» → тихий `deadline_extended`; «Срок перенесён раньше: до …» / «Назначен срок: до …» → звонкий `deadline_moved` (ждёт окна); при ждущей просьбе сотрудника — «Новый срок: до …», просьба закрыта `answer='changed'` |
-| `request_deadline` | `(task_id uuid, proposed timestamptz, words text, client_request_id uuid) → jsonb` | «Нужно больше времени» (D-128): только исполнитель (`forbidden`), задача `sent, accepted, in_progress, rework`, срок впереди и не дальше года (`bad_deadline`). На `sent` — «возьму, но к …»: задача → `accepted`, квитанция «принял». Строка треда «Прошу срок до DD.MM HH:MM · слова» с `meta.time_request`; ждущая прежняя закрывается `replaced`. Директору — `message` в категории «Вопросы» |
-| `answer_deadline_request` | `(task_id uuid, approve boolean, client_request_id uuid) → jsonb` | Только director; нет ждущей — `no_request`. `true` — срок = просимый, «Срок согласован: до …», тихий `deadline_extended`; `false` — «Срок прежний», звонкий `deadline_kept` (ждёт окна). Другая дата — `extend_task_deadline` |
-| `nudge_task` | `(task_id uuid, client_request_id uuid) → jsonb` | «Напомнить» (D-128): только director, задача в руках исполнителя; строка «Директор напомнил» (`meta.nudge`, вопрос не закрывает) и `task_nudge` («Директор ждёт: примите задачу» / «Директор напоминает · срок прошёл» / «Директор напоминает», ждёт окна); чаще раза в 30 минут — `{too_soon: true, last_at}` без пуша |
-| `reassign_task` | `(task_id uuid, new_assignee_id uuid, client_request_id uuid, new_deadline timestamptz, change_deadline boolean, note text) → jsonb` | «Переназначить» (D-80 §5, D-128): только director, исходные `sent, accepted, in_progress, rework, declined`; клон новому активному человеку (`parent_task_id` = старая) — `sent` внутри окна доставки, вне окна — `scheduled` на `next_delivery_slot`; срок — прежний или новый (`change_deadline`; в прошлом — `bad_deadline`); в клоне строка «Передана от Имя» (имя, не причина — D-45) и слово директора (`meta.handoff_note`, едет в пуше `task_sent`, своего пуша нет). Старая → `revoked` + `passed_to`, строка «Передана: Имя», пуш «Задача передана · Имя». Ошибки `same_assignee`, `assignee_not_found` |
-| `delete_task` | `(task_id uuid) → jsonb`, без `client_request_id` | Жёсткое удаление (D-58): только director своей компании, без следа; `task_messages`/`notification_deliveries` каскадом, `point_transactions` остаются (append-only) с `task_id = null`, у клона-переназначения обнуляется `parent_task_id`. Отзыв (D-01) — штатный способ забрать поручение |
-| `purge_closed_tasks` | `() → jsonb`, без `client_request_id` | «Очистить закрытые» (D-58): все `done`/`declined`/`revoked` компании директора, те же правила по детям; возвращает `{deleted}` |
-| `mark_thread_read` | `(task_id uuid, seq bigint) → bigint` | Курсор прочтения треда (D-61/D-64): upsert своей строки `task_reads` с `greatest(old, new)` — назад не ходит (оффлайн-повтор старого «Прочитал» безвреден); та же транзакция закрывает квитанции `message` этого треда до `seq` (`acted_at`). Только своя компания, иначе `task_not_found`. Единственный способ двигать курсор; зовут открытие треда, «Прочитал» на карточке, ответ, `/api/push/acted` |
-| `next_delivery_slot` | `(p_company uuid, p_now timestamptz) → timestamptz` | null внутри окна доставки компании, иначе ближайшее открытие окна (Asia/Aqtobe). Общее правило D-38 для производителей задач и для `deliver_after` |
-| `award_points` | `(p_user_id uuid, p_amount int, p_reason text, client_request_id uuid, p_public boolean default true) → jsonb` | `[за флагом: settings.points_enabled]` — в интерфейсе и в самой функции: при выключенных очках `points_disabled` (tasks/023). Только director; `amount ≠ 0`, причина обязательна всегда (D-30), получатель — активный человек компании; `point_transactions(source='manual')`, `p_public = false` — `quiet` (ни Эфира, ни стены, D-133); возвращает `{id, balance}`. Ошибки `points_disabled`, `amount_required`, `reason_required`, `user_not_found` |
-| `react_to_task` | `(p_task uuid, p_code text, client_request_id uuid) → jsonb` | Реакция директора на задачу (D-133): `like \| fire \| heart \| clap \| zap \| think \| dislike`, `null` — снять. Только director; задача не `scheduled`/`revoked`, исполнитель — не он сам. При `points_enabled` и исполнителе из команды строки `reaction` этого директора по задаче доводятся до цены текущей реакции (`settings.points_rules.reactions`): доплата, списание разницы, снятие. Пуш `reaction`. Возвращает `{task_id, code, points}`. Ошибки `forbidden`, `unknown_reaction`, `task_not_found`, `not_reactable` |
-| `dispute_points` | `(p_transaction uuid, p_text text, client_request_id uuid) → jsonb` | «Оспорить» (D-133, D-14): только свой минус, не магазинный, один раз; строка `point_disputes` и пуш `points_dispute` директорам. Ошибки `text_required`, `not_found`, `not_disputable`, `already_disputed` |
-| `resolve_points_dispute` | `(p_dispute uuid, p_refund boolean, p_answer text, client_request_id uuid) → jsonb` | Только director, спор `open`: «Вернуть» — строка возврата (`manual`, `rule_code='refund'`, `quiet`), минус остаётся; «Оставить» — без строк. Пуш `points_answer`. Ошибки `forbidden`, `not_found`, `already_resolved` |
-| `fn_rating` | `(p_from timestamptz, p_to timestamptz) → table(user_id, display_name, points, rank, delta_vs_prev, on_time_pct, is_me)` | Рейтинг за период (D-11, D-29): состав — активные `team_role()`; `rating_mode='top5'` — топ-5 + строка запрашивающего, директору — все |
-| `update_company_settings` | `(patch jsonb) → jsonb`, без `client_request_id` | Director или secretary (D-104); `settings || patch` — секции заменяются целиком (роут дополняет их текущими значениями) |
-| `update_company_profile` | `(p_name text) → jsonb`, без `client_request_id` | Director или secretary (D-104); название 1–120 символов, иначе `invalid_name` (G.20d) |
-| `create_shop_order` | `(p_item_id uuid, client_request_id uuid) → jsonb` | Advisory lock на пользователя; баланс `SUM(point_transactions) ≥ price` и остаток; insert order(`pending`, снимок цены, `stock_reserved`) + `point_transactions(shop_hold, −price)` + декремент stock (`stock is null` = без ограничения, не трогается); outbox `shop_order` директору и завхозу (кроме заказчика). Роль `tv` — `forbidden`. Ошибки: `insufficient_points`, `out_of_stock`, `item_not_found` |
-| `cancel_shop_order` | `(p_order_id uuid, client_request_id uuid) → jsonb` | Владелец — только из `pending` (D-37); director/shopkeeper — из `pending/approved`. `point_transactions(shop_release, +price)` ровно на сумму холда по `order_id`; остаток возвращается, только если резервировался (`stock_reserved`); чужую отмену владелец узнаёт из outbox `shop_cancelled`. Ошибки: `wrong_status`, `order_not_found`, `forbidden` |
-| `set_shop_order_status` | `(p_order_id uuid, p_status order_status, client_request_id uuid) → jsonb` | Завхоз/директор ведёт заказ: `pending → approved`, `pending\|approved → delivered`; свой заказ не проводит никто; outbox `shop_approved` / `shop_ready` владельцу. Выдача новых транзакций **не пишет** — hold финален, `shop_final` не существует (D-10) |
-| `respond_event` | `(p_event uuid, p_status text, p_reason text) → event_participants`, без `client_request_id` (D-78 §6) | «Буду» / «Не смогу»: только позванный на неотменённое мероприятие; `going \| declined` (причина — только к отказу); отказ сразу шлёт автору `event_declined` |
-| `set_event_participants` | `(p_event uuid, p_add uuid[], p_remove uuid[]) → void`, без `client_request_id` | Только director: добавить активных людей компании (приглашение — триггером), убрать кого угодно, кроме автора |
-| `edit_event` | `(p_event uuid, p_title text, p_starts_at timestamptz, p_ends_at timestamptz, p_location text, p_body text, p_remind_before_min int, p_everyone boolean, p_participant_ids uuid[]) → events`, без `client_request_id` (D-94 §4) | Только director: все поля и состав атомарно; убранным, кто знал о встрече, — «Отмена» (ещё не ушедшее приглашение снимается), оставшимся — «Перенос» / «Новое место»; по прошедшей встрече — ничего |
-| `delete_event` | `(p_event uuid) → void`, без `client_request_id` (D-94 §5) | Только director: строки больше нет; тем, кто знал о будущей встрече, — «Отмена», всё стоящее в очереди по ней снимается; повтор безвреден |
-| `events_due_reminders` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика (§10): мероприятия, у которых наступило `starts_at − remind_before_min` и не прошло больше часа от начала, → `event_reminder` участникам, кроме отказавшихся, + `tv_events` вида `event`; идемпотентно через `events.reminded_at` (D-78 §5) |
-| `notes_due_reminders` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика (§10): заметки с наступившим `remind_at` → `note_reminder` автору, идемпотентно по `reminded_at` (D-95) |
-| `notes_purge_trash` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: удаляет заметки, лежащие в корзине дольше 3 дней (D-95) |
-| `transition_errand` | `(p_id uuid, p_to text, p_reason text, client_request_id uuid) → jsonb` | Автомат заявки (D-79 §1): `accepted` — только `secretary`, забирает первая (`already_claimed` остальным); `done` — взявшая; `declined` — секретарь из `sent` или взявшая из `accepted`; `cancelled` — автор из `sent`/`accepted` (пуша нет, очередь снимается). Ошибки `forbidden`, `bad_status`, `bad_transition` |
-| `errands_due_escalation` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: один повторный `errand_sent` (`meta.repeat`) секретарям по заявке, никем не взятой за `settings.secretary.escalate_after_min` (дефолт 3), не старше часа; идемпотентно через `errands.escalated_at` (D-79 §6) |
-| `thank_errand` | `(p_id uuid, client_request_id uuid) → jsonb` | «Спасибо ♥» (D-97 §10): только автор и только `done`; ставит `errands.thanked_at`, повтор держит время первого; пуша нет |
-| `errand_eta` / `errand_ask` / `errand_answer` / `errand_result` / `errand_nudge` | `(p_id uuid, …, client_request_id uuid) → jsonb` | Связь (D-99): обещание взявшего (`eta_at`); вопрос секретаря → пуш `errand_question` автору; ответ автора → пуш `errand_answer` взявшему (ничья — всем на месте); результат после «Готово» (полчаса) → пуш `errand_done`; повтор пуша автором, не чаще раза в минуту (`too_soon`). Идемпотентность — `ingest_batches` |
-| `errands_due_remind` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: за 10 минут до `due_at` одно напоминание (`errand_sent`, `meta.due`) взявшему, ничью — `errand_recipients`; просьба «впритык» (меньше 20 мин) и прошедший срок — без напоминания (D-106 §8) |
-| `errands_expire` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: заявка с `until_at` в прошлом — взятая в `done`, ничья в `cancelled` (D-99 §7) |
-| `announce_visit` | `(p_note text, client_request_id uuid, p_kind text default 'visitor') → visits` | «К вам посетитель» (D-96) и сообщение на стену (`p_kind = 'message'`, текст обязателен — иначе `empty_message`, D-116): только `secretary`; пуш `visit_arrived` / `visit_message` директорам; поднимает версию стены (`tv_touch`) |
-| `answer_visit` | `(p_id uuid, p_answer text) → visits`, без `client_request_id` (D-96 §6) | Только director: посетителю `invited` / `wait` / `declined`, сообщению — `read` (чужой виду ответ — `bad_answer`, D-116); `invited` включает гостя на час (`tv_state.guest_until`); пуш `visit_answered` автору (сообщению — только при истечении) |
-| `close_visit` | `(p_id uuid) → visits`, без `client_request_id` | Убрать карточку визита |
-| `visits_due_expiry` | `(p_now timestamptz) → int` | Только `service_role`, из минутного тика: визит без ответа гаснет (20 минут, после «Подождёт» — час; сообщение без «Понятно» — 30 минут, D-116) |
-| `tv_control`, `tv_focus`, `tv_heartbeat`, `tv_summary`, `tv_calendar`, `tv_overlay`, `tv_rating` | §8 | Пульт и киоск ТВ |
-| `my_daily_report` | `(p_date date) → jsonb` | Ежедневный отчёт (D-152), команда (`team_role`, иначе `not_team_member`): день сотрудника `MyDailyReportDay` — сегодня ли, рабочий ли, включён ли модуль, отчёт, живой список задач дня, подсказка «Пришёл» (время прошлого отчёта или `work_start`) и «Ушёл» (сейчас), правила очков |
-| `submit_daily_report` | `(p_arrived_at timestamptz, p_left_at timestamptz, p_summary text, client_request_id uuid) → jsonb` | Команда; день отчёта — местная дата «Пришёл»: сегодня или вчера, если вчера утренний тик ещё не закрыл (`checked_on`) и строки за него нет — так доезжает сданный без сети до полуночи (вставка без перезаписи, гонку с тиком проигрывает — `bad_times`); оба времени внутри этого дня, ушёл позже, чем пришёл (`bad_times`), слова 1…4000 (`summary_required`, `summary_too_long`), модуль включён (`daily_report_disabled`). Upsert по `(user_id, report_date)`: вторая сдача — правка, снимок задач дня заново. Первая сдача рабочего дня при `points_enabled` — `+points_rules.daily_report` (`auto_rule`, `daily_report`, ключ по отчёту). Повтор того же ключа отдаёт сохранённый отчёт с `points_awarded = 0` — и после полуночи |
-| `my_daily_report_history` | `(p_limit int) → jsonb` | Команда: свои отчёты, сданные и несданные, новые сверху (1…366, по умолчанию 30), у каждого — очки, которые он принёс (с учётом возврата по спору) |
-| `team_daily_report_day` | `(p_date date) → jsonb` | Только director (`forbidden`): `TeamDay` — работающая команда и ушедшие, у кого есть отчёт за день; состояние каждого (`submitted / pending / missed / away / off`), отчёт, задачи дня, активность (принял, сдал, принято, сообщений), итоги |
-| `team_daily_report_period` | `(p_from date, p_to date) → jsonb` | Только director; до 92 дней, концы включительно (`bad_period`): `TeamPeriod` — по людям доля сдачи, средние приход / уход / часы, сдано / принято, в срок / после, очки за отчёты; линия по дням, итоги команды |
-| `daily_reports_due_missed` | `(p_now timestamptz) → int` | Только `service_role`, первым шагом свипа (§10): компаниям с включённым модулем — пустой `started_on` пишет сегодняшний день и больше ничего; иначе за прошедшие рабочие дни после `checked_on` (не раньше `started_on`, не глубже 7 дней) работающим членам команды, кто был в компании в тот день, на месте (`availability = 'active'`) и без отчёта, — строка `missed` и при `points_enabled` `−points_rules.daily_report_missed`; затем `checked_on` = вчера: закрытый день больше не смотрится — вернувшегося из отпуска не штрафуют за отпуск, правка рабочих дней не штрафует прошлое; повтор ничего не удваивает |
-| `daily_report_reminders_due` | `(p_now timestamptz) → int` | Только `service_role`, из свипа: с `remind_at` рабочего дня — `daily_report_remind` тем, кто должен и не сдал, раз в день на человека (`meta.date`); окно, сдвигающее пуш за конец дня, — не шлётся |
-
-## 4. Подсистема доставки уведомлений — продуктовая фича №1
-
-«Директор видит, кто не увидел поручение» — это SELECT по этой подсистеме, а не инфраструктурная деталь.
-
-### Outbox
-Таблица `notification_deliveries` (схема в DATABASE.md): `event_kind`, `status enum('queued','sent','failed')`, `channel enum('push','telegram','sms')` (используется только `push`), `tier` (всегда 1), `attempts`, `last_error`, `meta` (`title`, `body`, `url`, `tag`… рендерит триггер — воркер ничего не сочиняет), `deliver_after`, `sent_at`, `seen_at`, `acted_at`.
-
-- **Триггер БД вставляет строку `queued` — и НИКОГДА не зовёт HTTP.** Push задачи `task_sent` рождается только при вставке со статусом `sent` или при переходе в `sent`.
-- **Воркер — `lib/push/send.ts` `sweepDeliveries()`** (G.20c, D-114): строки сначала **захватываются** — RPC `claim_deliveries` (`queued`, `channel='push'`, `mode='now'`, `attempts < 3`, `deliver_after <= now()`, `for update skip locked`, `claimed_at`; захват старше 2 минут возвращается в очередь), так что пинок и свип одновременно никогда не шлют один пуш дважды. По 50 строк, по 8 пушей одновременно, пока очередь не пуста (пинок — до 8 с, свип — до 40 с) → web-push на все **включённые** подписки человека → `sent`; неудача → `attempts+1`, на третьей — `failed`; нет ни одной включённой подписки → сразу `failed`, `last_error='no_subscription'` (директору — «уведомления не включены у сотрудника»). Срок жизни, срочность и «тихо» — по виду события из `lib/push/policy.ts` (фиксированная политика, §4 «Политика сотрудника»); строка директора с `private` уходит без слов — только что случилось. Исход пишется в подписку (`last_ok_at` / `last_error*`). Без VAPID-ключей строки остаются `queued` — квитанция не подделывается. Строка, чья жизнь вышла (`ttl` вида, считая от `max(created_at, deliver_after)` — `ttlLeft`), не шлётся: `failed`, `last_error='expired'` (сигнал «Уведомления не доходят» её не считает); ушедшую push-сервис хранит только остаток жизни (D-125). В полезной нагрузке с D-125 — `task_id` (кнопка «Принял») и `at` (время события для шторки).
-- **Пинок** — `kickDeliveries()` через `after()` (возвращает промис — платформа держит функцию до конца отправки; `void` давал Vercel заморозить отправку сразу после ответа, D-125) из `/api/voice/confirm`, `/api/tasks/:id/transition`, `/deadline`, `/reassign`, `/api/errands`, `/api/visits`, `/api/push/test`; записи мимо API-роутов (сообщение в треде, кнопки секретаря, ответ на мероприятие, магазин, досылка из офлайн-очереди) зовут `/api/push/kick` (`kickPush()` на клиенте); **страховка** — минутный тик `/api/push/sweep` (§10).
-- **Минутный свип** `GET|POST /api/push/sweep` (Vercel cron, сервисный ключ; на Hobby — раз в сутки, минутный тик — В-8, D-125) перед отправкой очереди зовёт тики, каждый сам по себе (ошибка одного пишется в лог и не валит свип): `recurrence_spawn` (D-148, первым — задача повтора, выданная под окно, уходит этим же свипом), `events_due_reminders` (D-78), `errands_due_escalation` (D-79), `notes_due_reminders` — напоминания заметок, пуш `note_reminder` автору без тихих часов, ссылка `/notes?n=<id>` — и `notes_purge_trash` — корзина заметок старше 3 дней (D-95), `visits_due_expiry` — визит без ответа гаснет (D-96), `errands_expire` — заявка со сроком («не беспокоить на 30 мин») кончается сама (D-99), `errands_due_remind` — напоминание за 10 минут до «к 18:00» (D-106 §8); с D-114 — первым `publish_due_scheduled`, последними сигналы директора и сводки (§10).
-
-### Политика сотрудника (D-114)
-Сотрудник, секретарь и завхоз настроек не имеют: у них только «включены / нет» и «Проверить». Что ждёт окна компании — матрица ниже; как пуш едет — `lib/push/policy.ts`: работа (новая, доработка, отзыв, сообщение, на приёмку, отказ) — `high`, 24 ч; хорошие новости («Принято», «Срок продлён», магазин) — тихо, `normal`; объявления и календарь — `normal`; заявки секретаря — 30 мин, визит — 20 мин, «скоро» — 1 ч, «Сдайте отчёт за день» — `high`, 4 ч (D-152); тревога («Охрана», `meta.urgent`) — громко всегда, 5 мин. Уведомления одной задачи — один пузырь (`tag = task:{id}`); открыл задачу — её пузыри уходят из шторки. Карточка «Включить» — «Не сейчас» до завтра, iPhone вне экрана «Домой» и запрет — инструкция платформы. Приложение само перерегистрирует подписку (§4 «Гигиена канала»).
-
-### Правила директора (D-114)
-«Профиль → Уведомления», таблица `notification_prefs` (DATABASE), применяет триггер при постановке строки в очередь — матрица «Маршрут строки» в DATABASE. Девять категорий: `review` (на приёмку), `declined`, `questions`, `messages`, `unseen` («Задача не принята»), `overdue`, `secretary` (заявки и визиты, кроме тревоги), `calendar`, `shop`, `team` («Уведомления не доходят»); режимы «Сразу / Тихо / Сводкой / Не присылать». Не настраиваются: `alarm` (тревога и её квитанции), `reminders` (свои «напомни мне» — всегда, тишину пробивают по флагу), `system` (сводки, итог дня, проверка). Дефолты — прежнее поведение: всё «сразу», тишины нет; новые сигналы включены — «не принята» через 30 мин «сразу», просрочки «сводкой», «уведомления не доходят» «сразу». Смена правил перестраивает ждущую очередь директора (`set_notify_prefs`: delete + insert через тот же триггер).
-
-### Ack-семантика (D-32)
-«Увидел» = SW шлёт `POST /api/push/seen {delivery_id}` при показе уведомления, ЛИБО открытое приложение шлёт тот же роут без `delivery_id` и закрывает все незакрытые строки человека (`seen_at`). «Принял» = переход задачи в `accepted` ставит `acted_at` строке `task_sent`; для `message` — `mark_thread_read`. Статусы директору: **«отправлено / увидел / принял»**; формулировка индикатора — «не открывал с 9:14», никогда «не получил» (Web Push не подтверждает доставку).
-
-### Эскалация
-Эскалации по каналам (Telegram, SMS) нет — не построено (D-21, D-32, D-41; указатели — IDEAS.md). Эскалация заявок секретарю — отдельная и есть: повторный push, §3 `errands_due_escalation`.
-
-### Гигиена канала
-- Чистка подписок: ответ `404`/`410` → подписка удаляется немедленно `[есть]`.
-- Подписка чинится сама (D-114): приложение при старте и возврате на экран сверяет её с сервером (`syncPush`, не чаще раза в 6 ч), SW отвечает на `pushsubscriptionchange`; выход из аккаунта отписывает телефон.
-- Подписка с чужим VAPID-ключом (другой деплой, смена пары — push-сервис отвечает `403` на каждый пуш) пересоздаётся приложением на старте: ключ сверяется локально (`lib/push/keys.ts`), новая подписка уходит на сервер сразу, с `replaces` — старый адрес удаляется. Сервер по `403` подписку не удаляет: так же отвечают на неверный ключ самого деплоя, и удаление стёрло бы все подписки (D-125).
-- «У кого канал мёртв» (D-114) — не еженедельный отчёт, а всегда: RPC `push_health()` (директор, секретарь) → «без уведомлений» у человека в «Сотрудниках», строка «У N человек не работают уведомления», в карточке — состояние и «Прислать проверку» (`/api/push/test`).
-- Окно доставки (D-38, `company.settings.delivery_window`, дефолт 08:00–21:00 Asia/Aqtobe): триггер `trg_notification_deliveries_deliver_after` ставит `deliver_after = next_delivery_slot(...)` видам, которые ждут окна (матрица ниже); задачи вне окна производители кладут `scheduled` (§2, §3), их выпускает минутный тик (`publish_due_scheduled`, D-114).
-
-### Матрица нотификаций (по триггерам и RPC в миграциях)
-
-| `event_kind` | Кто порождает | Получатель | Заголовок | Ссылка | Окно доставки |
-|---|---|---|---|---|---|
-| `pending_review` | триггер на `tasks` | автор задачи | «На приёмку · Имя» | `/tasks/{id}` | сразу |
-| `declined` | триггер на `tasks` | автор задачи | «Не может · Имя» | `/tasks/{id}` | сразу |
-| `message` | триггер на `task_messages` (text/voice/photo, кроме причины отказа, комментария доработки, отчёта и слова при передаче — `handoff_note`, D-128) | участники треда (автор ∪ исполнитель), кроме отправителя | «{Имя} · «{title}»» / «Вопрос по «{title}»» / «Просит срок · {Имя}» («{title}» · до … · слова; категория «Вопросы», в переписку не складывается, D-128) + слова (фото и голосовое — своими словами) | `/tasks/{id}` | автору задачи — сразу (D-51 п.2, 🟡), остальным — ждёт окна |
-| `task_sent` | триггер на `tasks` (вставка `sent` или переход в `sent`) | исполнитель | «Новая задача · Имя» + «…· срок завтра 18:00»; кнопки «Принял» / «Открыть» | `/tasks/{id}` | сразу (момент выбрал производитель) |
-| `rework` | триггер на `tasks` | исполнитель | «На доработку · Имя» (+ срок) | `/tasks/{id}` | ждёт окна |
-| `done` | триггер на `tasks` | исполнитель | «Принято · Имя» | `/tasks/{id}` | ждёт окна |
-| `revoked` | триггер на `tasks` (из открытых статусов, в т.ч. при переназначении) | исполнитель | «Отозвано · Имя»; при переназначении `reassign_task` переписывает заголовок на «Задача передана · Имя» (D-128) | `/tasks/{id}` | ждёт окна |
-| `deadline_extended` | `extend_task_deadline`, `answer_deadline_request` (согласие) | исполнитель | «Срок продлён до …» / «Срок согласован · до …» (тихо) | `/tasks/{id}` | ждёт окна |
-| `deadline_moved` | `extend_task_deadline` (раньше или впервые) | исполнитель | «Срок перенесён · до …» / «Назначен срок · до …» | `/tasks/{id}` | ждёт окна |
-| `deadline_kept` | `answer_deadline_request` (отказ) | исполнитель | «Срок прежний · до …» | `/tasks/{id}` | ждёт окна |
-| `task_nudge` | `nudge_task` | исполнитель | «Директор напоминает» / «Директор ждёт: примите задачу» | `/tasks/{id}` | ждёт окна |
-| `deadline_soon` | тик `deadline_reminders_due` (задача дана больше чем за 3 ч, раз на срок; не шлётся, если окно задержало бы его за срок) | исполнитель | «Скоро срок · HH:MM», «не успеваете — попросите время» | `/tasks/{id}` | ждёт окна |
-| `daily_report_remind` | тик `daily_report_reminders_due` (D-152; с `remind_at` рабочего дня, раз в день на человека; не шлётся, если окно сдвинуло бы его за конец дня) | член команды, который должен и не сдал отчёт | «Сдайте отчёт за день», «Во сколько пришли и ушли, чем занимались — задачи дня уже в отчёте» | `/report` | ждёт окна; `high`, живёт 4 ч |
-| `announcement` | триггер на `announcements` | все активные, кроме `tv` и автора | «Объявление» | `/ether` | ждёт окна |
-| `shop_order` | `create_shop_order` | director и shopkeeper, кроме заказчика | «Заказ в магазине» | `/shop` | завхозу — ждёт окна (D-114), директору — по его правилам |
-| `shop_approved` / `shop_ready` | `set_shop_order_status` | владелец заказа | «Заказ подтверждён» / «Заказ готов» | `/shop` | ждёт окна |
-| `shop_cancelled` | `cancel_shop_order`, если отменил не владелец | владелец заказа | «Заказ отменён» | `/shop` | ждёт окна |
-| `reaction` | `react_to_task` (новая реакция; неотправленный пуш по той же задаче переписывается) | исполнитель | «🔥 · Имя», в теле — «название · +10 очков» (тихо) | `/tasks/{id}` | ждёт окна |
-| `points_dispute` | `dispute_points` | все активные директора | «Оспаривает · Имя», в теле — минус, причина и слова сотрудника | `/rating#disputes` | категория «Магазин и очки» правил директора |
-| `points_answer` | `resolve_points_dispute` | тот, кто оспорил | «Очки вернули · +5» / «Начисление оставили» (тихо) | `/rating` | ждёт окна |
-| `event_invite` | триггер на `event_participants` | позванный (не автор) | «Приглашение» | `/calendar?e={id}` | ждёт окна |
-| `event_moved` / `event_cancelled` | триггер на `events` | участники, кроме автора (перенос — кроме отказавшихся) | «Перенос» / «Отмена» | `/calendar?e={id}` | ждёт окна |
-| `event_reminder` | `events_due_reminders` | участники, кроме отказавшихся (и автор) | «Скоро» | `/calendar?e={id}` | сразу (D-78 §5) |
-| `event_declined` | `respond_event` (только на смене ответа на «не смогу», D-114) | автор мероприятия | «Не сможет» | `/calendar?e={id}` | сразу |
-| `errand_sent` | триггер на `errands`; повтор — `errands_due_escalation`, «Напомнить» — `errand_nudge` | активные `secretary`, кроме автора, **кто на месте** (`errand_recipients`; никого — все, D-99) | надпись кнопки / «Ещё раз: …», без комментария текст — «Просит Имя» (D-125); тревога — «🚨 Вызови охрану!», `meta.urgent` (`requireInteraction`, повтор каждую минуту, пока не взяли) | `/secretary?e={id}` | сразу (D-79 §6) |
-| `errand_accepted` / `errand_done` / `errand_declined` | триггер на `errands`; `errand_done` с результатом — `errand_result` | автор заявки | «Принято · Имя» и обычное «Готово» — **только по тревоге** (D-99 §6); «Готово · Имя: результат»; «Не может · Имя» | `/pulse` / `/secretary?e={id}` | сразу |
-| `errand_question` / `errand_answer` | `errand_ask` / `errand_answer` | автор / взявший секретарь | «Айгуль спрашивает» / «Директор ответил» | `/pulse` / `/feed` | сразу (D-99 §3) |
-| `note_reminder` | `notes_due_reminders` | автор заметки | напоминание заметки | `/notes?n={id}` | сразу (D-95) |
-| `visit_arrived` | триггер на `visits` | директора компании | «К вам посетитель» — имя гостя или «Пусть заходит или подождёт?» (D-125) | `/pulse` | сразу (D-96) |
-| `visit_message` | триггер на `visits` (`kind = 'message'`) | директора компании | «Сообщение от секретаря» — текст | `/pulse` | по настройке «Секретарь»; «Не беспокоить» и встречу не пробивает; «Понятно» снимает неушедший (D-116) |
-| `visit_answered` | триггер на `visits` | секретарь-автор | ответ директора; на сообщение — только «Директор не прочитал» | `/feed` | сразу (D-96, D-116) |
-| `task_unseen` | `unseen_task_alerts_due` (тик) | автор-директор | «Задача не принята · Имя» — задача всё ещё `sent` N минут после пуша: «„…“ · увидел в 9:14» / «не открывал с 9:14» / «уведомления не включены» | `/tasks/{id}` | в окне компании, раз на отправку (D-114 §10) |
-| `team_channel` | `team_channel_alerts_due` (тик) | директора компании | «Уведомления не доходят · Имя» — пуш человеку не прошёл за сутки и после ничего не дошло | `/people/{id}/edit` | раз в неделю на человека (D-114 §10) |
-| `task_overdue` | `overdue_alerts_due` (тик) | автор-директор | «Просрочено · Имя» — «„…“ · срок был 18:00» | `/tasks/{id}` | раз на срок (D-114) |
-| `digest` | `director_digests_due` (тик) | директор | «Сводка» / «Пока вы отдыхали» / «Пока вы были на встрече» — «3 на приёмку · 2 вопроса» | `/pulse` | по слоту сводки, концу тишины или встречи (D-114) |
-| `day_summary` | `director_day_summaries_due` (тик) | директор | «Итог дня» — «принято 5 · на приёмке 2 · …» | `/sent` | в его время, раз в день (D-114) |
-| `test` | `/api/push/test` | себе или (director/secretary) человеку команды | «Проверка связи» | `/profile` | сразу (D-114) |
-
-Про задачи (D-125): заголовок — «событие · кто», имя другой стороны (директора — исполнителю, исполнителя — директору), без родовых глаголов; тело новой задачи и доработки несёт срок, пока он впереди, словами карточки (`push_when()` = `humanAqtobe()`).
-
-Про `message`: **схлопывание** — пока строка ещё `queued`, следующее сообщение того же треда не создаёт новую, а обновляет её («N новых сообщения · последние слова»), один сигнал на очередь, а не N. **Не сообщения:** причина отказа, комментарий к доработке и отчёт при сдаче — у них свои события (`declined`, `rework`, `pending_review`). **Квитанцию закрывает** `mark_thread_read` — «Прочитал» из шторки или открытый тред. В таблице могут лежать строки прежних видов `question` и `reply` — новых не появляется. Очки (`award_points`) уведомлений не порождают. Удалённое объявление забирает свои ещё не ушедшие пуши (`meta.announcement_id`, D-114). У `errand_declined` ссылка — `/secretary?e={id}`, у «принято / готово» — `/pulse`.
+**Канал.** Приложение сверяет подписку при старте (`syncPush()`), service worker на `pushsubscriptionchange` шлёт новый адрес с `replaces`, подписка под чужой VAPID-ключ пересоздаётся (`lib/push/keys.ts`); адрес браузера принадлежит тому, кто в нём вошёл. Мёртвый канал показывает `push_health()`.
 
 ## 5. Telegram
 
-Не построено; идея — IDEAS.md (указатель D-21). В схеме есть только колонка `profiles.telegram_chat_id`, её никто не пишет.
+Не построен (см. «Не построено»).
 
-## 6. Очки, реакции, магазин
+## 6. Очки и магазин
 
-- **Очки** `[за флагом: settings.points_enabled]` (D-48, дефолт выключено): ручное начисление и снятие — RPC `award_points` прямо из клиента (`lib/points/queries.ts`), только director, причина обязательна всегда, `amount ≠ 0` (D-30). Голосом — плюс и минус, как сказано, только при включённом флаге (`confirm_voice_batch`; минус без причины — «снял директор», D-137); из `source='shared'` очков нет (D-36). Рейтинг — `fn_rating` (§3).
-- **Авто-правила** (D-133, D-13, D-28) — триггер `trg_tasks_points` на переходе задачи, только при `points_enabled`, исполнитель из команды, задача не своя: `sent → accepted` в первые `quick_accept_min` минут после пуша `task_sent` — `quick_accept`; `→ done` с дедлайном: сдал (`completed_at`) в первой половине срока — `early`, иначе до дедлайна — `on_time`, после — `late` (только при `late_on`, не с `availability` отпуск/больничный). Значения — `settings.points_rules`; ключ `(task_id, rule_code) where source='auto_rule'` — один раз (D-31). Тот же триггер на `→ done` пишет серию `profiles.streak_count` (`task_streak_of`) — при любом флаге очков.
-- **Реакции** (D-133, И-68) — `react_to_task`; таблица `task_reactions`. **«Оспорить»** (D-14) — `dispute_points` / `resolve_points_dispute`; таблица `point_disputes`.
-- **Эфир** (D-133, И-46) — `ether_events` пишут триггеры: выдача заказа (`merch`) и ручной плюс без `quiet` (`praise`); пуша команде нет. Стена (`tv_events_points`, `tv_rating.awards`) — только ручные без `quiet` и реакции, авто-бонус — нет.
-- **Ежедневный отчёт** (D-152) — `+points_rules.daily_report` (1) за первую сдачу рабочего дня (`submit_daily_report`) и `−points_rules.daily_report_missed` (10) за несданный (утренний тик `daily_reports_due_missed`; строку `missed` тик пишет всем, а минус — только тому, у кого есть сданный отчёт раньше дня пропуска, D-155 п.1), обе при `points_enabled`, `source='auto_rule'`, `daily_report_id` — отчёт; ключ `(daily_report_id, rule_code)` — один раз за день. На стену и в Эфир не идут (авто-правило), минус оспаривается «Оспорить». Ранние минусы (до первого сданного отчёта) возвращает `daily_report_refund_early_fines()` (только `service_role`, вызвана миграцией `20261103120000`): `+|amount|`, `auto_rule`, `rule_code = 'daily_report_missed_refund'`, тот же `daily_report_id`, повтор — 0 строк; открытый спор на такой минус закрывается возвратом (`refunded`, `refund_id`); возвращённый минус «Оспорить» не принимает (`dispute_points` → `already_refunded`); в `points` отчёта и «Периода» возврат не считается дважды; `tv_rating.earned` возвратов не считает.
-- **Магазин** — только RPC `create_shop_order` / `cancel_shop_order` / `set_shop_order_status` (§3), hold-final (D-10). Баланс всегда = `SUM(point_transactions)`, нигде не хранится.
+Роутов нет, всё — прямые RPC (§3). Баланс — всегда `SUM(point_transactions)` (принцип 4), холд магазина финален (D-10); авто-очки начисляют триггеры и тик.
 
 ## 7. Статусная машина задач
 
-`scheduled → sent → accepted → pending_review → done | rework(→accepted) | declined | revoked`. `in_progress` в enum остаётся, переходов в него нет (D-04). «Уточнить» — не статус: `meta.is_question` на сообщении + `meta.answered_at` триггером при первом ответе автора задачи (G.7).
+`scheduled → sent → accepted → pending_review → done | rework | declined | revoked`; в `in_progress` переходов нет (D-04); «Уточнить» — сообщение с `meta.is_question`. Матрица — в триггере `trg_task_status_guard`; вызов без пользователя (тик) проходит любой из переходов.
 
 | Переход | Кто |
 |---|---|
-| `scheduled → sent` | service role — тик `publish_due_scheduled` (guard пускает при `auth.uid() is null`, D-114, наряд 017); director — «Отправить сейчас», `send_task_now` (D-129) |
-| `sent → accepted` | исполнитель («Принял») |
-| `sent/accepted → declined` | исполнитель; причина — `payload.reason`, сервер её не требует; подсказка коллеги — `payload.suggest_assignee_id` (D-128) |
-| `rework → declined` | исполнитель через `transition_task` — шагами `rework → accepted → declined` в одной транзакции (D-128; самого ребра в страже нет) |
-| `accepted → pending_review` | исполнитель (отчёт — в той же транзакции, D-64 §3) |
-| `rework → pending_review` | исполнитель через `transition_task` — шагами `rework → accepted → pending_review` в одной транзакции, отчёт внутри (D-130; самого ребра в страже нет, `rework → accepted` пуша не ставит) |
-| `pending_review → done \| rework` | только director |
-| `rework → accepted` | исполнитель |
-| `declined → sent` | director («Настоять», G.20; `closed_at` обнуляется) |
-| любой, кроме `done`/`revoked`, → `revoked` | director (`revoke_task`, в т.ч. из `declined` — «Отменить»; `reassign_task` для старой задачи) |
-| `scheduled → (delete)` | director (`revoke_task`), до отправки |
+| `scheduled → sent` | тик; директор — `send_task_now` |
+| `sent → accepted`, `rework → accepted` | исполнитель |
+| `sent`, `accepted → declined` | исполнитель |
+| `accepted → pending_review` | исполнитель, отчёт — в той же транзакции |
+| `rework → pending_review`, `rework → declined` | исполнитель через `transition_task`, шагами через `accepted` (D-128, D-130) |
+| `pending_review → done`, `rework` | директор |
+| `declined → sent` | директор («Настоять», G.20) |
+| любой, кроме `done` и `revoked`, в `revoked` | директор; `scheduled` при отзыве удаляется |
 
-Всё остальное — `invalid_transition` (роут отвечает `409`).
+Остальное — `invalid_transition`, роут отвечает `409`.
 
-## 8. ТВ-режим (D-76)
+## 8. Стена (ТВ)
 
-- Киоск — **auth-пользователь роли `tv`** (не anon): по RLS видит только свой профиль, `tv_events` (предмаскированный `payload_guest`) и `tv_state` своей компании, зовёт `tv_summary(p_guest)`, `tv_focus()`, `tv_calendar(p_guest)`, `tv_overlay()`, `tv_heartbeat(p_applied_version)` (D-96). Логин на устройстве один раз; после входа роль `tv` приземляется прямо на `/tv` (`homeForRole`).
-- **Состояние стены — строка `tv_state`** (одна на компанию): `mode` (`ether | employee | task`), `employee_id`, `task_id`, `scene` (`face | clock | team | calendar`), `clock_style` (`digital | analog`), `guest`, `guest_until`, `expires_at`, `version`, `reload_requested_at`, `seen_at`, `applied_version`, `updated_by`. Политик на запись нет вовсе; киоск и пульт слушают строку через Postgres Changes под RLS (D-76 §1). Отдельного HTTP-роута у пульта нет.
-- **Команды — только RPC `tv_control(p_mode, p_employee_id, p_task_id, p_scene, p_guest, p_reload, p_clock, p_calendar, p_board, p_board_guest, p_wake, p_rating, p_carousel)`** (security definer, роль `director`): абсолютное состояние, `null` = «не трогать», каждая команда поднимает `version`; повтор безвреден — `client_request_id` не заводится (исключение из принципа 7, D-76 §2–3). Фокус живёт 10 минут (`expires_at`), возврат в эфир считает киоск по своим часам, без cron. Режим `task` схемой допущен, UI его не строит.
-- **Данные фокуса — RPC `tv_focus()`** (роли `tv`/`director`): сотрудник и до 12 открытых дел (`sent, accepted, in_progress, rework, pending_review`) с историей каждого (`story` — вид события и время, без слов), сданное за неделю, рейтинг человека (место только из топ-5, очки, четыре недели, итоги недели) (D-120); маска гостя в БД (имя без фамилии, `title = null`, рейтинга нет), просрочка, отказ и доработка не помечаются (D-45).
-- **Сводка стены — `tv_summary(p_guest)`**: пульс дня по часам, ближайшие мероприятия, вердикт числами без имён, три числа дня, топ-5 недели через `fn_rating`, загрузка людей, закрытое за неделю, выдачи наград; маска гостя внутри. Неделя мероприятий для стены — `tv_calendar(p_guest, p_days)` (роль `tv` таблицу `events` не читает); надпись поверх любой сцены (посетитель, скорое мероприятие) — `tv_overlay()` (D-96 §3, §6–7).
-- **«К вам посетитель» (D-96)**: `POST /api/visits` (secretary → RPC `announce_visit`, пуш директору сразу) и `POST /api/visits/[id]/answer` (director → `answer_visit`, пуш секретарю сразу); закрытие — RPC `close_visit` с клиента; минутный свип зовёт `visits_due_expiry` (20 минут без ответа, после «Подождёт» — час). Визит поднимает версию `tv_state`, киоск перечитывает надпись `tv_overlay()`. Сообщение секретаря на стену (D-116) идёт тем же путём с `kind: 'message'`, ответ — `read`; `tv_overlay()` отдаёт `{visit, waiting, message, messages}` — приглашённый визит больше не отдаётся.
-- Guest-режим — поле `tv_state.guest` (переключатель «Гость в кабинете» на пульте, D-33; «Пусть заходит» посетителю включает его на час — `guest_until`, D-96); `?guest=1` — лишь стартовое значение до прихода строки.
-- **Квитанция экрана** — `tv_heartbeat(p_applied_version)` от роли `tv` раз в минуту и после каждого применённого состояния; пульт показывает «На стене» / «Отправлено, экран ещё не показал» / «Экран не отвечает с 9:14» (принцип 8). Перезапуск с пульта — `reload_requested_at`; киоск сравнивает отметку с временем своей загрузки.
-- Чистка хвоста `tv_events` — `tv_events_prune(p_days default 30)` из тика `/api/push/sweep` (§10, D-126): лента стены живёт последний месяц.
+Роутов нет. Киоск — пользователь роли `tv`, читает RPC `tv_*`; пульт шлёт `tv_control` и `tv_board_control` (абсолютное состояние без ключа, D-76). Визиты поднимают версию стены, тик чистит её ленту.
 
-## 9. Контракт ошибок AI-конвейера (для фронта)
+## 9. Ошибки голосового конвейера
 
-| Состояние | HTTP | JSON | Поведение фронта |
-|---|---|---|---|
-| upload-fail | — (Storage напрямую) или `502` | ошибка signed-URL upload / `upload_url_failed` | ретрай с этапа загрузки; запись держится на телефоне в IndexedDB (`lib/voice/kept.ts`, D-130) и возвращается директору повтором (`lib/voice/keptReplay.ts`); где IndexedDB нет — только в сторе `lib/store/ingest.ts` |
-| stt-fail | 502 | `{error:{code:'stt_failed'}, audio_path}` | «Не расслышал» + ретрай по сохранённому `audio_path`, без перезаписи |
-| empty-transcript | 200 | `{transcript: null, code:'empty_transcript', guard}` | guard отбраковал не-речь; парсер не вызывался |
-| empty-entities | 200 | `{entities:[]}` | показать сырой транскрипт + «Повторить / отправить как текст» |
-| errand | 200 | `{entities:[], errand, model:'matcher'}` | заявка секретарю без подтверждения (D-79 §9) |
-| refused (отказ модели) | 422 | `{error:{code:'parse_refused'}, transcript}` | сырой транскрипт + ручной ввод |
-| parse-fail | 502 | `{error:{code:'parse_failed'}, transcript}` | сырой транскрипт + ретрай |
-| low-confidence | 200 | `assignee_confidence`/`deadline_confidence` ниже порога | не ошибка: жёлтый/красный чип, отправка сущности с нераспознанным исполнителем заблокирована (D-16/D-36) |
-| confirm без исполнителя / времени | 400 | `assignee_required` / `event_time_required` | вернуть карточку на правку |
-| duplicate confirm | 200 | `{result, duplicate:true}` | обычный success (те же id) |
-| timeout | 504 | — | сервер кода `ai_timeout` не формирует; клиент (`lib/voice/api.ts`) так называет любой ответ 504 |
-| rate_limited | 429 | — | сервер не отдаёт (лимитов нет, §1); клиент на 429 показывает `rate_limited` |
+| Состояние | HTTP | Код или тело |
+|---|---|---|
+| не выдан URL загрузки | 502 | `upload_url_failed` |
+| STT не ответил | 502 | `stt_failed` + `audio_path`: повтор по пути |
+| не речь | 200 | `code: "empty_transcript"` |
+| пустой разбор | 200 | `entities: []` |
+| заявка | 200 | `errand`, `model: "matcher"` |
+| отказ модели, сбой разбора | 422, 502 | `parse_refused`, `parse_failed` + `transcript` |
+| подтверждение с ошибкой | 400 | `assignee_required`, `assignee_inactive`, `event_time_required` |
+| повтор подтверждения | 200 | `duplicate: true`, те же id |
+
+`ai_timeout` и `rate_limited` сервер не формирует: так `lib/voice/api.ts` называет ответы `504` и `429` платформы.
 
 ## 10. Минутный тик
 
-pg_cron, pg_net и Edge Functions не подключены (G.20c). Единственное расписание — Vercel cron в `vercel.json`: `/api/push/sweep` с заголовком `Authorization: Bearer <CRON_SECRET>` (без секрета — `401`); роут отвечает и на `GET` (так зовёт Vercel cron), и на `POST`, `maxDuration = 60`. Сейчас расписание `0 3 * * *` — раз в сутки (08:00 Asia/Aqtobe): проект на Vercel Hobby, cron раз в минуту — тариф Pro. Минутный тик — открытый вопрос В-8 (D-125).
+Cron из `vercel.json` зовёт `/api/push/sweep` (`GET` или `POST`) с `Authorization: Bearer <CRON_SECRET>`, без секрета — `401`; работа под service role. Локально — `pnpm dev:tick`. Шаги по порядку; сбой шага пишется в лог и не останавливает следующие:
 
-Один вызов тика делает по порядку: `daily_reports_due_missed()` — несданные отчёты прошедших рабочих дней становятся `missed`, с очками — минус (D-152; первым, чтобы утро начиналось с закрытого вчера); `recurrence_spawn()` — повторы (D-148): у правила-задачи, чей `next_run_at` настал, — обычная задача дня (`sent`, вне окна — `scheduled` до окна; срок — `next_on` + `at_time`; голос фразы; уникальный `(recurrence_rule_id, recurrence_on)` — повтор тика ничего не удваивает; день, чей срок прошёл, пропускается; исполнитель уволен — правило на паузу с `stopped_reason = 'assignee_inactive'`), у серии — следующая встреча с участниками, без приглашений (`pulse.recurrence_spawn` на время тика); затем `publish_due_scheduled()` — выпуск отложенных задач `scheduled → sent` (D-38, tasks/017, D-114), `events_due_reminders()` (D-78), `errands_due_escalation()` (D-79), `errands_expire()` (D-99), `errands_due_remind()` (D-106 §8), `notes_due_reminders()` и `notes_purge_trash()` (D-95), `visits_due_expiry()` (D-96), сигналы директора `unseen_task_alerts_due()`, `overdue_alerts_due()` (молчит, пока ждёт просьба о сроке, D-128), «Скоро срок» исполнителю `deadline_reminders_due()` (D-128), «Сдайте отчёт за день» `daily_report_reminders_due()` (D-152; на Hobby свип в 08:00 — до 18:00 не доходит, напоминание оживёт с минутным тиком, В-8), `team_channel_alerts_due()`, `director_day_summaries_due()` и последними сводки `director_digests_due()` (D-114), чистка outbox `notification_deliveries_purge()` (30 дней ушедшему, 7 — не ушедшему, до 2000 строк за тик, D-114 §10), чистка ленты стены `tv_events_prune()` (30 дней, D-126), затем `sweepDeliveries()` (outbox, §4). Сбой одного шага логируется и не останавливает рассылку. **Локально** cron нет: `pnpm dev:tick` зовёт тот же свип раз в минуту.
+1. `daily_reports_due_missed` — первым: утро начинается с закрытого вчера (D-152).
+2. `recurrence_spawn` — до выпуска: задача повтора под окно уходит этим же вызовом (D-148).
+3. `publish_due_scheduled` — отложенные задачи в `sent` (D-38).
+4. `events_due_reminders`, `errands_due_escalation`, `errands_expire`, `errands_due_remind`, `notes_due_reminders`, `notes_purge_trash`, `visits_due_expiry`.
+5. Сигналы: `unseen_task_alerts_due`, `overdue_alerts_due`, `deadline_reminders_due`, `daily_report_reminders_due`, `team_channel_alerts_due`, `director_day_summaries_due`, последними `director_digests_due` — придержанный сигнал попадает в сводку (D-114).
+6. `notification_deliveries_purge`, `tv_events_prune`.
+7. `purgeVoice()` (D-155): `voice_purge_due` до 500 файлов, удаление пачками по 100, `voice_mark_purged` только для пачек без ошибки.
+8. `drainStorage()` — файлы удалённых компаний, до 5 с (§14).
+9. `sweepDeliveries()` на 40 с: поставленное выше уходит этим же вызовом.
 
-Последний шаг свипа — **голос** (D-155 п.3, `lib/voice/retention.ts`): `voice_purge_due` (до 500 файлов) → `storage.from("voice").remove` пачками по 100 → `voice_mark_purged` только по пачкам без ошибки (отсутствующий файл Storage отдаёт без ошибки — путь обнуляется тоже); ошибка пишется в лог, свип идёт дальше, не удалённое придёт в следующий раз; в ответе — `voice_purged`. Авто-очки и серия — не тик, а триггер на переходе задачи (D-133).
+## 11. Переменные окружения в коде
 
-## 11. Environments (D-19)
+Схема — `serverEnvSchema` в `lib/env.schema.ts`; целиком её проверяет `getServerEnv()`, и зовёт его только воркер пушей. `NEXT_PUBLIC_*` проверяет `getPublicEnv()` без zod (модуль едет в браузер). Остальное читается из `process.env` напрямую. Значения по средам — `docs/SETUP.md`.
 
-Сейчас есть только dev-проект Supabase; прод-проекта и CI нет, вопрос открыт в D-19. Vercel-проект `pulse` — и Production, и Preview — смотрит в dev (SETUP.md §1). Миграции в dev — `pnpm db:push`; `db push` в прод запрещён. Своя VAPID-пара на каждую среду. **Смена VAPID-ключей = смерть всех push-подписок** до следующего открытия приложения (SETUP.md §2) — пару, на которую подписаны люди, не трогать без плана переподписки.
+| Переменная | Кто читает |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | клиенты Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | `createServiceSupabase()`; основа ключей кодов входа и подписи прогонов |
+| `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`, `ELEVENLABS_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY` | провайдеры STT и разбора |
+| `STT_PROVIDER`, `STT_FALLBACK_PROVIDER`, `PARSER_MODEL`, `PARSER_ESCALATION_MODEL` | умолчания, если компания не задала своё |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | воркер пушей |
+| `CRON_SECRET`, `LOGIN_CODE_SECRET` | тик; HMAC кодов (без него — производный от service role) |
+| `OPS_HOST`, `OPS_APP_ORIGIN` | хост консоли, адрес приложения для её ссылок входа |
+| `PULSE_BUILD_ID`, `PULSE_BUILD_SHA`, `PULSE_BUILD_AT` | `/api/version`, ставит `next.config.ts` |
 
-| Переменная | Где | Примечание |
-|---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Vercel | по средам |
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel (server) | никогда в клиенте |
-| `SUPABASE_ACCESS_TOKEN` / `SUPABASE_DB_PASSWORD` | локально | только CLI (`db:push`, `db:reset`), в Vercel не нужны |
-| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | Vercel | STT и парсер |
-| `ELEVENLABS_API_KEY` / `DEEPGRAM_API_KEY` | Vercel | ключи запасных STT-провайдеров из `settings.stt` (D-53) |
-| `DEEPSEEK_API_KEY` | Vercel | парсер компаний с моделью DeepSeek в `settings.parser` — у пилота (D-155 п.2) — и сравнение в «Лаб» (D-63) |
-| `STT_PROVIDER` / `STT_FALLBACK_PROVIDER` | Vercel | значения по умолчанию `getSttProviders()`; роут транскрипции берёт провайдеров из `settings.stt` |
-| `PARSER_MODEL` / `PARSER_ESCALATION_MODEL` | Vercel | значения по умолчанию `lib/ai/parse.ts`; роут парсера передаёт модели из `settings.parser` |
-| `QUERY_MODEL` | — | объявлена в `.env.example`, код не читает |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Vercel | отдельные пары dev/prod; без ключей воркер не шлёт ничего |
-| `CRON_SECRET` | Vercel | Bearer минутного тика §10 |
-| `OPS_HOST` / `OPS_APP_ORIGIN` | необязательны | хост консоли: с ним `/ops` и `/api/ops` отвечают только там; адрес приложения для ссылок входа из консоли (D-157) |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` / `INTERNAL_FN_SECRET` / `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | — | объявлены в `.env.example`, код не использует (Telegram, Edge Functions и Sentry нет) |
+`QUERY_MODEL`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `INTERNAL_FN_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN` есть в схеме, но не читаются.
 
 ## 12. Наблюдаемость
 
-- Ошибки роутов — `console.error` в логи Vercel без тела запроса и ключей (`withAuth`, §1).
-- `ai_logs` (схема в DATABASE.md): каждый вызов STT и парсера — провайдер, модель, латентность по этапам, токены (`input`, `output`, `cache_read`), `parsed/confirmed_entities` + `was_edited` / `edit_fields`, `source`, `client_request_id`, `status` (`ok` | `error:<код>`); у разбора в `raw_response` — `calls` и `rules_version` (D-138). Колонки стоимости нет: цену считает «Лаб» по `lib/ai/pricing.ts` (D-63). `tool_calls` не заполняется (вопросов к данным нет). Аудио в логи не пишется.
-- `/api/health` — liveness без БД.
-- Алертов и Sentry нет — не построено; идея — IDEAS.md (И-85).
+Ошибки роутов — `console.error` в логи Vercel. `ai_logs` — каждый вызов STT и разбора: модель, время этапов, токены, сущности, `status` (`ok` или `error:<код>`); цену считает «Лаб».
+
+## 13. Вход по коду и сессии
+
+Вход — одноразовый код из 8 цифр на 15 минут (D-135); почта с паролем тоже работает (G.21). База хранит только HMAC кода (`hashCode()`).
+
+**Выдача** — `POST /api/people/[id]/login-code`: себе — любой; человеку своей компании — директор и секретарь по `canResetLogin` (вход директора — только он сам). `issue_login_code` отменяет прежний открытый код. Ответ `201 { code, expires_at, link }` — код есть только здесь; `GET` — состояние последнего кода без кода.
+
+**Вход** — `POST /api/auth/code`, без сессии:
+
+1. Чужой `Origin` — `403` (`sameOrigin()`).
+2. `redeem_login_code` принимает HMAC кода и адреса (`hashAddress()`), id устройства и считает попытки по адресу, устройству и всей базе. Неверный, просроченный и использованный код — одно `400 bad_code`; превышение — `429 too_many`.
+3. Сессию сервер выпускает сам: `auth.admin.generateLink` с `type: "magiclink"` (письмо не уходит), затем `verifyOtp` через клиент на cookie — сессия ставится cookie этого ответа.
+4. Не вышло — код возвращается (`release_login_code`), `502`.
+
+**Отзыв** — `POST /api/people/[id]/sessions`, `revoke_sessions` под личностью вызывающего: сессии, push-подписки и открытые коды человека; себе с `keep_current` — кроме этого телефона. Право решает функция. Увольнение делает то же триггером.
+
+## 14. Консоль разработчиков: сервер
+
+Консоль `/ops` вне компаний (D-157): оператор — пользователь Auth без строки `profiles`, записанный в `ops.operators` командой `pnpm ops:grant <email>`. Контракт — `lib/ops/contract.ts`; устройство схемы `ops` — шапка миграции `20261104130000_ops_console.sql`.
+
+**Сессия** — своя cookie `pulse-ops-auth`, не касается сессии компании. `/api/ops/auth/login` проверяет пароль на клиенте без cookie и сохраняет сессию только оператору; затем `enroll` (один TOTP-фактор) или `verify` (сессия становится `aal2`, свежесть кода обновляется). С `OPS_HOST` консоль отвечает только на этом хосте.
+
+**Роут** — `withOps(spec, fn)` (`lib/ops/handler.ts`): по очереди хост, `Origin` на любой не-GET, клиент на cookie консоли, zod, ворота, `fn`. Ворота: `open` — шаги входа; `read` — чтения `ops_*` под JWT, каждая начинается с `ops.assert`; `operator` — проверка оператора перед service-only функциями без билета; действие — `ops_ticket` под JWT проверяет оператора, свежесть TOTP и причину и выдаёт билет на 60 с, который гасит пишущая `ops_*` под service role. Без сессии оператора билета нет, поэтому забытая проверка в роуте не становится дырой. Действие несёт `reason` и `client_request_id`; повтор отвечает из журнала `ops.audit`. Ошибки базы переводит `opsFailure()`: `ops_denied` — `401`, `ops_fresh_required` — `428` (клиент спрашивает код и повторяет), `ops_bad_ticket` — `409`. Правки консоли пушей не шлют.
+
+| Путь | Метод | Ворота, действие |
+|---|---|---|
+| `/api/ops/auth/login`, `enroll`, `verify`, `logout` | POST | `open` |
+| `/api/ops/me` | GET | `operator` |
+| `/api/ops/operators`, `/api/ops/audit` | GET | `read` |
+| `/api/ops/companies` | GET, POST | `read`; `create_company` (директор, киоск, код) |
+| `/api/ops/companies/[id]` | GET, PATCH | `read`; `update_company` |
+| `/api/ops/companies/[id]/footprint` | GET | `read` |
+| `/api/ops/companies/[id]/people`, `director`, `task-lookup` | POST | `add_person`, `change_director`, `task_lookup` |
+| `/api/ops/companies/[id]/wipe`, `export`, `purge` | POST | `wipe_activity`, `export_company`, `purge_company` |
+| `/api/ops/exports/[id]/page`, `files`, `finish` | GET, GET, POST | `operator` |
+| `/api/ops/people/[id]` | PATCH | `update_person` |
+| `/api/ops/people/[id]/login-code`, `sessions`, `points` | POST | `issue_login_code`, `revoke_sessions`, `adjust_points` |
+| `/api/ops/tasks/[id]`, `/api/ops/tasks/[id]/delete` | PATCH, POST | `update_task`, `delete_task` |
+| `/api/ops/storage/drain` | POST | `operator` |
+
+Выгрузку ведёт браузер: после `export` он забирает страницы строк и файлов, затем `finish` с хэшем. Файлы стёртых и удалённых компаний встают в очередь; её разбирают `wipe` и `purge` сразу, тик и `/api/ops/storage/drain`.
+
+## Не построено
+
+- Telegram как гарантийный ярус с эскалацией (D-21): колонку `telegram_chat_id` в `profiles` никто не пишет.
+- Канал SMS (D-21): только значение в enum канала.
+- Вопросы к данным моделью: вид `query` уходит в `skipped`, ответы на Пульсе детерминированные (D-51).
+- Web Share Target (D-36): `parse` принимает `source: shared`, входа нет.
+
+## Известные ограничения
+
+- Тик на стенде идёт раз в сутки (`0 3 * * *`, 08:00 Asia/Aqtobe): Vercel Hobby (В-8, D-125). Всё, что ждёт времени, ждёт утра; пуши после мутаций уходят сразу пинком.
+- Не каждая мутация пинает: отзыв задачи и запись из браузера без `kickPush()` ждут чужого пинка или тика.
+- Воркер пушей проверяет весь серверный env: без `OPENAI_API_KEY` или `ANTHROPIC_API_KEY` он падает, и пуши не уходят вовсе.
+- Ошибки не собираются: только логи Vercel, Sentry и алертов нет.
