@@ -72,12 +72,12 @@ export function InstallHint({ bubble = false, sticky = false }: { bubble?: boole
     offer.canInstall || !sticky ? (
       <div className="mt-3 flex gap-2">
         {offer.canInstall ? (
-          <Button variant="primary" className="!min-h-[40px] !px-4 !text-[14px]" onClick={() => void install()}>
+          <Button variant="primary" className="!px-4 !text-[14px]" onClick={() => void install()}>
             Установить
           </Button>
         ) : null}
         {sticky ? null : (
-          <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={dismiss}>
+          <Button variant="ghost" className="!px-3 !text-[14px]" onClick={dismiss}>
             {offer.canInstall ? "Не сейчас" : "Понятно"}
           </Button>
         )}

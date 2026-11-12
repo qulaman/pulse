@@ -17,6 +17,7 @@ import {
   SUMMARY_MAX,
   timeOf,
 } from "@/lib/daily-report/format";
+import { readDraft, writeDraft, type Draft } from "@/lib/daily-report/draft";
 import type { DailyReport, MyDailyReportDay, SubmitDailyReportInput } from "@/lib/daily-report/types";
 import type { Hm } from "@/lib/datetime/calendar";
 import { fitHeight } from "@/lib/ui/fitHeight";
@@ -30,29 +31,6 @@ import { TimePair } from "./TimePair";
 const FIELD =
   "w-full field px-3 py-3 text-[16px] leading-[22px] text-text placeholder:text-muted outline-none focus:border-accent";
 const MAX_FIELD_PX = 360;
-
-/** What the phone keeps of an unsent form, so a reload or an update does not eat the words. */
-const DRAFT_KEY = "pulse.daily-report.draft.v1";
-type Draft = { date: string; arrived: Hm | null; left: Hm | null; summary: string };
-
-function readDraft(date: string): Draft | null {
-  try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
-    const draft = raw ? (JSON.parse(raw) as Draft) : null;
-    return draft?.date === date ? draft : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeDraft(draft: Draft | null): void {
-  try {
-    if (draft) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    else window.localStorage.removeItem(DRAFT_KEY);
-  } catch {
-    // private mode or a full store: the form still holds the words while the screen is open
-  }
-}
 
 /**
  * «Отчёт за день» (D-152): the day and its state in the head, «Пришёл / Ушёл» prefilled, the

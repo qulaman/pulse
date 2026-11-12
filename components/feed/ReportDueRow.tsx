@@ -9,6 +9,7 @@ import { PointsPop, type Pop } from "@/components/daily-report/PointsPop";
 import { Icon } from "@/components/tasks/desk/icons";
 import { Button } from "@/components/ui/Button";
 import { HapticSwitch } from "@/components/ui/HapticSwitch";
+import { clearDraft, readDraft } from "@/lib/daily-report/draft";
 import { oneTapInput, type ReportDue } from "@/lib/daily-report/due";
 import { pointsText, timeOf } from "@/lib/daily-report/format";
 import { useMyDailyReport, useRefreshAfterReplay, useReportDue, useSubmitDailyReport, useSubmitWaiting } from "@/lib/daily-report/queries";
@@ -81,8 +82,10 @@ export function ReportDueRow({ now }: { now: Date }) {
 
   const send = () => {
     if (!day.data || day.data.report || sending.current) return;
-    // the moment of the tap, not the screen's minute: «Ушёл» is now
-    const input = oneTapInput(day.data, new Date(), crypto.randomUUID());
+    const date = day.data.date;
+    // the moment of the tap, not the screen's minute: «Ушёл» is now — unless the person set it on
+    // /report: what they typed there goes in (tasks/032)
+    const input = oneTapInput(day.data, new Date(), crypto.randomUUID(), readDraft(date));
     if (!input) return;
     sending.current = true;
     setSentFrom(due.asking ? "asking" : "quiet");
@@ -93,6 +96,8 @@ export function ReportDueRow({ now }: { now: Date }) {
       },
       // the day is written already (optimistic); the points rise over it after the server says so (1a)
       onSuccess: (result) => {
+        // the server has the day's report: the draft is done with, as the form drops it after a submit
+        clearDraft(date);
         if (result.points_awarded > 0) setPop({ key: Date.now(), amount: result.points_awarded });
       },
     });

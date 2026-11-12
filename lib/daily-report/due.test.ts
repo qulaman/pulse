@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import type { Draft } from "./draft";
 import { ASK_FROM_DEFAULT, askFromOf, NO_REPORT_DUE, oneTapInput, reportDue } from "./due";
 import type { DailyReport, DailyReportTask, MyDailyReportDay } from "./types";
 
@@ -142,6 +143,55 @@ describe("oneTapInput — what «Сдать» from Лента sends", () => {
     expect(oneTapInput(day({ tasks: [] }), at("18:00"), "k")).toBeNull();
     expect(oneTapInput(day(), at("00:05", "2026-10-29"), "k")).toBeNull();
     expect(oneTapInput(day(), at("08:59"), "k")).toBeNull();
+  });
+});
+
+describe("oneTapInput — the draft typed on /report goes in (tasks/032)", () => {
+  const draft = (patch: Partial<Draft> = {}): Draft => ({ date: "2026-10-28", arrived: null, left: null, summary: "", ...patch });
+  const plain = oneTapInput(day(), at("17:42"), "k");
+
+  it("without a draft — as before: the suggestion, now, no words", () => {
+    expect(oneTapInput(day(), at("17:42"), "k", null)).toEqual(plain);
+    expect(plain).toEqual({ arrived_at: "2026-10-28T09:00:00+05:00", left_at: "2026-10-28T17:42:00+05:00", summary: "", client_request_id: "k" });
+  });
+
+  it("the draft's words, trimmed; the times stay the suggestion and now", () => {
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ summary: "  Склад, приёмка цемента \n" }))).toEqual({
+      ...plain,
+      summary: "Склад, приёмка цемента",
+    });
+  });
+
+  it("the draft's «Пришёл» and «Ушёл» where they are set, each on its own", () => {
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "08:40", left: "17:15", summary: "Объект" }))).toEqual({
+      arrived_at: "2026-10-28T08:40:00+05:00",
+      left_at: "2026-10-28T17:15:00+05:00",
+      summary: "Объект",
+      client_request_id: "k",
+    });
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "08:40" }))).toEqual({ ...plain, arrived_at: "2026-10-28T08:40:00+05:00" });
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ left: "17:15" }))).toEqual({ ...plain, left_at: "2026-10-28T17:15:00+05:00" });
+  });
+
+  it("a draft of another day is not this day's — as without one", () => {
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ date: "2026-10-27", arrived: "08:40", summary: "Вчерашнее" }))).toEqual(plain);
+  });
+
+  it("times that make no length give way to the suggestion and now; the words still go in", () => {
+    const words = { ...plain, summary: "Объект" };
+    // «Ушёл» before «Пришёл»
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "10:00", left: "09:30", summary: "Объект" }))).toEqual(words);
+    // the same minute
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "10:00", left: "10:00", summary: "Объект" }))).toEqual(words);
+    // «Пришёл» later than now, «Ушёл» left to now
+    expect(oneTapInput(day(), at("17:42"), "k", draft({ arrived: "18:30", summary: "Объект" }))).toEqual(words);
+    // and when the plain way cannot either, nothing goes
+    expect(oneTapInput(day(), at("08:30"), "k", draft({ arrived: "10:00", left: "09:30", summary: "Объект" }))).toBeNull();
+  });
+
+  it("a draft is no way round the rules: no tasks or another day — nothing", () => {
+    expect(oneTapInput(day({ tasks: [] }), at("17:42"), "k", draft({ summary: "Объект" }))).toBeNull();
+    expect(oneTapInput(day(), at("00:05", "2026-10-29"), "k", draft({ summary: "Объект" }))).toBeNull();
   });
 });
 

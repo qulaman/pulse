@@ -39,7 +39,9 @@ export async function AppHeader({ fullName, companyId, pointsFor }: { fullName: 
               ) : (
                 <PulseMark />
               )}
-              <span className="truncate font-display text-[17px] font-bold leading-[22px] tracking-[-0.02em]">{brand.name}</span>
+              {/* a long name takes a second line (on 360 px a three-word name did not fit one): two lines
+                  of 16 px are the avatar's 32 px — the bar keeps its height, nothing beside it moves */}
+              <span className="line-clamp-2 break-words font-display text-[17px] font-bold leading-4 tracking-[-0.02em]">{brand.name}</span>
             </div>
           ) : (
             <PulseMark />

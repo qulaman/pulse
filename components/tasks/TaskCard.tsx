@@ -178,7 +178,7 @@ export function TaskCard({ task, variant, actions, companyId, declineReason, que
         />
       ) : null}
 
-      <div className={`relative mt-4 gap-2 ${threeKeys ? "grid grid-cols-3" : workKeys ? "grid grid-cols-2" : "flex flex-wrap"}`}>
+      <div className={`relative mt-4 gap-2 ${threeKeys ? "flex" : workKeys ? "grid grid-cols-2" : "flex flex-wrap"}`}>
         {variant === "employee" ? (
           <EmployeeButtons task={task} onPress={(action) => employee.press(action, task, card.current)} />
         ) : (
@@ -278,15 +278,18 @@ function StatusBanner({ task, declineReason }: { task: TaskWithPeople; declineRe
  */
 function EmployeeButtons({ task, onPress }: { task: TaskWithPeople; onPress: (action: "accept" | "ask" | "decline" | "complete") => void }) {
   if (task.status === "sent") {
+    // three keys in a row: each as wide as its words plus an equal share of what is left, the icon
+    // close to its word — in equal thirds on a 360 px phone «Уточнить» ran its icon into the edge
+    const key = "min-w-0 flex-auto !px-2 whitespace-nowrap [&>span]:gap-1";
     return (
       <>
-        <Button block className="!px-2 whitespace-nowrap" icon={<Icon name="check" />} onClick={() => onPress("accept")}>
+        <Button className={key} icon={<Icon name="check" />} onClick={() => onPress("accept")}>
           {BUTTON.accept}
         </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
+        <Button className={key} variant="secondary" icon={<Icon name="question" />} onClick={() => onPress("ask")}>
           {BUTTON.ask}
         </Button>
-        <Button block className="!px-2 whitespace-nowrap" variant="danger" icon={<Icon name="x" />} onClick={() => onPress("decline")}>
+        <Button className={key} variant="danger" icon={<Icon name="x" />} onClick={() => onPress("decline")}>
           {BUTTON.cant}
         </Button>
       </>

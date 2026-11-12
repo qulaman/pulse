@@ -251,10 +251,11 @@ export function TeamPanel({ director }: { director: boolean }) {
                 ? "Выключите — ни напоминаний, ни очков, ни штрафов"
                 : "Штрафы начнутся с сегодняшнего дня, не задним числом; штрафуем только тех, кто уже сдал хотя бы один отчёт"
             }
-            htmlFor="set-report-enabled"
+            htmlFor="set-report-enabled-switch"
             changed={report.enabled !== server.daily_report.enabled}
           >
-            <Switch id="set-report-enabled" label="Отчёты включены" checked={report.enabled} onChange={(enabled) => setReport({ enabled })} />
+            {/* the row itself is `set-report-enabled` (the search lands there): the switch has an id of its own */}
+            <Switch id="set-report-enabled-switch" label="Отчёты включены" checked={report.enabled} onChange={(enabled) => setReport({ enabled })} />
           </SettingRow>
           <SettingRow id="report-days" label="Рабочие дни" hint="В другие дни отчёт сдать можно — без очков и без штрафа" muted={!report.enabled} changed={!same(report.workdays, server.daily_report.workdays)}>
             <Weekdays days={report.workdays} onChange={(workdays) => setReport({ workdays })} />

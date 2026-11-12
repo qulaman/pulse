@@ -29,8 +29,9 @@ type SheetState = { name: "ask" | "cant" | "report" | "pass"; taskId: string; wo
  *
  * On a screen with a flight target (Лента, D-167) a press that is given its card answers with
  * motion over data already written: «Принял» sends a copy of the card into the face's hands,
- * a report handed in sends one up to the director. The card itself never hides — a write that
- * fails leaves it where it was, and the flight was only ever a copy.
+ * a report handed in sends one up to the director — there «Принято · в работе» and «Сдано на
+ * проверку» are not toasted (tasks/032); failures and toasts with «Отменить» still are. The card
+ * itself never hides — a write that fails leaves it where it was, and the flight was only ever a copy.
  */
 export function useEmployeeControls({
   actions,
@@ -69,7 +70,8 @@ export function useEmployeeControls({
     if (action === "accept") {
       haptic(15);
       actions.transition({ taskId: task.id, toStatus: "accepted" });
-      toast("Принято · в работе");
+      // where cards fly the flight and the face are the answer: a toast up top would lie over the face's words
+      if (!flight) toast("Принято · в работе");
       // written first; the copy is taken before React redraws the card in its new state
       const face = flight?.getTarget();
       if (card && face) flyInto(card, face, { onLand: flight?.onLand });
@@ -164,7 +166,8 @@ export function useEmployeeControls({
           });
           handedIn(sheetTask.id);
           haptic(15);
-          toast(partial ? "Сдано на проверку · не всё" : "Сдано на проверку директору");
+          // on Лента the copy rising to the director says it (D-167); elsewhere the toast does
+          if (!flight) toast(partial ? "Сдано на проверку · не всё" : "Сдано на проверку директору");
         }}
       />
     </>

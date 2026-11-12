@@ -419,7 +419,10 @@ export function NotesSkeleton() {
   );
 }
 
-/** A board of «Заметки» (D-102): the way back, the title, the status screen and numbered points. */
+/**
+ * A board of «Заметки» (D-102): the way back, the title, the status screen, then what the data
+ * brings — «Как на стене» right under the status screen (`mt-2`, D-140) and the numbered points.
+ */
 export function BoardSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
@@ -435,15 +438,25 @@ export function BoardSkeleton() {
       <div className="mt-3">
         <RecorderBone />
       </div>
-      <SkeletonGroup grow className="mt-4 flex flex-col gap-2">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
-            <Bone h={22} w={22} round className="shrink-0" />
-            <div className="flex-1 py-[2px]">
-              <Bone h={17} w={i === 1 ? "58%" : "76%"} />
-            </div>
+      <SkeletonGroup grow className="mt-2">
+        {/* the box of WallCard: a 112 px 16:9 preview and two lines */}
+        <div className="task-card flex items-center gap-3 rounded-[18px] p-2.5 pr-3.5">
+          <Bone h={63} w={112} className="shrink-0" />
+          <div className="min-w-0 flex-1">
+            <Bone h={18} w="52%" />
+            <Bone h={14} w="74%" className="mt-1.5" />
           </div>
-        ))}
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="task-card flex gap-3 rounded-[18px] px-3.5 pb-3 pt-3.5">
+              <Bone h={22} w={22} round className="shrink-0" />
+              <div className="flex-1 py-[2px]">
+                <Bone h={17} w={i === 1 ? "58%" : "76%"} />
+              </div>
+            </div>
+          ))}
+        </div>
       </SkeletonGroup>
     </main>
   );

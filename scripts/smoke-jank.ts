@@ -5,11 +5,15 @@
  * browser would forgive right after a tap: that is exactly where the jank lives.
  *   pnpm smoke:jank            (against http://localhost:3000, APP_URL to override)
  *   EMPLOYEE=erlan.b@demo.local (default) — any demo employee with the demo password
+ * Read-only (scripts/lib/login.ts): it only looks — the screens' writes are answered in the
+ * browser, and with no task sent on dev it says so instead of sending one.
  * Screenshots land in SHOTS_DIR (default ./.smoke-ui).
  */
 import { chromium, type Page } from "playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+
+import { PHONE, readOnly, signIn } from "./lib/login";
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui");
@@ -27,6 +31,8 @@ const record = (name: string, ok: boolean, detail = "") => {
   checks.push({ name, ok, detail });
   console.log(`${ok ? "ok  " : "FAIL"}  ${name}${detail ? `  ${detail}` : ""}`);
 };
+/** A step the data of dev does not allow today (nothing to open): said, not failed — the smoke writes nothing to make it. */
+const skip = (name: string, why: string) => console.log(`skip  ${name}  ${why}`);
 
 type Shift = { value: number; at: number; sources: string[] };
 
@@ -70,61 +76,73 @@ async function measure(page: Page, name: string, action: () => Promise<void>) {
   record(name, total <= LIMIT, `shift=${total.toFixed(4)} (${count} entries)${where}`);
 }
 
-async function login(page: Page, email: string, password: string) {
-  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-  await page.getByLabel("Почта").fill(email);
-  await page.getByLabel("Пароль").fill(password);
-  await page.getByRole("button", { name: "Войти" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 20_000 });
-  await page.waitForLoadState("networkidle");
+/** The pile of «Задачи» that holds a card: the one the screen opens on, or «Закрытые». */
+type Pile = "first" | "closed";
+
+const firstCard = (page: Page, timeout: number) =>
+  page
+    .locator('[data-testid="sent-task"]')
+    .first()
+    .waitFor({ timeout })
+    .then(() => true)
+    .catch(() => false);
+
+/**
+ * The director's «Задачи» need one card to open: an open task, or — with none open on dev — a
+ * closed one. The smoke only looks: with nothing sent at all it stops here and says so, it does
+ * not send a task to a live person.
+ */
+async function findPile(page: Page): Promise<Pile | null> {
+  await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
+  let pile: Pile | null = (await firstCard(page, 10_000)) ? "first" : null;
+  if (!pile) {
+    await page.getByTestId("tab-closed").click();
+    if (await firstCard(page, 10_000)) pile = "closed";
+  }
+  record("на dev есть задача для открытия", pile !== null, pile === "closed" ? "открытых нет — берём «Закрытые»" : pile ? "" : "отправьте задачу руками: смоук ничего не пишет");
+  return pile;
 }
 
-/** An empty database has nothing to open: send one task by text, the way smoke:ui does. */
-async function ensureTask(page: Page) {
-  await page.goto(`${APP_URL}/sent`, { waitUntil: "networkidle" });
-  const any = await page.locator('[data-testid="sent-task"]').first().isVisible().catch(() => false);
-  if (any) return;
-  await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
-  await page.getByRole("button", { name: /Записать голосовое|Идёт запись/ }).tap();
-  const field = page.getByPlaceholder(/Ерлану подготовить/);
-  await field.waitFor({ state: "visible", timeout: 5_000 });
-  await field.fill(`Марат, подготовь КП по Казхрому ${Date.now().toString(36)} завтра до обеда`);
-  await page.getByRole("button", { name: "Отправить" }).click();
-  await page.waitForURL((url) => url.pathname === "/confirm", { timeout: 40_000 });
-  await page.getByRole("heading", { name: /Понял так/ }).waitFor({ timeout: 10_000 });
-  const sendNow = page.getByRole("button", { name: "отправить сейчас" });
-  if (await sendNow.isVisible().catch(() => false)) await sendNow.click();
-  else await page.getByRole("button", { name: /Отправить \d+ из \d+/ }).click();
-  await page.waitForURL((url) => url.pathname === "/pulse", { timeout: 30_000 });
-  record("посев: задача отправлена текстом", true);
+/** «Задачи» open on their first pile: the closed one is a tap away, outside the measured step. */
+async function showPile(page: Page, pile: Pile) {
+  const closed = page.getByTestId("tab-closed");
+  if (pile === "closed" && (await closed.getAttribute("aria-selected")) !== "true") {
+    await closed.click();
+    await page.waitForTimeout(SETTLE_MS);
+  }
+  await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 15_000 });
+}
+
+/** The screen of «Задачи» is there with its data: a card of the first pile, or its tabs once the reads are done. */
+async function sentLoaded(page: Page, pile: Pile) {
+  if (pile === "first") return void (await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 15_000 }));
+  await page.locator('[role="tablist"]').waitFor({ timeout: 15_000 });
+  await page.waitForLoadState("networkidle");
 }
 
 async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
-  const phone = {
-    viewport: { width: 375, height: 667 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
-    locale: "ru-RU",
-  };
+  const blocked: string[] = [];
 
   // ---- director: Пульс → Задачи → карточка → назад → вкладки ------------------------
-  const director = await browser.newContext(phone);
+  const director = await browser.newContext(PHONE);
+  await readOnly(director, APP_URL, blocked);
   await director.addInitScript(COLLECTOR);
   const page = await director.newPage();
   lastPage = page;
-  await login(page, "test@demo.local", "1");
-  await ensureTask(page);
+  await signIn(page, APP_URL, { email: "test@demo.local", password: "1" });
+  const pile = await findPile(page);
+  if (!pile) return;
   await page.goto(`${APP_URL}/pulse`, { waitUntil: "networkidle" });
   await page.waitForTimeout(SETTLE_MS);
 
   await measure(page, "директор: Пульс → Задачи", async () => {
     await page.getByRole("link", { name: "Задачи" }).click();
     await page.waitForURL((url) => url.pathname === "/sent", { timeout: 10_000 });
-    await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 15_000 });
+    await sentLoaded(page, pile);
   });
   await page.screenshot({ path: join(SHOTS, "j1-sent.png") });
+  await showPile(page, pile);
 
   // «Задачи» are cards (D-83): a tap opens the card in place, «Переписка» opens its thread.
   // The pile that asks for a move opens its first card by itself — close it first.
@@ -160,8 +178,9 @@ async function main() {
     await measure(page, "директор: карточка → назад", async () => {
       await page.getByRole("button", { name: "Назад" }).click();
       await page.waitForURL((url) => url.pathname === "/sent", { timeout: 10_000 });
-      await page.locator('[data-testid="sent-task"]').first().waitFor({ timeout: 10_000 });
+      await sentLoaded(page, pile);
     });
+    await showPile(page, pile);
 
     // the tabs stick under the header while the list scrolls — sticky, not re-laid out
     await measure(page, "директор: прокрутка «Задач» — вкладки липнут", async () => {
@@ -172,8 +191,14 @@ async function main() {
     await page.evaluate(() => window.scrollTo(0, 0));
   }
 
-  await measure(page, "директор: вкладка Настройки", async () => {
-    await page.getByRole("link", { name: "Настройки" }).click();
+  // «Настройки» left the phone bar for the desk (D-153): they open from «Профиль», one row away
+  await measure(page, "директор: вкладка Профиль", async () => {
+    await page.getByRole("link", { name: "Профиль" }).click();
+    await page.waitForURL((url) => url.pathname === "/profile", { timeout: 10_000 });
+    await page.waitForLoadState("networkidle");
+  });
+  await measure(page, "директор: Профиль → Настройки", async () => {
+    await page.getByRole("link", { name: /^Настройки, Команда/ }).click();
     await page.waitForURL((url) => url.pathname === "/settings", { timeout: 10_000 });
     await page.waitForLoadState("networkidle");
   });
@@ -185,18 +210,19 @@ async function main() {
   await page.screenshot({ path: join(SHOTS, "j3-pulse.png") });
 
   // ---- employee: Дела → шторка «Уточнить» → закрыть → карточка → назад ----------------
-  const employee = await browser.newContext(phone);
+  const employee = await browser.newContext(PHONE);
+  await readOnly(employee, APP_URL, blocked);
   await employee.addInitScript(COLLECTOR);
   const epage = await employee.newPage();
   lastPage = epage;
-  await login(epage, EMPLOYEE, "demo1234");
+  await signIn(epage, APP_URL, { email: EMPLOYEE, password: "demo1234" });
   await epage.goto(`${APP_URL}/tasks`, { waitUntil: "networkidle" });
   await epage.waitForTimeout(SETTLE_MS);
   await epage.screenshot({ path: join(SHOTS, "j4-tasks.png") });
 
   const askButton = epage.getByRole("button", { name: "Уточнить" }).first();
   const hasAsk = await askButton.isVisible().catch(() => false);
-  record("есть карточка с кнопкой «Уточнить»", hasAsk);
+  if (!hasAsk) skip("сотрудник: шторка «Уточнить»", `у ${EMPLOYEE} на dev нет дела в работе`);
   if (hasAsk) {
     await measure(epage, "сотрудник: открыть шторку «Уточнить»", async () => {
       await askButton.click();
@@ -213,7 +239,8 @@ async function main() {
   }
 
   const elink = epage.locator('article a[href^="/tasks/"]').first();
-  const ehref = await elink.getAttribute("href").catch(() => null);
+  const ehref = await elink.getAttribute("href", { timeout: 5_000 }).catch(() => null);
+  if (!ehref) skip("сотрудник: список → карточка задачи", `у ${EMPLOYEE} на dev нет ни одного дела`);
   if (ehref) {
     await measure(epage, "сотрудник: список → карточка задачи", async () => {
       await elink.click();
@@ -230,6 +257,8 @@ async function main() {
     });
   }
 
+  const kinds = [...new Set(blocked)];
+  console.log(`only read: ${blocked.length} writes answered in the browser${kinds.length ? ` — ${kinds.slice(0, 12).join(", ")}` : ""}`);
   await browser.close();
 }
 

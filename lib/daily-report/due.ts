@@ -6,6 +6,7 @@
  */
 import { nowHm, parseHm, todayYmd, type Hm } from "@/lib/datetime/calendar";
 
+import type { Draft } from "./draft";
 import { hmOf, isoAt, minutesBetween } from "./format";
 import type { MyDailyReportDay, SubmitDailyReportInput } from "./types";
 
@@ -59,17 +60,35 @@ export const NO_REPORT_DUE: ReportDue = {
 /**
  * What «Сдать» from Лента sends: the suggested arrival (the last report's time of day or the
  * company's start, `my_daily_report`), leaving now on the minute, no words — the day's tasks are
- * the report. null — one tap cannot: the day is not today any more, it has no tasks, or now is not
- * after the arrival (the form on /report says why).
+ * the report. A draft of the same day typed on /report (`lib/daily-report/draft.ts`) goes in with
+ * it: its words always — they are what the person typed, and the draft is dropped after the
+ * submit — and its «Пришёл» and «Ушёл» where they are set and make a length; times that make none
+ * give way to the suggestion and now. null — one tap cannot: the day is not today any more, it has
+ * no tasks, or now is not after the arrival (the form on /report says why).
  */
-export function oneTapInput(day: MyDailyReportDay, now: Date, clientRequestId: string): SubmitDailyReportInput | null {
+export function oneTapInput(
+  day: MyDailyReportDay,
+  now: Date,
+  clientRequestId: string,
+  draft: Draft | null = null,
+): SubmitDailyReportInput | null {
   if (day.tasks.length === 0 || day.date !== todayYmd(now)) return null;
   const arrivedHm = hmOf(day.suggest.arrived_at);
   const arrived = arrivedHm ? isoAt(day.date, arrivedHm) : null;
   const left = isoAt(day.date, nowHm(now));
+  const own = draft?.date === day.date ? draft : null;
+  const summary = own && typeof own.summary === "string" ? own.summary.trim() : "";
+  if (own) {
+    const ownArrived = own.arrived ? isoAt(day.date, own.arrived) : arrived;
+    const ownLeft = own.left ? isoAt(day.date, own.left) : left;
+    const minutes = minutesBetween(ownArrived, ownLeft);
+    if (ownArrived && ownLeft && minutes !== null && minutes > 0) {
+      return { arrived_at: ownArrived, left_at: ownLeft, summary, client_request_id: clientRequestId };
+    }
+  }
   const minutes = minutesBetween(arrived, left);
   if (!arrived || !left || minutes === null || minutes <= 0) return null;
-  return { arrived_at: arrived, left_at: left, summary: "", client_request_id: clientRequestId };
+  return { arrived_at: arrived, left_at: left, summary, client_request_id: clientRequestId };
 }
 
 /**

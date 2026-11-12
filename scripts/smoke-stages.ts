@@ -20,12 +20,15 @@
  *   SCENARIOS=nav,cold   SHEETS=1 (a sheet per route: stages side by side + red/cyan overlay)
  *   SECRETARY=marat@demo.local (default) — any demo secretary with the demo password
  * Read-only: signs in with the demo accounts and navigates; held requests are released,
- * never failed. Screenshots land in SHOTS_DIR (default ./.smoke-ui/stages).
+ * never failed, and the screens' writes are answered in the browser (scripts/lib/login.ts).
+ * Screenshots land in SHOTS_DIR (default ./.smoke-ui/stages).
  */
 import { createClient } from "@supabase/supabase-js";
 import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Browser, type BrowserContext, type Page, type Route } from "playwright";
+
+import { PHONE as IPHONE, readOnly, signIn as enter } from "./lib/login";
 
 process.loadEnvFile(".env.local");
 
@@ -45,7 +48,7 @@ mkdirSync(SHOTS, { recursive: true });
 
 // the service worker answers the build's files and the screens itself (D-127): it would slip
 // past the requests this smoke holds — the stages are measured without it
-const PHONE = { viewport: { width: 375, height: 667 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, locale: "ru-RU", serviceWorkers: "block" as const };
+const PHONE = { ...IPHONE, serviceWorkers: "block" as const };
 
 type Account = { role: string; email: string; password: string; routes: (ids: Ids) => string[] };
 type Ids = { task: string | null; person: string | null; board: string | null };
@@ -160,11 +163,12 @@ function holder(page: Page, target: string) {
     const url = new URL(request.url());
     if (on.rsc && headers["rsc"] && !headers["next-router-prefetch"] && url.pathname === target) return void held.rsc.push(route);
     if (on.data && ["fetch", "xhr"].includes(request.resourceType()) && isData(url)) return void held.data.push(route);
-    return void route.continue().catch(() => {});
+    // on to the context's guard (readOnly): a write is answered there, a read goes to the server
+    return void route.fallback().catch(() => {});
   });
   const release = async (kind: "rsc" | "data") => {
     on[kind] = false;
-    for (const route of held[kind].splice(0)) await route.continue().catch(() => {});
+    for (const route of held[kind].splice(0)) await route.fallback().catch(() => {});
   };
   return { on, held, release };
 }
@@ -207,12 +211,7 @@ type Result = { role: string; route: string; name: string; fails: string[]; note
 
 async function signIn(context: BrowserContext, account: Account) {
   const page = await context.newPage();
-  await page.goto(`${APP_URL}/login`, { waitUntil: "networkidle" });
-  await page.getByLabel("Почта").fill(account.email);
-  await page.getByLabel("Пароль").fill(account.password);
-  await page.getByRole("button", { name: "Войти" }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 30_000 });
-  await page.waitForLoadState("networkidle");
+  await enter(page, APP_URL, account);
   await page.close();
 }
 
@@ -233,6 +232,10 @@ async function checkRoute(browser: Browser, context: BrowserContext, account: Ac
     // from outside the route's section: a nested screen must not borrow its parent's skeleton
     const section = `/${target.split("/")[1]}`;
     const start = section === "/calendar" ? "/profile" : "/calendar";
+    // next dev builds a route on its first request, and an edit next door drops the build again:
+    // open the route once, so the prefetch below finds it built, as production always does. A route
+    // without its own loading.tsx still keeps the old screen after this — that check stays honest.
+    await page.goto(`${APP_URL}${target}`, { waitUntil: "networkidle" }).catch(() => {});
     await page.goto(`${APP_URL}${start}`, { waitUntil: "networkidle" });
     await page.waitForTimeout(1_000);
     await page.evaluate(`window.next.router.prefetch(${JSON.stringify(target)})`);
@@ -344,11 +347,13 @@ async function sheet(browser: Browser, result: Result) {
 async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
   const results: Result[] = [];
+  const blocked: string[] = [];
   for (const account of ACCOUNTS.filter((a) => ROLE === "all" || a.role === ROLE)) {
     const ids = await idsFor(account);
     const routes = account.routes(ids).filter((route) => !ONLY || ONLY.some((only) => route === only || route.startsWith(`${only}/`) || (only.endsWith("*") && route.startsWith(only.slice(0, -1)))));
     if (routes.length === 0) continue;
     const context = await browser.newContext(PHONE);
+    await readOnly(context, APP_URL, blocked);
     await signIn(context, account);
     for (const route of routes) {
       const result = await checkRoute(browser, context, account, route);
@@ -361,6 +366,9 @@ async function main() {
     await context.close();
   }
   await browser.close();
+  const kinds = [...new Set(blocked)];
+  console.log(`
+only read: ${blocked.length} writes answered in the browser${kinds.length ? ` — ${kinds.slice(0, 16).join(", ")}` : ""}`);
   const failed = results.filter((r) => r.fails.length);
   console.log(`\n${results.length - failed.length}/${results.length} screens hold still while they load`);
   process.exit(failed.length ? 1 : 0);

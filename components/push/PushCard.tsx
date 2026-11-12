@@ -82,11 +82,11 @@ export function PushCard({ compact = false, bubble = false }: { compact?: boolea
         </p>
         <div className="mt-3 flex gap-2">
           {blocker ? null : (
-            <Button variant="primary" className="!min-h-[40px] !px-4 !text-[14px]" disabled={busy} onClick={enable}>
+            <Button variant="primary" className="!px-4 !text-[14px]" disabled={busy} onClick={enable}>
               {busy ? "…" : "Включить"}
             </Button>
           )}
-          <Button variant="ghost" className="!min-h-[40px] !px-3 !text-[14px]" onClick={dismiss}>
+          <Button variant="ghost" className="!px-3 !text-[14px]" onClick={dismiss}>
             {blocker ? "Понятно" : "Не сейчас"}
           </Button>
         </div>
@@ -107,7 +107,7 @@ export function PushCard({ compact = false, bubble = false }: { compact?: boolea
         <p className="text-[16px] leading-[22px]">Уведомления</p>
         <p className="text-[13px] leading-4 text-muted">Задача придёт на телефон, даже если Pulse закрыт</p>
       </div>
-      <Button variant="primary" className="!min-h-[40px] !px-3 !text-[14px]" disabled={busy} onClick={enable}>
+      <Button variant="primary" className="!px-3 !text-[14px]" disabled={busy} onClick={enable}>
         {busy ? "…" : "Включить"}
       </Button>
       <button type="button" aria-label="Скрыть до завтра" onClick={dismiss} className="text-[18px] text-muted">
