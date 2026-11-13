@@ -799,36 +799,6 @@ html[data-surface="desk"][data-journal] {
     letter-spacing: 0;
   }
 
-  /* the usual requests are words on a line, not pills; the company's mark stands in the margin, grey */
-  [data-testid="desk-quick-errands"] {
-    gap: 0 18px;
-
-    button {
-      height: 28px;
-      padding: 0;
-      background: none;
-      border: 0;
-      font-weight: 500;
-
-      > span:last-child {
-        box-shadow: 0 1px 0 var(--ink-2);
-      }
-      > span[aria-hidden] {
-        filter: grayscale(1);
-        opacity: 0.55;
-        font-size: 12px;
-        line-height: 16px;
-      }
-      &:hover {
-        color: var(--pen);
-
-        > span:last-child {
-          box-shadow: 0 1px 0 var(--pen);
-        }
-      }
-    }
-  }
-
   /* a reaction is print until the hand comes to it: seven colour faces would shout on the sheet */
   [data-testid="reaction-bar"] [data-reaction] {
     > span {

@@ -478,12 +478,22 @@ export async function checkErrands(ctx: Ctx) {
   try {
     await open(page, "/desk/errands");
     const hero = await visible(ctx, "desk-errands-hero");
-    const heroText = hero ? ((await page.getByTestId("desk-errands-hero").innerText()) ?? "").split("\n")[0] : "";
-    // the quick requests are counted and looked at — a click would ask the secretary for real
-    const quick = await page.locator('[data-testid="desk-quick-errands"] button').count();
-    const stats = await page.getByTestId("desk-errands-stats").isVisible();
-    record("заявки директора: герой «сейчас у секретаря», просьбы в один клик, 30 дней", hero && quick > 0 && stats, `«${heroText}»; кнопок ${quick}`);
+    const heroText = hero ? ((await page.getByTestId("desk-errands-hero").innerText()) ?? "").replace(/\s+/g, " ").trim() : "";
+    // «Пульт» (D-175): the keys are counted and looked at — a click or a digit would ask the secretary for real
+    const keys = await page.locator('[data-testid="desk-pult-keypad"] [data-testid="desk-pult-key"]').count();
+    const words = await page.getByTestId("desk-pult-words").isVisible().catch(() => false);
+    const zero = /(^| )0 мин/.test(heroText);
+    record("заявки директора «Пульт»: полоса — что делает секретарь, клавиши просьб, «Своими словами», нигде «0 мин»", hero && keys > 0 && words && !zero, `«${heroText.slice(0, 120)}»; клавиш ${keys}`);
     await ctx.shot("errands");
+
+    // «История» — the second view (?view=history): the table under one count naming its period, the thirty days beside it
+    await page.getByTestId("seg-history").click();
+    const viewed = await page.waitForURL((url) => url.searchParams.get("view") === "history", { timeout: 5_000 }).then(() => true, () => false);
+    const stats = await visible(ctx, "desk-errands-stats", 10_000);
+    await page.getByTestId("desk-errands-shown").filter({ hasText: /\d/ }).waitFor({ timeout: 8_000 }).catch(() => undefined);
+    const shown = ((await page.getByTestId("desk-errands-shown").innerText().catch(() => "")) ?? "").trim();
+    record("заявки: «История» вторым видом, один счёт с периодом, 30 дней рядом", viewed && stats && /за всё время|\d/.test(shown) && /·/.test(shown), `${page.url().replace(/^.*\/desk/, "/desk")} · «${shown}»`);
+    await ctx.shot("errands-history");
 
     // the history's filters: a state, the words — looked at, then all again
     const history = '[data-testid="desk-errands-history"] [data-testid="desk-row"]';
@@ -523,8 +533,12 @@ export async function checkErrands(ctx: Ctx) {
       const closed = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
       // the panel goes at once, the address a moment later (the router's replace)
       const cleared = await page.waitForURL((url) => !url.searchParams.has("e"), { timeout: 5_000 }).then(() => true, () => false);
-      record("заявки: Esc закрывает панель и снимает ?e=", closed && cleared, page.url());
+      record("заявки: Esc закрывает панель и снимает ?e=, вид «История» остаётся", closed && cleared && new URL(page.url()).searchParams.get("view") === "history", page.url());
     }
+    // back to «Сейчас»: the address loses its view
+    await page.getByTestId("seg-now").click();
+    const back = await page.waitForURL((url) => !url.searchParams.has("view"), { timeout: 5_000 }).then(() => true, () => false);
+    record("заявки: «Сейчас» возвращает пульт", back && (await page.getByTestId("desk-pult-keypad").isVisible().catch(() => false)), page.url());
 
     // «Объявления» (D-174): the feed of cards or its empty state; a card opens in the panel from the
     // keys (↓, Enter) and goes with Esc — nothing is acknowledged, sent or deleted
@@ -704,15 +718,18 @@ export async function checkSecretary(ctx: Ctx) {
   const release = await guardWrites(page);
   try {
     await open(page, "/desk/errands");
+    // «Стойка» (D-175): the head with «Очередь | История» and her presence, the director's door, the queue
     const queue = await visible(ctx, "desk-errand-queue");
+    const head = await page.getByTestId("stoika-head").isVisible().catch(() => false);
     const presence = await page.getByTestId("desk-presence").isVisible();
-    const hero = await page.getByTestId("desk-errands-hero").isVisible().catch(() => false);
+    const door = await page.getByTestId("stoika-door").isVisible().catch(() => false);
+    const empty = await page.getByTestId("stoika-slot").isVisible().catch(() => false);
     const cards = await page.getByTestId("desk-errand-card").count();
-    record("секретарь: герой, очередь заявок и «На месте»", queue && presence && hero, `заявок ${cards}`);
+    record("секретарь: «Стойка» — шапка, «На месте», очередь (дверь директора, место новой просьбы)", queue && head && presence && (cards > 0 || empty), `заявок ${cards}${door ? " · дверь" : ""}`);
     if (cards > 0) {
-      // the first is chosen, ↓ moves the choice; «N» opens the reasons as a menu and Esc closes it — none is picked
+      // the first is chosen and holds its keys, ↓ moves the choice; «N» opens the reasons as a menu and Esc closes it — none is picked
       const chosen = await page.locator('[data-testid="desk-errand-card"][data-chosen]').count();
-      const hint = await page.getByTestId("desk-keys-hint").isVisible();
+      const hint = (await page.locator('[data-testid="desk-errand-card"][data-chosen] .stoika-cap').count()) > 0;
       let moved = true;
       if (cards > 1) {
         const first = await page.locator('[data-testid="desk-errand-card"][data-chosen]').getAttribute("data-errand-id");
@@ -721,7 +738,7 @@ export async function checkSecretary(ctx: Ctx) {
         moved = (await page.locator('[data-testid="desk-errand-card"][data-chosen]').getAttribute("data-errand-id")) !== first;
         await page.keyboard.press("ArrowUp");
       }
-      record("секретарь: первая заявка выбрана, ↑/↓ — выбор, подсказка клавиш", chosen === 1 && hint && moved, `выбрано ${chosen}`);
+      record("секретарь: первая заявка выбрана, клавиши в её кнопках, ↑/↓ — выбор", chosen === 1 && hint && moved, `выбрано ${chosen}`);
       const waiting = page.locator('[data-testid="desk-errand-card"][data-chosen][data-status="sent"]');
       if ((await waiting.count()) && (await waiting.getByTestId("desk-errand-decline").count())) {
         await page.keyboard.press("KeyN");

@@ -15,15 +15,6 @@
 
 html[data-surface="desk"][data-journal] {
   /* ---- shared pieces ------------------------------------------------------------------------- */
-  .errands-card {
-    position: relative;
-    min-width: 0;
-    padding: 12px 0;
-    border-top: 1px solid var(--line, var(--border));
-  }
-  .errands-card-rows > li + li {
-    border-top: 1px solid var(--rule-soft, var(--border));
-  }
   .errands-tile {
     --tone: var(--accent);
     position: relative;
@@ -122,44 +113,9 @@ html[data-surface="desk"][data-journal] {
     transform-origin: 50% 20%;
     animation: errands-ring 1.4s ease-in-out infinite;
   }
-  .errands-alarm-word {
-    color: var(--danger);
-  }
 
   /* ---- the hero ------------------------------------------------------------------------------ */
-  .errands-hero-ask {
-    padding-top: 12px;
-    border-top: 1px solid var(--rule-soft, var(--border));
-  }
-  .errands-desk-faces {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-
-    > .errands-face + .errands-face {
-      margin-left: -10px;
-    }
-  }
   /* somebody is at the desk: a green dot on the circle's corner breathes a ring */
-  .errands-presence {
-    position: absolute;
-    right: -1px;
-    bottom: -1px;
-    width: 11px;
-    height: 11px;
-    border-radius: 9999px;
-    background: var(--ok);
-    box-shadow: 0 0 0 2.5px var(--raise, var(--surface));
-
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: var(--ok);
-      animation: errands-ping 2.2s ease-out infinite;
-    }
-  }
   .errands-figure-tile {
     --tone: var(--accent);
     display: inline-flex;
@@ -188,197 +144,13 @@ html[data-surface="desk"][data-journal] {
   }
 
   /* ---- the director's live board ---------------------------------------------------------- */
-  .errands-live {
-    container-type: inline-size;
-    padding: 0;
-  }
-  .errands-live-head,
-  .errands-live-row {
-    display: grid;
-    grid-template-columns: 30px minmax(0, 1fr) 132px minmax(128px, 176px) 72px 118px;
-    column-gap: 12px;
-    align-items: center;
-  }
-  .errands-live-head {
-    padding: 8px 14px;
-    border-bottom: 1px solid var(--rule, var(--border));
-    color: var(--ink-3, var(--text-muted));
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 16px;
-  }
-  .errands-live-row {
-    min-height: 60px;
-    padding: 9px 14px;
-    border-bottom: 1px solid var(--rule-soft, var(--border));
-    cursor: default;
-    animation: errands-rise 320ms var(--ease-snap, ease-out) both;
-
-    &:last-child {
-      border-bottom: 0;
-    }
-    &[data-pending] {
-      opacity: 0.8;
-    }
-  }
   @container (max-width: 780px) {
-    .errands-live-head,
-    .errands-live-row {
-      grid-template-columns: 30px minmax(0, 1fr) minmax(112px, 150px) 72px 112px;
-    }
-    .errands-live-track {
-      display: none;
-    }
   }
   @container (max-width: 600px) {
-    .errands-live-head,
-    .errands-live-row {
-      grid-template-columns: 30px minmax(0, 1fr) 72px 104px;
-    }
-    .errands-live-who {
-      display: none;
-    }
-  }
-  .errands-state {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 6px;
-    margin-top: 2px;
-    color: var(--text-muted);
-    font-size: 12px;
-    line-height: 16px;
-
-    > svg {
-      flex-shrink: 0;
-    }
-    b {
-      font-weight: 600;
-      color: var(--text);
-    }
-    &[data-tone="ask"] {
-      color: var(--pen, var(--accent));
-    }
-    &[data-tone="work"] > svg {
-      color: var(--ok);
-    }
-    &[data-tone="warn"] {
-      color: var(--warn);
-    }
-    [data-tone="warn"] {
-      color: var(--warn);
-    }
-    [data-tone="ok"] {
-      color: var(--ok);
-    }
   }
   /* nobody has it yet: a blue dot breathes, as «Сегодня» says it (D-169) */
-  .errands-ping {
-    position: relative;
-    flex-shrink: 0;
-    width: 7px;
-    height: 7px;
-    margin: 0 2px;
-    border-radius: 9999px;
-    background: var(--sky, var(--accent));
-
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      background: inherit;
-      animation: errands-ping 2s ease-out infinite;
-    }
-  }
-  .errands-seat {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-    border-radius: 9999px;
-    border: 1.5px dashed color-mix(in srgb, var(--text-muted) 55%, transparent);
-  }
-  .errands-cancel {
-    height: 28px;
-    padding: 0 8px;
-    border-radius: 7px;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    line-height: 16px;
-    opacity: 0;
-    transition:
-      opacity 120ms linear,
-      color 120ms linear,
-      background-color 120ms linear;
-
-    &:hover {
-      color: var(--danger);
-      background: color-mix(in srgb, var(--danger) 10%, transparent);
-    }
-    &:focus-visible,
-    &[data-shown] {
-      opacity: 1;
-    }
-    &[data-urgent] {
-      opacity: 1;
-      color: var(--danger);
-    }
-  }
-  .desk-row:hover .errands-cancel,
-  .desk-row[aria-selected="true"] .errands-cancel {
-    opacity: 1;
-  }
 
   /* the track: asked → taken → done */
-  .errands-track {
-    display: flex;
-    width: 100%;
-    max-width: 128px;
-    align-items: center;
-  }
-  .errands-track-node {
-    position: relative;
-    width: 9px;
-    height: 9px;
-    flex-shrink: 0;
-    border-radius: 9999px;
-    background: var(--raise, var(--surface));
-    box-shadow: inset 0 0 0 1.5px var(--line, var(--border));
-
-    &[data-on] {
-      background: var(--pen, var(--accent));
-      box-shadow: none;
-    }
-    /* the step the request waits for breathes */
-    &[data-now]::after {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      border-radius: inherit;
-      box-shadow: 0 0 0 1.5px var(--pen, var(--accent));
-      animation: errands-ping 2s ease-out infinite;
-    }
-  }
-  .errands-track-line {
-    position: relative;
-    height: 2px;
-    flex: 1;
-    margin: 0 3px;
-    overflow: hidden;
-    border-radius: 2px;
-    background: var(--line, var(--border));
-
-    > i {
-      position: absolute;
-      inset: 0;
-      background: var(--pen, var(--accent));
-      transform-origin: left center;
-      transform: scaleX(var(--fill));
-      transition: transform 600ms var(--ease-snap, ease-out);
-      animation: errands-fill 700ms var(--ease-snap, ease-out) both;
-    }
-  }
 
   /* ---- the history's cells ------------------------------------------------------------------- */
   .errands-status {
@@ -456,78 +228,8 @@ html[data-surface="desk"][data-journal] {
   }
 
   /* ---- the thirty days ---------------------------------------------------------------------- */
-  .errands-figure {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 2px;
-    padding: 9px 10px;
-    border-radius: 10px;
-    background: var(--surface-2);
-
-    &[data-tone="warn"] .errands-figure-value {
-      color: var(--warn);
-    }
-  }
-  .errands-figure-value {
-    overflow: hidden;
-    font-size: 20px;
-    font-weight: 600;
-    line-height: 24px;
-    letter-spacing: -0.02em;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .errands-figure-label {
-    overflow: hidden;
-    color: var(--text-muted);
-    font-size: 11.5px;
-    line-height: 14px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .errands-days-base {
-    stroke: var(--rule, var(--border));
-    stroke-width: 1;
-  }
-  .errands-day {
-    fill: color-mix(in srgb, var(--text-muted) 45%, transparent);
-    transform-box: fill-box;
-    transform-origin: 50% 100%;
-    animation: errands-grow 560ms var(--ease-snap, ease-out) both;
-    transition: fill 120ms linear;
-
-    &[data-today] {
-      fill: var(--pen, var(--accent));
-    }
-    &[data-on] {
-      fill: var(--text);
-    }
-  }
-  .errands-bar {
-    position: relative;
-    display: block;
-    height: 4px;
-    overflow: hidden;
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--pen, var(--accent)) 14%, transparent);
-
-    > i {
-      position: absolute;
-      inset: 0;
-      background: var(--pen, var(--accent));
-      transform-origin: left center;
-      transform: scaleX(var(--fill));
-      animation: errands-fill 800ms var(--ease-snap, ease-out) both;
-      animation-delay: inherit;
-    }
-  }
 
   /* the board's own cells: the desk's grid padding is the table's, not the board's */
-  .errands-live :is([role="gridcell"], [role="columnheader"]) {
-    padding: 0;
-    font-size: inherit;
-  }
 
   /* ---- a request in the panel: its way as steps -------------------------------------------- */
   .errands-steps {
@@ -566,7 +268,8 @@ html[data-surface="desk"][data-journal] {
     margin-top: 4px;
     border-radius: 9999px;
     background: var(--raise, var(--surface));
-    box-shadow: inset 0 0 0 2px var(--line, var(--border));
+    /* a step still ahead is a ring that reads (3:1 and more), not a hairline (D-175) */
+    box-shadow: inset 0 0 0 2px var(--ink-3, var(--text-muted));
 
     [data-state="done"] > & {
       background: var(--pen, var(--accent));
@@ -630,90 +333,8 @@ html[data-surface="desk"][data-journal] {
   }
 
   /* ---- the secretary's queue -------------------------------------------------------------------- */
-  .errands-queue {
-    container-type: inline-size;
-    padding: 0;
-  }
   /* a narrow queue (the panel open on a smaller screen): the moves go under the words, never over them */
   @container (max-width: 640px) {
-    .errands-queue-row {
-      grid-template-columns: 84px 34px minmax(0, 1fr);
-      row-gap: 8px;
-
-      > :last-child {
-        grid-column: 3;
-        justify-content: flex-start;
-      }
-    }
-  }
-  .errands-queue-row {
-    display: grid;
-    grid-template-columns: 84px 34px minmax(0, 1fr) auto;
-    column-gap: 12px;
-    align-items: center;
-    min-height: 62px;
-    padding: 9px 14px;
-    border-bottom: 1px solid var(--rule-soft, var(--border));
-    cursor: default;
-    animation: errands-rise 320ms var(--ease-snap, ease-out) both;
-
-    &:last-child {
-      border-bottom: 0;
-    }
-    > .errands-wait {
-      justify-self: start;
-    }
-  }
-  .errands-queue-label {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 12px 14px 6px;
-    border-bottom: 1px solid var(--rule-soft, var(--border));
-    color: var(--text-muted);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 16px;
-
-    > svg {
-      color: var(--ok);
-    }
-  }
-  .errands-asked {
-    color: var(--pen, var(--accent));
-  }
-  .errands-closed {
-    display: flex;
-    width: calc(100% + 12px);
-    min-height: 38px;
-    align-items: center;
-    gap: 10px;
-    padding: 6px;
-    margin: 0 -6px;
-    border-radius: 8px;
-    font-size: 13px;
-    line-height: 18px;
-    text-align: left;
-    transition: background-color 120ms linear;
-
-    &:hover {
-      background: var(--hover, var(--surface-2));
-    }
-    &[aria-current] {
-      background: color-mix(in srgb, var(--pen, var(--accent)) 9%, transparent);
-    }
-  }
-  .errands-closed-word {
-    flex-shrink: 0;
-    color: var(--text-muted);
-    font-size: 12px;
-
-    [data-status="done"] > & {
-      color: var(--ok);
-    }
-    [data-status="declined"] > & {
-      color: var(--danger);
-    }
   }
 }
 
@@ -721,29 +342,7 @@ html[data-surface="desk"][data-journal] {
    «Графит»: the same pieces as cards with hairline rings, a lit top edge and depth.
    ========================================================================================== */
 :root[data-surface="desk"][data-journal][data-graphite] {
-  .errands-card {
-    padding: 14px 16px;
-    border-top: 0;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-  }
-  .errands-live,
-  .errands-queue {
-    overflow: clip;
-    padding: 0;
-  }
-  .errands-live-head {
-    background: color-mix(in srgb, var(--raise) 86%, transparent);
-  }
   /* the board's cells are its own: the desk table's cell padding (one step stronger here) stays off */
-  .errands-live :is([role="gridcell"], [role="columnheader"]) {
-    padding: 0;
-    font-size: inherit;
-  }
-  .errands-quick button {
-    animation: errands-rise 300ms var(--ease-snap) both;
-  }
 
   /* the hero takes the moment's ink in its corner: the pen by default, the pencil at an alarm */
   .errands-hero {
@@ -795,144 +394,19 @@ html[data-surface="desk"][data-journal] {
   }
 
   /* a row that arrives while the screen looks: a moment of the accent as it rises in */
-  .errands-live-row,
-  .errands-queue-row {
-    &[data-arrived]::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      pointer-events: none;
-      background: color-mix(in srgb, var(--pen) 16%, transparent);
-      animation: errands-arrive 1600ms ease-out both;
-    }
-    > * {
-      position: relative;
-      z-index: 1;
-    }
-  }
   /* the secretary's question waits for the director: the row carries the pen's rail */
-  .errands-live-row[data-asks]:not([aria-selected="true"]) {
-    background: color-mix(in srgb, var(--pen) 5%, transparent);
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--pen) 70%, transparent);
-  }
 
   /* the alarm stands above everything: the red pencil's plate breathing, its siren ringing */
-  .errands-live-row[data-alarm],
-  .errands-queue-row[data-alarm] {
-    background: color-mix(in srgb, var(--pencil) 11%, transparent);
-    box-shadow: inset 3px 0 0 var(--pencil);
-
-    &::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 55%, transparent);
-      animation: errands-alarm 1.6s ease-in-out infinite;
-    }
-  }
-  #desk-main .desk-list .errands-queue-row.desk-queue-alarm,
-  .desk-queue-alarm {
-    border-top: 0;
-    border-bottom: 1px solid var(--rule-soft);
-  }
   .errands-alarm-tile {
     --tone: var(--pencil);
     color: var(--pencil);
     background: color-mix(in srgb, var(--pencil) 18%, transparent);
     box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 45%, transparent);
   }
-  .errands-queue-row[data-alarm] .desk-move {
-    background: color-mix(in srgb, var(--pencil) 16%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 50%, transparent);
-    color: var(--pencil);
-
-    &:hover:not(:disabled) {
-      background: color-mix(in srgb, var(--pencil) 26%, transparent);
-    }
-  }
-  .errands-queue-row[data-alarm] .btn-primary {
-    background: var(--pencil);
-    color: #fff;
-    box-shadow:
-      inset 0 1px 0 rgb(255 255 255 / 0.2),
-      0 0 0 1px color-mix(in srgb, var(--pencil) 80%, black),
-      0 6px 18px -6px color-mix(in srgb, var(--pencil) 70%, transparent);
-  }
 
   /* «Что передать директору?»: done by her — a green plate with the ready words as chips */
-  .errands-result-row:not([aria-selected="true"]) {
-    background: color-mix(in srgb, var(--ok-ink) 6%, transparent);
-  }
-  .errands-queue-label {
-    background: color-mix(in srgb, var(--ink) 2.5%, transparent);
-  }
-
-  /* the visitors at her desk and the director's answers to them: rows of a card, a rail in their tone */
-  .errands-reception,
-  .errands-guests {
-    overflow: clip;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-  }
-  #desk-main :is(.errands-reception, .errands-guests) {
-    [data-testid="reception-cards"] {
-      border-top: 0;
-    }
-    :is([data-testid="visit-card"], [data-testid="visit-ask-card"], [data-testid="message-ask-card"]) {
-      position: relative;
-      padding: 10px 14px 10px 18px;
-      border-bottom: 1px solid var(--rule-soft) !important;
-      animation: errands-rise 320ms var(--ease-snap) both;
-
-      > span[aria-hidden] {
-        display: block;
-        top: 10px;
-        bottom: 10px;
-      }
-      > p:nth-of-type(2) {
-        font-size: 15px;
-      }
-      button {
-        min-height: 32px;
-        border-radius: 8px;
-      }
-    }
-    :is([data-testid="visit-ask-card"], [data-testid="message-ask-card"]) {
-      background: color-mix(in srgb, var(--pen) 6%, transparent) !important;
-      box-shadow: inset 3px 0 0 var(--pen);
-
-      .btn-primary {
-        background: var(--btn-main);
-        border: 0;
-        color: var(--btn-main-ink);
-        box-shadow: var(--btn-main-edge);
-      }
-    }
-    [data-testid="visit-card"] {
-      &[data-status="waiting"] > p:nth-of-type(3) {
-        color: var(--pen) !important;
-      }
-      &[data-status="wait"] > p:nth-of-type(3) {
-        color: var(--warn-ink) !important;
-      }
-      &:is([data-status="invited"], [data-status="read"]) > p:nth-of-type(3) {
-        color: var(--ok-ink) !important;
-      }
-    }
-    > div > :last-child > :last-child,
-    > div:last-child > :last-child {
-      border-bottom: 0 !important;
-    }
-  }
 
   /* the thirty days */
-  .errands-figure {
-    background: var(--surface-2);
-    box-shadow: inset 0 0 0 1px var(--rule-soft);
-  }
 
   /* the secretary's figure tile in the hero */
   .errands-figure-tile {
@@ -1375,19 +849,6 @@ html[data-surface="desk"][data-journal] {
 @media (prefers-reduced-motion: reduce) {
   html[data-surface="desk"][data-journal] {
     .errands-siren,
-    .errands-presence::after,
-    .errands-ping::after,
-    .errands-track-node::after,
-    .errands-track-line > i,
-    .errands-day,
-    .errands-bar > i,
-    .errands-live-row,
-    .errands-queue-row,
-    .errands-quick button,
-    .errands-live-row::before,
-    .errands-live-row::after,
-    .errands-queue-row::before,
-    .errands-queue-row::after,
     .errands-figure-tile,
     .errands-steps > li,
     .errands-step-dot::after,
@@ -1395,9 +856,6 @@ html[data-surface="desk"][data-journal] {
     [data-testid="visit-ask-card"],
     [data-testid="message-ask-card"] {
       animation: none !important;
-    }
-    .errands-track-line > i {
-      transition: none;
     }
   }
 }

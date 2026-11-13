@@ -1,0 +1,1097 @@
+/* «Заявки» redesign (D-175): stoika — one file a hand.
+
+   «Стойка», the secretary's side of «Заявки» (components/desk/errands/{SecretaryErrands, Queue, Door,
+   StoikaHead, StoikaDay, Reception}.tsx) and her top bar (TopBar `SecretaryCalls`, DirectorBusyLine).
+   - The director's door: a lamp of its state's ink (green free, amber in a meeting, violet «не
+     беспокоить»), the words, his day as a line; folded into a 56 px strip while work is on the desk.
+   - Requests that wait as tickets on the counter, the chosen one in the pen's ring with the screen's
+     one white button; what is in her hands as rows; a colleague's work muted.
+   - Motion is news: a ticket drops in, its tile rings twice, a ring of the pen goes out once; a
+     taken one slides into «У вас», a done one's icon flies to «Сегодня». A quiet page is still: the
+     only loop is the live dot of a request nobody has taken, and it stops after three minutes.
+   The first block lays everything out for both looks (tokens fall back to the app's own for
+   «Журнал»); the second dresses it for «Графит». Keyframes at the end; still under reduced motion. */
+
+html[data-surface="desk"][data-journal] {
+  /* the inks of words on a plate of their own colour: deep enough for the light sheet */
+  --stoika-sky-ink: var(--sky, var(--accent));
+  --stoika-pen-ink: var(--pen-deep, var(--pen, var(--accent)));
+  --stoika-ok-ink: var(--ok-deep, var(--ok-ink, var(--ok)));
+  --stoika-warn-ink: var(--warn-deep, var(--warn-ink, var(--warn)));
+  --stoika-pencil-ink: var(--pencil-deep, var(--pencil, var(--danger)));
+
+  &[data-desk-theme="light"] {
+    --stoika-sky-ink: color-mix(in srgb, var(--sky, var(--accent)) 78%, #000000);
+  }
+
+  /* ---- the top bar: «Посетитель», «Сообщение», the door ---------------------------------- */
+  .stoika-calls button.card-in {
+    min-height: 32px;
+    height: 32px;
+    gap: 6px;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 16px;
+
+    > svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+  .stoika-door-pill {
+    display: inline-flex;
+    min-width: 0;
+    max-width: 100%;
+    align-items: center;
+    gap: 8px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 9999px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    line-height: 16px;
+    white-space: nowrap;
+
+    > .stoika-lamp {
+      width: 8px;
+      height: 8px;
+      box-shadow: none;
+    }
+    &[data-state="dnd"] {
+      color: var(--ink, var(--text));
+      font-weight: 500;
+    }
+  }
+
+  /* ---- the lamp of the door: still, it changes ink and never blinks ---------------------- */
+  .stoika-lamp {
+    --lamp: var(--ok-ink, var(--ok));
+    display: inline-block;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 9999px;
+    background: var(--lamp);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--lamp) 18%, transparent),
+      0 0 16px color-mix(in srgb, var(--lamp) 45%, transparent);
+    transition:
+      background-color 300ms linear,
+      box-shadow 300ms linear;
+
+    &[data-state="busy"] {
+      --lamp: var(--warn-ink, var(--gold-ink, var(--warn)));
+    }
+    &[data-state="dnd"] {
+      --lamp: var(--violet, var(--accent));
+    }
+    &[data-state="unknown"] {
+      --lamp: var(--ink-3, var(--text-muted));
+    }
+  }
+
+  /* ---- the head ------------------------------------------------------------------------- */
+  .stoika-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    min-height: 36px;
+
+    > h1 {
+      margin-right: 4px;
+    }
+  }
+  .stoika-presence {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px 0 12px;
+    border: 1px solid var(--rule, var(--border));
+    border-radius: 9999px;
+    background: var(--surface-2);
+    color: var(--ink, var(--text));
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition: background-color 140ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ink, var(--text)) 8%, var(--surface-2));
+    }
+  }
+  .stoika-presence-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--ok-ink, var(--ok));
+
+    [data-away="1"] > & {
+      background: transparent;
+      box-shadow: inset 0 0 0 1.5px var(--ink-3, var(--text-muted));
+    }
+  }
+  .stoika-away {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 48px;
+    padding: 8px 8px 8px 12px;
+    border: 1px dashed var(--line, var(--border));
+    border-radius: 12px;
+  }
+
+  /* ---- the page's two columns ----------------------------------------------------------- */
+  .stoika-grid {
+    display: grid;
+    align-items: start;
+    gap: 24px;
+  }
+  @container (min-width: 900px) {
+    .stoika-grid {
+      grid-template-columns: minmax(0, 1fr) 320px;
+    }
+  }
+  .stoika-column,
+  .stoika-side {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+  }
+  /* the column measures itself: the slot's keys step aside before its words get cut */
+  .stoika-column {
+    container-type: inline-size;
+  }
+  .stoika-section {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+  .stoika-label {
+    display: flex;
+    min-height: 24px;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px 2px;
+    font-size: 13px;
+    line-height: 18px;
+
+    > h2 {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 18px;
+      color: var(--ink, var(--text));
+    }
+  }
+  .stoika-label-face {
+    display: inline-flex;
+
+    &[data-pop] {
+      animation: stoika-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+  }
+  .stoika-card {
+    position: relative;
+    min-width: 0;
+    padding: 12px 0;
+    border-top: 1px solid var(--line, var(--border));
+  }
+  .stoika-card-head {
+    display: flex;
+    min-height: 24px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 18px;
+
+    > h2 {
+      font-size: 13px;
+      font-weight: 600;
+      line-height: 18px;
+    }
+  }
+  .stoika-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 28px;
+    padding: 0 4px;
+    border-radius: 6px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 18px;
+    white-space: nowrap;
+    transition: color 140ms linear;
+
+    &:hover {
+      color: var(--ink, var(--text));
+    }
+  }
+
+  /* ---- the door ------------------------------------------------------------------------- */
+  .stoika-door {
+    position: relative;
+    overflow: hidden;
+    min-width: 0;
+    border-top: 1px solid var(--line, var(--border));
+  }
+  .stoika-door-bone {
+    height: 168px;
+
+    &[data-compact] {
+      height: 56px;
+    }
+  }
+  .stoika-door-big {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px 24px 16px;
+  }
+  .stoika-door-head {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .stoika-door-label {
+    color: var(--ink-3, var(--text-muted));
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .stoika-door-title {
+    margin-top: 2px;
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 26px;
+    letter-spacing: -0.015em;
+  }
+  .stoika-door-words {
+    margin-top: 4px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .stoika-door-strip {
+    position: relative;
+    display: flex;
+    height: 56px;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px 0 20px;
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .stoika-door-strip-title {
+    font-weight: 600;
+  }
+  .stoika-door-strip-words {
+    color: var(--ink-2, var(--text-muted));
+  }
+  .stoika-door-open.stoika-door-open {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 14px;
+    border-radius: 8px;
+  }
+
+  /* his day as a line: busy hatched in amber, the past a shade lighter, «не беспокоить» violet */
+  .stoika-dayline {
+    position: relative;
+    height: 52px;
+    margin: 0 4px;
+
+    > span {
+      position: absolute;
+    }
+  }
+  .stoika-dayline-track,
+  .stoika-dayline-past,
+  .stoika-dayline-busy,
+  .stoika-dayline-dnd {
+    top: 18px;
+    height: 10px;
+    border-radius: 5px;
+  }
+  .stoika-dayline-track {
+    left: 0;
+    right: 0;
+    background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent);
+  }
+  .stoika-dayline-past {
+    left: 0;
+    background: color-mix(in srgb, var(--ink, var(--text)) 9%, transparent);
+  }
+  .stoika-dayline-busy {
+    --hatch: 70%;
+    --hatch-gap: 30%;
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--warn-ink, var(--gold-ink)) var(--hatch), transparent) 0 4px,
+      color-mix(in srgb, var(--warn-ink, var(--gold-ink)) var(--hatch-gap), transparent) 4px 8px
+    );
+  }
+  /* on paper the amber is darker and the hatch denser: the busy hours still read at 3:1 */
+  &[data-desk-theme="light"] .stoika-dayline-busy {
+    --hatch: 92%;
+    --hatch-gap: 48%;
+  }
+  .stoika-dayline-dnd {
+    background: var(--violet, var(--accent));
+  }
+  .stoika-dayline-now {
+    top: 8px;
+    width: 2px;
+    height: 30px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--ink, var(--text));
+
+    > b {
+      position: absolute;
+      top: -18px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+  }
+  .stoika-dayline-hours {
+    left: 0;
+    right: 0;
+    top: 34px;
+    height: 16px;
+    color: var(--ink-3, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+
+    > span {
+      position: absolute;
+      transform: translateX(-50%);
+    }
+    > span:first-child {
+      transform: none;
+    }
+    > span:last-child {
+      transform: translateX(-100%);
+    }
+  }
+
+  /* ---- the landing slot: the page's one empty message -------------------------------------- */
+  .stoika-slot {
+    display: flex;
+    height: 44px;
+    min-width: 0;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px dashed var(--line, var(--border));
+    border-radius: 12px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 14px;
+    line-height: 20px;
+
+    > svg {
+      flex-shrink: 0;
+      color: var(--ok-ink, var(--ok));
+    }
+  }
+  .stoika-slot-keys {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    color: var(--ink-3, var(--text-muted));
+    font-size: 13px;
+    line-height: 18px;
+
+    > span + kbd {
+      margin-left: 6px;
+    }
+  }
+  @container (max-width: 700px) {
+    .stoika-slot-keys {
+      display: none;
+    }
+  }
+
+  /* ---- tickets: what waits for her ------------------------------------------------------- */
+  .stoika-tickets {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+    gap: 12px;
+  }
+  .stoika-ticket-slot {
+    display: flex;
+    min-width: 0;
+
+    > .stoika-ticket {
+      flex: 1;
+    }
+  }
+  .stoika-ticket {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    border: 1px solid var(--rule, var(--border));
+    cursor: default;
+
+    &[data-chosen] {
+      outline: 2px solid var(--pen, var(--accent));
+      outline-offset: -1px;
+    }
+  }
+  .stoika-ticket-top {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .stoika-ticket-tile {
+    position: relative;
+    display: inline-flex;
+    flex-shrink: 0;
+
+    /* nobody has it yet: a dot on the tile's corner — beating for three minutes, then still */
+    &::after,
+    &[data-live="on"]::before {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      top: -3px;
+      right: -3px;
+      width: 9px;
+      height: 9px;
+      border-radius: 9999px;
+      background: var(--sky, var(--accent));
+    }
+    &::after {
+      box-shadow: 0 0 0 2px var(--raise, var(--surface));
+    }
+    &[data-live="on"]::before {
+      animation: stoika-ping 1.8s ease-out infinite;
+    }
+    [data-alarm] > .stoika-ticket-top > &::after,
+    [data-alarm] > .stoika-ticket-top > &::before {
+      background: var(--pencil, var(--danger));
+    }
+  }
+  /* what and the note: two lines at most — «с молоком, без сахара» is the request too */
+  .stoika-ticket-title {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 26px;
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+
+    [data-alarm] & {
+      color: var(--stoika-pencil-ink);
+    }
+  }
+  .stoika-ticket-note {
+    color: var(--ink-2, var(--text-muted));
+    font-weight: 400;
+  }
+  .stoika-who {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+    margin-top: 4px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .stoika-ticket-moves {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .stoika-asked {
+    color: var(--stoika-pen-ink);
+
+    &[data-answered] {
+      color: var(--ink-2, var(--text-muted));
+
+      > b {
+        color: var(--ink, var(--text));
+        font-weight: 600;
+      }
+    }
+  }
+
+  /* the buttons of the queue: 32 px, the key inside, shown on the chosen item only */
+  :is(.stoika-ticket, .stoika-row) :is(.stoika-main, .stoika-move) {
+    min-height: 32px;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 8px;
+    gap: 0;
+  }
+  .stoika-ghost {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 8px;
+    border-radius: 8px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+    transition:
+      color 140ms linear,
+      background-color 140ms linear;
+
+    &:hover {
+      color: var(--ink, var(--text));
+      background: var(--hover, var(--surface-2));
+    }
+  }
+  .stoika-cap {
+    display: inline-flex;
+    height: 18px;
+    min-width: 18px;
+    align-items: center;
+    justify-content: center;
+    margin-left: 6px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    opacity: 0;
+    transition: opacity 140ms linear;
+
+    [data-chosen] & {
+      opacity: 0.85;
+    }
+  }
+
+  /* how long the director waits: a clock that warms — fresh blue, amber, the red pencil */
+  .stoika-wait {
+    --tone: var(--ink-3, var(--text-muted));
+    --tone-ink: var(--ink-2, var(--text-muted));
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-self: start;
+    gap: 4px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--tone) 13%, transparent);
+    color: var(--tone-ink);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+
+    &[data-tone="sky"] {
+      --tone: var(--sky, var(--accent));
+      --tone-ink: var(--stoika-sky-ink);
+    }
+    &[data-tone="warn"] {
+      --tone: var(--warn-ink, var(--gold-ink, var(--warn)));
+      --tone-ink: var(--stoika-warn-ink);
+    }
+    &[data-tone="pencil"] {
+      --tone: var(--pencil, var(--danger));
+      --tone-ink: var(--stoika-pencil-ink);
+    }
+    &[data-tone="ok"] {
+      --tone: var(--ok-ink, var(--ok));
+      --tone-ink: var(--stoika-ok-ink);
+    }
+  }
+
+  /* ---- rows: what is in her hands --------------------------------------------------------- */
+  .stoika-rows {
+    container-type: inline-size;
+    padding: 0;
+  }
+  .stoika-row {
+    position: relative;
+    display: grid;
+    width: 100%;
+    min-height: 60px;
+    grid-template-columns: 72px 30px minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    padding: 10px 12px 10px 16px;
+    border-top: 1px solid var(--rule-soft, var(--border));
+    cursor: default;
+    text-align: left;
+
+    :where(.stoika-rows) > :first-child > &,
+    :where(.stoika-rows) > &:first-child {
+      border-top: 0;
+    }
+    &[data-chosen] {
+      background: color-mix(in srgb, var(--pen, var(--accent)) 7%, transparent);
+      box-shadow: inset 3px 0 0 var(--pen, var(--accent));
+    }
+    &[data-came] {
+      animation: stoika-slide 300ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+    }
+  }
+  .stoika-row-tile {
+    display: inline-flex;
+  }
+  .stoika-row-title {
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 20px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    > b {
+      font-weight: 600;
+    }
+  }
+  .stoika-row > div > .stoika-who {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .stoika-row-moves {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  /* a narrow list keeps the moves' icons and keys; the words go to their titles */
+  @container (max-width: 760px) {
+    .stoika-move-word {
+      display: none;
+    }
+  }
+  /* second-rank moves: laid out always, lit on the chosen row and under the mouse — nothing moves */
+  .stoika-second {
+    opacity: 0;
+    visibility: hidden;
+    transition:
+      opacity 140ms linear,
+      visibility 0s linear 140ms;
+
+    :is(.stoika-row:hover, .stoika-row:focus-within, .stoika-row[data-chosen]) & {
+      opacity: 1;
+      visibility: visible;
+      transition:
+        opacity 140ms linear,
+        visibility 0s;
+    }
+  }
+  .stoika-result:not([data-chosen]) {
+    background: color-mix(in srgb, var(--ok-ink, var(--ok)) 5%, transparent);
+  }
+  .stoika-row-muted {
+    color: var(--ink-2, var(--text-muted));
+    grid-template-columns: 72px 30px minmax(0, 1fr);
+    min-height: 56px;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover, var(--surface-2));
+    }
+    .stoika-row-title > b {
+      font-weight: 500;
+    }
+  }
+  @container (max-width: 620px) {
+    .stoika-row {
+      grid-template-columns: 72px 30px minmax(0, 1fr);
+      row-gap: 8px;
+    }
+    .stoika-row-moves {
+      grid-column: 3;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+    }
+  }
+
+  /* the alarm in the queue: the red pencil, still — the page's alarm field does the calling */
+  .stoika-alarm-tile {
+    --tone: var(--pencil, var(--danger));
+    color: var(--pencil, var(--danger));
+    background: color-mix(in srgb, var(--pencil, var(--danger)) 16%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil, var(--danger)) 45%, transparent);
+  }
+  .stoika-ticket[data-alarm] {
+    border-color: color-mix(in srgb, var(--pencil, var(--danger)) 50%, transparent);
+
+    &[data-chosen] {
+      outline-color: var(--pencil, var(--danger));
+    }
+  }
+  :is(.stoika-ticket, .stoika-row)[data-alarm][data-chosen] .stoika-main {
+    /* the pencil deepened: white words on it read at 4.5:1 and more in both themes */
+    background: color-mix(in srgb, var(--pencil, var(--danger)) 74%, #000000);
+    color: #ffffff;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.18),
+      0 0 0 1px color-mix(in srgb, var(--pencil, var(--danger)) 60%, #000000);
+  }
+
+  /* ---- «Приёмная» ---------------------------------------------------------------------- */
+  .stoika-visits {
+    display: flex;
+    flex-direction: column;
+  }
+  .stoika-visit {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 0;
+    border-top: 1px solid var(--rule-soft, var(--border));
+
+    &:first-child {
+      padding-top: 2px;
+      border-top: 0;
+    }
+  }
+  .stoika-visit-dot {
+    width: 8px;
+    height: 8px;
+    flex-shrink: 0;
+    margin-top: 6px;
+    border-radius: 9999px;
+    background: var(--tone);
+  }
+
+  /* ---- «Сегодня» ------------------------------------------------------------------------- */
+  .stoika-journal-rows {
+    display: flex;
+    flex-direction: column;
+  }
+  .stoika-journal-row {
+    display: grid;
+    width: calc(100% + 16px);
+    min-height: 40px;
+    grid-template-columns: 40px 26px minmax(0, 1fr) 64px 20px;
+    align-items: center;
+    column-gap: 12px;
+    margin: 0 -8px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover, var(--surface-2));
+    }
+    &[aria-current] {
+      background: color-mix(in srgb, var(--pen, var(--accent)) 9%, transparent);
+    }
+  }
+  .stoika-journal-rows > li + li > .stoika-journal-row {
+    box-shadow: 0 -1px 0 var(--rule-soft, var(--border));
+  }
+  .stoika-declined {
+    color: var(--stoika-pencil-ink);
+  }
+  .stoika-heart,
+  .stoika-heart-slot {
+    display: inline-flex;
+    width: 20px;
+    justify-content: center;
+  }
+  .stoika-heart {
+    color: var(--pencil, var(--danger));
+
+    &[data-fresh] > svg {
+      animation: stoika-heart 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+  }
+  .stoika-tally {
+    display: flex;
+    min-height: 52px;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 8px 12px 8px 16px;
+  }
+  .stoika-tally-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+  .stoika-tally-items {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .stoika-tally-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+  }
+  .stoika-tally-thanks {
+    color: var(--pencil, var(--danger));
+  }
+}
+
+/* ==========================================================================================
+   «Графит»: cards with hairline rings and a lit top edge, the lamp's glow, the white button.
+   ========================================================================================== */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .stoika-calls button.card-in {
+    border: 0;
+    background: var(--surface-2);
+    box-shadow:
+      0 0 0 1px var(--rule),
+      var(--lift);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ink) 9%, var(--raise));
+      box-shadow:
+        0 0 0 1px var(--line),
+        var(--lift);
+    }
+  }
+  .stoika-door-pill {
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
+    box-shadow: inset 0 0 0 1px var(--rule-soft);
+
+    &[data-state="dnd"] {
+      background: color-mix(in srgb, var(--violet) 12%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--violet) 30%, transparent);
+    }
+  }
+  .stoika-presence {
+    border: 0;
+    background: var(--surface-2);
+    box-shadow:
+      0 0 0 1px var(--rule),
+      var(--lift);
+  }
+  .stoika-away {
+    border-color: var(--line);
+    background: color-mix(in srgb, var(--ink) 3%, var(--raise));
+  }
+
+  .stoika-card {
+    padding: 14px 16px;
+    border-top: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .stoika-rows {
+    overflow: clip;
+    padding: 0;
+  }
+
+  .stoika-door {
+    --door-ink: var(--ok-ink);
+    border-top: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    /* the lamp lights its corner of the card */
+    &::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(560px 200px at 0% 0%, color-mix(in srgb, var(--door-ink) 13%, transparent), transparent 70%);
+      transition: opacity 300ms linear;
+    }
+    &[data-state="busy"] {
+      --door-ink: var(--warn-ink);
+    }
+    &[data-state="dnd"] {
+      --door-ink: var(--violet);
+    }
+    &[data-compact]::before {
+      opacity: 0;
+    }
+    &[data-compact][data-state="dnd"] {
+      background: color-mix(in srgb, var(--violet) 7%, var(--raise));
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--violet) 32%, transparent),
+        var(--lift);
+    }
+  }
+  .stoika-door-bone {
+    background: color-mix(in srgb, var(--ink) 3%, var(--raise));
+  }
+
+  .stoika-ticket {
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 180ms linear;
+
+    &[data-chosen] {
+      outline: 0;
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 4px color-mix(in srgb, var(--pen) 14%, transparent),
+        var(--lift);
+    }
+    &[data-alarm] {
+      background: color-mix(in srgb, var(--pencil) 7%, var(--raise));
+      box-shadow:
+        0 0 0 1px color-mix(in srgb, var(--pencil) 45%, transparent),
+        var(--lift);
+
+      &[data-chosen] {
+        box-shadow:
+          0 0 0 1px var(--pencil),
+          0 0 0 4px color-mix(in srgb, var(--pencil) 16%, transparent),
+          var(--lift);
+      }
+    }
+    /* a request that has just come: it drops into its place, its tile rings twice, a ring of the pen goes out once */
+    &[data-arrived] {
+      animation: stoika-drop 340ms cubic-bezier(0.34, 1.4, 0.64, 1) both;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        pointer-events: none;
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--pen) 60%, transparent);
+        animation: stoika-ring-out 700ms ease-out 140ms both;
+      }
+      .stoika-ticket-tile > .errands-tile {
+        animation: stoika-ring 420ms ease-in-out 220ms 2 both;
+      }
+    }
+  }
+  .stoika-ghost:hover {
+    background: var(--hover);
+  }
+  .stoika-row-muted .errands-tile[data-muted] {
+    opacity: 0.8;
+  }
+  .stoika-journal {
+    padding-bottom: 8px;
+  }
+}
+
+/* ---- motion: news only ---------------------------------------------------------------- */
+@keyframes stoika-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes stoika-ring-out {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+}
+@keyframes stoika-ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-12deg);
+  }
+  75% {
+    transform: rotate(12deg);
+  }
+}
+@keyframes stoika-ping {
+  from {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+@keyframes stoika-slide {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes stoika-pop {
+  0% {
+    transform: scale(0.5);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes stoika-heart {
+  0% {
+    transform: scale(0.3);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .stoika-ticket,
+    .stoika-ticket::after,
+    .stoika-ticket-tile::before,
+    .stoika-ticket-tile > .errands-tile,
+    .stoika-row,
+    .stoika-label-face,
+    .stoika-heart > svg {
+      animation: none !important;
+    }
+    .stoika-lamp,
+    .stoika-cap,
+    .stoika-second {
+      transition: none !important;
+    }
+  }
+}

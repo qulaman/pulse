@@ -241,6 +241,13 @@ export function todayTally(errands: readonly Errand[], meId: string, now: Date, 
 /** A job closed within two minutes of the ask — the game feel counts it (D-97, after the D-40 gate). */
 export const QUICK_MS = 2 * 60_000;
 
+/**
+ * A request nobody has taken for this long gets «Напомнить ещё раз» for the director — on the
+ * desk as on the phone (SecretaryPanel, D-175). Not `pending.STALE_MS`: that one says when a
+ * request kept without network is too old to send.
+ */
+export const NUDGE_MS = 2 * 60_000;
+
 export function isQuick(errand: Pick<Errand, "created_at" | "done_at">): boolean {
   if (!errand.done_at) return false;
   return new Date(errand.done_at).getTime() - new Date(errand.created_at).getTime() <= QUICK_MS;
@@ -446,4 +453,19 @@ export function absenceLine(people: readonly { full_name: string; away_until?: s
   const back = people.map((person) => person.away_until as string).sort()[0];
   if (people.length === 1) return `${shortName(people[0].full_name)} не на месте ${untilLine(back)}`;
   return `никого нет на месте ${untilLine(back)}`;
+}
+
+/**
+ * The two answers of an «X или Y?» question (D-175): «Чёрный или зелёный?» → «Чёрный», «Зелёный» —
+ * the director answers with one click instead of typing a word. Null for any other question, and
+ * for one whose sides are too long to be buttons.
+ */
+export function choicesOf(question: string): [string, string] | null {
+  const words = question.trim().replace(/[?？!.…]+$/u, "").trim();
+  const parts = words.split(/\s+или\s+/iu);
+  if (parts.length !== 2) return null;
+  const sides = parts.map((part) => part.trim().replace(/^[,;:—–-]+|[,;:—–-]+$/gu, "").trim());
+  if (sides.some((side) => !side || side.length > 24 || side.split(/\s+/).length > 3)) return null;
+  const cap = (side: string) => side.charAt(0).toUpperCase() + side.slice(1);
+  return [cap(sides[0]), cap(sides[1])];
 }

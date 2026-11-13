@@ -1,13 +1,14 @@
 "use client";
 
+import { ConciergeBell } from "lucide-react";
 import type { ReactNode } from "react";
 
+import type { Ink } from "@/components/desk/today/home/look";
 import type { Tone } from "@/components/desk/ui/tone";
-import type { SecretaryPerson } from "@/lib/errands/queries";
-import { isAway, untilLine } from "@/lib/errands/scene";
-import { shortName } from "@/lib/people/names";
 
-import { PersonFace } from "./look";
+import { HeroFacts, type HeroFact } from "../team/Hero";
+import { PersonFace, SCENE_ICON } from "./look";
+import type { Band, BandRing } from "./pult";
 
 /**
  * The total of «Заявки» (D-174), a card lit from its corner as the desk's other totals: what is
@@ -47,21 +48,51 @@ export function ErrandsHero({
   );
 }
 
+const RING_INK: Record<NonNullable<BandRing>, Ink | null> = { ok: "ok", work: "pen", door: "violet", away: null, wait: "sky", alarm: "pencil" };
+
 /**
- * Who is at the secretary's desk, for the director: their circles, the one at work ringed in green,
- * the one away dimmed with a dashed ring; a dot beside the first says there is somebody there.
+ * The band of the director's «Пульт» (D-175), in the language of «Команда»'s hero: the secretary's
+ * face with the ring of what they are doing and the job's sign on it, one sentence and a line under
+ * it; on a calm desk, the thirty days' facts on the right (the median, a zero quiet).
  */
-export function DeskFaces({ people, busyId, now }: { people: readonly SecretaryPerson[]; busyId: string | null; now: Date }) {
-  if (people.length === 0) return null;
-  const shown = people.slice(0, 3);
-  const there = people.some((person) => !isAway(person, now));
-  const title = people.map((person) => `${shortName(person.full_name)} — ${isAway(person, now) ? `не на месте ${untilLine(person.away_until as string)}` : "на месте"}`).join("\n");
+export function PultBand({ band, facts }: { band: Band; facts: HeroFact[] | null }) {
+  const Glyph = band.scene ? SCENE_ICON[band.scene] : null;
   return (
-    <span className="errands-desk-faces" title={title} data-there={there ? "" : undefined}>
-      {shown.map((person) => (
-        <PersonFace key={person.id} id={person.id} name={person.full_name} size={44} ring={person.id === busyId ? "ok" : null} away={isAway(person, now)} />
-      ))}
-      {there ? <span aria-hidden className="errands-presence" /> : null}
-    </span>
+    <section className="pult-band" data-ring={band.ring ?? undefined} data-testid="desk-errands-hero">
+      <span className="pult-band-face">
+        {band.face ? (
+          <PersonFace id={band.face.id} name={band.face.full_name} size={64} ring={band.ring ? RING_INK[band.ring] : null} away={band.ring === "away"} />
+        ) : (
+          <span aria-hidden className="pult-band-nobody">
+            <ConciergeBell size={26} strokeWidth={2} />
+          </span>
+        )}
+        {Glyph ? (
+          <span aria-hidden className="pult-band-badge" data-scene={band.scene}>
+            <Glyph size={14} strokeWidth={2.25} />
+          </span>
+        ) : null}
+      </span>
+      <div className="pult-band-words">
+        <p className="pult-band-title" data-testid="hero-title">
+          {band.title}
+        </p>
+        {band.sub ? <p className="pult-band-sub">{band.sub}</p> : null}
+      </div>
+      {facts ? <HeroFacts facts={facts} className="pult-band-facts" /> : null}
+    </section>
+  );
+}
+
+/** The band while the requests load: its height, nothing moves when they land. */
+export function PultBandBone() {
+  return (
+    <section className="pult-band" aria-hidden>
+      <span className="skeleton h-16 w-16 shrink-0 rounded-full bg-surface-2" />
+      <span className="flex flex-col gap-2">
+        <span className="skeleton h-[18px] w-[260px] rounded-[4px] bg-surface-2" />
+        <span className="skeleton h-[13px] w-[180px] rounded-[4px] bg-surface-2" />
+      </span>
+    </section>
   );
 }

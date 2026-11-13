@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { DirectorBusyLine } from "@/components/desk/calendar/DirectorBusyLine";
 import { CommandLine } from "@/components/desk/CommandLine";
+import { useScreenKeys } from "@/components/desk/team/keys";
 import { Menu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Avatar } from "@/components/desk/ui/PersonCell";
-import { openShortcuts } from "@/components/desk/ui/Shortcuts";
+import { openShortcuts, useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { useSettled } from "@/components/desk/ui/SideNav";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { MessageButton, VisitorButton } from "@/components/visits/VisitorButton";
@@ -124,21 +125,39 @@ function KeysButton() {
 
 /**
  * The secretary's two calls to the director, on top of every desk screen (D-96, D-116): a visitor
- * at the door and a message for the wall — the same sheets as on her phone, dialogs here — and
- * whether he is free right now, in one line.
+ * at the door and a message for the wall — the same sheets as on her phone, dialogs here; V and M
+ * open them from the keyboard — and the director's door in one pill (D-175).
  */
 function SecretaryCalls() {
   // asked after the screen hydrated: the errands screen under it draws the same visits (D-143)
   const settled = useSettled();
   const visits = useVisits(settled);
   const rows = visits.data ?? [];
+  const calls = useRef<HTMLDivElement>(null);
+  useShortcuts("Директору", [
+    { keys: ["V"], label: "Посетитель к директору" },
+    { keys: ["M"], label: "Сообщение на экран директора" },
+  ]);
+  // the sheets' own buttons open them: one way in, whether by the mouse or the key
+  useScreenKeys((event) => {
+    if (event.shiftKey || event.repeat) return false;
+    const target = event.code === "KeyV" ? "visitor-button" : event.code === "KeyM" ? "message-button" : null;
+    const button = target ? calls.current?.querySelector<HTMLButtonElement>(`[data-testid="${target}"]`) : null;
+    if (!button) return false;
+    button.click();
+    return true;
+  });
   return (
-    <div className="@container flex min-w-0 flex-1 items-center gap-2 [&_button.card-in]:min-h-[40px] [&_button.card-in]:text-[14px]" data-testid="desk-secretary-calls">
+    <div ref={calls} className="stoika-calls @container flex min-w-0 flex-1 items-center gap-2" data-testid="desk-secretary-calls">
       <span className="mr-1 text-[13px] leading-4 text-muted">Директору:</span>
-      <VisitorButton visits={rows} />
-      <MessageButton visits={rows} />
-      {/* whether he is free: whole or not at all — a narrow head cut it down to «[» (D-174) */}
-      <span className="hidden min-w-0 @min-[520px]:inline-flex">
+      <Tooltip label="Посетитель к директору" keys={["V"]} side="bottom">
+        <VisitorButton visits={rows} />
+      </Tooltip>
+      <Tooltip label="Сообщение на экран" keys={["M"]} side="bottom">
+        <MessageButton visits={rows} />
+      </Tooltip>
+      {/* the door: whole or not at all — a narrow head cut it down to «[» (D-174) */}
+      <span className="ml-1 hidden min-w-0 @min-[520px]:inline-flex">
         <DirectorBusyLine />
       </span>
     </div>

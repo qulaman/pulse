@@ -8,9 +8,15 @@ import { DeskLinks } from "@/components/desk/ui/DeskLinks";
 import { DeskPanelColumn, DeskPanelProvider, useDeskPanelState } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { ShortcutsHelp, useShortcuts, type Shortcut } from "@/components/desk/ui/Shortcuts";
-import { SideNav, useDeskBadges, type DeskBrand } from "@/components/desk/ui/SideNav";
+import { SideNav, useDeskBadges, useSettled, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
+import { DeskAlarmGate } from "@/components/secretary/SecretaryAlarm";
+import { playChime, playRing, RING_EVERY_MS, unlockAudio, useAudioUnlocked, useDeskSound } from "@/lib/desk/chime";
 import { goPhoneView } from "@/lib/desk/device";
+import { directorSignal, newKeys, secretarySignal, tabTitle, type SignalDot } from "@/lib/desk/signals";
+import { useErrands, useSecretaryActions } from "@/lib/errands/queries";
+import { useNow } from "@/lib/pulse/queries";
+import { useVisits } from "@/lib/visits/queries";
 import { useDeskLook, useDeskTheme } from "@/lib/desk/theme";
 import { LIST_MIN, NAV_ICONS, NAV_WIDE, PANEL_DEFAULT, PANEL_MIN, readNavFolded, readPanelWidth, subscribeFrame, writeNavCookie, writeNavFolded, writePanelWidth } from "@/lib/desk/frame";
 import { isCommandKey, focusCommandLine, isPlainKey, isTypingTarget } from "@/lib/desk/keys";
@@ -172,22 +178,176 @@ function useDeskKeys(role: DeskRole, panel: { isOpen: boolean; close: () => void
   }, [role, router]);
 }
 
+/** The icon the tab wears (app/layout.tsx metadata): drawn again with a dot while something waits. */
+const ICON_SRC = "/icons/icon-192.png";
+const DOT_INK: Record<Exclude<SignalDot, "none">, string> = { wait: "#f5b931", alarm: "#ff453a" };
+const dotted = new Map<SignalDot, Promise<string | null>>();
+
+/** The app's icon with a dot in its corner, as a data URL: amber — something waits, red — «Охрана». */
+function dottedIcon(dot: Exclude<SignalDot, "none">): Promise<string | null> {
+  const cached = dotted.get(dot);
+  if (cached) return cached;
+  const made = new Promise<string | null>((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 64;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return resolve(null);
+        ctx.drawImage(image, 0, 0, 64, 64);
+        // a ring of the icon's own dark ground keeps the dot apart from the pulse line
+        ctx.fillStyle = "#0b0f14";
+        ctx.beginPath();
+        ctx.arc(49, 15, 15, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = DOT_INK[dot];
+        ctx.beginPath();
+        ctx.arc(49, 15, 11, 0, Math.PI * 2);
+        ctx.fill();
+        resolve(canvas.toDataURL("image/png"));
+      } catch {
+        resolve(null);
+      }
+    };
+    image.onerror = () => resolve(null);
+    image.src = ICON_SRC;
+  });
+  dotted.set(dot, made);
+  return made;
+}
+
 /**
- * The browser tab says what waits (D-154): «(3) Pulse» — the director's decisions and visitors,
- * the secretary's requests nobody has taken. A desk behind the accounting program still calls;
- * the push of this computer (Профиль → Уведомления) rings for the rest.
+ * Every icon link of the page shows `href`, or its own again (null). The links are the layout's
+ * metadata: their own address is kept on them while the dot is up, and they are never removed —
+ * React owns the nodes.
  */
-function DeskTitle({ role }: { role: DeskRole }) {
+function showIcon(href: string | null): void {
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')) {
+    if (href) {
+      if (link.dataset.deskHref === undefined) link.dataset.deskHref = link.getAttribute("href") ?? "";
+      if (link.getAttribute("href") !== href) link.setAttribute("href", href);
+    } else if (link.dataset.deskHref !== undefined) {
+      link.setAttribute("href", link.dataset.deskHref);
+      delete link.dataset.deskHref;
+    }
+  }
+}
+
+/**
+ * What reaches the person outside the tab (D-154, D-175). The tab's title says what waits in
+ * words — the secretary's «(1) Кофе — Pulse», «Охрана!» while it calls, for a minute the
+ * director's answer to her («Директор: пусть заходит»); the director's tab keeps its number of
+ * decisions, visitors and open requests. A dot on the tab's icon while something waits. With the
+ * sound on (Профиль; on for the secretary, off for the director until chosen): a soft chime once
+ * for each new request — for the director, a visitor, a message or a question — and the ring of
+ * «Охрана» every few seconds until somebody takes it. The browser lets a page sound only after a
+ * click or a key: the first one on the desk wakes the audio. The push of this computer (Профиль →
+ * Уведомления) rings for a closed tab.
+ */
+function DeskSignals({ role, meId }: { role: DeskRole; meId: string }) {
   const { counts } = useDeskBadges(role);
   const pathname = usePathname();
-  const waiting = (role === "director" ? (counts.tasks ?? 0) + (counts.today ?? 0) : 0) + (counts.errands ?? 0);
+  const settled = useSettled();
+  const secretary = role === "secretary";
+  const errands = useErrands(settled);
+  const visits = useVisits(settled);
+  const catalogue = useSecretaryActions(settled && secretary);
+  // the director's answer leaves the secretary's tab a minute after it came
+  const now = useNow(secretary ? 10_000 : 60_000);
+  const sound = useDeskSound(role);
+  const unlocked = useAudioUnlocked();
+
+  const rows = errands.data ?? [];
+  const lobby = visits.data ?? [];
+  const signal = secretary
+    ? secretarySignal({ meId, errands: rows, visits: lobby, now, catalogue: catalogue.data ?? [] })
+    : directorSignal({ meId, count: (counts.tasks ?? 0) + (counts.today ?? 0) + (counts.errands ?? 0), errands: rows, visits: lobby });
+  const title = tabTitle(signal);
+
+  // what the head should say; the route's metadata says «Pulse» again on every screen, and a
+  // refresh of the server's tree (a navigation, a reload of the layout) draws the head anew
+  const head = useRef<{ title: string; icon: string | null }>({ title, icon: null });
   useEffect(() => {
-    // after the route's own title is set (it says «Pulse» again on every screen)
+    head.current.title = title;
+    // after the route's own title is set
     const timer = setTimeout(() => {
-      document.title = waiting > 0 ? `(${waiting > 99 ? "99+" : waiting}) Pulse` : "Pulse";
+      if (document.title !== head.current.title) document.title = head.current.title;
     }, 0);
     return () => clearTimeout(timer);
-  }, [waiting, pathname]);
+  }, [title, pathname]);
+
+  const dot = signal.dot;
+  useEffect(() => {
+    let gone = false;
+    if (dot === "none") {
+      head.current.icon = null;
+      showIcon(null);
+    } else
+      void dottedIcon(dot).then((href) => {
+        if (gone || !href) return;
+        head.current.icon = href;
+        showIcon(href);
+      });
+    return () => {
+      gone = true;
+    };
+  }, [dot, pathname]);
+
+  // the head redrawn under the desk: the words and the dot put back at once
+  useEffect(() => {
+    const keep = () => {
+      if (document.title !== head.current.title) document.title = head.current.title;
+      if (head.current.icon) showIcon(head.current.icon);
+    };
+    const watch = new MutationObserver(keep);
+    watch.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => {
+      watch.disconnect();
+      // the desk gone (a phone screen, the sign-in): the icon is the app's own again
+      showIcon(null);
+    };
+  }, []);
+
+  // the first click or key wakes the audio — only when this computer is to sound at all
+  useEffect(() => {
+    if (!sound) return;
+    unlockAudio();
+    const wake = () => unlockAudio(true);
+    window.addEventListener("pointerdown", wake, true);
+    window.addEventListener("keydown", wake, true);
+    return () => {
+      window.removeEventListener("pointerdown", wake, true);
+      window.removeEventListener("keydown", wake, true);
+    };
+  }, [sound]);
+
+  // a chime once per new request: what was there when the desk opened is not news
+  const ready = errands.data !== undefined && visits.data !== undefined;
+  const seen = useRef<Set<string> | null>(null);
+  const chimeKeys = signal.chime.join(",");
+  const ringing = signal.ringing;
+  useEffect(() => {
+    if (!ready) return;
+    const keys = chimeKeys ? chimeKeys.split(",") : [];
+    if (!seen.current) {
+      seen.current = new Set(keys);
+      return;
+    }
+    const fresh = newKeys(seen.current, keys);
+    for (const key of fresh) seen.current.add(key);
+    // the alarm's ring speaks for everything while it calls
+    if (fresh.length > 0 && sound && !ringing) playChime();
+  }, [chimeKeys, ready, ringing, sound]);
+
+  // «Охрана» rings until it is taken — and starts the moment the first click lets it
+  useEffect(() => {
+    if (!ringing || !sound || !unlocked) return;
+    playRing();
+    const timer = setInterval(playRing, RING_EVERY_MS);
+    return () => clearInterval(timer);
+  }, [ringing, sound, unlocked]);
+
   return null;
 }
 
@@ -314,10 +474,14 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
           <SideNav role={role} brand={brand} folded={folded} onToggle={toggleNav} />
           <div className="flex min-h-0 min-w-0 flex-col">
             <TopBar fullName={me.fullName} role={role} folded={folded} onToggleNav={toggleNav} />
-            {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen */}
-            <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
-              {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
-            </main>
+            {/* the work area: the screen, and for a secretary the alarm over it or its strip above it (D-175) */}
+            <div className="relative flex min-h-0 flex-1 flex-col" data-desk-work="">
+              <DeskAlarmGate meId={me.userId} role={role} main={main} />
+              {/* `isolate`: the screen's light (DeskLight) sits under the content, inside the screen */}
+              <main ref={main} id="desk-main" className="relative isolate min-h-0 flex-1 overflow-y-auto">
+                {allowed ? <DeskLinks className="contents">{children}</DeskLinks> : null}
+              </main>
+            </div>
           </div>
           {panel.api.isOpen ? (
             <DeskLinks className="contents">
@@ -327,7 +491,7 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
         </div>
         {narrow ? <NarrowHint role={role} /> : null}
         {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
-        <DeskTitle role={role} />
+        <DeskSignals role={role} meId={me.userId} />
         {/* «?» — every key of the screen and of the desk (D-154 wave 3) */}
         <ShortcutsHelp />
       </DeskScope>

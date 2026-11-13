@@ -146,7 +146,8 @@ export function useErrandLink() {
  * «Не на месте до 14:00» (D-99): the secretary's own row, one field — the same value twice is
  * the same state, so a retry is harmless. null — back at the desk.
  */
-export function useSetAway(meId: string) {
+/** `quiet` — the caller says it in its own words (the desk's «Отметил: на месте» with «Отменить», D-175). */
+export function useSetAway(meId: string, { quiet = false }: { quiet?: boolean } = {}) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (until: string | null) => {
@@ -164,7 +165,7 @@ export function useSetAway(meId: string) {
       return { before };
     },
     onSuccess: (_data, until) => {
-      toast(until ? "Отметил: не на месте" : "Отметил: на месте");
+      if (!quiet) toast(until ? "Отметил: не на месте" : "Отметил: на месте");
     },
     onError: (_error, _until, context) => {
       if (context?.before) queryClient.setQueryData(secretaryKeys.all, context.before);

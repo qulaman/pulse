@@ -5,7 +5,7 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { RollingNumber } from "@/components/ui/RollingNumber";
 import type { Errand } from "@/lib/errands/queries";
 import { aqtobeDay, sceneOf, type DeskScene } from "@/lib/errands/scene";
-import { averageDoneMinutes, humanMinutes, tallyByPerson, unclaimedCount } from "@/lib/errands/stats";
+import { medianDoneMinutes, outcomesOf, spanWords, tallyByPerson } from "@/lib/errands/stats";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 import { pluralRu } from "@/lib/tasks/status-text";
@@ -62,8 +62,8 @@ function DaysChart({ rows, now }: { rows: readonly Errand[]; now: Date }) {
           </>
         )}
       </p>
-      <svg viewBox={`0 0 ${W} ${H}`} className="errands-days block h-[44px] w-full" preserveAspectRatio="none" role="img" aria-label={`Заявки по дням за ${DAYS} дней`} onMouseLeave={() => setAt(null)}>
-        <line x1={0} x2={W} y1={H - 0.5} y2={H - 0.5} className="errands-days-base" />
+      <svg viewBox={`0 0 ${W} ${H}`} className="pult-days block h-[44px] w-full" preserveAspectRatio="none" role="img" aria-label={`Заявки по дням за ${DAYS} дней`} onMouseLeave={() => setAt(null)}>
+        <line x1={0} x2={W} y1={H - 0.5} y2={H - 0.5} className="pult-days-base" />
         {days.map((day, index) => {
           const h = day.count === 0 ? 0 : Math.max(3, Math.round((day.count / top) * (H - 4)));
           const today = index === days.length - 1;
@@ -78,7 +78,7 @@ function DaysChart({ rows, now }: { rows: readonly Errand[]; now: Date }) {
                   width={6}
                   height={h}
                   rx={1.5}
-                  className="errands-day"
+                  className="pult-day"
                   data-today={today ? "" : undefined}
                   data-on={at === index ? "" : undefined}
                   style={{ animationDelay: `${index * 12}ms` } as CSSProperties}
@@ -112,7 +112,7 @@ function TopScenes({ rows, catalogue }: { rows: readonly Errand[]; catalogue: re
           <SceneTile scene={scene} size={22} />
           <span className="truncate text-[13px] leading-[18px]">{label}</span>
           <span className="nums text-[13px] leading-[18px] text-muted">{count}</span>
-          <span aria-hidden className="errands-bar col-start-2 col-end-4" style={{ "--fill": count / most, animationDelay: `${120 + index * 60}ms` } as CSSProperties}>
+          <span aria-hidden className="pult-bar col-start-2 col-end-4" style={{ "--fill": count / most, animationDelay: `${120 + index * 60}ms` } as CSSProperties}>
             <i />
           </span>
         </li>
@@ -122,44 +122,50 @@ function TopScenes({ rows, catalogue }: { rows: readonly Errand[]; catalogue: re
 }
 
 /**
- * The thirty days of the director's «Заявки» (D-174): how many, how fast, what nobody took — the
- * one figure worth fixing — the days as columns, what is asked most, and who took what, by face.
+ * The thirty days of the director's «Заявки» (D-174, D-175): how many, how fast as the median — one
+ * forgotten coffee does not make every coffee slow — what nobody took (the one figure worth fixing,
+ * amber only above zero), how they ended, the days as columns, what is asked most, and who took what
+ * — only where there is more than one secretary to compare. Every number from the same rows.
  */
-export function ErrandStats({ rows, now, catalogue }: { rows: readonly Errand[]; now: Date; catalogue: readonly SecretaryAction[] }) {
+export function ErrandStats({ rows, now, catalogue, several }: { rows: readonly Errand[]; now: Date; catalogue: readonly SecretaryAction[]; several: boolean }) {
+  const outcomes = outcomesOf(rows);
+  const usual = medianDoneMinutes(rows);
   const tally = tallyByPerson(rows);
-  const unclaimed = unclaimedCount(rows);
-  const average = averageDoneMinutes(rows);
   // the tally keys a person by the short name: their id and full name back for the circle
   const people = new Map(rows.filter((row) => row.claimed_by).map((row) => [shortName(row.claimed?.full_name ?? "") || "Секретарь", { id: row.claimed_by as string, name: row.claimed?.full_name ?? "" }]));
   return (
-    <aside className="errands-card errands-stats flex min-w-0 flex-col gap-4" data-testid="desk-errands-stats">
-      <div className="flex items-baseline justify-between">
-        <h2 className="desk-label text-[13px] font-semibold leading-[18px]">За 30 дней</h2>
+    <aside className="pult-card pult-month" data-testid="desk-errands-stats">
+      <header className="pult-month-head">
+        <h2 className="pult-month-title">За 30 дней</h2>
+        <span className="pult-month-total">
+          <RollingNumber value={outcomes.asked} className="nums" /> {pluralRu(outcomes.asked, ["заявка", "заявки", "заявок"])}
+        </span>
+      </header>
+      <div className="pult-month-figures">
+        <div className="pult-figure" title="Медиана «попросил → готово»: половина просьб сделана быстрее">
+          <span className="pult-figure-value nums">{spanWords(usual)}</span>
+          <span className="pult-figure-label">обычно до «готово»</span>
+        </div>
+        <div className="pult-figure" data-tone={outcomes.unclaimed > 0 ? "warn" : undefined} title="Просьбы, которые никто не взял">
+          <span className="pult-figure-value nums">{outcomes.unclaimed}</span>
+          <span className="pult-figure-label">не взяли</span>
+        </div>
       </div>
-      <div className="grid grid-cols-3 gap-2">
-        <div className="errands-figure">
-          <RollingNumber value={rows.length} className="errands-figure-value" />
-          <span className="errands-figure-label">{pluralRu(rows.length, ["заявка", "заявки", "заявок"])}</span>
-        </div>
-        <div className="errands-figure" title="Попросил → готово, в среднем">
-          <span className="errands-figure-value nums">{average === null ? "—" : humanMinutes(average)}</span>
-          <span className="errands-figure-label">до «готово»</span>
-        </div>
-        <div className="errands-figure" data-tone={unclaimed > 0 ? "warn" : undefined} title="Просьбы, которые никто не взял">
-          <RollingNumber value={unclaimed} className="errands-figure-value" />
-          <span className="errands-figure-label">не взяли</span>
-        </div>
-      </div>
+      <p className="pult-month-ends nums" data-testid="desk-errands-outcomes">
+        взято {outcomes.taken} · готово {outcomes.done}
+        {outcomes.declined > 0 ? ` · отказ ${outcomes.declined}` : ""} · отменено {outcomes.cancelled}
+      </p>
       <DaysChart rows={rows} now={now} />
       {rows.length > 0 ? (
         <section className="flex flex-col gap-2.5">
-          <h3 className="text-[12px] font-medium leading-4 text-muted">Чаще всего</h3>
+          <h3 className="pult-month-sub">Чаще всего</h3>
           <TopScenes rows={rows} catalogue={catalogue} />
         </section>
       ) : null}
-      {tally.length > 0 ? (
+      {/* who took what says something only where there is somebody to compare with */}
+      {several || tally.length > 1 ? (
         <section className="flex flex-col gap-2" aria-label="Кто сколько взял">
-          <h3 className="text-[12px] font-medium leading-4 text-muted">Кто брал</h3>
+          <h3 className="pult-month-sub">Кто брал</h3>
           <ul className="flex flex-col gap-1.5">
             {tally.map((person) => (
               <li key={person.name} className="flex items-center gap-2.5">
@@ -171,7 +177,7 @@ export function ErrandStats({ rows, now, catalogue }: { rows: readonly Errand[];
                     {person.declined > 0 ? (
                       <>
                         {" · "}
-                        <span style={{ color: "var(--danger)" }}>отказ {person.declined}</span>
+                        <span className="pult-pencil">отказ {person.declined}</span>
                       </>
                     ) : null}
                   </span>

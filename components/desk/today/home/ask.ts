@@ -1,5 +1,7 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
+
 import { dismissToast, toast } from "@/components/ui/Toast";
 import { GRACE_MS, graceLine } from "@/lib/desk/home";
 import { rememberSend } from "@/lib/errands/habits";
@@ -32,6 +34,29 @@ export type DeskAsk = {
 /** Requests inside their window: what sends each one now. */
 const waiting = new Map<string, () => void>();
 
+/** The buttons whose request is inside its window, by request: a key of the keypad shows it is about to go (D-175). */
+const held = new Map<string, string>();
+const watchers = new Set<() => void>();
+const NOTHING: readonly string[] = [];
+let heldCodes: readonly string[] = NOTHING;
+function heldChanged() {
+  heldCodes = held.size ? [...held.values()] : NOTHING;
+  for (const watcher of watchers) watcher();
+}
+function watchHeld(watcher: () => void) {
+  watchers.add(watcher);
+  return () => void watchers.delete(watcher);
+}
+
+/** The catalogue codes waiting out their five seconds now; «Отменить» in the toast takes one out. */
+export function useHeldCodes(): readonly string[] {
+  return useSyncExternalStore(
+    watchHeld,
+    () => heldCodes,
+    () => NOTHING,
+  );
+}
+
 let listening = false;
 function listen() {
   if (listening || typeof window === "undefined") return;
@@ -53,6 +78,8 @@ export function askAfterWindow({ action, note, untilMin = null, absence, onSent 
   const settle = () => {
     clearTimeout(timer);
     waiting.delete(id);
+    held.delete(id);
+    heldChanged();
     dismissToast(toastId);
   };
   const send = () => {
@@ -64,6 +91,8 @@ export function askAfterWindow({ action, note, untilMin = null, absence, onSent 
   };
   const timer = setTimeout(send, GRACE_MS);
   waiting.set(id, send);
+  held.set(id, action.code);
+  heldChanged();
   toastId = toast(graceLine(action.label, note, absence), {
     // the toast outlives the window by a breath, so the button never vanishes under the mouse
     lifetimeMs: GRACE_MS + 400,

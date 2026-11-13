@@ -35,6 +35,11 @@
     --ok-ink: #45cb7c;
     --gold-ink: #f59e3b;
     --warn-ink: #f2bd42;
+    /* words on a tinted plate of their own colour (D-175): on the dark the inks already read */
+    --pen-deep: var(--pen);
+    --ok-deep: var(--ok-ink);
+    --warn-deep: var(--warn-ink);
+    --pencil-deep: var(--pencil);
     --marker: rgb(43 217 187 / 0.2);
     --hover: rgb(255 255 255 / 0.045);
     --selected: rgb(255 255 255 / 0.075);
@@ -59,7 +64,8 @@
     --raise: #ffffff;
     --ink: #17191c;
     --ink-2: #5b6068;
-    --ink-3: #80858d;
+    /* 4.98:1 on the page: the quietest words still read (D-175; was #80858d, 3.7:1) */
+    --ink-3: #6b7078;
     --rule: rgb(15 17 22 / 0.09);
     --rule-soft: rgb(15 17 22 / 0.06);
     --line: rgb(15 17 22 / 0.12);
@@ -71,6 +77,11 @@
     --ok-ink: #138a45;
     --gold-ink: #b45a00;
     --warn-ink: #9e6500;
+    /* words on a 12–14 % plate of their own colour: 5:1 and more on the light (D-175) */
+    --pen-deep: #006b5b;
+    --ok-deep: #0e6e37;
+    --warn-deep: #7a4d00;
+    --pencil-deep: #b3332a;
     --marker: rgb(0 131 111 / 0.14);
     --hover: rgb(15 17 22 / 0.04);
     --selected: rgb(15 17 22 / 0.065);
@@ -410,7 +421,7 @@
   }
 
   /* ---- buttons: a body that sinks under the press ---------------------------------------- */
-  :is(.btn-primary, .btn-secondary, .btn-gold, .desk-move, .desk-word, .desk-alias-add, [data-testid="desk-quick-errands"] button, [data-testid="desk-me"], [data-testid="desk-theme"], [data-testid="desk-keys"], [data-testid="desk-nav-fold"]) {
+  :is(.btn-primary, .btn-secondary, .btn-gold, .desk-move, .desk-word, .desk-alias-add, [data-testid="desk-me"], [data-testid="desk-theme"], [data-testid="desk-keys"], [data-testid="desk-nav-fold"]) {
     transition:
       scale 240ms var(--ease-snap),
       background-color 140ms linear,
@@ -666,6 +677,11 @@
     border-radius: 12px;
     background: var(--raise);
     box-shadow: var(--shadow-card);
+
+    /* the card's shadow took the grid's focus ring away: Tab into a table showed nothing (D-175) */
+    &:focus-visible {
+      box-shadow: var(--shadow-card), 0 0 0 2px color-mix(in srgb, var(--pen) 55%, transparent);
+    }
 
     > [role="row"]:first-child {
       background: color-mix(in srgb, var(--raise) 86%, transparent);
@@ -975,37 +991,7 @@
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--pencil) 40%, transparent);
   }
 
-  /* ---- the usual requests and the reactions: colour back, as chips -------------------------- */
-  [data-testid="desk-quick-errands"] {
-    gap: 8px;
-
-    button {
-      height: 32px;
-      padding: 0 12px;
-      border-radius: 9px;
-      background: var(--surface-2);
-      box-shadow: 0 0 0 1px var(--rule);
-      font-weight: 500;
-
-      > span:last-child {
-        box-shadow: none;
-      }
-      > span[aria-hidden] {
-        filter: none;
-        opacity: 1;
-        font-size: 14px;
-      }
-      &:hover {
-        color: var(--ink);
-        background: color-mix(in srgb, var(--pen) 12%, var(--surface-2));
-        box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 42%, transparent);
-
-        > span:last-child {
-          box-shadow: none;
-        }
-      }
-    }
-  }
+  /* ---- the reactions: colour back, as chips ------------------------------------------------- */
   [data-testid="reaction-bar"] [data-reaction] > span {
     filter: none;
     opacity: 1;

@@ -4,9 +4,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { useErrandLink } from "@/lib/errands/mutations";
-import { STALE_MS } from "@/lib/errands/pending";
 import { isActive, type Errand } from "@/lib/errands/queries";
-import { isYesNo, QUESTIONS, RESULTS, sceneOf } from "@/lib/errands/scene";
+import { isYesNo, NUDGE_MS, QUESTIONS, RESULTS, sceneOf } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 
@@ -30,7 +29,7 @@ function WordField({ placeholder, action, busy, onSend }: { placeholder: string;
   return (
     <div className="flex items-center gap-2">
       <input
-        className="field h-9 min-w-0 flex-1 px-3 text-[14px] leading-5"
+        className="field h-8 min-w-0 flex-1 px-2.5 text-[13px] leading-5"
         placeholder={placeholder}
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -38,7 +37,7 @@ function WordField({ placeholder, action, busy, onSend }: { placeholder: string;
           if (event.key === "Enter") send();
         }}
       />
-      <Button size="sm" variant="secondary" disabled={!text.trim() || busy} onClick={send}>
+      <Button size="sm" variant="secondary" className="!min-h-8" disabled={!text.trim() || busy} onClick={send}>
         {action}
       </Button>
     </div>
@@ -109,7 +108,7 @@ export function SecretaryLink({ errand, meId, catalogue }: { errand: Errand; meI
           </div>
         ) : (
           <div>
-            <Button size="sm" variant="ghost" className="!px-0" onClick={() => setAsking(true)} data-testid="desk-errand-ask-open">
+            <Button size="sm" variant="secondary" className="!min-h-8" onClick={() => setAsking(true)} data-testid="desk-errand-ask-open">
               Уточнить у директора
             </Button>
           </div>
@@ -128,7 +127,7 @@ export function DirectorLink({ errand, now }: { errand: Errand; now: Date }) {
   const link = useErrandLink();
   const busy = link.isPending && link.variables?.id === errand.id;
   const asking = Boolean(errand.question && !errand.answer);
-  const stale = errand.status === "sent" && now.getTime() - new Date(errand.created_at).getTime() >= STALE_MS;
+  const stale = errand.status === "sent" && now.getTime() - new Date(errand.created_at).getTime() >= NUDGE_MS;
   const answer = (text: string) => link.mutate({ fn: "errand_answer", id: errand.id, text });
   const who = shortName(errand.claimed?.full_name ?? "");
 

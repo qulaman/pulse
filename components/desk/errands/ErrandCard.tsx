@@ -2,7 +2,6 @@
 
 import { BellRing, CircleHelp, Heart } from "lucide-react";
 
-import { TONE_VAR } from "@/components/desk/ui/tone";
 import { When } from "@/components/desk/ui/When";
 import { humanAqtobe } from "@/lib/ai/time";
 import { useThankErrand } from "@/lib/errands/mutations";
@@ -16,7 +15,7 @@ import { CancelErrandButton } from "./cancel";
 import { ErrandActions } from "./ErrandActions";
 import { DirectorLink, SecretaryLink } from "./ErrandLink";
 import { AlarmGlyph, ErrandTile, PersonFace } from "./look";
-import { STATUS_TONE, STATUS_WORD, canCancel, canThank } from "./words";
+import { canCancel, canThank } from "./words";
 
 /** The request itself: its scene's tile, what, by when, the note; who asked and how long ago; the question and its answer. */
 function ErrandBody({ errand, now, catalogue }: { errand: Errand; now: Date; catalogue: readonly SecretaryAction[] }) {
@@ -48,13 +47,8 @@ function ErrandBody({ errand, now, catalogue }: { errand: Errand; now: Date; cat
             </span>
           ) : null}
         </p>
-        {errand.note ? <p className="mt-0.5 text-[14px] leading-5 text-muted">{errand.note}</p> : null}
-        <p className="mt-2">
-          <span className="errands-status" data-status={errand.status} style={{ color: TONE_VAR[STATUS_TONE[errand.status]] }}>
-            {STATUS_WORD[errand.status]}
-          </span>
-          {errand.decline_reason ? <span className="text-[13px] text-muted"> · {errand.decline_reason}</span> : null}
-        </p>
+        {/* the note only when it says more than the label; the state is told once — by the steps below (D-175) */}
+        {errand.note && errand.note !== errand.label ? <p className="mt-0.5 text-[14px] leading-5 text-muted">{errand.note}</p> : null}
       </div>
     </div>
   );
@@ -71,10 +65,15 @@ export function ThankButton({ errand }: { errand: Errand }) {
   );
 }
 
-/** The push to the secretaries and what became of it (принцип 8): «увидел 09:14», «не открывал с 09:14». */
+/**
+ * The push to the secretaries and what became of it (принцип 8): «увидел 09:14», «не открывал с
+ * 09:14» — only while nobody has taken the request: a taken one has its answer in the steps, and
+ * «не открывал» over it would contradict them (D-175).
+ */
 function Receipt({ errand, now }: { errand: Errand; now: Date }) {
-  const receipt = useErrandReceipt(errand.id, isActive(errand));
-  const line = receiptLine(receipt.data, now);
+  const waiting = errand.status === "sent";
+  const receipt = useErrandReceipt(errand.id, waiting);
+  const line = waiting ? receiptLine(receipt.data, now) : null;
   if (!line) return null;
   return (
     <p className="errands-receipt" data-tone={line.tone}>

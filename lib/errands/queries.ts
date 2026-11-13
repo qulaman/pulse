@@ -27,7 +27,6 @@ export const errandKeys = {
   history: (days: number) => ["errands", "history", days] as const,
   // plain lists under the root: «Отменить» paints them and a change invalidates them with the others
   archive: (scope: string) => ["errands", "archive", scope] as const,
-  counts: (scope: string) => ["errands", "counts", scope] as const,
   one: (id: string) => ["errands", "one", id] as const,
 };
 
@@ -195,34 +194,6 @@ export function useErrandArchive(filter: ErrandFilter, status: ClosedErrandStatu
     more,
     loadingMore,
   };
-}
-
-/** How the filtered history ended, state by state: the numbers on its tabs, for the whole of it. */
-export function useErrandCounts(filter: ErrandFilter, enabled = true) {
-  const settled = useDebounced(filter.text, SEARCH_PAUSE_MS);
-  const text = searchWords(settled).length > 0 ? settled : "";
-  const queryKey = errandKeys.counts(JSON.stringify([filter.range, filter.claimed, text]));
-  const query = useQuery({
-    queryKey,
-    enabled,
-    meta: { keep: false },
-    placeholderData: keepPreviousData,
-    refetchOnReconnect: false,
-    queryFn: async ({ signal }): Promise<Record<ClosedErrandStatus, number>> => {
-      const supabase = createBrowserSupabase();
-      const counted = await Promise.all(
-        CLOSED_ERRANDS.map(async (status) => {
-          const asked = supabase.from("errands").select("id", { count: "exact", head: true }).eq("status", status);
-          const { count, error } = await narrowed(asked, filter, text).abortSignal(signal);
-          if (error) throw new Error(error.message);
-          return [status, count ?? 0] as const;
-        }),
-      );
-      return Object.fromEntries(counted) as Record<ClosedErrandStatus, number>;
-    },
-  });
-  useRealtimeInvalidate({ table: "errands" }, queryKey, enabled);
-  return query.data ?? null;
 }
 
 /** The same request in any list a screen holds: a row opened from a list paints at once. */

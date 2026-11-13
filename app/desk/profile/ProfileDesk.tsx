@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bell, LogOut, MonitorSmartphone, PanelLeft, Smartphone } from "lucide-react";
+import { ArrowRight, Bell, LogOut, MonitorSmartphone, PanelLeft, Smartphone, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 
@@ -16,6 +16,7 @@ import { openShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
+import { playChime, unlockAudio, useDeskSound, writeDeskSound } from "@/lib/desk/chime";
 import { goPhoneView } from "@/lib/desk/device";
 import { readNavFolded, subscribeFrame, writeNavFolded } from "@/lib/desk/frame";
 import { useChangePassword } from "@/lib/desk/shell-queries";
@@ -208,17 +209,56 @@ function PushSetting({ director }: { director: boolean }) {
         ) : null
       }
     >
-      <div className="profile-device">
-        <span className="profile-device-icon" aria-hidden>
-          <Bell size={18} strokeWidth={2} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-medium leading-5">Этот компьютер</p>
-          <p className="text-[12px] leading-4 text-muted">{director ? "Задачи, ответы и заявки — по правилам ниже" : "Заявки и напоминания — сразу, задачи — в рабочие часы компании"}</p>
+      <div className="flex flex-col gap-2">
+        <div className="profile-device">
+          <span className="profile-device-icon" aria-hidden>
+            <Bell size={18} strokeWidth={2} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[14px] font-medium leading-5">Этот компьютер</p>
+            <p className="text-[12px] leading-4 text-muted">{director ? "Задачи, ответы и заявки — по правилам ниже" : "Заявки и напоминания — сразу, задачи — в рабочие часы компании"}</p>
+          </div>
+          {words ? <StateBadge tone={words.tone}>{words.text}</StateBadge> : <span className="skeleton block h-[26px] w-[96px] rounded-full bg-surface-2" />}
         </div>
-        {words ? <StateBadge tone={words.tone}>{words.text}</StateBadge> : <span className="skeleton block h-[26px] w-[96px] rounded-full bg-surface-2" />}
+        <SoundSetting director={director} />
       </div>
     </ProfileCard>
+  );
+}
+
+/**
+ * The sound of this browser while the desk is open (D-175): a soft chime for what is new, the ring
+ * of «Охрана» until it is taken — on for the secretary, off for the director until chosen. Turned
+ * on, it answers with the chime itself: the click lets the page sound, and the ear checks it.
+ */
+function SoundSetting({ director }: { director: boolean }) {
+  const sound = useDeskSound(director ? "director" : "secretary");
+  return (
+    <div className="profile-device" data-testid="desk-profile-sound">
+      <span className="profile-device-icon" aria-hidden>
+        {sound ? <Volume2 size={18} strokeWidth={2} /> : <VolumeX size={18} strokeWidth={2} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-medium leading-5">Звук, пока открыт Pulse</p>
+        <p className="text-[12px] leading-4 text-muted">
+          {director ? "Мягкий звонок, когда вас ждёт посетитель, сообщение или вопрос секретаря" : "Мягкий звонок на новую просьбу; «Охрана» звенит, пока её не возьмут"}
+        </p>
+      </div>
+      <SegmentTabs
+        aria-label="Звук"
+        value={sound ? "sound" : "mute"}
+        onChange={(value) => {
+          writeDeskSound(value === "sound");
+          if (value !== "sound") return;
+          unlockAudio(true);
+          playChime();
+        }}
+        items={[
+          { value: "sound", label: "Со звуком" },
+          { value: "mute", label: "Без звука" },
+        ]}
+      />
+    </div>
   );
 }
 

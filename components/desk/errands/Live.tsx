@@ -1,279 +1,331 @@
 "use client";
 
-import { CircleHelp, CloudOff, LoaderCircle } from "lucide-react";
-import type { CSSProperties, MouseEvent } from "react";
+import { Check, CloudOff, LoaderCircle } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 
-import { MiniButton } from "@/components/desk/tasks/RowMoves";
-import { When } from "@/components/desk/ui/When";
-import { humanAqtobe } from "@/lib/ai/time";
-import { asksDirector } from "@/lib/desk/home";
 import { useErrandLink } from "@/lib/errands/mutations";
-import { cancelAsked, STALE_MS, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
-import { useErrandReceipt, waitedFor, type Errand } from "@/lib/errands/queries";
-import { atLine, etaLeftMin, etaLine, isYesNo, sceneOf, untilLine } from "@/lib/errands/scene";
+import { cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
+import { useErrandReceipt, type Errand } from "@/lib/errands/queries";
+import { atLine, isPlanned, sceneOf, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import type { SecretaryAction } from "@/lib/settings";
 import { receiptLine } from "@/lib/tasks/receipts";
 
-import { ErrandTile, PersonFace, SceneTile, WaitClock } from "./look";
+import { ErrandTile, PersonFace, SceneTile } from "./look";
+import { canNudge, clockOf, isDoor, stageOf, towardDone, tripFigure } from "./pult";
 import { canCancel, cancelWord } from "./words";
 
-const STAGES = ["Попросили", "Взяли", "Готово"] as const;
-
-/**
- * Where a request stands, as a delivery is tracked (D-174): asked → taken → done, the reached
- * steps in the ink, the line between them filled as far as it got. A promise («будет через 5
- * мин») fills the second line by the time that has passed of it.
+/*
+ * «В пути» of the director's «Пульт» (D-175): every request on its way as a tracker card — what
+ * (the scene's tile, the note), the biggest figure the promise or the wait, the track «Попросили →
+ * <Имя> → Готово» with the taker's face on its node, the push's receipt only while nobody has it
+ * (принцип 8), «Напомнить ещё раз» after two minutes, «Отменить» to who asked. Cards keep the order
+ * they were asked in: a card never jumps when its state changes.
  */
-export function StageTrack({ errand, now }: { errand: Errand; now: Date }) {
-  const stage = errand.status === "sent" ? 0 : errand.status === "accepted" ? 1 : 2;
-  let toward = 0;
-  if (errand.status === "accepted" && errand.eta_at && errand.accepted_at) {
-    const span = new Date(errand.eta_at).getTime() - new Date(errand.accepted_at).getTime();
-    toward = span > 0 ? Math.max(0.08, Math.min(1, (now.getTime() - new Date(errand.accepted_at).getTime()) / span)) : 1;
-  }
-  const label = `${STAGES.slice(0, stage + 1).join(" → ")}${stage < 2 ? ` · дальше: ${STAGES[stage + 1].toLowerCase()}` : ""}`;
+
+/** A card's arrival: drops 12 px into its place with a short spring; the rest make room. */
+const ARRIVE = { type: "spring", stiffness: 560, damping: 36, mass: 0.7 } as const;
+
+/** The track moved on while the screen looks: its line draws and the face pops on (once). */
+function useAdvanced(stage: number): boolean {
+  const was = useRef(stage);
+  const [advanced, setAdvanced] = useState(false);
+  useEffect(() => {
+    if (stage <= was.current) {
+      was.current = stage;
+      return;
+    }
+    was.current = stage;
+    setAdvanced(true);
+    const timer = setTimeout(() => setAdvanced(false), 900);
+    return () => clearTimeout(timer);
+  }, [stage]);
+  return advanced;
+}
+
+/** Asked → taken → done, the reached nodes in the pen, «Готово» in green; the next one waits ringed. */
+export function Track({ errand, now, finished = false, alarm = false }: { errand: Errand; now: Date; finished?: boolean; alarm?: boolean }) {
+  const stage = finished ? 2 : stageOf(errand);
+  const advanced = useAdvanced(stage);
+  const fill = stage === 0 ? 0 : stage === 1 ? 0.5 + towardDone(errand, now) * 0.5 : 1;
+  const who = shortName(errand.claimed?.full_name ?? "");
+  const done = errand.done_at ?? (finished ? now.toISOString() : null);
+  const nodes = [
+    { word: alarm ? "Подняли" : "Попросили", time: clockOf(errand.created_at, now), state: "done" },
+    { word: stage >= 1 && who ? (alarm ? `${who} вызывает` : who) : "Взяли", time: errand.accepted_at ? clockOf(errand.accepted_at, now) : "", state: stage >= 1 ? "done" : "now" },
+    { word: alarm ? "Охрана на месте" : "Готово", time: done ? clockOf(done, now) : errand.eta_at ? `к ${clockOf(errand.eta_at, now)}` : "", state: stage >= 2 ? "end" : stage === 1 ? "now" : "todo" },
+  ] as const;
+  const label = `${nodes[0].word} ${nodes[0].time} → ${stage >= 1 ? `взято${who ? ` · ${who}` : ""}` : "ещё никто не взял"} → ${stage >= 2 ? "готово" : "ещё не готово"}`;
   return (
-    <span className="errands-track" role="img" aria-label={label} title={label} data-stage={stage}>
-      {STAGES.map((word, index) => (
-        <span key={word} className="contents">
-          {index > 0 ? (
-            <span className="errands-track-line" data-on={index <= stage ? "" : undefined}>
-              <i style={{ "--fill": index <= stage ? 1 : index === stage + 1 ? toward : 0 } as CSSProperties} />
-            </span>
-          ) : null}
-          <span className="errands-track-node" data-on={index <= stage ? "" : undefined} data-now={index === stage + 1 && stage < 2 ? "" : undefined} />
+    <div className="pult-track" role="img" aria-label={label} data-stage={stage} data-alarm={alarm ? "" : undefined} data-advanced={advanced ? "" : undefined}>
+      <span aria-hidden className="pult-track-line">
+        <i style={{ transform: `scaleX(${fill})` } as CSSProperties} />
+      </span>
+      {nodes.map((node, index) => (
+        <span key={index} aria-hidden className="pult-node" data-state={node.state} data-at={index}>
+          <span className="pult-node-dot">
+            {index === 1 && stage >= 1 && errand.claimed_by ? (
+              <PersonFace id={errand.claimed_by} name={errand.claimed?.full_name ?? who} size={28} />
+            ) : node.state === "done" || node.state === "end" ? (
+              <Check size={14} strokeWidth={3} />
+            ) : null}
+            {/* a request nobody has taken: the one live dot of the card (frozen after quiet minutes) */}
+            {index === 1 && stage === 0 ? <span className="pult-live" /> : null}
+          </span>
+          <span className="pult-node-word">{node.word}</span>
+          <span className="pult-node-time nums">{node.time || " "}</span>
         </span>
       ))}
-    </span>
-  );
-}
-
-/** What the director needs to know of a live request, in one line under it. */
-function StateLine({ errand, now, dnd }: { errand: Errand; now: Date; dnd: boolean }) {
-  const receiptQuery = useErrandReceipt(errand.id, errand.status === "sent");
-  const who = shortName(errand.claimed?.full_name ?? "");
-  if (asksDirector(errand)) {
-    return (
-      <span className="errands-state" data-tone="ask">
-        <CircleHelp size={13} strokeWidth={2.5} aria-hidden />
-        <span className="truncate">
-          {who || "Секретарь"} спрашивает: <b>{errand.question}</b>
-        </span>
-      </span>
-    );
-  }
-  if (errand.status === "sent") {
-    const receipt = receiptLine(receiptQuery.data, now);
-    const stale = now.getTime() - new Date(errand.created_at).getTime() >= STALE_MS;
-    return (
-      <span className="errands-state" data-tone={stale ? "warn" : "wait"}>
-        <span aria-hidden className="errands-ping" />
-        <span className="truncate">
-          никто ещё не взял
-          {/* the push's receipt while nobody has it (principle 8): «не открывал с 9:14», never «не получил» */}
-          {receipt ? <span data-tone={receipt.tone}> · {receipt.text}</span> : null}
-        </span>
-      </span>
-    );
-  }
-  const eta = etaLine(etaLeftMin(errand, now));
-  const late = eta?.startsWith("опаздывает");
-  return (
-    <span className="errands-state" data-tone={late ? "warn" : "work"}>
-      <LoaderCircle size={13} strokeWidth={2.5} className="desk-spin" aria-hidden />
-      <span className="truncate">
-        {dnd && errand.until_at ? `дверь закрыта ${untilLine(errand.until_at)}` : eta ? eta : "в работе"}
-      </span>
-    </span>
-  );
-}
-
-/** Who has it: their circle and name, when they took it; nobody yet — an empty seat. */
-function Taker({ errand, now }: { errand: Errand; now: Date }) {
-  if (!errand.claimed_by) {
-    return (
-      <span className="flex min-w-0 items-center gap-2 text-[13px] leading-[18px] text-muted">
-        <span aria-hidden className="errands-seat" />
-        <span className="truncate">никто</span>
-      </span>
-    );
-  }
-  const name = shortName(errand.claimed?.full_name ?? "") || "Секретарь";
-  return (
-    <span className="flex min-w-0 items-center gap-2">
-      <PersonFace id={errand.claimed_by} name={errand.claimed?.full_name ?? name} size={24} ring="ok" />
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[13px] font-medium leading-[18px]">{name}</span>
-        {errand.accepted_at ? (
-          <span className="truncate text-[12px] leading-4 text-muted">
-            взяли <When>{humanAqtobe(new Date(errand.accepted_at), now).replace(/^сегодня /, "в ")}</When>
-          </span>
-        ) : null}
-      </span>
-    </span>
-  );
-}
-
-function RowMoves({ errand, meId, onCancel }: { errand: Errand; meId: string; onCancel: (errand: Errand) => void }) {
-  const link = useErrandLink();
-  const busy = link.isPending && link.variables?.id === errand.id;
-  const answer = (text: string) => link.mutate({ fn: "errand_answer", id: errand.id, text });
-  if (asksDirector(errand) && isYesNo(errand.question ?? "")) {
-    return (
-      <span className="flex items-center justify-end gap-1">
-        <MiniButton label="Да" main disabled={busy} onPress={() => answer("Да")} testId="desk-errand-row-yes" />
-        <MiniButton label="Нет" disabled={busy} onPress={() => answer("Нет")} testId="desk-errand-row-no" />
-      </span>
-    );
-  }
-  if (!canCancel(errand, meId)) return null;
-  return (
-    <button
-      type="button"
-      className="errands-cancel desk-focus"
-      data-urgent={errand.urgent ? "" : undefined}
-      title="Отменить заявку · клавиша X, когда она открыта"
-      onClick={(event) => {
-        // the row's click would open the panel for what is leaving the list
-        event.stopPropagation();
-        onCancel(errand);
-      }}
-      data-testid="desk-errand-cancel"
-    >
-      {cancelWord(errand)}
-    </button>
-  );
-}
-
-/** A request on its way from this computer (D-106): «отправляю…», or kept without network with «Отменить». */
-function PendingLine({ row }: { row: PendingErrand }) {
-  return (
-    <div role="row" className="errands-live-row desk-row" data-pending data-testid="desk-errand-pending">
-      <SceneTile scene={sceneOf({ kind: row.code, label: row.label }, [])} size={30} muted />
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate text-[14px] font-medium leading-5">{row.label}</span>
-        <span className="errands-state" data-tone={row.waiting ? "warn" : "wait"}>
-          {row.waiting ? <CloudOff size={13} strokeWidth={2.5} aria-hidden /> : <LoaderCircle size={13} strokeWidth={2.5} className="desk-spin" aria-hidden />}
-          <span className="truncate">{row.waiting ? "ждёт связи — уйдёт сама" : "отправляю…"}</span>
-        </span>
-      </span>
-      <span className="errands-live-track" />
-      <span className="errands-live-who" />
-      <span />
-      <span className="flex justify-end">
-        {row.waiting ? (
-          <button type="button" className="errands-cancel desk-focus" data-shown onClick={() => cancelAsked(row.id)}>
-            Отменить
-          </button>
-        ) : null}
-      </span>
     </div>
   );
 }
 
+/** The card's own small moves: «Напомнить ещё раз», «Отменить» — always there, never under a hover. */
+function Moves({ errand, now, meId, onCancel }: { errand: Errand; now: Date; meId: string; onCancel: (errand: Errand) => void }) {
+  const link = useErrandLink();
+  const nudge = canNudge(errand, now);
+  const busy = link.isPending && link.variables?.id === errand.id;
+  return (
+    <span className="pult-moves">
+      {nudge ? (
+        <button
+          type="button"
+          className="pult-move desk-focus"
+          disabled={busy}
+          onClick={() => link.mutate({ fn: "errand_nudge", id: errand.id })}
+          title="Секретарям уйдёт ещё один пуш"
+          data-testid="desk-errand-nudge"
+        >
+          Напомнить ещё раз
+        </button>
+      ) : null}
+      {canCancel(errand, meId) ? (
+        <button type="button" className="pult-move desk-focus" onClick={() => onCancel(errand)} title="Отменить заявку · клавиша X, когда она открыта" data-testid="desk-errand-cancel">
+          {cancelWord(errand)}
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+type CardProps = {
+  errand: Errand;
+  now: Date;
+  meId: string;
+  catalogue: readonly SecretaryAction[];
+  chosen: boolean;
+  fresh: boolean;
+  finished: boolean;
+  onOpen: (id: string) => void;
+  onCancel: (errand: Errand) => void;
+};
+
+const openBy = (id: string, onOpen: (id: string) => void) => (event: MouseEvent<HTMLElement>) => {
+  if ((event.target as HTMLElement).closest("button, a, input")) return;
+  onOpen(id);
+};
+
+function TripCard({ errand, now, meId, catalogue, chosen, fresh, finished, onOpen, onCancel }: CardProps) {
+  const waiting = errand.status === "sent";
+  const receiptQuery = useErrandReceipt(errand.id, waiting);
+  // the push's receipt only while nobody has it (принцип 8): «не открывал с 13:20», never «не получил»
+  const receipt = waiting ? receiptLine(receiptQuery.data, now) : null;
+  const figure: { big: string; caption: string; tone: string } = finished ? { big: "Готово", caption: shortName(errand.claimed?.full_name ?? ""), tone: "ok" } : tripFigure(errand, now);
+  // a time far ahead is the card's big figure already: the note does not say it twice
+  const note = [errand.note && errand.note !== errand.label ? errand.note : null, errand.due_at && !isPlanned(errand, now) ? atLine(errand.due_at, now) : null].filter(Boolean).join(" · ");
+  return (
+    <motion.article
+      initial={fresh ? { opacity: 0, y: -12 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
+      transition={ARRIVE}
+      role="listitem"
+      aria-current={chosen ? "true" : undefined}
+      className="pult-trip desk-focus"
+      data-row-key={errand.id}
+      data-status={errand.status}
+      data-finished={finished ? "" : undefined}
+      data-testid="desk-errand-live"
+      onClick={openBy(errand.id, onOpen)}
+    >
+      <header className="pult-trip-head">
+        <ErrandTile errand={errand} catalogue={catalogue} size={36} />
+        <span className="pult-trip-what">
+          <span className="pult-trip-title" title={[errand.label, errand.note].filter(Boolean).join(" · ")}>
+            {errand.label}
+          </span>
+          <span className="pult-trip-note">{note || " "}</span>
+        </span>
+        <span className="pult-trip-figure">
+          <span className="pult-trip-big nums" data-tone={figure.tone}>
+            {figure.big}
+          </span>
+          <span className="pult-trip-caption">{figure.caption}</span>
+        </span>
+      </header>
+      <Track errand={errand} now={now} finished={finished} />
+      <footer className="pult-trip-foot">
+        <span className="pult-trip-receipt" data-tone={receipt?.tone}>
+          {receipt ? receipt.text : ""}
+        </span>
+        {finished ? null : <Moves errand={errand} now={now} meId={meId} onCancel={onCancel} />}
+      </footer>
+    </motion.article>
+  );
+}
+
 /**
- * «Сейчас» of the director (D-174): the live requests as a board — what (its scene's icon, by when,
- * the note), where it stands (asked → taken → done, and the line under it: nobody has it yet and
- * what the push did, the promise, the secretary's question), who has it, how long it waits; the
- * secretary's yes-or-no answered in the row, «Отменить» under the hand. A request asked from here
- * is in the list at once («отправляю…»); one that arrives rises into place.
+ * The director's own «Не беспокоить» on its way (D-175): his door, closed until a time, who holds it,
+ * how long is left as a line that runs down — and «Открыть дверь».
  */
-export function LiveBoard({
-  active,
-  meId,
+function DoorCard({ errand, now, meId, chosen, fresh, onOpen, onCancel }: CardProps) {
+  const figure = tripFigure(errand, now);
+  const who = shortName(errand.claimed?.full_name ?? "");
+  const start = new Date(errand.accepted_at ?? errand.created_at).getTime();
+  const end = errand.until_at ? new Date(errand.until_at).getTime() : start;
+  const left = end > start ? Math.max(0, Math.min(1, (end - now.getTime()) / (end - start))) : 0;
+  return (
+    <motion.article
+      initial={fresh ? { opacity: 0, y: -12 } : false}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.16 } }}
+      transition={ARRIVE}
+      role="listitem"
+      aria-current={chosen ? "true" : undefined}
+      className="pult-trip pult-door desk-focus"
+      data-row-key={errand.id}
+      data-status={errand.status}
+      data-testid="desk-errand-live"
+      onClick={openBy(errand.id, onOpen)}
+    >
+      <header className="pult-trip-head">
+        <SceneTile scene="dnd" size={36} />
+        <span className="pult-trip-what">
+          <span className="pult-trip-title" title={errand.until_at ? `Ваша дверь закрыта ${untilLine(errand.until_at)}` : "Ваша дверь закрыта"}>
+            Ваша дверь закрыта
+          </span>
+          <span className="pult-trip-note">{[errand.until_at ? untilLine(errand.until_at) : null, errand.note && errand.note !== errand.label ? errand.note : "никого не пускают"].filter(Boolean).join(" · ")}</span>
+        </span>
+        <span className="pult-trip-figure">
+          <span className="pult-trip-big nums" data-tone="door">
+            {figure.big}
+          </span>
+          <span className="pult-trip-caption">осталось</span>
+        </span>
+      </header>
+      <span aria-hidden className="pult-door-left" style={{ "--left": left } as CSSProperties}>
+        <i />
+      </span>
+      <footer className="pult-trip-foot">
+        <span className="pult-door-holder">
+          {errand.claimed_by ? <PersonFace id={errand.claimed_by} name={errand.claimed?.full_name ?? who} size={20} /> : null}
+          <span className="truncate">{who ? `держит ${who}` : "держит секретарь"}</span>
+        </span>
+        {canCancel(errand, meId) ? (
+          <span className="pult-moves">
+            <button type="button" className="pult-move desk-focus" onClick={() => onCancel(errand)} title="Снять «Не беспокоить» · клавиша X, когда открыта" data-testid="desk-errand-cancel">
+              Открыть дверь
+            </button>
+          </span>
+        ) : null}
+      </footer>
+    </motion.article>
+  );
+}
+
+/** A request on its way from this computer (D-106): «отправляю…», or kept without network with «Отменить». */
+function PendingTrip({ row }: { row: PendingErrand }) {
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, transition: { duration: 0.12 } }}
+      transition={ARRIVE}
+      role="listitem"
+      className="pult-trip"
+      data-pending
+      data-testid="desk-errand-pending"
+    >
+      <header className="pult-trip-head">
+        <SceneTile scene={sceneOf({ kind: row.code, label: row.label }, [])} size={36} muted />
+        <span className="pult-trip-what">
+          <span className="pult-trip-title">{row.label}</span>
+          <span className="pult-trip-note">{row.note && row.note !== row.label ? row.note : " "}</span>
+        </span>
+        <span className="pult-trip-figure">
+          <span className="pult-trip-big" data-tone={row.waiting ? "warn" : "muted"}>
+            {row.waiting ? <CloudOff size={20} strokeWidth={2.25} aria-hidden /> : <LoaderCircle size={20} strokeWidth={2.25} className="desk-spin" aria-hidden />}
+          </span>
+          <span className="pult-trip-caption">{row.waiting ? "ждёт связи — уйдёт сама" : "отправляю…"}</span>
+        </span>
+      </header>
+      <footer className="pult-trip-foot">
+        <span />
+        {row.waiting ? (
+          <span className="pult-moves">
+            <button type="button" className="pult-move desk-focus" onClick={() => cancelAsked(row.id)}>
+              Отменить
+            </button>
+          </span>
+        ) : null}
+      </footer>
+    </motion.article>
+  );
+}
+
+/**
+ * The cards in the order they were asked, the director's door among them; a request asked from here
+ * is on the board at once («отправляю…»), one that arrives drops into place, one just done stays a
+ * moment in green and leaves for «Только что» (`leaving`).
+ */
+export function TripBoard({
+  trips,
+  leaving,
   now,
+  meId,
   catalogue,
   openId,
   fresh,
   onOpen,
   onCancel,
 }: {
-  active: readonly Errand[];
-  meId: string;
+  trips: readonly Errand[];
+  /** Just done while the screen looks: drawn finished for a moment, then gone. */
+  leaving: readonly Errand[];
   now: Date;
+  meId: string;
   catalogue: readonly SecretaryAction[];
   openId: string | null;
-  /** Requests that arrived while the screen looks (`useArrivals`). */
   fresh: ReadonlySet<string>;
   onOpen: (id: string) => void;
   onCancel: (errand: Errand) => void;
 }) {
   const pending = usePendingErrands((state) => state.pending);
-  if (active.length === 0 && pending.length === 0) return null;
-  const open = (id: string) => (event: MouseEvent<HTMLElement>) => {
-    if ((event.target as HTMLElement).closest("button, a, input")) return;
-    onOpen(id);
-  };
+  const gone = new Set(leaving.map((errand) => errand.id));
+  const cards = [...trips.filter((errand) => !gone.has(errand.id)), ...leaving].sort((a, b) => a.created_at.localeCompare(b.created_at));
+  if (cards.length === 0 && pending.length === 0) return null;
   return (
-    <div role="grid" aria-label="Заявки сейчас" className="errands-card errands-live">
-      <div role="row" className="errands-live-head">
-        <span role="columnheader" className="col-span-2">
-          Что
-        </span>
-        <span role="columnheader" className="errands-live-track">
-          Где
-        </span>
-        <span role="columnheader" className="errands-live-who">
-          У кого
-        </span>
-        <span role="columnheader" className="text-right">
-          Ждёт
-        </span>
-        <span role="columnheader" />
-      </div>
-      {pending.map((row) => (
-        <PendingLine key={row.id} row={row} />
-      ))}
-      {active.map((errand, index) => {
-        const alarm = sceneOf(errand, catalogue) === "security";
-        const late = Boolean(errand.due_at) && new Date(errand.due_at as string) < now;
-        const waited = now.getTime() - new Date(errand.created_at).getTime();
-        const urgency = errand.status !== "sent" ? 0 : waited >= STALE_MS ? 2 : waited >= 3 * 60_000 ? 1 : 0;
-        return (
-          <div
-            key={errand.id}
-            role="row"
-            aria-selected={openId === errand.id}
-            data-row-key={errand.id}
-            data-testid="desk-errand-live"
-            data-status={errand.status}
-            data-asks={asksDirector(errand) ? "" : undefined}
-            data-alarm={alarm ? "" : undefined}
-            data-arrived={fresh.has(errand.id) ? "" : undefined}
-            className="errands-live-row desk-row"
-            style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
-            onClick={open(errand.id)}
-          >
-            <ErrandTile errand={errand} catalogue={catalogue} size={30} />
-            <span role="gridcell" className="flex min-w-0 flex-col">
-              <span className="truncate text-[14px] font-medium leading-5" title={[errand.label, errand.note].filter(Boolean).join(" · ")}>
-                <span className={alarm ? "errands-alarm-word" : undefined}>{alarm ? "Вызови охрану!" : errand.label}</span>
-                {errand.due_at ? (
-                  <span className="font-normal" data-testid="errand-due">
-                    {" · "}
-                    <When overdue={late}>{atLine(errand.due_at, now)}</When>
-                  </span>
-                ) : null}
-                {errand.note ? <span className="font-normal text-muted"> · {errand.note}</span> : null}
-              </span>
-              <StateLine errand={errand} now={now} dnd={sceneOf(errand, catalogue) === "dnd"} />
-            </span>
-            <span role="gridcell" className="errands-live-track">
-              <StageTrack errand={errand} now={now} />
-            </span>
-            <span role="gridcell" className="errands-live-who min-w-0">
-              <Taker errand={errand} now={now} />
-            </span>
-            <span role="gridcell" className="flex justify-end">
-              <WaitClock text={waitedFor(errand, now)} urgency={urgency} />
-            </span>
-            <span role="gridcell" className="flex justify-end">
-              <RowMoves errand={errand} meId={meId} onCancel={onCancel} />
-            </span>
-          </div>
-        );
-      })}
+    <div className="pult-trips" role="list" aria-label="В пути">
+      <AnimatePresence initial={false} mode="popLayout">
+        {cards.map((errand) => {
+          const props: CardProps = {
+            errand,
+            now,
+            meId,
+            catalogue,
+            chosen: openId === errand.id,
+            fresh: fresh.has(errand.id),
+            finished: gone.has(errand.id),
+            onOpen,
+            onCancel,
+          };
+          return errand.status === "accepted" && isDoor(errand, catalogue) && !props.finished ? <DoorCard key={errand.id} {...props} /> : <TripCard key={errand.id} {...props} />;
+        })}
+        {[...pending].reverse().map((row) => (
+          <PendingTrip key={row.id} row={row} />
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

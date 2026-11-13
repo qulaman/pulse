@@ -1,26 +1,23 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
 import { CircleHelp, Clock, ConciergeBell, LoaderCircle, Siren } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 
 import { useCancelErrand } from "@/components/desk/errands/cancel";
+import { ALARM_HOLD_MS, isAlarmAction, useDeskAsk, useHold } from "@/components/desk/errands/useAsk";
 import { cancelWord } from "@/components/desk/errands/words";
 import { MiniButton } from "@/components/desk/tasks/RowMoves";
-import { Menu } from "@/components/desk/ui/Menu";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { When } from "@/components/desk/ui/When";
 import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
-import { toast } from "@/components/ui/Toast";
-import { useCalendar } from "@/lib/calendar/queries";
-import { asksDirector, dndChoices, freeAction, meetingEndOf, myErrandsOf } from "@/lib/desk/home";
+import { asksDirector, myErrandsOf } from "@/lib/desk/home";
 import { loadStateOf, worstLoad } from "@/lib/desk/tasks";
-import { orderFor, rememberSend, usualNote } from "@/lib/errands/habits";
+import { orderFor } from "@/lib/errands/habits";
 import { useErrandLink } from "@/lib/errands/mutations";
-import { askSecretary, cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
-import { errandKeys, useErrandReceipt, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
+import { cancelAsked, usePendingErrands, type PendingErrand } from "@/lib/errands/pending";
+import { useErrandReceipt, useErrands, useSecretaries, useSecretaryActions, waitedFor, type Errand, type SecretaryPerson } from "@/lib/errands/queries";
 import { absenceLine, atLine, etaLeftMin, etaLine, isAway, isYesNo, sceneOfAction, untilLine } from "@/lib/errands/scene";
 import { shortName } from "@/lib/people/names";
 import { useNow } from "@/lib/pulse/queries";
@@ -28,7 +25,6 @@ import type { SecretaryAction } from "@/lib/settings";
 import type { Me } from "@/lib/tasks/queries";
 import { receiptLine } from "@/lib/tasks/receipts";
 
-import { askAfterWindow } from "./ask";
 import { SCENE_ICON, SCENE_INK } from "@/components/desk/errands/look";
 
 import { INK, Live, Mark, Titled } from "./look";
@@ -47,8 +43,6 @@ function ActionSign({ action }: { action: SecretaryAction }) {
   return <Mark icon={SCENE_ICON[scene]} ink={SCENE_INK[scene] ?? "ok"} size={15} />;
 }
 
-/** «Охрана» goes on a hold of two seconds, as on the phone (D-101): never one stray click away. */
-const ALARM_HOLD_MS = 2_000;
 /** How many of the director's requests stand before «…ещё N». */
 const SHOWN = 5;
 /** Where the catalogue is set: «Настройки → Программа → Кнопки секретаря». */
@@ -56,7 +50,7 @@ const CATALOGUE_HREF = "/desk/settings?tab=app";
 
 const NO_ACTIONS: SecretaryAction[] = [];
 const NO_ERRANDS: Errand[] = [];
-const isAlarm = (action: SecretaryAction) => sceneOfAction(action) === "security";
+const isAlarm = isAlarmAction;
 
 /**
  * «Секретарь» on the desk's home (D-164): the phone's secretary desk — the company's whole catalogue
@@ -107,28 +101,18 @@ export function HomeSecretary({ me }: { me: Me }) {
 }
 
 function Desk({ me, people, now }: { me: Me; people: readonly SecretaryPerson[]; now: Date }) {
-  const queryClient = useQueryClient();
   const catalogue = useSecretaryActions();
   const errands = useErrands();
-  const calendar = useCalendar();
   const pending = usePendingErrands((state) => state.pending);
+  // the ask of the desk, one with the keypad of «Заявки» (D-175): the window, the spans, the hold
+  const asks = useDeskAsk();
   const actions = catalogue.data ?? NO_ACTIONS;
   // the order of this part of the day, decided once per part (D-106): a word never jumps under the mouse
   const ordered = useMemo(() => orderFor(actions, isAlarm), [actions]);
-  const usual = useMemo(() => new Map(actions.map((action) => [action.code, isAlarm(action) ? null : usualNote(action.code)])), [actions]);
-  const absence = absenceLine(people, now);
-  const meetingEnd = meetingEndOf(calendar.data ?? [], now);
   const mine = useMemo(() => myErrandsOf(errands.data ?? NO_ERRANDS, me.userId), [errands.data, me.userId]);
   const shown = mine.slice(0, SHOWN);
   const more = mine.length - shown.length;
   const load = worstLoad([loadStateOf(catalogue), loadStateOf(errands)]);
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: errandKeys.root });
-
-  const ask = (action: SecretaryAction | ReturnType<typeof freeAction>, note: string | null, untilMin: number | null = null) =>
-    askAfterWindow({ action, note, untilMin, absence, onSent: refresh });
-
-  // «Не беспокоить» asks for how long: a menu under its word
-  const [dnd, setDnd] = useState<{ action: SecretaryAction; anchor: HTMLElement } | null>(null);
 
   return (
     <>
@@ -161,24 +145,14 @@ function Desk({ me, people, now }: { me: Me; people: readonly SecretaryPerson[];
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5" data-testid="home-secretary-catalogue">
             {ordered.map((action) =>
               isAlarm(action) ? (
-                <AlarmWord
-                  key={action.code}
-                  action={action}
-                  onSend={() => {
-                    rememberSend(action.code, null);
-                    // the phone's alarm: at once, «Отменить» in the toast, «Ложная тревога» in its row (D-99)
-                    askSecretary(action, null, refresh);
-                  }}
-                />
+                // the phone's alarm: at once, «Отменить» in the toast, «Ложная тревога» in its row (D-99)
+                <AlarmWord key={action.code} action={action} onSend={() => asks.alarm(action)} />
               ) : (
                 <button
                   key={action.code}
                   type="button"
-                  onClick={(event) => {
-                    if (sceneOfAction(action) === "dnd") setDnd({ action, anchor: event.currentTarget });
-                    else ask(action, usual.get(action.code) ?? null);
-                  }}
-                  title={sceneOfAction(action) === "dnd" ? "Выбрать, на сколько" : `Отправлю через 5 с — успеете отменить${usual.get(action.code) ? ` · как обычно: ${usual.get(action.code)}` : ""}`}
+                  onClick={(event) => asks.press(action, event.currentTarget)}
+                  title={sceneOfAction(action) === "dnd" ? "Выбрать, на сколько" : `Отправлю через 5 с — успеете отменить${asks.usual(action.code) ? ` · как обычно: ${asks.usual(action.code)}` : ""}`}
                   aria-haspopup={sceneOfAction(action) === "dnd" ? "menu" : undefined}
                   className="desk-word desk-focus inline-flex max-w-full items-baseline gap-1.5 text-[14px] leading-5"
                   data-testid="home-secretary-ask"
@@ -186,13 +160,13 @@ function Desk({ me, people, now }: { me: Me; people: readonly SecretaryPerson[];
                 >
                   <ActionSign action={action} />
                   <span className="truncate">{action.label}</span>
-                  {usual.get(action.code) ? <span className="truncate text-[12px] text-muted">· {usual.get(action.code)}</span> : null}
+                  {asks.usual(action.code) ? <span className="truncate text-[12px] text-muted">· {asks.usual(action.code)}</span> : null}
                 </button>
               ),
             )}
           </div>
         )}
-        <OwnWords onSend={(words) => ask(freeAction(words), words)} />
+        <OwnWords onSend={asks.own} />
         {pending.map((row) => (
           <PendingRow key={row.id} row={row} />
         ))}
@@ -205,24 +179,7 @@ function Desk({ me, people, now }: { me: Me; people: readonly SecretaryPerson[];
           </Link>
         ) : null}
       </div>
-      <Menu
-        open={dnd !== null}
-        onClose={() => setDnd(null)}
-        anchor={dnd?.anchor ?? null}
-        align="start"
-        width={260}
-        label={dnd?.action.label}
-        items={
-          dnd
-            ? dndChoices(meetingEnd, now).map((choice) => ({
-                key: choice.key,
-                label: choice.label,
-                // the toast and the row say for how long; the server takes the span itself (until_min)
-                onSelect: () => ask({ ...dnd.action, label: `${dnd.action.label} ${choice.label.charAt(0).toLowerCase()}${choice.label.slice(1)}` }, choice.note, choice.untilMin),
-              }))
-            : []
-        }
-      />
+      {asks.menu}
     </>
   );
 }
@@ -295,45 +252,11 @@ function OwnWords({ onSend }: { onSend: (words: string) => void }) {
  * as the phone's button does; a click or a key alone only says how.
  */
 function AlarmWord({ action, onSend }: { action: SecretaryAction; onSend: () => void }) {
-  const [holding, setHolding] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sent = useRef(false);
-  const stop = () => {
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = null;
-    setHolding(false);
-  };
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
+  const { holding, handlers } = useHold(onSend, action.label);
   return (
     <button
       type="button"
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        sent.current = false;
-        setHolding(true);
-        timer.current = setTimeout(() => {
-          timer.current = null;
-          sent.current = true;
-          setHolding(false);
-          onSend();
-        }, ALARM_HOLD_MS);
-      }}
-      onPointerUp={stop}
-      onPointerLeave={stop}
-      onPointerCancel={stop}
-      onClick={() => {
-        if (sent.current) {
-          sent.current = false;
-          return;
-        }
-        toast(`«${action.label}» — удержите 2 секунды: от случайного клика не уходит`);
-      }}
-      onContextMenu={(event) => event.preventDefault()}
+      {...handlers}
       title="Удержите 2 секунды — уйдёт сразу"
       aria-label={`${action.label}: удержите две секунды, чтобы отправить`}
       className="desk-focus relative inline-flex select-none items-baseline gap-1.5 text-[14px] font-medium leading-5"

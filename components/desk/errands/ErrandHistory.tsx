@@ -2,11 +2,10 @@
 
 import { Heart } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DataGrid, type Column } from "@/components/desk/ui/DataGrid";
 import { EmptyState } from "@/components/desk/ui/EmptyState";
-import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
 import { SearchField, SegmentTabs, Select, Toolbar } from "@/components/desk/ui/Toolbar";
 import { TONE_VAR } from "@/components/desk/ui/tone";
@@ -15,11 +14,13 @@ import { Button } from "@/components/ui/Button";
 import { Bone, SkeletonGroup } from "@/components/ui/Skeleton";
 import { toast } from "@/components/ui/Toast";
 import { humanAqtobe } from "@/lib/ai/time";
-import { parseRange, rowsLeft, type DayRange } from "@/lib/desk/archive";
+import { parseRange, rangeWords, rowsLeft, type DayRange } from "@/lib/desk/archive";
 import { loadStateOf } from "@/lib/desk/tasks";
-import { CLOSED_ERRANDS, isActive, useErrandArchive, useErrandCounts, useSecretaries, type ClosedErrandStatus, type Errand, type ErrandFilter } from "@/lib/errands/queries";
+import { CLOSED_ERRANDS, isActive, useErrandArchive, useSecretaries, type ClosedErrandStatus, type Errand, type ErrandFilter } from "@/lib/errands/queries";
 import { atLine } from "@/lib/errands/scene";
+import { doneSpanMinutes, spanWords } from "@/lib/errands/stats";
 import { shortName } from "@/lib/people/names";
+import { pluralRu } from "@/lib/tasks/status-text";
 import type { SecretaryAction } from "@/lib/settings";
 
 import { DateRangeField } from "../tasks/DateRange";
@@ -77,6 +78,8 @@ export function ErrandWord({ errand, taker = true, compact = false }: { errand: 
 
 type Show = "all" | ClosedErrandStatus;
 
+const lowerFirst = (text: string) => (text ? text.charAt(0).toLowerCase() + text.slice(1) : text);
+
 const SHOW_WORD: Record<ClosedErrandStatus, string> = { done: "Готово", declined: "Отказ", cancelled: "Отменено" };
 
 /**
@@ -93,6 +96,7 @@ export function ErrandHistory({
   now,
   pointsOn,
   catalogue,
+  aside,
 }: {
   viewer: "director" | "secretary";
   meId: string;
@@ -101,6 +105,8 @@ export function ErrandHistory({
   now: Date;
   pointsOn: boolean;
   catalogue: readonly SecretaryAction[];
+  /** Beside the table, under the toolbar: the director's thirty days (D-175). */
+  aside?: ReactNode;
 }) {
   const director = viewer === "director";
   const params = useSearchParams();
@@ -117,13 +123,17 @@ export function ErrandHistory({
   const filter: ErrandFilter = { range, claimed, text: query };
   const live = Boolean(meId);
   const archive = useErrandArchive(filter, show === "all" ? null : show, live);
-  const counts = useErrandCounts(filter, live);
   const secretaries = useSecretaries(director);
   const load = loadStateOf(archive.query);
 
   const rows = archive.rows;
-  const whole = counts ? CLOSED_ERRANDS.reduce((sum, status) => sum + counts[status], 0) : undefined;
   const left = rowsLeft(archive.total, rows.length);
+  // one count, and it names its period (D-175): «42 заявки · за всё время» never stands beside the thirty days' «6» unexplained
+  const period = range ? lowerFirst(rangeWords(range, now)) : "за всё время";
+  const shown =
+    archive.total === null
+      ? " "
+      : `${left > 0 ? `${rows.length} из ${archive.total}` : archive.total} ${pluralRu(archive.total, ["заявка", "заявки", "заявок"])} · ${period}`;
   const narrowed = show !== "all" || Boolean(who) || Boolean(query) || Boolean(range);
   // a person's id, with the name to show: who works here, and whoever took a request on screen
   const takers = useMemo(() => {
@@ -171,6 +181,24 @@ export function ErrandHistory({
       sort: (a, b) => a.created_at.localeCompare(b.created_at),
       render: (e) => <When className="text-muted">{humanAqtobe(new Date(e.created_at), now)}</When>,
     },
+    {
+      key: "took",
+      title: "За сколько",
+      width: "112px",
+      align: "right",
+      // asked → «готово»: the director's actual wait; nothing to measure for the rest
+      // the unmeasured (declined, cancelled) after the measured, in a stable order among themselves
+      sort: (a, b) => {
+        const x = doneSpanMinutes(a);
+        const y = doneSpanMinutes(b);
+        if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+        return x - y;
+      },
+      render: (e) => {
+        const span = doneSpanMinutes(e);
+        return <span className={`nums ${span === null ? "text-muted" : ""}`}>{spanWords(span)}</span>;
+      },
+    },
     ...(director
       ? ([
           {
@@ -193,12 +221,11 @@ export function ErrandHistory({
   ];
 
   return (
-    <section className="flex min-w-0 flex-col gap-1" data-testid="desk-errands-history">
-      <SectionLabel count={whole}>{director ? "История" : "Мои заявки"}</SectionLabel>
+    <section className="flex min-w-0 flex-col gap-3" data-testid="desk-errands-history">
       <Toolbar
         end={
-          <span className="nums text-[13px] leading-4 text-muted" data-testid="desk-errands-shown">
-            {archive.total === null ? " " : left > 0 ? `${rows.length} из ${archive.total}` : archive.total}
+          <span className="nums whitespace-nowrap text-[13px] leading-4 text-muted" data-testid="desk-errands-shown">
+            {shown}
           </span>
         }
       >
@@ -206,10 +233,7 @@ export function ErrandHistory({
           aria-label="Чем закончилась"
           value={show}
           onChange={setShow}
-          items={[
-            { value: "all", label: "Все", count: whole },
-            ...CLOSED_ERRANDS.map((status) => ({ value: status, label: SHOW_WORD[status], count: counts?.[status] })),
-          ]}
+          items={[{ value: "all", label: "Все" }, ...CLOSED_ERRANDS.map((status) => ({ value: status, label: SHOW_WORD[status] }))]}
         />
         {director ? (
           <Select aria-label="Кто" value={who} onChange={(event) => setWho(event.target.value)} className="w-[164px]" data-testid="desk-errands-who">
@@ -225,55 +249,60 @@ export function ErrandHistory({
         <DateRangeField value={range} onChange={setRange} now={now} />
         <SearchField ref={search} value={query} onChange={setQuery} placeholder="Что просили  ·  F" width={172} aria-label="Поиск по заявкам" />
       </Toolbar>
-      {archive.busy && rows.length === 0 ? (
-        <SkeletonGroup grow>
-          <Bone h={34} />
-          <Bone h={34} className="mt-px" />
-          <Bone h={34} className="mt-px" />
-        </SkeletonGroup>
-      ) : load.kind === "failed" ? (
-        <LoadFailure what="историю заявок" offline={load.offline} busy={archive.query.isFetching} onRetry={() => void archive.query.refetch()} />
-      ) : (
-        <DataGrid
-          aria-label="Закрытые заявки"
-          columns={columns}
-          rows={rows}
-          rowKey={(e) => e.id}
-          selectedKey={openId}
-          onSelect={(e) => onOpen(e.id)}
-          empty={
-            narrowed ? (
-              <EmptyState
-                title="Таких заявок не нашлось"
-                hint="Фильтры — над таблицей"
-                action={
-                  <Button size="sm" variant="secondary" onClick={reset}>
-                    Показать все
-                  </Button>
-                }
-              />
-            ) : director ? (
-              <EmptyState title="Заявок ещё не было" hint="«Кофе», «Чай», «Не беспокоить» — в один клик сверху" />
-            ) : (
-              <EmptyState title="Закрытых заявок пока нет" hint="Сюда лягут заявки, которые вы брали" />
-            )
-          }
-        />
-      )}
-      <LoadNote state={load.kind === "stale" ? load : { kind: "ready" }} failed="" now={now} onRetry={() => void archive.query.refetch()} />
-      {left > 0 ? (
-        <div className="mt-3 flex justify-center">
-          <Button
-            variant="secondary"
-            size="sm"
-            loading={archive.loadingMore}
-            onClick={() => void archive.more().catch(() => toast("Не получилось загрузить. Попробуйте ещё раз"))}
-            data-testid="desk-errands-more"
-          >
-            Показать ещё · {left}
-          </Button>
+      <div className="pult-history-body" data-aside={aside ? "" : undefined}>
+        <div className="flex min-w-0 flex-col gap-1">
+          {archive.busy && rows.length === 0 ? (
+            <SkeletonGroup grow>
+              <Bone h={34} />
+              <Bone h={34} className="mt-px" />
+              <Bone h={34} className="mt-px" />
+            </SkeletonGroup>
+          ) : load.kind === "failed" ? (
+            <LoadFailure what="историю заявок" offline={load.offline} busy={archive.query.isFetching} onRetry={() => void archive.query.refetch()} />
+          ) : (
+            <DataGrid
+              aria-label="Закрытые заявки"
+              columns={columns}
+              rows={rows}
+              rowKey={(e) => e.id}
+              selectedKey={openId}
+              onSelect={(e) => onOpen(e.id)}
+              empty={
+                narrowed ? (
+                  <EmptyState
+                    title="Таких заявок не нашлось"
+                    hint="Фильтры — над таблицей"
+                    action={
+                      <Button size="sm" variant="secondary" onClick={reset}>
+                        Показать все
+                      </Button>
+                    }
+                  />
+                ) : director ? (
+                  <EmptyState title="Закрытых заявок ещё нет" hint="Попросить — кнопками на «Сейчас»" />
+                ) : (
+                  <EmptyState title="Закрытых заявок пока нет" hint="Сюда лягут заявки, которые вы брали" />
+                )
+              }
+            />
+          )}
+          <LoadNote state={load.kind === "stale" ? load : { kind: "ready" }} failed="" now={now} onRetry={() => void archive.query.refetch()} />
+          {left > 0 ? (
+            <div className="mt-3 flex justify-center">
+              <Button
+                variant="secondary"
+                size="sm"
+                loading={archive.loadingMore}
+                onClick={() => void archive.more().catch(() => toast("Не получилось загрузить. Попробуйте ещё раз"))}
+                data-testid="desk-errands-more"
+              >
+                Показать ещё · {left}
+              </Button>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+        {aside}
+      </div>
     </section>
   );
 }

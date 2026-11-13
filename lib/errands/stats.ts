@@ -48,3 +48,51 @@ export function humanMinutes(minutes: number | null): string {
 export function unclaimedCount(rows: readonly Errand[]): number {
   return rows.filter((row) => !row.claimed_by && (row.status === "cancelled" || row.status === "sent")).length;
 }
+
+/** Asked → «готово» of one request, in minutes; null — not done (or a clock that went backwards). */
+export function doneSpanMinutes(row: Pick<Errand, "status" | "done_at" | "created_at">): number | null {
+  if (row.status !== "done" || !row.done_at) return null;
+  const minutes = (new Date(row.done_at).getTime() - new Date(row.created_at).getTime()) / 60_000;
+  return minutes >= 0 ? minutes : null;
+}
+
+/**
+ * The usual «попросил → готово» (D-175): the median, as «Команда» says «обычно» — one coffee
+ * forgotten for an hour does not make every coffee slow. Minutes, unrounded; null with nothing done.
+ */
+export function medianDoneMinutes(rows: readonly Errand[]): number | null {
+  const spans = rows.map(doneSpanMinutes).filter((minutes): minutes is number => minutes !== null);
+  return median(spans);
+}
+
+/** The middle value; null for nothing. */
+export function median(values: readonly number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+/** A span said honestly: «< 1 мин» under a minute (never «0 мин»), «—» without data, else `humanMinutes`. */
+export function spanWords(minutes: number | null): string {
+  if (minutes === null) return "—";
+  if (minutes < 1) return "< 1 мин";
+  return humanMinutes(Math.round(minutes));
+}
+
+export type ErrandOutcomes = { asked: number; taken: number; done: number; declined: number; cancelled: number; unclaimed: number };
+
+/**
+ * How a period's requests ended, every number from the same rows (D-175): asked, taken by
+ * somebody, done, refused, taken back — and what nobody took, the one figure worth fixing.
+ */
+export function outcomesOf(rows: readonly Errand[]): ErrandOutcomes {
+  return {
+    asked: rows.length,
+    taken: rows.filter((row) => Boolean(row.claimed_by)).length,
+    done: rows.filter((row) => row.status === "done").length,
+    declined: rows.filter((row) => row.status === "declined").length,
+    cancelled: rows.filter((row) => row.status === "cancelled").length,
+    unclaimed: unclaimedCount(rows),
+  };
+}
