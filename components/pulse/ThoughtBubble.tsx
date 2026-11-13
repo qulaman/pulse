@@ -54,7 +54,12 @@ export function ThoughtBubble({
       initial={{ opacity: 0, scale: 0.85, y: drop + 8 }}
       animate={{ opacity: 1, scale: 1, y: drop }}
       exit={{ opacity: 0, scale: 0.9, y: drop + 4, transition: { duration: 0.18 } }}
-      transition={{ type: "spring", stiffness: 300, damping: 22, y: FACE_SPRING }}
+      // the face's band can move at once (a ball's card taking its room on Пульс): the thought
+      // glides after it on the face's spring, as the face does by its own `layout`. The band moves
+      // when the face changes its size, so only that change measures the thought
+      layout="position"
+      layoutDependency={faceSize}
+      transition={{ type: "spring", stiffness: 300, damping: 22, y: FACE_SPRING, layout: FACE_SPRING }}
       className="absolute left-1/2 z-10 w-[min(88vw,320px)] -translate-x-1/2 text-left"
       style={{ bottom: `calc(50% + ${FACE / 2 + 26}px)`, transformOrigin: "60% 100%" }}
       data-testid="thought"

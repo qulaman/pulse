@@ -1,5 +1,20 @@
 /* The card a ball opens on Пульс (D-166, PanelCard.tsx). */
 
+/* wider than the board's padding by 16 px a side; it comes up from below its own height on the
+   object spring written out for CSS — the compositor runs it, so the frame of the tap, busy with
+   the board, does not hold it back. `translate` and not `transform`: the grip's drag and the way
+   out move `transform` (framer's `y`), and the two add up */
+.card {
+  translate: -16px 0;
+  animation: panel-rise var(--t-object) var(--ease-object);
+}
+
+@keyframes panel-rise {
+  from {
+    translate: -16px 100%;
+  }
+}
+
 /* frosted, a shade above the board: the cards inside stay solid objects on it; the glass and the
    shadow are static — only the card's transform moves (D-131) */
 .surface {

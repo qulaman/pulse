@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 import styles from "./HazeWords.module.css";
 
 /** However long the line, the last word is in sight by then. */
@@ -8,8 +10,9 @@ const STEP_S = 0.04;
  * A line said by the assistant: each word comes out of a light haze a moment after the one
  * before it, as a written answer appears (D-166). The text is all there from the first frame —
  * for a screen reader, a copy and a test it is one plain string; only its look arrives.
+ * Memoised: the board redraws on every tap (a ball opened), the words it says stay the same.
  */
-export function HazeWords({ text, delay = 0 }: { text: string; delay?: number }) {
+export const HazeWords = memo(function HazeWords({ text, delay = 0 }: { text: string; delay?: number }) {
   const words = text.split(/\s+/).filter(Boolean);
   const step = Math.min(STEP_S, WHOLE_S / Math.max(1, words.length));
   return (
@@ -24,4 +27,4 @@ export function HazeWords({ text, delay = 0 }: { text: string; delay?: number })
       ))}
     </>
   );
-}
+});

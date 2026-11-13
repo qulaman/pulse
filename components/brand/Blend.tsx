@@ -42,6 +42,36 @@ function isRest(m: DOMMatrix): boolean {
 }
 
 /**
+ * The writes of the blends of one commit. Every blend reads where its body is first, and the
+ * animations start together once the commit is over (a microtask: before the frame is drawn, so
+ * the pose never shows cut). A read after another blend's write made the browser work out the
+ * whole screen's styles again, once per blend, in the middle of the commit — on Пульс that was
+ * the tap's own frame (a ball opened, the face took up its work).
+ */
+let due: Blend[] | null = null;
+
+function afterReads(blend: Blend): void {
+  if (!due) {
+    due = [];
+    queueMicrotask(playDue);
+  }
+  due.push(blend);
+}
+
+function playDue(): void {
+  const list = due ?? [];
+  due = null;
+  for (const blend of list) {
+    try {
+      blend.play();
+    } catch (error) {
+      // one body failing to blend leaves the others theirs
+      reportError(error);
+    }
+  }
+}
+
+/**
  * A motion that is cut off does not jump. `k` names the animation of the one element inside (its
  * `animation` string): when it changes, CSS starts the new animation from its first frame, and the
  * body — tilted to the ear, in the air of a hop, halfway through a roll — would be back at the start
@@ -65,12 +95,23 @@ export class Blend extends Component<{
 }> {
   private readonly node = createRef<SVGGElement & HTMLSpanElement>();
   private running: Animation[] = [];
+  /** what componentDidUpdate measured, waiting for the end of the commit to start */
+  private pending: (() => void) | null = null;
+
+  /** Starts the blend measured last — at the end of its commit, or sooner if the body changes again. */
+  play(): void {
+    const write = this.pending;
+    this.pending = null;
+    write?.();
+  }
 
   getSnapshotBeforeUpdate(previous: { k: string }): DOMMatrix | null {
     if (previous.k === this.props.k) return null;
     const self = this.node.current;
     const inner = self?.firstElementChild;
     if (!self || !inner || reducedMotion()) return null;
+    // a second change before the first one's blend has started: that blend is part of the body too
+    this.play();
     // a blend still under way is part of where the body is now
     return matrixOf(self).multiply(matrixOf(inner));
   }
@@ -80,41 +121,49 @@ export class Blend extends Component<{
     const self = this.node.current;
     const inner = self?.firstElementChild;
     if (!self || !inner) return;
-    for (const animation of this.running) animation.cancel();
-    this.running = [];
-    // the new animation's first frame (reading it starts the animation at its time zero)
+    // the new animation's first frame (reading it starts the animation at its time zero); the
+    // blend running on the wrapper does not touch it, so it is cancelled with the writes below
     const start = matrixOf(inner);
     const invertible = Math.abs(start.a * start.d - start.b * start.c) > 1e-4;
     const timing = this.props.timing ?? BODY_BLEND;
     const lead = this.props.lead;
     const split = lead !== undefined && invertible && !isRest(start);
     const from = invertible && !split ? was.multiply(start.inverse()) : was;
-    if (!isRest(from)) this.running.push(self.animate([{ transform: from.toString() }, { transform: "none" }], { duration: timing.duration, easing: easing(timing) }));
-    if (split) {
-      this.running.push(
-        self.animate([{ transform: start.inverse().toString() }, { transform: "none" }], { duration: lead.duration, easing: easing(lead), composite: "add" }),
-      );
-    }
     // cut while it showed its back (a spin, mirrored): it turns to the front on the way back, and
     // what only the front has (`data-front` — the eyes and the mouth) comes back once it is edge-on
-    if (from.a * from.d - from.b * from.c < 0 && from.a < 0) {
-      const edge = timeAt(timing, -from.a / (1 - from.a));
-      for (const front of self.querySelectorAll("[data-front]")) {
+    const mirrored = from.a * from.d - from.b * from.c < 0 && from.a < 0;
+    const fronts = mirrored ? Array.from(self.querySelectorAll("[data-front]")) : [];
+    this.pending = () => {
+      for (const animation of this.running) animation.cancel();
+      this.running = [];
+      if (!isRest(from)) this.running.push(self.animate([{ transform: from.toString() }, { transform: "none" }], { duration: timing.duration, easing: easing(timing) }));
+      if (split) {
         this.running.push(
-          front.animate(
-            [
-              { opacity: 0, offset: 0 },
-              { opacity: 0, offset: edge },
-              { opacity: 1, offset: edge },
-            ],
-            { duration: timing.duration },
-          ),
+          self.animate([{ transform: start.inverse().toString() }, { transform: "none" }], { duration: lead.duration, easing: easing(lead), composite: "add" }),
         );
       }
-    }
+      if (mirrored) {
+        const edge = timeAt(timing, -from.a / (1 - from.a));
+        for (const front of fronts) {
+          this.running.push(
+            front.animate(
+              [
+                { opacity: 0, offset: 0 },
+                { opacity: 0, offset: edge },
+                { opacity: 1, offset: edge },
+              ],
+              { duration: timing.duration },
+            ),
+          );
+        }
+      }
+    };
+    afterReads(this);
   }
 
   componentWillUnmount() {
+    // unmounted before its commit ended: nothing to start
+    this.pending = null;
     for (const animation of this.running) animation.cancel();
   }
 

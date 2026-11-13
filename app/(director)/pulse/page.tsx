@@ -956,9 +956,14 @@ export default function PulsePage() {
 
         {/* under the head: the balls in a row, then the cards — or, with a ball open, the ball's card
             up from the bottom edge (D-166). The row is outside the card and the scroller, so a ball
-            walking down from the orbit is never clipped on its way in. */}
+            walking down from the orbit is never clipped on its way in.
+            A ball's card takes its room at once: the face, the words, the balls and a thought glide
+            from where they stood by transform (their framer `layout`), while the card comes up on
+            the compositor. Glided by CSS, the band resized the frosted card every frame of that.
+            A phrase in hand glides it by CSS (D-146) — in, and out while the face throws it; a
+            phrase dropped gives the room back at once, the face gliding by its `layout`. */}
         <div
-          className="flex min-h-0 flex-1 flex-col transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none"
+          className={`flex min-h-0 flex-1 flex-col${phraseInHand ? " transition-[flex-grow] duration-300 ease-out motion-reduce:transition-none" : ""}`}
           style={{ flexGrow: crowded ? CROWDED_GROW : cardOpen ? PANEL_GROW : 1 }}
           data-band="cards"
           data-crowded={crowded ? "" : undefined}

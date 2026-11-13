@@ -1,6 +1,6 @@
 "use client";
 
-import { motion, useDragControls, type PanInfo } from "motion/react";
+import { animate, motion, useDragControls, useIsPresent, type PanInfo, type TargetAndTransition } from "motion/react";
 import { useEffect, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
 
 import { springs } from "@/lib/design/tokens";
@@ -27,6 +27,13 @@ const FLICK = 650;
  * The card reaches the screen's bottom edge, under the floating tab bar: it is wider than the
  * board's padding by `translate` (not margins, which a popped-out leaving card would add to its
  * measured place) and taller than the band by the tab bar's room.
+ *
+ * Nothing of its motion waits for the page's script. The tap's own frame is busy (the board
+ * redrawn, the face taking up its work): the card comes up by a CSS animation on the object
+ * spring, which the compositor runs, and goes down in pixels, which framer hands to the browser
+ * too («100%» it could only move from script, a frame at a time). What is inside is drawn in the
+ * tap's frame with the rest: drawn a frame later, it held up the face and the balls, which glide by
+ * script, in the middle of their way.
  */
 export function PanelCard({
   ref,
@@ -48,6 +55,21 @@ export function PanelCard({
 }) {
   const controls = useDragControls();
   const scroller = useRef<HTMLDivElement>(null);
+  // A ball tapped while the card is still going down keeps the same card (AnimatePresence brings
+  // it back): it comes up to its place. Asked of the element itself — an `animate` target or a `y`
+  // of our own on the card made framer move the way out by script again
+  const present = useIsPresent();
+  const away = useRef(false);
+  useEffect(() => {
+    if (!present) {
+      away.current = true;
+      return;
+    }
+    if (!away.current) return;
+    away.current = false;
+    const card = scroller.current?.parentElement;
+    if (card) animate(card, { y: 0 }, springs.object);
+  }, [present]);
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: 0 });
@@ -80,13 +102,11 @@ export function PanelCard({
       data-testid="panel-card"
       data-panel={panelKey}
       data-receded={receded ? "" : undefined}
-      className="relative z-10 flex min-h-0 flex-1 flex-col"
+      className={`${styles.card} relative z-10 flex min-h-0 flex-1 flex-col`}
       style={CARD}
-      initial={{ y: "100%" }}
-      animate={{ y: 0 }}
-      // the way out gathers speed instead of settling (D-131), from wherever the finger left it
-      exit={{ y: "100%", transition: { duration: 0.24, ease: [0.4, 0, 1, 1] } }}
-      transition={springs.object}
+      // up: `.card` in the module (CSS, the object spring); down: its own height in pixels
+      variants={{ gone: () => goneBy(scroller.current?.parentElement) }}
+      exit="gone"
       drag="y"
       dragListener={false}
       dragControls={controls}
@@ -121,11 +141,20 @@ export function PanelCard({
   );
 }
 
+/** `translate: -16px 0` lives in `.card`, under the rising animation that moves the same property. */
 const CARD: CSSProperties = {
-  translate: "-16px 0",
   width: "calc(100% + 32px)",
   marginBottom: "calc(-1 * var(--tabbar-space))",
 };
+
+/**
+ * The way out gathers speed instead of settling (D-131), from wherever the finger left it, down by
+ * the card's own height. Read when the card starts to leave — the popped-out card has its size
+ * set by then — and in pixels, so framer runs it as a browser animation.
+ */
+function goneBy(card: HTMLElement | null | undefined): TargetAndTransition {
+  return { y: card?.offsetHeight ?? window.innerHeight, transition: { duration: 0.24, ease: [0.4, 0, 1, 1] } };
+}
 
 const RECEDE_T = "opacity 360ms var(--ease-out), filter 360ms var(--ease-out), scale 360ms var(--ease-out)";
 
