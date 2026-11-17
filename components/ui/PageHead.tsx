@@ -17,7 +17,7 @@ type Light = "accent" | "ok" | "warn" | "danger" | "none" | "iris";
 const LIGHTS: Light[] = ["accent", "ok", "warn", "danger", "none", "iris"];
 
 /** The lights of each sky (`.page-sky-blob[data-b]` in globals.css): a state's sky has three. */
-const BLOBS: Record<Light, number> = { accent: 3, ok: 3, warn: 3, danger: 3, none: 1, iris: 4 };
+const BLOBS: Record<Light, number> = { accent: 3, ok: 3, warn: 3, danger: 3, none: 1, iris: 5 };
 
 /** A sky that went out keeps its lights while it fades (the 900 ms crossfade in globals.css). */
 const SKY_FADE_MS = 1000;

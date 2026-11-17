@@ -2773,27 +2773,30 @@ select,
 }
 .page-sky-layer {
   --c: #7b8aa0;
-  --drift: 22s;
-  --breath: 5s;
+  --c2: var(--c);
+  --drift: 16s;
+  --breath: 4s;
   --breathe: sky-breath-calm;
   position: absolute;
   inset: 0;
   opacity: 0;
   visibility: hidden;
   transition: opacity 900ms var(--ease-in-out), visibility 0s linear 900ms;
-  background: radial-gradient(130% 62% at 50% -26%, color-mix(in oklch, var(--c) 12%, transparent), transparent 100%);
+  background: radial-gradient(140% 70% at 50% -22%, color-mix(in oklch, var(--c) 24%, transparent), transparent 100%);
 }
 .page-sky-layer[data-lit] {
   opacity: 1;
   visibility: visible;
   transition: opacity 900ms var(--ease-in-out), visibility 0s;
 }
-/* the state's character: green rests, the brand's teal is steady, amber stirs, red breathes
-   fast and comes up brighter on the breath in — never a blink */
-.page-sky-layer[data-tone="ok"] { --c: var(--ok); --drift: 26s; --breath: 6s; }
-.page-sky-layer[data-tone="accent"] { --c: var(--accent); --drift: 22s; --breath: 5s; }
-.page-sky-layer[data-tone="warn"] { --c: var(--warn); --drift: 18s; --breath: 4.5s; --breathe: sky-breath; }
-.page-sky-layer[data-tone="danger"] { --c: var(--danger); --drift: 14s; --breath: 2.8s; --breathe: sky-breath-deep; }
+/* the state's character: its colour and a neighbour hue of it (`--c2`, the second source) —
+   green into lime, the brand's teal into cyan, amber into orange, red into crimson. Green rests,
+   teal is steady, amber stirs, red breathes fast and comes up brighter on the breath in — never
+   a blink */
+.page-sky-layer[data-tone="ok"] { --c: oklch(0.74 0.21 148); --c2: oklch(0.84 0.2 128); --drift: 17s; --breath: 4.6s; }
+.page-sky-layer[data-tone="accent"] { --c: oklch(0.78 0.15 178); --c2: oklch(0.74 0.15 222); --drift: 15s; --breath: 4s; }
+.page-sky-layer[data-tone="warn"] { --c: oklch(0.8 0.165 75); --c2: oklch(0.7 0.19 50); --drift: 12s; --breath: 3.2s; --breathe: sky-breath; }
+.page-sky-layer[data-tone="danger"] { --c: oklch(0.66 0.23 25); --c2: oklch(0.6 0.25 8); --drift: 9s; --breath: 1.9s; --breathe: sky-breath-deep; }
 /* a head mounted after another — the screen after its skeleton, a tab after a tab — is a new
    sky: its first frame is the light that was up (PageHead's `data-from`, the layer `data-was`),
    and the crossfade above runs from there instead of the new colour switching on. The lights
@@ -2805,8 +2808,9 @@ select,
 }
 
 /* a light: one soft source, its box the ellipse of its gradient. A state's sky has three — a
-   bright core just above the top edge, its halo, a second source on the right: a bright core
-   falling off fast reads as light, a wide dim wash of amber alone reads as brown */
+   bright core just above the top edge, its halo, a second source on the right in the neighbour
+   hue: a bright core falling off fast reads as light, a wide dim wash of amber alone reads as
+   brown */
 .page-sky-blob {
   --a: 30%;
   position: absolute;
@@ -2820,10 +2824,10 @@ select,
 /* scrolled under the glass: the lights hold still (PageHead holds the sky's clock with them) */
 .page-sky[data-glass] .page-sky-blob { animation-play-state: paused; }
 /* how many lights each sky has is `BLOBS` in PageHead.tsx — a rule here for every one of them */
-.page-sky-blob[data-b="1"] { --a: 62%; left: -18%; top: -32%; width: 92%; height: 52%; }
-.page-sky-blob[data-b="2"] { animation-name: sky-drift-2, var(--breathe); --k: 1.27; --kb: 1.3; left: -48%; top: -54%; width: 140%; height: 88%; }
-.page-sky-blob[data-b="3"] { --a: 22%; animation-name: sky-drift-3, var(--breathe); --k: 1.13; --kb: 0.8; left: 31%; top: -48%; width: 110%; height: 68%; }
-.page-sky-layer[data-tone="danger"] .page-sky-blob[data-b="1"] { --a: 68%; }
+.page-sky-blob[data-b="1"] { --a: 86%; left: -16%; top: -30%; width: 96%; height: 60%; }
+.page-sky-blob[data-b="2"] { --a: 40%; animation-name: sky-drift-2, var(--breathe); --k: 1.27; --kb: 1.3; left: -46%; top: -54%; width: 150%; height: 96%; }
+.page-sky-blob[data-b="3"] { --c: var(--c2); --a: 76%; animation-name: sky-drift-3, var(--breathe); --k: 1.13; --kb: 0.8; left: 34%; top: -38%; width: 98%; height: 62%; }
+.page-sky-layer[data-tone="danger"] .page-sky-blob[data-b="1"] { --a: 92%; }
 
 /* the quiet sky of a state at rest: one grey haze drifting slowly, no breath */
 .page-sky-layer[data-tone="none"] { --drift: 30s; --breathe: none; background: none; }
@@ -2836,84 +2840,95 @@ select,
   height: 79%;
 }
 
-/* a screen with no state (D-176): four lights in colours that are no state — the brand's teal,
-   blue, violet, orchid; never green, amber or red (DESIGN §3) — each on its own path and
-   breath, so the colours cross and flow into each other; dimmer than any state's light */
+/* a screen with no state (D-176): five lights along one stretch of the colour wheel — the
+   brand's teal, cyan, blue, violet, magenta, one lightness, full chroma; never green, amber or
+   red (DESIGN §3). Each on its own path and breath across the whole width, so the colours run
+   through each other like a polar light */
 .page-sky-layer[data-tone="iris"] {
-  --c: #8f6bff;
+  --c: oklch(0.6 0.26 298);
   --breathe: sky-breath-iris;
-  background: radial-gradient(130% 62% at 50% -26%, color-mix(in oklch, var(--c) 9%, transparent), transparent 100%);
+  background: radial-gradient(140% 70% at 50% -22%, color-mix(in oklch, var(--c) 26%, transparent), transparent 100%);
 }
 .page-sky-layer[data-tone="iris"] .page-sky-blob {
   animation-duration: calc(var(--drift) * var(--sky-tempo, 1)), calc(var(--breath) * var(--sky-tempo, 1));
 }
 .page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="1"] {
-  --c: var(--accent); --a: 56%; --drift: 17s; --breath: 5.5s;
+  --c: oklch(0.8 0.16 178); --a: 84%; --drift: 11s; --breath: 3.4s;
   animation-name: sky-iris-1, sky-breath-iris;
-  left: -32%; top: -26%; width: 92%; height: 56%;
+  left: -34%; top: -28%; width: 84%; height: 58%;
 }
 .page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="2"] {
-  --c: #4c9dff; --a: 52%; --drift: 23s; --breath: 6.5s;
+  --c: oklch(0.72 0.17 232); --a: 82%; --drift: 14s; --breath: 4.1s;
   animation-name: sky-iris-2, sky-breath-iris;
-  left: 10%; top: -34%; width: 100%; height: 60%;
+  left: 2%; top: -36%; width: 90%; height: 62%;
 }
 .page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="3"] {
-  --c: #8f6bff; --a: 50%; --drift: 29s; --breath: 9.5s;
+  --c: oklch(0.62 0.24 268); --a: 86%; --drift: 17s; --breath: 5.3s;
   animation-name: sky-iris-3, sky-breath-iris;
-  left: 48%; top: -26%; width: 88%; height: 56%;
+  left: 50%; top: -30%; width: 86%; height: 60%;
 }
 .page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="4"] {
-  --c: #e26bd6; --a: 44%; --drift: 31s; --breath: 7.5s;
+  --c: oklch(0.6 0.27 302); --a: 86%; --drift: 13s; --breath: 3.8s;
   animation-name: sky-iris-4, sky-breath-iris;
-  left: -2%; top: -8%; width: 76%; height: 40%;
+  left: 26%; top: -14%; width: 80%; height: 48%;
+}
+.page-sky-layer[data-tone="iris"] .page-sky-blob[data-b="5"] {
+  --c: oklch(0.67 0.27 340); --a: 80%; --drift: 19s; --breath: 4.7s;
+  animation-name: sky-iris-5, sky-breath-iris;
+  left: -12%; top: -6%; width: 70%; height: 42%;
 }
 
-/* paths in % of the light's own box: a state's light wanders about 8 % of the screen, the
+/* paths in % of the light's own box: a state's light wanders about a sixth of the screen, the
    shimmer's lights cross each other's place */
 @keyframes sky-drift-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(6%, 5%) scale(1.05); }
-  50% { transform: translate(9%, -3%) scale(0.97); }
-  75% { transform: translate(2%, -6%) scale(1.03); }
+  25% { transform: translate(12%, 8%) scale(1.1); }
+  50% { transform: translate(18%, -4%) scale(0.92); }
+  75% { transform: translate(5%, -9%) scale(1.06); }
 }
 @keyframes sky-drift-2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  30% { transform: translate(-4%, 4%) scale(1.04); }
-  60% { transform: translate(3%, 6%) scale(0.98); }
-  80% { transform: translate(5%, 1%) scale(1.02); }
+  30% { transform: translate(-8%, 6%) scale(1.08); }
+  60% { transform: translate(6%, 10%) scale(0.95); }
+  80% { transform: translate(10%, 2%) scale(1.04); }
 }
 @keyframes sky-drift-3 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  35% { transform: translate(-8%, 6%) scale(1.06); }
-  70% { transform: translate(-3%, -4%) scale(0.96); }
+  35% { transform: translate(-18%, 10%) scale(1.12); }
+  70% { transform: translate(-7%, -6%) scale(0.9); }
 }
 @keyframes sky-iris-1 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(18%, 8%) scale(1.1); }
-  50% { transform: translate(30%, -4%) scale(0.95); }
-  75% { transform: translate(10%, -8%) scale(1.05); }
+  25% { transform: translate(36%, 12%) scale(1.18); }
+  50% { transform: translate(70%, -4%) scale(0.9); }
+  75% { transform: translate(28%, -10%) scale(1.08); }
 }
 @keyframes sky-iris-2 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-22%, 6%) scale(0.92); }
-  66% { transform: translate(-8%, 10%) scale(1.08); }
+  33% { transform: translate(-36%, 10%) scale(0.86); }
+  66% { transform: translate(34%, 14%) scale(1.16); }
 }
 @keyframes sky-iris-3 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(-16%, 10%) scale(1.06); }
-  50% { transform: translate(-34%, 2%) scale(0.94); }
-  75% { transform: translate(-12%, -6%) scale(1.02); }
+  25% { transform: translate(-30%, 14%) scale(1.12); }
+  50% { transform: translate(-64%, 2%) scale(0.88); }
+  75% { transform: translate(-24%, -8%) scale(1.04); }
 }
 @keyframes sky-iris-4 {
   0%, 100% { transform: translate(0, 0) scale(1); }
-  30% { transform: translate(30%, -10%) scale(1.12); }
-  65% { transform: translate(50%, 6%) scale(0.9); }
+  30% { transform: translate(-46%, -12%) scale(1.2); }
+  65% { transform: translate(40%, 8%) scale(0.86); }
+}
+@keyframes sky-iris-5 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  35% { transform: translate(70%, -16%) scale(1.14); }
+  70% { transform: translate(110%, 10%) scale(0.88); }
 }
 /* breaths run there and back (`alternate`): a period is half a breath */
-@keyframes sky-breath-calm { from { opacity: 0.86; } to { opacity: 1; } }
-@keyframes sky-breath { from { opacity: 0.74; } to { opacity: 1; } }
-@keyframes sky-breath-deep { from { opacity: 0.58; } to { opacity: 1; } }
-@keyframes sky-breath-iris { from { opacity: 0.45; } to { opacity: 1; } }
+@keyframes sky-breath-calm { from { opacity: 0.78; } to { opacity: 1; } }
+@keyframes sky-breath { from { opacity: 0.62; } to { opacity: 1; } }
+@keyframes sky-breath-deep { from { opacity: 0.42; } to { opacity: 1; } }
+@keyframes sky-breath-iris { from { opacity: 0.5; } to { opacity: 1; } }
 /* film grain: a dark gradient on OLED bands into steps without it */
 .page-sky-grain {
   position: absolute;
@@ -3051,6 +3066,8 @@ body:has(.page-sky:not([data-tone="none"]):not([data-tone="iris"])) .status-scre
   --title-from: 8px;
   --title-to: 56px;
   position: relative;
+  /* a soft shade under the words: they stay readable where the sky is at its brightest */
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.32);
   padding: 0 2px;
   padding-right: calc(2px + var(--beside, 0px));
 }
