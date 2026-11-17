@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { Ellipsis } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { useContextMenu, type MenuItem } from "@/components/desk/ui/Menu";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
@@ -10,6 +11,7 @@ import { NoteIcon } from "@/components/notes/icons";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { toast } from "@/components/ui/Toast";
 import { demotedPlace, promotedPlace } from "@/lib/mindboard/branch";
+import { pointToThoughtRefusal } from "@/lib/mindboard/thought";
 import { hasContent, isDrawn, sketchFrom } from "@/lib/mindboard/sketch";
 import { splitList, type SplitPoint } from "@/lib/mindboard/split";
 import { branchesOf } from "@/lib/mindboard/tree";
@@ -43,6 +45,8 @@ export type OutlineActions = {
   sketch: (row: Note) => void;
   /** A pasted list as lines: at the end, after a point, or as sub-points of a point. */
   writeMany: (points: SplitPoint[], at: { parent?: string; after?: string }) => void;
+  /** «В мысли» (D-177): a plain line back to the loose thoughts of «Заметки». */
+  toThought?: (row: Note) => void;
 };
 
 type Props = {
@@ -62,6 +66,12 @@ type Props = {
   actions: OutlineActions;
   /** The board has nothing yet: the first line is ready to be typed. */
   autoStart: boolean;
+  /** Beside the line of a new point: the board's dictaphone (D-177) — one recording, one point. */
+  tail?: ReactNode;
+  /** The words of the line of a new point: «Пункт» while preparing, «Пункт с совещания» in a meeting. */
+  addLabel?: string;
+  /** «Ведущий» (D-177): a narrow column beside the stage — no handles. */
+  compact?: boolean;
 };
 
 type Caret = "start" | "end" | number;
@@ -103,7 +113,7 @@ const releaseBlur = () => {
  * line, the circle ticks, the handle drags a point with its branch (a sub-point within its
  * point), «⋯» and a right click open the line's menu. A new line is a draft until it has words.
  */
-export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, actions, autoStart }: Props) {
+export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, actions, autoStart, tail, addLabel = "Пункт", compact = false }: Props) {
   const branches = useMemo(() => branchesOf(rows), [rows]);
   const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
   const [draft, setDraft] = useState<Draft | null>(() => (autoStart ? { id: crypto.randomUUID(), parent: null, after: null, text: "" } : null));
@@ -375,6 +385,10 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
       ...(lightable ? [{ key: "spot", label: spot === row.id ? "Снять подсветку на стене" : "Показать на стене", icon: <NoteIcon name="wall" size={14} />, onSelect: () => actions.spotlight(spot === row.id ? null : row.id) }] : []),
       ...(!sub && !onPhone ? [{ key: "sketch", label: isDrawn(row.sketch) ? "Дорисовать…" : "Рисунок к пункту…", icon: <NoteIcon name="pencil" size={14} />, onSelect: () => actions.sketch(row) }] : []),
       ...(!sub && !onPhone ? [{ key: "move", label: "На другую доску…", icon: <NoteIcon name="move" size={14} />, onSelect: () => actions.move(row) }] : []),
+      // only a plain line goes back to the thoughts: no sub-points, no drawing, not handed out
+      ...(actions.toThought && !onPhone && row.text.trim() && pointToThoughtRefusal(row, rows) === null
+        ? [{ key: "thought", label: "В мысли", icon: <NoteIcon name="note" size={14} />, onSelect: () => actions.toThought?.(row) }]
+        : []),
       "separator",
       { key: "bin", label: "В корзину", hint: "Ctrl Shift ⌫", danger: true, disabled: onPhone, icon: <NoteIcon name="trash" size={14} />, onSelect: () => removeRow(row) },
     ];
@@ -464,6 +478,7 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
         onGrip={(event) => startDrag(row, event)}
         onMenu={(event) => menu.open(event, lineMenu(row))}
         onSketch={() => actions.sketch(row)}
+        compact={compact}
       />
     );
   };
@@ -513,20 +528,27 @@ export function Outline({ rows, phone, hearing, numbers, spot, onWall, taskOf, a
       ) : null}
       {draft && ((draft.parent === null && (draft.after === null || !rowById.has(draft.after))) || (draft.parent !== null && !rowById.has(draft.parent))) ? draftNode : null}
 
-      {/* the way to a new point with the mouse: a quiet line under the last one */}
-      {!draft || draft.parent !== null || draft.after !== null ? (
-        <button
-          type="button"
-          onClick={() => {
-            const last = branches[branches.length - 1]?.point ?? null;
-            startDraft({ id: crypto.randomUUID(), parent: null, after: last?.id ?? null, text: "" });
-          }}
-          className="flex h-9 items-center gap-2.5 pl-[32px] pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[120ms] hover:bg-surface-2/50 hover:text-text"
-          data-testid="desk-outline-add"
-        >
-          <NoteIcon name="plus" size={14} />
-          Пункт
-        </button>
+      {/* the way to a new point with the mouse: a quiet line under the last one, the dictaphone beside it */}
+      {!draft || draft.parent !== null || draft.after !== null || tail ? (
+        <div className="board-add-row flex items-center gap-2" data-testid="desk-outline-add-row">
+          {!draft || draft.parent !== null || draft.after !== null ? (
+            <button
+              type="button"
+              onClick={() => {
+                const last = branches[branches.length - 1]?.point ?? null;
+                startDraft({ id: crypto.randomUUID(), parent: null, after: last?.id ?? null, text: "" });
+              }}
+              className={`flex h-9 min-w-0 flex-1 items-center gap-2.5 ${compact ? "pl-[8px]" : "pl-[32px]"} pr-2 text-left text-[14px] leading-5 text-muted transition-colors duration-[120ms] hover:bg-surface-2/50 hover:text-text`}
+              data-testid="desk-outline-add"
+            >
+              <NoteIcon name="plus" size={14} />
+              <span className="truncate">{addLabel}</span>
+            </button>
+          ) : (
+            <span className="flex-1" />
+          )}
+          {tail}
+        </div>
       ) : null}
       {menu.node}
     </div>
@@ -557,6 +579,7 @@ function LineRow({
   onGrip,
   onMenu,
   onSketch,
+  compact,
 }: {
   row: Note;
   level: 0 | 1;
@@ -573,6 +596,7 @@ function LineRow({
   onGrip: (event: ReactPointerEvent<HTMLButtonElement>) => void;
   onMenu: (event: ReactMouseEvent) => void;
   onSketch: () => void;
+  compact: boolean;
 }) {
   const done = row.done_at !== null;
   const sketch = level === 0 ? sketchFrom(row.sketch) : null;
@@ -582,17 +606,18 @@ function LineRow({
     <div
       data-line-box={row.id}
       onContextMenu={onMenu}
-      className={`group relative flex items-start gap-1.5 py-[3px] pr-1 transition-colors duration-[120ms] hover:bg-surface-2/40 focus-within:bg-surface ${level === 1 ? "pl-[34px]" : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
+      className={`group relative flex items-start gap-1.5 py-[3px] pr-1 transition-colors duration-[120ms] hover:bg-surface-2/40 focus-within:bg-surface ${level === 1 ? (compact ? "pl-[26px]" : "pl-[34px]") : "pl-0"} ${dragging ? "bg-surface-2/60" : ""}`}
       style={lit ? { boxShadow: "inset 2px 0 0 var(--accent)", background: "color-mix(in srgb, var(--accent) 7%, transparent)" } : undefined}
       data-testid="desk-outline-line"
       data-level={level}
+      data-lit={lit ? "" : undefined}
     >
       <button
         type="button"
         aria-label="Перетащить"
         tabIndex={-1}
         onPointerDown={onGrip}
-        className="mt-[5px] flex h-6 w-5 shrink-0 cursor-grab items-center justify-center text-muted/60 opacity-0 transition-opacity duration-[120ms] hover:text-text active:cursor-grabbing group-hover:opacity-100"
+        className={`mt-[5px] h-6 shrink-0 cursor-grab items-center justify-center text-muted/60 opacity-0 transition-opacity duration-[120ms] hover:text-text active:cursor-grabbing group-hover:opacity-100 ${compact ? "hidden" : "flex w-5"}`}
       >
         <NoteIcon name="grip" size={13} />
       </button>
@@ -631,7 +656,11 @@ function LineRow({
         ) : null}
       </div>
       {task ? <TaskPill task={task} /> : null}
-      {lit ? <span className="mt-[7px] shrink-0 text-[12px] font-medium leading-4 text-accent">на стене</span> : null}
+      {lit ? (
+        <span className="board-lit-chip mt-[5px] shrink-0" data-testid="desk-outline-lit">
+          на стене
+        </span>
+      ) : null}
       <button
         type="button"
         aria-label="Действия с пунктом"
@@ -640,11 +669,7 @@ function LineRow({
         className="mt-[3px] flex h-7 w-7 shrink-0 items-center justify-center text-muted opacity-0 transition-opacity duration-[120ms] hover:bg-surface-2 hover:text-text focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
         data-testid="desk-outline-menu"
       >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-          <circle cx="5.5" cy="12" r="1.7" />
-          <circle cx="12" cy="12" r="1.7" />
-          <circle cx="18.5" cy="12" r="1.7" />
-        </svg>
+        <Ellipsis aria-hidden size={16} strokeWidth={2.2} />
       </button>
     </div>
   );

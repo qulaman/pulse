@@ -81,7 +81,8 @@ export async function insertNote(me: Me, row: NewNote): Promise<Note> {
 }
 
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
-const KEPT_OFFLINE = "Нет связи — сохранил на телефоне, отправлю сам";
+/** The same words on the phone and on the desk (D-177). */
+const KEPT_OFFLINE = "Нет связи — сохранил, отправлю сам";
 /** The server's branch rule said no (D-121): the move is undone on screen too. */
 const REFUSED_BRANCH = "Не получилось сложить ветку — вернул как было";
 /**

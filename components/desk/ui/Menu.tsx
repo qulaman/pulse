@@ -44,6 +44,8 @@ export function Menu({
   header?: ReactNode;
 }) {
   const live = items.filter((item): item is Exclude<MenuItem, "separator"> => item !== "separator" && !item.disabled);
+  // one column of icons for the whole menu: an item without its icon keeps the room, so the words line up (D-177)
+  const icons = items.some((item) => item !== "separator" && Boolean(item.icon));
   const [at, setAt] = useState(0);
   const list = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(open);
@@ -94,7 +96,11 @@ export function Menu({
                 live[at] === item ? "bg-surface-2" : ""
               } ${item.danger ? "text-danger" : "text-text"}`}
             >
-              {item.icon ? <span className="flex w-4 shrink-0 justify-center text-muted">{item.icon}</span> : null}
+              {icons ? (
+                <span aria-hidden className={`flex w-4 shrink-0 justify-center ${item.danger ? "" : "text-muted"}`}>
+                  {item.icon ?? null}
+                </span>
+              ) : null}
               <span className="min-w-0 flex-1 truncate">{item.label}</span>
               {item.hint ? <Kbd>{item.hint}</Kbd> : null}
             </button>
@@ -106,7 +112,23 @@ export function Menu({
 }
 
 /** A button that opens a menu under itself — «⋯» of a row, «Ещё» of a card. */
-export function MenuButton({ items, children, label, className = "", align = "end", width }: { items: MenuItem[]; children: ReactNode; label: string; className?: string; align?: "start" | "end"; width?: number }) {
+export function MenuButton({
+  items,
+  children,
+  label,
+  className = "",
+  align = "end",
+  width,
+  testId,
+}: {
+  items: MenuItem[];
+  children: ReactNode;
+  label: string;
+  className?: string;
+  align?: "start" | "end";
+  width?: number;
+  testId?: string;
+}) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   return (
     <>
@@ -116,6 +138,7 @@ export function MenuButton({ items, children, label, className = "", align = "en
         title={label}
         aria-haspopup="menu"
         aria-expanded={Boolean(anchor)}
+        data-testid={testId}
         onClick={(event) => {
           event.stopPropagation();
           setAnchor(anchor ? null : event.currentTarget);

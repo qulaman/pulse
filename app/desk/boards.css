@@ -1,0 +1,816 @@
+/* «Доски» of the desk (D-177): the gallery, a board in preparation and «Ведущий». Owned by the boards builder.
+   Both looks: the journal lays the screens out in print, «Графит» (D-171) gives them depth below. The sheet of
+   a board is the wall's — dark in both themes and both looks, as the room will see it. Motion is news only:
+   a tile rises once when it comes, nothing loops; all of it off under reduced motion. */
+
+html[data-surface="desk"][data-journal] {
+  /* ---- the wall's sheet: text only, laid out in container units ------------------------------ */
+  .board-sheet {
+    --sheet-bg: #0b0f14;
+    --sheet-ink: #eef3f8;
+    --sheet-ink-2: #93a2b4;
+    --sheet-pen: #2ed3b7;
+    --sheet-ok: #34c759;
+    container-type: inline-size;
+    position: relative;
+    aspect-ratio: 16 / 9;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    background: var(--sheet-bg);
+    color: var(--sheet-ink);
+    text-align: left;
+  }
+  /* the units are the sheet's own width: the padding lives inside it, not on the container */
+  .board-sheet-in {
+    display: flex;
+    height: 100%;
+    flex-direction: column;
+    padding: 7cqw 7.5cqw 5cqw;
+  }
+  .board-sheet-title {
+    overflow: hidden;
+    font-family: var(--font-display);
+    font-size: 6cqw;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .board-sheet-points {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 1.3cqw;
+    margin-top: 3.6cqw;
+    font-size: 3.9cqw;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .board-sheet-point {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 2.2cqw;
+    margin: 0 -1.6cqw;
+    padding: 0.3cqw 1.6cqw;
+    border-radius: 1cqw;
+
+    i {
+      display: inline-flex;
+      width: 3.6cqw;
+      height: 3.6cqw;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+      color: var(--sheet-ink-2);
+      font-size: 2.4cqw;
+      font-style: normal;
+    }
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    &[data-done] {
+      color: var(--sheet-ink-2);
+      font-weight: 500;
+
+      i {
+        background: var(--sheet-ok);
+      }
+      span {
+        text-decoration: line-through;
+        text-decoration-color: color-mix(in srgb, var(--sheet-ink-2) 70%, transparent);
+      }
+    }
+    &[data-lit] {
+      background: color-mix(in srgb, var(--sheet-pen) 18%, transparent);
+      box-shadow: inset 0.5cqw 0 0 var(--sheet-pen);
+    }
+  }
+  .board-sheet-sub,
+  .board-sheet-more,
+  .board-sheet-empty {
+    overflow: hidden;
+    padding-left: 5.8cqw;
+    color: var(--sheet-ink-2);
+    font-weight: 500;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .board-sheet-empty {
+    margin-top: 3.6cqw;
+    padding-left: 0;
+    font-size: 3.6cqw;
+  }
+  .board-sheet-foot {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2cqw;
+    margin-top: auto;
+    color: var(--sheet-ink-2);
+    font-size: 2.6cqw;
+
+    b {
+      color: var(--sheet-ink);
+      font-size: 3.4cqw;
+      font-weight: 600;
+    }
+  }
+  /* the hero draws the same sheet larger: smaller type in its own units, more lines */
+  .board-sheet[data-size="hero"] {
+    .board-sheet-in {
+      padding: 6cqw 6.5cqw 4.4cqw;
+    }
+
+    .board-sheet-title {
+      font-size: 4.4cqw;
+    }
+    .board-sheet-points {
+      gap: 0.9cqw;
+      margin-top: 2.6cqw;
+      font-size: 2.85cqw;
+    }
+    .board-sheet-point i {
+      width: 2.8cqw;
+      height: 2.8cqw;
+      font-size: 1.9cqw;
+    }
+    .board-sheet-sub,
+    .board-sheet-more {
+      padding-left: 5cqw;
+    }
+    .board-sheet-foot {
+      font-size: 2cqw;
+
+      b {
+        font-size: 2.8cqw;
+      }
+    }
+  }
+
+  /* ---- the gallery ---------------------------------------------------------------------------- */
+  .boards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px 20px;
+  }
+  @media (min-width: 1400px) {
+    .boards-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 1800px) {
+    .boards-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+  .boards-tile-sheet,
+  .boards-hero-sheet {
+    display: block;
+    width: 100%;
+    border-radius: 12px;
+    outline: none;
+
+    &:focus-visible {
+      box-shadow:
+        0 0 0 2px var(--bg),
+        0 0 0 4px var(--accent);
+    }
+  }
+  .boards-new {
+    display: block;
+    align-self: start;
+    width: 100%;
+    border-radius: 12px;
+    color: var(--text-muted);
+    outline: none;
+
+    &:focus-visible .boards-new-plate {
+      box-shadow:
+        0 0 0 2px var(--bg),
+        0 0 0 4px var(--accent);
+    }
+  }
+  .boards-new-plate {
+    display: flex;
+    aspect-ratio: 16 / 9;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 1px dashed var(--rule);
+    border-radius: 12px;
+    transition:
+      background-color 120ms linear,
+      border-color 120ms linear;
+  }
+  .boards-new:hover .boards-new-plate {
+    border-color: var(--line);
+    background: var(--surface-2);
+  }
+  .boards-meter {
+    display: block;
+    height: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--ink) 10%, transparent);
+
+    i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--ok-ink);
+      transform: scaleX(var(--done, 0));
+      transform-origin: left;
+    }
+  }
+  .board-head-meter {
+    width: 220px;
+    margin-top: 8px;
+  }
+  /* a finished board: its sheet in quieter inks, not a faded picture */
+  .boards-tile[data-finished] .board-sheet {
+    --sheet-bg: #10141a;
+    --sheet-ink: #b9c4d0;
+    --sheet-ok: #2e9e55;
+  }
+
+  /* the board on the wall now */
+  .boards-hero {
+    display: grid;
+    grid-template-columns: minmax(0, min(46%, 560px)) minmax(0, 1fr);
+    gap: 24px;
+    padding: 16px;
+    border: 1px solid var(--rule);
+  }
+  .boards-live-chip {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 9px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--pen-deep, var(--accent));
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .boards-live-dot,
+  .board-live-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--accent);
+  }
+  .board-live-dot {
+    margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .boards-steps {
+    display: grid;
+    grid-template-columns: repeat(var(--steps), minmax(0, 1fr));
+    gap: 4px;
+    max-width: 420px;
+
+    i {
+      display: block;
+      height: 4px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--ink) 12%, transparent);
+
+      &[data-done] {
+        background: var(--ok-ink);
+      }
+      &[data-here] {
+        background: var(--accent);
+      }
+    }
+  }
+
+  /* the bin */
+  .boards-bin-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .boards-bin-kind {
+    width: 52px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .boards-bin-purge,
+  .boards-bin-clear {
+    color: var(--pencil-deep, var(--danger)) !important;
+  }
+
+  /* ---- a board ---------------------------------------------------------------------------------- */
+  .board-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: -3px;
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 18px;
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+  .board-title {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 34px;
+    letter-spacing: -0.025em;
+  }
+  .board-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 20px;
+  }
+  .board-lead-body {
+    display: grid;
+    grid-template-columns: 360px minmax(0, 1fr);
+    align-items: start;
+    gap: 20px;
+  }
+  @media (min-width: 1400px) {
+    .board-body {
+      grid-template-columns: minmax(0, 1fr) 400px;
+    }
+    .board-lead-body {
+      grid-template-columns: 420px minmax(0, 1fr);
+    }
+  }
+  @media (min-width: 1800px) {
+    .board-body {
+      grid-template-columns: minmax(0, 1fr) 520px;
+      gap: 28px;
+    }
+    .board-lead-body {
+      grid-template-columns: 480px minmax(0, 1fr);
+      gap: 28px;
+    }
+  }
+  .board-aside {
+    position: sticky;
+    top: 16px;
+  }
+  .board-wall-card {
+    padding: 12px;
+    border: 1px solid var(--rule);
+  }
+  .board-keys > span {
+    flex-shrink: 0;
+  }
+  .board-add-row {
+    padding-right: 6px;
+  }
+  .board-lit-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--pen-deep, var(--accent));
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+
+  /* «Ведущий»: the live strip of the wall over the stage */
+  .board-live-strip {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 6px 6px 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    font-size: 14px;
+    line-height: 20px;
+
+    .board-live-dot {
+      margin-right: 0;
+    }
+  }
+  .board-stage-steps {
+    max-width: none;
+    margin-top: 12px;
+  }
+  .board-stage-point {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 34px;
+    letter-spacing: -0.02em;
+
+    &[data-done] {
+      color: var(--text-muted);
+      text-decoration: line-through;
+      text-decoration-color: color-mix(in srgb, var(--ink) 30%, transparent);
+    }
+  }
+  .board-faces {
+    padding: 12px;
+    border: 1px solid var(--rule);
+  }
+  .board-face {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 36px;
+    padding: 0 12px 0 6px;
+    border: 1px solid var(--rule);
+    border-radius: 9999px;
+    font-size: 14px;
+    font-weight: 600;
+    transition:
+      background-color 120ms linear,
+      border-color 120ms linear;
+
+    &:hover:not(:disabled) {
+      background: var(--surface-2);
+    }
+    &:disabled {
+      opacity: 0.5;
+    }
+    &[aria-pressed="true"] {
+      border-color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, transparent);
+      opacity: 1;
+    }
+    &[data-testid="board-face-other"] {
+      padding-left: 12px;
+      color: var(--text-muted);
+    }
+  }
+
+  /* «Раздать поручения»: a «Кому» column over the lines */
+  .board-handout {
+    padding: 12px;
+    border: 1px solid var(--rule);
+  }
+  .board-handout-head {
+    padding: 2px 4px 10px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .board-handout-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 4px;
+    border-bottom: 1px solid var(--rule-soft);
+
+    &[data-sub] {
+      padding-left: 30px;
+      color: var(--text-muted);
+    }
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+  .board-handout-n {
+    width: 22px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+    text-align: center;
+  }
+  .board-handout-done {
+    width: 240px;
+    flex-shrink: 0;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .board-who {
+    display: flex;
+    width: 240px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 8px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: var(--surface);
+
+    &:focus-within {
+      border-color: var(--accent);
+    }
+  }
+  .board-who-field {
+    min-width: 0;
+    flex: 1;
+    background: transparent;
+    font-size: 14px;
+    line-height: 20px;
+    outline: none;
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+  }
+  .board-who-chip {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 4px 0 8px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--pen-deep, var(--accent));
+    font-size: 13px;
+    font-weight: 600;
+
+    button {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 9999px;
+
+      &:hover {
+        background: color-mix(in srgb, var(--accent) 22%, transparent);
+      }
+    }
+  }
+  .board-who-list {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--surface);
+    box-shadow: var(--shadow-raised);
+  }
+  .board-who-option {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 18px;
+    text-align: left;
+
+    &[aria-selected="true"],
+    &:hover {
+      background: var(--surface-2);
+    }
+  }
+  .board-quiet {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 13px;
+
+    b {
+      color: var(--pen-deep, var(--accent));
+    }
+  }
+
+  /* «Добавить из мыслей…» */
+  .board-thoughts {
+    max-height: 420px;
+    overflow-y: auto;
+  }
+  .board-thought {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .board-thought-add {
+    display: flex;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    color: var(--text-muted);
+
+    &:hover {
+      background: var(--surface-2);
+      color: var(--text);
+    }
+  }
+}
+
+/* ---- «Графит»: depth, the plates, a tile that rises once ------------------------------------------- */
+html[data-surface="desk"][data-journal][data-graphite] {
+  .boards-tile {
+    animation: boards-rise 260ms var(--ease-snap) backwards;
+  }
+  .boards-tile-sheet,
+  .boards-hero-sheet {
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.07);
+    transition:
+      transform 220ms var(--ease-snap),
+      box-shadow 160ms linear;
+
+    &:hover {
+      box-shadow:
+        0 0 0 1px rgb(255 255 255 / 0.14),
+        0 10px 28px -10px rgb(0 0 0 / 0.55);
+      transform: translateY(-2px);
+    }
+  }
+  &[data-desk-theme="light"] {
+    .boards-tile-sheet,
+    .boards-hero-sheet {
+      box-shadow: 0 1px 2px rgb(15 17 22 / 0.18);
+    }
+  }
+  .boards-hero {
+    border: 0;
+    border-radius: 16px;
+    background:
+      radial-gradient(90% 120% at 0% 0%, color-mix(in srgb, var(--pen) 9%, transparent), transparent 60%),
+      var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .board-wall-card,
+  .board-faces,
+  .board-handout,
+  .boards-bin {
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .board-wall-card {
+    padding: 14px;
+  }
+  .boards-bin {
+    padding: 8px 16px;
+  }
+  .boards-bin-row:last-child {
+    border-bottom: 0;
+  }
+  .board-who {
+    background: var(--surface-2);
+    border-color: transparent;
+
+    &:focus-within {
+      border-color: color-mix(in srgb, var(--pen) 60%, transparent);
+    }
+  }
+  .board-who-list {
+    border: 0;
+    background: var(--raise);
+    box-shadow: var(--shadow-pop);
+  }
+  .board-face {
+    border-color: transparent;
+    background: var(--surface-2);
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--ink) 10%, var(--surface-2));
+    }
+  }
+  .board-stage .screen-bezel {
+    border-radius: 14px;
+  }
+  /* the outline: a card of lines, a point's number in a circle that turns green with its tick
+     (moved here from planning.css, D-177) */
+  [data-testid="desk-board"] [data-testid="desk-outline"] {
+    padding: 6px;
+    border-top: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+
+    > [data-branch] {
+      border-bottom-color: var(--rule-soft);
+    }
+    > [data-testid="desk-outline-add"] {
+      margin-top: 2px;
+      border-bottom: 0;
+      border-radius: 8px;
+
+      &:hover {
+        background: var(--hover);
+      }
+    }
+    [data-testid="desk-outline-line"] {
+      border-radius: 8px;
+
+      &:hover {
+        background: var(--hover);
+      }
+      &:focus-within {
+        background: color-mix(in srgb, var(--pen) 6%, transparent);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 26%, transparent);
+      }
+    }
+    [data-testid="desk-outline-draft"] {
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--pen) 6%, transparent);
+
+      > span[aria-hidden]:nth-child(2) {
+        border-radius: 9999px;
+      }
+    }
+    /* a point's number in a circle; a ticked one turns green with its tick */
+    [data-testid="desk-outline-check"] {
+      border-radius: 9999px;
+      border-color: var(--line);
+      background: var(--surface-2);
+      color: var(--ink-3);
+      font-weight: 600;
+      transition:
+        background-color 160ms linear,
+        border-color 160ms linear,
+        color 160ms linear,
+        scale 220ms var(--ease-snap);
+
+      &:hover:not(:disabled) {
+        border-color: color-mix(in srgb, var(--pen) 70%, transparent);
+        color: var(--ink);
+      }
+      &:active:not(:disabled) {
+        scale: 0.88;
+        transition-duration: 70ms;
+      }
+      &[aria-checked="true"] {
+        border-color: var(--ok-ink);
+        background: var(--ok-ink);
+        color: #fff;
+      }
+    }
+    [data-level="1"] [data-testid="desk-outline-check"] {
+      border-radius: 6px;
+    }
+    [data-testid="desk-outline-menu"] {
+      border-radius: 7px;
+    }
+    .desk-phone-look {
+      border-radius: 8px;
+      box-shadow: 0 0 0 1px var(--rule);
+    }
+  }
+  &[data-desk-theme="dark"] [data-testid="desk-board"] [data-testid="desk-outline-check"][aria-checked="true"] {
+    color: #06140c;
+  }
+  .board-page[data-mode="lead"] [data-testid="desk-outline"] {
+    padding: 4px;
+  }
+}
+
+@keyframes boards-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .boards-tile,
+    .boards-tile-sheet,
+    .boards-hero-sheet,
+    .boards-new-plate,
+    .board-face {
+      animation: none !important;
+      transition: none !important;
+    }
+    .boards-tile-sheet:hover,
+    .boards-hero-sheet:hover {
+      transform: none;
+    }
+  }
+}

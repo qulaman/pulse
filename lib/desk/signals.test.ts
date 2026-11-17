@@ -130,6 +130,13 @@ describe("directorSignal", () => {
     expect(signal.chime).toEqual([`v:${at.id}`, `q:${q.id}:${q.asked_at}`]);
     expect(directorSignal({ meId: DIRECTOR, count: 0, errands: [], visits: [] }).dot).toBe("none");
   });
+
+  it("a reminder that has just rung says itself in the tab and lights the dot (D-177)", () => {
+    const signal = directorSignal({ meId: DIRECTOR, count: 0, errands: [], visits: [], reminder: "Позвонить в банк по кредитной линии и ставке" });
+    expect(tabTitle(signal)).toBe("Напоминание: Позвонить в банк по кредитн… — Pulse");
+    expect(signal.dot).toBe("wait");
+    expect(tabTitle(directorSignal({ meId: DIRECTOR, count: 2, errands: [], visits: [], reminder: "Банк" }))).toBe("(2) Напоминание: Банк — Pulse");
+  });
 });
 
 describe("tabTitle", () => {

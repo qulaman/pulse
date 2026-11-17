@@ -1,0 +1,717 @@
+/* «Заметки» of the desk (D-177): the notebook — capture card, rows, the note as a document. Owned by the
+   notes builder. Both looks: the tokens fall back from «Графит» (graphite.css) to the journal's inks. */
+
+html[data-surface="desk"] .nb {
+  --nb-page: var(--page, var(--bg));
+  --nb-paper: var(--raise, var(--sheet, var(--surface)));
+  --nb-ink: var(--ink, var(--text));
+  --nb-ink-2: var(--ink-2, var(--text-muted));
+  --nb-ink-3: var(--ink-3, var(--ink-2, var(--text-muted)));
+  --nb-rule: var(--rule-soft, var(--border));
+  --nb-hover: var(--hover, color-mix(in srgb, var(--nb-ink) 4%, transparent));
+  --nb-chosen: var(--selected, color-mix(in srgb, var(--nb-ink) 7%, transparent));
+  --nb-pen: var(--pen, var(--accent));
+  --nb-pen-deep: var(--pen-deep, var(--nb-pen));
+  /* amber only for reminders; words on its plate in the deep ink (D-175) */
+  --nb-amber: var(--warn-ink, #b07a10);
+  --nb-warn: var(--warn-deep, var(--nb-ink-2));
+  --nb-danger: var(--pencil-deep, var(--danger));
+  --nb-card: var(--shadow-card, 0 0 0 1px var(--nb-rule));
+  /* the stream: 390 / 460 / 540 at 1280 / 1440 / 1920 */
+  --nb-stream: 390px;
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+
+  /* ---- the head across the work area, in the place of every desk section's head ---- */
+  .nb-head {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 16px;
+  }
+  .nb-title {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 14px;
+  }
+  .nb-private {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .nb-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .nb-body {
+    display: grid;
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: var(--nb-stream) minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  /* ---- the stream ---- */
+  .nb-stream {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .nb-scroll {
+    flex: 1;
+    min-height: 0;
+    margin-right: -10px;
+    padding: 0 10px 16px 0;
+    overflow-y: auto;
+  }
+
+  /* the capture card: the one place a thought is written */
+  .nb-capture {
+    display: flex;
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 14px 10px;
+    border-radius: 14px;
+    background: var(--nb-paper);
+    box-shadow: var(--nb-card);
+    transition: box-shadow 160ms linear;
+
+    &:focus-within {
+      box-shadow:
+        0 0 0 1.5px color-mix(in srgb, var(--nb-pen) 55%, transparent),
+        var(--nb-card);
+    }
+    &[data-listening] {
+      box-shadow:
+        0 0 0 1.5px var(--nb-pen),
+        0 10px 30px -14px color-mix(in srgb, var(--nb-pen) 60%, transparent);
+    }
+  }
+  .nb-capture-head {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 8px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .nb-capture-title {
+    color: var(--nb-ink);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .nb-capture-sub {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nb-capture-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--nb-pen-deep);
+
+    &::before {
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--nb-pen);
+      content: "";
+    }
+  }
+  .nb-capture-count {
+    flex-shrink: 0;
+    margin-left: auto;
+    white-space: nowrap;
+  }
+  .nb-capture-field {
+    width: 100%;
+    min-height: 44px;
+    padding: 2px 0 0;
+    resize: none;
+    border: 0;
+    background: transparent;
+    color: var(--nb-ink);
+    font: inherit;
+    font-size: 15px;
+    line-height: 22px;
+    outline: none;
+
+    &::placeholder {
+      color: var(--nb-ink-3);
+      opacity: 1;
+    }
+  }
+  .nb-capture-foot {
+    display: flex;
+    min-height: 32px;
+    align-items: center;
+    gap: 12px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .nb-keyword {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .nb-trash-head {
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 4px 8px 10px;
+    border-bottom: 1px solid var(--nb-rule);
+
+    p {
+      color: var(--nb-ink-2);
+      font-size: 12px;
+      line-height: 16px;
+    }
+  }
+  .nb-purge {
+    flex-shrink: 0;
+    color: var(--nb-danger) !important;
+    white-space: nowrap;
+  }
+
+  /* ---- rows, not cards: a listbox with one ring ---- */
+  .nb-group-title {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    padding: 14px 12px 6px;
+    background: var(--nb-page);
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+
+    .nums {
+      color: var(--nb-ink-2);
+      font-weight: 500;
+    }
+  }
+  .nb-list[data-kind="converted"] .nb-group:first-child,
+  .nb-list[data-kind="trash"] .nb-group:first-child {
+    padding-top: 6px;
+  }
+  .nb-row {
+    position: relative;
+    display: block;
+    padding: 9px 12px 10px 14px;
+    border-radius: 12px;
+    outline: none;
+    cursor: default;
+    transition: background-color 120ms linear;
+    /* hundreds of rows: the browser lays out only those on screen */
+    content-visibility: auto;
+    contain-intrinsic-size: auto 62px;
+
+    &:hover {
+      background: var(--nb-hover);
+    }
+    &[aria-selected="true"] {
+      background: var(--nb-chosen);
+    }
+    &[data-current] {
+      background: color-mix(in srgb, var(--nb-pen) 7%, var(--nb-paper));
+      box-shadow: var(--nb-card);
+
+      &::before {
+        position: absolute;
+        top: 9px;
+        bottom: 9px;
+        left: 0;
+        width: 2px;
+        border-radius: 2px;
+        background: var(--nb-pen);
+        content: "";
+      }
+    }
+    &:focus-visible {
+      box-shadow:
+        0 0 0 2px var(--nb-pen),
+        var(--nb-card);
+    }
+  }
+  .nb-row-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .nb-row-head {
+    display: -webkit-box;
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+    color: var(--nb-ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .nb-row-head-quiet {
+    color: var(--nb-ink-2);
+    font-weight: 500;
+  }
+  .nb-row-when {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 5px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    line-height: 20px;
+    white-space: nowrap;
+  }
+  .nb-row-rest {
+    margin-top: 2px;
+    overflow: hidden;
+    color: var(--nb-ink-2);
+    font-size: 13px;
+    line-height: 18px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nb-row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .nb-row-actions {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0 -2px -8px;
+  }
+  .nb-row-button {
+    display: inline-flex;
+    height: 28px;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: 8px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    font-weight: 600;
+
+    &:hover {
+      background: var(--nb-hover);
+      color: var(--nb-ink);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--nb-pen);
+      outline-offset: 1px;
+    }
+  }
+  .nb-row-button-danger:hover {
+    color: var(--nb-danger);
+  }
+
+  /* chips: the meta of a row and of the page */
+  .nb-chip {
+    display: inline-flex;
+    height: 22px;
+    max-width: 100%;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    white-space: nowrap;
+
+    &[data-tone="warn"] {
+      background: color-mix(in srgb, var(--nb-amber) 16%, transparent);
+      color: var(--nb-warn);
+      font-weight: 600;
+    }
+    &[data-tone="pen"] {
+      background: color-mix(in srgb, var(--nb-pen) 12%, transparent);
+      color: var(--nb-pen-deep);
+    }
+    &[data-tone="danger"] {
+      background: color-mix(in srgb, var(--nb-danger) 11%, transparent);
+      color: var(--nb-danger);
+    }
+  }
+  .nb-chip-voice {
+    background: color-mix(in srgb, var(--nb-pen) 12%, transparent);
+    color: var(--nb-pen-deep);
+  }
+  .nb-row .nb-chip {
+    height: 20px;
+    padding: 0 7px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--nb-rule);
+  }
+  .nb-row .nb-chip-voice {
+    padding: 0;
+    box-shadow: none;
+  }
+  .nb-row .nb-chip[data-tone="warn"] {
+    background: color-mix(in srgb, var(--nb-amber) 16%, transparent);
+    box-shadow: none;
+  }
+
+  .nb-empty {
+    padding: 14px 12px;
+    color: var(--nb-ink-2);
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .nb-foot {
+    margin-top: 12px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+  }
+
+  /* placeholders: the rows' own boxes while the first read is on its way */
+  .nb-bones {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 16px 12px;
+  }
+  .nb-bone-row {
+    display: block;
+  }
+  .nb-bone {
+    display: block;
+    height: 14px;
+    border-radius: 6px;
+    background: var(--surface-2);
+  }
+  .nb-bone-thin {
+    height: 10px;
+    margin-top: 8px;
+  }
+  .nb-bone-title {
+    width: 72px;
+    height: 10px;
+  }
+
+  /* ---- the note: a document centred on its paper ---- */
+  .nb-main {
+    position: relative;
+    min-height: 0;
+    overflow-y: auto;
+    border-radius: 16px;
+    background: var(--nb-paper);
+    box-shadow: var(--nb-card);
+  }
+  .nb-doc-wrap {
+    display: flex;
+    min-height: 100%;
+    flex-direction: column;
+  }
+  .nb-bar {
+    position: sticky;
+    z-index: 2;
+    top: 0;
+    display: flex;
+    height: 52px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 4px;
+    padding: 0 12px 0 16px;
+    border-bottom: 1px solid var(--nb-rule);
+    background: color-mix(in srgb, var(--nb-paper) 86%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.3);
+    backdrop-filter: blur(14px) saturate(1.3);
+  }
+  .nb-bar-button {
+    display: inline-flex;
+    height: 34px;
+    max-width: 300px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--nb-ink);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition:
+      background-color 120ms linear,
+      scale 220ms var(--ease-snap, ease-out);
+
+    svg {
+      flex-shrink: 0;
+      color: var(--nb-ink-2);
+    }
+    &:hover:not(:disabled),
+    &[aria-expanded="true"] {
+      background: var(--nb-hover);
+    }
+    &:active:not(:disabled) {
+      scale: 0.96;
+      transition-duration: 70ms;
+    }
+    &:disabled {
+      opacity: 0.4;
+    }
+    &[data-tone="warn"],
+    &[data-tone="warn"] svg {
+      color: var(--nb-warn);
+    }
+  }
+  .nb-bar-icon {
+    width: 34px;
+    justify-content: center;
+    padding: 0;
+    color: var(--nb-ink-2);
+
+    &:hover:not(:disabled) svg {
+      color: var(--nb-ink);
+    }
+  }
+  .nb-bar-link {
+    display: inline-flex;
+    height: 34px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-radius: 8px;
+    color: var(--nb-ink);
+    font-size: 13px;
+    font-weight: 600;
+
+    &:hover {
+      background: var(--nb-hover);
+    }
+  }
+  .nb-chevron {
+    color: var(--nb-ink-3) !important;
+  }
+  .nb-doc {
+    display: flex;
+    width: 100%;
+    max-width: 720px;
+    flex: 1;
+    flex-direction: column;
+    margin: 0 auto;
+    padding: 26px 40px 64px;
+  }
+  .nb-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .nb-voice {
+    margin-top: 6px;
+  }
+  .nb-hearing {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    color: var(--nb-ink-2);
+    font-size: 14px;
+    line-height: 20px;
+  }
+  .nb-hearing-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: var(--nb-pen);
+    animation: nb-breathe 1.6s ease-in-out infinite;
+  }
+  .nb-unheard {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 12px;
+    margin-top: 14px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--nb-amber) 10%, transparent);
+    color: var(--nb-warn);
+    font-size: 13px;
+    line-height: 18px;
+
+    span {
+      min-width: 0;
+      flex: 1 1 260px;
+    }
+  }
+  .nb-page {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    margin-top: 18px;
+    cursor: text;
+  }
+  .nb-page-read {
+    cursor: auto;
+  }
+  .nb-title-field,
+  .nb-body-field {
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    resize: none;
+    border: 0;
+    background: transparent;
+    color: var(--nb-ink);
+    font: inherit;
+    outline: none;
+    overflow-wrap: anywhere;
+
+    &::placeholder {
+      color: var(--nb-ink-3);
+      opacity: 1;
+    }
+  }
+  /* the first line read as a title — still the same plain text (D-75) */
+  .nb-title-field {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    line-height: 30px;
+  }
+  .nb-body-field {
+    margin-top: 10px;
+    font-size: 16px;
+    line-height: 26px;
+  }
+
+  /* ---- nothing chosen: a hint in the middle of the paper ---- */
+  .nb-quiet {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 96px 40px 40px;
+  }
+  .nb-quiet-title {
+    color: var(--nb-ink);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+  }
+  .nb-quiet-hint {
+    margin-top: 8px;
+    color: var(--nb-ink-2);
+    font-size: 14px;
+    line-height: 22px;
+  }
+  .nb-quiet-link {
+    display: inline-block;
+    margin-top: 14px;
+    color: var(--nb-ink);
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* ---- several chosen ---- */
+  .nb-picked-count {
+    margin-right: 8px;
+    color: var(--nb-ink-2);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .nb-picked-title {
+    color: var(--nb-ink);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 28px;
+  }
+  .nb-picked-keys {
+    margin-left: 8px;
+    color: var(--nb-ink-2);
+    font-size: 12px;
+    font-weight: 400;
+  }
+  .nb-picked-list {
+    margin-top: 14px;
+
+    li {
+      overflow: hidden;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--nb-rule);
+      color: var(--nb-ink);
+      font-size: 14px;
+      line-height: 20px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+  .nb-picked-more {
+    color: var(--nb-ink-2) !important;
+  }
+}
+
+@media (min-width: 1440px) {
+  html[data-surface="desk"] .nb {
+    --nb-stream: 460px;
+  }
+}
+@media (min-width: 1920px) {
+  html[data-surface="desk"] .nb {
+    --nb-stream: 540px;
+  }
+}
+
+/* the journal's print: rows are lines on the sheet, the paper has no card under it */
+html[data-surface="desk"][data-journal]:not([data-graphite]) .nb {
+  .nb-main,
+  .nb-capture {
+    box-shadow: inset 0 0 0 1px var(--rule);
+  }
+  .nb-row[data-current] {
+    box-shadow: none;
+  }
+}
+
+@keyframes nb-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] .nb {
+    .nb-hearing-dot {
+      animation: none;
+    }
+    .nb-row,
+    .nb-capture,
+    .nb-bar-button {
+      transition: none;
+    }
+  }
+}

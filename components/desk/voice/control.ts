@@ -17,9 +17,22 @@ export type VoicePin = Pin & { address: string };
  */
 let starting: Promise<void> | null = null;
 
+/** Dictaphones of the pages recording right now (D-177): the order line waits — one microphone at a time. */
+let pagesRecording = 0;
+
+/** A page's dictaphone started (true) or stopped (false) listening. */
+export function markPageRecording(on: boolean): void {
+  pagesRecording = Math.max(0, pagesRecording + (on ? 1 : -1));
+}
+
+/** A page's dictaphone is listening: the order line's microphone must not open a second one. */
+export function pageRecording(): boolean {
+  return pagesRecording > 0;
+}
+
 export function startDeskVoice(pin?: VoicePin | null): void {
   const store = useIngestStore.getState();
-  if (!CAN_START.has(store.stage)) return;
+  if (!CAN_START.has(store.stage) || pageRecording()) return;
   starting = pin ? store.startVoice(pin.address, { id: pin.id, name: pin.name }) : store.startVoice();
 }
 

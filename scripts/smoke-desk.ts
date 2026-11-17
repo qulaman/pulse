@@ -128,7 +128,7 @@ async function checkShell(ctx: Ctx) {
   const themeSwitched = await themeOf();
   await page.getByTestId("desk-theme").click();
   record("тема: тёмная по умолчанию, кнопка переключает туда и обратно", themeAtStart === "dark" && themeSwitched === "light" && (await themeOf()) === "dark", `${themeAtStart} → ${themeSwitched}`);
-  record("боковая навигация директора: одиннадцать разделов и профиль", nav === 12, `ссылок ${nav}`);
+  record("боковая навигация директора: двенадцать разделов и профиль", nav === 13, `ссылок ${nav}`);
 
   // the profile is a computer's account page: a label on the left, its control on the right (D-154 wave 3)
   const parts = ["desk-profile-password", "desk-profile-push", "desk-notify-rules", "desk-profile-view", "desk-profile-others", "desk-profile-signout"];

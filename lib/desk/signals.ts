@@ -114,25 +114,29 @@ export function secretarySignal({
 /**
  * The director's signal: the number the tab always showed (decisions, visitors, open requests —
  * the navigation's counts, `count`), the dot while it is above zero; with the sound on, a chime
- * for a visitor or a message at the door and for the secretary's question on his request.
+ * for a visitor or a message at the door and for the secretary's question on his request. A
+ * reminder that has just rung says itself in the tab's words («Напоминание: Банк») and lights the dot.
  */
 export function directorSignal({
   meId,
   count,
   errands,
   visits,
+  reminder = null,
 }: {
   meId: string;
   count: number;
   errands: readonly SignalErrand[];
   visits: readonly SignalVisit[];
+  /** A reminder of his own that has just rung on this desk (D-177): its words stay in the tab until seen. */
+  reminder?: string | null;
 }): DeskSignal {
   const door = [...awaitingDirector(visits).filter((v) => v.status === "waiting"), ...unreadMessages(visits)];
   const asked = errands.filter((e) => e.author_id === meId && e.status === "accepted" && e.question && e.asked_at && !e.answered_at);
   return {
     count,
-    words: null,
-    dot: count > 0 ? "wait" : "none",
+    words: reminder ? `Напоминание: ${clip(reminder, 28)}` : null,
+    dot: count > 0 || reminder ? "wait" : "none",
     chime: [...door.map((v) => `v:${v.id}`), ...asked.map((e) => `q:${e.id}:${e.asked_at}`)],
     ringing: false,
   };

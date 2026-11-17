@@ -38,11 +38,12 @@ const HOLD_MS = 350;
 /** A thought, not a meeting: the key lets go by itself after five minutes. */
 const MAX_MS = 5 * 60_000;
 
-const TOO_SHORT: Receipt = { tone: "warn", eyebrow: "Не записал", headline: "Слишком коротко", line: "Держи клавишу и говори, или нажми один раз" };
-const MIC_DENIED: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Нет доступа", line: "Разреши микрофон в настройках браузера" };
-const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Недоступен здесь", line: "Открой приложение по https" };
-const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Аудио сохранил", line: "Заметка в ленте — распознаю ещё раз по тапу" };
-const KEPT_ON_PHONE: Receipt = { tone: "warn", eyebrow: "Нет связи", headline: "Голос на телефоне", line: "Отправлю сам, как появится связь" };
+// the words fit the phone and the desk alike (D-177): no «телефон», no «держи клавишу»
+const TOO_SHORT: Receipt = { tone: "warn", eyebrow: "Не записал", headline: "Слишком коротко", line: "Скажите ещё раз, чуть дольше" };
+const MIC_DENIED: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Нет доступа", line: "Разрешите микрофон в настройках браузера" };
+const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Недоступен здесь", line: "Откройте приложение по https" };
+const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Голос сохранён", line: "Заметка с голосом — можно распознать ещё раз" };
+const KEPT_HERE: Receipt = { tone: "warn", eyebrow: "Нет связи", headline: "Голос сохранён", line: "Отправлю сам, как появится связь" };
 /**
  * A sub-point said under a point that has not left the phone yet (D-121): the network is
  * fine, the server just cannot take a sub-point before its point — the replay sends both.
@@ -55,7 +56,7 @@ export const WAITS_FOR_POINT: Receipt = { tone: "ok", eyebrow: "Голос со�
  * anything else waits for the network.
  */
 export function keptReceipt(waitsForPoint: boolean): Receipt {
-  return waitsForPoint ? WAITS_FOR_POINT : KEPT_ON_PHONE;
+  return waitsForPoint ? WAITS_FOR_POINT : KEPT_HERE;
 }
 
 /**

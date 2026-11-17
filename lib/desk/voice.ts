@@ -110,7 +110,8 @@ function ids(result: Record<string, unknown>, key: string): string[] {
 /**
  * The toast once the batch is away (D-164): whom and what — «Отправил: Жасулан — «Проверить
  * склад»», «Отправил 3 задачи: Жасулан и Гульмира» — and where «Открыть» leads: the one task in
- * the panel of «Задачи», the list for several, the section of a batch without tasks. Names stay in
+ * the panel of «Задачи», the list for several, the one note kept in «Заметки» (`?n=`), the section
+ * of a batch without tasks. Names stay in
  * the nominative (DESIGN §4): the gender of a Kazakh name is not known, «Айгерим» does not decline.
  */
 export function sentNotice(items: readonly SentItem[], result: Record<string, unknown>): SentNotice {
@@ -156,7 +157,11 @@ export function sentNotice(items: readonly SentItem[], result: Record<string, un
   else if (tasks.length > 1 || repeats.length > 0) href = "/desk/tasks";
   else if (events > 0) href = "/desk/calendar";
   else if (announcements > 0) href = "/desk/ether";
-  else if (count("reminder") > 0 || count("note") > 0) href = "/desk/notes";
+  else if (count("reminder") > 0 || count("note") > 0) {
+    // one thought kept: «Открыть» opens that very note (D-177), several — the list
+    const noteIds = ids(result, "note_ids");
+    href = count("reminder") + count("note") === 1 && noteIds.length === 1 ? `/desk/notes?n=${noteIds[0]}` : "/desk/notes";
+  }
   return { text, href };
 }
 

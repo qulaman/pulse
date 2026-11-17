@@ -3,7 +3,8 @@
 import { useState } from "react";
 
 import { Dialog } from "@/components/desk/ui/Dialog";
-import { MenuButton, type MenuItem } from "@/components/desk/ui/Menu";
+import { MoreMenu } from "@/components/desk/ui/IconButton";
+import type { MenuItem } from "@/components/desk/ui/Menu";
 import { NoteIcon } from "@/components/notes/icons";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -12,9 +13,9 @@ import { useFinishBoard, usePinBoard, useRenameBoard } from "@/lib/mindboard/mut
 import type { MindBoard } from "@/lib/mindboard/queries";
 
 /**
- * The actions of a board without opening it (D-140, wave 3): rename, pin, finish, to the bin — as
- * the desk's menu under «⋯» of its row (and `boardMenuItems` for a right click). The board itself
- * has the same and more on the right.
+ * The actions of a board without opening it (D-140, D-177): rename, pin, finish, to the bin — the
+ * desk's «⋯» under a sheet of the gallery (and `boardMenuItems` for a right click). «В корзину»
+ * here and in the board's own head do the same: the board goes at once, the toast brings it back.
  */
 export function BoardRowMenu({ board, me, onBin }: { board: MindBoard; me: { userId: string } | undefined; onBin: (board: MindBoard) => void }) {
   const [renaming, setRenaming] = useState(false);
@@ -24,20 +25,7 @@ export function BoardRowMenu({ board, me, onBin }: { board: MindBoard; me: { use
 
   return (
     <>
-      <MenuButton
-        items={items}
-        label={`Действия с доской «${board.title}»`}
-        width={248}
-        className="flex h-7 w-7 items-center justify-center text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-text"
-      >
-        <span data-testid="desk-board-menu" className="contents">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <circle cx="5.5" cy="12" r="1.7" />
-            <circle cx="12" cy="12" r="1.7" />
-            <circle cx="18.5" cy="12" r="1.7" />
-          </svg>
-        </span>
-      </MenuButton>
+      <MoreMenu items={items} label={`Действия с доской «${board.title}»`} width={248} testId="desk-board-menu" />
       <RenameBoardDialog board={board} me={me} open={renaming} onClose={() => setRenaming(false)} />
     </>
   );
@@ -76,7 +64,7 @@ export function boardMenuItems(board: MindBoard, { pin, finish, onBin, onRename 
           },
         ]),
     "separator",
-    { key: "delete", label: "В корзину", hint: "Del", danger: true, icon: <NoteIcon name="trash" size={14} />, onSelect: () => onBin(board) },
+    { key: "delete", label: "В корзину", danger: true, icon: <NoteIcon name="trash" size={14} />, onSelect: () => onBin(board) },
   ];
 }
 

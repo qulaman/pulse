@@ -199,7 +199,7 @@ export function BoardsPick({
   if (boards.length === 0) {
     return (
       <p className="text-[13px] leading-[18px] text-muted">
-        Досок пока нет — <Link href="/desk/notes?tab=boards" className="font-medium text-text underline underline-offset-2">заметки → доски</Link>
+        Досок пока нет — <Link href="/desk/boards" className="font-medium text-text underline underline-offset-2">доски</Link>
       </p>
     );
   }
@@ -211,7 +211,7 @@ export function BoardsPick({
         return (
           <li key={board.id} data-lit={lit ? "" : undefined} className={`screen-board-row flex min-h-11 items-center gap-1 border-b border-border/60 last:border-b-0 ${lit ? "bg-accent/[0.08] pl-2 shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
             <span className="min-w-0 flex-1">
-              <Link href={`/desk/notes/b/${board.id}`} className="block truncate text-[14px] leading-5 hover:underline">
+              <Link href={`/desk/boards/${board.id}`} className="block truncate text-[14px] leading-5 hover:underline">
                 {board.title}
               </Link>
               <span className="block truncate text-[12px] leading-4 text-muted">

@@ -238,6 +238,8 @@ describe("reminders (D-95)", () => {
     expect(reminderRu(soon, NOW)).toBe("напомню завтра 09:00");
     expect(reminderRu(rung, NOW)).toBe("напомнил сегодня 09:00");
     expect(reminderRu(note({ remind_at: "2026-09-23T06:59:00Z" }), NOW)).toBe("напомню сейчас");
+    // nothing rang for hours: no «сейчас» promise, the time it was due
+    expect(reminderRu(note({ remind_at: "2026-09-23T04:00:00Z" }), NOW)).toBe("время прошло · сегодня 09:00");
     expect(reminderRu(note(), NOW)).toBeNull();
   });
 

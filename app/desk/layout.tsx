@@ -24,6 +24,9 @@ import "./errands-pult.css";
 import "./errands-stoika.css";
 import "./errands-alarm.css";
 import "./planning.css";
+// «Заметки» and «Доски» apart (D-177): one file a section, after planning.css so they win a tie
+import "./notes.css";
+import "./boards.css";
 import "./reports.css";
 import "./settings.css";
 

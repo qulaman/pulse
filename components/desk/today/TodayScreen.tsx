@@ -41,6 +41,7 @@ import { queueOf, type DeskItem, type DeskReason } from "@/lib/tasks/desk";
 import { useTaskActions } from "@/lib/tasks/mutations";
 import { directorScreen, directorTabOf, reasonFor } from "@/lib/tasks/overview";
 import { useMe, usePulseBoard, useSentTasks, type Me, type TaskWithPeople } from "@/lib/tasks/queries";
+import { useRemindersToday } from "@/lib/notes/reminders";
 import { isOverdue } from "@/lib/tasks/status-text";
 import { useTvFeed } from "@/lib/tv/queries";
 import { useHydrated } from "@/lib/useHydrated";
@@ -456,6 +457,8 @@ function TodayView({
   }, [all]);
   const taskOfTitle = (title: string | null) => (title ? (byTitle.get(title.trim().toLowerCase()) ?? null) : null);
   const dueList = useMemo(() => [...dueToday].sort((a, b) => (a.deadline ?? "").localeCompare(b.deadline ?? "")), [dueToday]);
+  // «Напомню сегодня · N» (D-177): the director's own reminders, the same small read as the desk's ring
+  const reminders = useRemindersToday(me.userId, now);
 
   /* ---- who is at the door ---- */
   const visitRows = visits.data ?? [];
@@ -694,6 +697,7 @@ function TodayView({
               due={dueList}
               onOpenTask={openTask}
               now={now}
+              reminders={reminders}
             />
             <HomeSecretary me={me} />
             <HomeEther onAnnounce={() => useComposeStore.getState().request("Всем: ")} />

@@ -4,17 +4,20 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode, type RefObject } from "react";
 
 import { DeskScope } from "@/components/desk/DeskScope";
+import { QuickNote } from "@/components/desk/QuickNote";
 import { DeskLinks } from "@/components/desk/ui/DeskLinks";
 import { DeskPanelColumn, DeskPanelProvider, useDeskPanelState } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { ShortcutsHelp, useShortcuts, type Shortcut } from "@/components/desk/ui/Shortcuts";
 import { SideNav, useDeskBadges, useSettled, type DeskBrand } from "@/components/desk/ui/SideNav";
 import { TopBar } from "@/components/desk/ui/TopBar";
+import { NotesReplay } from "@/components/notes/NotesReplay";
 import { DeskAlarmGate } from "@/components/secretary/SecretaryAlarm";
 import { playChime, playRing, RING_EVERY_MS, unlockAudio, useAudioUnlocked, useDeskSound } from "@/lib/desk/chime";
 import { goPhoneView } from "@/lib/desk/device";
 import { directorSignal, newKeys, secretarySignal, tabTitle, type SignalDot } from "@/lib/desk/signals";
 import { useErrands, useSecretaryActions } from "@/lib/errands/queries";
+import { useReminderFlag, useReminderRinger } from "@/lib/notes/reminders";
 import { useNow } from "@/lib/pulse/queries";
 import { useVisits } from "@/lib/visits/queries";
 import { useDeskLook, useDeskTheme } from "@/lib/desk/theme";
@@ -257,12 +260,14 @@ function DeskSignals({ role, meId }: { role: DeskRole; meId: string }) {
   const now = useNow(secretary ? 10_000 : 60_000);
   const sound = useDeskSound(role);
   const unlocked = useAudioUnlocked();
+  // a reminder of his own that has just rung on this desk (D-177) says itself in the tab
+  const reminder = useReminderFlag();
 
   const rows = errands.data ?? [];
   const lobby = visits.data ?? [];
   const signal = secretary
     ? secretarySignal({ meId, errands: rows, visits: lobby, now, catalogue: catalogue.data ?? [] })
-    : directorSignal({ meId, count: (counts.tasks ?? 0) + (counts.today ?? 0) + (counts.errands ?? 0), errands: rows, visits: lobby });
+    : directorSignal({ meId, count: (counts.tasks ?? 0) + (counts.today ?? 0) + (counts.errands ?? 0), errands: rows, visits: lobby, reminder });
   const title = tabTitle(signal);
 
   // what the head should say; the route's metadata says «Pulse» again on every screen, and a
@@ -348,6 +353,16 @@ function DeskSignals({ role, meId }: { role: DeskRole; meId: string }) {
     return () => clearInterval(timer);
   }, [ringing, sound, unlocked]);
 
+  return null;
+}
+
+/**
+ * The director's own reminders ring on time while the desk is open (D-177, `lib/notes/reminders.ts`):
+ * the server's sweep comes once a day on this plan. «Открыть» in the toast is the desk's navigation.
+ */
+function DeskReminders({ meId }: { meId: string }) {
+  const router = useRouter();
+  useReminderRinger({ userId: meId }, (href) => router.push(href));
   return null;
 }
 
@@ -492,6 +507,15 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
         {narrow ? <NarrowHint role={role} /> : null}
         {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
         <DeskSignals role={role} meId={me.userId} />
+        {role === "director" ? (
+          <>
+            {/* a thought kept on this computer without network lands once it is back, from any section (D-95, D-177) */}
+            <NotesReplay />
+            {/* Alt+N — a thought into «Заметки» from any section, verbatim (D-177) */}
+            <QuickNote me={me} />
+            <DeskReminders meId={me.userId} />
+          </>
+        ) : null}
         {/* «?» — every key of the screen and of the desk (D-154 wave 3) */}
         <ShortcutsHelp />
       </DeskScope>

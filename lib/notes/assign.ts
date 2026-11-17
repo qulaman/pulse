@@ -3,12 +3,12 @@
 import { useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { toast } from "@/components/ui/Toast";
+import { assignBody } from "@/lib/mindboard/assignPoint";
 import { isNetworkError, NetworkError } from "@/lib/net";
 import { shortName } from "@/lib/people/names";
 import { pluralRu } from "@/lib/tasks/status-text";
 import { voiceApi, VoiceApiError } from "@/lib/voice/api";
 
-import { firstLine, restLines } from "./list";
 import { noteKeys, type Note } from "./queries";
 
 /**
@@ -35,34 +35,8 @@ export type AssignResult = { taskId: string | null; scheduled: boolean };
 /** One task from one line: the pick's idempotency key, its note marked by `note_id`. */
 async function sendAssign({ note, person, forceNow, client_request_id }: AssignInput): Promise<AssignResult> {
   if (typeof navigator !== "undefined" && !navigator.onLine) throw new NetworkError();
-  const text = note.text.trim();
-  const res = await voiceApi.confirm({
-    client_request_id,
-    source: "typed",
-    audio_path: note.audio_path,
-    transcript: text,
-    parsed_entities: [],
-    confirmed_entities: [
-      {
-        kind: "task",
-        assignee_queries: [],
-        assignee_id: person.id,
-        assignee_name: person.full_name,
-        assignee_confidence: 1,
-        group_id: null,
-        title: firstLine(text) || text,
-        body: restLines(text) || null,
-        deadline_iso: null,
-        deadline_confidence: null,
-        deadline_source_text: null,
-        priority: "normal",
-        scheduled_send_at: null,
-        source_span: text,
-      },
-    ],
-    note_id: note.id,
-    ...(forceNow ? { force_now: true } : {}),
-  });
+  // one body for a line handed out here and for «Поручить этот пункт» with its undo window (D-177)
+  const res = await voiceApi.confirm(assignBody(note, person, client_request_id, forceNow));
   const ids = (res.result.task_ids as string[] | null | undefined) ?? [];
   return { taskId: ids[0] ?? null, scheduled: res.result.scheduled === true };
 }

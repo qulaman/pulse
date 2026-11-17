@@ -3,6 +3,7 @@
 import {
   Activity,
   AlarmClock,
+  BellRing,
   CalendarClock,
   CalendarDays,
   Check,
@@ -466,6 +467,7 @@ export function Agenda({
   now,
   note,
   failed,
+  reminders,
 }: {
   events: readonly CalendarEvent[];
   loading: boolean;
@@ -477,8 +479,11 @@ export function Agenda({
   due: readonly TaskWithPeople[];
   onOpenTask: (id: string) => void;
   now: Date;
+  /** the director's own reminders still to ring today (D-177): one quiet line, none at 0 */
+  reminders?: { count: number; next: Date | null };
 }) {
   const dueToday = due.length;
+  const reminding = reminders && reminders.count > 0 ? reminders : null;
   const today = todayYmd(now);
   const todays = events.filter((event) => ymdOfEvent(event) === today).sort((a, b) => a.starts_at.localeCompare(b.starts_at));
   const later = todays.length === 0 ? nextEvent(events.filter((event) => ymdOfEvent(event) > today), now) : null;
@@ -492,7 +497,7 @@ export function Agenda({
         </Titled>
       </SectionLabel>
       {note}
-      {known || dueToday > 0 ? (
+      {known || dueToday > 0 || reminding ? (
         <ul className="desk-list">
           {!known ? null : todays.length === 0 ? (
             <li>
@@ -527,6 +532,22 @@ export function Agenda({
                 <span />
                 <span className="text-muted">
                   ещё <Num value={dueToday - DUE_SHOWN} /> {pluralRu(dueToday - DUE_SHOWN, ["срок", "срока", "сроков"])} — в «Задачах» →
+                </span>
+              </Link>
+            </li>
+          ) : null}
+          {reminding ? (
+            <li>
+              {/* a quiet line, not a list (D-177): the thoughts are private, «Заметки» shows them */}
+              <Link href="/desk/notes" prefetch className={`desk-row ${DAY_ROW_MARKED}`} data-testid="today-reminders">
+                <When className="text-muted">{reminding.next ? humanAqtobe(reminding.next, now).replace(/^сегодня /, "") : "сегодня"}</When>
+                <span className="flex min-w-0 items-center gap-2 text-muted">
+                  <span aria-hidden className="inline-flex shrink-0" style={{ color: "var(--warn-ink, var(--warn))" }}>
+                    <BellRing size={14} strokeWidth={2.25} />
+                  </span>
+                  <span className="truncate">
+                    Напомню сегодня · <Num value={reminding.count} />
+                  </span>
                 </span>
               </Link>
             </li>

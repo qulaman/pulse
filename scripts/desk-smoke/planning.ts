@@ -239,18 +239,20 @@ export async function checkNotes(ctx: Ctx) {
     skip("заметки: создать, сохранить, удалить", "на dev активность");
   } else {
     const words = `смоук ${ctx.stamp}`;
-    await page.getByTestId("desk-note-new").click();
-    const editor = page.locator('[data-testid="desk-note"] [data-testid="note-editor"]');
-    await editor.waitFor({ timeout: 10_000 });
-    await page.waitForTimeout(300);
-    const focused = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
-    record("заметки: «Новая заметка» — курсор в редакторе", focused === "note-editor", `activeElement=${focused}`);
+    // D-177: N puts the caret into the capture card; Enter saves verbatim and keeps the caret there
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press("KeyN");
+    await page.waitForTimeout(200);
+    const focused = await page.evaluate(() => document.activeElement?.id);
+    record("заметки: N — курсор в строке «Новая мысль»", focused === "desk-notes-capture", `activeElement=${focused}`);
     await page.keyboard.type(words);
-    const saved = await page.getByTestId("note-saved").waitFor({ timeout: 15_000 }).then(() => true, () => false);
-    const listed = await list.getByText(words).count();
-    record("заметки: текст сохранился сам («Сохранено»), строка в списке", saved && listed === 1, `в списке ${listed}`);
+    await page.keyboard.press("Enter");
+    const listed = await list.getByText(words).first().waitFor({ timeout: 15_000 }).then(() => true, () => false);
+    const after = await page.evaluate(() => ({ id: document.activeElement?.id, value: (document.activeElement as HTMLTextAreaElement | null)?.value ?? null }));
+    record("заметки: Enter — мысль в списке, строка пуста и ждёт следующую", listed && after.id === "desk-notes-capture" && after.value === "", `в фокусе ${after.id}, «${after.value}»`);
     await ctx.shot("notes-saved");
 
+    await list.getByText(words).first().click();
     await page.getByTestId("desk-note-delete").click();
     const gone = await list.getByText(words).waitFor({ state: "detached", timeout: 8_000 }).then(() => true, () => false);
     record("заметки: «Удалить» убирает из мыслей", gone);
@@ -259,7 +261,7 @@ export async function checkNotes(ctx: Ctx) {
     const card = page.getByTestId("note-trashed").filter({ hasText: words });
     const inBin = await card.waitFor({ timeout: 8_000 }).then(() => true, () => false);
     if (inBin) {
-      await card.getByRole("button", { name: "Удалить навсегда" }).click();
+      await card.getByRole("button", { name: "Удалить навсегда" }).click({ force: true });
       await page.getByTestId("desk-purge-confirm").click();
       const purged = await card.waitFor({ state: "detached", timeout: 8_000 }).then(() => true, () => false);
       record("заметки: корзина — «Удалить навсегда»", purged);
@@ -283,20 +285,33 @@ export async function checkNotes(ctx: Ctx) {
   await page.keyboard.press("Escape");
   record("заметки: клавиши в справке «?»", await helpLists(page, "Заметки"));
 
-  // the boards: the list, and the first one opened on the right as an outline — looked at, walked, not typed in
-  await page.getByTestId("seg-boards").click();
-  const rows = list.getByTestId("desk-row");
-  await page.waitForTimeout(800);
-  if ((await rows.count()) > 0) {
-    await rows.first().click();
-    await page.waitForURL((url) => url.pathname.startsWith("/desk/notes/b/"), { timeout: 15_000 });
+  // «Доски» are a section of their own since D-177
+  await checkBoards(ctx);
+}
+
+/**
+ * «Доски» (D-177): the gallery of sheets, and the first board opened on the whole work area — the
+ * outline beside «Как увидит кабинет»; looked at, walked, not typed in. Nothing is written.
+ */
+export async function checkBoards(ctx: Ctx) {
+  const { page } = ctx;
+  await open(page, "/desk/boards");
+  const grid = await page.getByTestId("boards-grid").waitFor({ timeout: 15_000 }).then(() => true, () => false);
+  record("доски: галерея листов", grid && (await page.getByTestId("boards-new").count()) === 1);
+  await ctx.shot("boards");
+  record("доски: клавиши в справке «?»", await helpLists(page, "Доски"));
+  const tiles = page.getByTestId("boards-open");
+  if ((await tiles.count()) > 0) {
+    await tiles.first().click();
+    await page.waitForURL((url) => /^\/desk\/boards\/[^/]+$/.test(url.pathname), { timeout: 15_000 });
     const outline = page.getByTestId("desk-outline");
     const shown = await outline.waitFor({ timeout: 15_000 }).then(() => true, () => false);
-    const width = shown ? ((await page.getByTestId("desk-board").boundingBox())?.width ?? 0) : 0;
+    const width = shown ? ((await outline.boundingBox())?.width ?? 0) : 0;
     const lines = shown ? await outline.getByTestId("desk-outline-line").count() : 0;
-    record("заметки: доска — настольный редактор пунктов справа", shown && width > 600, `ширина ${Math.round(width)}, строк ${lines}`);
+    const wall = await page.getByTestId("board-wall-card").isVisible().catch(() => false);
+    record("доски: доска на всю ширину — пункты и «Как увидит кабинет»", shown && width > 500 && wall, `ширина ${Math.round(width)}, строк ${lines}`);
     await page.waitForTimeout(600);
-    await ctx.shot("notes-board");
+    await ctx.shot("board");
     if (lines >= 2) {
       // a click into a line and ↓ — the caret walks to the next line; Esc lets it go, nothing changed
       const fields = outline.locator("[data-testid=desk-outline-line] textarea");
@@ -305,14 +320,14 @@ export async function checkNotes(ctx: Ctx) {
       const first = await page.evaluate(() => document.activeElement?.getAttribute("data-line"));
       await page.keyboard.press("ArrowDown");
       const second = await page.evaluate(() => document.activeElement?.getAttribute("data-line"));
-      record("заметки: доска — ↓ переводит курсор на следующую строку", Boolean(first && second && first !== second), `${first?.slice(0, 8)} → ${second?.slice(0, 8)}`);
+      record("доски: ↓ переводит курсор на следующую строку", Boolean(first && second && first !== second), `${first?.slice(0, 8)} → ${second?.slice(0, 8)}`);
       await page.keyboard.press("Escape");
     } else {
-      skip("заметки: доска — ↓ по строкам", "на доске меньше двух строк");
+      skip("доски: ↓ по строкам", "на доске меньше двух строк");
     }
-    record("заметки: клавиши доски в справке «?»", await helpLists(page, "Доска"));
+    record("доски: клавиши доски в справке «?»", await helpLists(page, "Доска"));
   } else {
-    skip("заметки: доска открывается справа", "досок нет");
+    skip("доски: доска открывается", "досок нет");
   }
 }
 

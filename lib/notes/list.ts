@@ -292,13 +292,21 @@ export function awaitsReminder(note: Note): boolean {
   return note.remind_at !== null && note.reminded_at === null && note.deleted_at === null;
 }
 
-/** The reminder of a note in words: «напомню завтра 09:00», «напомнил вчера 09:00». */
+/**
+ * A reminder past its time and not rung yet is «сейчас» this long: an open desk rings it within
+ * its minute (D-177), the phone's push comes with the next sweep. Past that nothing rang — the
+ * words say the time went by instead of promising «сейчас» for hours.
+ */
+const RINGS_NOW_MS = 5 * 60_000;
+
+/** The reminder of a note in words: «напомню завтра 09:00», «напомнил вчера 09:00», «время прошло · сегодня 10:00». */
 export function reminderRu(note: Note, now: Date): string | null {
   if (!note.remind_at) return null;
   const at = new Date(note.remind_at);
   if (note.reminded_at) return `напомнил ${whenRu(note.remind_at, now)}`;
-  // the tick has not come round yet: it rings within the minute
-  if (at.getTime() <= now.getTime()) return "напомню сейчас";
+  const late = now.getTime() - at.getTime();
+  if (late >= RINGS_NOW_MS) return `время прошло · ${whenRu(note.remind_at, now)}`;
+  if (late >= 0) return "напомню сейчас";
   return `напомню ${humanAqtobe(at, now)}`;
 }
 

@@ -46,11 +46,11 @@ describe("deskRouteFor — the director", () => {
     expect(to("/admin", "?table=tasks")).toBe("/desk/settings/data?table=tasks");
     expect(to("/secretary", "?e=e1")).toBe("/desk/errands?e=e1");
     expect(to("/calendar")).toBe("/desk/calendar");
-    expect(to("/notes", "?tab=boards")).toBe("/desk/notes?tab=boards");
+    expect(to("/notes", "?tab=boards")).toBe("/desk/boards");
     // what the pushes carry: a meeting, a reminder
     expect(to("/calendar", "?e=ev1")).toBe("/desk/calendar?e=ev1");
     expect(to("/notes", "?n=n1")).toBe("/desk/notes?n=n1");
-    expect(to("/notes/b/b1")).toBe("/desk/notes/b/b1");
+    expect(to("/notes/b/b1")).toBe("/desk/boards/b1");
     expect(to("/screen")).toBe("/desk/screen");
     expect(to("/reports")).toBe("/desk/reports");
     expect(to("/rating")).toBe("/desk/settings/points");
@@ -126,7 +126,7 @@ describe("mayHaveDeskRoute", () => {
 
 describe("deskAllows and the navigation", () => {
   it("keeps the secretary off the director's desk screens", () => {
-    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/screen", "/desk/settings/lab", "/desk/settings/data", "/desk/settings/points"]) {
+    for (const path of ["/desk/today", "/desk/tasks", "/desk/inbox", "/desk/reports", "/desk/notes", "/desk/notes/b/1", "/desk/boards", "/desk/boards/1", "/desk/screen", "/desk/settings/lab", "/desk/settings/data", "/desk/settings/points"]) {
       expect(deskAllows(path, "secretary")).toBe(false);
       expect(deskAllows(path, "director")).toBe(true);
     }
@@ -161,6 +161,7 @@ describe("chordHref (D-154 wave 3)", () => {
   it("goes to the role's section by the letter after G", () => {
     expect(chordHref("KeyT", "director")).toBe("/desk/tasks");
     expect(chordHref("KeyS", "director")).toBe("/desk/today");
+    expect(chordHref("KeyD", "director")).toBe("/desk/boards");
     expect(chordHref("KeyA", "director")).toBe("/desk/ether");
     expect(chordHref("KeyA", "secretary")).toBe("/desk/ether");
     expect(chordHref("KeyH", "secretary")).toBe("/desk/settings");

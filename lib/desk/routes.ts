@@ -45,6 +45,7 @@ export const DESK_NAV: Record<DeskRole, DeskNavItem[]> = {
     { href: "/desk/reports", label: "Отчёты", key: "O" },
     { href: "/desk/calendar", label: "Календарь", badge: "calendar", key: "C" },
     { href: "/desk/notes", label: "Заметки", key: "N" },
+    { href: "/desk/boards", label: "Доски", key: "D" },
     { href: "/desk/screen", label: "Экран", key: "E" },
     { href: "/desk/settings", label: "Настройки", key: "H" },
   ],
@@ -83,6 +84,7 @@ const DIRECTOR_ONLY = [
   "/desk/inbox",
   "/desk/reports",
   "/desk/notes",
+  "/desk/boards",
   "/desk/screen",
   "/desk/settings/lab",
   "/desk/settings/data",
@@ -169,9 +171,13 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
     case "/calendar":
       // a meeting's push carries `?e=<event>`; the desk calendar opens it
       return withQuery("/desk/calendar", keep(search, ["e"]));
-    case "/notes":
+    case "/notes": {
+      if (!director) return null;
+      // the phone's «Доски» tab is a section of its own on the desk (D-177)
+      if (keep(search, ["tab"]).get("tab") === "boards") return "/desk/boards";
       // a reminder's push carries `?n=<note>`; the desk notes open it
-      return director ? withQuery("/desk/notes", keep(search, ["tab", "n"])) : null;
+      return withQuery("/desk/notes", keep(search, ["tab", "n"]));
+    }
     case "/screen":
       return director ? "/desk/screen" : null;
     case "/reports":
@@ -199,7 +205,7 @@ export function deskRouteFor(pathname: string, search: string, role: Role | unde
   match = new RegExp(`^/people/${ID}$`).exec(path);
   if (match) return withQuery(`/desk/team/${match[1]}`, none);
   match = new RegExp(`^/notes/b/${ID}$`).exec(path);
-  if (match) return director ? `/desk/notes/b/${match[1]}` : null;
+  if (match) return director ? `/desk/boards/${match[1]}` : null;
   return null;
 }
 

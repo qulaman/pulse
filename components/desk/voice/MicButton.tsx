@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
+import { useVoiceClaim, voiceClaimed } from "@/components/desk/voice/claim";
 import { cancelDeskVoice, deskLayerUp, finishDeskVoice, startDeskVoice, type VoicePin } from "@/components/desk/voice/control";
 import { toast } from "@/components/ui/Toast";
 import { isTypingTarget } from "@/lib/desk/keys";
-import { CAN_START, isVoiceKey, VOICE_KEY } from "@/lib/desk/voice";
+import { CAN_START, IN_FLIGHT, isVoiceKey, VOICE_KEY } from "@/lib/desk/voice";
 import { subscribeIngestLevel, useIngestStore, type IngestStage } from "@/lib/store/ingest";
 import { elapsedSince } from "@/lib/voice/stages";
 
@@ -69,13 +70,50 @@ function busyLine(stage: IngestStage): string {
   return stage === "confirm" || stage === "sending" ? "Сначала отправьте или отмените поручение в панели" : "Разбираю прошлую фразу — секунду";
 }
 
-function MicGlyph() {
+/** The desk's microphone, one drawing for the order line and the pages' dictaphones (D-177). */
+export function MicGlyph({ size = 18 }: { size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <rect x="7.6" y="2.6" width="4.8" height="9" rx="2.4" />
       <path d="M4.8 9.6a5.2 5.2 0 0 0 10.4 0" />
       <line x1="10" y1="14.8" x2="10" y2="17.4" />
     </svg>
+  );
+}
+
+/**
+ * What a desk microphone shows while it listens (D-164, D-177): a dot, the time, the voice and
+ * «Готово» — the order line's and a page's dictaphone are one family; the click saves.
+ */
+export function RecordingPill({
+  clock,
+  level,
+  onClick,
+  ariaLabel,
+  testId,
+  className = "",
+}: {
+  clock: ReactNode;
+  level: ReactNode;
+  onClick: () => void;
+  ariaLabel: string;
+  testId: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      data-testid={testId}
+      data-recording="1"
+      className={`desk-focus flex h-8 shrink-0 items-center gap-2 border border-accent px-2.5 text-accent transition-colors duration-[120ms] hover:bg-accent/10 ${className}`}
+    >
+      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" />
+      {clock}
+      {level}
+      <span className="text-[13px] font-semibold leading-4">Готово</span>
+    </button>
   );
 }
 
@@ -107,8 +145,10 @@ function useVoiceKeys(pin: VoicePin | null) {
     };
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || !isVoiceKey(event) || isTypingTarget(event.target) || deskLayerUp()) return;
-      event.preventDefault();
       const stage = useIngestStore.getState().stage;
+      // «Заметки», «Доски», the quick thought hold the voice (D-177): «V» is their dictaphone's
+      if (voiceClaimed()) return;
+      event.preventDefault();
       // one phrase at a time: the key says why it does not listen instead of doing nothing
       if (!CAN_START.has(stage)) toast(busyLine(stage));
       else startDeskVoice(pinned.current);
@@ -130,6 +170,7 @@ function useVoiceKeys(pin: VoicePin | null) {
  */
 export function MicButton({ pin }: { pin: VoicePin | null }) {
   const stage = useIngestStore((state) => state.stage);
+  const claim = useVoiceClaim();
   useVoiceKeys(pin);
   const recording = stage === "recording";
   const free = CAN_START.has(stage);
@@ -137,22 +178,21 @@ export function MicButton({ pin }: { pin: VoicePin | null }) {
   if (recording) {
     return (
       <Tooltip label="Готово — отправить на разбор" keys={["Enter"]} side="bottom">
-        <button
-          type="button"
+        <RecordingPill
           onClick={() => void finishDeskVoice()}
-          aria-label="Идёт запись. Нажмите, чтобы закончить и разобрать"
-          data-testid="command-mic"
-          data-recording="1"
-          className="desk-focus flex h-8 shrink-0 items-center gap-2 rounded-[2px] border border-accent px-2.5 text-accent transition-colors duration-[120ms] hover:bg-accent/10"
-        >
-          <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-current motion-reduce:animate-none" />
-          <Elapsed className="text-[13px] font-medium leading-4" />
-          <LevelBars height={14} />
-          <span className="text-[13px] font-semibold leading-4">Готово</span>
-        </button>
+          ariaLabel="Идёт запись. Нажмите, чтобы закончить и разобрать"
+          testId="command-mic"
+          className="rounded-[2px]"
+          clock={<Elapsed className="text-[13px] font-medium leading-4" />}
+          level={<LevelBars height={14} />}
+        />
       </Tooltip>
     );
   }
+
+  // a page holds the voice (D-177): its own dictaphone writes word for word, one microphone on a
+  // screen — the line's steps aside unless an order phrase of its own is still on its way
+  if (claim !== null && !IN_FLIGHT.has(stage)) return null;
 
   const label = free ? (pin ? `Сказать поручение: ${pin.name}` : "Сказать поручение голосом") : busyLine(stage);
   return (

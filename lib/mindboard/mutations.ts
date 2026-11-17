@@ -9,6 +9,7 @@ import { noteKeys, type Note } from "@/lib/notes/queries";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
 import { boardKeys, type MindBoard } from "./queries";
+import { pointToThoughtRefusal, type ThoughtRestore } from "./thought";
 
 /**
  * Boards (D-102) are written straight through PostgREST under RLS, like notes. A new
@@ -23,7 +24,7 @@ type Me = { userId: string; companyId: string };
 type NewBoard = { id: string; title: string; client_request_id: string };
 
 const OFFLINE = "Нет связи — не получилось, попробуйте ещё раз";
-const KEPT_OFFLINE = "Нет связи — доска на телефоне, отправлю сам";
+const KEPT_OFFLINE = "Нет связи — доска сохранена, отправлю сам";
 const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
 
 /** Creates of boards and notes run in one line: a point never overtakes its board. */
@@ -251,6 +252,88 @@ export function useMovePoint(me: { userId: string } | undefined) {
     },
     onError: (error, _input, context) => {
       if (me && context?.snapshot) queryClient.setQueryData(noteKeys.mine(me.userId), context.snapshot);
+      fail(error);
+    },
+  });
+}
+
+export { pointToThoughtRefusal, type ThoughtRestore } from "./thought";
+
+/** «В мысли» said no in words — on the screen as it is, never through the server's error map. */
+class Refusal extends Error {}
+
+/**
+ * «В мысли» (D-177): a plain point of a board becomes a loose thought again — one row written,
+ * the cache moves at the click. `restore` puts back the reminder and the pin a «На доску» just
+ * cleared (the «Отменить» of that toast); without it the thought comes back plain. The thought
+ * keeps its `created_at`, so it returns to its own day in «Заметки». Online only, like a move.
+ */
+export function usePointToThought(me: { userId: string } | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    networkMode: "always",
+    retry: false,
+    scope: { id: "notes" },
+    mutationFn: async ({ id, restore }: { id: string; restore?: ThoughtRestore }) => {
+      if (typeof navigator !== "undefined" && !navigator.onLine) throw new NetworkError();
+      const supabase = createBrowserSupabase();
+      // the cache may not know a sub-point made on another device: the branch would be orphaned
+      // (its follow trigger only moves it to another board), so the server's rows decide
+      const children = await supabase.from("notes").select("id", { count: "exact", head: true }).eq("parent_id", id).is("deleted_at", null);
+      if (children.error) throw new Error(children.error.message);
+      if ((children.count ?? 0) > 0) throw new Refusal("У пункта есть подпункты — он остаётся на доске");
+      const { data, error } = await supabase
+        .from("notes")
+        .update({
+          board_id: null,
+          position: null,
+          parent_id: null,
+          done_at: null,
+          remind_at: restore?.remind_at ?? null,
+          pinned: restore?.pinned ?? false,
+        })
+        .eq("id", id)
+        .is("parent_id", null)
+        .is("sketch", null)
+        .is("converted_task_id", null)
+        .select("id");
+      if (error) throw new Error(error.message);
+      // nothing matched: handed out or drawn on another device meanwhile — it stays on the board
+      if ((data ?? []).length === 0) throw new Refusal("Пункт изменился на другом устройстве — он остаётся на доске");
+    },
+    onMutate: async ({ id, restore }) => {
+      if (!me) return undefined;
+      const key = noteKeys.mine(me.userId);
+      const rows = queryClient.getQueryData<Note[]>(key) ?? [];
+      const note = rows.find((row) => row.id === id);
+      const refusal = note ? pointToThoughtRefusal(note, rows) : null;
+      if (refusal) throw new Refusal(refusal);
+      await queryClient.cancelQueries({ queryKey: key });
+      queryClient.setQueryData<Note[]>(key, (list) =>
+        (list ?? []).map((row) =>
+          row.id === id
+            ? {
+                ...row,
+                board_id: null,
+                position: null,
+                parent_id: null,
+                done_at: null,
+                remind_at: restore?.remind_at ?? null,
+                pinned: restore?.pinned ?? false,
+              }
+            : row,
+        ),
+      );
+      return { snapshot: rows };
+    },
+    onError: (error, _input, context) => {
+      if (me && context?.snapshot) queryClient.setQueryData(noteKeys.mine(me.userId), context.snapshot);
+      // a refusal is already a sentence; the server's errors are mapped by `fail`
+      if (error instanceof Refusal) {
+        toast(error.message);
+        return;
+      }
       fail(error);
     },
   });

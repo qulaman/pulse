@@ -673,23 +673,6 @@ html[data-surface="desk"][data-journal] {
       box-shadow: inset 0 -1px 0 var(--pen);
     }
   }
-  /* the phone's cards of a note or a board where the desk shows them: rows of the list, the ring only on a stage */
-  [data-testid="desk-notes"] .task-card {
-    padding: 8px 0;
-    background: none;
-    border: 0;
-    border-bottom: 1px solid var(--rule-soft);
-    border-radius: 0;
-    box-shadow: none;
-
-    > span[aria-hidden]:first-child {
-      display: none;
-    }
-    /* a date a note will go on is no move of the director's: print, not the pen */
-    .nums {
-      color: var(--ink-2) !important;
-    }
-  }
   /* the phone's benches in the lab: their cards are sections of the sheet, their tiles plain figures */
   .desk-bench .card {
     padding: 8px 0 16px;

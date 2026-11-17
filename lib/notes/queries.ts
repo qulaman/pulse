@@ -207,6 +207,29 @@ export function useOlderNotes(userId: string | undefined) {
   });
 }
 
+/**
+ * One note by its id — a reminder's push or a link to a thought older than the loaded feed
+ * (D-177): read once and laid into the notes cache, so the page shows it and every edit, pin
+ * and Realtime event treats it like any other row. Null — no such note for this author (RLS).
+ */
+export function useNote(userId: string | undefined, id: string | null, enabled: boolean) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: ["notes", "one", userId ?? "", id ?? ""] as const,
+    enabled: Boolean(userId) && Boolean(id) && enabled,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Note | null> => {
+      const supabase = createBrowserSupabase();
+      const { data, error } = await supabase.from("notes").select("*").eq("id", id as string).maybeSingle();
+      if (error) throw new Error(error.message);
+      if (data && userId) {
+        queryClient.setQueryData<Note[]>(noteKeys.mine(userId), (rows) => (rows && !rows.some((note) => note.id === data.id) ? [...rows, data].sort(newestFirst) : rows));
+      }
+      return data ?? null;
+    },
+  });
+}
+
 /** `%` and `_` are wildcards of ilike: a typed «50%» must mean the characters. */
 function likeEscape(text: string): string {
   return text.replace(/[\\%_]/g, (char) => `\\${char}`);

@@ -85,6 +85,16 @@ describe("sentNotice", () => {
     expect(sentNotice([{ kind: "recurrence", title: "Отчёт", who: "Гульмира" }], {})).toEqual({ text: "Отправил повтор «Отчёт» — Гульмира", href: "/desk/tasks" });
   });
 
+  it("one thought kept: «Открыть» opens that note; several — the list", () => {
+    expect(sentNotice([{ kind: "note", title: "Банк", who: null }], { note_ids: ["n1"] })).toEqual({ text: "Отправил заметку в Заметки", href: "/desk/notes?n=n1" });
+    expect(sentNotice([{ kind: "reminder", title: "Позвонить", who: null }], { note_ids: ["n2"] }).href).toBe("/desk/notes?n=n2");
+    expect(sentNotice([{ kind: "note", title: "А", who: null }, { kind: "reminder", title: "Б", who: null }], { note_ids: ["n1", "n2"] }).href).toBe("/desk/notes");
+    // the answer did not name the note: the list, never a broken address
+    expect(sentNotice([{ kind: "note", title: "Банк", who: null }], {}).href).toBe("/desk/notes");
+    // a task in the batch still wins «Открыть»
+    expect(sentNotice([task("Проверить склад", "Жасулан"), { kind: "note", title: "Банк", who: null }], { task_ids: ["t1"], note_ids: ["n1"] }).href).toBe("/desk/tasks?id=t1");
+  });
+
   it("quiet hours: the batch waits for the morning and says so", () => {
     expect(sentNotice([task("Проверить склад", "Жасулан")], { task_ids: ["t1"], scheduled: true }).text).toBe("Отправлю утром: Жасулан — «Проверить склад»");
   });

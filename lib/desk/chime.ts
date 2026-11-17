@@ -154,6 +154,16 @@ export function writeDeskSound(on: boolean): void {
   for (const listener of soundListeners) listener();
 }
 
+/**
+ * Whether a reminder the person set himself may chime (D-177): unless this browser was told «Без
+ * звука» — the director's default silence is about other people's news, not his own «напомни».
+ */
+export function reminderSoundOn(): boolean {
+  if (typeof window === "undefined") return false;
+  const value = memory === null ? readSoundValue() : memory ? "on" : "off";
+  return value !== "off";
+}
+
 /** Whether this browser chimes and rings: on for the secretary, off for the director until chosen. */
 export function useDeskSound(role: "director" | "secretary"): boolean {
   return useSyncExternalStore(
