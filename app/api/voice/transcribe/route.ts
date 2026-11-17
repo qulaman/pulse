@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
-import { guardTranscript } from "@/lib/ai/stt-guard";
+import { guardTranscript, isOpus, isSilentOpus } from "@/lib/ai/stt-guard";
 import { getSttProviders, SttError, transcribe } from "@/lib/ai/stt";
 import { HINT_MAX_PEOPLE } from "@/lib/ai/hint-roster";
 import { loadAssigneeCounts, loadCompanySettings, loadRoster, vocabularyHintsFor } from "@/lib/roster";
@@ -81,6 +81,20 @@ export const POST = withAuth<z.infer<typeof BodySchema>>(
     const buffer = Buffer.from(await file.data.arrayBuffer());
     const ext = body.audio_path.split(".").pop()?.toLowerCase() ?? "";
     const mime = MIME_BY_EXT[ext] ?? "audio/webm";
+
+    // a dead microphone: nothing to hear, and the recogniser would make a phrase up (AI.md §1 (з))
+    if (body.duration_ms && isSilentOpus({ bytes: buffer.length, durationMs: body.duration_ms, opus: isOpus(buffer) })) {
+      await supabase.from("ai_logs").insert({
+        ...logRow,
+        provider: "none",
+        model: "none",
+        status: "error:stt_guard:silent",
+        raw_response: { duration_ms: body.duration_ms, bytes: buffer.length },
+        stt_ms: 0,
+        latency_ms: 0,
+      });
+      return apiOk({ transcript: null, code: "empty_transcript", guard: "silent" });
+    }
 
     const settings = parseCompanySettings(rawSettings);
     // Only a large roster needs the task history to decide whom the prompt names (D-55).

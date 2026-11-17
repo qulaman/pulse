@@ -43,6 +43,7 @@ export const ERROR_ACT: Record<IngestErrorCode, MascotAct> = {
   // the microphone is not there: the ear crossed out
   mic_denied: "nomic",
   mic_unavailable: "nomic",
+  mic_silent: "nomic",
   // no network, or the audio could not be saved: a phone held up for signal
   network: "signal",
   upload_failed: "signal",

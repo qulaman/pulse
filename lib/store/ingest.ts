@@ -42,6 +42,7 @@ import {
 import {
   createRecorder,
   extForMime,
+  isSilent,
   MicUnavailableError,
   type RecordedAudio,
   type Recorder,
@@ -75,6 +76,7 @@ export type IngestStage =
 
 export type IngestErrorCode =
   | "record_too_short"
+  | "mic_silent"
   | "mic_denied"
   | "mic_unavailable"
   | "stt_failed"
@@ -119,6 +121,7 @@ export const KEPT_MS = 1500;
 
 const KNOWN_CODES = new Set<string>([
   "record_too_short",
+  "mic_silent",
   "mic_denied",
   "mic_unavailable",
   "stt_failed",
@@ -658,6 +661,13 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         fail(cause, "upload");
         return;
       }
+      // nothing came through the microphone: the voice is in Storage (principle 5), but the
+      // recogniser is not asked — on silence it invents a phrase out of its hint (2026-11-17)
+      if (isSilent(audio)) {
+        forget();
+        set({ stage: "error", error: { code: "mic_silent" }, retryFrom: null });
+        return;
+      }
       await get().runTranscribe();
     },
 
@@ -688,7 +698,8 @@ export const useIngestStore = create<IngestState & IngestActions>((set, get) => 
         if (res.code === "empty_transcript" || !words.trim()) {
           // nothing was said: the audio stays in Storage, the phone has nothing left to carry
           forget();
-          set({ stage: "error", error: { code: "empty_transcript" }, retryFrom: null });
+          // the server's own measure of a dead microphone says what to check, not «не расслышал»
+          set({ stage: "error", error: { code: res.guard === "silent" ? "mic_silent" : "empty_transcript" }, retryFrom: null });
           return;
         }
         void mirror({ transcript, inboxId: get().inboxId, suspicious: get().suspicious, stage: "heard" });

@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { MIN_RECORDING_MS } from "@/lib/store/ingest";
 import { useUpdateHold } from "@/lib/update/client";
-import { createRecorder, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
+import { createRecorder, isSilent, MicUnavailableError, type RecordedAudio, type Recorder } from "@/lib/voice/recorder";
 
 import { firstLine } from "./list";
 import { refusedBranch, upsertCached } from "./mutations";
@@ -40,6 +40,12 @@ const MAX_MS = 5 * 60_000;
 
 // the words fit the phone and the desk alike (D-177): no «телефон», no «держи клавишу»
 const TOO_SHORT: Receipt = { tone: "warn", eyebrow: "Не записал", headline: "Слишком коротко", line: "Скажите ещё раз, чуть дольше" };
+/**
+ * Nothing came through the microphone: the recording is kept as a note all the same (principle 5 —
+ * a wrong measure must not lose a voice), but the recogniser is not asked: on silence it invents a
+ * phrase out of its hint. «Распознать ещё раз» on the note sends it if the measure was wrong.
+ */
+const MIC_SILENT: Receipt = { tone: "warn", eyebrow: "Микрофон молчит", headline: "В записи нет звука", line: "Запись сохранил — проверьте, какой микрофон выбран и не выключен ли он" };
 const MIC_DENIED: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Нет доступа", line: "Разрешите микрофон в настройках браузера" };
 const MIC_UNAVAILABLE: Receipt = { tone: "warn", eyebrow: "Микрофон", headline: "Недоступен здесь", line: "Откройте приложение по https" };
 const STT_FAILED: Receipt = { tone: "warn", eyebrow: "Не расслышал", headline: "Голос сохранён", line: "Заметка с голосом — можно распознать ещё раз" };
@@ -75,6 +81,8 @@ type Job = {
   entry: PendingCreate;
   /** It is in IndexedDB: a failed delivery is the replay's job, and the key is free at once. */
   kept: boolean;
+  /** Nothing came through the microphone: kept, the recogniser is not asked. */
+  silent?: boolean;
 };
 
 export function useDictation(
@@ -163,6 +171,11 @@ export function useDictation(
     job.current = null;
     upsertCached(queryClient, me.userId, note);
     headNote.current = note.id;
+    if (current.silent) {
+      setStage("idle");
+      live.current.onReceipt(MIC_SILENT);
+      return;
+    }
     setStage("transcribing");
     await transcribe(note, current.entry.audio?.durationMs);
   }
@@ -216,6 +229,8 @@ export function useDictation(
       live.current.onReceipt(TOO_SHORT);
       return;
     }
+    // a dead input: kept, but the recogniser would invent a phrase out of its hint (2026-11-17)
+    const silent = isSilent(audio);
     const me = live.current.me;
     if (!me) return;
     const place = live.current.target;
@@ -235,7 +250,7 @@ export function useDictation(
     };
     // this capture is the dictaphone's until it lands or is handed over to the replay
     claim(entry.id);
-    job.current = { entry, kept: await keepCreate(entry) };
+    job.current = { entry, kept: await keepCreate(entry), silent };
     await deliver();
   }
 

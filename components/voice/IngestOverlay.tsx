@@ -24,6 +24,7 @@ type ErrorView = {
 
 const ERRORS: Record<IngestErrorCode, ErrorView> = {
   record_too_short: { line: "Слишком коротко" },
+  mic_silent: { line: "Микрофон молчит — в записи нет звука. Проверь, включён ли микрофон, и скажи ещё раз" },
   mic_denied: { line: "Не получил доступ к микрофону. Разреши его в настройках браузера для этого сайта" },
   mic_unavailable: {
     line: "Микрофон здесь недоступен: браузер даёт его только по HTTPS или на localhost. Открой приложение по HTTPS-адресу",

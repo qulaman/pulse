@@ -10,7 +10,33 @@ export type RecordedAudio = {
   blob: Blob;
   mime: string;
   durationMs: number;
+  /**
+   * The loudest sample of the whole recording, 0..1 — or undefined when the page could not measure
+   * all of it (no Web Audio, a suspended AudioContext, a window hidden or a frame stalled on the
+   * way — animation frames stop there): unknown is never «silent».
+   */
+  peak?: number;
 };
+
+/**
+ * Below this for the whole recording (−54 dBFS) there was no voice at all: a microphone muted in
+ * the system, the wrong input chosen, another program holding it. Any speech peaks far above it,
+ * a quiet room's own noise too; only a dead input stays under. Such a recording is not sent to the
+ * recogniser — on silence it invents a phrase out of the names and words of its hint (2026-11-17).
+ */
+export const SILENT_PEAK = 0.002;
+
+/** Measured, and nothing came through the microphone. */
+export function isSilent(audio: Pick<RecordedAudio, "peak">): boolean {
+  return audio.peak !== undefined && audio.peak < SILENT_PEAK;
+}
+
+/** Fewer measured frames than this (about 0.2 s) say nothing about the input. */
+const MEASURED_TICKS = 12;
+/** A gap between two measured frames longer than this: the window was hidden, the measure broke. */
+const MEASURE_GAP_MS = 500;
+/** The measured frames must span this share of the recording. */
+const MEASURE_SPAN = 0.8;
 
 export type Recorder = {
   start(): Promise<void>;
@@ -55,6 +81,12 @@ export function createRecorder(): Recorder {
   let audioContext: AudioContext | null = null;
   let rafId: number | null = null;
   let startedAt = 0;
+  // the loudest sample seen, and how many frames were measured with the audio clock running
+  let peak = 0;
+  let measured = 0;
+  let firstTick = 0;
+  let lastTick = 0;
+  let broken = false;
   const chunks: Blob[] = [];
   const listeners = new Set<(level: number) => void>();
 
@@ -67,24 +99,50 @@ export function createRecorder(): Recorder {
     stream = null;
   }
 
-  /** Loudness for the pulsing ring: RMS of the time-domain buffer, 0..1. */
+  /**
+   * Loudness for the pulsing ring: RMS of the time-domain buffer, 0..1. The same frames give the
+   * recording's peak — floats where the browser has them (a byte is 1/128, too coarse for −54 dB).
+   */
   function meter(source: MediaStream) {
     const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return;
-    audioContext = new Ctor();
-    const analyser = audioContext.createAnalyser();
+    const ctx = new Ctor();
+    audioContext = ctx;
+    const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
-    audioContext.createMediaStreamSource(source).connect(analyser);
-    const buffer = new Uint8Array(analyser.fftSize);
+    ctx.createMediaStreamSource(source).connect(analyser);
+    const floats = typeof analyser.getFloatTimeDomainData === "function" ? new Float32Array(analyser.fftSize) : null;
+    const bytes = new Uint8Array(analyser.fftSize);
 
     const tick = () => {
-      analyser.getByteTimeDomainData(buffer);
       let sum = 0;
-      for (const value of buffer) {
-        const centered = (value - 128) / 128;
-        sum += centered * centered;
+      let top = 0;
+      if (floats) {
+        analyser.getFloatTimeDomainData(floats);
+        for (const value of floats) {
+          sum += value * value;
+          const size = Math.abs(value);
+          if (size > top) top = size;
+        }
+      } else {
+        analyser.getByteTimeDomainData(bytes);
+        for (const value of bytes) {
+          const centered = (value - 128) / 128;
+          sum += centered * centered;
+          const size = Math.abs(centered);
+          if (size > top) top = size;
+        }
       }
-      const level = Math.min(1, Math.sqrt(sum / buffer.length) * 3);
+      // a suspended clock hands out zeros: those frames prove nothing about the microphone
+      const now = performance.now();
+      if (ctx.state !== "running" || document.visibilityState === "hidden" || (lastTick > 0 && now - lastTick > MEASURE_GAP_MS)) broken = true;
+      if (ctx.state === "running") {
+        measured += 1;
+        if (firstTick === 0) firstTick = now;
+        if (top > peak) peak = top;
+      }
+      lastTick = now;
+      const level = Math.min(1, Math.sqrt(sum / analyser.fftSize) * 3);
       for (const cb of listeners) cb(level);
       rafId = requestAnimationFrame(tick);
     };
@@ -110,6 +168,11 @@ export function createRecorder(): Recorder {
       };
       recorder.start();
       startedAt = Date.now();
+      peak = 0;
+      measured = 0;
+      firstTick = 0;
+      lastTick = 0;
+      broken = false;
       meter(stream);
     },
 
@@ -122,12 +185,14 @@ export function createRecorder(): Recorder {
           return;
         }
         const durationMs = Date.now() - startedAt;
+        const whole = !broken && measured >= MEASURED_TICKS && lastTick - firstTick >= MEASURE_SPAN * durationMs;
+        const heard = whole ? peak : undefined;
         active.onstop = () => {
           const mime = active.mimeType || pickMimeType() || "audio/webm";
           const blob = new Blob(chunks, { type: mime });
           recorder = null;
           teardown();
-          resolve({ blob, mime, durationMs });
+          resolve({ blob, mime, durationMs, ...(heard === undefined ? {} : { peak: heard }) });
         };
         active.stop();
       });

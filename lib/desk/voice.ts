@@ -63,6 +63,8 @@ export function micLine(code: IngestErrorCode, denied: boolean | null): string |
       return "Здесь браузер не даёт микрофон — откройте сайт по https или напишите поручение строкой.";
     case "record_too_short":
       return "Запись короче секунды. Нажмите микрофон, скажите поручение и нажмите ещё раз.";
+    case "mic_silent":
+      return "В записи нет звука — микрофон молчит. Проверьте, какой микрофон выбран (значок в адресной строке или «Звук» в настройках компьютера) и не выключен ли он.";
     case "empty_transcript":
       return "В записи нет слов. Запись сохранил — скажите ещё раз, ближе к микрофону.";
     default:
@@ -73,13 +75,14 @@ export function micLine(code: IngestErrorCode, denied: boolean | null): string |
 /** The head of the panel when a phrase fails: the microphone's own troubles by name. */
 export function failureTitle(code: IngestErrorCode): string {
   if (code === "mic_denied" || code === "mic_unavailable") return "Нет микрофона";
+  if (code === "mic_silent") return "Микрофон молчит";
   if (code === "record_too_short") return "Слишком коротко";
   if (code === "empty_transcript" || code === "stt_failed") return "Не расслышал";
   return "Не получилось";
 }
 
 /** Failures after which speaking again is the way out (nothing left to retry on the server). */
-export const SPEAK_AGAIN: ReadonlySet<IngestErrorCode> = new Set(["mic_denied", "mic_unavailable", "record_too_short", "empty_transcript", "stt_failed"]);
+export const SPEAK_AGAIN: ReadonlySet<IngestErrorCode> = new Set(["mic_denied", "mic_unavailable", "mic_silent", "record_too_short", "empty_transcript", "stt_failed"]);
 
 /* ------------------------------------------------------------------ the toast after the send */
 

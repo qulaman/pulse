@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { buildVocabularyHints } from "./stt";
-import { guardTranscript } from "./stt-guard";
+import { guardTranscript, isOpus, isSilentOpus } from "./stt-guard";
 
 const HINTS = buildVocabularyHints({
   users: [
@@ -105,5 +105,36 @@ describe("guardTranscript", () => {
     });
     expect(result.ok).toBe(false);
     if (result.ok === false) expect(["prompt_echo", "loop"]).toContain(result.code);
+  });
+});
+
+describe("isSilentOpus — a dead microphone by the size of the file (AI.md §1 (з))", () => {
+  it("the 2026-11-17 recording: 2981 bytes for 8.4 s of Opus is silence", () => {
+    expect(isSilentOpus({ bytes: 2981, durationMs: 8435, opus: true })).toBe(true);
+  });
+
+  it("speech, even a short phrase in a long pause, is not", () => {
+    expect(isSilentOpus({ bytes: 21952, durationMs: 2270, opus: true })).toBe(false);
+    expect(isSilentOpus({ bytes: 6400, durationMs: 10000, opus: true })).toBe(false);
+    // a latched minute of silence with 1.5 s of speech in it
+    expect(isSilentOpus({ bytes: 9000 + 58_500 * 0.28, durationMs: 60_000, opus: true })).toBe(false);
+  });
+
+  it("a longer silence is silence too", () => {
+    expect(isSilentOpus({ bytes: 1000 + 60 * 280, durationMs: 60_000, opus: true })).toBe(true);
+  });
+
+  it("judges neither a short recording nor an AAC one", () => {
+    expect(isSilentOpus({ bytes: 300, durationMs: 2000, opus: true })).toBe(false);
+    expect(isSilentOpus({ bytes: 2981, durationMs: 8435, opus: false })).toBe(false);
+  });
+
+  it("knows Opus in an mp4 and in a webm", () => {
+    const bytes = (text: string) => new TextEncoder().encode(text);
+    expect(isOpus(bytes("....ftypisom....moov....Opus....dOps"))).toBe(true);
+    // «Opus» alone somewhere in the data of another codec is no sample entry
+    expect(isOpus(bytes("....ftypM4A ....mp4a....esds....Opus...."))).toBe(false);
+    expect(isOpus(bytes("\u001aE\u00df\u00a3....A_OPUS...."))).toBe(true);
+    expect(isOpus(bytes("....ftypM4A ....mp4a....esds"))).toBe(false);
   });
 });

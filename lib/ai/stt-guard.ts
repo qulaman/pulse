@@ -1,7 +1,7 @@
 import { normalize, tokens } from "../text/normalize";
 import { hintSurfaces, hintsToPrompt } from "./stt";
 
-export type GuardCode = "too_dense" | "phantom" | "too_short" | "prompt_echo" | "loop" | "low_density";
+export type GuardCode = "too_dense" | "phantom" | "too_short" | "prompt_echo" | "loop" | "low_density" | "silent";
 
 export type GuardResult =
   | { ok: true; suspicious: boolean; reason?: GuardCode }
@@ -11,6 +11,44 @@ export interface GuardInput {
   text: string;
   durationMs: number;
   vocabularyHints: string[];
+}
+
+/**
+ * Opus of a dead microphone (AI.md §1 (з)): the encoder spends under 300 bytes a second on digital
+ * silence, against about 6 KB a second on speech. A recording longer than 3 s whose bytes over the
+ * header and that floor would not hold a third of a second of speech has none — the recogniser
+ * would invent a phrase out of its hint (2026-11-17: 8 s of −91 dB became «Ербол, составь отчёт по
+ * Хиральному принтеру»). A minute of silence with one short phrase in it stays well above. Only
+ * Opus is judged: AAC of an iPhone keeps a bigger floor on silence and is left to the text guards.
+ */
+const SILENT_HEADER_BYTES = 1000;
+const SILENT_FLOOR_BYTES_PER_SEC = 300;
+const SILENT_SPEECH_BYTES = 2000;
+const SILENT_MIN_MS = 3000;
+/** The codec is named in the container's head: no need to read a long recording through. */
+const HEAD_BYTES = 16 * 1024;
+
+/** Does the byte string occur in the file (plain bytes: the lab imports this module in a browser). */
+function hasBytes(audio: Uint8Array, ascii: string): boolean {
+  const first = ascii.charCodeAt(0);
+  outer: for (let i = audio.indexOf(first); i !== -1 && i + ascii.length <= audio.length; i = audio.indexOf(first, i + 1)) {
+    for (let j = 1; j < ascii.length; j++) if (audio[i + j] !== ascii.charCodeAt(j)) continue outer;
+    return true;
+  }
+  return false;
+}
+
+/** The file is Opus: an mp4's sample entry with its «dOps» box, or a webm's codec «A_OPUS» — in its head. */
+export function isOpus(audio: Uint8Array): boolean {
+  const head = audio.subarray(0, HEAD_BYTES);
+  return (hasBytes(head, "Opus") && hasBytes(head, "dOps")) || hasBytes(head, "A_OPUS");
+}
+
+/** Silence by the size of the file, before any recogniser is paid for. */
+export function isSilentOpus(audio: { bytes: number; durationMs: number; opus: boolean }): boolean {
+  if (!audio.opus || audio.durationMs < SILENT_MIN_MS) return false;
+  const floor = SILENT_HEADER_BYTES + SILENT_FLOOR_BYTES_PER_SEC * (audio.durationMs / 1000);
+  return audio.bytes - floor < SILENT_SPEECH_BYTES;
 }
 
 /** Known Whisper hallucinations on silence / unintelligible speech (AI.md §1 (в)). */
