@@ -21,7 +21,10 @@ export const colors = {
 /** Not a hex color: kept apart so the CSS parity test stays exact. */
 export const overlay = "rgba(4,8,12,.6)";
 
-/** Body: Golos Text (self-hosted by next/font); headings and numbers: Manrope (D-50). */
+/**
+ * Every letter in Golos Text, every digit in the digits cut of Inter; `--font-body` and
+ * `--font-display` hold the same stack (app/globals.css, self-hosted by next/font, D-179).
+ */
 export const fontStack =
   'var(--font-body), -apple-system, "SF Pro", Roboto, "Segoe UI", system-ui, sans-serif';
 export const displayStack = 'var(--font-display), var(--font-body), system-ui, sans-serif';

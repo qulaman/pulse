@@ -50,6 +50,13 @@
   --tabbar-space: calc(var(--tabbar-gap) + 70px);
   --tabbar-fold-drop: 11px;
 
+  /* Type (D-179, docs/DESIGN.md §2): every letter in Golos Text, every digit — and the colon, plus,
+     minus and percent beside it — in the digits cut of Inter (app/layout.tsx). The cut stands first;
+     its unicode-range hands the rest on to Golos. Display and body keep their names for their roles
+     (the desk's «Журнал» gives them faces of its own) but carry one stack. */
+  --font-body: var(--font-digits), var(--font-golos);
+  --font-display: var(--font-digits), var(--font-golos);
+
   /* Dark theme is the only theme in v1 (docs/FRONTEND.md). */
   color-scheme: dark;
 }
@@ -235,7 +242,6 @@ body {
   line-height: 22px;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  font-feature-settings: "ss01", "cv01";
   /* app chrome, not a document: no text caret or selection outside real inputs
      (a mouse click on a label must never place a blinking cursor — Chrome caret browsing included) */
   -webkit-user-select: none;
@@ -243,7 +249,7 @@ body {
   caret-color: transparent;
 }
 
-/* Pulse numbers read on an outstretched arm — no digit jitter; digits in the display face. */
+/* Pulse numbers read on an outstretched arm — no digit jitter: Inter's digits (D-179) in tabular figures. */
 .nums {
   font-variant-numeric: tabular-nums;
   font-family: var(--font-display);

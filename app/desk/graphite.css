@@ -7,7 +7,7 @@
      hairline ring and a highlight on its top edge, what floats (the panel, menus, dialogs) on top
      with a soft shadow and frosted glass.
    - Neutral greys, one accent (the brand's turquoise), the statuses at one lightness.
-   - One interface face, Inter, with Russian letters and tabular figures; no capitals in labels.
+   - The phone's face (D-179): Golos Text letters, Inter digits, tabular where they line up; no capitals in labels.
    - Everything answers the hand: a press sinks, a selection draws its rail, a panel slides in, a
      screen rises into place. Short (≤ 300 ms), never holding a click; still under «уменьшить
      движение».
@@ -110,10 +110,12 @@
     --danger: var(--pencil);
     --gold: var(--gold-ink);
     --shadow-raised: var(--shadow-pop);
-    --font-body: var(--font-inter), system-ui, sans-serif;
-    --font-display: var(--font-inter), system-ui, sans-serif;
-    --font-cond: var(--font-inter), system-ui, sans-serif;
-    --font-mono: var(--font-inter), system-ui, sans-serif;
+    /* the phone's face (D-179): Golos Text letters, Inter digits; «Журнал» keeps its Plex voices,
+       so each name is said again here rather than inherited */
+    --font-body: var(--font-digits), var(--font-golos), system-ui, sans-serif;
+    --font-display: var(--font-digits), var(--font-golos), system-ui, sans-serif;
+    --font-cond: var(--font-digits), var(--font-golos), system-ui, sans-serif;
+    --font-mono: var(--font-digits), var(--font-golos), system-ui, sans-serif;
     --ease-snap: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
 
@@ -121,7 +123,6 @@
     font-family: var(--font-body);
     font-size: 14px;
     line-height: 20px;
-    font-feature-settings: "cv05", "ss03";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

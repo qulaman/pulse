@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed, Inter, Manrope } from "next/font/google";
+import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed } from "next/font/google";
+import localFont from "next/font/local";
 
 import { AppUpdate } from "@/components/AppUpdate";
 import { MascotPower } from "@/components/brand/MascotPower";
@@ -20,10 +21,33 @@ import { INSTALL_CATCHER } from "@/lib/push/install-catcher";
 import { ToastHost } from "@/components/ui/Toast";
 import "./globals.css";
 
-// Self-hosted at build time (no runtime request, works offline): Manrope for headings and
-// numbers, Golos Text for running Cyrillic text (D-50).
-const display = Manrope({ subsets: ["cyrillic", "latin"], weight: ["600", "700", "800"], variable: "--font-display", display: "swap" });
-const body = Golos_Text({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-body", display: "swap" });
+// Self-hosted at build time (no runtime request, works offline). One face for every letter on every
+// screen, phone and desk alike: Golos Text, variable 400–900; `cyrillic-ext` holds the Kazakh
+// letters (Ә Ғ Қ Ң Ө Ү Һ) and is preloaded, so a name reads in one face offline too (D-179).
+const golos = Golos_Text({ subsets: ["cyrillic", "cyrillic-ext", "latin"], variable: "--font-golos", display: "swap" });
+// Golos's figures are of uneven width (a timer jitters, a column will not line up), so every digit
+// comes from a cut of Inter that holds only 0–9 : + − % — Inter's latin file (opsz, wght) from
+// Google Fonts cut with
+//   pyftsubset inter-latin.woff2 --unicodes=U+0025,U+002B,U+0030-003A,U+2212 --layout-features='*'
+//     --name-IDs='*' --notdef-outline --no-hinting --flavor=woff2
+// It stands first in the stack (globals.css) and its range hands every other character on to Golos.
+// Its figures are brought to Golos's capital height (700 of 1000 vs Inter's 1490 of 2048) and it
+// takes Golos's vertical metrics (980 / 220, divided by the same size): a digit never changes the
+// height of a line. No fallback face — until the 12 KB file lands, the digits are Golos's own.
+const digits = localFont({
+  src: "./fonts/inter-digits.woff2",
+  weight: "100 900",
+  variable: "--font-digits",
+  display: "swap",
+  adjustFontFallback: false,
+  declarations: [
+    { prop: "unicode-range", value: "U+0025, U+002B, U+0030-003A, U+2212" },
+    { prop: "size-adjust", value: "96.22%" },
+    { prop: "ascent-override", value: "101.85%" },
+    { prop: "descent-override", value: "22.86%" },
+    { prop: "line-gap-override", value: "0%" },
+  ],
+});
 
 // The desk's three voices (D-158). `preload: false`: only a page that sets them in type fetches a
 // file, so a phone never does. Condensed has no Russian letters on Google Fonts: it speaks in
@@ -31,8 +55,6 @@ const body = Golos_Text({ subsets: ["cyrillic", "latin"], weight: ["400", "500",
 const plexSans = IBM_Plex_Sans({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans", display: "swap", preload: false });
 const plexCond = IBM_Plex_Sans_Condensed({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-cond", display: "swap", preload: false });
 const plexMono = IBM_Plex_Mono({ subsets: ["cyrillic", "latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap", preload: false });
-// «Графит» (D-171): one interface face with Russian letters, tabular figures and a display cut by size
-const inter = Inter({ subsets: ["cyrillic", "cyrillic-ext", "latin"], variable: "--font-inter", display: "swap", preload: false, axes: ["opsz"] });
 
 export const metadata: Metadata = {
   title: "Pulse",
@@ -58,7 +80,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang="ru"
-      className={`${display.variable} ${body.variable} ${plexSans.variable} ${plexCond.variable} ${plexMono.variable} ${inter.variable}`}
+      className={`${golos.variable} ${digits.variable} ${plexSans.variable} ${plexCond.variable} ${plexMono.variable}`}
       // the desk's attributes land before hydration, from the script below
       suppressHydrationWarning
       style={brand.customAccent ? ({ "--accent": brand.accent } as React.CSSProperties) : undefined}
