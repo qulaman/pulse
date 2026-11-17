@@ -469,7 +469,7 @@ export function BoardScreen({ board, lines, wall, now, taskOf, dictation, aimed,
       <PageHead
         back={{ href: "/notes?tab=boards", label: "Заметки", testId: "board-back" }}
         smallTitle={board.title}
-        tone={onWall ? "accent" : undefined}
+        tone={onWall ? "accent" : "muted"}
         heading={
           <BoardTitle
             key={board.title}

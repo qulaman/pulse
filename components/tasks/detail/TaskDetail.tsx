@@ -164,6 +164,8 @@ export function TaskDetail({
           the title lives in the status screen, so the bar carries none (as a letter in Mail) */}
       <PageHead
         bare
+        // the task's state lives in its status card below: the sky stays quiet (D-176)
+        tone="muted"
         back={{ label: "Назад", onClick: onBack }}
         actions={
           isDirector ? (

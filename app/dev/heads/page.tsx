@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useState, type CSSProperties, type ReactNode } from "react";
 
 import { HeadButton } from "@/components/ui/HeadButton";
 import { PageHead } from "@/components/ui/PageHead";
@@ -52,16 +52,28 @@ const VARIANTS: Record<string, Variant> = {
   task: { title: "", bare: true, back: { label: "Назад", href: "/dev/heads" }, actions: <HeadButton label="Все действия" icon="more" /> },
 };
 
-const TONES: (Tone | "none")[] = ["accent", "ok", "warn", "danger", "none"];
+// «muted» — a screen with a state, quiet now; «iris» — a screen with no state (no tone, D-176)
+const TONES: (Tone | "iris")[] = ["accent", "ok", "warn", "danger", "muted", "iris"];
+// `--sky-tempo` multiplies every period of the sky's lights: below 1 is faster
+const TEMPOS: { label: string; value: number }[] = [
+  { label: "медленнее", value: 1.6 },
+  { label: "как есть", value: 1 },
+  { label: "быстрее", value: 0.6 },
+];
 
 function Sandbox() {
-  const v = useSearchParams().get("v") ?? "tasks";
+  const params = useSearchParams();
+  const v = params.get("v") ?? "tasks";
   const key = v in VARIANTS ? v : "tasks";
   const variant = VARIANTS[key];
-  const [override, setOverride] = useState<Tone | "none" | null>(null);
-  const tone = override === "none" ? undefined : (override ?? variant.tone);
+  const [override, setOverride] = useState<Tone | "iris" | null>(() => {
+    const t = params.get("tone");
+    return TONES.includes(t as Tone | "iris") ? (t as Tone | "iris") : null;
+  });
+  const [tempo, setTempo] = useState(() => Math.min(4, Math.max(0.25, Number(params.get("tempo")) || 1)));
+  const tone = override === "iris" ? undefined : (override ?? variant.tone);
   return (
-    <main className="mx-auto w-full max-w-lg px-4 pb-24">
+    <main className="mx-auto w-full max-w-lg px-4 pb-24" style={{ "--sky-tempo": tempo } as CSSProperties}>
       <PageHead
         key={key}
         title={variant.title || undefined}
@@ -94,9 +106,23 @@ function Sandbox() {
             type="button"
             data-testid={`tone-${t}`}
             onClick={() => setOverride(t)}
-            className={`rounded-full px-3 py-1.5 text-[13px] ${(tone ?? "none") === t ? "bg-text/15 text-text" : "bg-surface-2 text-muted"}`}
+            className={`rounded-full px-3 py-1.5 text-[13px] ${(tone ?? "iris") === t ? "bg-text/15 text-text" : "bg-surface-2 text-muted"}`}
           >
             {t}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-[12px] text-muted">темп:</span>
+        {TEMPOS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            data-testid={`tempo-${t.value}`}
+            onClick={() => setTempo(t.value)}
+            className={`rounded-full px-3 py-1.5 text-[13px] ${tempo === t.value ? "bg-text/15 text-text" : "bg-surface-2 text-muted"}`}
+          >
+            {t.label}
           </button>
         ))}
       </div>
@@ -108,8 +134,9 @@ function Sandbox() {
 }
 
 /**
- * /dev/heads?v=tasks|calendar|team|mine|settings|person|task — the screen head of D-113 and
- * D-117 over a long page, with a switch of the state's light (dev only).
+ * /dev/heads?v=tasks|calendar|team|mine|settings|person|task[&tone=…][&tempo=…] — the screen
+ * head of D-113 and D-117 over a long page, with a switch of the state's light, the shimmer of
+ * a screen with no state and the tempo of the sky's lights (D-176; dev only).
  */
 export default function HeadsSandboxPage() {
   return (

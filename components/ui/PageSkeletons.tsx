@@ -125,7 +125,7 @@ function CardColumnBone({ className = "mt-1", count = 4 }: { className?: string;
 function CardsSkeleton({ title }: { title: string }) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead eyebrow={DATE_BONE} title={title} actions={<HeadButtonBone />} />
+      <PageHead eyebrow={DATE_BONE} title={title} tone="muted" actions={<HeadButtonBone />} />
 
       <SkeletonGroup className="status-screen mt-3 rounded-[22px] px-4 pb-0.5 pt-3">
         <div className="flex items-center justify-between">
@@ -190,7 +190,7 @@ export function TeamListBone() {
 export function PeopleSkeleton() {
   return (
     <main className={MAIN}>
-      <PageHead title="Команда" state={LOADING_LINE} actions={<HeadButtonBone />} />
+      <PageHead title="Команда" tone="muted" state={LOADING_LINE} actions={<HeadButtonBone />} />
       <SkeletonGroup grow className="mt-6">
         <h2 className="text-[19px] font-semibold leading-6">Сейчас</h2>
         <div className="mt-3">
@@ -411,6 +411,7 @@ export function BoardSkeleton() {
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
       <PageHead
         back={{ href: "/notes?tab=boards", label: "Заметки" }}
+        tone="muted"
         heading={
           <SkeletonGroup className="mt-px min-w-0 flex-1 py-[5px]">
             <Bone h={30} w="62%" />
@@ -454,7 +455,7 @@ export function BoardSkeleton() {
 export function TasksSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-24">
-      <PageHead eyebrow={DATE_BONE} title="Мои дела" />
+      <PageHead eyebrow={DATE_BONE} title="Мои дела" tone="muted" />
       {/* one placeholder for the rest: the screen fills it, nothing in it is kept */}
       <CardColumnBone className="mt-3" count={3} />
     </main>
@@ -529,7 +530,7 @@ const GRID_WEEK = 48;
 export function CalendarSkeleton({ month = monthOf(null) }: { month?: Month }) {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-28">
-      <PageHead eyebrow={DATE_BONE} title="Календарь" />
+      <PageHead eyebrow={DATE_BONE} title="Календарь" tone="muted" />
       <SkeletonGroup className="mt-3">
         <div className="h-[223px] rounded-[22px] border border-border/70 bg-surface px-4 pt-3">
           <Bone h={16} w="34%" />
@@ -596,7 +597,7 @@ export function RatingSkeleton() {
 export function TaskPageSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4">
-      <PageHead bare back={{ label: "Назад" }} />
+      <PageHead bare tone="muted" back={{ label: "Назад" }} />
       <SkeletonGroup grow className="status-screen mt-1 rounded-[22px] px-4 pb-3.5 pt-3.5">
         <div className="flex items-center justify-between">
           <Bone h={18} w={120} />

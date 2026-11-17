@@ -94,7 +94,7 @@ export function PersonCard() {
   if (!person.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-        <PageHead back={{ href: "/people", label: "Команда" }} title="Сотрудник не найден" />
+        <PageHead back={{ href: "/people", label: "Команда" }} title="Сотрудник не найден" tone="muted" />
       </main>
     );
   }

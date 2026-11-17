@@ -73,7 +73,7 @@ export function RemoteSkeleton() {
 export function ScreenPageSkeleton() {
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-      <PageHead title="Экран в кабинете" />
+      <PageHead title="Экран в кабинете" tone="muted" />
       <RemoteSkeleton />
     </main>
   );

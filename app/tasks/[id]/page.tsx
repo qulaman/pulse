@@ -61,7 +61,7 @@ export default function TaskThreadPage() {
   if (!task.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-6">
-        <PageHead bare back={{ label: "Назад", onClick: back }} />
+        <PageHead bare tone="muted" back={{ label: "Назад", onClick: back }} />
         <p className="mt-4 text-[16px] leading-[22px] text-muted">Задача не найдена — возможно, её удалили</p>
       </main>
     );

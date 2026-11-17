@@ -32,7 +32,7 @@ export default function ReportPage() {
   if (!day.data) {
     return (
       <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-36">
-        <PageHead title="Отчёт за день" />
+        <PageHead title="Отчёт за день" tone="muted" />
         <LoadFailed title="Не получилось загрузить отчёт" onRetry={() => void day.refetch()} />
       </main>
     );

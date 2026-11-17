@@ -25,7 +25,7 @@ const DATE_BONE = (
 export function ReportSkeleton() {
   return (
     <main className={MAIN}>
-      <PageHead eyebrow={DATE_BONE} title="Отчёт за день" state={" "} />
+      <PageHead eyebrow={DATE_BONE} title="Отчёт за день" tone="muted" state={" "} />
       <SkeletonGroup grow className="mt-3">
         <div className="card p-4">
           <div className="grid grid-cols-2 gap-2">

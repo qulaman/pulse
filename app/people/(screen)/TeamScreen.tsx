@@ -50,7 +50,7 @@ export function TeamScreen() {
       <PageHead
         title="Команда"
         // no status card here: the head says the team's state itself, red when someone is late (D-117)
-        tone={overdue > 0 ? "danger" : undefined}
+        tone={overdue > 0 ? "danger" : "muted"}
         state={<span className="nums">{summary}</span>}
         actions={<HeadButton label="Добавить сотрудника" icon="plus" tone="accent" href="/people/new" />}
       />

@@ -36,7 +36,7 @@ export default function EditPersonPage({ searchParams }: { searchParams: Promise
   return (
     <main className="mx-auto w-full max-w-lg flex-1 px-4 pb-40">
       {!p || !editor ? (
-        <PageHead back={back} title="Сотрудник не найден" />
+        <PageHead back={back} title="Сотрудник не найден" tone="muted" />
       ) : (
         // the head of the screen (D-113): the name and what the person is
         <PageHead

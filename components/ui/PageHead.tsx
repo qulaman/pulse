@@ -12,12 +12,23 @@ import { useMe } from "@/lib/tasks/queries";
 import { useHydrated } from "@/lib/useHydrated";
 
 type Back = { label: string; href?: string; onClick?: () => void; testId?: string };
-type Light = "accent" | "ok" | "warn" | "danger" | "none";
+type Light = "accent" | "ok" | "warn" | "danger" | "none" | "iris";
 
-const LIGHTS: Light[] = ["accent", "ok", "warn", "danger", "none"];
+const LIGHTS: Light[] = ["accent", "ok", "warn", "danger", "none", "iris"];
 
-/** The state's colour lights the screen; «muted» and «gold» are not states of a screen. */
+/** The lights of each sky (`.page-sky-blob[data-b]` in globals.css): a state's sky has three. */
+const BLOBS: Record<Light, number> = { accent: 3, ok: 3, warn: 3, danger: 3, none: 1, iris: 4 };
+
+/** A sky that went out keeps its lights while it fades (the 900 ms crossfade in globals.css). */
+const SKY_FADE_MS = 1000;
+
+/**
+ * The state's colour lights the screen; «muted» and «gold» are not states of a screen — a
+ * screen with a state that is quiet now. No tone at all: a screen with no state, its sky
+ * shimmers (D-176).
+ */
 function lightOf(tone: Tone | undefined): Light {
+  if (tone === undefined) return "iris";
   return tone === "accent" || tone === "ok" || tone === "warn" || tone === "danger" ? tone : "none";
 }
 
@@ -38,10 +49,22 @@ let skyGoneAt = Number.NEGATIVE_INFINITY;
 const SKY_HANDOVER_MS = 100;
 
 /**
+ * The clock of the sky's lights (D-176): every light runs `skyTime()` into its motion, so a head
+ * that takes over goes on where the lights were instead of starting them over. The server's
+ * lights start with the page's first style — the head that hydrates takes their start as the
+ * epoch; while the page is scrolled under the glass the lights hold still and the clock holds
+ * with them (`skyPausedAt`), so the next head starts where they stand.
+ */
+let skyEpoch = 0;
+let skyPausedAt: number | null = null;
+const skyTime = () => (skyPausedAt ?? performance.now()) - skyEpoch;
+
+/**
  * The head of every screen that has a title — «свет состояния» (D-117) in the bar grammar of
  * D-113. The screen is lit from above by the colour of its state (`tone` — the one it already
  * computes for its status card) and the colour belongs to the state alone: «‹ Назад» and the
- * round `HeadButton`s are neutral glass.
+ * round `HeadButton`s are neutral glass. The light lives (D-176): its lights drift and breathe
+ * in the state's character, and a screen with no state shimmers in colours that are no state.
  *
  *   ЧЕТВЕРГ, 24 СЕНТЯБРЯ                   (○)     ← a tab: no bar row at rest
  *   Задачи
@@ -76,7 +99,12 @@ export function PageHead({
    * screen with its own «×»).
    */
   back?: Back | false;
-  /** the screen's state: the colour of its light (D-117); none — a quiet neutral sky */
+  /**
+   * the screen's state: the colour of its light (D-117); `muted` — a screen with a state that
+   * is quiet now (a neutral sky); left out — a screen with no state at all: the sky shimmers
+   * (D-176). A screen with a state passes its tone always, its skeleton `muted`, or a quiet
+   * state would shimmer.
+   */
   tone?: Tone;
   /** the state in words, in its colour — only where no status card below says it */
   state?: ReactNode;
@@ -97,7 +125,8 @@ export function PageHead({
   const [glass, setGlass] = useState(false);
   const [titled, setTitled] = useState(false);
   // where this sky's light starts (`data-from`, a CSS @starting-style): the light that was up
-  // when the head came. A head that hydrates finds the server's sky painted — none.
+  // when the head came. A head that hydrates finds the server's sky already painted, so it has
+  // no `data-from`.
   const hydrated = useHydrated();
   const [skyFrom] = useState<Light | undefined>(() =>
     hydrated ? (skyHeads > 0 || performance.now() - skyGoneAt < SKY_HANDOVER_MS ? skyLight : "none") : undefined,
@@ -120,6 +149,33 @@ export function PageHead({
   useEffect(() => {
     skyLight = light;
   }, [light]);
+
+  // only the lit sky and the ones fading out carry their lights — a sky at opacity 0 has none,
+  // so nothing animates or takes a layer where nobody sees it. A new head's first fading sky is
+  // the light it takes over from (`data-from`); two changes inside one fade keep both going out.
+  const [sky, setSky] = useState<{ light: Light; fading: Light[] }>(() => ({
+    light,
+    fading: skyFrom && skyFrom !== light ? [skyFrom] : [],
+  }));
+  if (sky.light !== light) {
+    setSky({ light, fading: [...sky.fading.filter((f) => f !== light && f !== sky.light), sky.light] });
+  }
+  useEffect(() => {
+    if (!sky.fading.length) return;
+    const timer = window.setTimeout(() => setSky((s) => ({ ...s, fading: [] })), SKY_FADE_MS);
+    return () => window.clearTimeout(timer);
+  }, [sky]);
+
+  // scrolled under the glass, the sky is dim behind the page: its lights hold still — nothing
+  // to draw while the list is read — and the clock holds with them
+  useIsoLayoutEffect(() => {
+    if (!glass) return;
+    skyPausedAt = performance.now();
+    return () => {
+      if (skyPausedAt !== null) skyEpoch += performance.now() - skyPausedAt;
+      skyPausedAt = null;
+    };
+  }, [glass]);
 
   // the D-113 thresholds: the fallback where scroll timelines are missing, and the state
   // under reduced motion
@@ -172,9 +228,17 @@ export function PageHead({
 
   return (
     <>
-      <div aria-hidden className="page-sky" data-tone={light} data-from={skyFrom}>
+      <div aria-hidden className="page-sky" data-tone={light} data-from={skyFrom} data-glass={glass ? "" : undefined}>
         {LIGHTS.map((key) => (
-          <div key={key} className="page-sky-layer" data-tone={key} />
+          <div
+            key={key}
+            className="page-sky-layer"
+            data-tone={key}
+            data-lit={key === light ? "" : undefined}
+            data-was={key === skyFrom ? "" : undefined}
+          >
+            {key === light || sky.fading.includes(key) ? <SkyLights light={key} /> : null}
+          </div>
         ))}
         <div className="page-sky-grain" />
       </div>
@@ -224,6 +288,32 @@ export function PageHead({
       <div ref={titleEnd} aria-hidden className="h-px" />
     </>
   );
+}
+
+/**
+ * The moving lights of one sky (D-176). They run on the sky's one clock (`skyTime`), set as a
+ * negative delay before their first frame — the browser resolves a new animation's start on
+ * the next frame, so the delay set here is the one it starts with. Lights hydrating the
+ * server's sky have run since the page's first style: they keep the server's markup, and their
+ * start becomes the clock's epoch.
+ */
+function SkyLights({ light }: { light: Light }) {
+  const first = useRef<HTMLDivElement>(null);
+  const hydrated = useHydrated();
+  const hydrating = useRef(!hydrated);
+  useIsoLayoutEffect(() => {
+    const blobs = Array.from(first.current?.parentElement?.querySelectorAll<HTMLElement>(":scope > .page-sky-blob") ?? []);
+    const started = blobs[0]?.getAnimations()[0]?.startTime;
+    if (hydrating.current && typeof started === "number") {
+      skyEpoch = started;
+      return;
+    }
+    const delay = `${-Math.round(skyTime())}ms`;
+    for (const blob of blobs) blob.style.animationDelay = delay;
+  }, []);
+  return Array.from({ length: BLOBS[light] }, (_, i) => (
+    <div key={i} ref={i === 0 ? first : undefined} className="page-sky-blob" data-b={i + 1} />
+  ));
 }
 
 /**

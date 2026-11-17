@@ -274,6 +274,7 @@
 
 Одна строка на идею: откуда (наряд, D-номер, дата) и суть. Архитектор разбирает по разделам и ставит номера «И-N».
 
+- (D-176, 2026-11-17) Выключенный человек (`is_active = false`) с живой cookie крутится в бесконечном редиректе `/login → /pulse → /login`: proxy видит сессию и шлёт с `/login` домой, а layout роли (`app/(director)/layout.tsx`) ловит `AuthError 403 inactive` и шлёт на `/login` — вместо экрана «доступ закрыт». Найдено на dev: `director@demo.local` выключен, браузер получает ERR_TOO_MANY_REDIRECTS.
 - (D-126, 2026-09-26) На деплое main Пульс директора однажды упал в консоль «Failed to construct 'IntersectionObserver': rootMargin must be specified in pixels or percent» — `PageHead.tsx:113` и `SettingsTabs.tsx:66` собирают `-${top}px` без округления и без защиты от NaN/отрицательного (в `tasks/list/Tabs.tsx` — с `Math.round`). → уже исправлено в коде (проверено 2026-11-03, наряд 025)
 - (D-126, 2026-09-26) Жёсткое удаление строки не доходит до канала с фильтром (Realtime не шлёт DELETE по фильтру): заметки, окончательно удалённые `notes_purge_trash`, висят в корзине открытого экрана до следующего снимка — нужен отдельный канал DELETE, как `useTaskDeletes`. → исправлено нарядом 024 (2026-11-03)
 

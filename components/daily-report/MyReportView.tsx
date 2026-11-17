@@ -66,7 +66,7 @@ export function MyReportView({
       <PageHead
         eyebrow={dayTitle(day.date)}
         title="Отчёт за день"
-        tone={state.tone === "none" ? undefined : state.tone}
+        tone={state.tone === "none" ? "muted" : state.tone}
         state={waiting ? "Сдан · ждёт связи" : state.text}
       />
 
