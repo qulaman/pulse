@@ -139,6 +139,11 @@ export function DeskScreen() {
   const weekId = row && weekBoardLive(row, now) ? row.week_board_id : null;
   const mine = wall.board !== null && wall.board.deleted_at === null;
   const until = row?.board_until ? new Date(row.board_until) : null;
+  // a person or an order lies over the screensaver for its ten minutes (D-76): a scene, a view or a
+  // board picked by hand is meant to be seen now, so the same command takes them down — without
+  // it the click only changed what lies underneath, and the wall did not move
+  const covered = mode !== "ether";
+  const uncover: TvControlInput = covered ? { mode: "ether" } : {};
 
   /** A command to the wall; `then` — the words of its toast, or what to do instead. */
   const show = (input: TvControlInput, then: string | ((row: TvState) => void)) => {
@@ -154,10 +159,10 @@ export function DeskScreen() {
   const sceneValue: SceneKey = round ? "round" : scene;
   const pickScene = (value: SceneKey) => {
     if (value === "round") {
-      if (!round) show({ carousel: true }, "Заставки меняются по кругу · раз в 3 мин");
+      if (!round || covered) show({ ...uncover, carousel: true }, "Заставки меняются по кругу · раз в 3 мин");
       return;
     }
-    if (round || scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
+    if (round || scene !== value || covered) show({ ...uncover, scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
   };
   // the row of scenes in its order: what the digits pick
   const sceneOrder: SceneKey[] = [...sceneKeys, "round"];
@@ -257,7 +262,7 @@ export function DeskScreen() {
                     : round
                       ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                       : mode !== "ether"
-                        ? "Потом стена сама вернётся к заставке"
+                        ? "Потом стена сама вернётся к заставке · клик по заставке — сразу"
                         : "Заставка не меняется — «По кругу» включит смену"}
                 </p>
               </div>
@@ -358,20 +363,20 @@ export function DeskScreen() {
               />
             </SettingRow>
             {/* lit while the calendar is up in that view; a click puts it up — the segment is also the way to the scene */}
-            <SettingRow label="Календарь" hint={scene === "calendar" ? "на стене" : "клик — на стену"}>
+            <SettingRow label="Календарь" hint={scene === "calendar" && !covered ? "на стене" : "клик — на стену"}>
               <SegmentTabs<CalendarView | typeof NONE>
                 aria-label="Календарь на стене"
                 value={scene === "calendar" ? calendarView : NONE}
                 onChange={(value) => {
-                  if (value === NONE || (scene === "calendar" && calendarView === value)) return;
-                  show({ scene: "calendar", calendar: value }, value === "month" ? "На стене — месяц" : "На стене — сегодня и неделя");
+                  if (value === NONE || (scene === "calendar" && calendarView === value && !covered)) return;
+                  show({ ...uncover, scene: "calendar", calendar: value }, value === "month" ? "На стене — месяц" : "На стене — сегодня и неделя");
                 }}
                 items={CALENDAR_VIEWS.map((value) => ({ value, label: CALENDAR_LABEL[value] }))}
               />
             </SettingRow>
             {/* outside the round a click puts the rating up in that period; inside it only the period changes (D-123) */}
             {points ? (
-              <SettingRow label="Рейтинг" hint={round ? "период в круге" : scene === "rating" ? "на стене" : "клик — на стену"}>
+              <SettingRow label="Рейтинг" hint={round ? "период в круге" : scene === "rating" && !covered ? "на стене" : "клик — на стену"}>
                 <SegmentTabs<RatingView | typeof NONE>
                   aria-label="Рейтинг на стене"
                   value={round || scene === "rating" ? ratingView : NONE}
@@ -381,8 +386,8 @@ export function DeskScreen() {
                       if (ratingView !== value) show({ rating: value }, value === "month" ? "В круге — рейтинг месяца" : "В круге — рейтинг недели");
                       return;
                     }
-                    if (scene === "rating" && ratingView === value) return;
-                    show({ scene: "rating", rating: value }, value === "month" ? "На стене — рейтинг месяца" : "На стене — рейтинг недели");
+                    if (scene === "rating" && ratingView === value && !covered) return;
+                    show({ ...uncover, scene: "rating", rating: value }, value === "month" ? "На стене — рейтинг месяца" : "На стене — рейтинг недели");
                   }}
                   items={RATING_VIEWS.map((value) => ({ value, label: RATING_LABEL[value] }))}
                 />
@@ -437,7 +442,7 @@ export function DeskScreen() {
                   wallId={wall.boardId}
                   weekId={weekId}
                   weekBusy={weekBoard.isPending}
-                  onPut={(board) => show({ board: board.id }, `На стене — «${board.title}»`)}
+                  onPut={(board) => show({ ...uncover, board: board.id }, `На стене — «${board.title}»`)}
                   onWeek={(board, on) =>
                     weekBoard.mutate(on ? board.id : null, {
                       onSuccess: () => toast(on ? "Доска недели — в круге заставок до воскресенья, 21:00" : "Доска ушла из круга заставок"),
