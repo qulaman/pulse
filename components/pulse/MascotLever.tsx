@@ -2,12 +2,14 @@
 
 import { motion, useMotionValue, useReducedMotion, useSpring } from "motion/react";
 import {
+  memo,
   useCallback,
   useEffect,
   useRef,
   useState,
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent,
+  type ReactNode,
   type TouchEvent as ReactTouchEvent,
 } from "react";
 
@@ -82,12 +84,23 @@ function useUses(): number {
 }
 
 /**
+ * The face and the typed input re-render only when what they are given changes (D-178): the lever
+ * re-renders whenever the screen hands it new balls round the face, and the face's whole drawing
+ * went with it every time, as did the closed text sheet.
+ */
+const Face = memo(Mascot);
+const QuietTextSheet = memo(TextSheet);
+
+/**
  * The mascot as the one lever of the screen (D-60): hold — it shivers and listens (the
  * same pipeline as the voice button had), release — the phrase goes to the parser; tap —
  * the summary again and the cards thrown anew; pull down — the typed input. Pointer
  * capture and a dead touch-action keep the page still under the finger.
+ *
+ * Memoised (D-178): a tap on Пульс or Лента renders the page again, and the lever only when its own
+ * props changed — the screen keeps `onTap`, `onHold`, `pin`, `gaze`, `carry` and `around` stable.
  */
-export function MascotLever({
+export const MascotLever = memo(function MascotLever({
   state,
   onTap,
   size = 128,
@@ -100,6 +113,7 @@ export function MascotLever({
   gaze = null,
   carry = null,
   onHold,
+  around = null,
 }: {
   state: MascotState;
   /** the employee's orders in work, held as a stack of cards (D-110) */
@@ -125,6 +139,11 @@ export function MascotLever({
   gaze?: { x: number; y: number } | null;
   /** the finger is on the face and the microphone is open — the pick card says so (D-84) */
   onHold?: (held: boolean) => void;
+  /**
+   * What lives round the face and travels with it: the balls (D-178). Drawn in the face's own box,
+   * under the face, so the face's glide carries them and nothing ever covers the face.
+   */
+  around?: ReactNode;
 }) {
   const stage = useIngestStore((s) => s.stage);
   // the holiday the face dresses for (D-119)
@@ -139,6 +158,7 @@ export function MascotLever({
   const cancelVoice = useIngestStore((s) => s.cancelVoice);
 
   const [textOpen, setTextOpen] = useState(false);
+  const closeText = useCallback(() => setTextOpen(false), []);
   // «Дать задачу» on a person's card asks for the typed input
   useEffect(
     () =>
@@ -340,9 +360,11 @@ export function MascotLever({
       {/* the box never changes size: it only carries the face, and `layout` keeps the parent's
           own resize (idle ↔ ring ↔ panel) from squashing what is inside it */}
       <motion.div layout className="relative flex items-center justify-center" style={{ width: BASE + 24, height: BASE + 24 }} transition={SPRING}>
+        {around}
         {/* the size the screen asked for is a scale, not a new face: growing and shrinking
-            rides the same spring as the box and never re-draws the SVG mid-flight */}
-        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ y: give }} className="flex items-center justify-center">
+            rides the same spring as the box and never re-draws the SVG mid-flight; it stands
+            above whatever is round it */}
+        <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} style={{ y: give }} className="relative z-[1] flex items-center justify-center">
           <button
             ref={leverRef}
             type="button"
@@ -410,7 +432,7 @@ export function MascotLever({
                 if (event.target === event.currentTarget && event.animationName === "mascot-wake") setWaking(false);
               }}
             >
-              <Mascot state={face} size={BASE} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} />
+              <Face state={face} size={BASE} act={pipeline || gaze ? null : act} gaze={pipeline ? null : gaze} carry={pipeline ? null : carry} season={season} />
             </span>
           </button>
         </motion.div>
@@ -434,7 +456,7 @@ export function MascotLever({
         ) : null}
       </motion.div>
 
-      {voice ? <TextSheet open={textOpen} onClose={() => setTextOpen(false)} /> : null}
+      {voice ? <QuietTextSheet open={textOpen} onClose={closeText} /> : null}
     </div>
   );
-}
+});

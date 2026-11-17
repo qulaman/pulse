@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { memo } from "react";
 
 import { springs } from "@/lib/design/tokens";
 import type { SpeechTone } from "@/lib/pulse/board";
@@ -9,6 +10,8 @@ import { HazeWords } from "./HazeWords";
 
 /** The full face; a smaller one (a panel open) lets the thought down by the difference. */
 const FACE = 128;
+/** From the face's middle to the thought's bottom over a full face: the trail reaches the head. */
+const OVER_FACE = FACE / 2 + 26;
 /** The face's own spring when it grows or shrinks: the thought follows it on the same one. */
 const FACE_SPRING = springs.object;
 
@@ -23,12 +26,15 @@ const TONE_COLOR: Record<SpeechTone, string> = {
  * A thought above the face (D-60): a change on the board — «Марат: задача «…» сдана» —
  * as a cloud with a trail of small circles down to the head. It pops in, hangs for a
  * while and fades; a tap sends it away sooner. Rendered inside the face's box, so it
- * follows the face wherever the layout puts it.
+ * follows the face wherever the layout puts it. Over the ring it floats above the orbit
+ * (`rise`), clear of the top balls and of their taps (D-178). Memoised: the screen keeps its
+ * handlers stable, so a tap elsewhere does not draw the thought again.
  */
-export function ThoughtBubble({
+export const ThoughtBubble = memo(function ThoughtBubble({
   text,
   tone,
   faceSize,
+  rise,
   onDismiss,
   onOpen,
   openLabel = "открыть переписку",
@@ -36,6 +42,8 @@ export function ThoughtBubble({
   text: string;
   tone?: SpeechTone;
   faceSize: number;
+  /** px from the face's middle up to the thought's bottom; by default just over the face */
+  rise?: number;
   onDismiss: () => void;
   /** The thought is about a thread: a tap opens it instead of dismissing (D-64 §5). */
   onOpen?: () => void;
@@ -43,9 +51,9 @@ export function ThoughtBubble({
   openLabel?: string;
 }) {
   const color = tone ? TONE_COLOR[tone] : "var(--text-muted)";
-  // the face grows and shrinks with the mode: the thought follows it — as a transform, the old
-  // transition of `bottom` laid the screen out again on every frame of it
-  const drop = (FACE - faceSize) / 2;
+  // the face grows and shrinks with the mode, the balls come out round it: the thought follows — as
+  // a transform, the old transition of `bottom` laid the screen out again on every frame of it
+  const drop = OVER_FACE - (rise ?? faceSize / 2 + 26);
   return (
     <motion.button
       type="button"
@@ -61,7 +69,7 @@ export function ThoughtBubble({
       layoutDependency={faceSize}
       transition={{ type: "spring", stiffness: 300, damping: 22, y: FACE_SPRING, layout: FACE_SPRING }}
       className="absolute left-1/2 z-10 w-[min(88vw,320px)] -translate-x-1/2 text-left"
-      style={{ bottom: `calc(50% + ${FACE / 2 + 26}px)`, transformOrigin: "60% 100%" }}
+      style={{ bottom: `calc(50% + ${OVER_FACE}px)`, transformOrigin: "60% 100%" }}
       data-testid="thought"
     >
       <span
@@ -79,4 +87,4 @@ export function ThoughtBubble({
       <span aria-hidden className="absolute left-[54%] top-full mt-[18px] h-2 w-2 rounded-full border border-border bg-surface" />
     </motion.button>
   );
-}
+});

@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { memo, useState, type ReactNode } from "react";
 
 import { SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
 import type { Daypart, DeskPhase, DeskScene, Urgency } from "@/lib/errands/scene";
@@ -16,8 +17,10 @@ const SPRING = springs.object;
  * The middle of the secretary's Лента (D-87, D-97): the secretary's own face instead of
  * «Капля». A tap wakes the balls as in anybody's Лента — except while a request is calling:
  * then the face itself is the biggest «Принял» on the screen (the screen decides, `onTap`).
+ * The balls live round it and travel with it, as round «Капля» (`around`, D-178). Memoised: Лента
+ * keeps `onTap` and `around` stable, so a tap redraws the face only when what it shows changes.
  */
-export function SecretaryFace({
+export const SecretaryFace = memo(function SecretaryFace({
   scene,
   phase,
   size,
@@ -32,6 +35,7 @@ export function SecretaryFace({
   cheer,
   still = false,
   onTap,
+  around = null,
 }: {
   scene: DeskScene | null;
   phase: DeskPhase;
@@ -50,11 +54,23 @@ export function SecretaryFace({
   /** the deep rest of an untouched screen: the secretary stops typing and reads (D-119) */
   still?: boolean;
   onTap: () => void;
+  /** the balls: drawn in the face's box, under the face, carried by its glide (D-178) */
+  around?: ReactNode;
 }) {
   const season = useMascotSeason();
+  // The stretch of waking up plays once per wake on the same face. A key on the wrapper remounted
+  // the whole secretary: the room and the job in its hands were dropped in one frame instead of
+  // fading out while the balls come out (D-178).
+  const [waking, setWaking] = useState(false);
+  const [wakeSeen, setWakeSeen] = useState(wakeKey);
+  if (wakeSeen !== wakeKey) {
+    setWakeSeen(wakeKey);
+    setWaking(true);
+  }
   return (
     <motion.div layout className="relative flex items-center justify-center" style={{ width: BASE + 24, height: BASE + 24 }} transition={SPRING}>
-      <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} className="flex items-center justify-center">
+      {around}
+      <motion.div initial={false} animate={{ scale: size / BASE }} transition={SPRING} className="relative z-[1] flex items-center justify-center">
         <button
           type="button"
           onClick={onTap}
@@ -68,9 +84,12 @@ export function SecretaryFace({
           style={{ width: BASE + 24, height: BASE + 24, touchAction: "manipulation", WebkitTapHighlightColor: "transparent" }}
         >
           <span
-            key={wakeKey}
             className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]"
-            style={{ animation: wakeKey > 0 ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
+            style={{ animation: waking ? "mascot-wake 520ms cubic-bezier(0.34, 1.4, 0.64, 1) both" : "none" }}
+            onAnimationEnd={(event) => {
+              // the face's own animations end in here too: only the stretch of this wrapper counts
+              if (event.target === event.currentTarget && event.animationName === "mascot-wake") setWaking(false);
+            }}
           >
             <SecretaryMascot
               scene={scene}
@@ -91,4 +110,4 @@ export function SecretaryFace({
       </motion.div>
     </motion.div>
   );
-}
+});

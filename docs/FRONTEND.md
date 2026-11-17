@@ -268,6 +268,8 @@ PWA живёт днями, и после деплоя код на экране �
 
 **Покой** (D-131). Слушатель `animationiteration`, который React вешает на корень, будит основной поток на каждой границе бесконечной CSS-петли; строка `QUIET_LOOPS` (`lib/design/quiet-loops.ts`) в `<head>` не даёт его зарегистрировать, поэтому `onAnimationIteration` не использовать. `MascotPower` останавливает лица вне экрана; помощники скольжения — `components/ui/motion.ts`.
 
+**Тап по лицу и шарикам** (D-178). Пульс и Лента держат сцену в одном `useReducer` (режим, шарик, `cameFrom`, у Ленты ещё место строки отчёта). Части, которых тап не касается, мемоизированы: `SaidBand`, `MascotLever` (внутри — лицо и закрытый `TextSheet`), `OrbitBalls` вплоть до шарика, `PanelCard` с телом из `useMemo`, `IdleScene`, `ThoughtBubble`, листы событий и переписки. Обработчики — `useStableCallback`, действия задач — `useStableActions` (`components/pulse/stable.ts`). `AnimatePresence` внутри общего `LayoutGroup` — только через `LocalPresence`, иначе конец выхода перерисовывает весь экран посреди скольжения лица.
+
 **Клавиатура телефона** (`lib/ui/keyboard.ts`): ответ на неё пишется в DOM внутри события `visualViewport`, не через состояние React, и ничто не прокручивает страницу в ответ на прокрутку — иначе экран дрожит. Целевые телефоны — iPhone 16–18 и флагманы Android (D-136).
 
 ## 11. Game feel как механизм

@@ -1,7 +1,7 @@
 "use client";
 
-import { animate, motion, useDragControls, useIsPresent, type PanInfo, type TargetAndTransition } from "motion/react";
-import { useEffect, useRef, type CSSProperties, type ReactNode, type Ref } from "react";
+import { animate, motion, PresenceContext, useDragControls, useIsPresent, type PanInfo, type TargetAndTransition } from "motion/react";
+import { memo, useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 
 import { springs } from "@/lib/design/tokens";
 
@@ -12,6 +12,13 @@ import styles from "./PanelCard.module.css";
  * card takes three quarters of the screen, the face and the balls step up (D-166, D-167).
  */
 export const PANEL_GROW = 3;
+
+/**
+ * A class for what the band shows again when a card goes down (the service lines, the secretary's
+ * hint): it fades in once the card is gone instead of standing twice on the screen, in the card
+ * going down and in the band (D-178).
+ */
+export const AFTER_CARD = styles.afterCard;
 
 /** A pull on the grip past this, or a flick, sends the card back down. */
 const CLOSE_PX = 96;
@@ -34,8 +41,15 @@ const FLICK = 650;
  * too («100%» it could only move from script, a frame at a time). What is inside is drawn in the
  * tap's frame with the rest: drawn a frame later, it held up the face and the balls, which glide by
  * script, in the middle of their way.
+ *
+ * Closed while still coming up, it goes down from where it is, not from its place (D-178). A card
+ * that is there on the first render of its AnimatePresence with `initial={false}` — Лента coming
+ * back to the card it left open (D-167) — stands in place instead of coming up.
+ *
+ * Memoised (D-178): the screen keeps `onClose` and `children` stable, so a tap that changes nothing
+ * in the card does not draw the card and what is in it again.
  */
-export function PanelCard({
+export const PanelCard = memo(function PanelCard({
   ref,
   panelKey,
   receded,
@@ -55,11 +69,20 @@ export function PanelCard({
 }) {
   const controls = useDragControls();
   const scroller = useRef<HTMLDivElement>(null);
+  // the card remembered open is where it was: no rise. Latched at mount — on the way out
+  // AnimatePresence no longer says `initial`, and a rise picked up then would drop the card in a frame
+  const presence = useContext(PresenceContext);
+  const [rise] = useState(() => presence?.initial !== false);
   // A ball tapped while the card is still going down keeps the same card (AnimatePresence brings
   // it back): it comes up to its place. Asked of the element itself — an `animate` target or a `y`
   // of our own on the card made framer move the way out by script again
   const present = useIsPresent();
   const away = useRef(false);
+  // In the commit that sends it away, before that frame is painted: a rise still running is held
+  // where it is (holdRise) — the way out starts from there, not from a frame further up
+  useLayoutEffect(() => {
+    if (!present) holdRise(scroller.current?.parentElement);
+  }, [present]);
   useEffect(() => {
     if (!present) {
       away.current = true;
@@ -68,7 +91,12 @@ export function PanelCard({
     if (!away.current) return;
     away.current = false;
     const card = scroller.current?.parentElement;
-    if (card) animate(card, { y: 0 }, springs.object);
+    if (!card) return;
+    animate(card, { y: 0 }, springs.object);
+    // caught while it was still coming up: the rise goes on from where it was held
+    card.getAnimations().forEach((run) => {
+      if (run instanceof CSSAnimation && run.playState === "paused") run.play();
+    });
   }, [present]);
 
   useEffect(() => {
@@ -102,7 +130,7 @@ export function PanelCard({
       data-testid="panel-card"
       data-panel={panelKey}
       data-receded={receded ? "" : undefined}
-      className={`${styles.card} relative z-10 flex min-h-0 flex-1 flex-col`}
+      className={`${styles.card}${rise ? ` ${styles.rise}` : ""} relative z-10 flex min-h-0 flex-1 flex-col`}
       style={CARD}
       // up: `.card` in the module (CSS, the object spring); down: its own height in pixels
       variants={{ gone: () => goneBy(scroller.current?.parentElement) }}
@@ -139,7 +167,7 @@ export function PanelCard({
       </motion.div>
     </motion.section>
   );
-}
+});
 
 /** `translate: -16px 0` lives in `.card`, under the rising animation that moves the same property. */
 const CARD: CSSProperties = {
@@ -147,13 +175,30 @@ const CARD: CSSProperties = {
   marginBottom: "calc(-1 * var(--tabbar-space))",
 };
 
+/** The whole way out, from the card's place down by its own height. */
+const GONE_S = 0.24;
+
 /**
  * The way out gathers speed instead of settling (D-131), from wherever the finger left it, down by
  * the card's own height. Read when the card starts to leave — the popped-out card has its size
  * set by then — and in pixels, so framer runs it as a browser animation.
+ *
+ * A card closed while it is still coming up is caught where it is: its rise (CSS, `translate`) is
+ * held at the height it reached and the way out (`y`, the transform) goes down from there. Left
+ * running, the rise went on under the way out, and the card crawled up a few dozen pixels before it
+ * went down (D-178). Held, not cancelled: a cancelled rise would put the card back at its place for
+ * a frame; held, the card brought back by a ball's tap rises on from the same height.
  */
 function goneBy(card: HTMLElement | null | undefined): TargetAndTransition {
-  return { y: card?.offsetHeight ?? window.innerHeight, transition: { duration: 0.24, ease: [0.4, 0, 1, 1] } };
+  holdRise(card);
+  return { y: card?.offsetHeight ?? window.innerHeight, transition: { duration: GONE_S, ease: [0.4, 0, 1, 1] } };
+}
+
+/** The CSS rise of a card that is leaving stops where it is (see goneBy). */
+function holdRise(card: HTMLElement | null | undefined) {
+  card?.getAnimations().forEach((run) => {
+    if (run instanceof CSSAnimation && run.playState === "running") run.pause();
+  });
 }
 
 const RECEDE_T = "opacity 360ms var(--ease-out), filter 360ms var(--ease-out), scale 360ms var(--ease-out)";

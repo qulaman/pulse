@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useEffect, useRef } from "react";
 
 import { flyInto } from "@/lib/ui/flyAway";
 
@@ -18,7 +18,7 @@ const FLIGHT_MS = 650;
  * header), nothing flies. Renders nothing; `arrival` is the key of `usePointsArrival`, the one the
  * coin plays on.
  */
-export function PointsFlight({ arrival }: { arrival: number }) {
+export const PointsFlight = memo(function PointsFlight({ arrival }: { arrival: number }) {
   // a key seen at mount is not news: only a change after it flies
   const played = useRef(arrival);
   useEffect(() => {
@@ -35,4 +35,4 @@ export function PointsFlight({ arrival }: { arrival: number }) {
     return () => clearTimeout(timer);
   }, [arrival]);
   return null;
-}
+});

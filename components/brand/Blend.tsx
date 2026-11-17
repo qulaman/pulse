@@ -91,6 +91,12 @@ export class Blend extends Component<{
   lead?: Timing;
   /** an HTML element inside (the director's desk) instead of an SVG group */
   html?: boolean;
+  /**
+   * The wrapper around this one is mirrored about the vertical line through `origin` (an act drawn on
+   * the other side, components/brand/hands.ts). When that flips together with `k` — a mirrored act cut
+   * short — the pose read in the old frame is mirrored into the new one, so the lean does not jump sides.
+   */
+  mirrored?: boolean;
   children: ReactNode;
 }> {
   private readonly node = createRef<SVGGElement & HTMLSpanElement>();
@@ -105,7 +111,7 @@ export class Blend extends Component<{
     write?.();
   }
 
-  getSnapshotBeforeUpdate(previous: { k: string }): DOMMatrix | null {
+  getSnapshotBeforeUpdate(previous: { k: string; mirrored?: boolean }): DOMMatrix | null {
     if (previous.k === this.props.k) return null;
     const self = this.node.current;
     const inner = self?.firstElementChild;
@@ -113,7 +119,10 @@ export class Blend extends Component<{
     // a second change before the first one's blend has started: that blend is part of the body too
     this.play();
     // a blend still under way is part of where the body is now
-    return matrixOf(self).multiply(matrixOf(inner));
+    const was = matrixOf(self).multiply(matrixOf(inner));
+    // seen through a mirror that is going away (or coming): the same pose, the other way round
+    if ((previous.mirrored ?? false) === (this.props.mirrored ?? false)) return was;
+    return new DOMMatrix([was.a, -was.b, -was.c, was.d, -was.e, was.f]);
   }
 
   componentDidUpdate(_previous: unknown, _state: unknown, was: DOMMatrix | null) {

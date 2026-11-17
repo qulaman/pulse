@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { SpeechTone } from "@/lib/pulse/board";
 
 import { HazeWords } from "./HazeWords";
+import haze from "./HazeWords.module.css";
 
 const TONE_COLOR: Record<SpeechTone, string> = {
   danger: "var(--danger)",
@@ -39,9 +40,13 @@ export function Assistant({ said, lines, children }: Props) {
         </div>
       ) : null}
       {lines.map((line) => (
-        // keyed by id: a new line comes in word by word, the old one is gone
-        <p key={line.id} className="relative py-1 pl-4 text-center text-[17px] leading-6" data-testid="assistant-line">
-          {line.tone ? <span aria-hidden className="absolute left-0 top-[11px] h-2 w-2 rounded-full" style={{ background: TONE_COLOR[line.tone] }} /> : null}
+        // keyed by id: a new line comes in word by word, the old one is gone. The tone's dot stands
+        // right before the first word and comes out of the haze with it — at the band's edge it
+        // sat far from a centred line and showed before any word did
+        <p key={line.id} className="py-1 text-center text-[17px] leading-6" data-testid="assistant-line">
+          {line.tone ? (
+            <span aria-hidden className={`${haze.word} mr-2 h-2 w-2 rounded-full align-middle`} style={{ background: TONE_COLOR[line.tone], marginTop: -3 }} />
+          ) : null}
           <HazeWords text={line.text} />
         </p>
       ))}

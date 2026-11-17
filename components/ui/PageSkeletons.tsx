@@ -68,18 +68,18 @@ export function PulseInboxBone() {
 }
 
 /**
- * Пульс and Лента (D-60) before their data: the page's own three bands with the face asleep
- * in the middle one — the box of MascotLever (128 + 24) and its 0.82 on a low screen — so the
+ * Пульс and Лента (D-60) before their data: the page's own three bands with the face in the
+ * middle one — asleep on Пульс, awake on Лента (D-178) — the box of MascotLever (128 + 24) and its 0.82 on a low screen — so the
  * face is where the page will put it, at the size it will have.
  */
-export function PulseSkeleton() {
+export function PulseSkeleton({ face = "sleeping" }: { face?: "sleeping" | "calm" } = {}) {
   return (
     <main className="mx-auto flex w-full min-h-0 max-w-lg flex-1 flex-col overflow-hidden px-4" data-board="">
       <div className="min-h-0 flex-1" data-band="said" />
       <div className="relative flex shrink-0 flex-col items-center">
         <div className="flex h-[152px] w-[152px] items-center justify-center">
           <span className="flex items-center justify-center [@media(max-height:760px)]:scale-[0.82]">
-            <Mascot state="sleeping" size={128} />
+            <Mascot state={face} size={128} />
           </span>
         </div>
       </div>
@@ -326,9 +326,12 @@ export function AdminSkeleton() {
 
 /* ---- employee ---------------------------------------------------------------- */
 
-/** Лента (D-62): the face alone in the middle, as on Пульс — the home screen has no title. */
+/**
+ * Лента (D-62): the face alone in the middle, as on Пульс — the home screen has no title. Awake and
+ * neutral, as the page draws it until the board is read: work may be waiting (D-178).
+ */
 export function FeedSkeleton() {
-  return <PulseSkeleton />;
+  return <PulseSkeleton face="calm" />;
 }
 
 /** A line of the head that loads (a position, a count): a no-break space keeps its room. */

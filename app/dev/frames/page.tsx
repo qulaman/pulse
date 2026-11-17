@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 
+import { ACT_HANDS } from "@/components/brand/hands";
 import { ACT_MS, Mascot, type MascotAct, type MascotState } from "@/components/brand/Mascot";
 import { SecretaryDesk } from "@/components/pulse/SecretaryDesk";
 import { FINISH_MS, SEC_ACT_MS, SecretaryMascot, type SecretaryAct } from "@/components/secretary/SecretaryMascot";
@@ -15,9 +16,11 @@ import type { MascotSeason } from "@/lib/mascot/season";
  * on its own clock, so a screenshot of a row is the whole motion at a glance — a hand that stays
  * on the desk while the arms go up shows in one picture.
  *
- *   ?set=drop-states | drop-acts | sec | desk | transitions   which rows (transitions: the face
- *                                               mounts in one state and turns to the next at once —
- *                                               the columns are the moments after the turn)
+ *   ?set=drop-states | drop-acts | sec | desk | transitions | jobs | job-acts   which rows
+ *                                               (transitions, jobs: the face mounts in one state and
+ *                                               turns to the next — the columns are the moments after
+ *                                               the turn; job-acts: every act that moves a hand, over
+ *                                               every job that holds one)
  *   ?only=<row key>[,<row key>…]                just these rows
  *   ?n=8                                        frames per row
  *   ?size=96                                    the face's size; the cells grow with it
@@ -306,14 +309,38 @@ function desk(): Row[] {
   }));
 }
 
-/** One face that mounts showing `from` and turns into `to` on the next frame. */
-function Turn({ from, to }: { from: ReactNode; to: ReactNode }) {
+/**
+ * The animations a turn found running, and how far into them it held the face: the sheet seeks them
+ * that much further, so what the face was doing before the turn keeps its moment instead of starting over.
+ */
+const HELD = new WeakMap<Animation, number>();
+
+/**
+ * One face that mounts showing `from` and turns into `to` on the next frame. `hold` (ms) — `from` is
+ * first held that far into its motion, so the turn starts from a settled face (a prop fully in the
+ * hand, an act halfway through) rather than from its first frame.
+ */
+function Turn({ from, to, hold = 0 }: { from: ReactNode; to: ReactNode; hold?: number }) {
+  const box = useRef<HTMLSpanElement>(null);
   const [on, setOn] = useState(false);
   useLayoutEffect(() => {
-    const frame = requestAnimationFrame(() => setOn(true));
+    const frame = requestAnimationFrame(() => {
+      if (hold > 0 && box.current) {
+        for (const anim of box.current.getAnimations({ subtree: true })) {
+          anim.pause();
+          anim.currentTime = hold;
+          HELD.set(anim, hold);
+        }
+      }
+      setOn(true);
+    });
     return () => cancelAnimationFrame(frame);
-  }, []);
-  return <>{on ? to : from}</>;
+  }, [hold]);
+  return (
+    <span ref={box} className="contents">
+      {on ? to : from}
+    </span>
+  );
 }
 
 /**
@@ -364,7 +391,76 @@ function transitions(size: number): Row[] {
   ];
 }
 
-const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk, transitions };
+type Face = { state: MascotState; act?: MascotAct | null; carry?: { count: number; hot?: boolean } | null };
+
+/**
+ * A ball opens, another one is tapped, the card closes (D-82, D-178): the face takes up the job from a
+ * settled rest or from another job, and the prop that leaves and the one that comes must never be in
+ * one hand at once. `from` is held 1.4 s in, so its prop is fully in the hand when the turn comes; an
+ * act in `from` is held at its middle.
+ */
+const JOB_TURNS: [string, Face, Face][] = [
+  // rest → job
+  ["calm-checking", { state: "calm" }, { state: "checking" }],
+  ["calm-chatting", { state: "calm" }, { state: "chatting" }],
+  ["calm-announcing", { state: "calm" }, { state: "announcing" }],
+  ["calm-scheduling", { state: "calm" }, { state: "scheduling" }],
+  ["calm-serving", { state: "calm" }, { state: "serving" }],
+  ["calm-tuned", { state: "calm" }, { state: "tuned" }],
+  ["sleeping-checking", { state: "sleeping" }, { state: "checking" }],
+  ["working-checking", { state: "working", carry: { count: 3 } }, { state: "checking" }],
+  ["nervous-chatting", { state: "nervous", carry: { count: 1 } }, { state: "chatting" }],
+  ["calling-tuned", { state: "calling", carry: { count: 1 } }, { state: "tuned" }],
+  // job → job
+  ["checking-chatting", { state: "checking" }, { state: "chatting" }],
+  ["chatting-announcing", { state: "chatting" }, { state: "announcing" }],
+  ["announcing-scheduling", { state: "announcing" }, { state: "scheduling" }],
+  ["scheduling-checking", { state: "scheduling" }, { state: "checking" }],
+  ["checking-serving", { state: "checking" }, { state: "serving" }],
+  ["checking-happy", { state: "checking" }, { state: "happy" }],
+  ["tuned-checking", { state: "tuned" }, { state: "checking" }],
+  // job → rest
+  ["checking-calm", { state: "checking" }, { state: "calm" }],
+  ["announcing-happy", { state: "announcing" }, { state: "happy" }],
+  ["scheduling-calm", { state: "scheduling" }, { state: "calm" }],
+  ["chatting-calm", { state: "chatting" }, { state: "calm" }],
+  ["tuned-working", { state: "tuned" }, { state: "working", carry: { count: 2 } }],
+  // a called act meets a job: the wave of waking when a ball is tapped in the middle of it (it gives
+  // the hand up — useMascotActs), an act of the board when the card closes in the middle of it
+  ["calm-wave-checking", { state: "calm", act: "wave" }, { state: "checking" }],
+  ["checking-hmm-calm", { state: "checking", act: "hmm" }, { state: "calm" }],
+  ["calm-scratch-checking", { state: "calm", act: "scratch" }, { state: "checking", act: "scratch" }],
+];
+
+function jobs(size: number): Row[] {
+  const face = (f: Face) => <Mascot state={f.state} size={size} act={f.act ?? null} carry={f.carry ?? null} />;
+  return JOB_TURNS.map(([key, from, to]) => ({
+    key: `job-${key}`,
+    label: `${from.state}${from.act ? `+${from.act}` : ""} → ${to.state}${to.act ? `+${to.act}` : ""}`,
+    dur: 700,
+    w: size * 1.7,
+    h: size * 1.7,
+    draw: () => <Turn hold={from.act ? ACT_MS[from.act] / 2 : 1400} from={face(from)} to={face(to)} />,
+  }));
+}
+
+/** The jobs that hold a hand (components/brand/hands.ts): an act that moves one has to find it free. */
+const HELD_JOBS: MascotState[] = ["checking", "announcing", "scheduling", "serving"];
+
+function jobActs(size: number): Row[] {
+  return HELD_JOBS.flatMap((on) =>
+    (Object.keys(ACT_HANDS) as MascotAct[]).map((act) => ({
+      key: `job-${on}-${act}`,
+      label: `${act} · ${on}`,
+      dur: ACT_MS[act],
+      w: size * 1.7,
+      h: size * 1.7,
+      draw: () => <Mascot state={on} size={size} act={act} />,
+    })),
+  );
+}
+
+const SETS: Record<string, (size: number) => Row[]> = { "drop-states": dropStates, "drop-acts": dropActs, sec: secretary, desk, transitions, jobs, "job-acts": jobActs };
 
 /** The query string after hydration — a string snapshot, so the store stays stable. */
 function useSearch(): string | null {
@@ -407,7 +503,7 @@ function Sheet({ rows, n, live }: { rows: Row[]; n: number; live: boolean }) {
         const t = Number(frame.dataset.t);
         for (const anim of frame.getAnimations({ subtree: true })) {
           anim.pause();
-          anim.currentTime = t;
+          anim.currentTime = t + (HELD.get(anim) ?? 0);
         }
       }
     };

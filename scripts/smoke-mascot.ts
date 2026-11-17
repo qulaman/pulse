@@ -6,7 +6,9 @@
  *   pnpm smoke:mascot              compare with the baseline (APP_URL, default http://localhost:3000)
  *   UPDATE=1 pnpm smoke:mascot     take the baseline (after a change you meant)
  *   REDUCED=1 pnpm smoke:mascot    the same under prefers-reduced-motion: the still frames
- *   SETS=sec,desk                  only these sets (drop-states, drop-acts, sec, desk, transitions)
+ *   SETS=sec,desk                  only these sets (drop-states, drop-acts, sec, desk, transitions, jobs,
+ *                                  job-acts — the jobs of the open balls: taken up, switched, put down, and
+ *                                  every act that moves a hand over every job that holds one)
  * Pictures live in .smoke-ui/mascot/<motion|reduced>/{baseline,current}/<set>/<row>.png.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -16,7 +18,7 @@ import { chromium, type Page } from "playwright";
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const UPDATE = process.env.UPDATE === "1";
 const REDUCED = process.env.REDUCED === "1";
-const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions").split(",");
+const SETS = (process.env.SETS ?? "drop-states,drop-acts,sec,desk,transitions,jobs,job-acts").split(",");
 const ROOT = join(process.cwd(), ".smoke-ui", "mascot", REDUCED ? "reduced" : "motion");
 /** A pixel counts as changed past this much on any channel; a row, past this many pixels. */
 const CHANNEL = 24;

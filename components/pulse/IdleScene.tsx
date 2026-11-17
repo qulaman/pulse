@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react";
+import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
+import { motion, useIsPresent, useReducedMotion } from "motion/react";
 
 import { SLEEP_COLOR } from "@/components/brand/Mascot";
 import { DreamFlight, TOUCHES, type DreamId, DREAMS } from "@/components/pulse/DreamOrbit";
 import { flyChase, MAX_OVERSHOOT, type Chase } from "@/lib/idle/flight";
+import { LocalPresence } from "@/components/pulse/LocalPresence";
 import { PeopleField } from "@/components/pulse/PeopleField";
 import type { Member, Pick } from "@/lib/idle/people";
 import { looseSeed } from "@/lib/idle/random";
@@ -69,8 +70,11 @@ function useArea(anchor: RefObject<HTMLDivElement | null>): { hx: number; hy: nu
  * Under `prefers-reduced-motion` there is no dream: it carries no state the director needs,
  * so the right amount of it is none. The team stays, still (D-118): who is at work and what
  * waits for the director is exactly the state he needs.
+ *
+ * Memoised (D-178): a tap on the face or a ball renders the board again, and the scene — the
+ * whole team on the director's screen — only when what it is given changes.
  */
-export function IdleScene({
+export const IdleScene = memo(function IdleScene({
   active,
   quiet = true,
   only,
@@ -137,7 +141,7 @@ export function IdleScene({
       <div ref={anchor} className="pointer-events-none absolute inset-0" aria-hidden />
       {/* the team leaves with the rest of the scene — it dissolves in 180 ms at the first touch
           instead of vanishing in one frame — and comes back softly when the face falls asleep */}
-      <AnimatePresence>
+      <LocalPresence>
         {active && area && team ? (
           <Fade key="team">
             <PeopleField
@@ -158,12 +162,12 @@ export function IdleScene({
             />
           </Fade>
         ) : null}
-      </AnimatePresence>
+      </LocalPresence>
       <RimWake dream={dream} chase={chase} ms={FLIGHT_MS} />
       <DreamFlight dream={dream} chase={chase} ms={FLIGHT_MS} />
     </>
   );
-}
+});
 
 /**
  * A layer of the scene coming and going: in over 240 ms, out over 180 ms. While it goes, nothing in

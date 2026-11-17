@@ -3,9 +3,13 @@
 /* wider than the board's padding by 16 px a side; it comes up from below its own height on the
    object spring written out for CSS — the compositor runs it, so the frame of the tap, busy with
    the board, does not hold it back. `translate` and not `transform`: the grip's drag and the way
-   out move `transform` (framer's `y`), and the two add up */
+   out move `transform` (framer's `y`), and the two add up. A card remembered open stands without
+   it (`.rise` off) */
 .card {
   translate: -16px 0;
+}
+
+.rise {
   animation: panel-rise var(--t-object) var(--ease-object);
 }
 
@@ -29,6 +33,24 @@
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .surface {
     background: var(--surface);
+  }
+}
+
+/* what the band shows again once a card has gone down — the service lines, «Посетитель», the
+   secretary's hint — waits for the card to be gone instead of standing over it twice (D-178) */
+.afterCard {
+  animation: after-card 200ms var(--ease-out) 220ms both;
+}
+
+@keyframes after-card {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .afterCard {
+    animation: none;
   }
 }
 

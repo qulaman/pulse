@@ -2,10 +2,21 @@
 
 import { useState, type ReactNode } from "react";
 
-/** A held thing that is no longer held goes back the way it came: down into the hand, smaller. */
-export const PROP_OUT = "mascot-prop-out 0.26s cubic-bezier(0.5, 0, 0.75, 0) both";
+/**
+ * A held thing that is no longer held goes back the way it came: down into the hand, smaller. Quicker
+ * than it came (0.45 s) and on `--ease-in`, so it starts going at once: a clipboard that stayed whole
+ * for a beat hung by the side of a face already grown back after its card closed.
+ */
+export const PROP_OUT = "mascot-prop-out 0.2s cubic-bezier(0.4, 0, 1, 1) both";
 /** A piece of a room or a scene that is no longer needed fades where it stands. */
 export const FADE_OUT = "mascot-fade-out 0.26s ease-in both";
+/** Amber and gold that are not held go by getting smaller where they are — never by a fade, half-clear they read brown (D-151). */
+export const SHRINK_OUT = "mascot-shrink-out 0.2s cubic-bezier(0.4, 0, 1, 1) both";
+/**
+ * The hands of an act cut short (useMascotActs drops a called act when a job needs its hand): the
+ * arm draws back into the body instead of vanishing in one frame. At an act's own end it is already gone.
+ */
+export const ACT_OUT = "mascot-shrink-out 0.16s cubic-bezier(0.4, 0, 1, 1) both";
 
 /** «Уменьшить движение»: nothing is played out, a prop simply goes. Read at the moment it goes. */
 function reducedMotion(): boolean {

@@ -257,10 +257,27 @@ export const handFill = (body: string) => `color-mix(in srgb, ${body} 72%, #0000
 export const MIRROR = "matrix(-1 0 0 1 64 0)";
 
 /**
+ * Inside a mirrored act (components/brand/hands.ts — the act's hand is on the other side), what reads
+ * one way only is drawn the right way round again in its place: a card's lines and badge, a «?», the
+ * hands of a clock. `about` — the x it is mirrored about.
+ */
+const unflip = (flip: boolean, about: number) => (flip ? `matrix(-1 0 0 1 ${2 * about} 0)` : undefined);
+/** The same for a piece placed by `translate(..) rotate(..)` around its own middle. */
+const turned = (flip: boolean) => (flip ? " scale(-1 1)" : "");
+
+/** How an act is drawn on a face that holds something (components/brand/hands.ts `planHands`). */
+export type ActHands = {
+  /** the act is drawn mirrored: the pieces that read one way only are turned back */
+  flip?: boolean;
+  /** a two-handed act done with one hand, the hand of this side (screen side) */
+  only?: "left" | "right" | null;
+};
+
+/**
  * Behind the body (drawn before it, inside the body's motion group — the body covers the root
  * of the arm, so the arm grows out of it, the way the D-82 wave does).
  */
-export function WorkActBehind({ act, body, holding = false }: { act: string; body: string; holding?: boolean }) {
+export function WorkActBehind({ act, body, flip = false, only = null }: { act: string; body: string } & ActHands) {
   if (act === "raise") {
     // the left hand: the card of a new order waits over the right shoulder
     return (
@@ -272,16 +289,18 @@ export function WorkActBehind({ act, body, holding = false }: { act: string; bod
     );
   }
   if (act === "shrug" || act === "poof") {
-    // palms up on both sides; on «poof» they come after the card is gone. The right hand keeps
-    // the stack if there is one — the shrug lifts it with the shoulders instead
+    // palms up on both sides; on «poof» they come after the card is gone. A hand that holds something
+    // (the stack, the clipboard, the calendar) keeps it — the shrug lifts it with the shoulders instead
     const timing = act === "poof" ? "1.2s ease-in-out 0.6s both" : "1.8s ease-in-out both";
     return (
       <>
-        <g style={{ transformOrigin: "12px 44px", animation: `mascot-act-palm ${timing}` }}>
-          <path d="M12 44 Q5 44 2.4 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
-          <ellipse cx="0.8" cy="38" rx="4.8" ry="2.6" transform="rotate(-22 0.8 38)" fill={body} />
-        </g>
-        {holding ? null : (
+        {only === "right" ? null : (
+          <g style={{ transformOrigin: "12px 44px", animation: `mascot-act-palm ${timing}` }}>
+            <path d="M12 44 Q5 44 2.4 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
+            <ellipse cx="0.8" cy="38" rx="4.8" ry="2.6" transform="rotate(-22 0.8 38)" fill={body} />
+          </g>
+        )}
+        {only === "left" ? null : (
           <g style={{ transformOrigin: "52px 44px", animation: `mascot-act-palm ${timing}` }}>
             <path d="M52 44 Q59 44 61.6 39.6" fill="none" stroke={body} strokeWidth="5" strokeLinecap="round" />
             <ellipse cx="63.2" cy="38" rx="4.8" ry="2.6" transform="rotate(22 63.2 38)" fill={body} />
@@ -309,14 +328,17 @@ export function WorkActBehind({ act, body, holding = false }: { act: string; bod
         {/* the watch on the wrist, face to the viewer */}
         <rect x="-5.2" y="29.2" width="8.4" height="4" rx="1.2" fill="var(--text-muted)" />
         <circle cx="-1" cy="31.2" r="4.3" fill="var(--surface)" stroke="var(--accent)" strokeWidth="1.2" />
-        <path d="M-1 31.2 H1.2" stroke="var(--text)" strokeWidth="1" strokeLinecap="round" />
-        <path
-          d="M-1 31.2 V28.2"
-          stroke="var(--text)"
-          strokeWidth="0.9"
-          strokeLinecap="round"
-          style={{ transformOrigin: "-1px 31.2px", animation: "mascot-act-watch-hand 1.8s linear both" }}
-        />
+        {/* the hands go clockwise on either wrist */}
+        <g transform={unflip(flip, -1)}>
+          <path d="M-1 31.2 H1.2" stroke="var(--text)" strokeWidth="1" strokeLinecap="round" />
+          <path
+            d="M-1 31.2 V28.2"
+            stroke="var(--text)"
+            strokeWidth="0.9"
+            strokeLinecap="round"
+            style={{ transformOrigin: "-1px 31.2px", animation: "mascot-act-watch-hand 1.8s linear both" }}
+          />
+        </g>
       </g>
     );
   }
@@ -376,7 +398,7 @@ const POOF_BITS: { x: number; y: number }[] = [
 ];
 
 /** Over everything (after the face): what flies — the cards, the letter, the clock, the coin. */
-export function WorkActOver({ act }: { act: string }) {
+export function WorkActOver({ act, flip = false }: { act: string } & ActHands) {
   switch (act) {
     case "catch":
     case "insist":
@@ -396,7 +418,7 @@ export function WorkActOver({ act }: { act: string }) {
       );
     case "raise":
       return (
-        <g transform="translate(-2 -7)">
+        <g transform={`translate(-2 -7)${turned(flip)}`}>
           <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-act-ask 1.8s both", opacity: 0 }}>
             <circle r="5.4" fill="var(--surface)" stroke="var(--warn)" strokeWidth="1.4" />
             <text y="0.4" fontSize="8" fontWeight="800" textAnchor="middle" dominantBaseline="central" fill="var(--warn)" fontFamily="var(--font-display), system-ui, sans-serif">
@@ -444,7 +466,7 @@ export function WorkActOver({ act }: { act: string }) {
       // wind-up behind the head is WorkActUnder's)
       return (
         <g style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card 1.2s linear both", opacity: 0 }}>
-          <g transform="translate(42.5 11)">
+          <g transform={`translate(42.5 11)${turned(flip)}`}>
             <CardShape badge="done" stroke="var(--ok)" />
           </g>
         </g>
@@ -541,11 +563,11 @@ export function WorkActOver({ act }: { act: string }) {
  * Under the body (drawn before it, outside its motion): the wind-up of «Сдал» — the card in the hand
  * behind the head, only its top over the crown; WorkActOver's copy takes over at the release.
  */
-export function WorkActUnder({ act, body }: { act: string; body: string }) {
+export function WorkActUnder({ act, body, flip = false }: { act: string; body: string } & ActHands) {
   if (act !== "handover") return null;
   return (
     <g data-still="hide" style={{ transformOrigin: "42px 12px", animation: "mascot-throw-card-back 1.2s linear both", opacity: 0 }}>
-      <g transform="translate(42.5 11)">
+      <g transform={`translate(42.5 11)${turned(flip)}`}>
         <CardShape badge="done" stroke="var(--ok)" />
       </g>
       <ellipse cx="35.4" cy="5.2" rx="3" ry="2.6" fill={handFill(body)} />
@@ -566,15 +588,9 @@ export function WorkActUnder({ act, body }: { act: string; body: string }) {
  */
 export type BoardAct = "tick" | "receive" | "hmm" | "puzzle" | "stamp" | "flick" | "crumple" | "push" | "clock" | "reply";
 
-/**
- * The board acts that take a hand. On «Задачи» (`checking`) the right hand holds the clipboard
- * and the left one the pencil — the pencil goes down for them, so there are never three hands.
- */
-export const TAKES_HAND: ReadonlySet<string> = new Set(["hmm", "stamp", "flick", "crumple", "push", "clock", "reply"]);
-
 /** Where a held card sits: in the right hand in front of the body, or on the clipboard of «Задачи». */
 const HELD_AT = { x: 52, y: 46 };
-const ON_BOARD = { x: 60, y: 45 };
+const ON_BOARD = { x: 62.5, y: 45 };
 
 /** A thumb over the left edge of a card held in the right hand, as the employee's stack has it. */
 function HeldThumb({ body, animation }: { body: string; animation: string }) {
@@ -619,10 +635,15 @@ export function BoardActBehind({ act, body }: { act: string; body: string }) {
 /**
  * In front of the body, riding it: what the hands do with the card. `board` — the face holds the
  * clipboard of «Задачи»: the card lies on it instead of in a hand, and a gesture of two hands is
- * made with the free one.
+ * made with the free one. `only` — a job holds the other hand (the megaphone, the calendar): the
+ * card is not held, the free hand does the gesture alone.
  */
-export function BoardActFront({ act, body, board }: { act: string; body: string; board: boolean }) {
+export function BoardActFront({ act, body, board, flip = false, only = null }: { act: string; body: string; board: boolean } & ActHands) {
   const hand = handFill(body);
+  // the hand that holds the card by its edge — none when the card lies on the board or a job has the hand
+  const holds = !board && !only;
+  // the one fist of a push: the pencil hand on the board, the free one beside a job
+  const fists = board ? "left" : only;
   switch (act) {
     case "receive": {
       // the handed-in card comes up from below into the hand (onto the clipboard) and is read
@@ -630,7 +651,7 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       return (
         <>
           <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-receive-card 1.6s both", opacity: 0 }}>
-            <g transform={`translate(${at.x} ${at.y}) rotate(${board ? 3 : -4})`}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(${board ? 3 : -4})${turned(flip)}`}>
               <CardShape badge="done" stroke="var(--ok)" />
             </g>
           </g>
@@ -639,11 +660,11 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       );
     }
     case "hmm":
-      // a fist under the chin, knuckles up; on «Задачи» it is the left hand — the right one holds
-      // the clipboard. A short thick forearm and a flat fist: a thin arm with a round end read as a
-      // lollipop
+      // a fist under the chin, knuckles up — the right hand; on a face whose right hand holds its job
+      // (the clipboard, the megaphone) the act is drawn mirrored. A short thick forearm and a flat fist:
+      // a thin arm with a round end read as a lollipop
       return (
-        <g transform={board ? MIRROR : undefined}>
+        <g>
           <g style={{ transformBox: "fill-box", transformOrigin: "85% 100%", animation: "mascot-act-hmm-hand 1.8s ease-in-out both", opacity: 0 }}>
             <path d="M51 60 L40.5 53" fill="none" stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="7" strokeLinecap="round" />
             <path d="M51 60 L40.5 53" fill="none" stroke={hand} strokeWidth="5.4" strokeLinecap="round" />
@@ -662,17 +683,19 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
         <g transform={`translate(${at.x} ${at.y})`}>
           {board ? null : (
             <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-act-stamp-card 1.8s both", opacity: 0 }}>
-              <g transform="rotate(-5)">
+              <g transform={`rotate(-5)${turned(flip)}`}>
                 <CardShape badge={null} stroke="var(--accent)" />
               </g>
               {/* the thumb over the edge nearest the body */}
-              <ellipse cx="8.4" cy="2" rx="2.3" ry="3.1" transform="rotate(-18 8.4 2)" fill={body} />
+              {holds ? <ellipse cx="8.4" cy="2" rx="2.3" ry="3.1" transform="rotate(-18 8.4 2)" fill={body} /> : null}
             </g>
           )}
           {/* what the stamp leaves: a tick in a ring */}
+          <g transform={unflip(flip, 0)}>
           <g style={{ transformBox: "fill-box", transformOrigin: "50% 50%", animation: "mascot-act-stamp-mark 1.8s both", opacity: 0 }}>
             <circle r="4.4" fill="none" stroke="var(--ok)" strokeWidth="1.3" />
             <path d="M-2.2 0.2 l1.6 1.7 l3 -3.3" fill="none" stroke="var(--ok)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
           </g>
           <g style={{ animation: "mascot-act-stamp-tool 1.8s both", opacity: 0 }}>
             <g transform="scale(1.2)">
@@ -694,7 +717,7 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       return (
         <>
           <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-flick-card 1.4s both", opacity: 0 }}>
-            <g transform={`translate(${at.x} ${at.y}) rotate(4)`}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(4)${turned(flip)}`}>
               <CardShape badge={null} stroke="var(--warn)" />
               {/* the corner turned down in red: «не то» */}
               <path d="M4.6 -6.5 H9 V-2.1 Z" fill="var(--danger)" />
@@ -722,7 +745,7 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       return (
         <>
           <g style={{ transformOrigin: `${at.x}px ${at.y}px`, animation: "mascot-act-crumple-card 1.7s both", opacity: 0 }}>
-            <g transform={`translate(${at.x} ${at.y}) rotate(4)`}>
+            <g transform={`translate(${at.x} ${at.y}) rotate(4)${turned(flip)}`}>
               <CardShape badge={null} stroke="var(--text-muted)" />
             </g>
           </g>
@@ -747,8 +770,8 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
       );
     }
     case "push":
-      // «Настоять»: the card with «!!» is pushed forward with both hands and goes back out;
-      // on «Задачи» the right hand keeps the clipboard, so it is the left one alone
+      // «Настоять»: the card with «!!» is pushed forward with both hands and goes back out; a hand
+      // that holds its job keeps it (the clipboard, the megaphone, the calendar), the free one pushes alone
       return (
         <g transform="translate(30 52)">
           <g style={{ transformOrigin: "0px 0px", animation: "mascot-act-push 1.6s both" }}>
@@ -756,8 +779,8 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
               <CardShape badge="insist" stroke="var(--danger)" />
             </g>
             <g fill={hand} stroke="var(--bg)" strokeOpacity="0.3" strokeWidth="0.8" style={{ animation: "mascot-act-push-fists 1.6s both", opacity: 0 }}>
-              <ellipse cx="-10.4" cy="1.4" rx="3.2" ry="3.6" />
-              {board ? null : <ellipse cx="10.4" cy="1.4" rx="3.2" ry="3.6" />}
+              {fists === "right" ? null : <ellipse cx="-10.4" cy="1.4" rx="3.2" ry="3.6" />}
+              {fists === "left" ? null : <ellipse cx="10.4" cy="1.4" rx="3.2" ry="3.6" />}
             </g>
           </g>
         </g>
@@ -765,11 +788,11 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
     case "reply": {
       // the answer to a question: the hand writes a note and the note goes up to the person
       // it goes up on the side it was written on: past the left eye, or off the clipboard on the right
-      const at = board ? { x: 58, y: 44 } : { x: 18, y: 49 };
+      const at = board ? { x: 60.5, y: 44 } : { x: 18, y: 49 };
       return (
         <g transform={`translate(${at.x} ${at.y})`}>
           <g style={{ animation: `${board ? "mascot-act-reply-note-board" : "mascot-act-reply-note"} 2s both`, opacity: 0 }}>
-            <g transform="rotate(-6)">
+            <g transform={`rotate(-6)${turned(flip)}`}>
               <rect x="-8" y="-6" width="16" height="12" rx="1.8" fill="var(--surface)" stroke="var(--accent)" strokeWidth="1.4" />
               {[0, 1, 2].map((line) => (
                 <path
@@ -782,7 +805,7 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
                 />
               ))}
             </g>
-            {board ? null : <ellipse cx="-8.6" cy="1.6" rx="2.3" ry="3.1" transform="rotate(18 -8.6 1.6)" fill={body} />}
+            {holds ? <ellipse cx="-8.6" cy="1.6" rx="2.3" ry="3.1" transform="rotate(18 -8.6 1.6)" fill={body} /> : null}
           </g>
           {/* the pen, and the fist on it, going along the lines */}
           <g style={{ animation: "mascot-act-reply-pen 2s both", opacity: 0 }}>
@@ -799,7 +822,7 @@ export function BoardActFront({ act, body, board }: { act: string; body: string;
 }
 
 /** Over everything: what flies in or hangs by the head — the tick, the card with «?», the clock. */
-export function BoardActOver({ act }: { act: string }) {
+export function BoardActOver({ act, flip = false }: { act: string } & ActHands) {
   switch (act) {
     case "tick":
       return <Tick at={{ x: 57, y: 13 }} timing="1.2s" />;
@@ -821,8 +844,11 @@ export function BoardActOver({ act }: { act: string }) {
           <g stroke="var(--text-muted)" strokeWidth="0.9" strokeLinecap="round">
             <path d="M7 -4.4 v1.2 M7 6.4 v-1.2 M1.6 1 h1.2 M12.4 1 h-1.2" />
           </g>
-          <path d="M7 1 L9.2 2.2" stroke="var(--text)" strokeWidth="1.3" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-hour 1.8s both" }} />
-          <path d="M7 1 V-3.4" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-minute 1.8s both" }} />
+          {/* the hands go forward on either side of the head; the crown stays where the fingers are */}
+          <g transform={unflip(flip, 7)}>
+            <path d="M7 1 L9.2 2.2" stroke="var(--text)" strokeWidth="1.3" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-hour 1.8s both" }} />
+            <path d="M7 1 V-3.4" stroke="var(--accent)" strokeWidth="1.2" strokeLinecap="round" style={{ transformOrigin: "7px 1px", animation: "mascot-act-clock-minute 1.8s both" }} />
+          </g>
           <circle cx="7" cy="1" r="0.9" fill="var(--text)" />
         </g>
       );
@@ -943,10 +969,10 @@ export function ErrorActFront({ act, body }: { act: string; body: string }) {
 }
 
 /** Over everything: the «?» of a word not heard. */
-export function ErrorActOver({ act }: { act: string }) {
+export function ErrorActOver({ act, flip = false }: { act: string } & ActHands) {
   if (act !== "ear") return null;
   return (
-    <g transform="translate(13 -3)">
+    <g transform={`translate(13 -3)${turned(flip)}`}>
       <g style={{ transformBox: "fill-box", transformOrigin: "50% 100%", animation: "mascot-act-ask 1.8s both", opacity: 0 }}>
         <circle r="5.4" fill="var(--surface)" stroke="var(--warn)" strokeWidth="1.4" />
         <text y="0.4" fontSize="8" fontWeight="800" textAnchor="middle" dominantBaseline="central" fill="var(--warn)" fontFamily="var(--font-display), system-ui, sans-serif">
