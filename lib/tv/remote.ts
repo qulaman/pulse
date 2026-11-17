@@ -157,4 +157,14 @@ export function wallNow(
   return `${SCENE_NOW[scene]}${round}`;
 }
 
+/**
+ * A person or an order lies over the screensaver for its ten minutes (D-76). A scene, a calendar
+ * or rating view and a board are put up from a remote to be seen now, so the same command takes
+ * the focus down — without it a press changed only what lay underneath, and the wall did not
+ * move. Spread into the command: `{ ...uncover(row, now), scene }`; in the ether — nothing.
+ */
+export function uncover(state: TvState | null, now: Date): { mode?: "ether" } {
+  return effectiveMode(state, now) === "ether" ? {} : { mode: "ether" };
+}
+
 export { keyLabels } from "@/lib/people/labels";

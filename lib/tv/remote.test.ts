@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TvState } from "./queries";
-import { SCENE_LABEL, keyLabels, wallNow, wallReceipt } from "./remote";
+import { SCENE_LABEL, keyLabels, uncover, wallNow, wallReceipt } from "./remote";
 
 const NOW = new Date("2026-09-18T09:00:00Z"); // 14:00 в Актобе
 
@@ -189,5 +189,18 @@ describe("wallNow — стена v4 (D-123)", () => {
   it("круг заставок — сцена и «по кругу»", () => {
     const text = wallNow(state({ carousel: true }), PEOPLE, NOW);
     expect(text).toMatch(/^Эфир · .+ · по кругу$/);
+  });
+});
+
+describe("uncover — заставка с пульта снимает человека и дело", () => {
+  it("человек или дело на стене — команда возвращает эфир", () => {
+    expect(uncover(state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T09:05:00Z" }), NOW)).toEqual({ mode: "ether" });
+    expect(uncover(state({ mode: "task", task_id: "t1", expires_at: "2026-09-18T09:05:00Z" }), NOW)).toEqual({ mode: "ether" });
+  });
+
+  it("эфир, истёкший фокус или нет строки — команда как была", () => {
+    expect(uncover(state(), NOW)).toEqual({});
+    expect(uncover(state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T08:59:00Z" }), NOW)).toEqual({});
+    expect(uncover(null, NOW)).toEqual({});
   });
 });

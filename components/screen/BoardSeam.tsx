@@ -20,6 +20,7 @@ import { tvTime } from "@/lib/tv/clock";
 import { useTvBoardControl, type TvControlInput } from "@/lib/tv/mutations";
 import { boardShelf, cartridgeLine, countLine, type BoardCount } from "@/lib/tv/presenter";
 import { tvKeys, type TvState } from "@/lib/tv/queries";
+import { uncover } from "@/lib/tv/remote";
 import { afterBoard, boardExtendTo, boardUntilFrom } from "@/lib/tv/state";
 
 import c from "./board-seam.module.css";
@@ -61,7 +62,8 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
   const until = row?.board_until ? new Date(row.board_until) : null;
   const mine = wall.board !== null && wall.board.deleted_at === null;
 
-  const put = (board: MindBoard) => show({ board: board.id }, `На стене — «${board.title}»`);
+  // a person or an order on the wall goes down with the same command: the board is seen at once
+  const put = (board: MindBoard) => show({ ...uncover(row, now), board: board.id }, `На стене — «${board.title}»`);
   const open = (boardId: string) => router.push(`/notes/b/${boardId}`);
 
   // «Новая доска» (D-140): a meeting from scratch — the board is made, goes up, opens with the
@@ -77,7 +79,7 @@ export function BoardSeam({ wall, row, now, guest, show }: Props) {
       {
         // the board opens once the wall has it: the remote stays (with its «нет связи») if not
         onSuccess: () =>
-          show({ board: id }, () => {
+          show({ ...uncover(row, now), board: id }, () => {
             toast("Новая доска на стене — говорите пункты");
             open(id);
           }),

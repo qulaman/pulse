@@ -23,7 +23,7 @@ import { useMe } from "@/lib/tasks/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvControl } from "@/lib/tv/mutations";
 import { useTvState, type TvState } from "@/lib/tv/queries";
-import { CALENDAR_LABEL, CLOCK_LABEL, RATING_LABEL, SCENE_LABEL, wallNow, wallReceipt } from "@/lib/tv/remote";
+import { CALENDAR_LABEL, CLOCK_LABEL, RATING_LABEL, SCENE_LABEL, uncover, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
   awakeUntil,
   CALENDAR_VIEWS,
@@ -178,6 +178,10 @@ export default function ScreenPage() {
   const receipt = wallReceipt(row, now);
   const remainingMs = focusRemainingMs(row, now);
   const onScreenId = mode === "employee" ? row?.employee_id ?? null : null;
+  // a person or an order over the screensaver: a scene, a view or a board put up from here takes
+  // them down in the same command (`uncover`), and no scene is lit as «on the wall» meanwhile
+  const covered = mode !== "ether";
+  const takeDown = uncover(row, now);
   const visitor = awaitingDirector(visits.data ?? [])[0] ?? null;
   // the secretary's words on the wall (D-116): the newest one, as the wall shows it
   const messages = unreadMessages(visits.data ?? []);
@@ -360,13 +364,13 @@ export default function ScreenPage() {
                       icon={SCENE_ICON[value]}
                       data-testid={`remote-scene-${value}`}
                       onClick={() => {
-                        if (round || scene !== value) show({ scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
+                        if (round || scene !== value || covered) show({ ...takeDown, scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
                       }}
                     >
                       {SCENE_LABEL[value]}
                     </Key>
                     <span className="flex justify-center">
-                      <Dot on={scene === value} />
+                      <Dot on={scene === value && !covered} />
                     </span>
                   </div>
                 ))}
@@ -379,24 +383,27 @@ export default function ScreenPage() {
                     data-testid="remote-carousel"
                     onClick={() =>
                       show(
-                        // off pins the face: a round that a run-out board left (D-144) stops as well
-                        round ? { carousel: false, scene: "face" } : { carousel: true },
-                        round ? "Заставки больше не меняются" : "Заставки меняются по кругу · раз в 3 мин",
+                        // off pins the face: a round that a run-out board left (D-144) stops as well;
+                        // under a person or an order the key puts the round up, it does not stop it
+                        round && !covered ? { carousel: false, scene: "face" } : { ...takeDown, carousel: true },
+                        round && !covered ? "Заставки больше не меняются" : "Заставки меняются по кругу · раз в 3 мин",
                       )
                     }
                   >
                     По кругу
                   </Key>
                   <span className="flex justify-center">
-                    <Dot on={round} />
+                    <Dot on={round && !covered} />
                   </span>
                 </div>
               </div>
               {/* two lines always: «По кругу» spells out the round on two, and the seams below do not jump */}
               <p className="mt-1 min-h-[36px] px-1 text-center text-[13px] leading-[18px] text-muted">
-                {round
-                  ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
-                  : SCENE_HINT[scene]}
+                {covered
+                  ? `Поверх заставки — ${mode === "task" ? "дело" : "человек"} · тап по заставке покажет её сразу`
+                  : round
+                    ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
+                    : SCENE_HINT[scene]}
               </p>
 
               {/* the director's boards (D-102, D-121): the one on the wall as a cartridge, the others on a
@@ -423,8 +430,8 @@ export default function ScreenPage() {
                               if (ratingView !== value) show({ rating: value }, value === "month" ? "В круге — рейтинг месяца" : "В круге — рейтинг недели");
                               return;
                             }
-                            if (scene === "rating" && ratingView === value) return;
-                            show({ scene: "rating", rating: value }, value === "month" ? "На стене — рейтинг месяца" : "На стене — рейтинг недели");
+                            if (scene === "rating" && ratingView === value && !covered) return;
+                            show({ ...takeDown, scene: "rating", rating: value }, value === "month" ? "На стене — рейтинг месяца" : "На стене — рейтинг недели");
                           }}
                         >
                           {RATING_LABEL[value]}
@@ -447,8 +454,8 @@ export default function ScreenPage() {
                     aria-checked={scene === "calendar" && calendarView === value}
                     icon={value === "month" ? <MonthIcon /> : <WeekIcon />}
                     onClick={() => {
-                      if (scene === "calendar" && calendarView === value) return;
-                      show({ scene: "calendar", calendar: value }, value === "month" ? "На стене — месяц" : "На стене — сегодня и неделя");
+                      if (scene === "calendar" && calendarView === value && !covered) return;
+                      show({ ...takeDown, scene: "calendar", calendar: value }, value === "month" ? "На стене — месяц" : "На стене — сегодня и неделя");
                     }}
                   >
                     {CALENDAR_LABEL[value]}
