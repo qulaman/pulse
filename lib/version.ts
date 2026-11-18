@@ -87,10 +87,7 @@ export type UpdateContext = {
   busy: boolean;
   /** A field has the focus: the person may be mid-word. Stops only the quiet update. */
   typing: boolean;
-  /**
-   * The TV wall: nobody there to tap (principle 10). It updates by itself — but not over a
-   * visitor's words, a focus, a board or a celebration: those come as `busy` (D-182).
-   */
+  /** The TV wall: nobody there to tap (principle 10). */
   kiosk: boolean;
   /** The person tapped «Обновить» and the update has not happened yet. */
   requested: boolean;
@@ -102,8 +99,7 @@ export type UpdateContext = {
 
 export function updateAction(c: UpdateContext): UpdateAction {
   if (c.status === "current" || c.status === "unknown") return "none";
-  // the wall's busy is what is on it now (kioskBusy → holdUpdate); its 04:00 reload brings the build anyway
-  if (c.kiosk) return c.recentlyFailed ? "none" : c.busy ? "wait" : "apply";
+  if (c.kiosk) return c.recentlyFailed ? "none" : "apply";
   if (c.busy) return c.requested ? "wait" : "offer";
   if (c.requested) return "apply";
   if (c.status === "required") return "screen";

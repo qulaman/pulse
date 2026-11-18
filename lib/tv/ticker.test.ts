@@ -32,10 +32,11 @@ const SUMMARY: TvSummary = {
 };
 
 describe("tickerItems", () => {
-  it("день, события, топ и неделя — в одной ленте", () => {
+  it("день, вердикт, события, топ и неделя — в одной ленте", () => {
     const items = tickerItems([line("task_accepted")], SUMMARY);
     const ids = items.map((item) => item.id);
     expect(ids[0]).toBe("today");
+    expect(ids[1]).toBe("verdict");
     expect(ids.some((id) => id.startsWith("event:"))).toBe(true);
     expect(ids).toContain("rating");
     expect(ids).toContain("week");
@@ -67,16 +68,6 @@ describe("tickerItems", () => {
   });
 });
 
-describe("tickerItems: без негатива (D-45, D-182)", () => {
-  it("ни просрочек, ни вопросов, ни «на приёмке» — даже числом, даже когда они есть", () => {
-    const items = tickerItems([], { ...SUMMARY, counts: { overdue: 3, declined: 1, review: 2, questions: 4 } });
-    expect(items.map((item) => item.id)).not.toContain("verdict");
-    const text = items.map((item) => item.text).join(" | ");
-    expect(text).not.toMatch(/просроч|вопрос|приёмк|отказ/i);
-    expect(items.some((item) => item.tone === "danger" || item.tone === "warn")).toBe(false);
-  });
-});
-
 describe("tickerItems: мероприятия", () => {
   const meeting = {
     id: "e-1",
@@ -86,7 +77,7 @@ describe("tickerItems: мероприятия", () => {
     people: 6,
   };
 
-  it("ставит ближайшие встречи после чисел дня, с днём, местом и числом людей", () => {
+  it("ставит ближайшие встречи после вердикта, с днём, местом и числом людей", () => {
     const items = tickerItems([], { ...SUMMARY, events: [meeting] });
     const row = items.find((item) => item.id === "meeting:e-1");
     expect(row?.text).toBe("Сегодня 16:00 · Планёрка · в офисе · 6 чел.");

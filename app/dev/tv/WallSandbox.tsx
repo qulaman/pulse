@@ -17,8 +17,7 @@ import type {
   TvSummary,
   TvTaskFocus,
 } from "@/lib/tv/queries";
-import { DEFAULT_PROGRAM_WINDOW, programNext, programScene, type WallScene } from "@/lib/tv/program";
-import { carouselScene, type ClockStyle } from "@/lib/tv/state";
+import { carouselScene, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
@@ -54,20 +53,7 @@ export type WallCase =
   | "message"
   | "message-long"
   | "event"
-  | "night"
-  | "day-result"
-  | "week-result"
-  | "announcement"
-  | "welcome"
-  | "program"
-  | "visit-board"
-  | "message-focus"
-  | "event-task"
-  | "visit-announcement"
-  | "cheer"
-  | "cheer-guest"
-  | "moment"
-  | "moment-usual";
+  | "night";
 
 const MIN = 60_000;
 const at = (base: number, minutes: number) => new Date(base + minutes * MIN).toISOString();
@@ -162,32 +148,13 @@ function fixtures(base: number, guest: boolean) {
     counts: { overdue: 1, declined: 0, review: 2, questions: 1 },
     today: { sent: 14, done: 9, in_work: 21 },
     rating: team.slice(0, 5).map(([n], i) => ({ name: name(n), points: guest ? null : 60 - i * 7, rank: i + 1 })),
-    // done today per person (D-182): a few handed work in, the rest stay without a mark
-    load: team.map(([n, active], i) => ({ name: name(n), active, overdue: 0, done_today: [2, 1, 3, 0, 1, 0, 0, 2, 0, 1][i % 10] })),
+    load: team.map(([n, active]) => ({ name: name(n), active, overdue: 0 })),
     week: [],
     merch: [],
     events: [
       { id: "e-soon", title: guest ? null : "Планёрка", starts_at: at(base, 15), location: guest ? null : "Переговорная", people: 8 },
       { id: "e-later", title: guest ? null : "Приёмка объекта", starts_at: todayAt(base, 17, 30), location: null, people: 4 },
     ],
-    // the summary of D-182 (I1)
-    program: { night_from: "21:00", night_to: "08:00", evening_from: "17:00" },
-    announcement: guest
-      ? null
-      : { id: "a1", text: "В пятницу короткий день — до 16:00. Пропуска на объект «Север» забрать у секретаря до четверга.", at: at(base, -35), acks: 18 },
-    day: {
-      done: 9,
-      points: guest ? null : 120,
-      people: 6,
-      awards: guest
-        ? []
-        : [
-            { name: "Марат Ахметов", amount: 50, reason: "Сдал объект «Север» на день раньше", at: at(base, -35) },
-            { name: "Айгерим Сапарова", amount: 30, reason: "Закрыла сверку с поставщиками", at: at(base, -90) },
-          ],
-    },
-    week_result: { done: 48, points: guest ? null : 1240, best_day: { day: todayAt(base, 12, 0, -2).slice(0, 10), done: 14 }, leader: guest ? "Айгерим" : "Айгерим Сапарова" },
-    pace: { done: 9, usual_now: 7, usual_day: 12, best_day: 15 },
   };
 
   const focus: TvFocusEmployee = {
@@ -284,13 +251,13 @@ function boardFor(wallCase: WallCase, base: number, guest: boolean): TvBoard | n
 function overlayFor(wallCase: WallCase, base: number, guest: boolean): TvOverlay {
   const note = guest ? null : "Иванов, по поставкам бетона";
   const none = { visit: null, waiting: 0, message: null, messages: 0 };
-  if (wallCase === "visit" || wallCase === "visit-board" || wallCase === "visit-announcement") {
+  if (wallCase === "visit") {
     return { ...none, visit: { id: "v1", status: "waiting", note, created_at: at(base, -3), answered_at: null }, waiting: 1 };
   }
   if (wallCase === "wait") {
     return { ...none, visit: { id: "v1", status: "wait", note, created_at: at(base, -9), answered_at: at(base, -2) }, waiting: 1 };
   }
-  if (wallCase === "message" || wallCase === "message-long" || wallCase === "message-focus") {
+  if (wallCase === "message" || wallCase === "message-long") {
     const words =
       wallCase === "message"
         ? "Звонил Ахметов, перезвоните"
@@ -305,7 +272,6 @@ function focusFor(wallCase: WallCase, focus: TvFocusEmployee): TvFocusEmployee |
   const none = { tasks: [], counts: { new: 0, work: 0, review: 0 } };
   switch (wallCase) {
     case "focus":
-    case "message-focus":
       return focus;
     case "focus-few":
       return { ...focus, tasks: focus.tasks.filter((t) => t.id === "t4" || t.id === "t7"), counts: { new: 0, work: 1, review: 1 } };
@@ -376,7 +342,7 @@ function ratingFor(wallCase: WallCase, base: number, guest: boolean, reorder = f
 /** One order on the whole wall (D-123): in work after a return, on review, accepted. */
 function taskFor(wallCase: WallCase, focus: TvFocusEmployee, guest: boolean): TvTaskFocus | null {
   const source =
-    wallCase === "task" || wallCase === "event-task"
+    wallCase === "task"
       ? focus.tasks.find((t) => t.id === "t4")
       : wallCase === "task-review"
         ? focus.tasks.find((t) => t.id === "t7")
@@ -417,7 +383,6 @@ export const WALKS = {
   scenes: ["face", "clock", "team", "calendar", "calendar-month", "rating", "rating-month", "focus", "task", "board-branches", "face"],
   overlay: ["face", "visit", "face", "message", "wait", "message-long", "event", "focus", "visit", "focus"],
   night: ["night", "face", "night", "focus", "night"],
-  program: ["face", "rating", "calendar", "team", "day-result", "week-result", "announcement", "face"],
   focus: ["focus", "focus-few", "focus", "focus-done", "task", "task-review", "task-done"],
   rating: ["rating", "rating-reorder", "rating", "rating-month"],
   team: ["team", "team-reorder", "team"],
@@ -449,51 +414,6 @@ function newsOf(base: number, count: number): TvEvent[] {
   }));
 }
 
-/** `&at=HH:MM[&dow=1…7]`: that time today — or on that weekday of this week (Monday 1), for the day's program. */
-function programTime(base: number, at: string, dow: number | null): Date {
-  const [hh, mm] = at.split(":").map(Number);
-  const local = new Date(base + 5 * 3_600_000);
-  const today = (local.getUTCDay() + 6) % 7;
-  const shift = dow === null ? 0 : dow - 1 - today;
-  return new Date(todayAt(base, hh!, mm!, shift));
-}
-
-/** Fresh good news for the plaques (D-182): points with a reason, an accepted order. */
-function cheerEvents(base: number): TvEvent[] {
-  return [
-    { kind: "points", name: "Марат Ахметов", title: "Сдал объект «Север» на день раньше", amount: 50 },
-    { kind: "task_done", name: "Айгерим Сапарова", title: "Сверка с бухгалтерией", amount: null },
-  ].map((e, i) => ({
-    id: `cheer${i}`,
-    kind: e.kind as TvEvent["kind"],
-    created_at: at(base, -i),
-    payload: { name: e.name, title: e.title, amount: e.amount },
-    payload_guest: { name: e.name.split(" ")[0]!, title: null, amount: null },
-  }));
-}
-
-/** True `every - 1.5 s` after the walk's step changed: the next step's scene is drawn ahead, hidden (D-182). */
-function usePrepared(step: number, every: number, on: boolean): boolean {
-  const [ready, setReady] = useState({ step, at: false });
-  if (ready.step !== step) setReady({ step, at: false });
-  useEffect(() => {
-    if (!on) return;
-    const timer = setTimeout(() => setReady({ step, at: true }), Math.max(0, every - 1_500));
-    return () => clearTimeout(timer);
-  }, [step, every, on]);
-  return ready.step === step && ready.at;
-}
-
-/** The program's scene of a sandbox case — for the walk's next step drawn ahead. */
-function sceneOfCase(c: WalkCase): WallScene | null {
-  if (c === "rating-reorder" || c.startsWith("rating")) return "rating";
-  if (c === "team-reorder") return "team";
-  if (c === "clock" || c === "team" || c === "face" || c === "day-result" || c === "week-result" || c === "announcement" || c === "welcome") return c;
-  if (c.startsWith("calendar")) return "calendar";
-  if (c.startsWith("board")) return "board";
-  return null;
-}
-
 export function WallSandbox({
   wallCase,
   clock,
@@ -503,9 +423,6 @@ export function WallSandbox({
   walk = null,
   every = 4_000,
   lag = 0,
-  scale = 100,
-  at: atTime = null,
-  dow = null,
 }: {
   wallCase: WallCase;
   clock: ClockStyle;
@@ -515,9 +432,6 @@ export function WallSandbox({
   walk?: string | null;
   every?: number;
   lag?: number;
-  scale?: number;
-  at?: string | null;
-  dow?: number | null;
 }) {
   // on the minute: the fixtures are built on the server and again in the browser, and
   // they have to be the same fixtures for hydration
@@ -534,8 +448,7 @@ export function WallSandbox({
   const current: WallCase = reorder ? "rating" : busier ? "team" : walked;
   const arrived = useArrived(`${walkStep}`, route ? lag : 0);
   // the night case pins the clock to 23:10 in Aqtobe; every other case runs on the real one
-  const programAt = atTime ? programTime(base, atTime, dow) : null;
-  const now = current === "night" || walk === "night" ? new Date(todayAt(base, 23, 10)) : (programAt ?? live);
+  const now = current === "night" || walk === "night" ? new Date(todayAt(base, 23, 10)) : live;
   // the scene data keeps its identity between renders, as query results do on the kiosk (TvFrame holds a scene by it)
   const data = useMemo(() => fixtures(base, guest), [base, guest]);
   const lines = [...newsOf(base, news), ...data.events].map((event) => lineOf(event, guest));
@@ -544,18 +457,11 @@ export function WallSandbox({
   const before = route ? route[(walkStep + route.length - 1) % route.length] : wallCase;
   const sceneCase: WallCase =
     !arrived && (current.startsWith("focus") || current.startsWith("task")) ? (before === "rating-reorder" ? "rating" : before === "team-reorder" ? "team" : before) : current;
-  const opts = { points: true, guest, weekBoard: false, announcement: !guest };
-  const scene: WallScene =
-    sceneCase === "program"
-      ? programScene(now, DEFAULT_PROGRAM_WINDOW, opts)
-      : sceneCase === "carousel"
+  const scene: TvScene =
+    sceneCase === "carousel"
       ? carouselScene(now, true)
-      : sceneCase === "clock" || sceneCase === "team" || sceneCase === "day-result" || sceneCase === "week-result" || sceneCase === "announcement" || sceneCase === "welcome"
+      : sceneCase === "clock" || sceneCase === "team"
         ? sceneCase
-        : sceneCase === "visit-board"
-          ? "board"
-          : sceneCase === "visit-announcement"
-            ? "announcement"
         : sceneCase === "calendar" || sceneCase === "calendar-month" || sceneCase === "calendar-empty"
           ? "calendar"
           : sceneCase.startsWith("board")
@@ -563,26 +469,13 @@ export function WallSandbox({
             : sceneCase.startsWith("rating")
               ? "rating"
               : "face";
-  // the walk's next step, drawn ahead while its turn is 1.5 s away (D-182); the program's own next turn
-  const prepared = usePrepared(walkStep, every, route !== null && lag === 0);
-  const nextCase: WalkCase | null = route && prepared ? route[(walkStep + 1) % route.length]! : null;
-  const programNextScene = sceneCase === "program" ? programNext(now, DEFAULT_PROGRAM_WINDOW, opts) : null;
-  const nextScene: WallScene | null = nextCase
-    ? sceneOfCase(nextCase)
-    : programNextScene && programNextScene.at.getTime() - now.getTime() <= 15_000
-      ? programNextScene.scene
-      : null;
-  const ratingCase: WallCase | null =
-    scene === "rating" ? sceneCase : nextScene === "rating" && nextCase ? (nextCase === "rating-reorder" ? "rating" : (nextCase as WallCase)) : null;
-  const boardCaseNow: WallCase =
-    sceneCase === "visit-board" ? "board" : nextScene === "board" && scene !== "board" && nextCase ? (nextCase as WallCase) : sceneCase;
   // the scene under a pending person keeps its data; a new scene waits for its own
   const hasData = arrived || sceneCase !== current;
-  const boardData = useMemo(() => (hasData ? boardFor(boardCaseNow, base, guest) : null), [hasData, boardCaseNow, base, guest]);
+  const boardData = useMemo(() => (hasData ? boardFor(sceneCase, base, guest) : null), [hasData, sceneCase, base, guest]);
   const board = useMemo(() => (boardData && demo ? boardDemo(boardData, demo, step) : boardData), [boardData, demo, step]);
   const rating = useMemo(
-    () => (hasData && ratingCase ? ratingFor(ratingCase, base, guest, reorder || nextCase === "rating-reorder") : null),
-    [hasData, ratingCase, base, guest, reorder, nextCase],
+    () => (hasData && scene === "rating" ? ratingFor(sceneCase, base, guest, reorder) : null),
+    [hasData, scene, sceneCase, base, guest, reorder],
   );
   const calendar = useMemo(
     () =>
@@ -590,21 +483,16 @@ export function WallSandbox({
     [hasData, sceneCase, data],
   );
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
-  const shown = current === "event" || current === "event-task" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
+  const shown = current === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
   const counted = news > 0 ? { ...shown, today: { ...shown.today, sent: shown.today.sent + news, done: shown.today.done + news } } : shown;
-  const paced =
-    current === "moment" || current === "moment-usual"
-      ? { ...counted, pace: { done: current === "moment" ? 16 : 12, usual_now: 7, usual_day: 12, best_day: current === "moment" ? 15 : 20 } }
-      : counted;
   const summary = busier
     ? {
-        ...paced,
-        load: paced.load.map((row) =>
+        ...counted,
+        load: counted.load.map((row) =>
           row.name.startsWith("Динара") ? { ...row, active: 6 } : row.name.startsWith("Тимур") ? { ...row, active: 1 } : row,
         ),
       }
-    : paced;
-  const events = current === "cheer" || current === "cheer-guest" ? cheerEvents(base) : [];
+    : counted;
 
   return (
     <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : route ? walkStep : undefined}>
@@ -614,7 +502,6 @@ export function WallSandbox({
         now={now}
         guest={guest}
         scene={scene}
-        next={nextScene}
         clock={clock}
         night={current === "night"}
         offline={false}
@@ -626,13 +513,10 @@ export function WallSandbox({
         focusRemainingMs={7 * MIN}
         rating={rating}
         calendar={calendar}
-        calendarView={sceneCase === "calendar-month" || (!sceneCase.startsWith("calendar") && nextCase === "calendar-month") ? "month" : "week"}
+        calendarView={sceneCase === "calendar-month" ? "month" : "week"}
         board={board}
         overlay={overlayOf(overlayFor(current, base, guest), summary.events, new Date(base))}
         sound={false}
-        scale={scale}
-        events={events}
-        remember={false}
       />
     </div>
   );

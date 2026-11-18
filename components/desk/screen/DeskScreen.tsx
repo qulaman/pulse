@@ -15,7 +15,6 @@ import { SegmentTabs } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { ejectReceipt } from "@/components/mindboard/carry";
 import { EXTEND_MINUTES } from "@/components/mindboard/WallSheet";
-import { markSent, useRemoteClock } from "@/components/screen/sent";
 import { useWallBoard } from "@/components/screen/useWallBoard";
 import { Button } from "@/components/ui/Button";
 import { Bone } from "@/components/ui/Skeleton";
@@ -29,29 +28,16 @@ import { useMe, useSentTasks } from "@/lib/tasks/queries";
 import { tvTime } from "@/lib/tv/clock";
 import { useTvBoardControl, useTvControl, useTvWeekBoard, type TvControlInput } from "@/lib/tv/mutations";
 import { cartridgeLine } from "@/lib/tv/presenter";
-import { programWindowOf, segmentEndsAt } from "@/lib/tv/program";
-import { tvKeys, useTvState, useTvSummary, type TvState } from "@/lib/tv/queries";
-import {
-  CALENDAR_LABEL,
-  CLOCK_LABEL,
-  overlayLine,
-  RATING_LABEL,
-  SCALE_LABEL,
-  SCENE_LABEL,
-  uncover,
-  WALL_SCALES,
-  wallHealth,
-  wallNow,
-  wallReceipt,
-  wallScaleOf,
-  type WallScale,
-} from "@/lib/tv/remote";
+import { tvKeys, useTvState, type TvState } from "@/lib/tv/queries";
+import { CALENDAR_LABEL, CLOCK_LABEL, RATING_LABEL, SCENE_LABEL, uncover, wallNow, wallReceipt } from "@/lib/tv/remote";
 import {
   afterBoard,
   awakeUntil,
   boardExtendTo,
   CALENDAR_VIEWS,
   calendarViewOf,
+  carouselNext,
+  carouselScenes,
   CLOCK_STYLES,
   clockStyleOf,
   effectiveMode,
@@ -59,18 +45,17 @@ import {
   guestEndsAt,
   guestOf,
   isNight,
-  isTvScene,
-  programOn,
   RATING_VIEWS,
   ratingViewOf,
+  roundOn,
+  sceneOf,
   TV_SCENES,
   WAKE_MS,
-  wallSceneOf,
   weekBoardLive,
+  weekInRound,
   type CalendarView,
   type ClockStyle,
   type RatingView,
-  type TvScene,
 } from "@/lib/tv/state";
 import { useAnswerVisit } from "@/lib/visits/mutations";
 import { useVisits } from "@/lib/visits/queries";
@@ -79,6 +64,16 @@ import { awaitingDirector, unreadMessages } from "@/lib/visits/text";
 import { SceneCards, type SceneKey } from "./SceneCards";
 import { BoardsPick, ConnectDialog, PeoplePick, Section, SettingRow, Switch, TaskPick, Visits } from "./ScreenParts";
 import { WallFrame } from "./WallFrame";
+
+/** «ещё N мин» melts by itself: every ten seconds is enough, the minute is never late. */
+function useTick(): Date {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 10_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
 
 /** Nothing of a row is lit: the thing is not on the wall right now. */
 const NONE = "none";
@@ -95,22 +90,14 @@ type Pick = "people" | "task" | "board";
  * 1–6 — the scenes and «По кругу», E — the ether back, Ctrl+F — the search of «Показать», and
  * while a board is up ←/→ (or a presentation clicker's PageUp/PageDown) lead the meeting. No
  * queue: without network a command says so (D-76 §3).
- *
- * D-182, the same as the phone's remote: the receipt warns when a command is not on the wall in
- * fifteen seconds and offers «Перезапустить» on the frame's chin; «Сейчас на стене» says why and
- * till when — the day's program («Программа: утро · дальше по кругу в 10:00»), a scene picked by
- * hand («Вручную до 17:00, потом программа»), what lies over everything; «Крупность» sits with the
- * look of the wall. `frozenNow` — the sandbox's stopped clock.
  */
-export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
-  const { now, sent: lastSent } = useRemoteClock(frozenNow);
+export function DeskScreen() {
+  const now = useTick();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { pointsEnabled: points } = useDeskScope();
   const me = useMe();
   const state = useTvState();
-  // the program's window and today's announcement (D-182) — the wall's own summary
-  const summary = useTvSummary(false);
   const people = usePeople();
   const control = useTvControl();
   const boardControl = useTvBoardControl();
@@ -125,32 +112,28 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
   const [pick, setPick] = useState<Pick | null>(null);
 
   const row = state.data ?? null;
-  const w = programWindowOf(summary.data);
-  const announcement = Boolean((summary.data as { announcement?: unknown } | undefined)?.announcement);
   const mode = effectiveMode(row, now);
   const guest = guestOf(row, false, now);
-  // what the office sees (D-182): the program's scene, or one picked by hand while its part of the day lasts
-  const visible = wallSceneOf(row, now, { points, guest, announcement }, w);
-  const program = programOn(row, now, w);
-  const pinned: TvScene | null = !program && visible !== "board" && isTvScene(visible) ? visible : null;
-  const scene: TvScene = pinned ?? (isTvScene(visible) ? visible : "face");
-  const scale = wallScaleOf(row);
+  const scene = sceneOf(row, now, points, guest);
+  const round = roundOn(row, now);
+  // a guest takes the rating out of the round (D-33): the panel counts the same round as the wall
+  const roundPoints = points && !guest;
+  const week = weekInRound(row, now, guest);
+  const next = carouselNext(now, roundPoints, week);
   const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || points);
   const clock = clockStyleOf(row);
   const calendarView = calendarViewOf(row);
   const ratingView = ratingViewOf(row);
   const guestEnds = guestEndsAt(row, now);
-  const night = isNight(now, w);
+  const night = isNight(now);
   const awake = awakeUntil(row, now);
-  const receipt = wallReceipt(row, now, lastSent);
-  const health = wallHealth(row, now);
+  const receipt = wallReceipt(row, now);
   const minutes = Math.max(1, Math.ceil(focusRemainingMs(row, now) / 60_000));
   const personId = mode === "employee" ? (row?.employee_id ?? null) : null;
   const taskId = mode === "task" ? (row?.task_id ?? null) : null;
   const taskTitle = taskId ? (sent.data?.find((task) => task.id === taskId)?.title ?? null) : null;
   const visitors = awaitingDirector(visits.data ?? []);
   const messages = unreadMessages(visits.data ?? []);
-  const over = overlayLine(visitors[0] ?? null, messages[messages.length - 1] ?? null, now);
   const screens = (people.data ?? []).filter((person) => person.role === "tv" && person.is_active);
   const liveBoards = splitBoards(boards.data ?? [], now, wall.boardId).live;
   const weekId = row && weekBoardLive(row, now) ? row.week_board_id : null;
@@ -161,27 +144,10 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
   const covered = mode !== "ether";
   const takeDown = uncover(row, now);
 
-  /** A command to the wall; `then` — the words of its toast, or what to do instead. The version that came back has fifteen seconds to show (D-182). */
+  /** A command to the wall; `then` — the words of its toast, or what to do instead. */
   const show = (input: TvControlInput, then: string | ((row: TvState) => void)) => {
-    control.mutate(input, {
-      onSuccess: (next) => {
-        markSent(next?.version);
-        if (typeof then === "string") toast(then);
-        else then(next);
-      },
-    });
+    control.mutate(input, { onSuccess: (next) => (typeof then === "string" ? toast(then) : then(next)) });
   };
-  // a scene picked by hand holds till the end of its part of the day (D-182); an older database — with no end
-  const holdsTill = (row as (TvState & { scene_set_at?: string | null }) | null)?.scene_set_at === undefined ? null : segmentEndsAt(now, w);
-  const tillWords = holdsTill ? ` · до ${tvTime(holdsTill)}` : "";
-  const display = wallNow(row, people.data ?? [], now, boards.data ?? [], {
-    points,
-    guest,
-    taskTitle,
-    boardPoints: wall.points.map((point) => point.id),
-    window: w,
-    announcement,
-  });
   const openBoard = (id: string) => router.push(`/desk/boards/${id}`);
 
   const loading = state.isLoading || people.isLoading;
@@ -189,13 +155,13 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
   // the list of «Показать на стене» opens on what is up there now
   const shownPick: Pick = pick ?? (taskId ? "task" : wall.boardId ? "board" : "people");
 
-  const sceneValue: SceneKey = program || !pinned ? "round" : pinned;
+  const sceneValue: SceneKey = round ? "round" : scene;
   const pickScene = (value: SceneKey) => {
     if (value === "round") {
-      if (!program || covered) show({ ...takeDown, carousel: true }, "Заставки по кругу — программа дня");
+      if (!round || covered) show({ ...takeDown, carousel: true }, "Заставки меняются по кругу · раз в 3 мин");
       return;
     }
-    if (program || pinned !== value || covered) show({ ...takeDown, scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}${tillWords}`);
+    if (round || scene !== value || covered) show({ ...takeDown, scene: value }, `Заставка: ${SCENE_LABEL[value].toLowerCase()}`);
   };
   // the row of scenes in its order: what the digits pick
   const sceneOrder: SceneKey[] = [...sceneKeys, "round"];
@@ -263,12 +229,7 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
 
       <div className="screen-layout grid grid-cols-[minmax(0,2fr)_minmax(340px,1fr)] items-start gap-8">
         <div className="screen-main flex min-w-0 flex-col gap-5">
-          <WallFrame
-            receipt={loading ? null : receipt}
-            health={loading ? null : health}
-            onRestart={() => show({ reload: true }, "Экран перезапускается")}
-            label={screens.length === 1 ? screens[0].full_name : screens.length > 1 ? `${screens.length} экрана` : null}
-          />
+          <WallFrame receipt={loading ? null : receipt} label={screens.length === 1 ? screens[0].full_name : screens.length > 1 ? `${screens.length} экрана` : null} />
 
           <Visits
             visitors={visitors}
@@ -289,24 +250,20 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
                   <Bone h={28} w="55%" />
                 ) : (
                   <p className="desk-figure text-[26px] leading-8 [overflow-wrap:anywhere]" data-testid="desk-screen-now-line">
-                    {connected ? display.title : "Экран ещё не подключался"}
+                    {connected
+                      ? wallNow(row, people.data ?? [], now, boards.data ?? [], { points, guest, taskTitle, boardPoints: wall.points.map((point) => point.id) })
+                      : "Экран ещё не подключался"}
                   </p>
                 )}
-                <p className="mt-0.5 text-[13px] leading-[18px] text-muted" data-testid="desk-screen-why">
+                <p className="mt-0.5 text-[13px] leading-[18px] text-muted">
                   {!connected && !loading
-                    ? "Подключите телевизор: «Подключить экран» — код с его экрана или код для входа"
-                    : loading
-                      ? ""
+                    ? "Войдите на телевизоре под пользователем роли «ТВ-экран» — «Подключить экран» даст код"
+                    : round
+                      ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                       : mode !== "ether"
-                        ? `${display.why} · клик по заставке — сразу`
-                        : display.why}
+                        ? "Потом стена сама вернётся к заставке · клик по заставке — сразу"
+                        : "Заставка не меняется — «По кругу» включит смену"}
                 </p>
-                {over && connected ? (
-                  <p className="mt-0.5 text-[13px] leading-[18px] text-accent" data-testid="desk-screen-over">
-                    Поверх всего: {over.charAt(0).toLowerCase()}
-                    {over.slice(1)}
-                  </p>
-                ) : null}
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 {/* the night dims the wall to its clock (D-96 §8); a late evening wakes it for two hours (D-105) */}
@@ -334,7 +291,7 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
               <SceneCards
                 value={sceneValue}
                 // what the office sees this minute: the screensaver, unless a person, an order or a board is up instead
-                live={connected && mode === "ether" && isTvScene(visible) && visible !== "board" ? visible : null}
+                live={connected && mode === "ether" ? scene : null}
                 onPick={pickScene}
                 items={sceneOrder.map((value, index) => ({ value, label: value === "round" ? "По кругу" : SCENE_LABEL[value], hint: String(index + 1) }))}
               />
@@ -418,13 +375,13 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
             </SettingRow>
             {/* outside the round a click puts the rating up in that period; inside it only the period changes (D-123) */}
             {points ? (
-              <SettingRow label="Рейтинг" hint={program ? "период в круге" : scene === "rating" && !covered ? "на стене" : "клик — на стену"}>
+              <SettingRow label="Рейтинг" hint={round ? "период в круге" : scene === "rating" && !covered ? "на стене" : "клик — на стену"}>
                 <SegmentTabs<RatingView | typeof NONE>
                   aria-label="Рейтинг на стене"
-                  value={program || scene === "rating" ? ratingView : NONE}
+                  value={round || scene === "rating" ? ratingView : NONE}
                   onChange={(value) => {
                     if (value === NONE) return;
-                    if (program) {
+                    if (round) {
                       if (ratingView !== value) show({ rating: value }, value === "month" ? "В круге — рейтинг месяца" : "В круге — рейтинг недели");
                       return;
                     }
@@ -435,18 +392,6 @@ export function DeskScreen({ frozenNow }: { frozenNow?: string } = {}) {
                 />
               </SettingRow>
             ) : null}
-            {/* «Крупность» (D-182): how far the room reads the wall from */}
-            <SettingRow label="Крупность">
-              <SegmentTabs<`${WallScale}`>
-                aria-label="Крупность стены"
-                value={`${scale}`}
-                onChange={(value) => {
-                  const next = Number(value) as WallScale;
-                  if (next !== scale) show({ scale: next }, `Крупность: ${SCALE_LABEL[next].toLowerCase()}`);
-                }}
-                items={WALL_SCALES.map((value) => ({ value: `${value}` as `${WallScale}`, label: SCALE_LABEL[value] }))}
-              />
-            </SettingRow>
             <SettingRow label="Гость в кабинете" hint={guest ? (guestEnds ? `Имена скрыты до ${tvTime(guestEnds)}` : "Имена скрыты") : "Имена на стене видны"}>
               <Switch on={guest} label="Гость в кабинете" testId="desk-screen-guest" onToggle={() => show({ guest: !guest }, guest ? "Гость ушёл: имена снова видны" : "Гость в кабинете: имена скрыты")} />
             </SettingRow>

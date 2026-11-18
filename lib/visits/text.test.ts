@@ -82,19 +82,6 @@ describe("тексты карточки", () => {
     expect(closeLabel(visit({ id: "1", status: "expired" }))).toBe("Понятно");
   });
 
-  it("квитанция стены с часами: 15 секунд — «отправлено», дальше — «не отвечает с …» (D-182)", () => {
-    const sent = visit({ id: "1", created_at: "2026-09-25T04:14:00Z" }); // 09:14 в Актобе
-    expect(wallLine(sent, new Date("2026-09-25T04:14:10Z"))).toBe("Отправлено, экран ещё не показал");
-    expect(wallLine(sent, new Date("2026-09-25T04:14:15Z"))).toBe("Экран у директора не отвечает с 09:14");
-    expect(wallLine(visit({ id: "1", status: "wait", created_at: "2026-09-25T04:14:00Z" }), NOW)).toBe("Экран у директора не отвечает с 09:14");
-    // показал — неважно, сколько прошло
-    expect(wallLine(visit({ id: "1", created_at: "2026-09-25T04:14:00Z", shown_at: "2026-09-25T04:14:02Z" }), NOW)).toBe("На экране у директора");
-    // решённое — квитанции нет
-    expect(wallLine(visit({ id: "1", status: "invited", created_at: "2026-09-25T04:14:00Z" }), NOW)).toBeNull();
-    const message = visit({ id: "m", kind: "message", created_at: "2026-09-25T04:14:00Z" });
-    expect(wallLine(message, NOW)).toBe("Экран у директора не отвечает с 09:14");
-  });
-
   it("сообщение: ждём прочтения, прочитал, не прочитал", () => {
     const message = (patch: Partial<VisitLike> = {}) => visit({ id: "m", kind: "message", note: "Звонил Ахметов", ...patch });
     expect(statusLine(message())).toBe("Ждём, пока директор прочитает");

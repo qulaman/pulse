@@ -24,7 +24,7 @@
 
 ## 1. Личность, права, устройство роута
 
-**Личность.** `getSessionProfile(req)` берёт токен из `Authorization: Bearer` (скрипты), иначе из cookie, проверяет JWT через `getClaims()` и читает свою строку `profiles` под этим токеном: нет — `401 unauthorized`, чтение не удалось (сбой базы) — `503 unavailable` (D-182), `is_active = false` — `403 inactive`; `requireRole` — `403 forbidden`. Роли: `director`, `manager`, `employee`, `shopkeeper`, `secretary`, `tv`; наборы `ADMIN_ROLES` (директор и секретарь, D-104) и `TEAM_ROLES` — `lib/routes.ts`.
+**Личность.** `getSessionProfile(req)` берёт токен из `Authorization: Bearer` (скрипты), иначе из cookie, проверяет JWT через `getClaims()` и читает свою строку `profiles` под этим токеном: нет — `401 unauthorized`, `is_active = false` — `403 inactive`; `requireRole` — `403 forbidden`. Роли: `director`, `manager`, `employee`, `shopkeeper`, `secretary`, `tv`; наборы `ADMIN_ROLES` (директор и секретарь, D-104) и `TEAM_ROLES` — `lib/routes.ts`.
 
 Отзыв входа действует сразу (D-135): `auth_company_id()` и `auth_role()` отвечают только работающему с живой сессией (`auth_session_live()`), своя строка `profiles` без неё тоже не читается — отозванный получает `401`, уволенный `403`. Свои строки по `auth.uid()` отозванный токен читает до истечения, не дольше часа. `SessionWatch` в браузере зовёт `/api/me` при возврате и раз в 5 минут.
 
@@ -34,7 +34,7 @@
 
 **Шаблон роута** — `withAuth(roles, fn, schema?)`: по очереди личность, роль (`'any'` — любой работающий), JSON и zod (почти везде `strictObject`), затем `fn({ req, profile, body, params })`. Провал JSON или схемы — `400 validation_error`, `AuthError` — его статус, прочее — `console.error` и `500 internal`. Id пути роут проверяет сам (`z.uuid()` или `z.guid()`: id сида не RFC 4122), мусор — `404`. Ошибку RPC (`raise exception '<код>'`) роут узнаёт по коду в `error.message`, незнакомая — `500`. Роуты задач с ключом отвечают `{ result, duplicate }`. `after()` нужен только чтобы отправить пуши после ответа: колбэк возвращает промис `kickDeliveries()`, и платформа держит функцию до конца отправки (D-125).
 
-Без `withAuth`: `/api/me` (тот же контракт), `/api/company/logo` (multipart), `/api/auth/code` (без сессии, §13), `/api/tv/pair` (без сессии, §13), `/api/push/sweep` (секрет cron, §10), `/api/health` и `/api/version` (публичные), роуты `app/api/ops/` (§14). Лимитов частоты нет, кроме входа по коду.
+Без `withAuth`: `/api/me` (тот же контракт), `/api/company/logo` (multipart), `/api/auth/code` (без сессии, §13), `/api/push/sweep` (секрет cron, §10), `/api/health` и `/api/version` (публичные), роуты `app/api/ops/` (§14). Лимитов частоты нет, кроме входа по коду.
 
 **Идемпотентность.** Ключ один на намерение, рождается на клиенте и живёт до ответа: TanStack Query возобновляет мутацию, `lib/outbox.ts` хранит POST и досылает при запуске (до 24 ч), фраза ждёт в IndexedDB (`lib/voice/kept.ts`, D-130). У фразы ключ один от `upload-url` до `confirm`. Повтор сервер узнаёт: RPC — по `ingest_batches` (сохранённый результат и `duplicate: true`); роуты, пишущие сами, — по уникальному индексу (`errands`, `inbox_items`, `profiles.client_request_id`); `parse` — по удачной строке `ai_logs`; проверка пушей — по `crid` в `meta`; правила парсера — по `parser_rules.request_id`; консоль — по журналу. Без ключа — мутации, повтор которых безвреден: абсолютное состояние или множество (ответ на визит, настройки, словарь, правила пушей, фото, отзыв сессий) и удаление (`delete_task`, `purge_closed_tasks`).
 
@@ -181,7 +181,7 @@
 
 ## 8. Стена (ТВ)
 
-Роутов нет, кроме подключения кодом (§13). Киоск — пользователь роли `tv`, читает RPC `tv_*`; пульт шлёт `tv_control` и `tv_board_control` (абсолютное состояние без ключа, D-76). Визиты поднимают версию стены, тик чистит её ленту. Квитанция киоска несёт здоровье (`tv_heartbeat(p_applied_version, p_health)`); надписи гаснут по возрасту в самой `tv_overlay`, тик только ставит `expired` и пишет секретарю (D-182).
+Роутов нет. Киоск — пользователь роли `tv`, читает RPC `tv_*`; пульт шлёт `tv_control` и `tv_board_control` (абсолютное состояние без ключа, D-76). Визиты поднимают версию стены, тик чистит её ленту.
 
 ## 9. Ошибки голосового конвейера
 
@@ -245,8 +245,6 @@ Cron из `vercel.json` зовёт `/api/push/sweep` (`GET` или `POST`) с `A
 2. `redeem_login_code` принимает HMAC кода и адреса (`hashAddress()`), id устройства и считает попытки по адресу, устройству и всей базе. Неверный, просроченный и использованный код — одно `400 bad_code`; превышение — `429 too_many`.
 3. Сессию сервер выпускает сам: `auth.admin.generateLink` с `type: "magiclink"` (письмо не уходит), затем `verifyOtp` через клиент на cookie — сессия ставится cookie этого ответа.
 4. Не вышло — код возвращается (`release_login_code`), `502`.
-
-**Экран кодом со стены** (D-182) — обратный путь для телевизора без клавиатуры. `POST /api/tv/pair` без сессии (`sameOrigin`) выдаёт код из шести цифр (пять и контрольная Дамма) на 10 минут и ставит браузеру httpOnly cookie `pulse-tv-pair` с секретом. `GET /api/tv/pair` по cookie отвечает `waiting / expired / gone / connected`; на подтверждённом сервер выпускает сессию пользователя `tv` тем же `generateLink` + `verifyOtp` и стирает cookie; не вышло — `tv_pair_release`, `502`. `POST /api/tv/pair/confirm` — только директор: `{code, client_request_id, screen_id?}`, RPC `tv_pair_confirm` под его токеном; ответы `400 bad_code / typo`, `429 too_many` (+`retry_after`), `409 no_screen / which_screen`. Код в базе — HMAC, секрет — SHA-256. Общий модуль — `app/api/tv/pair/pair-server.ts`.
 
 **Отзыв** — `POST /api/people/[id]/sessions`, `revoke_sessions` под личностью вызывающего: сессии, push-подписки и открытые коды человека; себе с `keep_current` — кроме этого телефона. Право решает функция. Увольнение делает то же триггером.
 

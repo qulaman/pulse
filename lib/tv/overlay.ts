@@ -1,7 +1,7 @@
 import { pluralRu } from "@/lib/tasks/status-text";
 import { waitedSince } from "@/lib/visits/text";
 
-import type { TvEventRow, TvOverlay, TvOverlayVisit } from "./queries";
+import type { TvEventRow, TvOverlay } from "./queries";
 
 /**
  * Что висит поверх любой сцены стены (D-96) — чистой функцией. Посетитель важнее всего:
@@ -14,11 +14,6 @@ import type { TvEventRow, TvOverlay, TvOverlayVisit } from "./queries";
  *
  * Негатива здесь нет (D-45): имя сотрудника на стену не попадает вовсе — только слова
  * секретаря, и те гостю не приезжают (D-33).
- *
- * Надпись живёт по возрасту (D-182), те же сроки, что у базы (`tv_overlay`, `visits_due_expiry`):
- * посетитель «ждёт» — 20 минут от прихода, «подождёт» — час от ответа, сообщение — 30 минут.
- * Стена без сети с последними данными в памяти не держит вчерашнего посетителя. Встреча зовёт
- * надписью, только если она директора: стена висит в его кабинете.
  */
 
 export type OverlayBanner =
@@ -35,25 +30,6 @@ export const EVENT_SOON_MIN = 15;
 /** Сколько надпись о мероприятии держится — минуту в начале окна и минуту на старте. */
 const EVENT_SHOW_MS = 60_000;
 
-/** Посетитель без ответа уходит со стены через 20 минут от прихода (D-96). */
-export const VISIT_WAITING_MS = 20 * 60_000;
-/** После «Подождёт» — через час от ответа директора (D-96). */
-export const VISIT_WAIT_MS = 60 * 60_000;
-/** Сообщение без «Понятно» — через 30 минут от отправки (D-116). */
-export const MESSAGE_MS = 30 * 60_000;
-
-/** Younger than `lifeMs` at `now`; a time that cannot be read is no notice at all. */
-function alive(fromIso: string | null | undefined, lifeMs: number, now: Date): boolean {
-  const from = fromIso ? Date.parse(fromIso) : NaN;
-  return Number.isFinite(from) && now.getTime() - from < lifeMs;
-}
-
-function visitAlive(visit: TvOverlayVisit, now: Date): boolean {
-  return visit.status === "waiting"
-    ? alive(visit.created_at, VISIT_WAITING_MS, now)
-    : alive(visit.answered_at ?? visit.created_at, VISIT_WAIT_MS, now);
-}
-
 /** «только что», «3 мин», «1 ч 5 мин» — сколько человек ждёт; то же слово, что у телефонов. */
 export const waited = waitedSince;
 
@@ -65,8 +41,6 @@ function eventDetail(event: TvEventRow): string {
 function eventBanner(events: readonly TvEventRow[], now: Date): OverlayBanner | null {
   const at = now.getTime();
   for (const event of events) {
-    // the wall hangs in the director's office: only his meetings call; an older database sends no flag
-    if (event.director === false) continue;
     const start = new Date(event.starts_at).getTime();
     const soonFrom = start - EVENT_SOON_MIN * 60_000;
     if (at >= soonFrom && at < soonFrom + EVENT_SHOW_MS) {
@@ -92,9 +66,8 @@ function sentAgo(fromIso: string, now: Date): string {
 }
 
 export function overlayOf(overlay: TvOverlay | null | undefined, events: readonly TvEventRow[], now: Date): OverlayView {
-  // data kept from before a gap in the network still ages: the same terms as the database
-  const visit = overlay?.visit && visitAlive(overlay.visit, now) ? overlay.visit : null;
-  const message = overlay?.message && alive(overlay.message.created_at, MESSAGE_MS, now) ? overlay.message : null;
+  const visit = overlay?.visit ?? null;
+  const message = overlay?.message ?? null;
 
   if (visit?.status === "waiting") {
     return {

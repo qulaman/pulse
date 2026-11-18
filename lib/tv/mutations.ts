@@ -50,8 +50,6 @@ export type TvControlInput = {
   rating?: RatingView;
   /** Стена меняет заставки сама по кругу (D-123). */
   carousel?: boolean;
-  /** «Крупность» — текст стены 100, 115 или 130 % (D-182). */
-  scale?: 100 | 115 | 130;
 };
 
 function patch(old: TvState | null | undefined, input: TvControlInput, now: Date): TvState | null {
@@ -103,9 +101,6 @@ function patch(old: TvState | null | undefined, input: TvControlInput, now: Date
   } else if (input.scene || input.board) {
     next.carousel = false;
   }
-  // a scene picked or the round switched: the program of the day holds it from now (same rule as tv_control, D-182)
-  if (input.scene || input.carousel !== undefined) next.scene_set_at = now.toISOString();
-  if (input.scale) next.scale = input.scale;
   if (input.rating) next.rating_view = input.rating;
   if (input.guest !== undefined) {
     next.guest = input.guest;
@@ -148,8 +143,6 @@ export function useTvControl() {
         p_rating: input.rating,
         p_carousel: input.carousel,
         p_board_minutes: input.board ? input.boardMinutes : undefined,
-        // sent only when set: an older database (before D-182) knows no such parameter
-        p_scale: input.scale,
       });
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error(OFFLINE)), TIMEOUT_MS),

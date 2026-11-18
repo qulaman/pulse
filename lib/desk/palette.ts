@@ -5,8 +5,6 @@
  * otherwise Enter with no row picked still sends the order. Pure: the line renders, this one matches.
  */
 
-import { parseWallCommand, type WallCommand, type WallContext, type WallPerson } from "@/lib/tv/command";
-
 import { fits, fold } from "./suggest";
 
 export type PaletteSection = { href: string; label: string; key?: string };
@@ -140,16 +138,4 @@ export function matchCommands<T extends PalettePerson>(query: string, people: re
     return found.map((person, index) => ({ kind: "remove", person, lead: short && index === 0 && found.length === 1 }));
   }
   return [];
-}
-
-/**
- * The wall by words in the palette (D-182): «Марата на стену», «часы на стену», «верни заставки»,
- * «убери со стены» stand under «Действия» like the moves above; a phrase that is only this command
- * (`lead`) is done by Enter, instead of going to the parser as an order. Strict: one word the wall
- * does not know — and the words stay an order (`parseWallCommand`).
- */
-export type PaletteWallCommand = WallCommand;
-
-export function matchWallCommands(query: string, people: readonly WallPerson[], context: Omit<WallContext, "people"> = {}): PaletteWallCommand[] {
-  return parseWallCommand(query, { ...context, people });
 }

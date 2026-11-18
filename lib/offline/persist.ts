@@ -156,8 +156,7 @@ export function keepQueries(client: QueryClient): () => void {
     if (!timer) timer = setTimeout(save, SAVE_DELAY_MS);
   };
   const unsubscribe = client.getQueryCache().subscribe((event) => {
-    // a query the snapshot never keeps (the wall's board on a 30-s poll) must not wake a save (D-182)
-    if (event.type === "updated" && event.action.type === "success" && shouldKeep(event.query)) later();
+    if (event.type === "updated" && event.action.type === "success") later();
     else if (event.type === "removed") later();
   });
   // a phone put away mid-way still keeps the last minute

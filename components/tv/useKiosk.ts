@@ -2,83 +2,38 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { createBrowserSupabase } from "@/lib/supabase/client";
 import { msUntilNightReload } from "@/lib/tv/clock";
-import { offlineNow, reloadAllowed } from "@/lib/tv/kiosk-signal";
 import type { TvState } from "@/lib/tv/queries";
 import { shouldReload } from "@/lib/tv/state";
 
 /**
- * Appliance-часть киоска (docs/FRONTEND.md «ТВ-режим», D-182): экран работает месяцами без рук.
- *  - ночной перезапуск в 04:00 Asia/Aqtobe — свежий деплой и сброс утечек, только к живому серверу;
- *  - честный индикатор «оффлайн»: сеть пропала, сводка перестала обновляться или так и не пришла.
- * Жизнь киоска целиком — `components/tv/KioskLife.tsx`.
+ * Appliance-часть киоска (docs/FRONTEND.md «ТВ-режим»): экран работает месяцами без рук.
+ *  - ночной перезапуск в 04:00 Asia/Aqtobe — свежий деплой и сброс утечек;
+ *  - честный индикатор «оффлайн»: сеть пропала ИЛИ сводка перестала обновляться.
  */
 
-/** A night reload the server did not answer for: asked again this much later. */
-const NIGHT_RETRY_MS = 5 * 60_000;
-/** «Перезапустить экран» from the remote while the server does not answer: asked again this much later. */
-const REMOTE_RETRY_MS = 30_000;
-/** One question to the server is not waited on longer than this. */
-const PROBE_TIMEOUT_MS = 10_000;
+/** Сводка тянется раз в минуту; три промаха подряд — экран уже показывает прошлое. */
+const STALE_MS = 3 * 60_000;
 
-/** `/api/me` status, 0 — no answer. */
-export async function probeServer(): Promise<number> {
-  try {
-    const res = await fetch("/api/me", { cache: "no-store", credentials: "include", signal: AbortSignal.timeout(PROBE_TIMEOUT_MS) });
-    return res.status;
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * Reload — but only into a server that answers (D-182): a blind reload into a dead deployment
- * leaves the wall on the browser's error page, with no script left to bring it back. Asks
- * `/api/me`; 2xx — reload, otherwise again `retryMs` later. Returns the cancel.
- */
-export function reloadWhenServerUp(retryMs: number): () => void {
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const attempt = async () => {
-    const status = await probeServer();
-    if (stopped) return;
-    if (reloadAllowed(status)) window.location.reload();
-    else timer = setTimeout(() => void attempt(), retryMs);
-  };
-  void attempt();
-  return () => {
-    stopped = true;
-    clearTimeout(timer);
-  };
-}
-
-/** 04:00 by Aqtobe: a fresh build and no leaks — whatever is on the wall at that hour. */
 export function useNightReload(): void {
   useEffect(() => {
-    let cancel: (() => void) | null = null;
-    const timer = setTimeout(() => {
-      cancel = reloadWhenServerUp(NIGHT_RETRY_MS);
-    }, msUntilNightReload());
-    return () => {
-      clearTimeout(timer);
-      cancel?.();
-    };
+    const timer = setTimeout(() => window.location.reload(), msUntilNightReload());
+    return () => clearTimeout(timer);
   }, []);
 }
 
 /**
- * «Оффлайн» в углу: браузер сам знает, что сети нет; последняя удачная загрузка сводки старше
- * трёх минут; или за две минуты работы сводка не пришла ни разу. Никогда не врёт «всё хорошо»
- * на замёрзшем экране.
+ * «Оффлайн» в углу: либо браузер сам знает, что сети нет, либо последняя удачная
+ * загрузка сводки старше трёх минут. Никогда не врёт «всё хорошо» на замерзшем экране.
  */
 export function useOffline(lastUpdatedAt: number): boolean {
   const [offline, setOffline] = useState(false);
 
   useEffect(() => {
-    // the effect starts again only when data comes, so before the first data this is the wall's start
-    const bootAt = Date.now();
     const check = () => {
-      setOffline(offlineNow({ online: navigator.onLine, lastDataAt: lastUpdatedAt || null, bootAt, now: Date.now() }));
+      const stale = lastUpdatedAt > 0 && Date.now() - lastUpdatedAt > STALE_MS;
+      setOffline(!navigator.onLine || stale);
     };
     check();
     const timer = setInterval(check, 15_000);
@@ -120,14 +75,39 @@ export function useVhPx(vh: number): number {
 }
 
 /**
+ * Квитанция экрана (принцип 8 для ТВ, D-76 §9). Расписывается только киоск: директор,
+ * открывший `/tv` с ноутбука, за стену в кабинете не отвечает — и RPC ему откажет.
+ *
+ * Три повода отметиться: поднялись, применили новое состояние, прошла минута. Ошибку
+ * гасим в консоль: пульт увидит «экран не отвечает», а стена от неё моргать не должна.
+ */
+const HEARTBEAT_MS = 60_000;
+
+export function useHeartbeat(role: string, appliedVersion: number | null): void {
+  useEffect(() => {
+    if (role !== "tv") return;
+    const supabase = createBrowserSupabase();
+    const beat = () => {
+      void supabase
+        .rpc("tv_heartbeat", { p_applied_version: appliedVersion ?? undefined })
+        .then(({ error }) => {
+          if (error) console.warn("tv_heartbeat:", error.message);
+        });
+    };
+    beat();
+    const timer = setInterval(beat, HEARTBEAT_MS);
+    return () => clearInterval(timer);
+  }, [role, appliedVersion]);
+}
+
+/**
  * Перезапуск с пульта: «Перезапустить экран» ставит отметку в строке, киоск видит её
- * через Realtime и перезагружается сам — к отвечающему серверу. Сравниваем с временем
- * загрузки страницы, иначе поднявшийся киоск увидел бы ту же отметку и ушёл в петлю.
+ * через Realtime и перезагружается сам. Сравниваем с временем загрузки страницы, иначе
+ * поднявшийся киоск увидел бы ту же отметку и ушёл в петлю перезагрузок.
  */
 export function useRemoteReload(state: TvState | null): void {
   const bootedAt = useRef(new Date());
   useEffect(() => {
-    if (!shouldReload(state, bootedAt.current)) return;
-    return reloadWhenServerUp(REMOTE_RETRY_MS);
+    if (shouldReload(state, bootedAt.current)) window.location.reload();
   }, [state]);
 }

@@ -1,3 +1,5 @@
+import { verdict } from "@/lib/tasks/status-text";
+
 import { tvTime, tvWeekday } from "./clock";
 import type { TvLine } from "./feed";
 import type { TvEventRow, TvSummary } from "./queries";
@@ -5,12 +7,12 @@ import { phraseOf } from "./voice";
 
 /**
  * Бегущая строка над лицом: всё, что экран рассказывает о компании, одной лентой —
- * последние события, числа дня, встречи и топ недели. Чистая функция: порядок и слова
+ * последние события, числа дня, вердикт и топ недели. Чистая функция: порядок и слова
  * проверяются тестом, а не глазами на стене.
  *
- * Правила те же, что у всего ТВ: негатива нет вовсе (D-45, D-182) — ни просрочек, ни
- * вопросов, ни «на приёмке» даже числом: строку видит и гость; у гостя в строку не
- * попадают ни фамилии, ни очки, потому что их нет уже в данных (D-33).
+ * Правила те же, что у всего ТВ: никаких имён рядом с негативом (D-45) — вердикт идёт
+ * числом («2 просрочки»), без «у кого»; у гостя в строку не попадают ни фамилии, ни
+ * очки, потому что их нет уже в данных (D-33).
  */
 
 export type TickerTone = "accent" | "ok" | "gold" | "muted" | "warn" | "danger";
@@ -24,12 +26,15 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   const items: TickerItem[] = [];
 
   if (summary) {
-    const { today } = summary;
+    const { today, counts } = summary;
     items.push({
       id: "today",
       text: `Сегодня: ${today.sent} ${pluralOrders(today.sent)} · ${today.done} принято · ${today.in_work} в работе`,
       tone: "muted",
     });
+
+    const line = verdict(counts);
+    items.push({ id: "verdict", text: line.text, tone: line.tone === "ok" ? "ok" : line.tone });
 
     // что впереди у всей компании: три ближайшие встречи, гостю — без названий (D-33)
     for (const event of (summary.events ?? []).slice(0, EVENTS_AHEAD)) {

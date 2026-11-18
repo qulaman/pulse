@@ -8,7 +8,6 @@ import {
   todayPlan,
   todaySummary,
   weekColumns,
-  weekStrip,
   weekSummary,
   type CalendarRow,
   type CalendarState,
@@ -22,16 +21,14 @@ import type { CalendarView } from "@/lib/tv/state";
 import s from "./tv.module.css";
 
 /**
- * Заставка «Календарь» (D-96, D-98; v5 — D-182). Два вида, переключаются с пульта:
+ * Заставка «Календарь» (D-96, D-98). Два вида, переключаются с пульта:
  *  - «Неделя»: сверху крупно «Сегодня» — лента дня с отрезками мероприятий и отметкой
  *    «сейчас», под ней карточки с большим временем, «идёт · до 14:30» с полоской прогресса
- *    и «через 45 мин» у ближайшего; снизу — только дни со встречами, пустые одной строкой
- *    («Сб–Вт свободно»);
- *  - «Месяц»: четыре недели от текущей, сегодня в акцентном круге, в клетке — одна встреча
- *    крупно и «+N».
- * Названия переносятся на вторую строку, а не режутся. Горит одно мероприятие на всю стену:
- * идущее сейчас, иначе ближайшее. Гостю названий и мест не приезжает уже из БД (D-33).
- * Движение — только opacity и transform (D-45).
+ *    и «через 45 мин» у ближайшего; снизу шесть следующих дней колонками;
+ *  - «Месяц»: сетка недель с понедельника, сегодня в акцентном круге, в клетке — до двух
+ *    мероприятий строками.
+ * Горит одно мероприятие на всю стену: идущее сейчас, иначе ближайшее. Гостю названий и
+ * мест не приезжает уже из БД (D-33). Движение — только opacity и transform (D-45).
  */
 
 const EASE = [0.2, 0, 0, 1] as const;
@@ -44,23 +41,20 @@ export function TvCalendar({ calendar, now, view }: { calendar: TvCalendarData |
 }
 
 /* -------------------------------------------------------------------------- */
-/* Неделя: «Сегодня» крупно, под ним дни со встречами                         */
+/* Неделя: «Сегодня» крупно, под ним шесть дней                               */
 /* -------------------------------------------------------------------------- */
 
 function WeekView({ calendar, now }: { calendar: TvCalendarData | null; now: Date }) {
   const plan = todayPlan(calendar, now);
   const days = weekColumns(calendar, now, 6, 1);
-  const strip = weekStrip(days);
 
   return (
-    // two blocks in a column that wraps what does not fit into a second column the box cuts off: at a big
-    // «Крупность» the days under «Сегодня» leave whole, never cut through a title
-    <div className="flex h-[74vh] w-full max-w-[94vw] flex-col flex-wrap content-start justify-center gap-[2.4vh] overflow-hidden" data-testid="tv-calendar" data-view="week">
+    <div className="flex w-full max-w-[94vw] flex-col gap-[2.6vh]" data-testid="tv-calendar" data-view="week">
       <motion.section
-        initial={{ opacity: 0, y: "1.6vh" }}
+        initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: EASE }}
-        className="relative w-full overflow-hidden rounded-[3vh] px-[3.4vh] pb-[2.4vh] pt-[2vh]"
+        className="relative overflow-hidden rounded-[3vh] px-[3.4vh] pb-[3vh] pt-[2.8vh]"
         style={{
           background:
             "radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%), color-mix(in srgb, var(--surface) 92%, transparent)",
@@ -69,12 +63,12 @@ function WeekView({ calendar, now }: { calendar: TvCalendarData | null; now: Dat
         data-testid="tv-today"
       >
         <header className="flex items-end justify-between gap-[3vh]">
-          <div className="flex min-w-0 items-baseline gap-[2.4vh]">
-            <h2 className="tv-title font-bold tracking-[-0.03em]">Сегодня</h2>
-            <span className="tv-text truncate text-muted">{plan.date}</span>
+          <div className="flex items-baseline gap-[2.4vh]">
+            <h2 className="text-[7vh] font-bold leading-[7.6vh] tracking-[-0.03em]">Сегодня</h2>
+            <span className="text-[3.2vh] leading-[4vh] text-muted">{plan.date}</span>
           </div>
           {plan.total > 0 ? (
-            <span className="tv-text shrink-0 font-semibold" style={{ color: "var(--accent)" }}>
+            <span className="text-[3vh] font-semibold leading-[4vh]" style={{ color: "var(--accent)" }}>
               {todaySummary(plan)}
             </span>
           ) : null}
@@ -84,61 +78,65 @@ function WeekView({ calendar, now }: { calendar: TvCalendarData | null; now: Dat
 
         {plan.cards.length > 0 ? (
           // the cards share the width: three meetings are thirds, not three quarters and a hole
-          <div className="mt-[2vh] grid gap-[2vh]" style={{ gridTemplateColumns: `repeat(${Math.max(plan.cards.length, 2)}, minmax(0, 1fr))` }}>
+          <div className="mt-[2.4vh] grid gap-[2vh]" style={{ gridTemplateColumns: `repeat(${Math.max(plan.cards.length, 2)}, minmax(0, 1fr))` }}>
             {plan.cards.map((card, i) => (
               <TodayTile key={card.id} card={card} index={i} />
             ))}
           </div>
         ) : (
-          <div className="mt-[2.4vh] flex flex-wrap items-baseline gap-x-[3vh] gap-y-[1vh] py-[1vh]">
-            <p className="tv-lead font-semibold">Свободный день</p>
+          <div className="mt-[3vh] flex items-center gap-[3vh] py-[2vh]">
+            <p className="text-[5vh] font-semibold leading-[6vh]">Свободный день</p>
             {plan.ahead ? (
-              <p className="tv-text text-muted">
+              <p className="text-[3.2vh] leading-[4vh] text-muted">
                 Ближайшее — <span className="text-text">{plan.ahead}</span>
               </p>
             ) : null}
           </div>
         )}
-        {plan.earlier > 0 ? <p className="tv-caption mt-[1.2vh] text-muted">Раньше сегодня — ещё {plan.earlier}</p> : null}
+        {plan.earlier > 0 ? (
+          <p className="mt-[1.4vh] text-[2.2vh] leading-[2.8vh] text-muted">
+            Раньше сегодня — ещё {plan.earlier}
+          </p>
+        ) : null}
       </motion.section>
 
-      <section className="flex w-full flex-col gap-[1.4vh]" data-testid="tv-week">
+      <section className="flex flex-col gap-[1.4vh]" data-testid="tv-week">
         <div className="flex items-baseline gap-[2vh] px-[0.6vh]">
-          <p className="tv-text font-semibold">Дальше на неделе</p>
-          {strip.busy.length > 0 ? <p className="tv-caption text-muted">{weekSummary(days)}</p> : null}
-          {/* the empty days in one line, beside the heading: «Вс–Вт свободно» */}
-          {strip.free ? (
-            <p className="tv-text ml-auto text-muted" data-testid="tv-week-free">
-              {strip.free}
-            </p>
-          ) : null}
+          <p className="text-[3.2vh] font-semibold leading-[4vh]">Дальше на неделе</p>
+          <p className="text-[2.6vh] leading-[3.4vh] text-muted">{weekSummary(days)}</p>
         </div>
-        {strip.busy.length > 0 ? (
-          <div className="grid gap-[1.4vh]" style={{ gridTemplateColumns: `repeat(${Math.max(strip.busy.length, 3)}, minmax(0, 1fr))` }}>
-            {strip.busy.map((column, index) => (
-              <motion.div
-                key={column.key}
-                initial={{ opacity: 0, y: "1.4vh" }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.45, delay: 0.2 + index * 0.05, ease: EASE }}
-                className="flex min-w-0 flex-col gap-[1vh] rounded-[2vh] px-[2vh] py-[1.6vh]"
-                style={{ background: "color-mix(in srgb, var(--surface) 60%, transparent)" }}
-                data-day={column.key}
-              >
-                <div className="flex items-baseline gap-[1vh]">
-                  <span className="tv-text min-w-0 flex-1 truncate font-bold">{column.label}</span>
-                  {column.more > 0 ? <span className="tv-caption nums shrink-0 font-semibold tabular-nums text-muted">+{column.more}</span> : null}
-                  <span className="tv-caption shrink-0 text-muted">{column.date}</span>
-                </div>
-                <ul className="flex flex-col gap-[1vh]">
+        <div className="grid grid-cols-6 gap-[1.4vh]">
+          {days.map((column, index) => (
+            <motion.div
+              key={column.key}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.2 + index * 0.05, ease: EASE }}
+              className="flex min-w-0 flex-col gap-[1vh] rounded-[2vh] p-[1.6vh]"
+              style={{ background: "color-mix(in srgb, var(--surface) 60%, transparent)" }}
+            >
+              <div className="flex items-baseline justify-between gap-[1vh]">
+                <span
+                  className="truncate text-[2.8vh] font-bold leading-[3.4vh]"
+                  style={{ color: column.weekend ? "var(--text-muted)" : "var(--text)" }}
+                >
+                  {column.label}
+                </span>
+                <span className="shrink-0 text-[2vh] leading-[2.6vh] text-muted">{column.date}</span>
+              </div>
+              {column.rows.length === 0 ? (
+                <p className="text-[2.4vh] leading-[3vh] text-muted opacity-50">—</p>
+              ) : (
+                <ul className="flex flex-col gap-[0.8vh]">
                   {column.rows.map((row) => (
                     <DayRow key={row.id} row={row} />
                   ))}
+                  {column.more > 0 ? <li className="text-[2vh] leading-[2.6vh] text-muted">+ ещё {column.more}</li> : null}
                 </ul>
-              </motion.div>
-            ))}
-          </div>
-        ) : null}
+              )}
+            </motion.div>
+          ))}
+        </div>
       </section>
     </div>
   );
@@ -156,12 +154,12 @@ function Track({ track }: { track: TodayTrack }) {
   const labels = track.hours.filter((h, i) => i % 2 === 0 || track.hours.length <= 8);
   const at = (hour: number) => `${((hour - track.from) / (track.to - track.from)) * 100}%`;
   return (
-    <div className="relative mt-[2vh] h-[5.8vh]" aria-hidden>
+    <div className="relative mt-[2.4vh] h-[5.8vh]" aria-hidden>
       {/* the rail */}
       <div className="absolute inset-x-0 top-[1.6vh] h-[0.5vh] rounded-full" style={{ background: "color-mix(in srgb, var(--border) 80%, transparent)" }} />
-      {/* hour ticks and labels: the one text on the wall allowed under the scale (tv-type.css) */}
+      {/* hour ticks and labels */}
       {labels.map((hour) => (
-        <span key={hour} className="nums absolute top-0 -translate-x-1/2 text-[2.2vh] leading-[1.2vh] text-muted tabular-nums" style={{ left: at(hour) }}>
+        <span key={hour} className="absolute top-0 -translate-x-1/2 text-[1.8vh] leading-[1.2vh] text-muted tabular-nums" style={{ left: at(hour) }}>
           <span className="absolute left-1/2 top-[1.5vh] block h-[0.9vh] w-[0.15vh] -translate-x-1/2 rounded-full" style={{ background: "var(--border)" }} />
           <span className="mt-[3.8vh] block">{String(hour).padStart(2, "0")}</span>
         </span>
@@ -194,23 +192,23 @@ function TodayTile({ card, index }: { card: TodayCard; index: number }) {
   const lit = card.state === "now" || card.state === "next";
   return (
     <motion.article
-      initial={{ opacity: 0, y: "1.6vh" }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: card.state === "past" ? 0.5 : 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.1 + index * 0.06, ease: EASE }}
-      className="relative flex min-w-0 flex-col overflow-hidden rounded-[2.2vh] px-[2.2vh] pb-[1.8vh] pt-[1.4vh]"
+      className="relative flex min-w-0 flex-col overflow-hidden rounded-[2.2vh] px-[2.2vh] pb-[2vh] pt-[1.8vh]"
       style={{
         background: lit ? "color-mix(in srgb, var(--accent) 13%, var(--surface-2))" : "var(--surface-2)",
         boxShadow: lit ? "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 60%, transparent)" : undefined,
       }}
       data-state={card.state}
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-[1.4vh] gap-y-[0.4vh]">
-        <span className="tv-lead nums font-bold tracking-[-0.02em] tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text)" }}>
+      <div className="flex items-baseline justify-between gap-[1.4vh]">
+        <span className="text-[5.2vh] font-bold leading-[5.6vh] tracking-[-0.02em] tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text)" }}>
           {card.time}
         </span>
         {card.note ? (
           <span
-            className="tv-caption nums shrink-0 rounded-full px-[1.2vh] font-semibold tabular-nums"
+            className="shrink-0 truncate rounded-full px-[1.2vh] py-[0.3vh] text-[2vh] font-semibold leading-[2.6vh] tabular-nums"
             style={{
               color: lit ? "var(--bg)" : "var(--text-muted)",
               background: lit ? "var(--accent)" : "color-mix(in srgb, var(--border) 70%, transparent)",
@@ -220,9 +218,9 @@ function TodayTile({ card, index }: { card: TodayCard; index: number }) {
           </span>
         ) : null}
       </div>
-      <p className="tv-text mt-[0.8vh] line-clamp-2 font-semibold [overflow-wrap:anywhere]">{card.title}</p>
+      <p className="mt-[1vh] line-clamp-2 text-[3.2vh] font-semibold leading-[4vh] [overflow-wrap:anywhere]">{card.title}</p>
       {card.place || card.people ? (
-        <p className="tv-caption mt-[0.4vh] flex min-w-0 items-center gap-[1.4vh] text-muted">
+        <p className="mt-[0.6vh] flex min-w-0 items-center gap-[1.4vh] text-[2.3vh] leading-[3vh] text-muted">
           {card.place ? (
             <span className="flex min-w-0 items-center gap-[0.6vh]">
               <PinIcon />
@@ -239,7 +237,10 @@ function TodayTile({ card, index }: { card: TodayCard; index: number }) {
       ) : null}
       {card.progress !== null ? (
         <span className="absolute inset-x-0 bottom-0 h-[0.6vh]" style={{ background: "color-mix(in srgb, var(--accent) 20%, transparent)" }}>
-          <span className={`block h-full w-full ${s.gauge}`} style={{ background: "var(--accent)", transform: `scaleX(${card.progress})` }} />
+          <span
+            className={`block h-full w-full ${s.gauge}`}
+            style={{ background: "var(--accent)", transform: `scaleX(${card.progress})` }}
+          />
         </span>
       ) : null}
     </motion.article>
@@ -249,34 +250,36 @@ function TodayTile({ card, index }: { card: TodayCard; index: number }) {
 function DayRow({ row }: { row: CalendarRow }) {
   const lit = row.state === "next" || row.state === "now";
   return (
-    // time above, the title under it on up to two lines: a title is wrapped, never cut
+    // time above, title under it: a sixth of the wall is too narrow for both on one line
     <li className="flex min-w-0 flex-col" data-state={row.state}>
-      <span className="tv-caption nums font-bold tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text-muted)" }}>
+      <span className="text-[2.1vh] font-bold leading-[2.6vh] tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text-muted)" }}>
         {row.time}
       </span>
-      <span className="tv-text line-clamp-2 min-w-0 font-medium [overflow-wrap:anywhere]">{row.title}</span>
+      <span className="min-w-0 truncate text-[2.4vh] font-medium leading-[3vh]">{row.title}</span>
     </li>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Месяц: четыре недели от текущей                                           */
+/* Месяц сеткой                                                               */
 /* -------------------------------------------------------------------------- */
 
 function MonthView({ calendar, now }: { calendar: TvCalendarData | null; now: Date }) {
   const grid = monthGrid(calendar, now);
   return (
-    <div className="flex h-[74vh] w-full max-w-[94vw] flex-col gap-[1.4vh]" data-testid="tv-calendar" data-view="month">
-      <div className="flex items-baseline gap-[2.4vh] px-[0.6vh]">
-        <h2 className="tv-title font-bold tracking-[-0.03em]">{grid.title}</h2>
-        <span className="tv-text text-muted">{monthSummary(grid)}</span>
+    <div className="flex w-full max-w-[94vw] flex-col gap-[1.4vh]" data-testid="tv-calendar" data-view="month">
+      <div className="flex items-baseline justify-between gap-[3vh] px-[0.6vh]">
+        <div className="flex items-baseline gap-[2.4vh]">
+          <h2 className="text-[6vh] font-bold leading-[6.6vh] tracking-[-0.03em]">{grid.title}</h2>
+          <span className="text-[2.8vh] leading-[3.6vh] text-muted">{monthSummary(grid)}</span>
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-[0.9vh] px-[0.4vh]">
         {grid.weekdays.map((day, i) => (
           <span
             key={day}
-            className="tv-caption px-[1vh] font-semibold uppercase tracking-[0.12em]"
+            className="px-[1vh] text-[2vh] font-semibold uppercase leading-[2.6vh] tracking-[0.12em]"
             style={{ color: i >= 5 ? "color-mix(in srgb, var(--text-muted) 70%, transparent)" : "var(--text-muted)" }}
           >
             {day}
@@ -284,17 +287,17 @@ function MonthView({ calendar, now }: { calendar: TvCalendarData | null; now: Da
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-[0.9vh]" style={{ gridTemplateRows: `repeat(${grid.weeks.length}, minmax(0, 1fr))` }}>
+      <div className="grid gap-[0.9vh]" style={{ gridTemplateRows: `repeat(${grid.weeks.length}, minmax(0, 1fr))` }}>
         {grid.weeks.map((week, w) => (
           <motion.div
             key={w}
-            initial={{ opacity: 0, y: "1.2vh" }}
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: w * 0.05, ease: EASE }}
-            className="grid min-h-0 grid-cols-7 gap-[0.9vh]"
+            className="grid grid-cols-7 gap-[0.9vh]"
           >
             {week.map((cell) => (
-              <MonthDay key={cell.key} cell={cell} />
+              <MonthDay key={cell.key} cell={cell} weeks={grid.weeks.length} />
             ))}
           </motion.div>
         ))}
@@ -303,43 +306,46 @@ function MonthView({ calendar, now }: { calendar: TvCalendarData | null; now: Da
   );
 }
 
-function MonthDay({ cell }: { cell: MonthCell }) {
-  const row = cell.rows[0] ?? null;
-  const lit = row !== null && (row.state === "next" || row.state === "now");
+function MonthDay({ cell, weeks }: { cell: MonthCell; weeks: number }) {
+  // five weeks leave more air per row than six: the cell grows with the month
+  const height = weeks > 5 ? "10.4vh" : "12.6vh";
+  const faded = !cell.inMonth ? 0.28 : cell.past ? 0.55 : 1;
   return (
     <div
-      className="relative flex min-h-0 min-w-0 flex-col gap-[0.4vh] overflow-hidden rounded-[1.6vh] px-[1.4vh] py-[1vh]"
+      className="relative flex min-w-0 flex-col gap-[0.5vh] overflow-hidden rounded-[1.6vh] px-[1.2vh] py-[0.9vh]"
       style={{
+        height,
         background: cell.today
           ? "color-mix(in srgb, var(--accent) 14%, var(--surface))"
           : cell.weekend
             ? "color-mix(in srgb, var(--surface) 40%, transparent)"
             : "color-mix(in srgb, var(--surface) 70%, transparent)",
         boxShadow: cell.today ? "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 65%, transparent)" : undefined,
-        opacity: cell.past ? 0.42 : 1,
+        opacity: faded,
       }}
       data-today={cell.today || undefined}
     >
-      <span className="flex items-center justify-between gap-[1vh]">
+      <span className="flex items-center justify-between">
         <span
-          className="tv-caption nums flex min-w-[2em] items-center justify-center rounded-full px-[0.8vh] font-bold tabular-nums"
-          style={{
-            background: cell.today ? "var(--accent)" : undefined,
-            color: cell.today ? "var(--bg)" : cell.dayLabel !== String(cell.day) ? "var(--accent)" : "var(--text)",
-          }}
+          className="flex h-[3.4vh] min-w-[3.4vh] items-center justify-center rounded-full px-[0.6vh] text-[2.4vh] font-bold leading-none tabular-nums"
+          style={{ background: cell.today ? "var(--accent)" : undefined, color: cell.today ? "var(--bg)" : "var(--text)" }}
         >
-          {cell.dayLabel}
+          {cell.day}
         </span>
-        {cell.more > 0 ? <span className="tv-caption nums font-semibold tabular-nums text-muted">+{cell.more}</span> : null}
+        {cell.more > 0 ? <span className="text-[1.8vh] font-semibold leading-[2.2vh] text-muted">+{cell.more}</span> : null}
       </span>
-      {row ? (
-        <p className="tv-text line-clamp-2 min-w-0 font-medium [overflow-wrap:anywhere]" data-state={row.state}>
-          <span className="nums mr-[0.8vh] font-bold tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text-muted)" }}>
-            {row.time}
+      {cell.rows.map((row) => {
+        const lit = row.state === "next" || row.state === "now";
+        return (
+          <span key={row.id} className="flex min-w-0 items-center gap-[0.7vh] text-[1.9vh] leading-[2.4vh]" data-state={row.state}>
+            <span aria-hidden className="h-[0.9vh] w-[0.9vh] shrink-0 rounded-full" style={{ background: lit ? "var(--accent)" : "var(--text-muted)" }} />
+            <span className="shrink-0 font-semibold tabular-nums" style={{ color: lit ? "var(--accent)" : "var(--text)" }}>
+              {row.time}
+            </span>
+            <span className="min-w-0 truncate text-muted">{row.title}</span>
           </span>
-          {row.title}
-        </p>
-      ) : null}
+        );
+      })}
     </div>
   );
 }

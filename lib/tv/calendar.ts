@@ -17,15 +17,12 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 86_400_000;
 /** Мероприятие без конца считается часовым: иначе «идёт» не погасло бы никогда. */
 const DEFAULT_LENGTH_MS = 60 * 60_000;
-/**
- * Встреч в дне под «Сегодня» — одна: название на стене переносится на вторую строку, а не режется
- * (D-182); остальные — «+N» рядом с датой.
- */
-export const PER_DAY = 1;
+/** Больше трёх строк в колонке недели под «Сегодня» не помещаются: остальное — «+ ещё N». */
+export const PER_DAY = 3;
 /** Карточек «Сегодня» — четыре в ряд; прошедшие уступают место будущим. */
 export const TODAY_CARDS = 4;
-/** В клетке месяца — одна встреча крупно, дальше «+N» (D-182): клетка не мельче шкалы стены. */
-export const PER_CELL = 1;
+/** В клетке месяца — две строки, дальше «+N». */
+export const PER_CELL = 2;
 /** Рабочий день на ленте времени «Сегодня»; раздвигается, если мероприятие вне его. */
 const DAY_FROM_HOUR = 8;
 const DAY_TO_HOUR = 20;
@@ -310,36 +307,6 @@ export function weekSummary(columns: readonly CalendarColumn[]): string {
   return `${total} ${pluralRu(total, ["мероприятие", "мероприятия", "мероприятий"])}`;
 }
 
-export type WeekStrip = {
-  /** Only the days with meetings: an empty day is not a tile with «—». */
-  busy: CalendarColumn[];
-  /** The empty days in one line: «Сб–Вт свободно», «Завтра, Пн–Вт свободно»; nothing empty — null. */
-  free: string | null;
-};
-
-/**
- * The days under «Сегодня» (D-182): tiles for the days that have meetings and one line for the
- * rest — runs of empty days fold into «Сб–Вт». The whole stretch empty — «Дальше на неделе свободно».
- */
-export function weekStrip(columns: readonly CalendarColumn[]): WeekStrip {
-  const busy = columns.filter((column) => column.rows.length > 0);
-  const runs: CalendarColumn[][] = [];
-  let run: CalendarColumn[] = [];
-  for (const column of columns) {
-    if (column.rows.length === 0) {
-      run.push(column);
-    } else if (run.length > 0) {
-      runs.push(run);
-      run = [];
-    }
-  }
-  if (run.length > 0) runs.push(run);
-  if (runs.length === 0) return { busy, free: null };
-  if (busy.length === 0) return { busy, free: "Дальше на неделе свободно" };
-  const parts = runs.map((days) => (days.length === 1 ? days[0].label : `${days[0].label}–${days[days.length - 1].label}`));
-  return { busy, free: `${parts.join(", ")} свободно` };
-}
-
 /* -------------------------------------------------------------------------- */
 /* Месяц сеткой (D-98)                                                        */
 /* -------------------------------------------------------------------------- */
@@ -347,8 +314,6 @@ export function weekStrip(columns: readonly CalendarColumn[]): WeekStrip {
 export type MonthCell = {
   key: string;
   day: number;
-  /** «1 дек» on the first day of a month: the grid crosses months, the boundary is named. */
-  dayLabel: string;
   inMonth: boolean;
   today: boolean;
   past: boolean;
@@ -358,32 +323,32 @@ export type MonthCell = {
 };
 
 export type MonthGrid = {
-  /** «Ноябрь 2026» или «Ноябрь — декабрь 2026». */
+  /** «Сентябрь 2026». */
   title: string;
   weekdays: string[];
   weeks: MonthCell[][];
-  /** Мероприятий в сетке от сегодняшнего дня: прошедшие дни текущей недели не считаются. */
+  /** Мероприятий в самом месяце, без хвостов соседних. */
   total: number;
 };
 
 export const WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"] as const;
-/**
- * «Месяц» на стене — четыре недели от текущей (D-182): первый ряд — эта неделя, а не прошлый
- * месяц; четыре ряда держат одну встречу в клетке крупно и при «Крупности» «далеко».
- */
-export const MONTH_WEEKS = 4;
-/** Столько дней запрашивается для «Месяца» — ровно сетка. */
-export const MONTH_DAYS = MONTH_WEEKS * 7;
+/** Сетка месяца всегда запрашивается на шесть недель: больше их не бывает. */
+export const MONTH_DAYS = 42;
 
 function partsOf(index: number): { year: number; month: number; day: number } {
   const date = new Date(index * DAY_MS); // midnight-aligned in Aqtobe: read in UTC
   return { year: date.getUTCFullYear(), month: date.getUTCMonth(), day: date.getUTCDate() };
 }
 
-/** Понедельник текущей недели по Актобе — номер суток: первый ряд «Месяца» (D-182). */
+function indexOfDate(year: number, month: number, day: number): number {
+  return Math.floor(Date.UTC(year, month, day) / DAY_MS);
+}
+
+/** Понедельник недели, в которую попало первое число текущего месяца, — номер суток. */
 export function monthGridStart(now: Date): number {
-  const today = dayIndex(now);
-  return today - ((weekdayOf(today) + 6) % 7);
+  const { year, month } = partsOf(dayIndex(now));
+  const first = indexOfDate(year, month, 1);
+  return first - ((weekdayOf(first) + 6) % 7);
 }
 
 /** Тот же понедельник строкой `YYYY-MM-DD` — для `tv_calendar(p_from)`. */
@@ -396,25 +361,26 @@ export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): M
   const events = sorted(calendar);
   const states = statesOf(events, now);
   const today = dayIndex(now);
-  const { month } = partsOf(today);
+  const { year, month } = partsOf(today);
   const start = monthGridStart(now);
-  const end = start + MONTH_WEEKS * 7 - 1;
+  const lastIndex = indexOfDate(year, month + 1, 0);
+  const weeksCount = Math.ceil((lastIndex - start + 1) / 7);
 
   let total = 0;
   const weeks: MonthCell[][] = [];
-  for (let w = 0; w < MONTH_WEEKS; w += 1) {
+  for (let w = 0; w < weeksCount; w += 1) {
     const week: MonthCell[] = [];
     for (let d = 0; d < 7; d += 1) {
       const index = start + w * 7 + d;
       const parts = partsOf(index);
+      const inMonth = parts.month === month;
       const all = events.filter((e) => dayIndex(new Date(e.starts_at)) === index);
-      if (index >= today) total += all.length;
+      if (inMonth) total += all.length;
       const rows = all.slice(0, PER_CELL).map((event) => rowOf(event, states.get(event.id) ?? "later"));
       week.push({
         key: String(index),
         day: parts.day,
-        dayLabel: parts.day === 1 ? shortDate(noonOf(index)) : String(parts.day),
-        inMonth: parts.month === month,
+        inMonth,
         today: index === today,
         past: index < today,
         weekend: d >= 5,
@@ -425,17 +391,12 @@ export function monthGrid(calendar: TvCalendar | null | undefined, now: Date): M
     weeks.push(week);
   }
 
-  return { title: rangeTitle(today, end), weekdays: [...WEEKDAYS], weeks, total };
-}
-
-/** «Ноябрь 2026», «Ноябрь — декабрь 2026», «Декабрь 2026 — январь 2027». */
-function rangeTitle(from: number, to: number): string {
-  const a = partsOf(from);
-  const b = partsOf(to);
-  const first = capital(monthFmt.format(noonOf(from)));
-  if (a.month === b.month && a.year === b.year) return `${first} ${a.year}`;
-  const second = monthFmt.format(noonOf(to));
-  return a.year === b.year ? `${first} — ${second} ${b.year}` : `${first} ${a.year} — ${second} ${b.year}`;
+  return {
+    title: `${capital(monthFmt.format(noonOf(today)))} ${year}`,
+    weekdays: [...WEEKDAYS],
+    weeks,
+    total,
+  };
 }
 
 /** Подпись месяца: «12 мероприятий» или «Свободно». */

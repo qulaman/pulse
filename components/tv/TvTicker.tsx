@@ -57,7 +57,7 @@ function Item({ item }: { item: TickerItem }) {
   return (
     <span className="flex shrink-0 items-center" data-tape-id={item.id}>
       <span aria-hidden className="mx-[2.4vh] h-[1vh] w-[1vh] shrink-0 rounded-full" style={{ background: COLOR[item.tone] }} />
-      <span className="tv-text whitespace-nowrap" style={{ color: item.tone === "muted" ? "var(--text-muted)" : "var(--text)" }}>
+      <span className="whitespace-nowrap text-[3.2vh] leading-[4.2vh]" style={{ color: item.tone === "muted" ? "var(--text-muted)" : "var(--text)" }}>
         {item.text}
       </span>
     </span>
@@ -76,8 +76,8 @@ const Run = memo(function Run({ items, runRef, echo }: { items: TickerItem[]; ru
 });
 
 /**
- * `paused` — the wall sleeps (D-96, D-105), or the quiet clock of a meeting or a board is up (D-182): the row
- * fades out (TvFrame) and the tape stops where it stands; nobody reads it, and later it rolls on from there.
+ * `paused` — the wall sleeps (D-96, D-105): the row fades out and the tape stops where it stands; nobody sees
+ * it, and in the morning it rolls on from there.
  */
 export function TvTicker({ items, paused = false }: { items: TickerItem[]; paused?: boolean }) {
   const reduced = useReducedMotion() ?? false;
