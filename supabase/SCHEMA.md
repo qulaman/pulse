@@ -4,7 +4,7 @@
 
 Зачем он нужен. Схема базы — результат всех миграций по порядку. Функция при каждой правке записывается целиком заново, поэтому одно имя встречается в нескольких файлах, а действует только последнее определение. Указатель говорит, где оно лежит. Перед правкой функции открой файл из столбца «Действует» и копируй тело оттуда, а не из первого найденного поиском.
 
-Миграций — 78, строк — 21648. Функций — 208, их определений — 314; устаревших тел — 7738 строк (36 % текста миграций).
+Миграций — 79, строк — 22521. Функций — 211, их определений — 323; устаревших тел — 8250 строк (37 % текста миграций).
 
 ## Функции
 
@@ -27,9 +27,9 @@
 | `daily_report_checked_on` | `20261028120000_daily_reports.sql:55` | 1 |
 | `daily_report_clock` | `20261028120000_daily_reports.sql:35` | 1 |
 | `daily_report_holiday` | `20261103120000_daily_report_soft_start.sql:28` | 1 |
-| `daily_report_json` | `20261103120000_daily_report_soft_start.sql:248` | 2 |
+| `daily_report_json` | `20261118120000_daily_report_remind_excuse.sql:48` | 3 |
 | `daily_report_on` | `20261028120000_daily_reports.sql:19` | 1 |
-| `daily_report_refund_early_fines` | `20261103120000_daily_report_soft_start.sql:549` | 1 |
+| `daily_report_refund_early_fines` | `20261118120000_daily_report_remind_excuse.sql:820` | 2 |
 | `daily_report_reminders_due` | `20261028120000_daily_reports.sql:767` | 1 |
 | `daily_report_started_on` | `20261028120000_daily_reports.sql:44` | 1 |
 | `daily_report_state` | `20261028120000_daily_reports.sql:167` | 1 |
@@ -46,7 +46,7 @@
 | `director_digests_due` | `20260924160000_push_followups.sql:173` | 2 |
 | `director_meeting_until` | `20260924150200_notify_prefs.sql:193` | 1 |
 | `director_quiet_until` | `20260924150200_notify_prefs.sql:143` | 1 |
-| `dispute_points` | `20261103120000_daily_report_soft_start.sql:592` | 2 |
+| `dispute_points` | `20261118120000_daily_report_remind_excuse.sql:167` | 3 |
 | `drop_announcement_pushes` | `20260924150000_push_foundation.sql:154` | 1 |
 | `edit_event` | `20260923200000_calendar_edit_delete.sql:108` | 1 |
 | `errand_answer` | `20260923235000_secretary_link.sql:172` | 1 |
@@ -65,6 +65,7 @@
 | `event_release` | `20260923200000_calendar_edit_delete.sql:68` | 1 |
 | `events_due_reminders` | `20260918150000_calendar_events.sql:656` | 1 |
 | `events_reset_reminder` | `20260918150000_calendar_events.sql:216` | 1 |
+| `excuse_daily_report` | `20261118120000_daily_report_remind_excuse.sql:74` | 1 |
 | `extend_task_deadline` | `20260926120000_task_lifecycle.sql:418` | 2 |
 | `fn_rating` | `20260922120100_errands.sql:44` | 2 |
 | `is_event_participant` | `20260918150000_calendar_events.sql:80` | 1 |
@@ -139,6 +140,7 @@
 | `ops.take` | `20261104130000_ops_console.sql:159` | 1 |
 | `ops.task_json` | `20261104130000_ops_console.sql:312` | 1 |
 | `overdue_alerts_due` | `20260926120000_task_lifecycle.sql:842` | 2 |
+| `person_daily_reports` | `20261118120000_daily_report_remind_excuse.sql:655` | 1 |
 | `point_transactions_hold_guard` | `20260917160000_shop.sql:80` | 1 |
 | `points_rule` | `20261014120000_points_game.sql:22` | 1 |
 | `profiles_guard` | `20261104120000_person_contact.sql:65` | 4 |
@@ -159,6 +161,7 @@
 | `recurrence_spawn` | `20261022120000_recurrence_live.sql:324` | 1 |
 | `redeem_login_code` | `20261014150000_login_codes.sql:152` | 1 |
 | `release_login_code` | `20261014150000_login_codes.sql:202` | 1 |
+| `remind_daily_report` | `20261118120000_daily_report_remind_excuse.sql:245` | 1 |
 | `request_deadline` | `20260926120000_task_lifecycle.sql:225` | 1 |
 | `resolve_points_dispute` | `20261014120000_points_game.sql:415` | 1 |
 | `respond_event` | `20260924150000_push_foundation.sql:176` | 2 |
@@ -181,8 +184,8 @@
 | `tasks_field_guard` | `20261022120000_recurrence_live.sql:278` | 3 |
 | `tasks_points` | `20261014120000_points_game.sql:93` | 1 |
 | `team_channel_alerts_due` | `20260924160000_push_followups.sql:124` | 1 |
-| `team_daily_report_day` | `20261028120000_daily_reports.sql:407` | 1 |
-| `team_daily_report_period` | `20261103120000_daily_report_soft_start.sql:273` | 2 |
+| `team_daily_report_day` | `20261118120000_daily_report_remind_excuse.sql:354` | 2 |
+| `team_daily_report_period` | `20261118120000_daily_report_remind_excuse.sql:462` | 3 |
 | `team_role` | `20260922120100_errands.sql:36` | 1 |
 | `thank_errand` | `20260923210000_errand_thanks.sql:12` | 1 |
 | `transition_errand` | `20260922120100_errands.sql:409` | 1 |
@@ -202,7 +205,7 @@
 | `tv_guest_on` | `20260923230000_tv_wall_v2.sql:59` | 1 |
 | `tv_heartbeat` | `20260923230100_visits.sql:366` | 2 |
 | `tv_overlay` | `20260924180000_visit_messages.sql:249` | 2 |
-| `tv_rating` | `20261103120000_daily_report_soft_start.sql:669` | 3 |
+| `tv_rating` | `20261118120000_daily_report_remind_excuse.sql:693` | 4 |
 | `tv_stage` | `20261021150000_board_live_week.sql:38` | 1 |
 | `tv_state_board_point_reset` | `20260925150000_mind_board_v2.sql:137` | 1 |
 | `tv_summary` | `20260922120100_errands.sql:110` | 5 |
@@ -232,7 +235,7 @@
 | `announcement_acks` | `20260910100000_voice_pipeline.sql:86` | — |
 | `announcements` | `20260910100000_voice_pipeline.sql:77` | — |
 | `companies` | `20260907120000_foundation.sql:26` | `20261014150000` |
-| `daily_reports` | `20261028120000_daily_reports.sql:65` | `20261103120000` |
+| `daily_reports` | `20261028120000_daily_reports.sql:65` | `20261103120000`, `20261118120000` |
 | `errands` | `20260922120100_errands.sql:258` | `20260923210000`, `20260923235000`, `20260924096000` |
 | `ether_events` | `20261014120000_points_game.sql:489` | — |
 | `event_participants` | `20260918150000_calendar_events.sql:54` | — |

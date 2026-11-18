@@ -37,6 +37,8 @@ const report = (patch: Partial<DailyReport> = {}): DailyReport => ({
   submitted_at: "2026-10-28T18:04:00+05:00",
   updated_at: "2026-10-28T18:04:00+05:00",
   points: 1,
+  excused_at: null,
+  excused_reason: null,
   ...patch,
 });
 
@@ -143,6 +145,10 @@ describe("the employee's day", () => {
     expect(historyLine(report({ status: "missed", points: -10, arrived_at: null, left_at: null }))).toBe("не сдан · −10");
     // a minus given back — by «Оспорить» or by the D-155 refund — nets the day to 0
     expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null }))).toBe("не сдан");
+    // D-183: the director excused the day — the minus is back, the reason is said
+    expect(historyLine(report({ status: "missed", points: 0, arrived_at: null, left_at: null, excused_at: "2026-10-29T10:00:00+05:00", excused_reason: "болел" }))).toBe(
+      "не сдан · уважительная причина",
+    );
   });
 
   it("says a task's state and its deadline", () => {
@@ -157,18 +163,16 @@ describe("the employee's day", () => {
     const b = "2026-10-28T18:00:00+05:00";
     expect(formProblem(a, b, "Сверка")).toBeNull();
     expect(formProblem(b, a, "Сверка")).toBe("«Ушёл» должно быть позже «Пришёл»");
-    expect(formProblem(a, b, "   ")).toBe("Напишите, чем занимались");
+    expect(formProblem(a, b, "   ")).toBe("Напишите одной строкой, что сделали");
     expect(formProblem(a, b, "x".repeat(4001))).toBe("Слишком длинно: до 4000 знаков");
   });
 
-  it("asks for words only on a day without tasks (D-155 §7)", () => {
+  it("asks for one line of words always, tasks or not (D-183)", () => {
     const a = "2026-10-28T09:00:00+05:00";
     const b = "2026-10-28T18:00:00+05:00";
-    expect(formProblem(a, b, "   ", true)).toBeNull();
-    expect(formProblem(a, b, "", false)).toBe("Напишите, чем занимались");
-    // the times and the length still count with tasks
-    expect(formProblem(b, a, "", true)).toBe("«Ушёл» должно быть позже «Пришёл»");
-    expect(formProblem(a, b, "x".repeat(4001), true)).toBe("Слишком длинно: до 4000 знаков");
+    expect(formProblem(a, b, "   ")).toBe("Напишите одной строкой, что сделали");
+    // the times still come first
+    expect(formProblem(b, a, "")).toBe("«Ушёл» должно быть позже «Пришёл»");
   });
 
   it("finds our codes in the database's words", () => {
@@ -191,25 +195,28 @@ describe("the director's day", () => {
     tasks: [],
     activity: { accepted: 3, handed_over: 2, closed: 2, messages: 5 },
     hours: 9.1,
+    reminded: null,
     ...patch,
   });
 
   it("writes the person's line", () => {
-    expect(personDayLine(row())).toBe("пришёл 9:05 — ушёл 18:10 · 9,1 ч");
-    expect(personDayLine(row({ state: "pending", report: null, hours: null }))).toBe("ещё не сдал");
+    // D-183: times without a gender
+    expect(personDayLine(row())).toBe("9:05–18:10 · 9,1 ч");
+    expect(personDayLine(row({ state: "pending", report: null, hours: null }))).toBe("отчёта пока нет");
+    expect(personDayLine(row({ state: "off", report: null, hours: null }))).toBe("отчёт не нужен");
     expect(personDayLine(row({ state: "away", availability: "sick", report: null }))).toBe("на больничном");
   });
 
   it("writes the activity without zeros", () => {
-    expect(activityLine({ accepted: 3, handed_over: 2, closed: 2, messages: 5 })).toBe("принял 3 · сдал 2 · принято 2 · сообщений 5");
-    expect(activityLine({ accepted: 0, handed_over: 1, closed: 0, messages: 0 })).toBe("сдал 1");
+    expect(activityLine({ accepted: 3, handed_over: 2, closed: 2, messages: 5 })).toBe("взято 3 · сдано 2 · принято 2 · сообщений 5");
+    expect(activityLine({ accepted: 0, handed_over: 1, closed: 0, messages: 0 })).toBe("сдано 1");
     expect(activityLine({ accepted: 0, handed_over: 0, closed: 0, messages: 0 })).toBe("в задачах тихо");
   });
 
   it("sums the team's day", () => {
-    const totals = { team: 12, submitted: 7, missed: 2, pending: 0, away: 1, handed_over: 15, closed: 9 };
+    const totals = { team: 12, submitted: 7, missed: 2, pending: 0, away: 1, excused: 0, handed_over: 15, closed: 9 };
     expect(teamTotalsLine({ date: "2026-10-27", today: false, workday: true, rows: [], totals })).toBe(
-      "не сдали 2 · в отпуске 1 · сдано задач 15 · принято 9",
+      "не сдали 2 · в отпуске или на больничном 1 · сдано задач 15 · принято 9",
     );
   });
 });

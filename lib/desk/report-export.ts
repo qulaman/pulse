@@ -1,14 +1,16 @@
-import { dayTitle, percentText, personDayLine, shortHm, timeOf } from "@/lib/daily-report/format";
-import type { TeamDayRow, TeamPeriodRow } from "@/lib/daily-report/types";
-import { parseYmd, type Ymd } from "@/lib/datetime/calendar";
+import { dayTitle, isoWeekday, spanText, taskMeta, timeOf } from "@/lib/daily-report/format";
+import { cellCode, TABEL_CODES_LEGEND, tabelPeriodWords, type Tabel, type TabelPerson } from "@/lib/daily-report/tabel";
+import type { TeamDay, TeamDayRow } from "@/lib/daily-report/types";
+import { aqtobeIsoToYmdHm, parseYmd, WEEKDAYS_SHORT_RU, type Ymd } from "@/lib/datetime/calendar";
 
 /**
- * «Отчёты» as a sheet of cells (D-152): one model behind the file for Excel and the table on paper,
- * so the two cannot disagree. Pure: the screen says which people are shown and in what order, this
- * file turns them into cells, and the cells into text.
+ * «Отчёты» as a sheet of cells (D-152, D-183): one model behind the file for Excel and the table on
+ * paper, so the two cannot disagree. Pure: the screen says which people are shown, this file puts
+ * them in order, turns them into cells, and the cells into text.
  *
  * A number stays a number: a spreadsheet adds it up, a sign on it is not a formula. Whatever a
- * person typed is text, and text is what the formula guard is for.
+ * person typed is text, and text is what the formula guard is for. No points anywhere: a minus is
+ * the director's business, not the paper's (D-152, D-45).
  */
 
 /** A number for the spreadsheet, words as they read, null — an empty cell (the screen's «—»). */
@@ -22,9 +24,24 @@ export type SheetColumn = {
   signed?: boolean;
   /** A person's own words: on paper they wrap, whatever was pasted into them. */
   words?: boolean;
+  /** A day of the табель: narrow and centred on paper. */
+  day?: boolean;
+  /** On paper under the title: the weekday of a day. */
+  sub?: string;
+  /** On paper a day nothing was due on (a weekend, a holiday) is shaded. */
+  dim?: boolean;
+  /** Short words that read on one line on paper (a time, a state): never wrapped. */
+  tight?: boolean;
 };
 
-export type ReportSheet = { columns: SheetColumn[]; rows: Cell[][]; total: Cell[] };
+export type ReportSheet = {
+  columns: SheetColumn[];
+  rows: Cell[][];
+  total: Cell[];
+  /** Lines under the table: after an empty line in the file, under the table on paper (the legend). */
+  notes?: string[];
+};
+export type Sheet = ReportSheet;
 
 const SEPARATOR = ";";
 const LINE_END = "\r\n";
@@ -33,9 +50,7 @@ const BOM = "﻿";
 /** What a spreadsheet would run as a formula, or read as the start of one (OWASP «CSV Injection»). */
 const FORMULA = /^[=+\-@\t\r]/;
 
-const pad = (value: number) => String(value).padStart(2, "0");
-const round1 = (value: number) => Math.round(value * 10) / 10;
-const sum = <T>(rows: readonly T[], pick: (row: T) => number) => rows.reduce((total, row) => total + pick(row), 0);
+const MONTHS_OF = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"] as const;
 
 /** One cell of the file. A zero stays «0» (only null is empty); decimals take the Russian comma. */
 export function csvCell(cell: Cell): string {
@@ -51,8 +66,9 @@ export function csvCell(cell: Cell): string {
 }
 
 /** The file: UTF-8 with a BOM (or Excel reads Cyrillic as cp1251), «;» — the Russian Excel's list separator. */
-export function toCsv({ columns, rows, total }: ReportSheet): string {
-  const lines = [columns.map((column) => column.title), ...rows, total];
+export function toCsv({ columns, rows, total, notes }: ReportSheet): string {
+  const lines: Cell[][] = [columns.map((column) => column.title), ...rows, total];
+  if (notes?.length) lines.push([], ...notes.map((note) => [note]));
   return BOM + lines.map((line) => line.map(csvCell).join(SEPARATOR)).join(LINE_END) + LINE_END;
 }
 
@@ -65,144 +81,166 @@ export function printCell(cell: Cell, signed = false): string {
   return signed && cell > 0 ? `+${digits}` : digits;
 }
 
-/** The rows in the order the screen shows them (a sort by a column lives in the table); the rest keep theirs, last. */
-export function inOrder<T>(rows: readonly T[], keyOf: (row: T) => string, keys: readonly string[]): T[] {
-  const at = new Map(keys.map((key, index) => [key, index]));
-  const place = (row: T) => at.get(keyOf(row)) ?? keys.length;
-  return [...rows].sort((a, b) => place(a) - place(b));
+/** «87%» — a share for the sheet (Excel reads it as a percent); null when nothing was due. */
+function shareText(rate: number | null | undefined): string | null {
+  return rate === null || rate === undefined || !Number.isFinite(rate) ? null : `${Math.round(rate * 100)}%`;
 }
 
-function dayMonth(ymd: Ymd): string {
-  const parts = parseYmd(ymd);
-  return parts ? `${pad(parts.day)}.${pad(parts.month)}` : ymd;
+/* ---- «Табель» ---------------------------------------------------------------------------------- */
+
+/** «Табель отчётов ноябрь 2026.csv», «Табель отчётов 3–9 нояб. 2026.csv». */
+export function tabelFileName(from: Ymd, to: Ymd): string {
+  return `Табель отчётов ${tabelPeriodWords(from, to)}.csv`;
 }
 
-function fullDate(ymd: Ymd): string {
-  const parts = parseYmd(ymd);
-  return parts ? `${pad(parts.day)}.${pad(parts.month)}.${parts.year}` : ymd;
+/** The head of the paper sheet: «Табель отчётов · ноябрь 2026». */
+export function tabelSheetTitle(from: Ymd, to: Ymd): string {
+  return `Табель отчётов · ${tabelPeriodWords(from, to)}`;
 }
 
-/** «Табель 01.11–30.11.csv». */
-export function periodFileName(from: Ymd, to: Ymd): string {
-  return `Табель ${dayMonth(from)}–${dayMonth(to)}.csv`;
+/**
+ * «Табель» for Excel and paper: a person a row, a day a column (its number for a title), the
+ * accountant's short words in the cells, then the totals — «Сдал» on the days it was due, «Не сдал»
+ * without the excused, «Уваж.» when any, «Доля». «Итого» counts who did not hand in each day.
+ * No hours (the times are typed, lunch included) and no points. The people are the shown ones
+ * (the search, «С пропусками»), in the табель's order; the total is over them.
+ */
+export function tabelSheet(tabel: Tabel, people: readonly TabelPerson[]): ReportSheet {
+  const excused = tabel.people.some((person) => (person.row.excused ?? 0) > 0);
+  const columns: SheetColumn[] = [
+    { title: "Сотрудник" },
+    ...tabel.days.map((day) => ({
+      title: String(parseYmd(day.day)?.day ?? day.day),
+      day: true,
+      sub: WEEKDAYS_SHORT_RU[isoWeekday(day.day) - 1],
+      dim: !day.workday,
+    })),
+    { title: "Сдал", right: true },
+    { title: "Не сдал", right: true },
+    ...(excused ? [{ title: "Уваж.", right: true }] : []),
+    { title: "Доля", right: true },
+  ];
+  const tail = (submitted: number, missed: number, excusedCount: number, rate: number | null | undefined): Cell[] => [
+    submitted,
+    missed,
+    ...(excused ? [excusedCount] : []),
+    shareText(rate),
+  ];
+  const rows = people.map((person) => [
+    person.row.full_name,
+    ...person.cells.map((cell, index) => cellCode(cell, tabel.days[index]) || null),
+    ...tail(person.row.submitted, person.row.missed, person.row.excused ?? 0, person.row.submit_rate),
+  ]);
+  const submitted = people.reduce((sum, person) => sum + person.row.submitted, 0);
+  const missed = people.reduce((sum, person) => sum + person.row.missed, 0);
+  const excusedSum = people.reduce((sum, person) => sum + (person.row.excused ?? 0), 0);
+  // a day anybody owed a report on gets its count, a zero included; a day off or ahead stays empty
+  const perDay = tabel.days.map((day, index) => {
+    if (day.future || !people.some((person) => person.cells[index]?.due)) return null;
+    return people.filter((person) => person.cells[index]?.state === "missed").length;
+  });
+  return {
+    columns,
+    rows,
+    total: ["Итого", ...perDay, ...tail(submitted, missed, excusedSum, submitted + missed > 0 ? submitted / (submitted + missed) : null)],
+    notes: [`${TABEL_CODES_LEGEND}. «Итого» под днями — сколько не сдали. Табель отчётов за день — не учёт рабочего времени: часов и очков в нём нет.`],
+  };
 }
 
-/** «Отчёты 04.11.csv». */
+/* ---- «Сводка» ---------------------------------------------------------------------------------- */
+
+/** «Отчёты 4 ноября 2026.csv». */
 export function dayFileName(date: Ymd): string {
-  return `Отчёты ${dayMonth(date)}.csv`;
+  const parts = parseYmd(date);
+  return parts ? `Отчёты ${parts.day} ${MONTHS_OF[parts.month - 1]} ${parts.year}.csv` : `Отчёты ${date}.csv`;
 }
 
-/** The head of the paper sheet: a sheet outlives the year it was printed in. */
-export function periodSheetTitle(from: Ymd, to: Ymd): string {
-  return `Табель · ${fullDate(from)} – ${fullDate(to)}`;
-}
-
+/** «Отчёты · Среда, 4 ноября 2026» — a sheet outlives the year it was printed in. */
 export function daySheetTitle(date: Ymd): string {
   return `Отчёты · ${dayTitle(date)} ${parseYmd(date)?.year ?? ""}`.trim();
 }
 
+const handedIn = (row: TeamDayRow) => (row.report?.status === "submitted" ? row.report : null);
+const excusedRow = (row: TeamDayRow) => row.state === "missed" && Boolean(row.report?.excused_at);
+
+/** The order of the paper: handed in (newest first, as the ledger reads), waiting, missed, excused, away. */
+function placeOf(row: TeamDayRow): number {
+  if (row.state === "submitted") return 0;
+  if (row.state === "pending") return 1;
+  if (row.state === "missed") return excusedRow(row) ? 3 : 2;
+  return 4;
+}
+
+function inDayOrder(rows: readonly TeamDayRow[]): TeamDayRow[] {
+  return rows
+    .filter((row) => row.state !== "off" || handedIn(row))
+    .sort((a, b) => {
+      const place = placeOf(a) - placeOf(b);
+      if (place) return place;
+      const at = handedIn(a)?.submitted_at ?? "";
+      const bt = handedIn(b)?.submitted_at ?? "";
+      if (at !== bt) return at < bt ? 1 : -1;
+      return a.full_name.localeCompare(b.full_name, "ru");
+    });
+}
+
+/** A person's state in the sheet's words; times without a gender, «не на месте» is the secretary's. */
+function stateWords(row: TeamDayRow, today: boolean): string {
+  if (handedIn(row)) return "сдан";
+  if (row.state === "pending") return "ждём";
+  if (row.state === "missed") return excusedRow(row) ? "уважительная" : "не сдан";
+  if (row.state === "away") {
+    // a closed past day kept no record of which: today's availability speaks only for today
+    if (!today) return "отпуск или больничный";
+    return row.availability === "sick" ? "на больничном" : row.availability === "vacation" ? "в отпуске" : "отпуск или больничный";
+  }
+  return "не рабочий день";
+}
+
+/** «18:04»; a report handed in on another day than its own says the day: «15.11 8:05». */
+function submittedWhen(report: NonNullable<ReturnType<typeof handedIn>>): string | null {
+  const at = aqtobeIsoToYmdHm(report.submitted_at);
+  if (!at) return null;
+  const time = timeOf(report.submitted_at);
+  if (at.ymd === report.report_date) return time;
+  const parts = parseYmd(at.ymd);
+  return parts ? `${String(parts.day).padStart(2, "0")}.${String(parts.month).padStart(2, "0")} ${time}` : time;
+}
+
 /**
- * «Отчёты → Период»: the screen's columns whatever the window has hidden, one change — «Задачи»
- * («3 / 2» on the screen) are two columns here: a spreadsheet would take «3 / 2» for a date.
- * The total is over the rows given, the shown ones, never the whole team's figure.
+ * «Сводка» for Excel and paper: everybody who owed the day's report or handed one in — the words in
+ * full, the tasks by title, the times without a gender; nobody's points. The rows are the shown
+ * ones (the search); this puts them in the paper's order and leaves out who owed nothing.
  */
-export function periodSheet(rows: readonly TeamPeriodRow[], { pointsOn }: { pointsOn: boolean }): ReportSheet {
+export function daySheet(day: TeamDay, rows: readonly TeamDayRow[]): ReportSheet {
   const columns: SheetColumn[] = [
     { title: "Сотрудник" },
-    { title: "Сдача", right: true },
-    { title: "Сдал", right: true },
-    { title: "Приход", right: true },
-    { title: "Уход", right: true },
-    { title: "Часы в день", right: true },
-    { title: "Всего", right: true },
-    { title: "Задачи сдано", right: true },
-    { title: "Задачи принято", right: true },
-    { title: "После срока", right: true },
-    ...(pointsOn ? [{ title: "Очки", right: true, signed: true }] : []),
+    { title: "Должность" },
+    { title: "Состояние" },
+    { title: "Время", tight: true },
+    { title: "Сдан в", tight: true },
+    { title: "Задачи", words: true },
+    { title: "Что сделано", words: true },
   ];
-  const points = (cells: Cell[], value: number) => (pointsOn ? [...cells, value] : cells);
-  const submitted = sum(rows, (row) => row.submitted);
-  const due = submitted + sum(rows, (row) => row.missed);
-  const hours = sum(rows, (row) => row.hours_total);
+  const shown = inDayOrder(rows);
+  const owed = shown.filter((row) => row.state !== "away" && row.state !== "off").length;
+  const submitted = shown.filter((row) => handedIn(row)).length;
+  const tasks = shown.reduce((sum, row) => sum + (handedIn(row) ? row.tasks.length : 0), 0);
   return {
     columns,
-    rows: rows.map((row) =>
-      points(
-        [
-          row.full_name,
-          row.submit_rate === null ? null : percentText(row.submit_rate),
-          `${row.submitted} из ${row.submitted + row.missed}`,
-          row.avg_arrived ? shortHm(row.avg_arrived) : null,
-          row.avg_left ? shortHm(row.avg_left) : null,
-          row.avg_hours,
-          row.hours_total,
-          row.handed_over,
-          row.closed,
-          row.late,
-        ],
-        row.points,
-      ),
-    ),
-    total: points(
-      [
-        "Итого",
-        due > 0 ? percentText(submitted / due) : null,
-        `${submitted} из ${due}`,
-        null,
-        null,
-        submitted > 0 ? round1(hours / submitted) : null,
-        round1(hours),
-        sum(rows, (row) => row.handed_over),
-        sum(rows, (row) => row.closed),
-        sum(rows, (row) => row.late),
-      ],
-      sum(rows, (row) => row.points),
-    ),
-  };
-}
-
-const handedIn = (row: TeamDayRow) => (row.report?.status === "submitted" ? row.report : null);
-
-/** «Чем занимался»: the words whole (the screen cuts them to a line), or what stands there without words. */
-function dayWords(row: TeamDayRow): string {
-  return handedIn(row)?.summary?.trim() || personDayLine(row);
-}
-
-/** «Отчёты → День»: the screen's columns; the total is over the rows given, the shown ones. */
-export function daySheet(rows: readonly TeamDayRow[], { pointsOn }: { pointsOn: boolean }): ReportSheet {
-  const columns: SheetColumn[] = [
-    { title: "Кто" },
-    { title: "Пришёл" },
-    { title: "Ушёл" },
-    { title: "Часы", right: true },
-    { title: "Задачи", right: true },
-    { title: "Чем занимался", words: true },
-    ...(pointsOn ? [{ title: "Очки", right: true, signed: true }] : []),
-  ];
-  const hoursOf = (row: TeamDayRow) => (handedIn(row) ? row.hours : null);
-  const points = (cells: Cell[], value: Cell) => (pointsOn ? [...cells, value] : cells);
-  const submitted = rows.filter(handedIn).length;
-  // out of everyone shown, as the screen's headline counts; a day off owes nothing, so no «из»
-  const working = rows.some((row) => row.state !== "off");
-  return {
-    columns,
-    rows: rows.map((row) => {
+    rows: shown.map((row) => {
       const report = handedIn(row);
-      return points(
-        [row.full_name, timeOf(report?.arrived_at) || null, timeOf(report?.left_at) || null, hoursOf(row), row.tasks.length, dayWords(row)],
-        row.report ? row.report.points : null,
-      );
+      const words = report?.summary?.trim() || (excusedRow(row) ? `Уважительная причина${row.report?.excused_reason ? `: ${row.report.excused_reason.trim()}` : ""}` : null);
+      return [
+        row.full_name,
+        row.position,
+        stateWords(row, day.today),
+        report ? spanText(report.arrived_at, report.left_at) || null : null,
+        report ? submittedWhen(report) : null,
+        report && row.tasks.length ? row.tasks.map((task) => `${task.title} — ${taskMeta(task)}`).join("\n") : null,
+        words,
+      ];
     }),
-    total: points(
-      [
-        "Итого",
-        null,
-        null,
-        round1(sum(rows, (row) => hoursOf(row) ?? 0)),
-        sum(rows, (row) => row.tasks.length),
-        working ? `сдали ${submitted} из ${rows.length}` : `сдали ${submitted}`,
-      ],
-      sum(rows, (row) => row.report?.points ?? 0),
-    ),
+    total: ["Итого", null, owed > 0 && day.workday ? `сдали ${submitted} из ${owed}` : `сдали ${submitted}`, null, null, tasks ? `задач ${tasks}` : null, null],
   };
 }

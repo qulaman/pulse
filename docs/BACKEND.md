@@ -61,6 +61,7 @@
 | `/api/visits` | POST | секретарь | посетитель, сообщение | `announce_visit` |
 | `/api/visits/[id]/answer` | POST | Д | ответ на визит | `answer_visit` |
 | `/api/daily-report` | POST | К | сдать отчёт | `submit_daily_report` |
+| `/api/reports/remind` | POST | Д | «Напомнить» о сегодняшнем отчёте; день нажатия не сегодня — 409 `stale_day` | `remind_daily_report` |
 | `/api/files/upload-url` | POST | все | URL загрузки фото | Storage |
 | `/api/files/url` | GET | все | URL файла сообщения | Storage |
 | `/api/push/subscribe` | POST, DELETE | все | подписка браузера | `push_subscriptions` |
@@ -126,7 +127,7 @@
 
 ## 3. RPC: из роутов и прямо из браузера
 
-Многие RPC браузер зовёт сам, под своим JWT: права, компания и идемпотентность проверяются внутри функции; после записи, рождающей пуш, клиент обычно зовёт `kickPush()` (§4). Прямые вызовы: тред — `mark_thread_read`; очки — `award_points`, `react_to_task`, `dispute_points`, `resolve_points_dispute`, `fn_rating`; магазин — `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`; календарь — `respond_event`, `edit_event`, `delete_event`; заявки — `transition_errand`, `thank_errand`, `errand_eta`, `errand_ask`, `errand_answer`, `errand_result`, `errand_nudge`; визиты — `close_visit`, `director_busy`; отчёт — `my_daily_report`, `my_daily_report_history`, `team_daily_report_day`, `team_daily_report_period`; Эфир — `send_announcements_now`; стена — `tv_*`; доски — `mind_board_copy`; команда — `push_health`; «Лаб» — `voice_keep`. Что они делают — `docs/DATABASE.md`.
+Многие RPC браузер зовёт сам, под своим JWT: права, компания и идемпотентность проверяются внутри функции; после записи, рождающей пуш, клиент обычно зовёт `kickPush()` (§4). Прямые вызовы: тред — `mark_thread_read`; очки — `award_points`, `react_to_task`, `dispute_points`, `resolve_points_dispute`, `fn_rating`; магазин — `create_shop_order`, `cancel_shop_order`, `set_shop_order_status`; календарь — `respond_event`, `edit_event`, `delete_event`; заявки — `transition_errand`, `thank_errand`, `errand_eta`, `errand_ask`, `errand_answer`, `errand_result`, `errand_nudge`; визиты — `close_visit`, `director_busy`; отчёт — `my_daily_report`, `my_daily_report_history`, `team_daily_report_day`, `team_daily_report_period`, `person_daily_reports`, `excuse_daily_report`; Эфир — `send_announcements_now`; стена — `tv_*`; доски — `mind_board_copy`; команда — `push_health`; «Лаб» — `voice_keep`. Что они делают — `docs/DATABASE.md`.
 
 ## 4. Доставка уведомлений
 

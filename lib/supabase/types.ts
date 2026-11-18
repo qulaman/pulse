@@ -215,6 +215,9 @@ export type Database = {
           client_request_id: string | null
           company_id: string
           created_at: string
+          excused_at: string | null
+          excused_by: string | null
+          excused_reason: string | null
           id: string
           left_at: string | null
           report_date: string
@@ -230,6 +233,9 @@ export type Database = {
           client_request_id?: string | null
           company_id: string
           created_at?: string
+          excused_at?: string | null
+          excused_by?: string | null
+          excused_reason?: string | null
           id?: string
           left_at?: string | null
           report_date: string
@@ -245,6 +251,9 @@ export type Database = {
           client_request_id?: string | null
           company_id?: string
           created_at?: string
+          excused_at?: string | null
+          excused_by?: string | null
+          excused_reason?: string | null
           id?: string
           left_at?: string | null
           report_date?: string
@@ -261,6 +270,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "daily_reports_excused_by_fkey"
+            columns: ["excused_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2778,6 +2794,18 @@ export type Database = {
       }
       thank_errand: {
         Args: { client_request_id?: string; p_id: string }
+        Returns: Json
+      }
+      person_daily_reports: {
+        Args: { p_from: string; p_to: string; p_user_id: string }
+        Returns: Json
+      }
+      excuse_daily_report: {
+        Args: { client_request_id?: string; p_reason: string; p_report: string }
+        Returns: Json
+      }
+      remind_daily_report: {
+        Args: { client_request_id?: string; p_user_ids: string[] }
         Returns: Json
       }
       transition_errand: {

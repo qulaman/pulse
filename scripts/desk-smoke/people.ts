@@ -572,144 +572,136 @@ export async function checkErrands(ctx: Ctx) {
 export async function checkReports(ctx: Ctx) {
   const { page } = ctx;
   await open(page, "/desk/reports");
-  const tabs = (await page.getByTestId("seg-day").isVisible()) && (await page.getByTestId("seg-period").isVisible());
-  record("отчёты: вкладки «День» и «Период»", tabs);
-  const hero = await visible(ctx, "desk-day-hero", 15_000);
-  const heroText = hero ? ((await page.getByTestId("desk-day-hero").innerText()) ?? "").replace(/\s+/g, " ") : "";
-  record("отчёты «День»: итог «N из M сдали», полосы-дубля нет", hero && (await page.getByTestId("desk-day-bar").count()) === 0 && /из \d+ сдали|сдали в выходной/.test(heroText), heroText.slice(0, 120));
-  const rows = page.locator('[data-testid="desk-reports-day"] [data-testid="desk-row"]');
-  const count = await rows.count();
-  const heads = await headsOf(ctx, '[data-testid="desk-reports-day"]');
-  // D-174: the day's bar between «Приход» and «Уход», words without a gender
-  record("отчёты «День»: люди таблицей, день полосой между приходом и уходом", count > 0 && ["кто", "приход", "уход", "задачи", "что сделано"].every((h) => heads.includes(h)), `строк ${count}; ${heads.join(" | ")}`);
+  const tabs = (await page.getByTestId("seg-day").isVisible()) && (await page.getByTestId("seg-tabel").isVisible());
+  record("отчёты: вкладки «День» и «Табель»", tabs);
+  // D-183: «Сводка» — the journal of reports and the roll call beside it; no hero of zeros, no table
+  const day = await visible(ctx, "desk-reports-day", 15_000);
+  const roll = await visible(ctx, "desk-rollcall", 10_000);
+  const rollText = roll ? ((await page.getByTestId("desk-rollcall").innerText()) ?? "").replace(/\s+/g, " ") : "";
+  record(
+    "отчёты «День»: журнал и перекличка «N из M сдали», без плиток и таблицы",
+    day && roll && (await page.getByTestId("desk-day-hero").count()) === 0 && (await page.locator('[data-testid="desk-reports-day"] [role="grid"]').count()) === 0 && /из \d+ сдали|выходной|праздник|не нужен/i.test(rollText),
+    rollText.slice(0, 140),
+  );
+  // the morning rule: before the evening the page opens the last working day and says so
+  const band = page.getByTestId("desk-day-band");
+  if (await band.isVisible().catch(() => false)) {
+    const before = (await page.getByTestId("desk-day-title").innerText()).trim();
+    await band.getByRole("button").first().click();
+    await page.waitForTimeout(500);
+    const after = (await page.getByTestId("desk-day-title").innerText()).trim();
+    record("отчёты «День»: утром — прошлый рабочий день и «Открыть сегодня»", before !== after && page.url().includes("day="), `${before} → ${after}`);
+  } else {
+    skip("отчёты «День»: утреннее правило", "вечер или выходной — открыт сегодняшний день");
+  }
   await ctx.shot("reports-day");
 
-  // the people's filter: F and words, then «Сдали» — looked at, then all again
+  // the address keeps the day: ← writes ?day=, a reload opens the same day, T comes back to today
+  const title = page.getByTestId("desk-day-title");
+  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("KeyT");
+  await page.waitForTimeout(300);
+  const today = (await title.innerText().catch(() => "")).trim();
+  await page.keyboard.press("ArrowLeft");
+  await page.waitForTimeout(500);
+  const earlier = (await title.innerText().catch(() => "")).trim();
+  const addressed = new URL(page.url()).searchParams.get("day");
+  await page.reload();
+  const reread = await page.getByTestId("desk-day-title").waitFor({ timeout: 15_000 }).then(
+    async () => (await title.innerText()).trim(),
+    () => "",
+  );
+  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("KeyT");
+  await page.waitForTimeout(400);
+  const back = (await title.innerText().catch(() => "")).trim();
+  record("отчёты «День»: ← пишет ?day=, перезагрузка открывает тот же день, T — сегодня", earlier !== today && Boolean(addressed) && reread === earlier && back === today, `${today} → ${earlier} (${addressed}) → ${reread} → ${back}`);
+
+  // the search (F) narrows the journal and the roll call alike
+  const people = page.locator('[data-testid="desk-reports-day"] [data-row-key]');
+  const count = await people.count();
   if (count > 0) {
     await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("KeyF");
     await page.keyboard.type("яяяяя");
     await page.waitForTimeout(300);
-    const none = await page.locator('[data-testid="desk-reports-day"] [data-testid="desk-empty"]').isVisible();
+    const none = (await people.count()) === 0;
     await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
-    await page.getByTestId("seg-in").click();
     await page.waitForTimeout(300);
-    const handed = await rows.count();
-    await page.getByTestId("seg-all").first().click();
-    await page.waitForTimeout(300);
-    record("отчёты «День»: поиск человека (F) и «Сдали» сужают таблицу", none && handed <= count && (await rows.count()) === count, `сдали ${handed} из ${count}`);
-    // the hero's legend is the same filter: «сдали» narrows, a second press shows everybody again (D-174)
-    const legend = page.getByTestId("reports-share-in");
-    if (await legend.count()) {
-      await legend.click();
-      await page.waitForTimeout(300);
-      const byLegend = await rows.count();
-      const pressed = (await legend.getAttribute("aria-pressed")) === "true";
-      await legend.click();
-      await page.waitForTimeout(300);
-      record("отчёты «День»: легенда итога — тот же фильтр", pressed && byLegend === handed && (await rows.count()) === count, `${byLegend} → ${await rows.count()}`);
-    } else {
-      skip("отчёты «День»: легенда итога", "сегодня никто не сдал");
-    }
-  }
+    record("отчёты «День»: поиск (F) сужает журнал и перекличку, Esc возвращает всех", none && (await people.count()) === count, `людей ${count}`);
 
-  // a row opens the whole report in the panel (?p=), Esc closes it
-  if (count > 0) {
-    await rows.first().locator('[role="gridcell"]').first().click();
-    const panel = await visible(ctx, "desk-report-panel", 8_000);
-    record("отчёты «День»: строка открывает отчёт в панели (?p=)", panel && page.url().includes("p="), page.url());
-    await ctx.shot("reports-day-panel");
+    // a person opens the diary in the panel (?p=), Esc closes it
+    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    const diary = await visible(ctx, "desk-diary", 8_000);
+    record("отчёты «День»: ↓ и Enter открывают дневник человека (?p=)", diary && page.url().includes("p="), page.url());
+    await ctx.shot("reports-diary");
     await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
     await page.keyboard.press("Escape");
     const closed = await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).then(() => true, () => false);
     const cleared = await page.waitForURL((url) => !url.searchParams.has("p"), { timeout: 5_000 }).then(() => true, () => false);
-    record("отчёты «День»: Esc закрывает панель и снимает ?p=", closed && cleared, page.url());
+    record("отчёты «День»: Esc закрывает дневник и снимает ?p=", closed && cleared, page.url());
+  } else {
+    skip("отчёты «День»: поиск и дневник", "в этот день в отчётах никого");
   }
 
-  // the day steps back and returns — by the arrow, by ← and by T
-  const title = page.getByTestId("desk-day-title");
-  const today = (await title.innerText().catch(() => "")).trim();
-  await page.getByRole("button", { name: "Предыдущий день" }).click();
-  await page.waitForTimeout(600);
-  const yesterday = (await title.innerText().catch(() => "")).trim();
-  await page.getByRole("button", { name: "К сегодня" }).click();
-  await page.waitForTimeout(400);
-  const back = (await title.innerText().catch(() => "")).trim();
-  await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("ArrowLeft");
-  await page.waitForTimeout(400);
-  const byKey = (await title.innerText().catch(() => "")).trim();
-  await page.keyboard.press("KeyT");
-  await page.waitForTimeout(400);
-  const byT = (await title.innerText().catch(() => "")).trim();
-  record("отчёты «День»: ‹ ›, ← и T листают дни", yesterday !== today && back === today && byKey === yesterday && byT === today, `${today} → ${yesterday} → ${back}; ← ${byKey}; T ${byT}`);
+  // «Табель»: people × days of the calendar month, the month in the address
+  await page.getByTestId("seg-tabel").click();
+  const tabel = await page.waitForURL((url) => url.searchParams.get("tab") === "tabel", { timeout: 5_000 }).then(() => true, () => false);
+  const grid = await visible(ctx, "desk-tabel", 15_000);
+  const rows = page.locator('[data-testid="desk-tabel-row"]');
+  await rows.first().waitFor({ timeout: 10_000 }).catch(() => undefined);
+  const dates = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
+  const heads = await page.getByTestId("desk-tabel-day").count();
+  record("отчёты «Табель»: ?tab=tabel, месяц календарный, люди × дни", tabel && grid && /^[А-Я][а-я]+ \d{4}$/.test(dates) && heads >= 28 && heads <= 31 && (await rows.count()) > 0, `${dates}; дней ${heads}; людей ${await rows.count()}`);
+  const states = await page.locator('[data-testid="desk-tabel-cell"]').evaluateAll((cells) => [...new Set(cells.map((c) => (c as HTMLElement).dataset.state ?? ""))]);
+  record("отчёты «Табель»: в клетках состояния, без часов", states.length > 0 && !(await page.locator('[data-testid="desk-tabel-cell"]').first().innerText()).match(/\d,\d|ч\b/), states.join(", "));
+  await ctx.shot("reports-tabel");
 
-  await page.getByTestId("seg-period").click();
-  const period = await page.waitForURL((url) => url.searchParams.get("tab") === "period", { timeout: 5_000 }).then(() => true, () => false);
-  const periodHero = await visible(ctx, "desk-period-hero", 15_000);
-  const strip = await page.getByTestId("desk-period-strip").isVisible().catch(() => false);
-  const periodRows = page.locator('[data-testid="desk-reports-period"] [data-testid="desk-row"]');
-  record("отчёты «Период»: ?tab=period, герой с долей сдачи, столбики по дням, люди таблицей", period && periodHero && strip, `строк ${await periodRows.count()}; ${page.url()}`);
-  // the strip's columns stay thin — never a wall of blocks
-  const widest = await page.locator('[data-testid="desk-period-strip"] [data-day]').evaluateAll((cols) => Math.max(0, ...cols.map((c) => (c as HTMLElement).getBoundingClientRect().width)));
-  record("отчёты «Период»: столбики тонкие", widest > 0 && widest <= 24, `шире всех ${Math.round(widest)} px`);
-  await ctx.shot("reports-period");
-
-  // a row opens the person's period in the panel
-  if ((await periodRows.count()) > 0) {
-    await periodRows.first().locator('[role="gridcell"]').first().click();
-    const panel = await visible(ctx, "desk-period-panel", 8_000);
-    record("отчёты «Период»: строка — период человека в панели", panel && page.url().includes("p="), page.url());
-    await ctx.shot("reports-period-panel");
-    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
-    await page.keyboard.press("Escape");
-    await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
-  }
-
-  // ← steps the week back; T returns; «Месяц» changes the dates
-  const week = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
+  // ← a month back, written into the address; T — this month again
   await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("ArrowLeft");
   await page.waitForTimeout(800);
-  const earlier = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
+  const before = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
+  const month = new URL(page.url()).searchParams.get("month");
   await page.keyboard.press("KeyT");
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   const again = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
-  record("отчёты «Период»: ← — неделя раньше, T — по сегодня", earlier !== week && again === week, `${week} → ${earlier} → ${again}`);
-  await page.getByTestId("seg-month").click();
-  await page.waitForTimeout(1500);
-  const month = (await page.getByTestId("desk-period-dates").innerText().catch(() => "")).trim();
-  record("отчёты «Период»: «Месяц» меняет даты", week !== month && month.length > 0, `${week} → ${month}`);
-  await ctx.shot("reports-month");
+  record("отчёты «Табель»: ← — месяц раньше (?month=), T — этот месяц", before !== dates && Boolean(month) && again === dates, `${dates} → ${before} (${month}) → ${again}`);
 
-  // what the screen hands out: the file — bytes, name, the total; the paper sheet — every row and column
+  // what the screen hands out: the табель for Excel — days as numbers, no points; the paper — every row
   const save = page.getByTestId("desk-report-csv");
   if (await save.isEnabled()) {
     const [file] = await Promise.all([page.waitForEvent("download"), save.click()]);
     const bytes = await readFile(await file.path());
     const text = bytes.toString("utf8");
     const bom = bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf;
+    const head = text.replace(/^﻿/, "").split("\r\n")[0] ?? "";
     record(
-      "отчёты «Период»: «Скачать для Excel» — CSV с BOM, «;», CRLF и итогом",
-      /^Табель \d\d\.\d\d–\d\d\.\d\d\.csv$/.test(file.suggestedFilename()) && bom && text.includes("Сотрудник;Сдача;Сдал;") && /\r\nИтого;[^\r\n]*\r\n$/.test(text) && !/[^\r]\n/.test(text),
-      file.suggestedFilename(),
+      "отчёты «Табель»: «Скачать для Excel» — табель по дням с BOM и CRLF, без очков",
+      /^Табель отчётов .+ \d{4}\.csv$/.test(file.suggestedFilename()) && bom && head.startsWith("Сотрудник;") && /;1;2;3;/.test(head) && !/очк/i.test(head) && !/[^\r]\n/.test(text),
+      `${file.suggestedFilename()}: ${head.slice(0, 80)}`,
     );
-    const onScreen = await periodRows.count();
-    const sheet = page.getByTestId("desk-print-sheet");
-    const printed = await sheet.locator("tbody tr").count();
-    record("отчёты «Период»: лист печати — все строки, заголовок и итог", printed === onScreen && (await sheet.locator("h2").innerText()).startsWith("Табель") && (await sheet.locator("tfoot td").first().innerText()) === "Итого", `строк ${printed} из ${onScreen}`);
-    record("отчёты «Период»: «Печать» рядом с выгрузкой", await page.getByTestId("desk-report-print").isEnabled());
+    const onScreen = await rows.count();
+    const printed = await page.getByTestId("desk-print-sheet").locator("tbody tr").count();
+    record("отчёты «Табель»: лист печати — все люди", printed === onScreen, `строк ${printed} из ${onScreen}`);
   } else {
-    skip("отчёты «Период»: выгрузка и печать", "в таблице никого нет");
+    skip("отчёты «Табель»: выгрузка и печать", "в табеле никого нет");
   }
 
-  // a day's column opens that day
-  const column = page.locator('[data-testid="desk-period-strip"] [data-day]').first();
-  const day = await column.getAttribute("data-day");
-  await column.click();
-  const toDay = await page.waitForURL((url) => url.searchParams.get("tab") !== "period", { timeout: 5_000 }).then(() => true, () => false);
-  record("отчёты «Период»: столбик дня открывает этот день", toDay && (await visible(ctx, "desk-day-title", 5_000)), `${day} → ${page.url()}`);
+  // a name opens the diary; a day's head opens «День» on that day
+  if ((await rows.count()) > 0) {
+    await rows.first().locator("button, a").first().click();
+    const diary = await visible(ctx, "desk-diary", 8_000);
+    record("отчёты «Табель»: имя открывает дневник", diary && page.url().includes("p="), page.url());
+    await page.locator("#desk-main").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Escape");
+    await page.getByTestId("desk-panel").waitFor({ state: "detached", timeout: 5_000 }).catch(() => undefined);
+  }
+  await page.getByTestId("desk-tabel-day").first().click();
+  const toDay = await page.waitForURL((url) => url.searchParams.get("tab") !== "tabel" && url.searchParams.has("day"), { timeout: 5_000 }).then(() => true, () => false);
+  record("отчёты «Табель»: заголовок дня открывает «День» на этом дне", toDay && (await visible(ctx, "desk-day-title", 5_000)), page.url());
 }
 
 /** On the secretary's desk (her page is signed in already). */

@@ -189,7 +189,7 @@ function TodayReport({ personId, companyId, now }: { personId: string; companyId
             ? "на больничном"
             : "в отпуске";
   return (
-    <Link href={`/desk/reports?p=${personId}`} className="person-report" data-state={row.state} data-testid="desk-person-report">
+    <Link href={`/desk/reports?day=${todayYmd(now)}&p=${personId}`} className="person-report" data-state={row.state} data-testid="desk-person-report">
       <ClipboardCheck size={16} strokeWidth={2.25} className="person-report-icon" aria-hidden />
       <span className="flex min-w-0 flex-col">
         <span className="person-report-value">{text}</span>
@@ -627,7 +627,7 @@ export function PersonDesk({ id }: { id: string }) {
   const manageLogin = canResetLogin(editor, p);
   const more: MenuItem[] = [];
   if (director && works) more.push({ key: "tasks", label: "Задачи человека", onSelect: () => router.push(`/desk/tasks?who=${p.id}`) });
-  if (director && works) more.push({ key: "reports", label: "Отчёт за сегодня", onSelect: () => router.push(`/desk/reports?p=${p.id}`) });
+  if (director && works) more.push({ key: "reports", label: "Отчёт за сегодня", onSelect: () => router.push(`/desk/reports?day=${todayYmd()}&p=${p.id}`) });
   if (manageLogin && p.is_active) more.push({ key: "login", label: "Выдать код входа…", onSelect: () => router.replace(`${pathname}?login=1`, { scroll: false }) });
   const kiosk = p.role === "tv";
   const revive = () =>

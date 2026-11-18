@@ -659,6 +659,13 @@
     label.field {
       box-shadow: inset 0 0 0 1px var(--rule-soft);
     }
+    /* the toolbar's flat field took the ring away: a search in focus showed nothing (D-183) */
+    .field:focus,
+    .field:focus-within {
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 70%, transparent),
+        0 0 0 3px color-mix(in srgb, var(--pen) 16%, transparent);
+    }
   }
   .field {
     background-color: var(--raise);
@@ -1170,5 +1177,28 @@ html[data-surface="desk"] {
     .pointer-events-none.fixed.z-\[80\] {
       animation: none !important;
     }
+  }
+}
+
+/* ---- on paper: black on white whatever the screen's face — the journal's print tokens sit one step
+   lower than the dark ones above and lost to them (D-183) --------------------------------------- */
+@media print {
+  :root[data-surface="desk"][data-journal][data-graphite],
+  :root[data-surface="desk"][data-journal][data-graphite][data-desk-theme="dark"],
+  :root[data-surface="desk"][data-journal][data-graphite][data-desk-theme="light"] {
+    --chrome: #ffffff;
+    --page: #ffffff;
+    --sheet: #ffffff;
+    --raise: #ffffff;
+    --ink: #000000;
+    --ink-2: #444444;
+    --ink-3: #666666;
+    --rule: #999999;
+    --rule-soft: #cccccc;
+    --line: #000000;
+    --surface-2: #eeeeee;
+    --shadow-card: none;
+    --lift: none;
+    color-scheme: light;
   }
 }

@@ -166,7 +166,7 @@ function ReportCell({ person, row }: { person: Person; row: TeamDayRow | undefin
   if (row.state === "away") return <span className="text-muted/40">—</span>;
   if (row.state === "submitted") {
     return (
-      <Link href={`/desk/reports?p=${person.id}`} className="hover:underline" title="Открыть отчёт" data-testid="team-report">
+      <Link href={`/desk/reports?day=${todayYmd()}&p=${person.id}`} className="hover:underline" title="Открыть отчёт" data-testid="team-report">
         <When className="text-muted">{timeOf(row.report?.submitted_at)}</When>
       </Link>
     );

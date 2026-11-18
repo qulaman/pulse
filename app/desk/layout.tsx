@@ -32,6 +32,10 @@ import "./cal-grid.css";
 import "./cal-side.css";
 import "./cal-month.css";
 import "./reports.css";
+// «Отчёты» (D-183): «Сводка», «Табель», «Дневник» — one file each, after reports.css so they win a tie
+import "./reports-day.css";
+import "./reports-tabel.css";
+import "./reports-diary.css";
 import "./settings.css";
 
 export const metadata: Metadata = { title: "Pulse" };

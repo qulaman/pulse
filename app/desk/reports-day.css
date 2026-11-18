@@ -1,0 +1,852 @@
+/* «Отчёты → Сводка» of the desk (D-183): reports-day. One builder a file.
+   The ledger of the day's handed-in reports (Ledger.tsx) and the roll call beside it or above it
+   (RollCall.tsx), the morning band and the day-off line (SummaryView.tsx).
+   Base rules lay it out in both looks with the journal's inks (the graphite-only ones fall back);
+   «Графит» gives the ledger and the rail a sheet, its inks and motion. Teal (`--pen`) only for the
+   choice, today and «только что»; green / red / grey — handed in / missed / away (DESIGN §8). */
+
+/* ---- both looks ------------------------------------------------------------------------------ */
+html[data-surface="desk"][data-journal] {
+  .rep-day {
+    --rep-ink-3: var(--ink-3, var(--ink-2));
+    --rep-raise: var(--raise, var(--sheet));
+    --rep-pen-deep: var(--pen-deep, var(--pen));
+    --rep-pencil-deep: var(--pencil-deep, var(--pencil));
+    --rep-hover: var(--hover, var(--surface-2));
+    --rep-ease: var(--ease-snap, cubic-bezier(0.2, 0.8, 0.2, 1));
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .rep-day[data-stale] .rep-day-cols {
+    opacity: 0.55;
+    transition: opacity 160ms linear 120ms;
+  }
+
+  .rep-day-cols {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 14px;
+
+    &[data-wide] {
+      grid-template-columns: minmax(0, 1fr) clamp(300px, 24%, 340px);
+      gap: 20px;
+    }
+  }
+
+  /* ---- the morning band: today's reports come later, the last working day is on screen ---- */
+  .rep-day-band {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 6px 6px 6px 14px;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--pen) 7%, var(--rep-raise));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 28%, transparent);
+  }
+  .rep-day-band-dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--pen);
+  }
+  .rep-day-band-text {
+    min-width: 0;
+    flex: 1 1 auto;
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .rep-day-band-quiet {
+    color: var(--ink-2);
+    font-weight: 450;
+  }
+  .rep-day-band-go {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 8px 0 12px;
+    border-radius: 8px;
+    color: var(--rep-pen-deep);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--pen) 12%, transparent);
+    }
+  }
+
+  /* a day off: one calm line, no box */
+  .rep-day-off {
+    padding: 0 4px;
+    color: var(--ink-2);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .rep-day-off-quiet {
+    color: var(--rep-ink-3);
+    font-weight: 450;
+  }
+
+  /* ---- the ledger --------------------------------------------------------------------------- */
+  .rep-day-ledger {
+    position: relative;
+    min-width: 0;
+    container: rep-ledger / inline-size;
+  }
+  .rep-day-ledger-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px 6px 12px;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--page);
+  }
+  .rep-day-ledger-title {
+    flex-shrink: 0;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 18px;
+    letter-spacing: 0;
+  }
+  .rep-day-ledger-sub {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* «1 новый отчёт»: in the head, which stays on top while one reads */
+  .rep-day-pill {
+    display: inline-flex;
+    height: 30px;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    padding: 0 14px 0 12px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--pen) 16%, var(--rep-raise));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 45%, transparent);
+    color: var(--rep-pen-deep);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  .rep-day-pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--pen);
+  }
+
+  .rep-day-entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rep-day-entry {
+    position: relative;
+    /* the keys bring a choice into view below the sticky head */
+    scroll-margin-top: 52px;
+    display: grid;
+    grid-template-columns: 208px minmax(0, 760px) minmax(64px, 1fr);
+    align-items: start;
+    column-gap: 20px;
+    row-gap: 8px;
+    padding: 14px 14px 15px 12px;
+    border-radius: 12px;
+    cursor: default;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--rep-hover);
+    }
+    /* the hairline between two entries, inside the sheet */
+    & + &::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 12px;
+      right: 12px;
+      height: 1px;
+      background: var(--rule-soft);
+    }
+    &[data-selected],
+    &[data-open] {
+      background: color-mix(in srgb, var(--pen) 8%, transparent);
+    }
+    &[data-selected] {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 50%, transparent);
+    }
+    &:is([data-selected], [data-open])::before,
+    &:is([data-selected], [data-open]) + .rep-day-entry::before {
+      opacity: 0;
+    }
+    /* the one whose diary is open: the rail of the choice at its edge */
+    &[data-open]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--pen);
+    }
+    &[data-words="0"] {
+      align-items: center;
+      padding-top: 9px;
+      padding-bottom: 9px;
+    }
+  }
+
+  .rep-day-who {
+    display: flex;
+    min-width: 0;
+    align-items: flex-start;
+    gap: 10px;
+
+    > .min-w-0 {
+      flex: 1 1 auto;
+    }
+  }
+  .rep-day-entry[data-words="0"] .rep-day-who {
+    align-items: center;
+  }
+  .rep-day-name,
+  .rep-day-position,
+  .rep-day-person-name,
+  .rep-day-person-note,
+  .rep-day-compact,
+  .rep-day-task-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-day-name {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+  }
+  .rep-day-position {
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .rep-day-span {
+    margin-top: 4px;
+    color: var(--ink-2);
+    font-size: 13px;
+    line-height: 18px;
+    white-space: nowrap;
+  }
+  .rep-day-hours {
+    color: var(--rep-ink-3);
+  }
+
+  .rep-day-body {
+    min-width: 0;
+  }
+  .rep-day-words {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 22px;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+
+    &[data-open] {
+      display: block;
+      -webkit-line-clamp: unset;
+      line-clamp: none;
+    }
+  }
+  .rep-day-more {
+    margin-top: 2px;
+    padding: 0 2px;
+    border-radius: 4px;
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 20px;
+
+    &:hover {
+      color: var(--ink);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .rep-day-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rep-day-task {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .rep-day-task-title {
+    min-width: 0;
+    flex: 0 1 auto;
+    color: var(--ink);
+    font-weight: 550;
+
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+  .rep-day-task-meta {
+    flex-shrink: 0;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    white-space: nowrap;
+
+    &[data-late] {
+      color: var(--rep-pencil-deep);
+    }
+  }
+
+  /* a report without words: its times and its tasks on one line */
+  .rep-day-compact {
+    min-width: 0;
+    color: var(--ink-2);
+    font-size: 13.5px;
+    line-height: 20px;
+  }
+  .rep-day-compact-span {
+    color: var(--ink);
+  }
+
+  .rep-day-stamp {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-self: end;
+    color: var(--rep-ink-3);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    line-height: 18px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .rep-day-fresh {
+    color: var(--rep-pen-deep);
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 16px;
+  }
+  .rep-day-late,
+  .rep-day-edited {
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  .rep-day-ledger-empty {
+    padding: 26px 16px 30px 12px;
+  }
+  .rep-day-ledger-empty-title {
+    color: var(--ink);
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 22px;
+  }
+  .rep-day-ledger-empty-hint {
+    margin-top: 2px;
+    color: var(--ink-2);
+    font-size: 13px;
+    line-height: 18px;
+  }
+
+  /* the sheet narrows (the panel, a small window): the words keep their room, the gutter gives way */
+  @container rep-ledger (max-width: 820px) {
+    .rep-day-entry {
+      grid-template-columns: 180px minmax(0, 1fr) auto;
+      column-gap: 16px;
+    }
+  }
+  @container rep-ledger (max-width: 600px) {
+    .rep-day-entry {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .rep-day-who {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .rep-day-stamp {
+      grid-column: 2;
+      grid-row: 1;
+    }
+    .rep-day-body,
+    .rep-day-compact {
+      grid-column: 1 / -1;
+      grid-row: 2;
+    }
+    .rep-day-entry[data-words="0"] .rep-day-compact {
+      padding-left: 34px;
+    }
+  }
+
+  /* ---- the roll call --------------------------------------------------------------------------- */
+  .rep-day-roll {
+    min-width: 0;
+  }
+  .rep-day-roll[data-mode="rail"] {
+    position: sticky;
+    top: 12px;
+    max-height: calc(100dvh - var(--rep-day-top, 150px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px 16px 14px;
+  }
+  .rep-day-roll-count {
+    color: var(--ink-2);
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 22px;
+  }
+  .rep-day-roll-figure {
+    margin-right: 2px;
+    color: var(--ink);
+    font-size: 34px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    line-height: 38px;
+    letter-spacing: -0.02em;
+  }
+  .rep-day-roll-sub {
+    margin-top: 2px;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  /* who owed the report as one thin bar: handed in, missed, excused; the track — still to come */
+  .rep-day-share {
+    display: flex;
+    height: 4px;
+    overflow: hidden;
+    margin-top: 12px;
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--rep-ink-3) 22%, transparent);
+
+    i {
+      width: var(--w);
+      flex: none;
+      background: var(--ok);
+
+      &[data-tone="missed"] {
+        background: var(--pencil);
+      }
+      &[data-tone="excused"] {
+        background: color-mix(in srgb, var(--rep-ink-3) 70%, transparent);
+      }
+      & + i {
+        margin-left: 2px;
+      }
+    }
+  }
+
+  .rep-day-group {
+    margin-top: 18px;
+  }
+  .rep-day-group-head {
+    display: flex;
+    min-height: 28px;
+    align-items: center;
+    gap: 8px;
+  }
+  .rep-day-dot {
+    width: 7px;
+    height: 7px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--rep-ink-3);
+  }
+  .rep-day-group[data-kind="pending"] .rep-day-dot {
+    background: transparent;
+    box-shadow: inset 0 0 0 1.5px var(--rep-ink-3);
+  }
+  .rep-day-group[data-kind="missed"] .rep-day-dot {
+    background: var(--pencil);
+  }
+  .rep-day-group-title {
+    min-width: 0;
+    flex: 1 1 auto;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 650;
+    line-height: 18px;
+    letter-spacing: 0;
+  }
+  .rep-day-group-count {
+    color: var(--rep-ink-3);
+    font-weight: 500;
+  }
+
+  .rep-day-people {
+    display: flex;
+    flex-direction: column;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .rep-day-person {
+    position: relative;
+    display: flex;
+    min-height: 36px;
+    align-items: center;
+    gap: 10px;
+    margin: 0 -8px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    cursor: default;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--rep-hover);
+    }
+    &[data-selected],
+    &[data-open] {
+      background: color-mix(in srgb, var(--pen) 8%, transparent);
+    }
+    &[data-selected] {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 50%, transparent);
+    }
+    &[data-open]::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 7px;
+      bottom: 7px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--pen);
+    }
+  }
+  .rep-day-person-name {
+    display: block;
+    color: var(--ink);
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 18px;
+  }
+  .rep-day-person-note {
+    display: block;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .rep-day-minus {
+    flex-shrink: 0;
+    color: var(--rep-pencil-deep);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .rep-day-excused {
+    flex-shrink: 0;
+    color: var(--rep-ink-3);
+    font-size: 12px;
+  }
+
+  .rep-day-remind {
+    display: inline-flex;
+    height: 26px;
+    flex-shrink: 0;
+    align-items: center;
+    padding: 0 10px;
+    border-radius: 8px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+    color: var(--ink);
+    font-size: 12.5px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+    transition:
+      background-color 120ms linear,
+      box-shadow 120ms linear,
+      scale 120ms ease-out;
+
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--pen) 12%, var(--surface-2));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pen) 42%, transparent);
+    }
+    &:active:not(:disabled) {
+      scale: 0.96;
+    }
+    &:disabled {
+      opacity: 0.5;
+    }
+  }
+
+  /* narrow or with the panel open: one line that opens in place */
+  .rep-day-strip {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 6px 4px 4px;
+
+    .rep-day-share {
+      width: 120px;
+      flex: none;
+      margin-top: 0;
+    }
+  }
+  .rep-day-strip-toggle {
+    display: flex;
+    min-width: 0;
+    flex: 1 1 auto;
+    align-items: baseline;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--ink-2);
+    font-size: 13.5px;
+    line-height: 20px;
+    text-align: left;
+    white-space: nowrap;
+    transition: background-color 120ms linear;
+
+    &:hover:not(:disabled) {
+      background: var(--rep-hover);
+    }
+    &:disabled {
+      cursor: default;
+    }
+  }
+  .rep-day-strip-count {
+    flex-shrink: 0;
+    color: var(--ink);
+    font-weight: 650;
+
+    .rep-day-roll-figure {
+      margin: 0;
+      font-size: inherit;
+      line-height: inherit;
+      letter-spacing: 0;
+    }
+  }
+  .rep-day-strip-rest {
+    min-width: 0;
+    /* a flex item drops its leading space: the gap after «8 из 11 сдали» is said here */
+    padding-left: 0.3em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .rep-day-strip-chevron {
+    flex-shrink: 0;
+    align-self: center;
+    margin-left: 6px;
+    color: var(--rep-ink-3);
+    transition: rotate 160ms var(--rep-ease);
+  }
+  .rep-day-strip-toggle[aria-expanded="true"] .rep-day-strip-chevron {
+    rotate: 180deg;
+  }
+  .rep-day-roll-body {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    align-items: start;
+    column-gap: 28px;
+    padding: 0 16px 14px;
+    border-top: 1px solid var(--rule-soft);
+
+    .rep-day-group {
+      margin-top: 12px;
+    }
+  }
+
+  /* ---- the day while it loads ---- */
+  .rep-day-bone-entry {
+    display: grid;
+    grid-template-columns: 208px minmax(0, 1fr) 64px;
+    gap: 20px;
+    padding: 14px 14px 15px 12px;
+  }
+  .rep-day-roll.rep-day-bone {
+    padding: 16px;
+  }
+}
+
+/* ---- «Журнал»: no sheets, the hairlines say it ------------------------------------------------- */
+html[data-surface="desk"][data-journal]:not([data-graphite]) {
+  .rep-day-ledger {
+    border-top: 2px solid var(--line);
+  }
+  .rep-day-roll[data-mode="rail"] {
+    padding: 0 0 0 20px;
+    border-left: 1px solid var(--rule);
+  }
+  .rep-day-roll[data-mode="strip"] {
+    border-top: 1px solid var(--rule);
+    border-bottom: 1px solid var(--rule);
+  }
+  .rep-day-band,
+  .rep-day-entry,
+  .rep-day-person {
+    border-radius: 0;
+  }
+}
+
+/* ---- «Графит» --------------------------------------------------------------------------------- */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .rep-day-ledger,
+  .rep-day-roll {
+    border-radius: 16px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card), var(--lift);
+  }
+  .rep-day-ledger {
+    padding: 0 4px 4px;
+  }
+  .rep-day-ledger-head {
+    margin: 0 -4px;
+    padding-left: 18px;
+    padding-right: 12px;
+    border-radius: 16px 16px 0 0;
+    background: var(--raise);
+  }
+  .rep-day-roll[data-mode="strip"] {
+    border-radius: 12px;
+  }
+  .rep-day-entry {
+    padding-left: 14px;
+
+    & + &::before {
+      left: 14px;
+      right: 14px;
+    }
+    &[data-selected] {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 46%, transparent);
+    }
+    &[data-open]::after {
+      box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+    }
+  }
+  .rep-day-person[data-open]::after {
+    box-shadow: 0 0 10px color-mix(in srgb, var(--pen) 60%, transparent);
+  }
+  .rep-day-ledger-empty {
+    padding-left: 14px;
+  }
+
+  /* motion: data first, the effect over it (principle 1a) — nothing here holds a click */
+  .rep-day-band {
+    animation: rep-day-in 240ms var(--ease-snap) both;
+  }
+  .rep-day-pill {
+    animation: rep-day-pill-in 220ms var(--ease-snap) both;
+    transition: scale 120ms ease-out;
+
+    &:active {
+      scale: 0.96;
+    }
+  }
+  .rep-day-entry[data-rise] {
+    animation: rep-day-rise 280ms var(--ease-snap) both;
+  }
+  .rep-day-entry[data-open]::after,
+  .rep-day-person[data-open]::after {
+    animation: rep-day-rail 240ms cubic-bezier(0.2, 0.9, 0.3, 1.25) both;
+  }
+  .rep-day-share i {
+    transform-origin: left center;
+    animation: rep-day-grow 300ms var(--ease-snap) both;
+    transition: width 300ms var(--ease-snap);
+  }
+  .rep-day-roll-body {
+    animation: rep-day-in 200ms var(--ease-snap) both;
+  }
+}
+
+@keyframes rep-day-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@keyframes rep-day-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+}
+@keyframes rep-day-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+@keyframes rep-day-rail {
+  from {
+    transform: scaleY(0.3);
+    opacity: 0;
+  }
+}
+@keyframes rep-day-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .rep-day-band,
+    .rep-day-pill,
+    .rep-day-entry,
+    .rep-day-entry::after,
+    .rep-day-person::after,
+    .rep-day-share i,
+    .rep-day-roll-body {
+      animation: none !important;
+    }
+    .rep-day-entry,
+    .rep-day-person,
+    .rep-day-remind,
+    .rep-day-pill,
+    .rep-day-strip-toggle,
+    .rep-day-strip-chevron,
+    .rep-day-band-go,
+    .rep-day-share i,
+    .rep-day[data-stale] .rep-day-cols {
+      transition: none;
+    }
+  }
+}

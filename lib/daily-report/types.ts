@@ -38,6 +38,12 @@ export type DailyReport = {
    * «Оспорить» and of a minus given back because no report came before it (D-155 §1).
    */
   points: number;
+  /**
+   * The director excused a missed day (D-183, `excuse_daily_report`): when and why; the minus is
+   * given back by an appended transaction, so `points` is already net of it. null — not excused.
+   */
+  excused_at: string | null;
+  excused_reason: string | null;
 };
 
 /** The employee's screen for one day — `my_daily_report(p_date)`. */
@@ -114,6 +120,19 @@ export type TeamDayRow = {
   activity: TeamDayActivity;
   /** left − arrived, hours with one decimal; null without a report. */
   hours: number | null;
+  /**
+   * The latest «Сдайте отчёт» push of the day (D-183): the director's «Напомнить» or the sweep's own;
+   * its receipt as the delivery queue keeps it. null — nobody was reminded that day.
+   */
+  reminded: DailyReportReminder | null;
+};
+
+export type DailyReportReminder = {
+  /** Queued at. */
+  at: string;
+  by: "director" | "auto";
+  sent_at: string | null;
+  seen_at: string | null;
 };
 
 /** The director's day — `team_daily_report_day(p_date)`; rows: submitted, pending, missed, away, off; by name inside. */
@@ -128,6 +147,8 @@ export type TeamDay = {
     missed: number;
     pending: number;
     away: number;
+    /** Missed days the director excused (D-183); `missed` leaves them out. */
+    excused: number;
     handed_over: number;
     closed: number;
   };
@@ -140,8 +161,12 @@ export type TeamPeriodRow = {
   avatar_url: string | null;
   /** Days the report was due: workdays in the period from `started_on`, after the person joined, not after today. */
   workdays: number;
+  /** Reports handed in on the days they were due (D-183: a report on a day off is not counted). */
   submitted: number;
+  /** Due days without a report, the excused ones left out. */
   missed: number;
+  /** Missed days the director excused (D-183). */
+  excused: number;
   /** submitted / (submitted + missed), 0..1; null when nothing was due yet. */
   submit_rate: number | null;
   /** Average local time of day, "HH:MM"; null without reports. */
@@ -164,11 +189,12 @@ export type TeamPeriod = {
   to: string;
   rows: TeamPeriodRow[];
   /** One entry per calendar day of the period, oldest first — the team's line of the period. */
-  days: { date: string; workday: boolean; submitted: number; missed: number; handed_over: number; closed: number }[];
+  days: { date: string; workday: boolean; submitted: number; missed: number; excused: number; handed_over: number; closed: number }[];
   totals: {
     team: number;
     submitted: number;
     missed: number;
+    excused: number;
     submit_rate: number | null;
     handed_over: number;
     closed: number;
@@ -183,7 +209,35 @@ export const DAILY_REPORT_RPC = {
   history: "my_daily_report_history",
   teamDay: "team_daily_report_day",
   teamPeriod: "team_daily_report_period",
+  /** One person's reports for the director, newest first (D-183). */
+  person: "person_daily_reports",
+  /** «Уважительная причина» on a missed day (D-183). */
+  excuse: "excuse_daily_report",
+  /** «Напомнить» — called through POST /api/reports/remind, which also kicks the delivery queue. */
+  remind: "remind_daily_report",
 } as const;
+
+/** One row of `person_daily_reports(p_user_id, p_from, p_to)`: the report and the dispute on its minus. */
+export type PersonDailyReport = DailyReport & {
+  /** The person's dispute of this report's minus; null — none. */
+  dispute: { id: string; transaction_id: string; text: string; created_at: string; resolved: boolean } | null;
+};
+
+/** `excuse_daily_report(...)`: the stored report and the points given back (0 — there was no minus). */
+export type ExcuseDailyReportResult = { report: DailyReport; points_returned: number };
+
+/** POST /api/reports/remind → `remind_daily_report(p_user_ids, ...)`. */
+export type RemindDailyReportResult = {
+  /** Who got a push queued now. */
+  reminded: string[];
+  /**
+   * Who did not, and why: already reminded today, the report is in, away, not due today, or `late` —
+   * the delivery window is shut till tomorrow, a push then would be about a day that is over.
+   */
+  skipped: { user_id: string; reason: "already" | "submitted" | "away" | "not_due" | "late" }[];
+  /** Before the window opens (08:00) the pushes wait for it: when they leave; null — now. */
+  deliver_after?: string | null;
+};
 
 /** Errors the RPCs raise (`raise exception '<code>'`), mapped to Russian words by the screens. */
 export type DailyReportError =
@@ -192,4 +246,8 @@ export type DailyReportError =
   | "bad_times"
   | "summary_required"
   | "summary_too_long"
-  | "bad_period";
+  | "bad_period"
+  | "not_missed"
+  | "already_excused"
+  | "disputed"
+  | "reason_required";

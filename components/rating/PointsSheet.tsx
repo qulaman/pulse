@@ -117,14 +117,17 @@ function isDisputable(line: PointRow): boolean {
 }
 
 /**
- * A daily-report minus given back because no report came before it (D-155 §1): its refund row
- * shares the report. It reads as a refund by «Оспорить» does, and it is not disputed again —
- * the database refuses that too (`already_refunded`). The refund is newer than its minus, so a
- * minus in the history has its refund there as well.
+ * A daily-report minus given back — because no report came before it (D-155 §1) or because the
+ * director wrote a good reason (D-183): its refund row shares the report. It reads as a refund by
+ * «Оспорить» does, and it is not disputed again — the database refuses that too
+ * (`already_refunded`). The refund is newer than its minus, so a minus in the history has its
+ * refund there as well.
  */
+const GIVEN_BACK = new Set(["daily_report_missed_refund", "daily_report_excused"]);
+
 function givenBack(line: PointRow, history: readonly PointRow[]): boolean {
   if (line.amount >= 0 || !line.daily_report_id) return false;
-  return history.some((other) => other.rule_code === "daily_report_missed_refund" && other.daily_report_id === line.daily_report_id);
+  return history.some((other) => GIVEN_BACK.has(other.rule_code ?? "") && other.daily_report_id === line.daily_report_id);
 }
 
 const DISPUTE_WORD: Record<MyDispute["status"], string> = {

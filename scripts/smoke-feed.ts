@@ -19,6 +19,8 @@ import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type BrowserContext, type Page, type Route } from "playwright";
 
+import { DRAFT_KEY } from "../lib/daily-report/draft";
+
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 const SHOTS = process.env.SHOTS_DIR ?? join(process.cwd(), ".smoke-ui", "feed");
 const EMPLOYEE = process.env.EMPLOYEE ?? "erlan.b@demo.local";
@@ -285,6 +287,16 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   const at = new Date(`${wall}T17:30:00+05:00`).getTime();
   await page.clock.install({ time: at });
   evening.today = day(me.userId, me.companyId, { at, evening: true });
+  // D-183: one tap hands the report in only with the person's words — typed on /report earlier today
+  await page.addInitScript(
+    ([key, value]) => {
+      if (!window.sessionStorage.getItem("smoke-draft")) {
+        window.localStorage.setItem(key, value);
+        window.sessionStorage.setItem("smoke-draft", "1");
+      }
+    },
+    [DRAFT_KEY, JSON.stringify({ date: wall, arrived: null, left: null, summary: "Склад, приёмка цемента" })] as const,
+  );
   await page.goto(`${APP_URL}/feed`, { waitUntil: "networkidle" });
   const face = page.locator('[data-testid="mascot-lever"]').first();
   await face.waitFor({ timeout: 20_000 });
@@ -315,6 +327,8 @@ async function evening(context: BrowserContext, me: { userId: string; companyId:
   record("после «Сдать» строка отчёта не уезжает из-под пальца", Boolean(before && after && Math.abs(before.y - after.y) < 4), `${Math.round(before?.y ?? -1)} → ${Math.round(after?.y ?? -1)}`);
   await shot("08-evening-submitted");
   record("отчёт сдан одной кнопкой", (await card.innerText()).includes("Сдан в 17:3"));
+  const sentWords = String(evening.today?.report.report?.summary ?? "");
+  record("одной кнопкой ушли слова из черновика (D-183)", sentWords === "Склад, приёмка цемента", sentWords);
   record("вечер без ошибок страницы", errors.length === 0, errors.slice(0, 3).join(" | "));
   await page.close();
 }

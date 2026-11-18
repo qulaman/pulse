@@ -124,10 +124,10 @@ function ReportForm({
   const arrivedIso = arrived ? isoAt(day.date, arrived) : null;
   const leftIso = left ? isoAt(day.date, left) : null;
   const length = durationText(arrivedIso, leftIso);
-  // D-155 §7: the day's tasks are the report already — the words may stay empty then
+  // D-183: one line of the person's own words always — the director reads them; the tasks go in by themselves
   const hasTasks = day.tasks.length > 0;
-  const problem = formProblem(arrivedIso, leftIso, summary, hasTasks);
-  const wordsMissing = !summary.trim() && !hasTasks;
+  const problem = formProblem(arrivedIso, leftIso, summary);
+  const wordsMissing = !summary.trim();
   const dirty =
     !saved || (saved.summary ?? "").trim() !== summary.trim() || hmOf(saved.arrived_at) !== arrived || hmOf(saved.left_at) !== left;
 
@@ -197,11 +197,11 @@ function ReportForm({
       </div>
 
       <label htmlFor="report-summary" className="eyebrow mt-6 block px-1">
-        Чем занимался
+        Что сделали
         {hasTasks ? (
-          <span className="font-normal normal-case tracking-normal text-muted" data-testid="report-summary-optional">
+          <span className="font-normal normal-case tracking-normal text-muted" data-testid="report-summary-tasks">
             {" "}
-            · необязательно — задачи дня уже в отчёте
+            · одной строкой — задачи дня уже в отчёте
           </span>
         ) : null}
       </label>

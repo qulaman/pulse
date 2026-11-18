@@ -1,0 +1,463 @@
+/* «Отчёты» of the desk (D-183): rep-diary. One builder a file.
+   «Дневник» — one person's reports in the shell's right-hand panel (components/desk/reports/Diary.tsx):
+   the head with the moves, the month as a calendar of day states, the reports newest first, and the
+   popover of «Уважительная причина…» (portalled to <body>, so it carries its own tokens).
+   Both looks: the tokens fall back from «Графит» (graphite.css) to the journal's inks. Colour says
+   state only — green handed in, red missed, grey away / excused / off; teal only for today, the
+   ringed day and «только что»; amber only a task on review (StatusGlyph). Hours stay grey. */
+
+html[data-surface="desk"] {
+  .rep-diary,
+  .rep-diary-excuse-form {
+    --rd-ink: var(--ink, var(--text));
+    --rd-ink-2: var(--ink-2, var(--text-muted));
+    --rd-ink-3: var(--ink-3, var(--ink-2, var(--text-muted)));
+    --rd-rule: var(--rule-soft, var(--border));
+    --rd-rule-strong: var(--rule, var(--border));
+    --rd-hover: var(--hover, color-mix(in srgb, var(--rd-ink) 4%, transparent));
+    --rd-pen: var(--pen, var(--accent));
+    --rd-pen-deep: var(--pen-deep, var(--rd-pen));
+    --rd-ok: var(--ok-ink, var(--ok));
+    --rd-ok-deep: var(--ok-deep, var(--rd-ok));
+    --rd-miss: var(--pencil, var(--danger));
+    --rd-miss-deep: var(--pencil-deep, var(--rd-miss));
+    /* the calendar's plates: one lightness for the three states, the words on them in the deep inks */
+    --rd-ok-cell: color-mix(in srgb, var(--rd-ok) 15%, transparent);
+    --rd-miss-cell: color-mix(in srgb, var(--rd-miss) 20%, transparent);
+    --rd-dim: color-mix(in srgb, var(--rd-ink) 3.5%, transparent);
+    --rd-hatch: color-mix(in srgb, var(--rd-ink) 9%, transparent);
+    /* the panel's sticky head over an entry brought into view */
+    --rd-head: 124px;
+  }
+  &[data-desk-theme="light"] .rep-diary {
+    --rd-ok-cell: color-mix(in srgb, var(--rd-ok) 11%, transparent);
+    --rd-miss-cell: color-mix(in srgb, var(--rd-miss) 13%, transparent);
+    --rd-dim: color-mix(in srgb, var(--rd-ink) 3%, transparent);
+    --rd-hatch: color-mix(in srgb, var(--rd-ink) 8%, transparent);
+  }
+
+  .rep-diary {
+    display: flex;
+    flex-direction: column;
+    color: var(--rd-ink);
+  }
+
+  /* ---- the head: who, where, the moves ------------------------------------------------------- */
+  .rep-diary-name {
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 26px;
+    color: var(--rd-ink);
+  }
+  .rep-diary-sub {
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink-2);
+
+    [data-away] {
+      font-weight: 500;
+      color: var(--rd-ink);
+    }
+  }
+  .rep-diary-moves {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  /* ---- the month ------------------------------------------------------------------------------ */
+  .rep-diary-month {
+    display: flex;
+    flex-direction: column;
+    padding-top: 10px;
+  }
+  .rep-diary-month-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 32px;
+  }
+  .rep-diary-tally {
+    min-width: 0;
+    min-height: 18px;
+    margin: 2px 0 10px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink-2);
+
+    [data-tone="danger"] {
+      font-weight: 600;
+      color: var(--rd-miss-deep);
+    }
+    [data-tone="muted"] {
+      color: var(--rd-ink-3);
+    }
+  }
+  .rep-diary-stepper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-right: -6px;
+  }
+  .rep-diary-month-name {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 20px;
+    color: var(--rd-ink);
+  }
+
+  .rep-diary-cal {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+  .rep-diary-wd {
+    height: 14px;
+    font-size: 11px;
+    line-height: 14px;
+    text-align: center;
+    color: var(--rd-ink-3);
+  }
+  .rep-diary-cell {
+    position: relative;
+    display: grid;
+    width: 100%;
+    height: 40px;
+    place-items: center;
+    border-radius: 7px;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--rd-rule);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+    color: var(--rd-ink);
+    transition:
+      background-color 120ms linear,
+      box-shadow 120ms linear;
+
+    &[data-state="out"] {
+      visibility: hidden;
+    }
+    &[data-state="loading"] {
+      background: var(--rd-dim);
+      box-shadow: none;
+    }
+    &[data-state="submitted"] {
+      background: var(--rd-ok-cell);
+      box-shadow: none;
+      color: var(--rd-ok-deep);
+    }
+    &[data-state="missed"] {
+      background: var(--rd-miss-cell);
+      box-shadow: none;
+      color: var(--rd-miss-deep);
+    }
+    &[data-state="excused"],
+    &[data-state="off"] {
+      background: var(--rd-dim);
+      box-shadow: none;
+      color: var(--rd-ink-3);
+    }
+    &[data-state="away"],
+    &[data-state="holiday"] {
+      background: var(--rd-dim) repeating-linear-gradient(135deg, var(--rd-hatch) 0 1.5px, transparent 1.5px 5px);
+      box-shadow: none;
+      color: var(--rd-ink-2);
+    }
+    &[data-state="future"] {
+      .rep-diary-dn {
+        opacity: 0.6;
+      }
+    }
+    &[data-state="pending"] {
+      box-shadow: inset 0 0 0 1px var(--rd-rule-strong);
+    }
+    &:is(button):hover {
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rd-ink) 28%, transparent);
+    }
+    &[data-today] {
+      box-shadow: inset 0 0 0 1.5px var(--rd-pen);
+    }
+    &[data-ringed] {
+      box-shadow: 0 0 0 2px var(--rd-pen);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--rd-pen);
+      outline-offset: 2px;
+    }
+  }
+  .rep-diary-dn {
+    position: absolute;
+    top: 4px;
+    left: 5px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 10px;
+    color: var(--rd-ink-3);
+  }
+  .rep-diary-mark {
+    margin-top: 7px;
+
+    &[data-long] {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--rd-ink-3);
+    }
+  }
+
+  /* ---- the reports, newest first -------------------------------------------------------------- */
+  .rep-diary-list {
+    margin: 16px -20px 0;
+    padding: 0 20px;
+    border-top: 1px solid var(--rd-rule-strong);
+  }
+  .rep-diary-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 6px;
+    padding: 12px 0 2px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--rd-ink);
+
+    span {
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 16px;
+      color: var(--rd-ink-3);
+    }
+  }
+  .rep-diary-entry {
+    margin: 0 -20px;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--rd-rule);
+    scroll-margin-top: var(--rd-head);
+    scroll-margin-bottom: 16px;
+    transition:
+      background-color 200ms linear,
+      box-shadow 200ms linear;
+    animation: rep-diary-in 180ms var(--ease-out, ease-out) both;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+    &[data-ringed] {
+      background: color-mix(in srgb, var(--rd-pen) 6%, transparent);
+      box-shadow: inset 3px 0 0 var(--rd-pen);
+    }
+    > .rep-diary-row {
+      margin-top: 8px;
+    }
+  }
+  .rep-diary-entry-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .rep-diary-date {
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--rd-ink);
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+      text-decoration-color: var(--rd-rule-strong);
+      text-underline-offset: 3px;
+    }
+  }
+  .rep-diary-stamp {
+    min-width: 0;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: right;
+    color: var(--rd-ink-3);
+
+    &[data-late] {
+      font-weight: 500;
+      color: var(--rd-ink-2);
+    }
+  }
+  .rep-diary-fresh {
+    font-weight: 600;
+    color: var(--rd-pen-deep);
+  }
+  .rep-diary-missed {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+    color: var(--rd-miss-deep);
+    white-space: nowrap;
+
+    &[data-excused] {
+      font-weight: 500;
+      color: var(--rd-ink-3);
+    }
+  }
+  .rep-diary-hours {
+    margin-top: 2px;
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--rd-ink-3);
+  }
+  .rep-diary-words {
+    margin-top: 6px;
+    font-size: 14px;
+    line-height: 21px;
+    color: var(--rd-ink);
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .rep-diary-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 8px;
+  }
+  .rep-diary-task {
+    display: flex;
+    min-height: 26px;
+    align-items: center;
+    gap: 8px;
+    margin: 0 -4px;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink);
+    transition: background-color 100ms linear;
+
+    &:hover {
+      background: var(--rd-hover);
+    }
+  }
+  .rep-diary-task-title {
+    min-width: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-diary-task-meta {
+    min-width: 0;
+    flex: 0 1000 auto;
+    overflow: hidden;
+    font-size: 12px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--rd-ink-3);
+
+    &[data-late] {
+      color: var(--rd-ink-2);
+    }
+  }
+  /* a report without words: its time and the day's tasks, in two lines at most */
+  .rep-diary-compact {
+    display: -webkit-box;
+    margin-top: 4px;
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+  .rep-diary-compact-time {
+    color: var(--rd-ink-3);
+  }
+  .rep-diary-excused {
+    margin-top: 4px;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink-2);
+    overflow-wrap: anywhere;
+  }
+  .rep-diary-dispute {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .rep-diary-dispute-who {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--rd-ink-3);
+  }
+  .rep-diary-quote {
+    display: flex;
+    gap: 6px;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--rd-ink);
+    overflow-wrap: anywhere;
+
+    svg {
+      flex-shrink: 0;
+      margin-top: 4px;
+      color: var(--rd-ink-3);
+    }
+  }
+  .rep-diary-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .rep-diary-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 14px 0;
+    font-size: 13px;
+    line-height: 18px;
+    color: var(--rd-ink-3);
+  }
+
+  /* ---- «Уважительная причина…» ---------------------------------------------------------------- */
+  .rep-diary-excuse-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    color: var(--rd-ink);
+  }
+  .rep-diary-excuse-label {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+  .rep-diary-excuse-hint {
+    font-size: 12px;
+    line-height: 16px;
+    color: var(--rd-ink-3);
+  }
+}
+
+@keyframes rep-diary-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"] {
+    .rep-diary-cell,
+    .rep-diary-entry,
+    .rep-diary-task {
+      animation: none;
+      transition: none;
+    }
+  }
+}

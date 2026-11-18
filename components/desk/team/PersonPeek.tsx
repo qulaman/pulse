@@ -11,6 +11,7 @@ import { When } from "@/components/desk/ui/When";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { Button } from "@/components/ui/Button";
 import { humanAqtobe } from "@/lib/ai/time";
+import { todayYmd } from "@/lib/datetime/calendar";
 import { timeOf } from "@/lib/daily-report/format";
 import type { TeamDayRow } from "@/lib/daily-report/types";
 import { formatNum } from "@/lib/desk/format";
@@ -246,7 +247,7 @@ export function PersonPeek({
           ) : null}
           {director && word ? (
             <FactRow label="Отчёт сегодня">
-              <Link href={`/desk/reports?p=${person.id}`} className="hover:underline" style={word.tone ? { color: TONE_VAR[word.tone] } : undefined} data-testid="person-peek-report">
+              <Link href={`/desk/reports?day=${todayYmd(now)}&p=${person.id}`} className="hover:underline" style={word.tone ? { color: TONE_VAR[word.tone] } : undefined} data-testid="person-peek-report">
                 {word.text} →
               </Link>
             </FactRow>

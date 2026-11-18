@@ -44,6 +44,8 @@ export const HISTORY_SOURCES: readonly HistorySource[] = [
   // «не сдан» is written by the morning tick, not by the person: a card made by mistake collects
   // these by itself, and they go with the card (AUTO_ROWS)
   { table: "daily_reports", column: "user_id", label: REPORTS, only: { column: "status", value: "submitted" } },
+  // the director who excused a missed day (D-183): his judgement stays on the report
+  { table: "daily_reports", column: "excused_by", label: REPORTS },
   // points and disputes
   { table: "point_transactions", column: "user_id", label: POINTS },
   { table: "point_transactions", column: "actor_id", label: POINTS },

@@ -54,6 +54,8 @@ const submitted = (hm: string): MyDailyReportDay["report"] => ({
   submitted_at: `${TODAY}T${hm}:00+05:00`,
   updated_at: `${TODAY}T${hm}:00+05:00`,
   points: 1,
+  excused_at: null,
+  excused_reason: null,
 });
 
 const STATES: { id: string; label: string; due: ReturnType<typeof reportDue>; waiting?: boolean }[] = [

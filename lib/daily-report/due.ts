@@ -36,8 +36,9 @@ export type ReportDue = {
    */
   evening: boolean;
   /**
-   * Not in yet and «Сдать» can hand it in as it is: the day has tasks, so «Чем занимался» may
-   * stay empty (D-155 §7, `submit_daily_report`), and leaving now is after the suggested arrival.
+   * Not in yet and «Сдать» can hand it in as it is: the day has tasks, the person's own words wait
+   * in a draft typed on /report (D-183: words are asked for always), and leaving now is after the
+   * arrival.
    */
   oneTap: boolean;
   /** The day's tasks written into the report by themselves. */
@@ -58,13 +59,12 @@ export const NO_REPORT_DUE: ReportDue = {
 };
 
 /**
- * What «Сдать» from Лента sends: the suggested arrival (the last report's time of day or the
- * company's start, `my_daily_report`), leaving now on the minute, no words — the day's tasks are
- * the report. A draft of the same day typed on /report (`lib/daily-report/draft.ts`) goes in with
- * it: its words always — they are what the person typed, and the draft is dropped after the
- * submit — and its «Пришёл» and «Ушёл» where they are set and make a length; times that make none
- * give way to the suggestion and now. null — one tap cannot: the day is not today any more, it has
- * no tasks, or now is not after the arrival (the form on /report says why).
+ * What «Сдать» from Лента sends: the words of a draft of the same day typed on /report
+ * (`lib/daily-report/draft.ts`; the draft is dropped after the submit), its «Пришёл» and «Ушёл»
+ * where they are set and make a length, else the suggested arrival (the last report's time of day
+ * or the company's start, `my_daily_report`) and leaving now on the minute. null — one tap cannot:
+ * the day is not today any more, it has no tasks, there are no words yet (D-183: the row then says
+ * «Написать ›»), or now is not after the arrival (the form on /report says why).
  */
 export function oneTapInput(
   day: MyDailyReportDay,
@@ -78,6 +78,7 @@ export function oneTapInput(
   const left = isoAt(day.date, nowHm(now));
   const own = draft?.date === day.date ? draft : null;
   const summary = own && typeof own.summary === "string" ? own.summary.trim() : "";
+  if (!summary) return null;
   if (own) {
     const ownArrived = own.arrived ? isoAt(day.date, own.arrived) : arrived;
     const ownLeft = own.left ? isoAt(day.date, own.left) : left;
@@ -95,9 +96,16 @@ export function oneTapInput(
  * Where today's report stands for Лента. `day` — `my_daily_report` (undefined while it loads or
  * when it failed: nothing is shown); `askFrom` — `settings.daily_report.ask_from`; `away` — the
  * person's own `availability` is not «на месте» (`my_daily_report` does not say it; the push
- * reminder skips them the same way, `daily_report_reminders_due`).
+ * reminder skips them the same way, `daily_report_reminders_due`); `draft` — the words typed on
+ * /report and not handed in yet: with them «Сдать» goes in one tap.
  */
-export function reportDue(day: MyDailyReportDay | undefined, now: Date, askFrom: string = ASK_FROM_DEFAULT, away = false): ReportDue {
+export function reportDue(
+  day: MyDailyReportDay | undefined,
+  now: Date,
+  askFrom: string = ASK_FROM_DEFAULT,
+  away = false,
+  draft: Draft | null = null,
+): ReportDue {
   if (!day || !day.enabled) return NO_REPORT_DUE;
   // the cached day may be yesterday's on a phone left open past midnight: only today's counts
   if (!day.today || day.date !== todayYmd(now)) return NO_REPORT_DUE;
@@ -113,6 +121,6 @@ export function reportDue(day: MyDailyReportDay | undefined, now: Date, askFrom:
     submitted: false,
     submittedAt: null,
     asking: evening,
-    oneTap: oneTapInput(day, now, "") !== null,
+    oneTap: oneTapInput(day, now, "", draft) !== null,
   };
 }

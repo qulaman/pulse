@@ -10,6 +10,7 @@ import { dequeue, enqueue, outboxSize, subscribeOutbox } from "@/lib/outbox";
 import { useRealtimeQuery } from "@/lib/realtime/useRealtimeQuery";
 import { createBrowserSupabase } from "@/lib/supabase/client";
 
+import { readDraft } from "./draft";
 import { askFromOf, ASK_FROM_DEFAULT, reportDue, type ReportDue } from "./due";
 import { DAILY_REPORT_ERROR_TEXT, errorCodeOf } from "./format";
 import {
@@ -139,6 +140,8 @@ function provisional(day: MyDailyReportDay, input: SubmitDailyReportInput): Dail
     updated_at: now,
     // the points are the server's to say: a first submit shows them when it lands
     points: was?.points ?? 0,
+    excused_at: null,
+    excused_reason: null,
   };
 }
 
@@ -245,10 +248,16 @@ export function useReportDue(now: Date): ReportDue {
   // a submit waiting on the phone is handed in as far as the person is concerned: a read of the day
   // that comes back without it must not bring «не сдан», the calling face and «Сдать» back (D-130)
   const waiting = useSubmitWaiting();
+  // the words typed on /report and not handed in: with them «Сдать» goes in one tap (D-183); read
+  // every render (a small localStorage read), so the row follows the draft without waiting a minute
+  const draft = day.data ? readDraft(day.data.date) : null;
+  const draftKey = draft ? `${draft.date}|${draft.arrived ?? ""}|${draft.left ?? ""}|${draft.summary ?? ""}` : "";
   return useMemo(() => {
-    const due = reportDue(day.data, now, askFrom, away);
+    const due = reportDue(day.data, now, askFrom, away, draftKey ? draft : null);
     return waiting && due.show && !due.submitted ? { ...due, submitted: true, asking: false, oneTap: false } : due;
-  }, [day.data, now, askFrom, away, waiting]);
+    // `draft` is a fresh object every render; `draftKey` is what it says
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [day.data, now, askFrom, away, waiting, draftKey]);
 }
 
 /**

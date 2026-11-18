@@ -143,9 +143,13 @@ export function taskMeta(task: DailyReportTask): string {
   return `${state} · ${task.on_time ? "в срок" : "после срока"}`;
 }
 
-/** A past day in «Прошлые отчёты»: «сдан · 8 ч 40 мин · 3 задачи · +1» / «не сдан · −10». */
+/**
+ * A past day in «Прошлые отчёты»: «сдан · 8 ч 40 мин · 3 задачи · +1» / «не сдан · −10»; a missed
+ * day the director excused (D-183) — «не сдан · уважительная причина», its minus already given back.
+ */
 export function historyLine(report: DailyReport): string {
   if (report.status === "missed") {
+    if (report.excused_at) return "не сдан · уважительная причина";
     return ["не сдан", pointsText(report.points)].filter(Boolean).join(" · ");
   }
   const length = durationText(report.arrived_at, report.left_at);
@@ -202,14 +206,15 @@ export const SUMMARY_MAX = 4000;
 
 /**
  * What stops the form from going, in the words the person needs — checked on the phone so the
- * common slips never cost a round trip; the database checks the same (`DailyReportError`).
- * `hasTasks` — the day has tasks: they are the report already, the words may stay empty (D-155 §7).
+ * common slips never cost a round trip. The words are asked for always (D-183: the director reads
+ * them; a day of tasks alone told him nothing) — one line is enough. The database still takes a
+ * day of tasks without words (D-155 §7), so a report queued by an older build is not lost.
  */
-export function formProblem(arrived: string | null, left: string | null, summary: string, hasTasks = false): string | null {
+export function formProblem(arrived: string | null, left: string | null, summary: string): string | null {
   if (!arrived || !left) return "Укажите, когда пришли и ушли";
   const minutes = minutesBetween(arrived, left);
   if (minutes === null || minutes <= 0) return "«Ушёл» должно быть позже «Пришёл»";
-  if (!summary.trim() && !hasTasks) return "Напишите, чем занимались";
+  if (!summary.trim()) return "Напишите одной строкой, что сделали";
   if (summary.trim().length > SUMMARY_MAX) return `Слишком длинно: до ${SUMMARY_MAX} знаков`;
   return null;
 }
@@ -222,6 +227,10 @@ export const DAILY_REPORT_ERROR_TEXT: Record<DailyReportError | "forbidden", str
   summary_required: "Напишите, чем занимались",
   summary_too_long: `Слишком длинно: до ${SUMMARY_MAX} знаков`,
   bad_period: `Период — не длиннее ${PERIOD_MAX_DAYS} дней`,
+  not_missed: "Этот отчёт сдан — снимать нечего",
+  already_excused: "Причина уже записана",
+  disputed: "Человек оспорил минус — ответьте на спор",
+  reason_required: "Напишите причину",
   forbidden: "Нет доступа",
 };
 
@@ -233,24 +242,24 @@ export function errorCodeOf(message: string | null | undefined): DailyReportErro
   return CODES.find((code) => new RegExp(`\\b${code}\\b`).test(message)) ?? null;
 }
 
-/** «принял 3 · сдал 2 · принято 2 · сообщений 5»; the zeros are left out. */
+/** «взято 3 · сдано 2 · принято 2 · сообщений 5» — words without a gender; the zeros are left out. */
 export function activityLine(activity: TeamDayActivity): string {
   const parts = [
-    activity.accepted ? `принял ${activity.accepted}` : "",
-    activity.handed_over ? `сдал ${activity.handed_over}` : "",
+    activity.accepted ? `взято ${activity.accepted}` : "",
+    activity.handed_over ? `сдано ${activity.handed_over}` : "",
     activity.closed ? `принято ${activity.closed}` : "",
     activity.messages ? `сообщений ${activity.messages}` : "",
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "в задачах тихо";
 }
 
-/** The second line of the team's day: «не сдали 2 · в отпуске 1 · сдано задач 15 · принято 9». */
+/** The second line of the team's day: «не сдали 2 · в отпуске или на больничном 1 · сдано задач 15 · принято 9». */
 export function teamTotalsLine(day: TeamDay): string {
   const t = day.totals;
   return [
     t.missed ? `не сдали ${t.missed}` : "",
     t.pending ? `ждём ${t.pending}` : "",
-    t.away ? `в отпуске ${t.away}` : "",
+    t.away ? `в отпуске или на больничном ${t.away}` : "",
     `сдано задач ${t.handed_over}`,
     `принято ${t.closed}`,
   ]
@@ -265,8 +274,9 @@ export const STATE_TITLE: Record<TeamDayState, string> = {
   submitted: "Сдали",
   pending: "Ещё не сдали",
   missed: "Не сдали",
-  away: "Отпуск и больничный",
-  off: "Не рабочий день",
+  away: "В отпуске и на больничном",
+  // not a working day, or not this person's: before they came, the module before it started (D-183)
+  off: "Отчёт не нужен",
 };
 
 /** The tone of a person's state: a status colour only where it is a status (DESIGN §1.3). */
@@ -278,24 +288,31 @@ export const STATE_TONE: Record<TeamDayState, "ok" | "warn" | "danger" | "muted"
   off: "muted",
 };
 
-/** The line under a person's name on a day: «пришёл 9:05 — ушёл 18:10 · 9 ч» or what stands instead. */
+/** «9:05–18:10» — a working day's times, without a gender (D-183). */
+export function spanText(arrived: string | null | undefined, left: string | null | undefined): string {
+  const from = timeOf(arrived);
+  const to = timeOf(left);
+  return from && to ? `${from}–${to}` : from || to;
+}
+
+/** The line under a person's name on a day: «9:05–18:10 · 9 ч» or what stands instead. */
 export function personDayLine(row: TeamDay["rows"][number]): string {
   const report = row.report;
   if (report?.status === "submitted") {
-    const times = `пришёл ${timeOf(report.arrived_at)} — ушёл ${timeOf(report.left_at)}`;
+    const times = spanText(report.arrived_at, report.left_at);
     const hours = hoursText(row.hours);
     return hours ? `${times} · ${hours}` : times;
   }
   switch (row.state) {
     case "pending":
-      return "ещё не сдал";
+      return "отчёта пока нет";
     case "missed":
-      return "отчёт не сдан";
+      return report?.excused_at ? "не сдан · уважительная причина" : "отчёт не сдан";
     case "away":
       // a closed past day comes back as away too: who was away then is not who is away now
       return row.availability === "sick" ? "на больничном" : row.availability === "vacation" ? "в отпуске" : "отпуск или больничный";
     default:
-      return "не рабочий день";
+      return "отчёт не нужен";
   }
 }
 

@@ -1,0 +1,699 @@
+/* «Отчёты → Табель» of the desk (D-183): reports-tabel. One builder a file.
+   The period as people × days (components/desk/reports/TabelView.tsx) and its paper
+   (PrintSheet.tsx, kind «tabel»: landscape A4).
+   - One sheet with hairlines inside it, no boxes in boxes: the head row and the names stay while the
+     days scroll under them, the totals hold the right edge, the misses of each day the bottom.
+   - A day is a mark while it has 26 px, colour only below that (a quarter) — never hours, never points.
+   - Inks: green handed in, red missed, grey away and excused, teal only for the choice and today;
+     a weekend dimmed, a holiday hatched (DESIGN §8). Both looks: the graphite-only inks fall back
+     to the journal's. Motion: the stale fade only, off under «уменьшить движение». */
+
+html[data-surface="desk"][data-journal] {
+  .rep-tabel {
+    --rt-ink-3: var(--ink-3, var(--ink-2));
+    --rt-raise: var(--raise, var(--sheet));
+    --rt-ok-deep: var(--ok-deep, var(--ok-ink));
+    --rt-pen-deep: var(--pen-deep, var(--pen));
+    --rt-pencil-deep: var(--pencil-deep, var(--pencil));
+    --rt-hover: var(--hover, var(--surface-2));
+    --rt-dim: color-mix(in srgb, var(--ink) 3.5%, transparent);
+    --rt-hatch: color-mix(in srgb, var(--ink) 14%, transparent);
+    --rt-ok-cell: color-mix(in srgb, var(--ok-ink) 16%, transparent);
+    --rt-miss-cell: color-mix(in srgb, var(--pencil) 20%, transparent);
+    --rt-grey-cell: color-mix(in srgb, var(--rt-ink-3) 17%, transparent);
+    --rt-today: color-mix(in srgb, var(--pen) 70%, transparent);
+    --rt-row-bg: var(--rt-raise);
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 12px;
+  }
+  &[data-desk-theme="light"] .rep-tabel {
+    --rt-ok-cell: color-mix(in srgb, var(--ok-ink) 12%, transparent);
+    --rt-miss-cell: color-mix(in srgb, var(--pencil) 13%, transparent);
+    --rt-dim: color-mix(in srgb, var(--ink) 3%, transparent);
+    --rt-hatch: color-mix(in srgb, var(--ink) 11%, transparent);
+  }
+  .rep-tabel[data-stale] .rep-tabel-sheet {
+    opacity: 0.6;
+    transition: opacity 160ms linear 120ms;
+  }
+
+  /* ---- the line over the sheet: the period's one total, «Все | С пропусками» ---- */
+  .rep-tabel-bar {
+    display: flex;
+    min-height: 36px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 20px;
+  }
+  .rep-tabel-sum {
+    display: flex;
+    margin: 0;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 16px;
+    color: var(--ink-2);
+    font-size: 13px;
+    line-height: 20px;
+
+    b {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 650;
+    }
+    [data-tone="danger"] b {
+      color: var(--rt-pencil-deep);
+    }
+  }
+  .rep-tabel-sum-period {
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* ---- the sheet: its own scroller, so the head and the names can stay ---- */
+  .rep-tabel-sheet {
+    position: relative;
+    /* down to the window's edge under the legend (TabelView measures where the sheet starts) */
+    max-height: max(260px, calc(100dvh - var(--rep-tabel-top, 286px)));
+    overflow: auto;
+    overscroll-behavior: contain;
+    border-radius: 12px;
+    background: var(--rt-raise);
+    box-shadow: 0 0 0 1px var(--rule);
+    font-size: 13px;
+    line-height: 16px;
+    scrollbar-width: thin;
+  }
+  .rep-tabel-grid {
+    min-width: var(--rep-tabel-least, 0);
+  }
+  .rep-tabel-row {
+    display: grid;
+    grid-template-columns: var(--rep-tabel-cols);
+    align-items: stretch;
+  }
+  .rep-tabel-body .rep-tabel-row {
+    height: 30px;
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--rt-row-bg);
+    cursor: default;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+    &:hover {
+      --rt-row-bg: color-mix(in srgb, var(--ink) 4%, var(--rt-raise));
+    }
+    &[data-selected] {
+      --rt-row-bg: color-mix(in srgb, var(--ink) 7.5%, var(--rt-raise));
+    }
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-body .rep-tabel-row {
+    height: 23px;
+  }
+
+  /* the names: stuck to the left edge, over the days that scroll under them */
+  .rep-tabel-name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    background: var(--rt-row-bg);
+    box-shadow: inset -1px 0 0 var(--rule);
+  }
+  .rep-tabel-name-button {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    align-items: center;
+    gap: 8px;
+    min-height: 0;
+    padding: 0 10px 0 12px;
+    border-radius: 0;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+  }
+  .rep-tabel-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rep-tabel-name-button:hover .rep-tabel-name-text {
+    text-decoration: underline;
+    text-decoration-color: var(--rule);
+    text-underline-offset: 3px;
+  }
+  .rep-tabel-row[data-gone] .rep-tabel-name-text {
+    color: var(--rt-ink-3);
+  }
+  .rep-tabel-row[data-selected] .rep-tabel-name {
+    box-shadow:
+      inset 3px 0 0 var(--pen),
+      inset -1px 0 0 var(--rule);
+  }
+  .rep-tabel-row[data-open] .rep-tabel-name-text {
+    color: var(--rt-pen-deep);
+    font-weight: 600;
+  }
+
+  /* ---- a day: its column's place (weekend, holiday, a new week, today), then its mark ---- */
+  .rep-tabel-cell,
+  .rep-tabel-dhead,
+  .rep-tabel-foot-cell {
+    position: relative;
+    min-width: 0;
+
+    &[data-off] {
+      background: var(--rt-dim);
+    }
+    &[data-hol] {
+      background: repeating-linear-gradient(135deg, var(--rt-hatch) 0 2px, transparent 2px 6px);
+    }
+    &[data-mon] {
+      box-shadow: inset 1px 0 0 var(--rule);
+    }
+    &[data-today] {
+      box-shadow:
+        inset 1px 0 0 var(--rt-today),
+        inset -1px 0 0 var(--rt-today);
+    }
+  }
+  .rep-tabel-cell {
+    display: grid;
+    place-items: center;
+  }
+  .rep-tabel-mark {
+    display: grid;
+    width: calc(100% - 4px);
+    max-width: 40px;
+    height: 22px;
+    place-items: center;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 650;
+    line-height: 1;
+  }
+  .rep-tabel-cell[data-state="submitted"] > .rep-tabel-mark {
+    background: var(--rt-ok-cell);
+    color: var(--rt-ok-deep);
+  }
+  .rep-tabel-cell[data-state="missed"] > .rep-tabel-mark {
+    background: var(--rt-miss-cell);
+    color: var(--rt-pencil-deep);
+    font-weight: 700;
+  }
+  .rep-tabel-cell[data-state="excused"] > .rep-tabel-mark {
+    background: var(--rt-grey-cell);
+    color: var(--ink-2);
+  }
+  .rep-tabel-cell[data-state="away"] > .rep-tabel-mark {
+    color: var(--rt-ink-3);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+  /* colour only: a quarter in one look */
+  .rep-tabel-sheet[data-mode="dense"] {
+    .rep-tabel-mark {
+      width: calc(100% - 3px);
+      height: 13px;
+      border-radius: 3px;
+    }
+    .rep-tabel-cell[data-state="submitted"] > .rep-tabel-mark {
+      background: color-mix(in srgb, var(--ok-ink) 62%, transparent);
+    }
+    .rep-tabel-cell[data-state="missed"] > .rep-tabel-mark {
+      background: var(--pencil);
+    }
+    .rep-tabel-cell[data-state="excused"] > .rep-tabel-mark {
+      background: color-mix(in srgb, var(--rt-ink-3) 48%, transparent);
+    }
+    .rep-tabel-cell[data-state="away"] > .rep-tabel-mark {
+      background: color-mix(in srgb, var(--rt-ink-3) 24%, transparent);
+    }
+  }
+
+  /* ---- the head: stays on top; a day's head opens «День» ---- */
+  /* the desk's tables pad and colour every column head (graphite.css, journal.css): this sheet
+     draws its own, so the head cells take nothing from there */
+  .rep-tabel-sheet .rep-tabel-head [role="columnheader"] {
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    line-height: inherit;
+  }
+  .rep-tabel-sheet .rep-tabel-head [role="columnheader"] button {
+    color: var(--ink-2);
+    font-size: inherit;
+    line-height: inherit;
+  }
+  .rep-tabel-head {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--rt-raise);
+    box-shadow: 0 1px 0 var(--rule);
+  }
+  .rep-tabel-heads {
+    height: 40px;
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-heads {
+    height: 22px;
+  }
+  .rep-tabel-head .rep-tabel-name,
+  .rep-tabel-foot .rep-tabel-name {
+    z-index: 2;
+    padding: 0 12px;
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .rep-tabel-sheet .rep-tabel-head .rep-tabel-name {
+    align-items: flex-end;
+    padding: 0 12px 7px;
+    color: var(--rt-ink-3);
+    font-weight: 500;
+  }
+  .rep-tabel-sheet .rep-tabel-head .rep-tabel-dhead {
+    display: flex;
+    overflow: hidden;
+    padding: 3px 1px;
+  }
+  .rep-tabel-dhead-button {
+    display: flex;
+    min-width: 0;
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 0;
+    border-radius: 6px;
+
+    &:hover:not(:disabled) {
+      background: var(--rt-hover);
+      color: var(--ink);
+    }
+    &:disabled {
+      cursor: default;
+    }
+  }
+  .rep-tabel-dnum {
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 14px;
+  }
+  .rep-tabel-dwd {
+    color: var(--rt-ink-3);
+    font-size: 10.5px;
+    line-height: 12px;
+  }
+  .rep-tabel-dhead[data-off] .rep-tabel-dnum,
+  .rep-tabel-dhead[data-hol] .rep-tabel-dnum,
+  .rep-tabel-dhead-button:disabled .rep-tabel-dnum {
+    color: var(--rt-ink-3);
+    font-weight: 500;
+  }
+  .rep-tabel-dhead[data-today] {
+    box-shadow:
+      inset 1px 0 0 var(--rt-today),
+      inset -1px 0 0 var(--rt-today),
+      inset 0 -2px 0 var(--pen);
+  }
+  .rep-tabel-dhead[data-today] .rep-tabel-dnum {
+    color: var(--rt-pen-deep);
+    font-weight: 700;
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-head .rep-tabel-dhead {
+    padding: 0;
+    overflow: visible;
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-dhead-button {
+    align-items: flex-start;
+    border-radius: 3px;
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-dnum {
+    position: relative;
+    z-index: 1;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .rep-tabel-months {
+    height: 18px;
+  }
+  .rep-tabel-month {
+    overflow: visible;
+    padding: 3px 0 0 2px;
+    color: var(--ink-2);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    white-space: nowrap;
+  }
+
+  /* ---- the totals: the right edge; the bottom row: who did not hand in each day ---- */
+  .rep-tabel-end {
+    position: sticky;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: flex-end;
+    background: var(--rt-row-bg);
+    box-shadow: inset 1px 0 0 var(--rule);
+  }
+  .rep-tabel-head .rep-tabel-end,
+  .rep-tabel-foot .rep-tabel-end {
+    z-index: 2;
+  }
+  .rep-tabel-totals {
+    display: flex;
+    height: 100%;
+    align-items: center;
+
+    > span {
+      padding-right: 10px;
+      color: var(--ink);
+      font-size: 13px;
+      text-align: right;
+      white-space: nowrap;
+    }
+    [data-col="submitted"] {
+      width: 44px;
+    }
+    [data-col="missed"] {
+      width: 58px;
+    }
+    [data-col="excused"] {
+      width: 48px;
+    }
+    [data-col="rate"] {
+      width: 50px;
+    }
+    [data-tone="danger"] {
+      color: var(--rt-pencil-deep);
+      font-weight: 650;
+    }
+    [data-tone="quiet"] {
+      color: var(--rt-ink-3);
+    }
+    &[data-as="head"] {
+      align-items: flex-end;
+      padding: 0 0 7px;
+
+      > span {
+        color: var(--rt-ink-3);
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+    &[data-as="foot"] > span {
+      font-weight: 600;
+    }
+  }
+  .rep-tabel-foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 3;
+    background: var(--rt-raise);
+    box-shadow: 0 -1px 0 var(--rule);
+
+    .rep-tabel-row {
+      height: 28px;
+    }
+    .rep-tabel-name {
+      color: var(--ink-2);
+      font-weight: 600;
+    }
+  }
+  .rep-tabel-foot-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rep-tabel-foot-n {
+    color: var(--rt-pencil-deep);
+    font-size: 12px;
+    font-weight: 650;
+  }
+  .rep-tabel-sheet[data-mode="dense"] .rep-tabel-foot-cell {
+    align-items: flex-end;
+    padding: 4px 0;
+  }
+  .rep-tabel-foot-bar {
+    width: calc(100% - 4px);
+    max-width: 9px;
+    border-radius: 2px 2px 0 0;
+    background: var(--pencil);
+  }
+  .rep-tabel-none {
+    position: sticky;
+    left: 0;
+    display: flex;
+    width: max-content;
+    margin: 0;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px;
+    color: var(--ink-2);
+    font-size: 13px;
+  }
+
+  /* ---- the legend under the sheet ---- */
+  .rep-tabel-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 16px;
+    color: var(--rt-ink-3);
+    font-size: 12px;
+    line-height: 16px;
+  }
+  .rep-tabel-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rep-tabel-legend-mark {
+    display: inline-grid;
+    min-width: 18px;
+    height: 16px;
+    place-items: center;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 650;
+    line-height: 1;
+
+    &[data-state="submitted"] {
+      background: var(--rt-ok-cell);
+      color: var(--rt-ok-deep);
+    }
+    &[data-state="missed"] {
+      background: var(--rt-miss-cell);
+      color: var(--rt-pencil-deep);
+    }
+    &[data-state="excused"] {
+      background: var(--rt-grey-cell);
+      color: var(--ink-2);
+    }
+    &[data-state="away"] {
+      color: var(--rt-ink-3);
+    }
+    &[data-state="holiday"] {
+      background: repeating-linear-gradient(135deg, var(--rt-hatch) 0 2px, transparent 2px 5px);
+    }
+    &[data-state="today"] {
+      box-shadow: inset 0 0 0 1px var(--rt-today);
+    }
+  }
+  .rep-tabel-legend[data-mode="dense"] .rep-tabel-legend-mark {
+    width: 10px;
+    min-width: 0;
+    height: 10px;
+    padding: 0;
+    border-radius: 2px;
+
+    &[data-state="submitted"] {
+      background: color-mix(in srgb, var(--ok-ink) 62%, transparent);
+    }
+    &[data-state="missed"] {
+      background: var(--pencil);
+    }
+    &[data-state="excused"] {
+      background: color-mix(in srgb, var(--rt-ink-3) 48%, transparent);
+    }
+    &[data-state="away"] {
+      background: color-mix(in srgb, var(--rt-ink-3) 24%, transparent);
+    }
+  }
+  .rep-tabel-legend-hint {
+    margin-left: auto;
+  }
+
+  /* ---- loading: the same line and sheet, no jump when the data comes ---- */
+  .rep-tabel-bone {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .rep-tabel-bone-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 0 0 1px var(--rule);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .rep-tabel[data-stale] .rep-tabel-sheet {
+      transition: none;
+    }
+  }
+}
+
+/* ---- on paper: the табель landscape A4 with the file's short words and the legend, «Сводка»
+   portrait; black on white is graphite.css's (D-183) ----------------------------------------- */
+@media print {
+  @page tabel {
+    size: A4 landscape;
+    margin: 9mm 8mm;
+  }
+
+  /* the whole document on the табель's page: a named page only on the sheet would break before it */
+  html[data-surface="desk"][data-journal]:has(.desk-print.rep-tabel-print),
+  html[data-surface="desk"][data-journal]:has(.desk-print.rep-tabel-print) body {
+    page: tabel;
+  }
+  html[data-surface="desk"][data-journal] .desk-print.rep-tabel-print {
+    page: tabel;
+    font-size: 7.5pt;
+    line-height: 7.5pt;
+
+    header {
+      margin-bottom: 5pt;
+    }
+    .desk-figure {
+      font-size: 12pt;
+      line-height: 15pt;
+    }
+    h2 {
+      font-size: 10pt;
+      line-height: 13pt;
+    }
+    table {
+      table-layout: fixed;
+    }
+    col[data-col="name"] {
+      width: 34mm;
+    }
+    col[data-col="total"] {
+      width: 13mm;
+    }
+    th,
+    td {
+      overflow: hidden;
+      padding: 0.6pt 2pt;
+      white-space: nowrap;
+    }
+    th {
+      font-size: 7pt;
+      font-weight: 600;
+      line-height: 8pt;
+      text-transform: none;
+    }
+    th[data-day],
+    td[data-day] {
+      padding: 0.6pt 0;
+      border-left: 0.25pt solid var(--rule-soft);
+      text-align: center;
+    }
+    td[data-day] {
+      font-size: 6.5pt;
+    }
+    td:first-child {
+      text-overflow: ellipsis;
+    }
+    [data-dim] {
+      background: #efefef;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+    .rep-tabel-print-sub {
+      display: block;
+      color: var(--ink-2);
+      font-size: 5.5pt;
+      font-weight: 400;
+      line-height: 6.5pt;
+    }
+    /* a quarter on one sheet: the words shrink, the codes stay */
+    &[data-long] {
+      font-size: 5pt;
+      line-height: 6.5pt;
+
+      th,
+      td[data-day] {
+        font-size: 5pt;
+      }
+    }
+  }
+  /* «Сводка» on paper: portrait, the words whole; a time or a state on one line */
+  @page rep-day {
+    size: A4 portrait;
+    margin: 12mm 12mm 14mm;
+  }
+  html[data-surface="desk"][data-journal]:has(.desk-print[data-kind="day"]),
+  html[data-surface="desk"][data-journal]:has(.desk-print[data-kind="day"]) body {
+    page: rep-day;
+  }
+  html[data-surface="desk"][data-journal] .desk-print[data-kind="day"] {
+    page: rep-day;
+    font-size: 8.5pt;
+    line-height: 11pt;
+
+    table {
+      table-layout: fixed;
+    }
+    /* Сотрудник, Должность, Состояние, Время, Сдан в, Задачи — the rest is «Что сделано» */
+    col:nth-child(1) {
+      width: 27mm;
+    }
+    col:nth-child(2) {
+      width: 21mm;
+    }
+    col:nth-child(3) {
+      width: 19mm;
+    }
+    col:nth-child(4) {
+      width: 17mm;
+    }
+    col:nth-child(5) {
+      width: 13mm;
+    }
+    col:nth-child(6) {
+      width: 33mm;
+    }
+    th {
+      font-size: 7.5pt;
+    }
+  }
+  html[data-surface="desk"][data-journal] .desk-print td[data-tight],
+  html[data-surface="desk"][data-journal] .desk-print th[data-tight] {
+    white-space: nowrap;
+  }
+  html[data-surface="desk"][data-journal] .desk-print .rep-tabel-print-note {
+    margin-top: 6pt;
+    color: var(--ink-2);
+    font-size: 7pt;
+    line-height: 9pt;
+    white-space: normal;
+  }
+}
