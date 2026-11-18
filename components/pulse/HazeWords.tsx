@@ -7,9 +7,10 @@ const WHOLE_S = 0.7;
 const STEP_S = 0.04;
 
 /**
- * A line said by the assistant: each word comes out of a light haze a moment after the one
- * before it, as a written answer appears (D-166). The text is all there from the first frame —
- * for a screen reader, a copy and a test it is one plain string; only its look arrives.
+ * A thought of the assistant (ThoughtBubble): each word comes out of a light haze a moment after
+ * the one before it, as a written answer appears (D-166); the line under the face speaks in
+ * captions instead (Assistant, D-181). The text is all there from the first frame — for a screen
+ * reader, a copy and a test it is one plain string; only its look arrives.
  * Memoised: the board redraws on every tap (a ball opened), the words it says stay the same.
  */
 export const HazeWords = memo(function HazeWords({ text, delay = 0 }: { text: string; delay?: number }) {

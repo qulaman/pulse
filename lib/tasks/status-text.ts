@@ -158,7 +158,8 @@ export function verdict(counts: InboxCounts): { tone: VerdictTone; text: string 
   if (counts.review > 0) parts.push(`${counts.review} на приёмке`);
 
   if (parts.length === 0) return { tone: "ok", text: TEXT.emptyInbox };
-  return { tone: counts.overdue > 0 ? "danger" : "warn", text: parts.join(", ") };
+  // a refusal is red, as its ball on the board (owner, 2026-11-18, D-181)
+  return { tone: counts.overdue > 0 || (counts.declined ?? 0) > 0 ? "danger" : "warn", text: parts.join(", ") };
 }
 
 /* -------------------------------------------------------------------------- */

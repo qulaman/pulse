@@ -315,6 +315,11 @@ describe("openingLine", () => {
     expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 просрочка, 2 на приёмке.", tone: "danger" });
   });
 
+  it("a refusal makes the line red, as its ball on the board", () => {
+    const lanes = lanesOf([row("d", "Смета", "Ерлан", "declined"), row("r", "КП", "Марат", "pending_review")], NOW, ME);
+    expect(openingLine(lanes, NOW, "Асхат")).toEqual({ text: "Доброе утро, Асхат. 1 отказ, 1 на приёмке.", tone: "danger" });
+  });
+
   it("greets and says it is quiet otherwise, with the nearest deadline", () => {
     const lanes = lanesOf([row("a", "Отчёт", "Марат", "accepted", { deadline: "2026-09-11T13:00:00Z" })], NOW, ME);
     expect(openingLine(lanes, NOW, "Асхат")).toEqual({

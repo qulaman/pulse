@@ -1,0 +1,223 @@
+/* What the assistant says, as live captions (D-181): type instead of ornament. Each word arrives in
+   the voice's rhythm; the grey frame just rises, the headline's facts come with a soft white light
+   and the line's verdict with a light of its tone's colour, which goes as the voice moves on. One-shot
+   CSS on the compositor (opacity, transform, filter) with `backwards` fill: once the last word has
+   landed nothing runs and no filter is left. The text is in the DOM from the first frame. Two weights
+   only — 400 and 600. */
+
+.root {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ---- the director's own question: quiet, after a microphone ---- */
+
+.said {
+  margin: 0 0 6px; /* 6 + the gap = 14 px to the reply */
+  text-align: center;
+  text-wrap: balance;
+  font-size: 15px;
+  line-height: 20px;
+  color: var(--text-muted);
+  animation: said-in 260ms var(--ease-out) backwards;
+}
+
+.mic {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+
+@keyframes said-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---- the assistant's lines ---- */
+
+.line {
+  margin: 0;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* the first line is the headline, always the same size: nothing jumps between replies */
+.head {
+  font-size: 20px;
+  line-height: 26px;
+  /* a hair tighter than the text, never so tight a digit touches its word («1 вопрос») */
+  letter-spacing: -0.005em;
+}
+
+/* the lines after it are details */
+.detail {
+  font-size: 17px;
+  line-height: 23px;
+}
+
+/* the greeting: a quiet row of its own over the news */
+.kicker {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0.01em;
+}
+
+/* ---- looks: white, the weight of a fact, the tone of a verdict ---- */
+
+.text {
+  color: var(--text);
+}
+
+.bold {
+  font-weight: 600;
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.warn {
+  color: var(--warn);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+/* a unit stays on one row */
+.keep {
+  white-space: nowrap;
+}
+
+/* ---- a word as it is said ---- */
+
+.w {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  animation: rise 260ms var(--ease-out) backwards;
+  /* --shift: the reply waits 60 ms while the last one lifts away */
+  animation-delay: calc(var(--d, 0s) + var(--shift, 0s));
+}
+
+/* the frame: up out of nothing, already in its grey — nothing dims under the eye */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.24em);
+  }
+}
+
+/* a white fact of the headline: a soft white light that goes in 420 ms */
+.shine {
+  animation-name: shine;
+  animation-duration: 420ms;
+}
+
+@keyframes shine {
+  0% {
+    opacity: 0;
+    transform: translateY(0.24em);
+    filter: drop-shadow(0 0 0.35em color-mix(in srgb, var(--text) 45%, transparent));
+  }
+  15% {
+    opacity: 1;
+  }
+  37% {
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+/* the verdict: a light of its own colour — the hue never shifts, red stays red, amber stays amber */
+.flare {
+  animation-name: flare;
+  animation-duration: 520ms;
+}
+
+@keyframes flare {
+  0% {
+    opacity: 0;
+    transform: translateY(0.24em);
+    filter: drop-shadow(0 0 0.45em color-mix(in srgb, var(--glow) 75%, transparent));
+  }
+  13% {
+    opacity: 1;
+  }
+  30% {
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+}
+
+/* ---- the ways out: in sight at once — a button is never hidden while it can be tapped ---- */
+
+.after {
+  animation: after-in 220ms var(--ease-out) backwards;
+}
+
+@keyframes after-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* ---- the lines that just left: what had been said of each lifts away from where it stood (each
+   line's bottom is set to its old one, so nothing drops); faint by mid-way, so two texts never mix ---- */
+
+.ghost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  animation: leave 140ms var(--ease-out) forwards;
+}
+
+.ghost > .line {
+  position: absolute;
+  inset-inline: 0;
+}
+
+.ghost .w {
+  animation: none;
+}
+
+@keyframes leave {
+  45% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-0.4em);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .said,
+  .w,
+  .after {
+    animation: none;
+  }
+
+  .ghost {
+    display: none;
+  }
+}
