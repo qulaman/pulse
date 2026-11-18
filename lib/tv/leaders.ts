@@ -9,7 +9,7 @@ import type { TvRatingScene } from "./queries";
  *
  * Главное правило то же, что у всей стены: плохое по имени не выносится (D-45). Поэтому
  * здесь только первая пятёрка (база шестого и не отдаёт), рост — только положительный,
- * награды — только награды, «в срок» — числом хорошего, без процента.
+ * награды — только награды, сданное — одним числом, без «в срок» и процента.
  */
 
 export type LeaderCard = {
@@ -23,7 +23,7 @@ export type LeaderCard = {
   pointsWord: string;
   /** Рост к прошлому периоду; падение не печатается. */
   delta: number | null;
-  /** «сдано 9 · в срок 8», если сдавал; иначе null. */
+  /** «сдано 9» (и «🔥 4 подряд»), если сдавал; иначе null. */
   done: string | null;
 };
 
@@ -56,12 +56,35 @@ export function formatPoints(value: number): string {
   return Math.round(value).toLocaleString("ru-RU").replace(/\s/g, " ");
 }
 
-/** «сдано 5 · в срок 4», and the run of handovers in time from two (И-69, D-133). */
-function doneLine(done: number, onTime: number, streak = 0): string | null {
+/**
+ * «сдано 5» — one number, and the run of handovers in time from two (И-69, D-133). «в срок 4»
+ * beside «сдано 5» is gone: the pair gives away the one late handover by name (D-45, D-182).
+ */
+function doneLine(done: number, streak = 0): string | null {
   const run = streak >= 2 ? `🔥 ${streak} подряд` : null;
   if (done <= 0) return run;
-  const base = onTime > 0 ? `сдано ${done} · в срок ${Math.min(onTime, done)}` : `сдано ${done}`;
+  const base = `сдано ${done}`;
   return run ? `${base} · ${run}` : base;
+}
+
+/**
+ * Who climbed since the last picture of the five (D-182): a place better than before, or a place
+ * in the five out of nowhere. The wall slides them to their new place and flashes the step once.
+ * The first picture (nothing before it) has no climbers — the scene's entrance is enough.
+ */
+export function risenIds(before: Readonly<Record<string, number>> | null, after: Readonly<Record<string, number>>): string[] {
+  if (!before || Object.keys(before).length === 0) return [];
+  return Object.entries(after)
+    .filter(([id, rank]) => before[id] === undefined || rank < before[id])
+    .map(([id]) => id);
+}
+
+/** The places of the five by person: the input of `risenIds`. */
+export function ranksOf(view: LeadersView): Record<string, number> {
+  if (view.state !== "ready") return {};
+  const ranks: Record<string, number> = {};
+  for (const card of [...view.podium, ...view.rest]) ranks[card.id] = card.rank;
+  return ranks;
 }
 
 export function leadersView(data: TvRatingScene | null, now: Date): LeadersView {
@@ -82,7 +105,7 @@ export function leadersView(data: TvRatingScene | null, now: Date): LeadersView 
       points: row.points,
       pointsWord: pluralRu(row.points, ["очко", "очка", "очков"]),
       delta: row.delta > 0 ? row.delta : null,
-      done: doneLine(row.done, row.on_time, row.streak ?? 0),
+      done: doneLine(row.done, row.streak ?? 0),
     }));
 
   const [first, second, third] = cards;
@@ -109,11 +132,9 @@ export function leadersView(data: TvRatingScene | null, now: Date): LeadersView 
       time: storyTime(award.at, now),
     }));
 
+  // one number of handovers, no «в срок» beside it (D-45, D-182)
   const team: string[] = [];
-  if (data.team.done > 0) {
-    team.push(`сдано ${formatPoints(data.team.done)}`);
-    if (data.team.on_time > 0) team.push(`в срок ${formatPoints(Math.min(data.team.on_time, data.team.done))}`);
-  }
+  if (data.team.done > 0) team.push(`сдано ${formatPoints(data.team.done)}`);
   if (data.team.earned > 0) {
     team.push(`${formatPoints(data.team.earned)} ${pluralRu(data.team.earned, ["очко", "очка", "очков"])} заработано`);
   }

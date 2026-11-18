@@ -88,3 +88,51 @@
     animation: none;
   }
 }
+
+/* The day curve's «now» (D-182): a dot on the curve that breathes by opacity — no line across the scenes */
+.breathe {
+  animation: tv-breathe 3.2s var(--ease-in-out) infinite;
+}
+
+@keyframes tv-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* A moment of the day (D-182): a few dozen sparks fly out of the face and fade, transform and opacity
+   only. Each spark carries its own path in custom properties (--dx, --dy, --rot) and its delay. */
+.spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  opacity: 0;
+  animation: tv-spark var(--spark-time, 2.6s) cubic-bezier(0.15, 0.6, 0.35, 1) var(--spark-delay, 0s) 1 both;
+}
+
+@keyframes tv-spark {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1) rotate(var(--rot));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spark {
+    display: none;
+  }
+}

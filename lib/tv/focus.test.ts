@@ -1,19 +1,22 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  currentStep,
   focusCard,
   focusRows,
   initialsOfName,
   PER_LANE,
+  focusPeople,
   ratingView,
-  ROWS_GRID,
-  ROWS_SINGLE,
-  storyBoard,
   storyRows,
   storyTime,
   taskSteps,
 } from "./focus";
 import type { TvFocusEmployee, TvFocusTask, TvStoryEvent } from "./queries";
+
+/** Rows of a story in the task scene: a long story squeezes to this. */
+const ROWS_SINGLE = 9;
+const ROWS_GRID = 5;
 
 const NOW = new Date("2026-09-18T09:00:00Z"); // 14:00 в Актобе
 
@@ -261,36 +264,54 @@ describe("storyRows — хронология дела", () => {
   });
 });
 
-describe("storyBoard — дела карточками", () => {
+describe("focusPeople — человек на стене v5 (D-182)", () => {
   const expires = new Date(NOW.getTime() + 10 * 60_000).toISOString(); // фокус начался сейчас
 
-  it("до двух дел — одной строкой карточек повыше", () => {
-    const board = storyBoard({ ...focus([{ status: "sent" }, { status: "accepted" }]), expires_at: expires }, NOW);
-    expect([board.mode, board.cols, board.rows, board.pages]).toEqual(["open", 2, 1, 1]);
-    expect(board.cards.map((card) => card.stageLabel)).toEqual(["Новая", "В работе"]);
+  it("дела — заголовок, срок и четыре станции; до двух — крупно, без журнала", () => {
+    const view = focusPeople({ ...focus([{ status: "sent" }, { status: "accepted" }]), expires_at: expires }, NOW);
+    expect([view.mode, view.large, view.pages]).toEqual(["open", true, 1]);
+    expect(view.plates.map((plate) => [plate.title, plate.now, plate.steps.length])).toEqual([
+      ["Подписать акт", "Принятие", 4],
+      ["Подписать акт", "Сдача", 4],
+    ]);
+    expect(Object.keys(view.plates[0])).not.toContain("rows");
+  });
+
+  it("нулевые числа не печатаются", () => {
+    const view = focusPeople({ ...focus([{ status: "accepted" }]), expires_at: expires, counts: { new: 0, work: 3, review: 0 } }, NOW);
+    expect(view.counts.map((count) => [count.key, count.value, count.word])).toEqual([["work", 3, "в работе"]]);
   });
 
   it("больше четырёх — сетка 2 × 2, стена листает сама по часам фокуса", () => {
     const seven = focus(Array.from({ length: 7 }, (_, i) => ({ id: `t${i}`, status: "accepted" })));
-    const at = (seconds: number) => storyBoard({ ...seven, expires_at: expires }, new Date(NOW.getTime() + seconds * 1000));
-    expect([at(0).page, at(0).pages, at(0).cards.length, at(0).cols, at(0).rows]).toEqual([0, 2, 4, 2, 2]);
-    expect([at(25).page, at(25).cards.length]).toEqual([1, 3]);
+    const at = (seconds: number) => focusPeople({ ...seven, expires_at: expires }, new Date(NOW.getTime() + seconds * 1000));
+    expect([at(0).page, at(0).pages, at(0).plates.length, at(0).large]).toEqual([0, 2, 4, false]);
+    expect([at(25).page, at(25).plates.length]).toEqual([1, 3]);
     expect(at(45).page).toBe(0);
   });
 
-  it("открытых нет — сданное за неделю; нет ничего — пусто", () => {
-    const none = { ...focus([]), expires_at: expires };
-    expect(storyBoard(none, NOW).mode).toBe("empty");
-    const done = storyBoard({ ...none, done_recent: [task({ id: "d", status: "done" })] }, NOW);
-    expect([done.mode, done.cards[0].stageLabel, done.cards[0].deadline]).toEqual(["done", "Принята", null]);
+  it("открытых нет — хорошая фраза, а не «0 · 0 · 0»", () => {
+    const none = { ...focus([]), expires_at: expires, counts: { new: 0, work: 0, review: 0 } };
+    expect(focusPeople({ ...none, done_today: { count: 2, titles: [null, null] } }, NOW).clear).toEqual({ title: "Все дела сданы", line: "сегодня 2" });
+    expect(focusPeople({ ...none, rating: { points: false, done_week: 9, on_time_week: 8 } }, NOW).clear).toEqual({
+      title: "Все дела сданы",
+      line: "за неделю 9",
+    });
+    expect(focusPeople(none, NOW).counts).toEqual([]);
+    expect(focusPeople(none, NOW).clear?.line).toBeNull();
   });
 
-  it("не отданное базой — числом: «ещё N»", () => {
-    const board = storyBoard(
-      { ...focus([{ status: "sent" }]), expires_at: expires, counts: { new: 5, work: 8, review: 2 } },
+  it("гостю — имя и сданное сегодня, без карточек дел и чисел (D-33)", () => {
+    const view = focusPeople(
+      { ...focus([{ status: "sent", title: null }, { status: "sent", title: null }], true), expires_at: expires, done_today: { count: 3, titles: [] } },
       NOW,
     );
-    expect([board.total, board.hidden]).toEqual([15, 14]);
+    expect([view.guest, view.plates, view.counts, view.today]).toEqual([true, [], [], 3]);
+  });
+
+  it("не отданное базой — числом: «показаны N»", () => {
+    const view = focusPeople({ ...focus([{ status: "sent" }]), expires_at: expires, counts: { new: 5, work: 8, review: 2 } }, NOW);
+    expect([view.total, view.hidden]).toEqual([15, 14]);
   });
 });
 
@@ -306,10 +327,10 @@ describe("taskSteps — одно дело во весь экран (D-123)", () 
   it("пройденные шаги — со временем, текущий — подсвечен", () => {
     const steps = taskSteps(task({ status: "pending_review", story }), NOW);
     expect(steps.map((step) => [step.label, step.time, step.state])).toEqual([
-      ["Поставлена", "09:12", "passed"],
-      ["Принята в работу", "09:20", "passed"],
-      ["Сдана на проверку", "15:45", "passed"],
-      ["Принята директором", null, "now"],
+      ["Выдана", "09:12", "passed"],
+      ["В работе", "09:20", "passed"],
+      ["Сдана", "15:45", "passed"],
+      ["Проверка", null, "now"],
     ]);
   });
 
@@ -317,6 +338,9 @@ describe("taskSteps — одно дело во весь экран (D-123)", () 
     const steps = taskSteps(task({ status: "rework", story }), NOW);
     expect(steps.map((step) => step.state)).toEqual(["passed", "passed", "now", "next"]);
     expect(steps[2].time).toBeNull();
+    // the lit station is «Сдача» — a process ahead, never «Сдана на проверку · ждём» on an order in work
+    expect(currentStep(steps)?.label).toBe("Сдача");
+    expect(steps.map((step) => step.label).join(" ")).not.toMatch(/Доработка|ждём/);
   });
 
   it("новая ждёт принятия; принятая директором — все четыре пройдены", () => {
@@ -329,6 +353,18 @@ describe("taskSteps — одно дело во весь экран (D-123)", () 
     const done = taskSteps(task({ status: "done", story: [...story, { k: "done", at: today(16) }] }), NOW);
     expect(done.map((step) => step.state)).toEqual(["passed", "passed", "passed", "passed"]);
     expect(done[3].time).toBe("16:00");
+    expect(currentStep(done)).toBeNull();
+    expect(currentStep(taskSteps(task({ status: "sent", story: [story[0]] }), NOW))?.label).toBe("Принятие");
+  });
+
+  it("в работе горит «Сдача», а не «Сдана»: слова — как на телефоне сотрудника (D-173)", () => {
+    const steps = taskSteps(task({ status: "accepted", story: story.slice(0, 2) }), NOW);
+    expect(steps.map((step) => [step.label, step.state])).toEqual([
+      ["Выдана", "passed"],
+      ["В работе", "passed"],
+      ["Сдача", "now"],
+      ["Закрыта", "next"],
+    ]);
   });
 });
 
@@ -347,7 +383,7 @@ describe("ratingView — рейтинг на стене", () => {
         { value: 30, current: false },
         { value: 90, current: true },
       ],
-      week: { done: 9, onTime: 8 },
+      week: { done: 9 },
     });
   });
 
@@ -370,7 +406,7 @@ describe("ratingView — рейтинг на стене", () => {
       points: null,
       delta: null,
       bars: null,
-      week: { done: 3, onTime: 3 },
+      week: { done: 3 },
     });
     expect(ratingView(withRating({ points: false, done_week: 0, on_time_week: 0 }))?.week).toBeNull();
   });

@@ -17,6 +17,8 @@ function isPublicPath(pathname: string): boolean {
   return (
     pathname === "/" ||
     isSignInPath(pathname) ||
+    // a wall without a session shows its code here and waits for the director (D-182)
+    pathname === "/tv-connect" ||
     pathname.startsWith("/api/") ||
     pathname.startsWith("/_next/") ||
     pathname.includes(".")
@@ -76,7 +78,9 @@ export async function proxy(request: NextRequest) {
 
   if (!userId) {
     if (isPublicPath(pathname)) return response;
-    return redirectTo(request, response, "/login");
+    // a wall without a session shows its pairing code instead of a sign-in form nobody can type into (D-182)
+    const wall = pathname === "/tv" || pathname.startsWith("/tv/");
+    return redirectTo(request, response, wall ? "/tv-connect" : "/login");
   }
 
   if (pathname === "/" || isSignInPath(pathname)) {

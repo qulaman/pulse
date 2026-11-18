@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EVENT_SOON_MIN, overlayOf, waited } from "./overlay";
+import { EVENT_SOON_MIN, MESSAGE_MS, VISIT_WAIT_MS, VISIT_WAITING_MS, overlayOf, waited } from "./overlay";
 import type { TvEventRow, TvOverlay } from "./queries";
 
 const NOW = new Date("2026-09-25T09:00:00Z");
@@ -118,6 +118,66 @@ describe("overlayOf — мероприятие", () => {
 
   it("посетитель важнее мероприятия", () => {
     expect(overlayOf(visit(), [meeting(NOW.toISOString())], NOW).banner?.kind).toBe("visit");
+  });
+});
+
+describe("overlayOf — надпись живёт по возрасту, как в базе (D-182)", () => {
+  it("сроки те же, что у tv_overlay и visits_due_expiry: 20 минут, час, 30 минут", () => {
+    expect(VISIT_WAITING_MS).toBe(20 * 60_000);
+    expect(VISIT_WAIT_MS).toBe(60 * 60_000);
+    expect(MESSAGE_MS).toBe(30 * 60_000);
+  });
+
+  it("посетитель без ответа — 20 минут от прихода, потом надписи нет", () => {
+    expect(overlayOf(visit({ created_at: minutesAgo(19) }), [], NOW).banner?.kind).toBe("visit");
+    expect(overlayOf(visit({ created_at: minutesAgo(20) }), [], NOW)).toEqual({ banner: null, pill: null });
+    // yesterday's visitor kept in memory over a night without network
+    expect(overlayOf(visit({ created_at: minutesAgo(16 * 60) }), [], NOW).banner).toBeNull();
+  });
+
+  it("«Подождёт» — час от ответа директора, а не от прихода", () => {
+    const answered = (m: number) => visit({ status: "wait", created_at: minutesAgo(m + 30), answered_at: minutesAgo(m) });
+    expect(overlayOf(answered(59), [], NOW).pill?.kind).toBe("visit-wait");
+    expect(overlayOf(answered(60), [], NOW).pill).toBeNull();
+    // no answer time: counted from the arrival
+    expect(overlayOf(visit({ status: "wait", created_at: minutesAgo(61), answered_at: null }), [], NOW).pill).toBeNull();
+  });
+
+  it("сообщение — 30 минут от отправки", () => {
+    expect(overlayOf(message({ created_at: minutesAgo(29) }), [], NOW).banner?.kind).toBe("message");
+    expect(overlayOf(message({ created_at: minutesAgo(30) }), [], NOW).banner).toBeNull();
+  });
+
+  it("ушедший посетитель не заслоняет сообщение и встречу", () => {
+    const both: TvOverlay = { ...message(), visit: visit({ created_at: minutesAgo(45) }).visit, waiting: 1 };
+    expect(overlayOf(both, [], NOW).banner?.kind).toBe("message");
+    const old = visit({ created_at: minutesAgo(45) });
+    expect(overlayOf(old, [meeting(NOW.toISOString())], NOW).banner?.kind).toBe("event");
+  });
+
+  it("время, которое не прочесть, — не надпись", () => {
+    expect(overlayOf(visit({ created_at: "вчера" }), [], NOW).banner).toBeNull();
+  });
+});
+
+describe("overlayOf — встреча зовёт, только если она директора (D-182)", () => {
+  it("встреча без директора — без надписи", () => {
+    expect(overlayOf(null, [{ ...meeting(minutesAhead(EVENT_SOON_MIN)), director: false }], NOW).banner).toBeNull();
+    expect(overlayOf(null, [{ ...meeting(NOW.toISOString()), director: false }], NOW).banner).toBeNull();
+  });
+
+  it("встреча директора — надпись, как прежде", () => {
+    expect(overlayOf(null, [{ ...meeting(minutesAhead(EVENT_SOON_MIN)), director: true }], NOW).banner?.title).toBe("Через 15 минут");
+  });
+
+  it("старая база без признака — встреча считается директорской", () => {
+    expect(overlayOf(null, [meeting(minutesAhead(EVENT_SOON_MIN))], NOW).banner?.kind).toBe("event");
+  });
+
+  it("чужая встреча раньше не заслоняет директорскую следом", () => {
+    const other = { ...meeting(minutesAhead(EVENT_SOON_MIN)), id: "e0", director: false };
+    const mine = { ...meeting(NOW.toISOString()), id: "e1", director: true };
+    expect(overlayOf(null, [other, mine], NOW).banner).toMatchObject({ id: "e1", title: "Начинается" });
   });
 });
 

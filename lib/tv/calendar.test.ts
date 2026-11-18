@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   monthGrid,
   monthGridFrom,
+  MONTH_DAYS,
+  MONTH_WEEKS,
   monthSummary,
   PER_CELL,
   PER_DAY,
@@ -10,6 +12,7 @@ import {
   todayPlan,
   todaySummary,
   weekColumns,
+  weekStrip,
   weekSummary,
 } from "./calendar";
 import type { TvCalendarEvent } from "./queries";
@@ -45,13 +48,38 @@ describe("weekColumns", () => {
     expect(columns[1].rows[0]?.time).toBe("01:30");
   });
 
-  it("лишнее в дне — «+ ещё N»", () => {
+  it("лишнее в дне — «+N»", () => {
     const events = Array.from({ length: PER_DAY + 2 }, (_, i) => event({ id: `e${i}`, starts_at: `2026-09-26T0${i + 1}:00:00Z` }));
     const saturday = weekColumns(cal(events), NOW)[1];
     expect(saturday.rows).toHaveLength(PER_DAY);
     expect(saturday.more).toBe(2);
-    expect(weekSummary(weekColumns(cal(events), NOW))).toBe(`${PER_DAY + 2} мероприятий`);
+    expect(weekSummary(weekColumns(cal(events), NOW))).toBe("3 мероприятия");
     expect(weekSummary(weekColumns(cal([]), NOW))).toBe("Свободно");
+  });
+});
+
+describe("weekStrip — пустые дни одной строкой (D-182)", () => {
+  const days = (events: TvCalendarEvent[]) => weekStrip(weekColumns(cal(events), NOW, 6, 1));
+
+  it("плитки — только у дней со встречами, пустые подряд складываются в «Пн–Ср»", () => {
+    // завтра (сб) и чт заняты; вс … ср свободны
+    const strip = days([
+      event({ id: "sat", starts_at: "2026-09-26T05:00:00Z" }),
+      event({ id: "thu", starts_at: "2026-10-01T05:00:00Z" }),
+    ]);
+    expect(strip.busy.map((c) => c.label)).toEqual(["Завтра", "Чт"]);
+    expect(strip.free).toBe("Вс–Ср свободно");
+  });
+
+  it("несколько пустых отрезков — через запятую; одиночный день — сам по себе", () => {
+    const strip = days([event({ id: "mon", starts_at: "2026-09-28T05:00:00Z" }), event({ id: "wed", starts_at: "2026-09-30T05:00:00Z" })]);
+    expect(strip.free).toBe("Завтра–Вс, Вт, Чт свободно");
+  });
+
+  it("вся неделя свободна — одна фраза; занято всё — без строки", () => {
+    expect(days([])).toEqual({ busy: [], free: "Дальше на неделе свободно" });
+    const full = Array.from({ length: 6 }, (_, i) => event({ id: `f${i}`, starts_at: new Date(Date.parse("2026-09-26T05:00:00Z") + i * 86_400_000).toISOString() }));
+    expect(days(full).free).toBeNull();
   });
 });
 
@@ -111,15 +139,17 @@ describe("todayPlan — «Сегодня» крупно", () => {
 });
 
 describe("monthGrid — месяц сеткой", () => {
-  it("сентябрь 2026 — пять недель с понедельника 31 августа", () => {
+  it("четыре недели от текущей: первый ряд — эта неделя, а не прошлый месяц (D-182)", () => {
     const grid = monthGrid(cal([]), NOW);
-    expect(grid.title).toBe("Сентябрь 2026");
+    expect(grid.title).toBe("Сентябрь — октябрь 2026");
     expect(grid.weekdays[0]).toBe("Пн");
-    expect(grid.weeks).toHaveLength(5);
-    expect(grid.weeks[0][0]).toMatchObject({ day: 31, inMonth: false });
-    expect(grid.weeks[0][1]).toMatchObject({ day: 1, inMonth: true });
-    expect(grid.weeks[4][6]).toMatchObject({ day: 4, inMonth: false });
-    expect(monthGridFrom(NOW)).toBe("2026-08-31");
+    expect(grid.weeks).toHaveLength(MONTH_WEEKS);
+    expect(grid.weeks[0][0]).toMatchObject({ day: 21, inMonth: true, past: true });
+    expect(grid.weeks[0][4]).toMatchObject({ day: 25, today: true });
+    expect(grid.weeks[1][3]).toMatchObject({ day: 1, dayLabel: "1 окт", inMonth: false });
+    expect(grid.weeks[3][6]).toMatchObject({ day: 18 });
+    expect(monthGridFrom(NOW)).toBe("2026-09-21");
+    expect(MONTH_DAYS).toBe(28);
   });
 
   it("сегодня отмечено, прошедшие дни — прошлым, выходные — выходными", () => {
@@ -130,11 +160,12 @@ describe("monthGrid — месяц сеткой", () => {
     expect(cells.find((c) => c.day === 26 && c.inMonth)?.weekend).toBe(true);
   });
 
-  it("в клетке две строки, дальше «+N»; в подпись — только свой месяц", () => {
+  it("в клетке одна встреча крупно, дальше «+N»; в подпись — от сегодня", () => {
     const grid = monthGrid(
       cal([
         ...Array.from({ length: PER_CELL + 1 }, (_, i) => event({ id: `d${i}`, starts_at: `2026-09-28T0${i + 4}:00:00Z` })),
         event({ id: "tail", starts_at: "2026-10-02T05:00:00Z" }),
+        event({ id: "past", starts_at: "2026-09-22T05:00:00Z" }),
       ]),
       NOW,
     );
@@ -143,13 +174,12 @@ describe("monthGrid — месяц сеткой", () => {
     expect(monday?.more).toBe(1);
     expect(grid.weeks.flat().find((c) => c.day === 2 && !c.inMonth)?.rows).toHaveLength(1);
     expect(monthSummary(grid)).toBe("3 мероприятия");
+    expect(PER_CELL).toBe(1);
   });
 
-  it("месяц, начатый в воскресенье, растягивается на шесть недель", () => {
-    // 1 ноября 2026 — воскресенье
-    const grid = monthGrid(cal([]), new Date("2026-11-10T06:00:00Z"));
-    expect(grid.title).toBe("Ноябрь 2026");
-    expect(grid.weeks).toHaveLength(6);
-    expect(grid.weeks[0][6]).toMatchObject({ day: 1, inMonth: true });
+  it("через год — оба года в заголовке; внутри месяца — один месяц", () => {
+    expect(monthGrid(cal([]), new Date("2026-12-21T06:00:00Z")).title).toBe("Декабрь 2026 — январь 2027");
+    // 1 февраля 2027 — понедельник: четыре недели целиком в феврале
+    expect(monthGrid(cal([]), new Date("2027-02-01T06:00:00Z")).title).toBe("Февраль 2027");
   });
 });

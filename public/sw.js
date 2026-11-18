@@ -45,7 +45,8 @@ function isKeptScreen(url) {
     url.pathname !== "/ops" &&
     !url.pathname.startsWith("/ops/") &&
     url.pathname !== "/login" &&
-    !url.pathname.startsWith("/c/") // a company's sign-in screen (D-135)
+    !url.pathname.startsWith("/c/") && // a company's sign-in screen (D-135)
+    url.pathname !== "/tv-connect" // the wall's pairing code: a kept one would be a stale code (D-182)
   );
 }
 
@@ -61,7 +62,12 @@ async function buildFile(request) {
   return response;
 }
 
-/** A screen from the network, kept as it passes; without network — the kept copy, or «Нет связи». */
+/**
+ * A screen from the network, kept as it passes; without network — the kept copy, or «Нет связи».
+ * A server error (5xx) gets the kept copy too: the wall reloading at night into a failing deploy
+ * shows yesterday's screen, which fetches its data itself, instead of an error page with nobody
+ * to press anything (D-182).
+ */
 async function screen(request, url) {
   const cache = await caches.open(PAGES_CACHE);
   const key = url.pathname + url.search;
@@ -79,7 +85,7 @@ async function screen(request, url) {
   network.catch(() => undefined);
   try {
     const first = await Promise.race([network, new Promise((resolve) => setTimeout(() => resolve(null), PAGE_SLOW_MS))]);
-    if (first) return first;
+    if (first) return first.status >= 500 ? (await cache.match(key)) || first : first;
     // slow: the kept copy now if there is one, the network's answer otherwise
     return (await cache.match(key)) || (await network);
   } catch {

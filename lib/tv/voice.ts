@@ -1,4 +1,5 @@
 import type { TvLine } from "./feed";
+import { DEFAULT_PROGRAM_WINDOW, nightIn, type ProgramWindow } from "./program";
 
 /**
  * Что маскот говорит и чувствует на стене. Чистая функция: фраза и состояние лица
@@ -29,19 +30,6 @@ export const SLEEP_AFTER_MS = 30 * 60_000;
 /** Добрые события: на них лицо теплеет. */
 const GLAD = new Set(["task_done", "points", "merch"]);
 
-const AQTOBE_OFFSET_MS = 5 * 3_600_000;
-
-/** Час по стенным часам Актобе. */
-function hourOf(date: Date): number {
-  return Math.floor(((date.getTime() + AQTOBE_OFFSET_MS) % 86_400_000) / 3_600_000);
-}
-
-/** Ночь — с 22:00 до 06:00: в кабинете никого, экран может спать. */
-function isNight(now: Date): boolean {
-  const hour = hourOf(now);
-  return hour >= 22 || hour < 6;
-}
-
 /** Одна фраза о событии — и лицу, и бегущей строке, чтобы они не разошлись в словах. */
 export function phraseOf(line: TvLine): string {
   const name = line.name;
@@ -67,27 +55,26 @@ export function phraseOf(line: TvLine): string {
   }
 }
 
-/** Когда новостей нет — лицо говорит про день в целом, а не молчит впустую. */
-function idlePhrase(today: { sent: number; done: number; in_work: number }): string {
-  if (today.done > 0) return `Сегодня принято: ${today.done}`;
-  if (today.in_work > 0) return `В работе: ${today.in_work}`;
-  if (today.sent > 0) return `Сегодня роздано: ${today.sent}`;
-  return "Пока тихо";
-}
-
 /**
  * Фраза и состояние лица на текущий момент. `lines` — лента, новое первым.
+ *
+ * Без свежей новости лицо молчит (D-182): «Сегодня принято: 9» повторяло первую строку бегущей
+ * строки — под лицом в это время темп дня (`TvPace`). Ночь — то же окно, что у стены
+ * (`tv_summary.program`, `isNight` в `state.ts`).
  */
 export function speechOf(
   lines: readonly TvLine[],
-  today: { sent: number; done: number; in_work: number },
+  // the day's numbers once made the idle phrase; the face no longer repeats the ticker (D-182)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _today: { sent: number; done: number; in_work: number } | null = null,
   now: Date = new Date(),
+  w: ProgramWindow = DEFAULT_PROGRAM_WINDOW,
 ): TvSpeech {
   const newest = lines[0];
   const since = newest ? now.getTime() - newest.at.getTime() : Infinity;
 
-  if (since > SLEEP_AFTER_MS && isNight(now)) return { text: null, mood: "sleeping" };
-  if (!newest || since > FRESH_MS) return { text: idlePhrase(today), mood: "calm" };
+  if (since > SLEEP_AFTER_MS && nightIn(now, w)) return { text: null, mood: "sleeping" };
+  if (!newest || since > FRESH_MS) return { text: null, mood: "calm" };
 
   // новость лицо именно проговаривает; за хорошую — радуется
   return { text: phraseOf(newest), mood: GLAD.has(newest.kind) ? "happy" : "speaking" };

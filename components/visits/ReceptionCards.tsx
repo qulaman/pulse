@@ -28,7 +28,7 @@ export function ReceptionCards({ visits, now }: { visits: readonly Visit[]; now:
     <div className="flex flex-col gap-2" data-testid="reception-cards">
       {live.map((visit) => {
         const tone = TONE[statusTone(visit)];
-        const wall = wallLine(visit);
+        const wall = wallLine(visit, now);
         return (
           <article
             key={visit.id}

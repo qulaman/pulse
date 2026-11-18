@@ -21,6 +21,8 @@ import s from "./tv.module.css";
 const HOUR_TICKS = Array.from({ length: 12 }, (_, i) => i);
 const MINUTE_TICKS = Array.from({ length: 60 }, (_, i) => i).filter((i) => i % 5 !== 0);
 const RESYNC_MS = 10 * 60_000;
+/** Hands and ticks that stand on the wall for hours: a step below pure white, as the digits (D-182). */
+const INK = "color-mix(in srgb, var(--text) 85%, var(--bg))";
 
 const noop = () => () => undefined;
 /** true only in the browser after hydration: the phase of the hands is the browser clock's. */
@@ -84,7 +86,7 @@ export function TvAnalogClock({
           y1={detailed ? 8 : 10}
           x2="100"
           y2={i % 3 === 0 ? (detailed ? 24 : 26) : detailed ? 19 : 20}
-          stroke={i === 0 ? "var(--accent)" : "var(--text)"}
+          stroke={i === 0 ? "var(--accent)" : INK}
           strokeWidth={i % 3 === 0 ? 4.5 : 3}
           strokeLinecap="round"
           transform={`rotate(${i * 30} 100 100)`}
@@ -123,8 +125,8 @@ export function TvAnalogClock({
   );
 }
 
-const HOUR_HAND = <line x1="100" y1="112" x2="100" y2="52" stroke="var(--text)" strokeWidth="8" strokeLinecap="round" />;
-const MINUTE_HAND = <line x1="100" y1="114" x2="100" y2="24" stroke="var(--text)" strokeWidth="5" strokeLinecap="round" />;
+const HOUR_HAND = <line x1="100" y1="112" x2="100" y2="52" stroke={INK} strokeWidth="8" strokeLinecap="round" />;
+const MINUTE_HAND = <line x1="100" y1="114" x2="100" y2="24" stroke={INK} strokeWidth="5" strokeLinecap="round" />;
 
 /**
  * Стрелки, которые крутит CSS. Фаза снимается один раз при монтировании: задержку

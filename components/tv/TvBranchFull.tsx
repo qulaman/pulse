@@ -71,12 +71,12 @@ export function TvBranchFull({ board }: { board: TvBoardData | null }) {
                 {wallText(item)}
               </p>
               {tag ? (
-                <p className="mt-[0.6vh] text-[3.2vh] font-semibold leading-[4vh]" style={{ color: "var(--accent)" }}>
+                <p className="tv-text mt-[0.6vh] font-semibold" style={{ color: "var(--accent)" }}>
                   {tag}
                 </p>
               ) : null}
             </div>
-            <span className="nums mt-[1.6vh] shrink-0 text-[3vh] font-semibold leading-[4vh] text-muted">
+            <span className="tv-text nums mt-[1.6vh] shrink-0 font-semibold text-muted">
               {zoom.at + 1} / {board?.items.length ?? 0}
             </span>
           </div>

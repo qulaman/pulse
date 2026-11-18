@@ -8,6 +8,7 @@ import { Dialog } from "@/components/desk/ui/Dialog";
 import { SectionLabel } from "@/components/desk/ui/SectionLabel";
 import { SearchField } from "@/components/desk/ui/Toolbar";
 import { LoginCodePanel } from "@/components/people/LoginCodePanel";
+import { ConnectPad } from "@/components/screen/ConnectPad";
 import { Button } from "@/components/ui/Button";
 import { ANSWERS } from "@/components/visits/VisitAsk";
 import type { MindBoard } from "@/lib/mindboard/queries";
@@ -295,8 +296,9 @@ export function Visits({
 }
 
 /**
- * «Подключить экран» (D-135): a one-time code for the wall's kiosk user, typed with the TV's
- * remote — issued the moment the dialog opens, as on the phone's remote.
+ * «Подключить экран»: first the wall's own code (D-182, `ConnectPad`) — the TV shows it, the
+ * director types it here; under it the D-135 way, a one-time code for the wall's kiosk user typed
+ * with the TV's remote — issued on a click, as on the phone's remote.
  */
 export function ConnectDialog({ open, onClose, screens }: { open: boolean; onClose: () => void; screens: Person[] }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -308,9 +310,11 @@ export function ConnectDialog({ open, onClose, screens }: { open: boolean; onClo
     onClose();
   };
   return (
-    <Dialog open={open} onClose={close} title={person ? `Подключить экран · ${person.full_name}` : "Подключить экран"} width="md">
+    <Dialog open={open} onClose={close} title="Подключить экран" width="md">
+      <ConnectPad />
+      <SectionLabel className="mb-2 mt-6">Или код для входа{person ? ` · ${person.full_name}` : ""}</SectionLabel>
       {person ? (
-        <LoginCodePanel key={`${person.id}-${round}`} person={person} tv autoIssue onDone={close} />
+        <LoginCodePanel key={`${person.id}-${round}`} person={person} tv onDone={close} />
       ) : screens.length > 1 ? (
         <div className="flex flex-col gap-2">
           <p className="text-[14px] leading-5 text-muted">Какой экран подключить?</p>
@@ -322,7 +326,7 @@ export function ConnectDialog({ open, onClose, screens }: { open: boolean; onClo
         </div>
       ) : (
         <p className="text-[14px] leading-5 text-muted">
-          Экрана нет среди сотрудников: «Команда» → «Новый сотрудник», роль «ТВ-экран». Потом — сюда.
+          Экрана нет среди сотрудников: «Команда» → «Новый сотрудник», роль «ТВ-экран».
         </p>
       )}
     </Dialog>

@@ -6,6 +6,7 @@ import {
   useQueryClient,
   type QueryClient,
   type QueryKey,
+  type QueryMeta,
   type UseQueryOptions,
 } from "@tanstack/react-query";
 import type {
@@ -26,6 +27,9 @@ export { lastSeqOf, mergeBySeq, type SeqRow } from "./mergeBySeq";
  *     (a return within QUICK_RETURN_MS to a still-joined socket keeps it as is).
  * Whatever the socket missed during the gap is caught by that snapshot — for
  * seq-carrying tables the snapshot is a cursor read — see ./mergeBySeq.
+ * A channel the server drops (CHANNEL_ERROR, TIMED_OUT, CLOSED that we did not ask for) is
+ * joined again after a growing pause (`retryDelayMs`): a screen that is never hidden and never
+ * offline — the wall (D-182) — has no other moment to come back.
  */
 
 /** Delay of the post-subscribe snapshot; the WAL listener attaches within this window. */
@@ -42,6 +46,18 @@ const LINGER_MS = 30_000;
  * no teardown, no snapshot (D-126). A longer stay may have killed the socket silently.
  */
 const QUICK_RETURN_MS = 15_000;
+
+/** The first pause before joining a dropped channel again; each next one doubles (D-182). */
+const RETRY_FIRST_MS = 2_000;
+/** The longest pause between two tries: a wall without a socket for a minute is caught by its snapshot. */
+const RETRY_MAX_MS = 60_000;
+
+/** Pause before the `attempt`-th rejoin (0-based): 2 s, 4 s, 8 s … never above a minute. */
+export function retryDelayMs(attempt: number): number {
+  const step = Number.isFinite(attempt) ? Math.max(0, Math.floor(attempt)) : 0;
+  // 2^5 · 2 s already passes the ceiling: no larger powers, no overflow
+  return Math.min(RETRY_MAX_MS, RETRY_FIRST_MS * 2 ** Math.min(step, 5));
+}
 
 export type RealtimeEvent<TRow extends Record<string, unknown>> =
   RealtimePostgresChangesPayload<TRow>;
@@ -98,6 +114,9 @@ function acquire<TRow extends Record<string, unknown>>(
     let generation = 0;
     let torn = false;
     let hiddenAt = 0;
+    // rejoins in a row after the server dropped the channel; a join that holds resets it
+    let attempt = 0;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     // listeners of the moment; with nobody there the change is remembered for the next one
     const deliver = (each: (l: Listener<Record<string, unknown>>) => void) => {
@@ -108,8 +127,19 @@ function acquire<TRow extends Record<string, unknown>>(
       for (const l of listeners) each(l);
     };
 
+    // our own leave: the channel is forgotten first, so the CLOSED it answers with is not a drop
+    const drop = () => {
+      const channel = active;
+      active = null;
+      if (channel) void supabase.removeChannel(channel);
+    };
+
     const subscribe = () => {
       const mine = ++generation;
+      if (retryTimer !== null) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
       // The join must carry the user's token: on a hard load the session is still being
       // read from the cookie when the first hook mounts, the channel joined as anon, RLS
       // let nothing through, and the board only ever learned of changes from snapshots
@@ -119,8 +149,11 @@ function acquire<TRow extends Record<string, unknown>>(
         if (torn || mine !== generation) return;
         await supabase.realtime.setAuth(data.session?.access_token);
         if (torn || mine !== generation) return;
-        active = supabase
-          .channel(topic)
+        // A name of its own per join: supabase-js hands back a channel of the same name that is
+        // still leaving, and a subscribe on it never answers (D-182).
+        const channel = supabase.channel(`${topic}:${mine}`);
+        active = channel;
+        channel
           .on(
             "postgres_changes",
             // the overloads of `.on` want a literal event; the value is one of the four they take
@@ -130,21 +163,47 @@ function acquire<TRow extends Record<string, unknown>>(
             },
           )
           .subscribe((status) => {
-            // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
-            // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
-            // One late snapshot closes that gap after every (re)subscribe.
-            if (status !== "SUBSCRIBED") return;
-            if (settleTimer !== null) clearTimeout(settleTimer);
-            settleTimer = setTimeout(() => {
-              deliver((l) => l.onResync());
-            }, SETTLE_MS);
+            // a channel we left ourselves (resync, a rejoin, teardown) says nothing more
+            if (torn || mine !== generation || channel !== active) return;
+            if (status === "SUBSCRIBED") {
+              attempt = 0;
+              // supabase-js rejoined the errored channel by itself before our pause ran out
+              if (retryTimer !== null) {
+                clearTimeout(retryTimer);
+                retryTimer = null;
+              }
+              // SUBSCRIBED confirms the channel join, not the WAL listener: a change made
+              // in the next ~1–2 s is never delivered (measured by scripts/smoke-realtime.ts).
+              // One late snapshot closes that gap after every (re)subscribe.
+              if (settleTimer !== null) clearTimeout(settleTimer);
+              settleTimer = setTimeout(() => {
+                deliver((l) => l.onResync());
+              }, SETTLE_MS);
+              return;
+            }
+            // CHANNEL_ERROR, TIMED_OUT or CLOSED by the server: the screen stays put and never
+            // fires visibilitychange or online, so the channel comes back by itself — after a
+            // pause that grows, with a fresh token; the SUBSCRIBED of the new join takes the
+            // snapshot of what was missed
+            retryLater();
           });
       });
     };
 
+    const retryLater = () => {
+      if (retryTimer !== null) return;
+      const delay = retryDelayMs(attempt);
+      attempt += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (torn) return;
+        drop();
+        subscribe();
+      }, delay);
+    };
+
     const resync = () => {
-      if (active) void supabase.removeChannel(active);
-      active = null;
+      drop();
       subscribe();
       deliver((l) => l.onResync());
     };
@@ -173,7 +232,8 @@ function acquire<TRow extends Record<string, unknown>>(
         document.removeEventListener("visibilitychange", onVisibility);
         window.removeEventListener("online", resync);
         if (settleTimer !== null) clearTimeout(settleTimer);
-        if (active) void supabase.removeChannel(active);
+        if (retryTimer !== null) clearTimeout(retryTimer);
+        drop();
       },
     };
     entry = created;
@@ -246,17 +306,21 @@ export type UseRealtimeQueryOptions<TData, TRow extends Record<string, unknown>>
   enabled?: boolean;
   /** Shown until the first fetch lands (never cached) — e.g. a row already known from a list. */
   placeholderData?: UseQueryOptions<TData, Error, TData, QueryKey>["placeholderData"];
+  /** A safety poll for a screen that must not trust the socket alone (the wall, D-182); off by default. */
+  refetchInterval?: number;
+  /** Passed to the query as is — e.g. `{ keep: false }` keeps it out of the offline snapshot (D-127). */
+  meta?: QueryMeta;
 };
 
 export function useRealtimeQuery<
   TData,
   TRow extends Record<string, unknown> = Record<string, unknown>,
 >(options: UseRealtimeQueryOptions<TData, TRow>) {
-  const { queryKey, queryFn, channel, onEvent, enabled = true, placeholderData } = options;
+  const { queryKey, queryFn, channel, onEvent, enabled = true, placeholderData, refetchInterval, meta } = options;
   const queryClient = useQueryClient();
 
   // a reconnect is the channel's `online` resync below — TanStack's own would fetch again
-  const query = useQuery({ queryKey, queryFn, enabled, placeholderData, refetchOnReconnect: false });
+  const query = useQuery({ queryKey, queryFn, enabled, placeholderData, refetchOnReconnect: false, refetchInterval, meta });
   const { refetch } = query;
 
   useRealtimeChannel<TRow>(

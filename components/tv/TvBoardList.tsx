@@ -220,13 +220,13 @@ function Empty({ still }: { still: boolean }) {
         <div key={n} className="flex items-center gap-[2.6vh] px-[2.4vh]" style={{ opacity: n === 1 ? 1 : n === 2 ? 0.55 : 0.3 }}>
           <span
             aria-hidden
-            className="nums flex h-[6.2vh] w-[6.2vh] shrink-0 items-center justify-center rounded-full text-[3vh] font-bold"
+            className="tv-text nums flex h-[6.2vh] w-[6.2vh] shrink-0 items-center justify-center rounded-full font-bold"
             style={{ color: "var(--accent)", boxShadow: "inset 0 0 0 0.2vh color-mix(in srgb, var(--accent) 45%, transparent)" }}
           >
             {n}
           </span>
           {n === 1 ? (
-            <p className="text-[4vh] font-semibold leading-[5vh] text-muted">Пункты появятся здесь, как только их скажут</p>
+            <p className="tv-lead font-semibold text-muted">Пункты появятся здесь, как только их скажут</p>
           ) : (
             <span aria-hidden className="h-[1.6vh] rounded-full" style={{ width: n === 2 ? "46vh" : "30vh", background: "color-mix(in srgb, var(--border) 80%, transparent)" }} />
           )}

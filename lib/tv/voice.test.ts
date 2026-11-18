@@ -34,20 +34,25 @@ describe("speechOf", () => {
     );
   });
 
-  it("когда новостей нет — говорит про день", () => {
+  it("без новостей молчит: числа дня едут в строке, под лицом — темп дня (D-182)", () => {
     const stale = speechOf([line("task_sent", "2026-09-17T05:00:00Z")], TODAY, NOON);
-    expect(stale.text).toBe("Сегодня принято: 2");
+    expect(stale.text).toBeNull();
     expect(stale.mood).toBe("calm");
-  });
-
-  it("пустой день не оставляет экран без слов", () => {
-    expect(speechOf([], { sent: 0, done: 0, in_work: 0 }, NOON).text).toBe("Пока тихо");
+    expect(speechOf([], { sent: 0, done: 0, in_work: 0 }, NOON).text).toBeNull();
   });
 
   it("ночью в тишине засыпает, но днём в тишине — нет", () => {
     const night = new Date("2026-09-17T18:00:00Z"); // 23:00 в Актобе
     expect(speechOf([line("task_sent", "2026-09-17T14:00:00Z")], TODAY, night).mood).toBe("sleeping");
     expect(speechOf([line("task_sent", "2026-09-17T02:00:00Z")], TODAY, NOON).mood).toBe("calm");
+  });
+
+  it("ночь — то же окно, что у стены: 21:30 уже ночь, своё окно компании — своё", () => {
+    const evening = new Date("2026-09-17T16:30:00Z"); // 21:30 в Актобе
+    const quiet = [line("task_sent", "2026-09-17T15:00:00Z")];
+    expect(speechOf(quiet, TODAY, evening).mood).toBe("sleeping");
+    // the company's night starts at 23:00: at 21:30 the face is awake
+    expect(speechOf(quiet, TODAY, evening, { nightFrom: 23 * 60, nightTo: 7 * 60, eveningFrom: 18 * 60 }).mood).toBe("calm");
   });
 
   it("у гостя в речи нет ни фамилии, ни цифр", () => {

@@ -193,31 +193,13 @@ export type StoryCard = {
   rows: StoryRow[];
 };
 
-export type StoryBoard = {
-  /** Открытые дела; или открытых нет — сданное за неделю; или нет ничего. */
-  mode: "open" | "done" | "empty";
-  cards: StoryCard[];
-  page: number;
-  pages: number;
-  /** Сетка страницы: до двух дел — одна строка карточек повыше, дальше — 2 × 2. */
-  cols: number;
-  rows: number;
-  /** Открытых дел всего — по всем, а не по показанным. */
-  total: number;
-  /** Сколько открытых дел база не отдала (больше двенадцати). */
-  hidden: number;
-};
-
 /**
- * На странице — четыре карточки, 2 × 2; больше — стена листает сама. Три колонки не
- * вмещали с двух метров ни время «ср 09:12», ни «Уточнение · ответ 11:40».
+ * На странице — четыре дела, 2 × 2; больше — стена листает сама. Стене 3–5 м: крупнее и
+ * меньше, а не мельче и больше.
  */
 export const PER_PAGE = 4;
 /** Страница стоит 20 секунд: двенадцать дел — три страницы, минута на круг. */
 export const PAGE_MS = 20_000;
-/** Строк хронологии в карточке: в сетке 2 × 2 и в одной строке крупных карточек. */
-export const ROWS_GRID = 5;
-export const ROWS_SINGLE = 9;
 
 const STAGE_LABEL: Record<StageKey, string> = { new: "Новая", work: "В работе", review: "На проверке", done: "Принята" };
 const STAGE_TONE: Record<StageKey, FocusTone> = { new: "accent", work: "ok", review: "muted", done: "ok" };
@@ -348,35 +330,6 @@ export function storyCard(task: TvFocusTask, now: Date, limit: number): StoryCar
   };
 }
 
-/**
- * Дела человека карточками (D-120). Страница выбирается по часам стены от начала фокуса —
- * без своего таймера: киоск и так перерисовывается по тику часов. Открытых дел нет —
- * стена показывает сданное за неделю с его хронологией: хорошее по имени можно (D-45).
- */
-export function storyBoard(focus: TvFocusEmployee, now: Date): StoryBoard {
-  const open = focus.tasks;
-  const list = open.length > 0 ? open : (focus.done_recent ?? []);
-  const mode = open.length > 0 ? "open" : list.length > 0 ? "done" : "empty";
-  const pages = Math.max(1, Math.ceil(list.length / PER_PAGE));
-  const started = Date.parse(focus.expires_at) - FOCUS_MS;
-  const elapsed = Number.isNaN(started) ? 0 : Math.max(0, now.getTime() - started);
-  const page = Math.floor(elapsed / PAGE_MS) % pages;
-  const single = list.length <= 2;
-  const limit = single ? ROWS_SINGLE : ROWS_GRID;
-  const counts = focus.counts;
-  const total = counts ? Math.max(counts.new + counts.work + counts.review, open.length) : open.length;
-  return {
-    mode,
-    cards: list.slice(page * PER_PAGE, (page + 1) * PER_PAGE).map((task) => storyCard(task, now, limit)),
-    page,
-    pages,
-    cols: single ? Math.max(1, list.length) : 2,
-    rows: single ? 1 : 2,
-    total,
-    hidden: Math.max(0, total - open.length),
-  };
-}
-
 /* -------------------------------------------------------------------------- */
 /* Одно дело во весь экран (D-123)                                             */
 /* -------------------------------------------------------------------------- */
@@ -391,27 +344,27 @@ export type TaskStep = {
   state: "passed" | "now" | "next";
 };
 
-const STEP_LABEL: Record<TaskStepKey, string> = {
-  posted: "Поставлена",
-  accepted: "Принята в работу",
-  review: "Сдана на проверку",
-  done: "Принята директором",
-};
-
-/** Сколько шагов пройдено по статусу: новая — один, в работе — два, на проверке — три. */
-const REACHED: Record<string, number> = {
-  sent: 1,
-  accepted: 2,
-  in_progress: 2,
-  rework: 2,
-  pending_review: 3,
-  done: 4,
+/**
+ * The four stations as the employee's phone names them (D-173, `stepsOf` in lib/tasks/overview.ts):
+ * a station is a stage, never a button's verb, and the one still ahead is named as a process —
+ * «Сдача», «Проверка» — so a lit ring never reads as done already (the wall used to light «Сдана на
+ * проверку · ждём» on an order in work). No «Доработка» on the wall: a return is work again (D-45).
+ * A new order's lit station is «Принятие»: the phone's «Ждёт вас» speaks to its holder, the wall to the room.
+ */
+const STEP_PLAN: Record<string, { labels: [string, string, string, string]; passed: number }> = {
+  sent: { labels: ["Выдана", "Принятие", "Сдача", "Закрыта"], passed: 1 },
+  accepted: { labels: ["Выдана", "В работе", "Сдача", "Закрыта"], passed: 2 },
+  in_progress: { labels: ["Выдана", "В работе", "Сдача", "Закрыта"], passed: 2 },
+  rework: { labels: ["Выдана", "В работе", "Сдача", "Закрыта"], passed: 2 },
+  pending_review: { labels: ["Выдана", "В работе", "Сдана", "Проверка"], passed: 3 },
+  done: { labels: ["Выдана", "В работе", "Сдана", "Закрыта"], passed: 4 },
 };
 
 /**
- * Четыре шага дела крупно — «Поставлена → Принята в работу → Сдана → Принята директором»:
- * пройденные с временем, текущий подсвечен. Возврат на доработку откатывает «Сдана»: шаг
- * снова впереди, без отдельного слова (D-45). Время сдачи — последней, а не первой.
+ * Четыре станции дела — «Выдана → В работе → Сдача → Закрыта», как на телефоне сотрудника:
+ * пройденные с временем, горит та, к которой дело идёт сейчас (в работе — «Сдача», сдано —
+ * «Проверка»). Возврат на доработку — снова «Сдача» впереди, без отдельного слова (D-45).
+ * Время сдачи — последней, а не первой.
  */
 export function taskSteps(task: TvFocusTask, now: Date): TaskStep[] {
   const story = [...(task.story ?? [])]
@@ -419,7 +372,7 @@ export function taskSteps(task: TvFocusTask, now: Date): TaskStep[] {
     .sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const first = (kind: TvStoryEvent["k"]) => story.find((event) => event.k === kind);
   const last = (kind: TvStoryEvent["k"]) => [...story].reverse().find((event) => event.k === kind);
-  const reached = REACHED[task.status] ?? 2;
+  const plan = STEP_PLAN[task.status] ?? STEP_PLAN.accepted;
   const at: Record<TaskStepKey, TvStoryEvent | undefined> = {
     posted: first("posted"),
     accepted: first("accepted"),
@@ -427,15 +380,20 @@ export function taskSteps(task: TvFocusTask, now: Date): TaskStep[] {
     done: last("done"),
   };
   return (["posted", "accepted", "review", "done"] as const).map((key, index) => {
-    const passed = index < reached;
+    const passed = index < plan.passed;
     const event = passed ? at[key] : undefined;
     return {
       key,
-      label: STEP_LABEL[key],
+      label: plan.labels[index],
       time: event ? storyTime(event.at, now) : null,
-      state: passed ? "passed" : index === reached ? "now" : "next",
+      state: passed ? "passed" : index === plan.passed ? "now" : "next",
     };
   });
+}
+
+/** The lit station — what a focus card names beside its four-step bar; a closed order has none. */
+export function currentStep(steps: readonly TaskStep[]): TaskStep | null {
+  return steps.find((step) => step.state === "now") ?? null;
 }
 
 export type RatingBar = { value: number; current: boolean };
@@ -449,14 +407,17 @@ export type RatingView = {
   delta: number | null;
   /** Четыре недели очков, текущая — последней; минус рисуется нулём. */
   bars: RatingBar[] | null;
-  /** Сдано за неделю и из них в срок — числом хорошего, без процента. */
-  week: { done: number; onTime: number } | null;
+  /**
+   * Сдано за неделю — одно число. «сдано 9 · в срок 8» не печатается: пара чисел сама выдаёт
+   * одно опоздание (D-45, D-182).
+   */
+  week: { done: number } | null;
 };
 
 /**
  * Рейтинг человека на стене (D-120). Гостю — ничего (D-33). База v2 без `rating` — как
  * было: только очки недели. Всё, что может читаться как упрёк, — место ниже пятого,
- * падение к прошлой неделе, «в срок 3 из 10» — не показывается вовсе (D-45).
+ * падение к прошлой неделе, «в срок» рядом со «сдано» — не показывается вовсе (D-45).
  */
 export function ratingView(focus: TvFocusEmployee): RatingView | null {
   if (focus.guest || focus.rating === null) return null;
@@ -480,7 +441,101 @@ export function ratingView(focus: TvFocusEmployee): RatingView | null {
     points,
     delta,
     bars,
-    week: done > 0 ? { done, onTime: Math.min(done, rating.on_time_week ?? 0) } : null,
+    week: done > 0 ? { done } : null,
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Человек на стене v5 (D-182): дела — заголовок, срок и четыре станции        */
+/* -------------------------------------------------------------------------- */
+
+export type FocusPlate = {
+  id: string;
+  title: string;
+  deadline: string | null;
+  soon: boolean;
+  steps: TaskStep[];
+  /** The lit station's word: «Сдача», «Проверка»; a closed order — null. */
+  now: string | null;
+};
+
+export type FocusPeople = {
+  /** «2 новых», «4 в работе», «1 на проверке» — only the stages that have orders (zeros are hidden). */
+  counts: { key: LaneKey; value: number; word: string; tone: FocusTone }[];
+  /** «сегодня сдано 2»; 0 — null. */
+  today: number | null;
+  /** The right side: the open orders as plates; none — the good phrase instead. */
+  mode: "open" | "clear";
+  plates: FocusPlate[];
+  page: number;
+  pages: number;
+  /** Plates in one column, stacked — up to two orders, each with its labelled stations. */
+  large: boolean;
+  total: number;
+  hidden: number;
+  /** No open orders: «Все дела сданы», and under it «сегодня 2» / «за неделю 9» when there is something. */
+  clear: { title: string; line: string | null } | null;
+  /** A guest in the office: the person and today's count, no plates at all (D-33). */
+  guest: boolean;
+};
+
+const LANE_COUNT_WORD: Record<LaneKey, [string, string, string]> = {
+  new: ["новое", "новых", "новых"],
+  work: ["в работе", "в работе", "в работе"],
+  review: ["на проверке", "на проверке", "на проверке"],
+};
+
+/**
+ * Сотрудник на стене v5 (D-182). Дела — без журнала: заголовок, срок и четыре станции, как в
+ * сцене одного дела (журнал живёт только там). Нулевые числа не печатаются; открытых дел нет —
+ * «Все дела сданы» и сданное сегодня или за неделю, а не «0 · 0 · 0». Гостю — имя, должность и
+ * «сегодня сдано N»: четыре одинаковые «Поручение · Ждёт принятия» ничего не говорят комнате (D-33).
+ */
+export function focusPeople(focus: TvFocusEmployee, now: Date): FocusPeople {
+  const card = focusCard(focus, now);
+  const counts = card.lanes
+    .filter((lane) => lane.count > 0)
+    .map((lane) => ({ key: lane.key, value: lane.count, word: pluralRu(lane.count, LANE_COUNT_WORD[lane.key]), tone: lane.tone }));
+  const today = card.done.count > 0 ? card.done.count : null;
+  const open = focus.tasks;
+  const weekDone = focus.rating?.done_week ?? 0;
+  const clear =
+    open.length === 0
+      ? { title: "Все дела сданы", line: today ? `сегодня ${today}` : weekDone > 0 ? `за неделю ${weekDone}` : null }
+      : null;
+
+  const pages = Math.max(1, Math.ceil(open.length / PER_PAGE));
+  const started = Date.parse(focus.expires_at) - FOCUS_MS;
+  const elapsed = Number.isNaN(started) ? 0 : Math.max(0, now.getTime() - started);
+  const page = Math.floor(elapsed / PAGE_MS) % pages;
+  const total = focus.counts ? Math.max(focus.counts.new + focus.counts.work + focus.counts.review, open.length) : open.length;
+
+  const plates = focus.guest
+    ? []
+    : open.slice(page * PER_PAGE, (page + 1) * PER_PAGE).map((task): FocusPlate => {
+        const steps = taskSteps(task, now);
+        return {
+          id: task.id,
+          title: task.title?.trim() || UNTITLED,
+          deadline: deadlineText(task.deadline, now),
+          soon: soonOf(task.deadline, now),
+          steps,
+          now: currentStep(steps)?.label ?? null,
+        };
+      });
+
+  return {
+    counts: focus.guest ? [] : counts,
+    today,
+    mode: open.length > 0 ? "open" : "clear",
+    plates,
+    page: focus.guest ? 0 : page,
+    pages: focus.guest ? 1 : pages,
+    large: open.length <= 2,
+    total,
+    hidden: Math.max(0, total - open.length),
+    clear,
+    guest: focus.guest,
   };
 }
 

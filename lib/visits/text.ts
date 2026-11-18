@@ -6,6 +6,8 @@
  * (D-116) — у сообщения один ответ, «Понятно».
  */
 
+import { tvTime } from "@/lib/tv/clock";
+
 export type VisitLike = {
   id: string;
   /** `visitor` | `message` (D-116). */
@@ -70,10 +72,24 @@ export function statusTone(visit: VisitLike): VisitTone {
   return "muted";
 }
 
-/** Квитанция стены (принцип 8): надпись появилась на экране в кабинете — или ещё нет. */
-export function wallLine(visit: VisitLike): string | null {
+/**
+ * A live wall shows the words within a second or two of the secretary's tap (the kiosk acks the
+ * version that carried them at once): fifteen seconds without it — the screen is off or offline (D-182).
+ */
+const SHOWN_WITHIN_MS = 15_000;
+
+/**
+ * Квитанция стены (принцип 8): надпись появилась на экране в кабинете — или ещё нет. С часами
+ * (`now`) «ещё не показал» живёт 15 секунд, дальше — честное «Экран у директора не отвечает с
+ * 9:14»: с той минуты, как секретарь отправила, а не вечное «отправлено» (D-182). Секретарь не
+ * читает строку стены, поэтому «с» — время её отправки: с него экран точно молчит.
+ */
+export function wallLine(visit: VisitLike, now?: Date): string | null {
   if (visit.status !== "waiting" && visit.status !== "wait") return null;
-  return visit.shown_at ? "На экране у директора" : "Отправлено, экран ещё не показал";
+  if (visit.shown_at) return "На экране у директора";
+  const sent = new Date(visit.created_at);
+  if (now && now.getTime() - sent.getTime() >= SHOWN_WITHIN_MS) return `Экран у директора не отвечает с ${tvTime(sent)}`;
+  return "Отправлено, экран ещё не показал";
 }
 
 /**

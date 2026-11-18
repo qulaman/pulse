@@ -51,7 +51,7 @@ export function ReceptionCard({ visits, now, loading = false }: { visits: readon
         <ul className="stoika-visits">
           {live.map((visit) => {
             const tone = statusTone(visit);
-            const wall = wallLine(visit);
+            const wall = wallLine(visit, now);
             const label = closeLabel(visit);
             const pending = visit.status === "waiting" || visit.status === "wait";
             return (

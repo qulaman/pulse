@@ -115,13 +115,13 @@ function TopRow({ board, page, pages }: { board: Board; page: number; pages: num
   const walking = at >= 0;
   return (
     <div className="flex shrink-0 items-center justify-between gap-[4vh]" style={{ height: vh(BOARD_TOP_ROW) }}>
-      <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--accent)" }}>
+      <p className="tv-caption font-display font-semibold uppercase tracking-[0.14em]" style={{ color: "var(--accent)" }}>
         {board.week ? "Доска недели" : "Доска"}
       </p>
       <div className="flex items-center gap-[3vh]">
         <div className="grid justify-items-end [grid-template-areas:'cell'] *:[grid-area:cell]">
           <span
-            className="nums self-center text-[3vh] font-semibold leading-[4vh] text-muted"
+            className="tv-caption nums self-center font-semibold text-muted"
             style={{ opacity: walking ? 0 : 1, transition: "opacity 450ms var(--ease-in-out)" }}
             aria-hidden={walking}
           >
@@ -177,7 +177,7 @@ function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) 
           data-testid="tv-board-progress-thumb"
         />
       </span>
-      <span className="nums text-[3.4vh] font-bold leading-[4vh] tabular-nums">
+      <span className="tv-text nums font-bold tabular-nums">
         <span className="inline-block text-right" style={{ minWidth: `${String(count).length}ch` }}>
           {on ? at + 1 : 1}
         </span>
@@ -207,8 +207,8 @@ function PageDots({ page, pages }: { page: number; pages: number }) {
 function Hidden({ now }: { now: Date }) {
   return (
     <div className="flex flex-col items-center gap-[2vh]" data-testid="tv-board-hidden">
-      <p className="nums text-[18vh] font-bold leading-[20vh] tabular-nums">{tvTime(now)}</p>
-      <p className="text-[3.4vh] leading-[4.4vh] text-muted">Доска скрыта · гость в кабинете</p>
+      <p className="tv-giant nums font-bold tabular-nums">{tvTime(now)}</p>
+      <p className="tv-text text-muted">Доска скрыта · гость в кабинете</p>
     </div>
   );
 }

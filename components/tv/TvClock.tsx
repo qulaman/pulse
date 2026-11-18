@@ -1,7 +1,5 @@
 "use client";
 
-import { PulseMark } from "@/components/brand/PulseMark";
-import { StillLogo } from "@/components/ui/StillLogo";
 import { tvDate, tvTime } from "@/lib/tv/clock";
 import type { TvEventRow } from "@/lib/tv/queries";
 import type { ClockStyle } from "@/lib/tv/state";
@@ -14,32 +12,30 @@ import { TvAnalogClock } from "./TvAnalogClock";
  * телевизор читается как сломанный.
  *
  * Цифры или стрелки — как выбрано на пульте (D-96). Стрелкам нужна ширина, поэтому
- * циферблат стоит слева, а дата, ближайшее мероприятие и марка — справа от него.
+ * циферблат стоит слева, а дата и ближайшее мероприятие — справа от него.
  *
- * Бегущая строка, подпись и пульс дня остаются — их рисует TvScreen поверх сцены.
+ * Бегущая строка на часах замирает и гаснет, подпись внизу не повторяет ни время, ни дату —
+ * марка и название компании стоят в ней (TvFrame, D-182). Цифры не чисто белые: белый
+ * на месте часами подряд — первое, что выгорает.
  */
+
+/** Digits that stand still for hours: a step below pure white (D-182). */
+export const CLOCK_INK = "color-mix(in srgb, var(--text) 85%, var(--bg))";
+
 export function TvClock({
-  company,
-  logoUrl,
   now,
   next,
   clock,
 }: {
-  company: string;
-  logoUrl: string | null;
+  /** Kept for callers of the scene before D-182: the brand lives in the footer now. */
+  company?: string;
+  logoUrl?: string | null;
   now: Date;
   /** Ближайшее мероприятие компании; у гостя без названия (D-33). */
   next: TvEventRow | null;
   clock: ClockStyle;
 }) {
   const nextLine = next ? `Ближайшее: ${tvTime(new Date(next.starts_at))} · ${next.title ?? "Мероприятие"}` : null;
-  const brand = (
-    <div className="flex items-center gap-[2.4vh]">
-      <PulseMark size="tv" />
-      <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
-      {logoUrl ? <StillLogo src={logoUrl} className="h-[8vh] w-auto object-contain" /> : null}
-    </div>
-  );
 
   if (clock === "analog") {
     const [weekday, date] = splitDate(tvDate(now));
@@ -47,10 +43,11 @@ export function TvClock({
       <div className="flex items-center gap-[8vh]" data-testid="tv-clock" data-clock="analog">
         <TvAnalogClock now={now} size="58vh" />
         <div className="flex min-w-0 max-w-[46vw] flex-col gap-[1.6vh]">
-          <p className="text-[8vh] font-bold leading-[9vh] tracking-[-0.02em] first-letter:uppercase">{weekday}</p>
-          {date ? <p className="text-[4.4vh] leading-[5.4vh] text-muted">{date}</p> : null}
-          {nextLine ? <p className="mt-[2vh] text-[3.2vh] leading-[4.2vh] text-muted">{nextLine}</p> : null}
-          <div className="mt-[4vh]">{brand}</div>
+          <p className="tv-title font-bold tracking-[-0.02em] first-letter:uppercase" style={{ color: CLOCK_INK }}>
+            {weekday}
+          </p>
+          {date ? <p className="tv-lead text-muted">{date}</p> : null}
+          {nextLine ? <p className="tv-text mt-[2vh] text-muted">{nextLine}</p> : null}
         </div>
       </div>
     );
@@ -58,10 +55,11 @@ export function TvClock({
 
   return (
     <div className="flex flex-col items-center gap-[2vh]" data-testid="tv-clock" data-clock="digital">
-      <p className="text-[22vh] font-bold leading-[24vh] tabular-nums">{tvTime(now)}</p>
-      <p className="text-[4vh] leading-[5vh] text-muted first-letter:uppercase">{tvDate(now)}</p>
-      {nextLine ? <p className="text-[3.2vh] leading-[4vh] text-muted">{nextLine}</p> : null}
-      <div className="mt-[3vh]">{brand}</div>
+      <p className="tv-giant font-bold tabular-nums" style={{ color: CLOCK_INK }}>
+        {tvTime(now)}
+      </p>
+      <p className="tv-lead text-muted first-letter:uppercase">{tvDate(now)}</p>
+      {nextLine ? <p className="tv-text text-muted">{nextLine}</p> : null}
     </div>
   );
 }

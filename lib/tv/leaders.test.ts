@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPoints, leadersView } from "./leaders";
+import { formatPoints, leadersView, ranksOf, risenIds } from "./leaders";
 import type { TvLeader, TvRatingScene } from "./queries";
 
 const NOW = new Date("2026-09-18T09:00:00Z"); // пятница, 14:00 в Актобе
@@ -57,9 +57,9 @@ describe("leadersView — заставка «Рейтинг» (D-123)", () => {
     const view = leadersView(scene({ top: [leader(1, { done: 5, on_time: 4, streak: 3 }), leader(2, { done: 0, on_time: 0, streak: 2 }), leader(3, { done: 2, on_time: 2, streak: 1 })] }), NOW);
     if (view.state !== "ready") throw new Error(view.state);
     const byRank = new Map([...view.podium, ...view.rest].map((card) => [card.rank, card.done]));
-    expect(byRank.get(1)).toBe("сдано 5 · в срок 4 · 🔥 3 подряд");
+    expect(byRank.get(1)).toBe("сдано 5 · 🔥 3 подряд");
     expect(byRank.get(2)).toBe("🔥 2 подряд");
-    expect(byRank.get(3)).toBe("сдано 2 · в срок 2");
+    expect(byRank.get(3)).toBe("сдано 2");
   });
 
   it("шестой и ниже на стену не попадают, даже если база их отдала (D-45)", () => {
@@ -82,7 +82,8 @@ describe("leadersView — заставка «Рейтинг» (D-123)", () => {
       ["+50", "12:20"],
       ["+20", "ср 10:00"],
     ]);
-    expect(view.team).toEqual(["сдано 48", "в срок 41", "1 240 очков заработано"]);
+    // one number of handovers: «в срок» beside it gives away the late ones (D-45, D-182)
+    expect(view.team).toEqual(["сдано 48", "1 240 очков заработано"]);
   });
 
   it("никто не набрал очков — пустой рейтинг, но итог команды остаётся", () => {
@@ -103,5 +104,18 @@ describe("formatPoints", () => {
   it("тысячи — с неразрывным пробелом", () => {
     expect(formatPoints(1240)).toBe("1 240");
     expect(formatPoints(80)).toBe("80");
+  });
+});
+
+describe("risenIds — обгон движением (D-182)", () => {
+  it("поднявшийся и новичок пятёрки — да; первая картинка и опустившийся — нет", () => {
+    expect(risenIds(null, { a: 1, b: 2 })).toEqual([]);
+    expect(risenIds({}, { a: 1, b: 2 })).toEqual([]);
+    expect(risenIds({ a: 1, b: 2, c: 3 }, { a: 1, c: 2, b: 3 })).toEqual(["c"]);
+    expect(risenIds({ a: 1, b: 2 }, { a: 1, b: 2, n: 3 })).toEqual(["n"]);
+  });
+
+  it("места пятёрки по людям; без данных — пусто", () => {
+    expect(ranksOf({ state: "hidden" })).toEqual({});
   });
 });

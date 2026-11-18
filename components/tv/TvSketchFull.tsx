@@ -36,8 +36,8 @@ export function TvSketchFull({ board }: { board: TvBoardData | null }) {
         >
           <div className="flex shrink-0 items-center gap-[2vh]" style={{ height: "6.4vh" }}>
             <Badge n={at + 1} done={item.done} size={5.6} lit />
-            <p className="min-w-0 flex-1 truncate text-[4.4vh] font-semibold leading-[5.6vh] tracking-[-0.015em]">{wallText(item)}</p>
-            <span className="nums shrink-0 text-[3vh] font-semibold leading-[4vh] text-muted">
+            <p className="tv-lead min-w-0 flex-1 truncate font-semibold tracking-[-0.015em]">{wallText(item)}</p>
+            <span className="tv-text nums shrink-0 font-semibold text-muted">
               {at + 1} / {board?.items.length ?? 0}
             </span>
           </div>

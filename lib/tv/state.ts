@@ -1,4 +1,17 @@
+import {
+  baseRound,
+  DEFAULT_PROGRAM_WINDOW,
+  manualHolds,
+  nightIn,
+  programScene,
+  segmentOf,
+  welcomeOn,
+  type ProgramWindow,
+  type WallScene,
+} from "./program";
 import type { TvState } from "./queries";
+
+export type { WallScene } from "./program";
 
 /**
  * Что киоск делает со строкой `tv_state` — чистыми функциями, без React.
@@ -77,20 +90,26 @@ export const CAROUSEL_MS = 3 * 60_000;
  * последней в круге.
  */
 export function carouselScenes(points: boolean, week = false): TvScene[] {
-  const scenes: TvScene[] = points ? ["face", "rating", "calendar", "team"] : ["face", "calendar", "team"];
-  return week ? [...scenes, "board"] : scenes;
+  return baseRound(points, week);
 }
 
 /**
  * Какая заставка сейчас в круге — по часам, без таймера и без обмена с пультом: киоск и
  * пульт считают одно и то же число и сходятся. Граница — ровные три минуты от эпохи.
+ *
+ * @deprecated The wall turns by the day's program (D-182): `programScene` / `programNext` in
+ * `lib/tv/program.ts`. Kept for the remote until it moves over.
  */
 export function carouselScene(now: Date, points: boolean, week = false): TvScene {
   const list = carouselScenes(points, week);
   return list[Math.floor(now.getTime() / CAROUSEL_MS) % list.length];
 }
 
-/** Когда круг сменит заставку и на какую — для пульта: «дальше — календарь в 14:03». */
+/**
+ * Когда круг сменит заставку и на какую — для пульта: «дальше — календарь в 14:03».
+ *
+ * @deprecated `programNext` in `lib/tv/program.ts` (D-182).
+ */
 export function carouselNext(now: Date, points: boolean, week = false): { scene: TvScene; at: Date } {
   const list = carouselScenes(points, week);
   const step = Math.floor(now.getTime() / CAROUSEL_MS);
@@ -103,19 +122,69 @@ export function carouselOn(state: TvState | null): boolean {
 }
 
 /**
- * Заставка эфира. Незнакомая сцена — лицо: экран старше базы не должен чернеть. Доска —
- * только пока она жива: истёк её срок или её нет — лицо (D-102 §6). Круг — по часам
- * (D-123). Рейтинг без очков — лицо: `points` передаёт тот, кто знает флаг (`false` —
- * очки выключены; не знает — считаем, что включены, и решает база). Гость в кабинете
- * убирает рейтинг из круга — три минуты «Рейтинг скрыт» круг не крутит; поставленный
- * руками рейтинг при госте честно говорит, что скрыт (D-33).
+ * What the middle of the wall shows when nobody's orders cover it (D-182), by priority: a live board
+ * (D-102), the greeting of a guest just let in, a screensaver picked by hand while its segment of the
+ * day lasts, else the day's program. A person, an order and the night stand above this (TvFrame).
+ *
+ * Незнакомая сцена — лицо: экран старше базы не должен чернеть. Рейтинг без очков — лицо:
+ * `points` передаёт тот, кто знает флаг (не знает — считаем, что включены, и решает база).
+ * Поставленный руками рейтинг при госте честно говорит, что скрыт (D-33); программа при госте
+ * рейтинга не крутит.
  */
-export function sceneOf(state: TvState | null, now: Date = new Date(), points = true, guest = false): TvScene {
-  if (roundOn(state, now)) return carouselScene(now, points && !guest, weekInRound(state, now, guest));
-  const scene = state?.scene;
-  if (scene === "board") return boardLive(state, now) ? "board" : "face";
-  if (scene === "rating" && !points) return "face";
-  return WALL_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
+export function wallSceneOf(
+  state: TvState | null,
+  now: Date,
+  o: { points: boolean; guest: boolean; announcement?: boolean; weekBoard?: boolean },
+  w: ProgramWindow = DEFAULT_PROGRAM_WINDOW,
+): WallScene {
+  if (boardLive(state, now)) return "board";
+  if (welcomeOn(state, now)) return "welcome";
+  if (manualHolds(state, now, w)) {
+    const scene = state?.scene;
+    if (scene === "rating" && !o.points) return "face";
+    return TV_SCENES.includes(scene as TvScene) ? (scene as TvScene) : "face";
+  }
+  return programScene(now, w, {
+    points: o.points,
+    guest: o.guest,
+    announcement: o.announcement ?? false,
+    weekBoard: o.weekBoard ?? weekInRound(state, now, o.guest, w),
+  });
+}
+
+/** A scene the remote can name (`TvScene`), not one of the program's own. */
+export function isTvScene(scene: WallScene): scene is TvScene {
+  return (WALL_SCENES as readonly string[]).includes(scene);
+}
+
+/**
+ * Заставка эфира словами пульта (D-76, D-123): то же, что `wallSceneOf`, только сцены программы
+ * («Итог дня», «Итог недели», «Объявление», «Приветствие») пульт пока называет лицом. Подпись
+ * старая — её зовут пульт, календарь и доски.
+ */
+export function sceneOf(
+  state: TvState | null,
+  now: Date = new Date(),
+  points = true,
+  guest = false,
+  w: ProgramWindow = DEFAULT_PROGRAM_WINDOW,
+  announcement = false,
+): TvScene {
+  const scene = wallSceneOf(state, now, { points, guest, announcement }, w);
+  return isTvScene(scene) ? scene : "face";
+}
+
+/** The program has the wall (D-182): no live board, no screensaver held by hand. */
+export function programOn(state: TvState | null, now: Date, w: ProgramWindow = DEFAULT_PROGRAM_WINDOW): boolean {
+  return !boardLive(state, now) && !manualHolds(state, now, w);
+}
+
+/**
+ * The calendar the wall draws: in the morning the program shows «Сегодня» (the week view); a calendar
+ * picked by hand keeps the remote's view (D-98).
+ */
+export function wallCalendarView(state: TvState | null, now: Date, w: ProgramWindow = DEFAULT_PROGRAM_WINDOW): CalendarView {
+  return programOn(state, now, w) && segmentOf(now, w) === "morning" ? "week" : calendarViewOf(state);
 }
 
 /** The week board (D-144) is alive: chosen, and its week has not ended. */
@@ -129,8 +198,8 @@ export function weekBoardLive(state: Pick<TvState, "week_board_id" | "week_board
  * (D-105) — and never with a guest in the office: «Показать гостю» opens the meeting's board,
  * not the director's week (D-33); three minutes of «Доска скрыта» the round does not show.
  */
-export function weekInRound(state: TvState | null, now: Date, guest: boolean): boolean {
-  return weekBoardLive(state, now) && !isNight(now) && !guest;
+export function weekInRound(state: TvState | null, now: Date, guest: boolean, w: ProgramWindow = DEFAULT_PROGRAM_WINDOW): boolean {
+  return weekBoardLive(state, now) && !isNight(now, w) && !guest;
 }
 
 /**
@@ -259,10 +328,12 @@ export function aqtobeHour(now: Date): number {
  * подряд выжигает матрицу, а смотреть на неё некому (D-96). Фокус, доска, надпись о
  * посетителе и разбудка с пульта ночь перебивают — их поставил человек, значит, в
  * кабинете кто-то есть. Это просто часы; спит ли стена — `wallAsleep`.
+ *
+ * Окно ночи — из программы компании (D-182, `tv_summary.program`); без окна — 21:00–08:00,
+ * те же тихие часы, что у доставки (CLAUDE.md принцип 8). Одно правило и для лица (`voice.ts`).
  */
-export function isNight(now: Date): boolean {
-  const hour = aqtobeHour(now);
-  return hour >= NIGHT_FROM_HOUR || hour < NIGHT_TO_HOUR;
+export function isNight(now: Date, w: ProgramWindow = DEFAULT_PROGRAM_WINDOW): boolean {
+  return nightIn(now, w);
 }
 
 /** Разбудка с пульта живёт два часа — то же число, что в `tv_control(p_wake)` (D-105). */
@@ -283,8 +354,8 @@ export function awakeUntil(state: TvState | null, now: Date): Date | null {
  * что ночь перебивает, — фокуса на человеке или деле и доски. Надпись о посетителе тоже
  * будит стену, но ненадолго; о ней пульт говорит отдельной строкой.
  */
-export function wallAsleep(state: TvState | null, now: Date): boolean {
-  if (!isNight(now) || awakeUntil(state, now)) return false;
+export function wallAsleep(state: TvState | null, now: Date, w: ProgramWindow = DEFAULT_PROGRAM_WINDOW): boolean {
+  if (!isNight(now, w) || awakeUntil(state, now)) return false;
   return effectiveMode(state, now) === "ether" && sceneOf(state, now) !== "board";
 }
 
@@ -309,5 +380,30 @@ const SHIFT: readonly (readonly [number, number])[] = [
 export function burnInShift(now: Date): { x: number; y: number } {
   const step = Math.floor(now.getTime() / SHIFT_STEP_MS) % SHIFT.length;
   const [x, y] = SHIFT[step];
+  return { x, y };
+}
+
+/**
+ * Where the night clock stands (D-182): the composition shift above is thinner than the stroke of the
+ * clock's digits, so the dim digits of a whole night would still burn in place. The night clock moves
+ * to another spot of the middle once in 10 minutes, the same spot for the same ten minutes on every
+ * kiosk — shares of the middle area, −1…1 across and down, never the same spot twice in a row.
+ */
+const NIGHT_SPOTS: readonly (readonly [number, number])[] = [
+  [0, 0],
+  [-0.62, -0.5],
+  [0.58, 0.46],
+  [-0.4, 0.62],
+  [0.66, -0.38],
+  [-0.7, 0.12],
+  [0.24, -0.64],
+  [0.36, 0.7],
+  [-0.2, -0.22],
+];
+
+export function nightSpot(now: Date): { x: number; y: number } {
+  const step = Math.floor(now.getTime() / SHIFT_STEP_MS);
+  // a stride coprime with the spot count walks every spot before it repeats one
+  const [x, y] = NIGHT_SPOTS[(step * 4) % NIGHT_SPOTS.length]!;
   return { x, y };
 }

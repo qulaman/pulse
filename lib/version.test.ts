@@ -112,6 +112,13 @@ describe("updateAction", () => {
     expect(updateAction({ ...base, kiosk: true, status: "required" })).toBe("apply");
     expect(updateAction({ ...base, kiosk: true, recentlyFailed: true })).toBe("none");
   });
+
+  it("lets the wall finish what is on it first (D-182)", () => {
+    expect(updateAction({ ...base, kiosk: true, busy: true })).toBe("wait");
+    expect(updateAction({ ...base, kiosk: true, busy: true, status: "required" })).toBe("wait");
+    expect(updateAction({ ...base, kiosk: true, busy: true, requested: true })).toBe("wait");
+    expect(updateAction({ ...base, kiosk: true, busy: false, requested: true })).toBe("apply");
+  });
 });
 
 describe("looksLikeStaleBuild", () => {

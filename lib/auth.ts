@@ -18,11 +18,16 @@ export type SessionProfile = {
   fullName: string;
 };
 
+/**
+ * 401 — no sign-in, 403 — signed in but not allowed. 503 — the sign-in could not be checked
+ * (the profile read failed): the session may well be alive, so a screen must not treat it as
+ * signed out (D-182 — a wall sent to the sign-in by a second's outage stood there all day).
+ */
 export class AuthError extends Error {
-  readonly status: 401 | 403;
+  readonly status: 401 | 403 | 503;
   readonly code: string;
 
-  constructor(status: 401 | 403, code: string) {
+  constructor(status: 401 | 403 | 503, code: string) {
     super(code);
     this.name = "AuthError";
     this.status = status;
@@ -34,6 +39,7 @@ const MESSAGES_RU: Record<string, string> = {
   unauthorized: "Нужно войти",
   forbidden: "Нет доступа",
   inactive: "Аккаунт отключён",
+  unavailable: "Сервер не отвечает. Попробуйте через минуту",
 };
 
 /** User-facing error text (docs/BACKEND.md section 0, rule 4). */
@@ -99,7 +105,11 @@ async function loadProfile(supabase: SupabaseClient<Database>, token?: string): 
     .eq("id", userId)
     .maybeSingle();
 
-  if (profileError || !profile) {
+  // a failed read says nothing about the session — only a missing row does (D-182)
+  if (profileError) {
+    throw new AuthError(503, "unavailable");
+  }
+  if (!profile) {
     throw new AuthError(401, "unauthorized");
   }
   if (!profile.is_active) {

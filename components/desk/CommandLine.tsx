@@ -1,9 +1,13 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { DeskConfirm } from "@/components/desk/DeskConfirm";
+import { useDeskScope } from "@/components/desk/DeskScope";
+import { markSent } from "@/components/screen/sent";
+import { toast } from "@/components/ui/Toast";
 import { InPanel } from "@/components/desk/ui/DeskPanel";
 import { Kbd } from "@/components/desk/ui/Kbd";
 import { useShortcuts } from "@/components/desk/ui/Shortcuts";
@@ -12,15 +16,20 @@ import { MicButton, RecordingHint } from "@/components/desk/voice/MicButton";
 import { StatusGlyph } from "@/components/tasks/list/StatusGlyph";
 import { formatWhen } from "@/lib/desk/when";
 import { COMMAND_FIELD_ID } from "@/lib/desk/keys";
-import { matchCommands, matchSections, matchTasks, searchPeople, taskLookup } from "@/lib/desk/palette";
+import { matchCommands, matchSections, matchTasks, matchWallCommands, searchPeople, taskLookup } from "@/lib/desk/palette";
 import { DESK_NAV, DESK_PROFILE, DESK_PROFILE_KEY } from "@/lib/desk/routes";
 import { suggestPeople, wordAtCaret } from "@/lib/desk/suggest";
 import { IN_FLIGHT, VOICE_KEY } from "@/lib/desk/voice";
+import { splitBoards } from "@/lib/mindboard/list";
+import { useBoards } from "@/lib/mindboard/queries";
 import { shortName } from "@/lib/people/names";
 import { usePeople } from "@/lib/people/queries";
 import { useComposeStore, type ComposePin } from "@/lib/store/compose";
 import { useIngestStore, type IngestStage } from "@/lib/store/ingest";
 import { useMe, useSentTasks, useTaskSearch, type TaskWithPeople } from "@/lib/tasks/queries";
+import { wallInput, type WallIntent } from "@/lib/tv/command";
+import { useTvControl } from "@/lib/tv/mutations";
+import { tvKeys, type TvState } from "@/lib/tv/queries";
 import { STAGE_LINE } from "@/lib/voice/stages";
 
 /** Stages the line shows as a thin bar under itself; the phrase is never silently in flight (D-43). */
@@ -38,7 +47,7 @@ type Person = { id: string; full_name: string; position: string | null; aliases:
 
 /** One row of the palette: a move named in words, pin a person to the order, or go somewhere. */
 type Row =
-  | { kind: "command"; key: string; label: string; href: string; lead: boolean }
+  | { kind: "command"; key: string; label: string; href: string; lead: boolean; wall?: { intent: WallIntent; done: string } }
   | { kind: "pin"; person: Person }
   | { kind: "section"; href: string; label: string; key?: string }
   | { kind: "person"; person: Person }
@@ -100,6 +109,11 @@ export function CommandLine() {
   const people = usePeople(touched);
   const me = useMe().data;
   const sent = useSentTasks(touched ? me?.userId : undefined);
+  // the wall answers the line too (D-182): «Марата на стену», «часы на стену», «верни заставки»
+  const queryClient = useQueryClient();
+  const control = useTvControl();
+  const { pointsEnabled } = useDeskScope();
+  const boards = useBoards(touched ? me?.userId : undefined);
 
   useShortcuts("Строка поручения", [
     { keys: ["Ctrl K"], label: "Встать в строку" },
@@ -109,6 +123,7 @@ export function CommandLine() {
     { keys: ["Tab"], label: "Поручить человеку из подсказки" },
     { keys: ["Shift Enter"], label: "Открыть карточку человека" },
     { keys: ["Ctrl K"], label: "«новый сотрудник» или «удалить Ерлана» + Enter — действие, не поручение" },
+    { keys: ["Ctrl K"], label: "«Марата на стену», «часы на стену», «верни заставки» + Enter — команда стене" },
     { keys: ["Esc"], label: "Убрать подсказку, выйти из строки" },
     { keys: [VOICE_KEY], label: "Сказать поручение голосом (вне поля); закреплённому человеку — ему" },
     { keys: ["Enter"], label: "Пока идёт запись — готово, на разбор" },
@@ -169,13 +184,21 @@ export function CommandLine() {
       const task = tasks.byId.get(hit.id);
       return task ? [task] : [];
     });
-    const commands = matchCommands(query, team).map((command): Row => {
+    // only the director runs the wall (D-76)
+    const wallRows =
+      me?.role === "director"
+        ? matchWallCommands(query, team, { boards: splitBoards(boards.data ?? [], new Date()).live, points: pointsEnabled }).map(
+            (wall): Row => ({ kind: "command", key: `wall:${wall.key}`, label: wall.label, href: "", lead: wall.lead, wall: { intent: wall.intent, done: wall.done } }),
+          )
+        : [];
+    const named = matchCommands(query, team).map((command): Row => {
       if (command.kind === "new") return { kind: "command", key: "new", label: "Новый сотрудник", href: "/desk/team/new", lead: command.lead };
       if (command.kind === "list") return { kind: "command", key: "list", label: "Добавить списком из Excel", href: "/desk/team/new?tab=list", lead: false };
       if (command.kind === "team") return { kind: "command", key: "team", label: "Удалить сотрудника — выбрать в «Команде»", href: "/desk/team", lead: false };
       const who = command.person;
       return { kind: "command", key: `remove:${who.id}`, label: `Удалить: ${who.full_name}…`, href: `/desk/team?p=${who.id}&remove=1`, lead: command.lead };
     });
+    const commands = [...wallRows, ...named];
     // a command's words are not a name to pin: «удалить ерлана» offers no «Поручить Ерлану»
     const pinning = commands.length === 0;
     return [
@@ -185,7 +208,7 @@ export function CommandLine() {
       ...others.map((person): Row => ({ kind: "person", person })),
       ...found.map((task): Row => ({ kind: "task", task })),
     ];
-  }, [at, query, team, tasks]);
+  }, [at, query, team, tasks, boards.data, pointsEnabled, me?.role]);
   const pins = rows.filter((row) => row.kind === "pin").length;
   const open = focused && rows.length > 0 && dismissed !== value;
   // a move named in short words is picked by itself; the arrows take over (-2: nothing, on purpose)
@@ -214,6 +237,18 @@ export function CommandLine() {
   };
 
   const act = (row: Row, alt: boolean) => {
+    if (row.kind === "command" && row.wall) {
+      const wall = row.wall;
+      setValue("");
+      setChosen(-1);
+      control.mutate(wallInput(wall.intent, queryClient.getQueryData<TvState | null>(tvKeys.state), new Date()), {
+        onSuccess: (next) => {
+          markSent(next?.version);
+          toast(wall.done);
+        },
+      });
+      return;
+    }
     if (row.kind === "command") go(row.href);
     else if (row.kind === "pin" && !alt) pinPerson(row.person);
     else if (row.kind === "pin" || row.kind === "person") go(`/desk/team/${row.person.id}`);

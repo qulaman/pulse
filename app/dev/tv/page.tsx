@@ -32,6 +32,19 @@ const CASES: readonly WallCase[] = [
   "message-long",
   "event",
   "night",
+  "day-result",
+  "week-result",
+  "announcement",
+  "welcome",
+  "program",
+  "visit-board",
+  "message-focus",
+  "event-task",
+  "visit-announcement",
+  "cheer",
+  "cheer-guest",
+  "moment",
+  "moment-usual",
 ];
 
 /**
@@ -41,8 +54,12 @@ const CASES: readonly WallCase[] = [
  * a login or the shared database. Screenshots at 1920×1080 and 1280×720 come from here. `&demo=` walks the board by
  * itself: the spotlight every 2 s (`focus`), list ↔ map (`view`), both (`1`) — for perf and frame-by-frame checks.
  * `&tick=1` brings news every 3 s: a new event at the head of the ticker, one more order today.
- * `&walk=scenes|overlay|night|focus|rating|team[&every=ms][&lag=ms]` walks the wall through its states by itself —
- * for filming scene changes; `lag` holds each step's data back like the kiosk's fetch after `tv_state` flips.
+ * `&walk=scenes|overlay|night|focus|rating|team|program[&every=ms][&lag=ms]` walks the wall through its states by
+ * itself — for filming scene changes; `lag` holds each step's data back like the kiosk's fetch after `tv_state` flips.
+ * D-182: `case=day-result|week-result|announcement|welcome` — the program's scenes; `case=program&at=HH:MM[&dow=1…7]`
+ * — what the day's program shows at that time (Monday 1); `visit-board|message-focus|event-task|visit-announcement` —
+ * a notice as a band over what the room reads; `cheer|cheer-guest|moment|moment-usual` — the celebrations;
+ * `&k=1.15|1.3` — the remote's «Крупность».
  */
 export default async function TvSandboxPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const params = await searchParams;
@@ -55,9 +72,15 @@ export default async function TvSandboxPage({ searchParams }: { searchParams: Pr
   const walk = params.walk ?? null;
   const every = Number(params.every) > 0 ? Number(params.every) : 4_000;
   const lag = Number(params.lag) > 0 ? Number(params.lag) : 0;
+  const scale = params.k === "1.3" ? 130 : params.k === "1.15" ? 115 : 100;
+  const at = params.at && /^\d{1,2}:\d{2}$/.test(params.at) ? params.at : null;
+  const dow = Number(params.dow) >= 1 && Number(params.dow) <= 7 ? Number(params.dow) : null;
   return (
     <WallSandbox
-      key={`${wallCase}-${clock}-${guest}-${demo}-${tick}-${walk}`}
+      key={`${wallCase}-${clock}-${guest}-${demo}-${tick}-${walk}-${scale}-${at}-${dow}`}
+      scale={scale}
+      at={at}
+      dow={dow}
       wallCase={wallCase}
       clock={clock}
       guest={guest}

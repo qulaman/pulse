@@ -4,21 +4,49 @@
  *
  * Браузер не играет звук без жеста пользователя, а киоску тапать некому: автозапуск
  * Chrome в киоске обязан идти с `--autoplay-policy=no-user-gesture-required`
- * (docs/FRONTEND.md, appliance-чеклист). Без флага звук молча не прозвучит — надпись всё
- * равно на стене.
+ * (docs/SETUP.md §8). Без флага звук молча не прозвучит — надпись всё равно на стене, а
+ * квитанция стены скажет пульту `sound: "suspended"` и число немых звонков (D-182).
  */
 
 type AudioContextCtor = typeof AudioContext;
 
 let context: AudioContext | null = null;
+/** Chimes rung while the sound was not running — the silent failure the receipt reports. */
+let silentRings = 0;
+
+function audioCtor(): AudioContextCtor | undefined {
+  if (typeof window === "undefined") return undefined;
+  return window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
+}
 
 function audio(): AudioContext | null {
-  if (typeof window === "undefined") return null;
-  const Ctor: AudioContextCtor | undefined =
-    window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext;
+  const Ctor = audioCtor();
   if (!Ctor) return null;
   context ??= new Ctor();
   return context;
+}
+
+/**
+ * The wall's sound for its receipt (D-182): `running` — a visitor's chime will be heard;
+ * `suspended` — Chrome was started without the autoplay flag; `idle` — not opened yet;
+ * `unsupported` — no WebAudio. `silent` — chimes rung into a sound that was not running.
+ */
+export function chimeStatus(): { state: string; silent: number } {
+  if (!context) return { state: audioCtor() ? "idle" : "unsupported", silent: silentRings };
+  return { state: context.state, silent: silentRings };
+}
+
+/**
+ * Open the sound when the wall comes up, not at the first visitor: the receipt then tells at
+ * once whether the kiosk can ring. Without the autoplay flag the context stays suspended.
+ */
+export function primeChime(): void {
+  try {
+    const ctx = audio();
+    if (ctx && ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+  } catch {
+    // no sound is not a reason to disturb the wall
+  }
 }
 
 function tone(ctx: AudioContext, frequency: number, at: number, length: number, peak: number): void {
@@ -43,6 +71,10 @@ export function playChime(): void {
     // ми и до — дверной звонок, а не тревога
     tone(ctx, 659.25, at, 0.9, 0.22);
     tone(ctx, 523.25, at + 0.42, 1.3, 0.2);
+    // resume() may wait for a gesture forever: whether the ring was heard is read a moment later
+    setTimeout(() => {
+      if (ctx.state !== "running") silentRings += 1;
+    }, 400);
   } catch {
     // no sound is not a reason to disturb the wall
   }

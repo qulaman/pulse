@@ -86,6 +86,9 @@ export const SERVICE_SOURCES: readonly { table: string; column: string; why: str
   { table: "login_codes", column: "user_id", why: "the person's own sign-in codes" },
   { table: "tv_state", column: "employee_id", why: "the wall's focus: set null, the wall simply lets go" },
   { table: "profile_phones", column: "user_id", why: "the card's own phone" },
+  { table: "tv_pairings", column: "tv_user_id", why: "a wall's pairing code: ten minutes of life, nothing to keep (D-182)" },
+  { table: "tv_pairings", column: "confirmed_by", why: "who typed a wall's pairing code: the code is spent, the screen's own login stays" },
+  { table: "tv_pair_attempts", column: "user_id", why: "the director's pairing attempts: a ten-minute rate limit" },
 ];
 
 /** Written about the person by the robot; the key does not cascade, so the delete clears them first. */

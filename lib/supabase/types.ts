@@ -2108,10 +2108,13 @@ export type Database = {
           expires_at: string | null
           guest: boolean
           guest_until: string | null
+          health: Json | null
           mode: string
           rating_view: string
           reload_requested_at: string | null
+          scale: number
           scene: string
+          scene_set_at: string | null
           seen_at: string | null
           task_id: string | null
           updated_at: string
@@ -2136,10 +2139,13 @@ export type Database = {
           expires_at?: string | null
           guest?: boolean
           guest_until?: string | null
+          health?: Json | null
           mode?: string
           rating_view?: string
           reload_requested_at?: string | null
+          scale?: number
           scene?: string
+          scene_set_at?: string | null
           seen_at?: string | null
           task_id?: string | null
           updated_at?: string
@@ -2164,10 +2170,13 @@ export type Database = {
           expires_at?: string | null
           guest?: boolean
           guest_until?: string | null
+          health?: Json | null
           mode?: string
           rating_view?: string
           reload_requested_at?: string | null
+          scale?: number
           scene?: string
+          scene_set_at?: string | null
           seen_at?: string | null
           task_id?: string | null
           updated_at?: string
@@ -2787,15 +2796,6 @@ export type Database = {
       }
       team_daily_report_day: { Args: { p_date?: string }; Returns: Json }
       team_daily_report_period: { Args: { p_from: string; p_to: string }; Returns: Json }
-      team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
-      team_role: {
-        Args: { r: Database["public"]["Enums"]["user_role"] }
-        Returns: boolean
-      }
-      thank_errand: {
-        Args: { client_request_id?: string; p_id: string }
-        Returns: Json
-      }
       person_daily_reports: {
         Args: { p_from: string; p_to: string; p_user_id: string }
         Returns: Json
@@ -2806,6 +2806,15 @@ export type Database = {
       }
       remind_daily_report: {
         Args: { client_request_id?: string; p_user_ids: string[] }
+        Returns: Json
+      }
+      team_channel_alerts_due: { Args: { p_now?: string }; Returns: number }
+      team_role: {
+        Args: { r: Database["public"]["Enums"]["user_role"] }
+        Returns: boolean
+      }
+      thank_errand: {
+        Args: { client_request_id?: string; p_id: string }
         Returns: Json
       }
       transition_errand: {
@@ -2921,6 +2930,7 @@ export type Database = {
           p_mode?: string
           p_rating?: string
           p_reload?: boolean
+          p_scale?: number
           p_scene?: string
           p_task_id?: string
           p_wake?: boolean
@@ -2941,10 +2951,13 @@ export type Database = {
           expires_at: string | null
           guest: boolean
           guest_until: string | null
+          health: Json | null
           mode: string
           rating_view: string
           reload_requested_at: string | null
+          scale: number
           scene: string
+          scene_set_at: string | null
           seen_at: string | null
           task_id: string | null
           updated_at: string
@@ -2976,7 +2989,10 @@ export type Database = {
         Args: { p_state: Database["public"]["Tables"]["tv_state"]["Row"] }
         Returns: boolean
       }
-      tv_heartbeat: { Args: { p_applied_version?: number }; Returns: undefined }
+      tv_heartbeat: {
+        Args: { p_applied_version?: number; p_health?: Json }
+        Returns: undefined
+      }
       tv_overlay: { Args: never; Returns: Json }
       tv_rating: {
         Args: { p_guest?: boolean; p_period?: string }
