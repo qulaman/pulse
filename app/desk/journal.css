@@ -55,10 +55,11 @@ html[data-surface="desk"][data-journal] {
   /* ---- type ---- */
   --font-body: var(--font-plex-sans), system-ui, sans-serif;
   --font-display: var(--font-plex-sans), system-ui, sans-serif;
-  /* the face by its own name, not `var(--font-plex-cond)`: that one carries next/font's metric
-     fallback — Arial for every letter — so Russian titles came out in Arial with a faked bold
-     instead of falling through to Plex Sans (D-171) */
-  --font-cond: "IBM Plex Sans Condensed", var(--font-plex-sans), sans-serif;
+  /* Condensed has no Russian letters, so it must have no Arial fallback face either: that one
+     would catch every letter and Russian titles would come out in Arial with a faked bold instead
+     of falling through to Plex Sans (D-171). Its next/font/local face is declared without one
+     (app/layout.tsx), and its own name there is generated — so only through the variable. */
+  --font-cond: var(--font-plex-cond), var(--font-plex-sans), sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
   color-scheme: light;

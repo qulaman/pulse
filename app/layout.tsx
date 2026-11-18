@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Golos_Text, IBM_Plex_Mono, IBM_Plex_Sans, IBM_Plex_Sans_Condensed } from "next/font/google";
+import { Golos_Text } from "next/font/google";
 import localFont from "next/font/local";
 
 import { AppUpdate } from "@/components/AppUpdate";
@@ -50,11 +50,47 @@ const digits = localFont({
 });
 
 // The desk's three voices (D-158). `preload: false`: only a page that sets them in type fetches a
-// file, so a phone never does. Condensed has no Russian letters on Google Fonts: it speaks in
-// figures, and Russian words in its place fall back to Plex Sans.
-const plexSans = IBM_Plex_Sans({ subsets: ["cyrillic", "latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans", display: "swap", preload: false });
-const plexCond = IBM_Plex_Sans_Condensed({ subsets: ["latin"], weight: ["500", "600"], variable: "--font-plex-cond", display: "swap", preload: false });
-const plexMono = IBM_Plex_Mono({ subsets: ["cyrillic", "latin"], weight: ["400", "500"], variable: "--font-plex-mono", display: "swap", preload: false });
+// file, so a phone never does. The files live in the repo, not fetched from Google at build time:
+// for IBM Plex Sans (a wdth axis on Google) Google once answered the Vercel builder with
+// `/l/font?kit=…&skey=…` URLs, and Turbopack's next/font/google cannot take an `&` in a font URL —
+// the whole build failed. Each file is Google Fonts' full TTF of that weight cut to exactly the
+// unicode ranges Google serves for the family, so every letter falls back as before:
+//   pyftsubset <family>-<weight>.ttf --unicodes=<the family's ranges> --layout-features='*'
+//     --name-IDs='*' --notdef-outline --no-hinting --flavor=woff2
+// Sans and Mono hold Russian and Kazakh letters and ₸. Condensed holds no Russian letters (nor does
+// Google's): it speaks in figures, and Russian words in its place fall back to Plex Sans — so it
+// has no Arial fallback face that would catch them first (app/desk/journal.css). Mono has none
+// either, as on Google: a missing glyph falls through to the monospace stack.
+const plexSans = localFont({
+  src: [
+    { path: "./fonts/plex-sans-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/plex-sans-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/plex-sans-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-plex-sans",
+  display: "swap",
+  preload: false,
+});
+const plexCond = localFont({
+  src: [
+    { path: "./fonts/plex-sans-condensed-500.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/plex-sans-condensed-600.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-plex-cond",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+});
+const plexMono = localFont({
+  src: [
+    { path: "./fonts/plex-mono-400.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/plex-mono-500.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-plex-mono",
+  display: "swap",
+  preload: false,
+  adjustFontFallback: false,
+});
 
 export const metadata: Metadata = {
   title: "Pulse",
