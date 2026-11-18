@@ -2,84 +2,21 @@
    html[data-surface="desk"][data-journal]; keyframes at top level; motion off under reduced motion. */
 
 /* ==========================================================================================
-   «Календарь», «Заметки», «Экран» (D-174) — the planning screens.
-   - The calendar is a living week: a card of hours, today's column lit, the time already gone a
-     shade darker, the line of now across the week; meetings are blocks in the colour of what they
-     are to this person (components/desk/calendar/state.ts): ahead — sky, on now — the accent,
-     waiting for an answer — amber and dashed, refused or over — grey. The open one stands raised.
-   - «Заметки» is a personal workspace: thoughts as cards with a preview, boards as small canvases
-     with their first points and a meter of what is ticked; the board itself a canvas card.
+   «Календарь», «Экран» (D-174, D-180) — the planning screens.
+   - The calendar's frame and head live here; its parts in files of their own (D-180): the week grid
+     and its blocks in cal-grid.css, the side (the day, the open meeting) in cal-side.css, the month
+     and «Окна директора» in cal-month.css. «Заметки» and «Доски» are in notes.css and boards.css.
    - «Экран» is the monitor of the room: the live wall in a bezel with its diode, the scenes as
      cards with a sketch of what each puts up, the remote's settings as a settings card.
    The journal («Журнал») keeps its print: the base rules lay the screens out there, the Graphite
    block below gives them depth, colour and motion.
    ========================================================================================== */
 
-/* ---- both looks: the meeting's state as a colour of print -------------------------------- */
-html[data-surface="desk"][data-journal] {
-  .cal-event {
-    --tone: var(--sky);
-    border-left-color: var(--tone);
-    background: var(--surface);
-    transition: background-color 120ms linear;
-
-    &:hover {
-      background: var(--surface-2);
-    }
-    &[data-state="running"] {
-      background: var(--surface-2);
-    }
-    /* the pen: this person's answer is owed; a meeting that is over keeps a hairline */
-    &[data-state="owes"] {
-      --tone: var(--accent);
-    }
-    &[data-state="over"],
-    &[data-state="declined"] {
-      --tone: var(--border);
-      color: var(--text-muted);
-    }
-  }
-  .cal-event-time {
-    color: var(--text-muted);
-  }
-  .cal-chip {
-    border-left-color: transparent;
-
-    &[data-state="owes"] {
-      border-left-color: var(--accent);
-    }
-    &[data-state="running"] {
-      border-left-color: var(--sky);
-    }
-  }
-}
 /* print says it in words: no faces, dots, icons or bars on the journal's sheet */
 html[data-surface="desk"][data-journal]:not([data-graphite]) {
-  .cal-event-faces,
   .cal-chip-dot,
-  .cal-gone,
-  .cal-now-week,
-  .cal-now-dot,
-  .cal-agenda-dot,
-  .cal-deadlines-icon,
-  .cal-next-people,
-  .cal-next-icon,
-  .cal-answers,
-  .cal-ask-faces,
-  .cal-card-chip,
-  .cal-card-icon,
-  .cal-fact-icon,
-  .cal-person .cal-face {
+  .cal-deadlines-icon {
     display: none;
-  }
-  .cal-next-fact {
-    display: inline;
-  }
-  .cal-card-when {
-    display: block;
-  }
-  .cal-live {
-    color: var(--sky);
   }
 }
 html[data-surface="desk"][data-journal] {
@@ -138,10 +75,9 @@ html[data-surface="desk"][data-journal] {
     background: var(--surface-2);
     box-shadow: inset 0 0 0 1px var(--rule-soft);
   }
-  .cal-arrow,
   .cal-nav .cal-today-button {
-    height: 30px;
-    min-height: 30px !important;
+    height: 32px;
+    min-height: 32px;
     border-radius: 7px;
     color: var(--ink-2);
     transition:
@@ -159,12 +95,9 @@ html[data-surface="desk"][data-journal] {
       transition-duration: 70ms;
     }
   }
-  .cal-arrow {
-    width: 30px;
-  }
   .cal-nav .cal-today-button {
-    padding-inline: 10px !important;
-    font-size: 13px !important;
+    padding-inline: 10px;
+    font-size: 13px;
     font-weight: 500;
 
     &:disabled {
@@ -233,752 +166,28 @@ html[data-surface="desk"][data-journal] {
     }
   }
 
-  /* ---- the week: a card of hours ------------------------------------------------------- */
-  .cal-week {
-    border-top: 0;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-  }
-  .cal-week-head {
-    border-bottom: 1px solid var(--rule);
-    border-radius: 14px 14px 0 0;
-    background: color-mix(in srgb, var(--raise) 86%, transparent);
-    -webkit-backdrop-filter: blur(14px) saturate(1.4);
-    backdrop-filter: blur(14px) saturate(1.4);
-  }
-  .cal-day-head {
-    height: 48px;
-    gap: 8px;
-    padding-inline: 12px;
-    border-left-color: var(--rule-soft);
+  /* ---- the week grid and its meetings live in cal-grid.css (D-180) -------------------------- */
 
-    .desk-label {
-      color: var(--ink-3);
-      font-size: 12px;
-      font-weight: 500;
-    }
-    .nums.desk-figure {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.03em;
-    }
-    .desk-today {
-      height: 28px;
-      min-width: 28px;
-      padding: 0 6px;
-      color: #fff;
-      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
-    }
-    &[data-today] {
-      background: color-mix(in srgb, var(--pen) 5%, transparent);
+  /* ---- the month and the secretary's «Окна директора» live in cal-month.css (D-180) -------- */
 
-      .desk-label {
-        color: var(--pen);
-        font-weight: 600;
-      }
-    }
-    &[data-weekend]:not([data-today]) .desk-label {
-      color: color-mix(in srgb, var(--ink-3) 80%, transparent);
-    }
-  }
-  &[data-desk-theme="dark"] .cal-day-head .desk-today {
-    color: #04130f;
-  }
-  .cal-gutter .cal-hour {
-    color: var(--ink-3);
-    font-size: 11px;
-    font-weight: 500;
-  }
-  .cal-day {
-    border-left-color: var(--rule-soft);
+  /* ---- the side beside the week (the day, the open meeting) and the quick card live in cal-side.css (D-180) */
+}
 
-    &[data-weekend] {
-      background-color: var(--cal-weekend);
-    }
-    &[data-today] {
-      background-color: color-mix(in srgb, var(--pen) 3.5%, transparent);
-    }
-    &[data-past]::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: var(--cal-gone);
-      pointer-events: none;
-    }
+/* ---- «Календарь»: the grid and the side beside it (D-180), both looks ---------------------- */
+html[data-surface="desk"][data-journal] {
+  .cal-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(300px, 23vw, 380px);
   }
-  .cal-gone {
-    background: var(--cal-gone);
-    transform-origin: top;
-    transition: transform 900ms linear;
+  .cal-nav {
+    height: 36px;
   }
-
-  /* now: bold in today's column with its dot, faint across the week, its clock a red tag */
-  .cal-now {
-    transition: transform 900ms linear;
-
-    .desk-now {
-      height: 2px;
-      border-radius: 2px;
-      background: var(--pencil);
-      box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 45%, transparent);
-    }
+  /* the shell's right panel (a phrase to confirm) stands where the side was: the week keeps its width */
+  &[data-desk-panel] .cal-layout {
+    grid-template-columns: minmax(0, 1fr);
   }
-  .cal-now-dot {
-    position: absolute;
-    left: -5px;
-    top: -5px;
-    width: 10px;
-    height: 10px;
-    border-radius: 9999px;
-    background: var(--pencil);
-    box-shadow: 0 0 0 2px var(--raise);
-  }
-  .cal-now-week {
-    height: 1px;
-    margin-top: -0.5px;
-    background: color-mix(in srgb, var(--pencil) 40%, transparent);
-    transition: transform 900ms linear;
-  }
-  .cal-now-time {
-    height: 18px;
-    margin-top: -1px;
-    padding: 0 5px;
-    border-radius: 5px;
-    background: var(--pencil);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    line-height: 18px;
-    transition: transform 900ms linear;
-  }
-
-  /* ---- a meeting: a block in the colour of what it is to this person ------------------------- */
-  .cal-event {
-    --tone: var(--sky);
-    padding-left: 10px;
-    border: 0;
-    border-radius: 7px;
-    background: color-mix(in srgb, var(--tone) 14%, var(--raise));
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
-    color: var(--ink);
-    transition:
-      transform 200ms var(--ease-snap),
-      scale 220ms var(--ease-snap),
-      box-shadow 160ms linear,
-      background-color 140ms linear;
-    animation: cal-event-in 340ms var(--ease-snap) backwards;
-    animation-delay: calc(var(--day, 0) * 24ms);
-
-    /* the rail of its colour on the left edge */
-    &::before {
-      content: "";
-      position: absolute;
-      left: 3px;
-      top: 3px;
-      bottom: 3px;
-      width: 3px;
-      border-radius: 3px;
-      background: var(--tone);
-    }
-    &:hover {
-      z-index: 12;
-      background: color-mix(in srgb, var(--tone) 21%, var(--raise));
-      box-shadow:
-        inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent),
-        0 10px 22px -12px rgb(0 0 0 / 0.6);
-      transform: translateY(-1px);
-    }
-    &:active {
-      scale: 0.98;
-      transition-duration: 70ms;
-    }
-    /* the open one: raised over the grid while its card stands beside it */
-    &[data-open] {
-      z-index: 26;
-      background: color-mix(in srgb, var(--tone) 24%, var(--raise));
-      box-shadow:
-        0 0 0 2px var(--tone),
-        0 14px 30px -12px rgb(0 0 0 / 0.7);
-      transform: translateY(-1px);
-    }
-    &[data-state="running"] {
-      --tone: var(--pen);
-
-      &::before {
-        box-shadow: 0 0 8px color-mix(in srgb, var(--pen) 60%, transparent);
-      }
-    }
-    /* an invitation not answered yet: outlined, not filled — a meeting that is not settled */
-    &[data-state="owes"] {
-      --tone: var(--warn-ink);
-      background: color-mix(in srgb, var(--tone) 7%, var(--raise));
-      box-shadow: none;
-      outline: 1px dashed color-mix(in srgb, var(--tone) 75%, transparent);
-      outline-offset: -1px;
-
-      &:hover,
-      &[data-open] {
-        outline-style: solid;
-      }
-    }
-    &[data-state="declined"] {
-      --tone: var(--ink-3);
-      opacity: 0.75;
-
-      .cal-event-title {
-        text-decoration: line-through;
-        text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
-      }
-    }
-    &[data-state="over"] {
-      --tone: var(--ink-3);
-      background: color-mix(in srgb, var(--ink) 4%, var(--raise));
-      box-shadow: inset 0 0 0 1px var(--rule-soft);
-      color: var(--ink-2);
-
-      &::before {
-        opacity: 0.55;
-      }
-    }
-  }
-  .cal-event-time {
-    color: color-mix(in srgb, var(--ink) 60%, transparent);
-
-    .desk-when {
-      color: inherit;
-    }
-  }
-  .cal-event .cal-who {
+  &[data-desk-panel] .cal-side-slot {
     display: none;
   }
-  .cal-event-faces {
-    --face: 18px;
-  }
-  .cal-event .team-face {
-    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tone) 14%, var(--raise));
-  }
-  .cal-event .cal-faces-more {
-    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tone) 14%, var(--raise));
-    background: color-mix(in srgb, var(--ink) 12%, var(--raise));
-  }
-  .cal-event-ask {
-    height: 18px;
-    padding: 0 6px;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--warn-ink) 18%, transparent);
-    line-height: 18px;
-  }
-
-  /* the meeting being made: dashed in the accent, its words as they are typed */
-  .cal-ghost {
-    border: 1.5px dashed var(--pen);
-    border-radius: 7px;
-    background: color-mix(in srgb, var(--pen) 13%, var(--raise));
-    box-shadow: 0 12px 26px -12px rgb(0 0 0 / 0.6);
-    animation: cal-pop 200ms var(--ease-snap) both;
-  }
-  .cal-slot-hint {
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--pen) 9%, transparent) !important;
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 32%, transparent);
-    font-weight: 600;
-  }
-  /* a deadline: a small chip on its hour, opaque over the lines */
-  .cal-mark {
-    border-radius: 6px;
-    background: var(--sheet);
-    box-shadow:
-      0 0 0 1px var(--rule),
-      0 3px 8px -4px rgb(0 0 0 / 0.45);
-    padding-inline: 6px;
-    transition:
-      background-color 120ms linear,
-      transform 180ms var(--ease-snap);
-
-    &:hover {
-      background: var(--surface-2);
-      transform: translateY(-1px);
-    }
-    &[data-tone="danger"] {
-      box-shadow:
-        0 0 0 1px color-mix(in srgb, var(--pencil) 45%, transparent),
-        0 3px 8px -4px rgb(0 0 0 / 0.45);
-    }
-  }
-  .cal-busy {
-    border-radius: 7px;
-
-    span {
-      background: transparent;
-    }
-  }
-
-  /* ---- the month: weeks of seven in one card --------------------------------------------- */
-  .cal-month {
-    border-top: 0;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-  }
-  .cal-month-head {
-    border-bottom-color: var(--rule);
-    background: color-mix(in srgb, var(--ink) 2%, transparent);
-
-    > span {
-      padding: 10px 12px;
-      border-left-color: var(--rule-soft);
-      color: var(--ink-3);
-      font-size: 12px;
-      font-weight: 500;
-    }
-  }
-  .cal-cell {
-    container-type: inline-size;
-    padding: 8px;
-    border-color: var(--rule-soft);
-    transition: background-color 120ms linear;
-
-    &[data-weekend] {
-      background-color: var(--cal-weekend);
-    }
-    &[data-past]:not([data-today]) {
-      background-color: color-mix(in srgb, var(--cal-gone) 60%, transparent);
-    }
-    &:hover,
-    &:focus-visible {
-      background-color: var(--hover);
-    }
-    &[data-today] {
-      background-color: color-mix(in srgb, var(--pen) 5%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 35%, transparent);
-    }
-    &[data-outside] .cal-cell-day {
-      color: color-mix(in srgb, var(--ink-3) 55%, transparent);
-    }
-  }
-  .cal-cell-day {
-    height: 26px;
-    min-width: 26px;
-    border-radius: 9999px;
-    font-size: 13px;
-    font-weight: 600;
-
-    &.desk-today {
-      color: #fff;
-      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
-    }
-  }
-  &[data-desk-theme="dark"] .cal-cell-day.desk-today {
-    color: #04130f;
-  }
-  .cal-cell-new {
-    border-radius: 7px;
-    color: var(--ink-3);
-
-    &:hover {
-      background: color-mix(in srgb, var(--pen) 14%, transparent);
-      color: var(--pen);
-    }
-  }
-  .cal-chip {
-    --tone: var(--sky);
-    gap: 6px;
-    padding: 2px 6px;
-    border-left: 0;
-    border-radius: 6px;
-    transition:
-      background-color 120ms linear,
-      transform 180ms var(--ease-snap);
-    animation: cal-rise 300ms var(--ease-snap) backwards;
-
-    &:hover {
-      background: color-mix(in srgb, var(--tone) 14%, transparent);
-    }
-    &[data-state="running"] {
-      --tone: var(--pen);
-      background: color-mix(in srgb, var(--pen) 13%, transparent);
-    }
-    &[data-state="owes"] {
-      --tone: var(--warn-ink);
-      outline: 1px dashed color-mix(in srgb, var(--warn-ink) 65%, transparent);
-      outline-offset: -1px;
-    }
-    &[data-state="declined"] > span:last-child {
-      text-decoration: line-through;
-    }
-    &[data-state="over"],
-    &[data-state="declined"] {
-      --tone: var(--ink-3);
-    }
-    &[data-open] {
-      background: color-mix(in srgb, var(--tone) 20%, transparent);
-      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
-    }
-  }
-  .cal-chip-dot {
-    width: 6px;
-    height: 6px;
-    flex-shrink: 0;
-    border-radius: 9999px;
-    background: var(--tone);
-  }
-  /* a narrow cell (a laptop's month) keeps the words: the hour is in the meeting's card */
-  @container (max-width: 128px) {
-    .cal-chip .desk-when {
-      display: none;
-    }
-  }
-  .cal-cell-more {
-    padding-left: 6px;
-    color: var(--ink-3);
-    font-size: 11.5px;
-    font-weight: 500;
-  }
-
-  /* ---- «Ближайшее»: the next meeting a card, the invitations cards, the days ahead a list ----- */
-  .cal-next-wrap,
-  .cal-asks,
-  .cal-agenda {
-    border-top: 0;
-
-    > * {
-      border-bottom: 0;
-    }
-  }
-  .cal-next {
-    position: relative;
-    gap: 2px;
-    margin-top: 6px;
-    padding: 14px 16px 14px;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-    transition:
-      transform 220ms var(--ease-snap),
-      scale 220ms var(--ease-snap),
-      box-shadow 180ms linear;
-    animation: cal-rise 360ms var(--ease-snap) backwards;
-
-    &:hover {
-      background: var(--raise);
-      transform: translateY(-2px);
-      box-shadow:
-        0 0 0 1px var(--line),
-        var(--lift),
-        0 14px 30px -16px rgb(0 0 0 / 0.6);
-    }
-    &:active {
-      scale: 0.98;
-      transition-duration: 70ms;
-    }
-    /* close in time: lit from its corner by the accent, its countdown in the pen */
-    &[data-soon] {
-      background:
-        radial-gradient(130% 120% at 0% 0%, color-mix(in srgb, var(--pen) 12%, transparent), transparent 60%),
-        var(--raise);
-
-      .cal-next-when {
-        color: var(--pen);
-        font-weight: 600;
-      }
-    }
-    &[data-open] {
-      box-shadow:
-        0 0 0 2px var(--pen),
-        0 14px 30px -16px rgb(0 0 0 / 0.6);
-    }
-  }
-  .cal-next-empty {
-    margin-top: 6px;
-    padding: 14px 16px;
-    border-radius: 14px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-    color: var(--ink-2);
-  }
-  .cal-next-when {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ink-2);
-    font-weight: 500;
-  }
-  .cal-next[data-running] .cal-next-when::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 9999px;
-    background: var(--pen);
-    animation: cal-breathe 1.8s ease-in-out infinite;
-  }
-  .cal-next-title {
-    margin-top: 2px;
-    font-size: 16px;
-    line-height: 22px;
-    letter-spacing: -0.01em;
-  }
-  .cal-next-facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 0;
-    margin-top: 2px;
-    white-space: normal;
-  }
-  .cal-next-fact {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .cal-next-sep,
-  .cal-next-rsvp-words {
-    display: none;
-  }
-  .cal-next-fact + .cal-next-fact {
-    margin-left: 10px;
-  }
-  .cal-next-icon {
-    color: var(--ink-3);
-  }
-  .cal-next-people {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .cal-next-rsvp {
-    color: var(--ink-2);
-    font-size: 12px;
-    line-height: 16px;
-  }
-  /* the answers: one thin bar of three lengths that draws itself from the left */
-  .cal-answers {
-    display: flex;
-    gap: 2px;
-    height: 4px;
-    margin-top: 10px;
-    overflow: hidden;
-    border-radius: 4px;
-    transform-origin: left;
-    animation: cal-bar 640ms var(--ease-snap) 80ms both;
-
-    i {
-      min-width: 4px;
-      border-radius: 2px;
-      background: color-mix(in srgb, var(--ink-3) 40%, transparent);
-
-      &[data-part="going"] {
-        background: var(--ok-ink);
-      }
-      &[data-part="declined"] {
-        background: var(--pencil);
-      }
-    }
-  }
-
-  .cal-ask {
-    position: relative;
-    margin-top: 8px;
-    padding: 12px 14px 12px 16px;
-    border-radius: 12px;
-    background: var(--raise);
-    box-shadow: var(--shadow-card);
-    animation: cal-rise 340ms var(--ease-snap) backwards;
-    animation-delay: calc(var(--i, 0) * 50ms + 60ms);
-
-    /* amber on its edge: an answer is owed */
-    &::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 12px;
-      bottom: 12px;
-      width: 3px;
-      border-radius: 0 3px 3px 0;
-      background: var(--warn-ink);
-    }
-  }
-  .cal-ask-who {
-    margin-top: 6px;
-  }
-  .cal-ask-faces {
-    --face: 18px;
-  }
-  .cal-ask .team-face,
-  .cal-ask .cal-faces-more {
-    box-shadow: 0 0 0 1.5px var(--raise);
-  }
-
-  .cal-agenda-day > p {
-    padding-left: 6px;
-    color: var(--ink-3);
-    font-weight: 500;
-  }
-  .cal-agenda-row {
-    --tone: var(--sky);
-    height: 30px;
-    padding: 0 6px;
-    border-radius: 7px;
-    transition: background-color 100ms linear;
-
-    &:hover {
-      background: var(--hover);
-    }
-    &[data-open] {
-      background: var(--selected);
-    }
-    &[data-state="running"] {
-      --tone: var(--pen);
-    }
-    &[data-state="owes"] {
-      --tone: var(--warn-ink);
-    }
-    &[data-state="over"],
-    &[data-state="declined"] {
-      --tone: var(--ink-3);
-    }
-  }
-  .cal-agenda-dot {
-    width: 6px;
-    height: 6px;
-    flex-shrink: 0;
-    border-radius: 9999px;
-    background: var(--tone);
-  }
-  .cal-live {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    color: var(--pen);
-
-    &::before {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-radius: 9999px;
-      background: var(--pen);
-    }
-  }
-
-  /* ---- the meeting's card beside its block -------------------------------------------------- */
-  .cal-card-chip {
-    --tone: var(--sky);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    height: 22px;
-    margin-bottom: 6px;
-    padding: 0 9px;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--tone) 15%, transparent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 28%, transparent);
-    color: var(--tone);
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 22px;
-    animation: cal-pop 220ms var(--ease-snap) both;
-
-    &[data-state="running"] {
-      --tone: var(--pen);
-    }
-    &[data-state="owes"] {
-      --tone: var(--warn-ink);
-    }
-    &[data-state="over"],
-    &[data-state="declined"] {
-      --tone: var(--ink-2);
-    }
-  }
-  .cal-card-live {
-    width: 7px;
-    height: 7px;
-    border-radius: 9999px;
-    background: var(--tone);
-  }
-  .cal-card-chip[data-state="running"] .cal-card-live {
-    animation: cal-breathe 1.8s ease-in-out infinite;
-  }
-  .cal-card-when-live {
-    display: none;
-  }
-  .cal-card-icon,
-  .cal-fact-icon {
-    color: var(--ink-3);
-  }
-  .cal-fact {
-    grid-template-columns: 14px minmax(0, 1fr);
-    align-items: start;
-    gap: 8px;
-  }
-  .cal-fact-word {
-    display: none;
-  }
-  .cal-fact-icon {
-    display: flex;
-    padding-top: 2px;
-  }
-  .cal-card-people .cal-answers {
-    margin: 2px 0 8px;
-  }
-  .cal-card-people .desk-list {
-    border-top: 0;
-
-    > * {
-      border-bottom: 0;
-    }
-  }
-  .cal-person {
-    gap: 10px;
-    margin: 0 -6px;
-    padding: 3px 6px;
-    border-radius: 8px;
-    animation: cal-rise 260ms var(--ease-snap) backwards;
-
-    &:hover {
-      background: var(--hover);
-    }
-    .team-face {
-      box-shadow:
-        0 0 0 2px var(--sheet),
-        0 0 0 3.5px var(--ring, transparent);
-    }
-  }
-  .cal-answer {
-    height: 20px;
-    padding: 0 8px;
-    border-radius: 9999px;
-    background: color-mix(in srgb, currentColor 13%, transparent);
-    font-size: 11.5px;
-    line-height: 20px;
-  }
-  .cal-card-foot,
-  .cal-card-confirm {
-    border-top: 1px solid var(--rule-soft);
-    background: color-mix(in srgb, var(--ink) 2.5%, transparent);
-  }
-  .cal-card-confirm {
-    background: color-mix(in srgb, var(--pencil) 6%, transparent);
-  }
-  .cal-icon-button {
-    border-radius: 8px;
-    transition:
-      background-color 120ms linear,
-      color 120ms linear,
-      scale 220ms var(--ease-snap);
-
-    &:active {
-      scale: 0.92;
-      transition-duration: 70ms;
-    }
-  }
-
-  /* the quick card and the form: the journal's ruled fields keep no padding, Graphite's boxes need it */
-  .cal-quick .field:not(textarea),
-  .cal-form .field:not(textarea) {
-    padding-left: 10px;
-  }
-
-  /* «Заметки» live in notes.css, «Доски» in boards.css (D-177) */
 }
 
 /* ---- «Экран» in both looks: the scenes are a row of words in the journal, cards in «Графит» ---- */
@@ -1442,17 +651,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     transform: scaleX(0);
   }
 }
-@keyframes notes-rise {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-}
-@keyframes notes-meter-in {
-  from {
-    transform: scaleX(0);
-  }
-}
 @keyframes screen-rise {
   from {
     opacity: 0;
@@ -1476,13 +674,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     .cal-event,
     .cal-ghost,
     .cal-chip,
-    .cal-next,
-    .cal-next[data-running] .cal-next-when::before,
-    .cal-answers,
-    .cal-ask,
-    .cal-card-chip,
-    .cal-card-live,
-    .cal-person,
     .screen-bezel,
     .screen-now,
     .screen-cartridge,
@@ -1499,9 +690,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     button.screen-switch[role="switch"] > span {
       transition: none;
     }
-    .notes-meter i {
-      transition: none;
-    }
     .cal-now,
     .cal-now-week,
     .cal-now-time,
@@ -1510,7 +698,6 @@ html[data-surface="desk"][data-journal]:not([data-graphite]) {
     }
     .cal-event:hover,
     .cal-event[data-open],
-    .cal-next:hover,
     .cal-mark:hover {
       transform: none;
     }

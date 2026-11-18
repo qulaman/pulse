@@ -195,3 +195,219 @@ export function dayLineOf(spans: readonly BusySpan[], now: Date, from = 8 * HOUR
 export function wallHm(iso: string): string {
   return aqtobeIsoToYmdHm(iso)?.hm ?? "";
 }
+
+/* ---- «Окна директора» (D-180): his free windows, said in words ------------------------------- */
+
+/** A free stretch of one day: minutes of the wall clock. */
+export type FreeWindow = { start: number; end: number };
+
+/** Shorter than this, a gap between two meetings is no window to offer a caller. */
+export const MIN_WINDOW = 15;
+
+/** `director_busy` answers at most this many days at once (`20261104121000_director_busy.sql:26`). */
+export const BUSY_MAX_DAYS = 31;
+
+function shiftYmd(ymd: Ymd, days: number): Ymd {
+  const [year, month, day] = ymd.split("-").map(Number);
+  const moved = new Date(Date.UTC(year, month - 1, day + days));
+  return `${moved.getUTCFullYear()}-${String(moved.getUTCMonth() + 1).padStart(2, "0")}-${String(moved.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * The reads of `[from, to)` — `to` not included — for an RPC that takes at most `max` days: a
+ * month on screen (42 days) is two calls.
+ */
+export function busyChunks(from: Ymd, to: Ymd, max = BUSY_MAX_DAYS): [Ymd, Ymd][] {
+  const out: [Ymd, Ymd][] = [];
+  let at = from;
+  while (daysBetween(at, to) > 0) {
+    const next = daysBetween(at, to) > max ? shiftYmd(at, max) : to;
+    out.push([at, next]);
+    at = next;
+  }
+  return out;
+}
+
+/** The days of `[from, to)`. */
+export function daysFromTo(from: Ymd, to: Ymd): Ymd[] {
+  const out: Ymd[] = [];
+  for (let at = from; daysBetween(at, to) > 0; at = shiftYmd(at, 1)) out.push(at);
+  return out;
+}
+
+/**
+ * The spans of several reads as one list: in order, what overlaps or touches made one span — as
+ * the server does within one read (both reads of a month return a span across their edge).
+ */
+export function mergeSpans(spans: readonly BusySpan[]): BusySpan[] {
+  const sorted = [...spans].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || Date.parse(a.ends_at) - Date.parse(b.ends_at));
+  const out: BusySpan[] = [];
+  for (const span of sorted) {
+    const last = out[out.length - 1];
+    if (last && Date.parse(span.starts_at) <= Date.parse(last.ends_at)) {
+      if (Date.parse(span.ends_at) > Date.parse(last.ends_at)) out[out.length - 1] = { starts_at: last.starts_at, ends_at: span.ends_at };
+    } else out.push({ starts_at: span.starts_at, ends_at: span.ends_at });
+  }
+  return out;
+}
+
+/**
+ * The free windows of a day inside `[from, to)`: the gaps between busy blocks (in any order, even
+ * overlapping), none shorter than `min`. A `from` later than the day's start — today after now — cuts.
+ */
+export function freeWindows(blocks: readonly BusyBlock[], from: number, to: number, min = MIN_WINDOW): FreeWindow[] {
+  const out: FreeWindow[] = [];
+  let at = from;
+  for (const block of [...blocks].sort((a, b) => a.start - b.start)) {
+    if (at >= to || block.start >= to) break;
+    if (block.end <= at) continue;
+    if (block.start - at >= min) out.push({ start: at, end: block.start });
+    at = Math.max(at, block.end);
+  }
+  if (to - at >= min) out.push({ start: at, end: to });
+  return out;
+}
+
+/** The minute of the day the wall clock stands at. */
+export function wallMinutes(now: Date): number {
+  const wall = aqtobeIsoToYmdHm(now.toISOString()) as { hm: string };
+  const [h, m] = wall.hm.split(":").map(Number);
+  return h * HOUR + m;
+}
+
+/** «08:15» of a minute of the day; the midnight that ends it is «24:00». */
+export function minuteHm(minute: number): string {
+  return `${String(Math.floor(minute / HOUR)).padStart(2, "0")}:${String(minute % HOUR).padStart(2, "0")}`;
+}
+
+/** «45 мин», «1 ч», «1 ч 30 мин». */
+export function lengthWords(minutes: number): string {
+  if (minutes < HOUR) return `${minutes} мин`;
+  const rest = minutes % HOUR;
+  return `${Math.floor(minutes / HOUR)} ч${rest ? ` ${rest} мин` : ""}`;
+}
+
+/**
+ * The closed door of today as a block: from now until its end — the rest of the day when it has
+ * no end or ends on another day. Null while the door is open. «Не беспокоить» is no free window.
+ */
+export function holdBlock(hold: DoorHold | null, now: Date): BusyBlock | null {
+  if (!holds(hold, now.getTime())) return null;
+  const start = wallMinutes(now);
+  if (!hold.until) return { start, end: DAY_MIN };
+  const until = aqtobeIsoToYmdHm(hold.until) as { ymd: Ymd; hm: string };
+  if (until.ymd !== todayYmd(now)) return { start, end: DAY_MIN };
+  const [h, m] = until.hm.split(":").map(Number);
+  return { start, end: Math.max(start, h * HOUR + m) };
+}
+
+/** What a day of the windows is: gone by, today, a working day ahead, a day off. */
+export type WindowDay = "past" | "today" | "work" | "off";
+
+/** 1 = Monday … 7 = Sunday, as `settings.workdays` counts. */
+export function isoWeekday(ymd: Ymd): number {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return ((new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7) + 1;
+}
+
+export function windowDayOf(ymd: Ymd, today: Ymd, workdays: readonly number[]): WindowDay {
+  const ahead = daysBetween(today, ymd);
+  if (ahead < 0) return "past";
+  if (!workdays.includes(isoWeekday(ymd))) return "off";
+  return ahead === 0 ? "today" : "work";
+}
+
+/**
+ * One day of «Окна директора»: its free windows inside the working hours — none on a day gone by
+ * or a day off (he is not at work to be offered) — how long he is free in all, whether he has any
+ * busy time at all (a day without is «нет встреч», never «весь день свободен»: the calendar knows
+ * meetings only), and his busy time outside the hours in words for the row's ends: «занят с
+ * 07:30», «занят 22:00→01:00». `night` — the next day's blocks, for a span past midnight.
+ */
+export type DayWindows = { windows: FreeWindow[]; free: number; busy: boolean; early: string | null; late: string | null };
+
+export function dayWindows({
+  blocks,
+  kind,
+  from,
+  to,
+  nowMinute = null,
+  hold = null,
+  night = [],
+}: {
+  blocks: readonly BusyBlock[];
+  kind: WindowDay;
+  from: number;
+  to: number;
+  /** Today: the windows start now. */
+  nowMinute?: number | null;
+  /** Today: the closed door. */
+  hold?: BusyBlock | null;
+  night?: readonly BusyBlock[];
+}): DayWindows {
+  const open = kind === "today" || kind === "work";
+  const start = kind === "today" && nowMinute !== null ? Math.max(from, nowMinute) : from;
+  const windows = open ? freeWindows(hold ? [...blocks, hold] : blocks, start, to) : [];
+  const early = blocks
+    .filter((block) => block.start < from)
+    // a block from midnight is mostly the night before going on: until when is the news
+    .map((block) => (block.start === 0 ? `до ${minuteHm(block.end)}` : block.end <= from ? `${minuteHm(block.start)}–${minuteHm(block.end)}` : `с ${minuteHm(block.start)}`));
+  const late = blocks
+    .filter((block) => block.end > to)
+    .map((block) => {
+      // a span past midnight goes on as the next day's first block
+      const next = block.end >= DAY_MIN ? night.find((other) => other.start === 0) : undefined;
+      const end = minuteHm(next ? next.end : block.end);
+      return block.start >= to ? `${minuteHm(block.start)}→${end}` : `до ${end}`;
+    });
+  return {
+    windows,
+    free: windows.reduce((sum, window) => sum + window.end - window.start, 0),
+    busy: blocks.length > 0,
+    early: early.length ? `занят ${early.join(", ")}` : null,
+    late: late.length ? `занят ${late.join(", ")}` : null,
+  };
+}
+
+/** A window offered for a call: which day, from when, until when. */
+export type DatedWindow = FreeWindow & { ymd: Ymd };
+
+/**
+ * «Ближайшие окна»: the free windows from now on over the days given — today and the working days
+ * ahead, inside the hours, the closed door taken out of today — the soonest first.
+ */
+export function nearestWindows({
+  blocks,
+  days,
+  now,
+  workdays,
+  from,
+  to,
+  hold = null,
+  limit = 6,
+}: {
+  blocks: ReadonlyMap<Ymd, readonly BusyBlock[]>;
+  days: readonly Ymd[];
+  now: Date;
+  workdays: readonly number[];
+  from: number;
+  to: number;
+  hold?: BusyBlock | null;
+  limit?: number;
+}): DatedWindow[] {
+  const today = todayYmd(now);
+  const out: DatedWindow[] = [];
+  for (const ymd of days) {
+    const kind = windowDayOf(ymd, today, workdays);
+    if (kind !== "today" && kind !== "work") continue;
+    const day = dayWindows({ blocks: blocks.get(ymd) ?? [], kind, from, to, nowMinute: kind === "today" ? wallMinutes(now) : null, hold: kind === "today" ? hold : null });
+    for (const window of day.windows) out.push({ ...window, ymd });
+    if (out.length >= limit) break;
+  }
+  return out.slice(0, limit);
+}
+
+/** What a window says when copied for a caller: «Свободен завтра, 12:30–14:00». */
+export function windowCopy(window: DatedWindow, now: Date): string {
+  return `Свободен ${humanYmd(window.ymd, now)}, ${minuteHm(window.start)}–${minuteHm(window.end)}`;
+}

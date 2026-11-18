@@ -9,6 +9,7 @@ import { EventRepeatField, RecurrenceFields } from "@/components/desk/confirm/Re
 import { WhenField } from "@/components/desk/confirm/WhenField";
 import { TileFace } from "@/components/desk/team/TeamGrid";
 import { Kbd } from "@/components/desk/ui/Kbd";
+import { Select } from "@/components/desk/ui/Toolbar";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import type { PostprocessedEntity } from "@/lib/ai/postprocess";
 import { shortName } from "@/lib/people/names";
@@ -307,6 +308,24 @@ export function EntityEditor({
                 </p>
               ) : null}
             </Field>
+            <Field label="До">
+              <EventEndField start={entity.starts_at_iso} end={entity.ends_at_iso} title={entity.title} onChange={(iso) => onPatch({ ends_at_iso: iso })} />
+            </Field>
+            <Field label="Напомнить">
+              <Select
+                value={entity.remind_before_min ?? DEFAULT_REMIND}
+                onChange={(change) => onPatch({ remind_before_min: Number(change.target.value) })}
+                aria-label={`Напомнить: ${entity.title}`}
+                className="w-full"
+                data-testid="desk-entity-remind"
+              >
+                {EVENT_REMIND.map((option) => (
+                  <option key={option.min} value={option.min}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
             <Field label="Где">
               <input
                 value={entity.location ?? ""}
@@ -340,5 +359,54 @@ export function EntityEditor({
         {entity.kind === "reminder" ? <p className="tasks-entity-note pl-[72px] pt-1 text-[12px] leading-4 text-muted">Напоминание придёт вам</p> : null}
       </div>
     </article>
+  );
+}
+
+/** The reminder of a meeting before it begins — the full form's choices (D-180); the database's default is 30. */
+const EVENT_REMIND: readonly { min: number; label: string }[] = [
+  { min: 10, label: "за 10 минут" },
+  { min: 30, label: "за 30 минут" },
+  { min: 60, label: "за час" },
+  { min: 1440, label: "за день" },
+];
+const DEFAULT_REMIND = 30;
+
+/** How long a meeting said without its end lasts: the one rule of the calendar (D-180). */
+const NO_END_MIN = 60;
+const LENGTHS = [30, 45, 60, 90, 120, 180] as const;
+const AQTOBE_HM = new Intl.DateTimeFormat("ru-RU", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Aqtobe" });
+
+function lengthWords(min: number): string {
+  if (min < 60) return `${min} мин`;
+  const hours = Math.floor(min / 60);
+  const rest = min % 60;
+  return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+}
+
+/**
+ * «До» of a meeting in the confirm (D-180): a phrase rarely says its end, and the parser leaves it
+ * empty — then the meeting lasts an hour, as everywhere in the calendar. The choice is a length from
+ * the start, shown as the clock it ends at; a length the phrase did say stays among the choices.
+ */
+function EventEndField({ start, end, title, onChange }: { start: string | null; end: string | null; title: string; onChange: (iso: string | null) => void }) {
+  if (!start) return <span className="text-[14px] leading-5 text-muted">сначала — когда</span>;
+  const from = new Date(start).getTime();
+  const said = end ? Math.round((new Date(end).getTime() - from) / 60_000) : null;
+  const current = said !== null && said > 0 ? said : NO_END_MIN;
+  const options = LENGTHS.includes(current as (typeof LENGTHS)[number]) ? [...LENGTHS] : [...LENGTHS, current].sort((a, b) => a - b);
+  return (
+    <Select
+      value={current}
+      onChange={(change) => onChange(new Date(from + Number(change.target.value) * 60_000).toISOString())}
+      aria-label={`До: ${title}`}
+      className="nums w-full"
+      data-testid="desk-entity-end"
+    >
+      {options.map((min) => (
+        <option key={min} value={min}>
+          {`до ${AQTOBE_HM.format(new Date(from + min * 60_000))} · ${lengthWords(min)}${min === NO_END_MIN && said === null ? " (обычно)" : ""}`}
+        </option>
+      ))}
+    </Select>
   );
 }

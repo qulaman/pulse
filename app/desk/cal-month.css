@@ -1,0 +1,809 @@
+/* «Календарь» of the desk (D-180): cal-month. One builder a file.
+
+   The month (both roles) and the secretary's «Окна директора» with its side
+   (components/desk/calendar/{CalendarGrids,Windows}.tsx).
+   - The month: equal rows sized to the screen, as many meetings in a cell as fit, the hour short in
+     a narrow cell («10 Планёрка»), «ещё N» a button to the day; the neighbours' days readable.
+   - The director's busy time is one look everywhere the secretary meets it: the amber hatch of
+     «Стойка» (errands-stoika.css `.stoika-dayline-busy`), grey once it has passed; free windows
+     in the ok ink, the next one outlined; «не беспокоить» violet; her own meetings sky pills.
+   The first block lays everything out for both looks (tokens fall back to the app's own for
+   «Журнал»); the second dresses it for «Графит». Motion: the chips' rise is listed with the other
+   calendar motion in planning.css (still under reduced motion). */
+
+html[data-surface="desk"][data-journal] {
+  --cal-win-hatch: 70%;
+  --cal-win-hatch-gap: 30%;
+
+  &[data-desk-theme="light"] {
+    /* on paper the amber is darker and the hatch denser: the busy hours still read at 3:1 */
+    --cal-win-hatch: 92%;
+    --cal-win-hatch-gap: 48%;
+  }
+
+  /* ---- the month ------------------------------------------------------------------------- */
+  .cal-month {
+    height: calc(100dvh - 210px);
+    min-height: 480px;
+  }
+  .cal-cell {
+    container-type: inline-size;
+  }
+  .cal-chip {
+    border-left-color: transparent;
+
+    /* print: waiting for an answer in the amber of waiting, on now in the sky */
+    &[data-state="owes"] {
+      border-left-color: var(--warn);
+    }
+    &[data-state="running"] {
+      border-left-color: var(--sky, var(--accent));
+    }
+    &[data-state="declined"] > span:last-child {
+      text-decoration: line-through;
+    }
+  }
+  /* the hour in full; a narrow cell (a laptop's month) says it short: «10 Планёрка» */
+  .cal-chip-h {
+    display: none;
+  }
+  @container (max-width: 128px) {
+    .cal-chip .cal-chip-hm {
+      display: none;
+    }
+    .cal-chip .cal-chip-h {
+      display: inline;
+    }
+  }
+  .cal-cell-day {
+    cursor: pointer;
+  }
+  .cal-cell-more {
+    border-radius: 4px;
+
+    &:hover {
+      color: var(--ink, var(--text));
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+  }
+  .cal-cell-load {
+    color: var(--ink-3, var(--text-muted));
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 16px;
+    white-space: nowrap;
+  }
+  /* the director's busy hours of a day, for the secretary: a strip of the working hours */
+  .cal-cell-busy {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 5px;
+    margin: 1px 0 3px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--ink, var(--text)) 7%, transparent);
+
+    > i {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      border-radius: 3px;
+      background: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch), transparent) 0 3px,
+        color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch-gap), transparent) 3px 6px
+      );
+    }
+  }
+
+  /* ---- «Окна директора»: a row a day, his time on a line ---------------------------------- */
+  .cal-win {
+    --cal-win-label: 150px;
+    display: flex;
+    height: calc(100dvh - 210px);
+    min-height: 420px;
+    min-width: 0;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--rule, var(--border));
+  }
+  .cal-win-axis {
+    display: flex;
+    flex: none;
+    height: 30px;
+    border-bottom: 1px solid var(--rule, var(--border));
+  }
+  .cal-win-corner {
+    flex: none;
+    width: var(--cal-win-label);
+    border-right: 1px solid var(--rule-soft, var(--border));
+  }
+  .cal-win-hours {
+    position: relative;
+    flex: 1;
+    margin: 0 20px 0 16px;
+
+    > span {
+      position: absolute;
+      top: 8px;
+      color: var(--ink-3, var(--text-muted));
+      font-size: 11px;
+      line-height: 14px;
+      transform: translateX(-50%);
+    }
+  }
+  .cal-win-rows {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .cal-win-row {
+    display: grid;
+    flex: 1 1 0;
+    min-height: 80px;
+    max-height: 200px;
+    grid-template-columns: var(--cal-win-label) minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule-soft, var(--border));
+
+    &:last-child {
+      border-bottom: 0;
+    }
+    &[data-lines="2"] {
+      min-height: 102px;
+    }
+    /* a day gone by is a short line: what he had, nothing to offer */
+    &[data-kind="past"] {
+      flex: 0 0 44px;
+      min-height: 44px;
+
+      .cal-win-label,
+      .cal-win-lane {
+        opacity: 0.6;
+      }
+      .cal-win-say {
+        display: none;
+      }
+    }
+    &[data-kind="off"] {
+      flex: 0 0 60px;
+      min-height: 60px;
+    }
+    &[data-kind="off"][data-lines="1"],
+    &[data-kind="off"][data-lines="2"] {
+      flex-basis: 84px;
+    }
+  }
+  .cal-win-label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 12px;
+    border-right: 1px solid var(--rule-soft, var(--border));
+  }
+  .cal-win-date {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 20px;
+
+    > span {
+      color: var(--ink-2, var(--text-muted));
+      font-size: 12px;
+      font-weight: 600;
+    }
+    > b {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    > .cal-win-today {
+      color: var(--pen-deep, var(--accent));
+    }
+  }
+  .cal-win-say {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--ink-3, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+
+    &[data-tone="ok"] {
+      color: var(--ok-deep, var(--ok));
+    }
+    &[data-tone="dnd"] {
+      color: var(--violet, var(--accent));
+      font-weight: 600;
+    }
+  }
+  .cal-win-lane {
+    --cal-win-pills: 38px;
+    position: relative;
+    min-width: 0;
+    margin: 0 20px 0 16px;
+  }
+  .cal-win-busy,
+  .cal-win-dnd,
+  .cal-win-slot,
+  .cal-win-bone {
+    position: absolute;
+    top: 9px;
+    height: 22px;
+  }
+  .cal-win-bone {
+    left: 0;
+    right: 0;
+  }
+  .cal-win-busy {
+    z-index: 1;
+    border-radius: 6px;
+    background: repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch), transparent) 0 4px,
+      color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch-gap), transparent) 4px 8px
+    );
+
+    &[data-gone] {
+      background: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--ink, var(--text)) 24%, transparent) 0 4px,
+        color-mix(in srgb, var(--ink, var(--text)) 9%, transparent) 4px 8px
+      );
+    }
+  }
+  .cal-win-dnd {
+    z-index: 1;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--violet, var(--accent)) 62%, transparent);
+  }
+  .cal-win-slot {
+    z-index: 2;
+  }
+  .cal-win-free {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: 0 4px;
+    border-radius: 6px;
+    color: var(--ok-deep, var(--ok));
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    white-space: nowrap;
+    cursor: copy;
+    transition:
+      background-color 120ms linear,
+      box-shadow 120ms linear;
+
+    &:hover {
+      background: color-mix(in srgb, var(--ok-ink, var(--ok)) 9%, transparent);
+      box-shadow: inset 0 0 0 1.5px var(--ok-ink, var(--ok));
+    }
+    &[data-next] {
+      background: color-mix(in srgb, var(--ok-ink, var(--ok)) 12%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok-ink, var(--ok)) 45%, transparent);
+    }
+  }
+  /* busy time before or after the hours: words at the row's ends, on the lane's own ground */
+  .cal-win-edge {
+    position: absolute;
+    bottom: 5px;
+    z-index: 3;
+    max-width: 48%;
+    overflow: hidden;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: var(--raise, var(--surface));
+    color: var(--warn-deep, var(--text-muted));
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &[data-side="start"] {
+      left: -6px;
+    }
+    &[data-side="end"] {
+      right: -6px;
+    }
+  }
+  .cal-win-pill-slot {
+    position: absolute;
+    z-index: 2;
+    display: flex;
+    height: 20px;
+  }
+  .cal-win-pill {
+    --tone: var(--sky, var(--accent));
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    height: 20px;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--tone) 16%, var(--raise, var(--surface)));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 45%, transparent);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 16px;
+    text-align: left;
+    white-space: nowrap;
+
+    > .nums {
+      flex: none;
+      color: var(--ink-2, var(--text-muted));
+    }
+    &[data-state="running"] {
+      --tone: var(--pen, var(--accent));
+    }
+    &[data-state="owes"] {
+      --tone: var(--warn-ink, var(--warn));
+      box-shadow: none;
+      outline: 1px dashed color-mix(in srgb, var(--warn-ink, var(--warn)) 75%, transparent);
+      outline-offset: -1px;
+    }
+    &[data-state="declined"],
+    &[data-state="over"] {
+      --tone: var(--ink-3, var(--text-muted));
+      color: var(--ink-3, var(--text-muted));
+    }
+    &[data-state="declined"] > span:last-child {
+      text-decoration: line-through;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen, var(--accent));
+      outline-offset: 2px;
+    }
+  }
+  .cal-win-now {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    z-index: 4;
+    width: 2px;
+    margin-left: -1px;
+    border-radius: 1px;
+    background: var(--pencil, var(--danger));
+    pointer-events: none;
+
+    > b {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      padding: 0 4px;
+      border-radius: 4px;
+      background: var(--pencil, var(--danger));
+      color: var(--raise, #fff);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 14px;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+  }
+  .cal-win-error {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 28px 24px;
+  }
+  .cal-win-error-title {
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 22px;
+  }
+  .cal-win-error-words {
+    max-width: 520px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  /* ---- her side: the door now, the nearest windows, her meetings -------------------------- */
+  .cal-wside {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 18px;
+    padding: 16px;
+    border: 1px solid var(--rule, var(--border));
+  }
+  .cal-wside-door {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--hover, var(--surface-2));
+
+    &[data-state="busy"] {
+      --door: var(--warn-ink, var(--warn));
+    }
+    &[data-state="free"] {
+      --door: var(--ok-ink, var(--ok));
+    }
+    &[data-state="dnd"] {
+      --door: var(--violet, var(--accent));
+    }
+    &[data-state="busy"],
+    &[data-state="free"],
+    &[data-state="dnd"] {
+      background: color-mix(in srgb, var(--door) 8%, var(--raise, var(--surface)));
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--door) 28%, transparent);
+    }
+  }
+  .cal-wside-door-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 22px;
+
+    > .stoika-lamp {
+      box-shadow: none;
+    }
+  }
+  .cal-wside-door-words {
+    padding-left: 18px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .cal-wside-part {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cal-wside-title {
+    margin-bottom: 2px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 18px;
+  }
+  .cal-wside-count {
+    margin-left: 4px;
+    color: var(--ink-3, var(--text-muted));
+    font-weight: 500;
+  }
+  .cal-wside-lines {
+    display: flex;
+    flex-direction: column;
+  }
+  .cal-wside-line {
+    display: flex;
+    width: calc(100% + 16px);
+    min-width: 0;
+    min-height: 30px;
+    align-items: center;
+    gap: 10px;
+    margin: 0 -8px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 18px;
+    text-align: left;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--hover, var(--surface-2));
+    }
+    &[data-next] {
+      background: color-mix(in srgb, var(--ok-ink, var(--ok)) 8%, transparent);
+    }
+    &[data-state="owes"] .cal-wside-dot {
+      background: var(--warn-ink, var(--warn));
+    }
+    &[data-state="running"] .cal-wside-dot {
+      background: var(--pen, var(--accent));
+    }
+  }
+  .cal-wside-time {
+    flex: none;
+    min-width: 92px;
+    font-weight: 600;
+  }
+  .cal-wside-words {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--ink-2, var(--text-muted));
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cal-wside-copy {
+    flex: none;
+    margin-left: auto;
+    color: var(--ink-3, var(--text-muted));
+  }
+  .cal-wside-when {
+    flex: none;
+    min-width: 64px;
+    color: var(--ink-2, var(--text-muted));
+    white-space: nowrap;
+  }
+  .cal-wside-dot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+    border-radius: 9999px;
+    background: var(--sky, var(--accent));
+  }
+  .cal-wside-owes {
+    flex: none;
+    color: var(--warn-deep, var(--warn));
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .cal-wside-empty {
+    color: var(--ink-3, var(--text-muted));
+    font-size: 13px;
+    line-height: 18px;
+  }
+  .cal-wside-link {
+    color: var(--ink, var(--text));
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .cal-wside-foot {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: auto;
+  }
+  .cal-wside-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    color: var(--ink-2, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+
+    > span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    i {
+      display: inline-block;
+      width: 18px;
+      height: 8px;
+      border-radius: 3px;
+    }
+    i[data-kind="busy"] {
+      background: repeating-linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch), transparent) 0 3px,
+        color-mix(in srgb, var(--warn-ink, var(--warn)) var(--cal-win-hatch-gap), transparent) 3px 6px
+      );
+    }
+    i[data-kind="free"] {
+      box-shadow: inset 0 0 0 1px var(--ok-ink, var(--ok));
+    }
+    i[data-kind="mine"] {
+      background: color-mix(in srgb, var(--sky, var(--accent)) 35%, transparent);
+    }
+  }
+  .cal-wside-hint {
+    color: var(--ink-3, var(--text-muted));
+    font-size: 12px;
+    line-height: 16px;
+  }
+}
+
+/* «Журнал» is print: the windows' lines are words on the sheet, its lamp still */
+html[data-surface="desk"][data-journal]:not([data-graphite]) {
+  .cal-win,
+  .cal-wside {
+    background: var(--page, var(--surface));
+  }
+}
+
+/* ==========================================================================================
+   «Графит»
+   ========================================================================================== */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* ---- the month: weeks of seven in one card --------------------------------------------- */
+  .cal-month {
+    border-top: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .cal-month-head {
+    border-bottom-color: var(--rule);
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+
+    > span {
+      padding: 10px 12px;
+      border-left-color: var(--rule-soft);
+      color: var(--ink-3);
+      font-size: 12px;
+      font-weight: 500;
+    }
+  }
+  .cal-cell {
+    padding: 8px;
+    border-color: var(--rule-soft);
+    transition: background-color 120ms linear;
+
+    &[data-weekend] {
+      background-color: var(--cal-weekend);
+    }
+    &[data-past]:not([data-today]) {
+      background-color: color-mix(in srgb, var(--cal-gone) 60%, transparent);
+    }
+    &:hover,
+    &:focus-within {
+      background-color: var(--hover);
+    }
+    &[data-today] {
+      background-color: color-mix(in srgb, var(--pen) 5%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 35%, transparent);
+    }
+    /* the neighbours' days stay readable: quieter, never faint */
+    &[data-outside] .cal-cell-day {
+      color: var(--ink-3);
+    }
+  }
+  .cal-cell-day {
+    height: 26px;
+    min-width: 26px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 600;
+    transition: background-color 120ms linear;
+
+    &:hover:not(.desk-today) {
+      background: var(--hover);
+    }
+    &.desk-today {
+      color: #fff;
+      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
+    }
+  }
+  &[data-desk-theme="dark"] .cal-cell-day.desk-today {
+    color: #04130f;
+  }
+  .cal-cell-new {
+    border-radius: 7px;
+    color: var(--ink-3);
+
+    &:hover {
+      background: color-mix(in srgb, var(--pen) 14%, transparent);
+      color: var(--pen);
+    }
+  }
+  .cal-chip {
+    --tone: var(--sky);
+    gap: 6px;
+    padding: 2px 6px;
+    border-left: 0;
+    border-radius: 6px;
+    transition:
+      background-color 120ms linear,
+      transform 180ms var(--ease-snap);
+    animation: cal-rise 300ms var(--ease-snap) backwards;
+
+    &:hover {
+      background: color-mix(in srgb, var(--tone) 14%, transparent);
+    }
+    &[data-state="running"] {
+      --tone: var(--pen);
+      background: color-mix(in srgb, var(--pen) 13%, transparent);
+    }
+    &[data-state="owes"] {
+      --tone: var(--warn-ink);
+      outline: 1px dashed color-mix(in srgb, var(--warn-ink) 65%, transparent);
+      outline-offset: -1px;
+
+      > span:last-child {
+        color: var(--warn-deep);
+      }
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      --tone: var(--ink-3);
+    }
+    &[data-open] {
+      background: color-mix(in srgb, var(--tone) 20%, transparent);
+      box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 55%, transparent);
+    }
+    /* the desk's ring wins over the dashed «ждёт ответа» */
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: 1px;
+    }
+  }
+  .cal-chip-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--tone);
+  }
+  .cal-cell-more {
+    padding-left: 6px;
+    color: var(--ink-2);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* ---- «Окна директора» -------------------------------------------------------------------- */
+  .cal-win,
+  .cal-wside {
+    border: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .cal-win-axis {
+    border-bottom-color: var(--rule);
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+  }
+  .cal-win-row[data-today] {
+    background: color-mix(in srgb, var(--pen) 4%, transparent);
+  }
+  .cal-win-row[data-kind="off"] {
+    background: var(--cal-weekend);
+  }
+  .cal-win-row[data-kind="past"] {
+    background: color-mix(in srgb, var(--cal-gone) 60%, transparent);
+  }
+  /* the hours as faint lines down the lane */
+  .cal-win-lane {
+    background-image: linear-gradient(90deg, var(--rule-soft) 1px, transparent 1px);
+    background-size: calc(100% / var(--cal-win-n, 12)) 100%;
+  }
+  .cal-win-free[data-next] {
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--ok-ink) 45%, transparent),
+      0 0 12px -4px color-mix(in srgb, var(--ok-ink) 45%, transparent);
+  }
+  .cal-win-pill {
+    transition:
+      background-color 120ms linear,
+      transform 180ms var(--ease-snap);
+
+    &:hover {
+      background: color-mix(in srgb, var(--tone) 24%, var(--raise));
+      transform: translateY(-1px);
+    }
+  }
+  .cal-win-now {
+    box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 55%, transparent);
+  }
+  &[data-desk-theme="dark"] .cal-win-now > b {
+    color: #1d0604;
+  }
+  &[data-desk-theme="light"] .cal-win-now > b {
+    color: #fff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface="desk"][data-journal][data-graphite] {
+    .cal-win-pill,
+    .cal-win-free {
+      transition: none;
+    }
+    .cal-win-pill:hover {
+      transform: none;
+    }
+  }
+}

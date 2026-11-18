@@ -1,22 +1,34 @@
-import { ymdOfEvent } from "@/lib/calendar/agenda";
+import { isoWeekday } from "@/lib/desk/busy";
+import { hhmm, ymdOfEvent } from "@/lib/calendar/agenda";
 import { endOf } from "@/lib/calendar/overview";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import type { Ymd } from "@/lib/datetime/calendar";
 
 /**
- * The week of the desk's calendar as hours (D-154): a column a day, an hour 48 px tall,
- * 08:00–20:00 unless something on screen lies outside — then the range widens to hold it.
- * Meetings that overlap stand side by side in their column. Pure functions over the Aqtobe
- * wall clock (+05:00 all year, docs/AI.md §2).
+ * The week of the desk's calendar as hours (D-154, D-180): a column a day, the working hours
+ * 08:00–20:00 always — what lies before or after them goes into a thin row of its own above or
+ * under the grid, so one early call never stretches the whole week. An hour is as tall as the
+ * screen allows (`hourPxFor`); the day the director looks at is wider than the rest, a day off
+ * narrower (`dayShares`) — widths come from settings and the focus, never from the meetings.
+ * Meetings that overlap stand side by side when two, cascade when three or more (`layoutDay`).
+ * Pure functions over the Aqtobe wall clock (+05:00 all year, docs/AI.md §2).
  */
 
-/** The height of an hour on the grid. */
-export const HOUR_PX = 48;
-/** The working day the grid shows when nothing asks for more. */
+/** The working day the grid always shows; the rest is a row of chips at either end. */
 export const DAY_FROM = 8;
 export const DAY_TO = 20;
-/** A meeting shorter than this still gets room for a line of words — and overlaps by it. */
-const MIN_MINUTES = 30;
+const HOURS = DAY_TO - DAY_FROM;
+/** An hour before the screen was measured (and the floor of the old fixed grid). */
+export const HOUR_PX = 48;
+/** An hour is never shorter than this (a 15-minute call still a sliver) nor taller (a huge screen). */
+export const HOUR_MIN_PX = 40;
+export const HOUR_MAX_PX = 72;
+
+/** The widths of the days, in shares of what is left after the hours' column (D-180). */
+export const SHARE = { focus: 2.2, work: 1, off: 0.55 } as const;
+
+/** Two meetings starting within this many minutes stand side by side, not one over the other. */
+export const TOGETHER_MIN = 30;
 
 const OFFSET_MS = 5 * 60 * 60 * 1000;
 const DAY_MIN = 24 * 60;
@@ -31,81 +43,177 @@ export function wallOf(at: string | number): { ymd: Ymd; minutes: number } {
   };
 }
 
-/** Where a meeting stands on its own day, in minutes: an end on a later day closes it at midnight. */
-export function spanOf(event: CalendarEvent): { start: number; end: number } {
+/**
+ * Where a meeting stands on its own day, in minutes: an end on a later day closes it at midnight
+ * (`overnight`). A meeting without an end lasts an hour, everywhere (`endOf`, D-180).
+ */
+export function spanOf(event: CalendarEvent): { start: number; end: number; overnight: boolean } {
   const start = wallOf(event.starts_at);
   const end = wallOf(endOf(event));
-  const close = end.ymd !== start.ymd ? DAY_MIN : end.minutes;
-  return { start: start.minutes, end: Math.max(close, start.minutes) };
+  const overnight = end.ymd !== start.ymd;
+  return { start: start.minutes, end: Math.max(overnight ? DAY_MIN : end.minutes, start.minutes), overnight };
 }
 
-/**
- * The hours the grid spans: the working day, widened to whole hours around every meeting and
- * every other mark (`extra` — minutes past midnight) on screen.
- */
-export function hourRange(events: readonly CalendarEvent[], extra: readonly number[] = []): { from: number; to: number } {
-  let from = DAY_FROM;
-  let to = DAY_TO;
-  for (const event of events) {
-    const { start, end } = spanOf(event);
-    from = Math.min(from, Math.floor(start / 60));
-    to = Math.max(to, Math.ceil(Math.max(end, start + MIN_MINUTES) / 60));
-  }
-  for (const minutes of extra) {
-    from = Math.min(from, Math.floor(minutes / 60));
-    // a mark sits on its line: a 20:00 deadline needs the hour under it
-    to = Math.max(to, Math.floor(minutes / 60) + 1);
-  }
-  return { from: Math.max(0, from), to: Math.min(24, Math.max(to, from + 1)) };
+/** Which part of a day a meeting is drawn in: the row before the grid, the grid, the row after it. */
+export type Band = "early" | "day" | "late";
+
+export function bandOf(span: { start: number; end: number }, from = DAY_FROM, to = DAY_TO): Band {
+  if (span.start >= to * 60) return "late";
+  if (span.start < from * 60 && span.end <= from * 60) return "early";
+  return "day";
+}
+
+/** A day's meetings by the part of the day they are drawn in, each list in its order. */
+export function bandsOf(events: readonly CalendarEvent[], from = DAY_FROM, to = DAY_TO): Record<Band, CalendarEvent[]> {
+  const out: Record<Band, CalendarEvent[]> = { early: [], day: [], late: [] };
+  for (const event of events) out[bandOf(spanOf(event), from, to)].push(event);
+  return out;
+}
+
+/** «10:00», «10:00–11:30», a night that runs into the next day — «22:00→01:00». */
+export function clockOf(event: CalendarEvent): string {
+  const start = hhmm(event.starts_at);
+  if (!event.ends_at) return start;
+  return `${start}${spanOf(event).overnight ? "→" : "–"}${hhmm(event.ends_at)}`;
+}
+
+/** The height of an hour for the room the grid has below its top: the twelve working hours fit. */
+export function hourPxFor(available: number): number {
+  if (!Number.isFinite(available)) return HOUR_PX;
+  return Math.max(HOUR_MIN_PX, Math.min(HOUR_MAX_PX, Math.floor(available / HOURS)));
+}
+
+/** Pixels from the top of the grid for a time of the day. */
+export function yOf(minutes: number, from: number, hourPx: number = HOUR_PX): number {
+  return ((minutes - from * 60) * hourPx) / 60;
+}
+
+// one Monday-to-Sunday rule for the widths here and «Окна директора» (lib/desk/busy.ts)
+export { isoWeekday };
+
+/** Each day's share of the width: the focused day widest, a working day one, a day off narrow. */
+export function dayShares(days: readonly Ymd[], focusDay: Ymd | null, workdays: readonly number[]): number[] {
+  const work = new Set(workdays);
+  return days.map((ymd) => (ymd === focusDay ? SHARE.focus : work.has(isoWeekday(ymd)) ? SHARE.work : SHARE.off));
+}
+
+/** The grid's columns: the hours' column, then each day in its share. */
+export function columnsOf(gutter: number, shares: readonly number[]): string {
+  return `${gutter}px ${shares.map((share) => `minmax(0, ${share}fr)`).join(" ")}`;
 }
 
 export type Placed = {
   event: CalendarEvent;
-  /** Minutes past midnight. */
+  /** Minutes past midnight, the real ones cut to the grid's hours. */
   start: number;
   end: number;
-  /** The lane of the meeting among those it overlaps, and how many lanes they take. */
+  /** Where the block is drawn to: tall enough for a line of words, never into the next meeting. */
+  drawEnd: number;
+  /** The meeting goes on before the grid's first hour or after its last. */
+  clipTop: boolean;
+  clipBottom: boolean;
+  /** Side by side: the place among the meetings that share the width, and how many share it. */
   lane: number;
   lanes: number;
+  /** A cascade (three or more at once): how far in this one is set, and the deepest of its run; 0 — none. */
+  depth: number;
+  depths: number;
 };
 
-/**
- * One day's meetings on the grid: in order, each in the first lane free at its start; a run of
- * meetings that overlap one another shares the column's width evenly.
- */
-export function layoutDay(events: readonly CalendarEvent[]): Placed[] {
-  const items = events
-    .map((event) => {
-      const { start, end } = spanOf(event);
-      return { event, start, end: Math.max(end, start + MIN_MINUTES), lane: 0, lanes: 1 };
-    })
-    .sort((a, b) => a.start - b.start || b.end - a.end);
+type Item = Placed & { realEnd: number };
 
-  const placed: Placed[] = [];
-  let cluster: Placed[] = [];
-  let lanes: number[] = [];
-  let clusterEnd = -1;
-  const close = () => {
-    for (const item of cluster) item.lanes = lanes.length;
-    cluster = [];
-    lanes = [];
-  };
+/**
+ * One day's meetings on the grid (`bandOf` = "day"). Whether two meetings overlap is decided by
+ * their real ends — a 10:00–10:15 call and a 10:15 meeting do not; `minMinutes` only gives a short
+ * one room for its words, and only up to the next meeting. A run of overlapping meetings that
+ * never has more than two at once stands side by side. A run with three or more cascades: each
+ * meeting that starts while others are on is set in one step further and lies over them; the ones
+ * starting together (within `TOGETHER_MIN` of the first of them) share their step side by side.
+ */
+export function layoutDay(events: readonly CalendarEvent[], options: { from?: number; to?: number; minMinutes?: number } = {}): Placed[] {
+  const from = (options.from ?? DAY_FROM) * 60;
+  const to = (options.to ?? DAY_TO) * 60;
+  const minMinutes = options.minMinutes ?? 0;
+  const items: Item[] = events
+    .map((event) => {
+      const span = spanOf(event);
+      const start = Math.max(from, Math.min(span.start, to));
+      const realEnd = Math.max(start, Math.min(span.end, to));
+      return { event, start, end: realEnd, realEnd, drawEnd: realEnd, clipTop: span.start < from, clipBottom: span.end > to, lane: 0, lanes: 1, depth: 0, depths: 0 };
+    })
+    .sort((a, b) => a.start - b.start || b.realEnd - a.realEnd || a.event.id.localeCompare(b.event.id));
+
+  // runs of meetings that overlap one another, by their real ends
+  const runs: Item[][] = [];
+  let runEnd = -1;
   for (const item of items) {
-    if (item.start >= clusterEnd) close();
-    let lane = lanes.findIndex((end) => end <= item.start);
-    if (lane === -1) {
-      lane = lanes.length;
-      lanes.push(item.end);
+    // a meeting of no length still stands with the one it starts inside
+    if (runs.length === 0 || item.start >= runEnd) {
+      runs.push([item]);
+      runEnd = Math.max(item.realEnd, item.start + 1);
     } else {
-      lanes[lane] = item.end;
+      runs[runs.length - 1].push(item);
+      runEnd = Math.max(runEnd, item.realEnd);
     }
-    item.lane = lane;
-    cluster.push(item);
-    placed.push(item);
-    clusterEnd = Math.max(clusterEnd, item.end);
   }
-  close();
-  return placed;
+
+  for (const run of runs) {
+    const ends: number[] = [];
+    for (const item of run) {
+      let lane = ends.findIndex((end) => end <= item.start);
+      if (lane === -1) {
+        lane = ends.length;
+        ends.push(Math.max(item.realEnd, item.start + 1));
+      } else {
+        ends[lane] = Math.max(item.realEnd, item.start + 1);
+      }
+      item.lane = lane;
+    }
+    if (ends.length <= 2) {
+      for (const item of run) item.lanes = ends.length;
+      continue;
+    }
+    cascade(run);
+  }
+
+  // a short meeting is drawn tall enough for its words, but never over the next one
+  for (const item of items) {
+    const next = items.reduce((min, other) => (other !== item && other.start >= item.realEnd && other.start < min ? other.start : min), to);
+    item.drawEnd = Math.max(item.realEnd, Math.min(item.start + minMinutes, next, to));
+  }
+  return items.map((item) => ({
+    event: item.event,
+    start: item.start,
+    end: item.end,
+    drawEnd: item.drawEnd,
+    clipTop: item.clipTop,
+    clipBottom: item.clipBottom,
+    lane: item.lane,
+    lanes: item.lanes,
+    depth: item.depth,
+    depths: item.depths,
+  }));
+}
+
+/** Steps for a run of three or more at once (see `layoutDay`). */
+function cascade(run: Item[]) {
+  let index = 0;
+  const done: Item[] = [];
+  while (index < run.length) {
+    const lead = run[index];
+    const group: Item[] = [];
+    while (index < run.length && run[index].start - lead.start < TOGETHER_MIN) group.push(run[index++]);
+    // one step deeper than the deepest meeting still on when the group starts
+    const depth = done.reduce((deepest, item) => (item.realEnd > lead.start ? Math.max(deepest, item.depth + 1) : deepest), 0);
+    group.forEach((item, at) => {
+      item.depth = depth;
+      item.lane = at;
+      item.lanes = group.length;
+    });
+    done.push(...group);
+  }
+  const depths = Math.max(...run.map((item) => item.depth));
+  for (const item of run) item.depths = depths;
 }
 
 /** The meetings of the days on screen, grouped by the company's day, in order. */
@@ -120,11 +228,6 @@ export function eventsByDay(events: readonly CalendarEvent[], days: readonly Ymd
     else map.set(ymd, [event]);
   }
   return map;
-}
-
-/** Pixels from the top of the grid for a time of the day. */
-export function yOf(minutes: number, from: number): number {
-  return ((minutes - from * 60) * HOUR_PX) / 60;
 }
 
 /** Tops for marks in order, each pushed below the one before it when they would touch. */

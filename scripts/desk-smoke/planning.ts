@@ -9,7 +9,7 @@
  */
 import type { Page } from "playwright";
 
-import { open, record, skip, type Ctx } from "./shared";
+import { injected, open, record, skip, type Ctx } from "./shared";
 
 /** A desk dialog: in the middle of the window, clear of its edges. */
 async function centred(page: Page, testId: string): Promise<{ ok: boolean; detail: string }> {
@@ -51,17 +51,19 @@ export async function checkCalendar(ctx: Ctx) {
   const { page } = ctx;
   await open(page, "/desk/calendar");
 
-  // the week as hours: seven day columns over a grid of 48 px an hour, 08:00–20:00 at the least
+  // the week as hours: seven day columns, 08:00–20:00 always (earlier and later are thin rows of
+  // their own, D-180), the hour as tall as the screen allows — 40–72 px
   const week = page.getByTestId("desk-calendar-week");
   const weekShown = await week.waitFor({ timeout: 15_000 }).then(() => true, () => false);
   const columns = weekShown ? await page.getByTestId("desk-week-day").count() : 0;
   const hours = weekShown ? ((await week.getAttribute("data-hours")) ?? "") : "";
   const [from, to] = hours.split("-").map(Number);
+  const hourPx = weekShown ? Number((await week.getAttribute("data-hour-px")) ?? 0) : 0;
   const height = weekShown ? ((await page.getByTestId("desk-week-hours").boundingBox())?.height ?? 0) : 0;
   record(
-    "календарь: неделя — сетка часов, семь колонок, 48 px на час",
-    columns === 7 && from <= 8 && to >= 20 && Math.abs(height - (to - from) * 48) < 2,
-    `колонок ${columns}, часы ${hours}, высота ${Math.round(height)}`,
+    "календарь: неделя — семь колонок, часы 08–20 по высоте экрана (40–72 px на час)",
+    columns === 7 && from === 8 && to === 20 && hourPx >= 40 && hourPx <= 72 && Math.abs(height - (to - from) * hourPx) < 3,
+    `колонок ${columns}, часы ${hours}, час ${hourPx} px, высота ${Math.round(height)}`,
   );
 
   // the line of now: in today's column while the clock is inside the grid's hours (Aqtobe, +05:00)
@@ -74,7 +76,8 @@ export async function checkCalendar(ctx: Ctx) {
   } else {
     skip("календарь: линия «сейчас»", `часы стены ${wallHour.toFixed(1)} вне сетки ${hours}`);
   }
-  record("календарь: «Ближайшее» рядом", await page.getByTestId("desk-calendar-aside").isVisible());
+  const side = page.getByTestId("cal-side");
+  record("календарь: рядом с неделей — колонка дня", (await side.isVisible()) && (await side.getAttribute("data-mode")) === "day");
   await ctx.shot("calendar-week");
 
   // «Сроки задач»: off by default, on by its switch and by D — the address keeps it; nothing is written
@@ -132,7 +135,7 @@ export async function checkCalendar(ctx: Ctx) {
   // a click on a day (its number, clear of the meetings) opens that day's week; the layer stays on
   if (cells > 10) {
     const cell = page.getByTestId("desk-month-day").nth(10);
-    const ymd = await cell.getAttribute("aria-label");
+    const ymd = await cell.getAttribute("data-ymd");
     await cell.click({ position: { x: 10, y: 10 } });
     const back = await week.waitFor({ timeout: 10_000 }).then(() => true, () => false);
     const days = back ? await page.getByTestId("desk-week-day").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label"))) : [];
@@ -170,21 +173,25 @@ export async function checkCalendar(ctx: Ctx) {
     record("календарь: «Новая встреча» у директора", false, "кнопки нет");
   }
 
-  // a meeting opens as a card beside its block, the grid in sight — looked at, not answered
-  const event = page.getByTestId("desk-event").first();
+  // a meeting opens in the side, in the day's place (D-180): the week stays whole, the address
+  // keeps it (`?e`); Esc gives the side back to the day — looked at, not answered
+  const event = page.getByTestId("desk-calendar-week").getByTestId("desk-event").first();
   if (await event.count()) {
+    const id = await event.getAttribute("data-event-id");
     await event.click();
-    const card = page.getByTestId("desk-event-card");
+    const card = page.getByTestId("cal-side").getByTestId("desk-event-card");
     const shown = await card.waitFor({ timeout: 6_000 }).then(() => true, () => false);
     await page.waitForTimeout(300);
-    const cardBox = await card.boundingBox();
-    const blockBox = await event.boundingBox();
-    const beside = Boolean(cardBox && blockBox && (cardBox.x >= blockBox.x + blockBox.width - 1 || cardBox.x + cardBox.width <= blockBox.x + 1));
-    record("календарь: встреча — карточка рядом с блоком, сетка видна", shown && beside, cardBox && blockBox ? `карточка x=${Math.round(cardBox.x)}, блок ${Math.round(blockBox.x)}–${Math.round(blockBox.x + blockBox.width)}` : "нет");
+    const linked = new URL(page.url()).searchParams.get("e");
+    record("календарь: встреча — в колонке рядом, неделя видна, ?e в адресе", shown && (await week.isVisible()) && Boolean(id) && linked === id, `?e=${linked} · блок ${id}`);
     await ctx.shot("calendar-event");
-    record("календарь: Esc закрывает карточку", await escapes(page, "desk-event-card"));
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(400);
+    const back = (await page.getByTestId("cal-side").getAttribute("data-mode")) === "day" && new URL(page.url()).searchParams.get("e") === null;
+    record("календарь: Esc — колонка снова о дне, ?e уходит из адреса", back, search(page));
   } else {
-    skip("календарь: встреча — карточка рядом с блоком", "на этой неделе мероприятий нет");
+    skip("календарь: встреча в колонке", "на этой неделе встреч нет");
   }
 
   // a click on an empty stretch of a day ahead: the block of the new meeting and the quick card;
@@ -211,12 +218,12 @@ export async function checkCalendar(ctx: Ctx) {
       await page.mouse.click(box.x + box.width / 2, box.y + spot);
       const quick = page.getByTestId("desk-quick-create");
       const shown = await quick.waitFor({ timeout: 5_000 }).then(() => true, () => false);
-      const ghost = await page.getByTestId("desk-slot-ghost").count();
+      const ghost = await page.getByTestId("cal-ghost").count();
       const focus = await page.evaluate(() => document.activeElement?.getAttribute("data-testid"));
       record("календарь: клик по пустому часу — блок и быстрая карточка, курсор в названии", shown && ghost === 1 && focus === "desk-quick-title", `блок ${ghost}, фокус ${focus}`);
       await ctx.shot("calendar-quick");
       const gone = await escapes(page, "desk-quick-create");
-      record("календарь: Esc отпускает новую встречу — блока нет", gone && (await page.getByTestId("desk-slot-ghost").count()) === 0);
+      record("календарь: Esc отпускает новую встречу — блока нет", gone && (await page.getByTestId("cal-ghost").count()) === 0);
     } else {
       skip("календарь: клик по пустому часу", "свободного места в дне нет");
     }
@@ -225,6 +232,16 @@ export async function checkCalendar(ctx: Ctx) {
   }
 
   record("календарь: клавиши в справке «?»", await helpLists(page, "Календарь"));
+
+  // a failed read never looks like a free week (D-158, D-180): the meetings answer 500 in this
+  // browser only (the run knows it made the failure) — the screen says so and offers «Повторить»
+  injected.failures = true;
+  await page.route(/\/rest\/v1\/events\?/, (route) => route.fulfill({ status: 500, contentType: "application/json", body: "{}" }));
+  await page.goto(new URL("/desk/calendar?d=2031-03-03", page.url()).toString(), { waitUntil: "load" });
+  const retry = await page.getByTestId("desk-calendar-retry").waitFor({ timeout: 20_000 }).then(() => true, () => false);
+  record("календарь: сбой чтения — «Не удалось загрузить календарь · Повторить», не пустая неделя", retry && (await page.getByTestId("desk-calendar-week").count()) === 0);
+  await page.unroute(/\/rest\/v1\/events\?/);
+  injected.failures = false;
 }
 
 export async function checkNotes(ctx: Ctx) {

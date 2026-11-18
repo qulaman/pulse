@@ -25,6 +25,7 @@ import { PulseMark } from "@/components/brand/PulseMark";
 import { StillLogo } from "@/components/ui/StillLogo";
 import { useCalendar } from "@/lib/calendar/queries";
 import { todayCount } from "@/lib/calendar/agenda";
+import { pendingInvites } from "@/lib/calendar/invites";
 import { Tooltip } from "@/components/desk/ui/Tooltip";
 import { TONE_VAR, type Tone } from "@/components/desk/ui/tone";
 import { useDeskScope } from "@/components/desk/DeskScope";
@@ -71,8 +72,9 @@ export type DeskBadges = { counts: Partial<Record<DeskBadge, number>>; tones: Pa
  * number never disagrees with the list behind it (D-153 §3): «Задачи» — everything waiting for
  * the director (danger with an overdue one, warn otherwise), «Заявки» — open errands and, for the
  * director, visitors waiting for an answer; for the secretary — requests nobody has taken yet,
- * «Календарь» — today's meetings still ahead, «Сегодня» — what waits for the director besides
- * tasks: open disputes and orders. The same counts name the browser tab (DeskShell).
+ * «Календарь» — the invitations waiting for this person's «Буду / Не смогу», lit, as the phone's
+ * ball calls (D-180), otherwise today's meetings still ahead, quiet; «Сегодня» — what waits for the
+ * director besides tasks: open disputes and orders. The same counts name the browser tab (DeskShell).
  */
 export function useDeskBadges(role: DeskRole): DeskBadges {
   const me = useMe().data;
@@ -87,22 +89,25 @@ export function useDeskBadges(role: DeskRole): DeskBadges {
   const visits = useVisits(director && settled);
   const calendar = useCalendar(settled);
   const now = useMinute();
+  const myId = me?.userId;
   return useMemo(() => {
     const ask = inbox.data ? inboxCounts(inbox.data) : null;
     const open = director
       ? activeCount(errands.data) + awaitingDirector(visits.data ?? []).length
       : (errands.data ?? []).filter((errand) => errand.status === "sent").length;
-    const besides = game ? (disputes.data?.length ?? 0) + ordersWaiting(orders.data ?? [], me?.userId).length : 0;
+    const besides = game ? (disputes.data?.length ?? 0) + ordersWaiting(orders.data ?? [], myId).length : 0;
+    // an invitation that waits for my answer calls; with none, the day's meetings are only counted
+    const owed = calendar.data && myId ? pendingInvites(calendar.data, myId, now).length : 0;
     return {
       counts: {
         today: besides,
         tasks: ask?.total ?? 0,
         errands: open,
-        calendar: calendar.data ? todayCount(calendar.data, now) : 0,
+        calendar: owed > 0 ? owed : calendar.data ? todayCount(calendar.data, now) : 0,
       },
-      tones: { today: "warn", tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: "muted" },
+      tones: { today: "warn", tasks: ask && ask.overdue > 0 ? "danger" : "warn", errands: "accent", calendar: owed > 0 ? "warn" : "muted" },
     };
-  }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, me?.userId, now, orders.data, visits.data]);
+  }, [calendar.data, director, disputes.data, errands.data, game, inbox.data, myId, now, orders.data, visits.data]);
 }
 
 /** Each section's sign (lucide, D-165): beside the name in the wide navigation, alone when folded. */

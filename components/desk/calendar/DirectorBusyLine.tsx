@@ -32,8 +32,8 @@ export function useDirectorDoor(enabled: boolean, now: Date): DirectorDoor {
   const errands = useErrands(enabled);
   const catalogue = useSecretaryActions(enabled);
   const hold = useMemo(() => (errands.data ? doorHoldOf(errands.data, catalogue.data ?? [], now) : null), [errands.data, catalogue.data, now]);
-  const spans = busy.data ?? null;
-  return { door: doorOf(spans, hold, now), spans, hold, pending: busy.isPending && !hold };
+  const spans = busy.spans;
+  return { door: doorOf(spans, hold, now), spans, hold, pending: busy.status === "loading" && !hold };
 }
 
 /**

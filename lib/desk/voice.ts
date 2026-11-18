@@ -158,7 +158,11 @@ export function sentNotice(items: readonly SentItem[], result: Record<string, un
   let href: string | null = null;
   if (tasks.length === 1) href = taskIds[0] ? `/desk/tasks?id=${taskIds[0]}` : "/desk/tasks";
   else if (tasks.length > 1 || repeats.length > 0) href = "/desk/tasks";
-  else if (events > 0) href = "/desk/calendar";
+  else if (events > 0) {
+    // one meeting: «Открыть» opens it in the calendar's side (D-180), several — the week
+    const eventIds = ids(result, "event_ids");
+    href = events === 1 && eventIds.length === 1 ? `/desk/calendar?e=${eventIds[0]}` : "/desk/calendar";
+  }
   else if (announcements > 0) href = "/desk/ether";
   else if (count("reminder") > 0 || count("note") > 0) {
     // one thought kept: «Открыть» opens that very note (D-177), several — the list

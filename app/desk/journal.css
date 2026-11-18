@@ -695,11 +695,6 @@ html[data-surface="desk"][data-journal] {
     background: var(--page);
   }
 
-  /* the director's busy time on the secretary's week: crossed out, as a paper timetable does it */
-  .desk-busy {
-    background: repeating-linear-gradient(-45deg, var(--rule) 0 1px, transparent 1px 7px), var(--page);
-  }
-
   /* ---- the work screens: Сегодня, Задачи, Разобрать, the task's panel, the order's editor --------- */
   /* a list's row answers like the table's: a row open in the panel, a row under the cursor (J/K) */
   .desk-row[aria-current="true"],

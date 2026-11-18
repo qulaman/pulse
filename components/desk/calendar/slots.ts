@@ -1,12 +1,14 @@
 import { hmOf, parseHm, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
+import { endOf } from "@/lib/calendar/overview";
 
-import { HOUR_PX } from "./week";
+import { HOUR_PX, wallOf } from "./week";
 
 /**
- * The mouse on the desk's week of hours (wave 3): a click or a drag over an empty stretch of a
- * day is the time of a new meeting — snapped to a quarter of an hour, a click alone takes an
- * hour from its half-hour. And the times a desk form offers in its lists. Pure functions over the
- * Aqtobe wall clock.
+ * The mouse on the desk's week of hours (wave 3, D-180): a click or a drag over an empty stretch
+ * of a day is the time of a new meeting — snapped to a quarter of an hour, a click alone takes an
+ * hour from its half-hour; a drag of the director's own meeting is its new time. The hour is as
+ * tall as the grid draws it (`hourPx`). And the times a desk form offers in its lists. Pure
+ * functions over the Aqtobe wall clock.
  */
 
 /** A drag snaps to this. */
@@ -19,8 +21,8 @@ const DAY_MIN = 24 * 60;
 export type Slot = { ymd: Ymd; start: number; end: number };
 
 /** The minutes of the day under a y on the grid (from the grid's top), snapped down to `step`. */
-export function minutesAt(y: number, from: number, step = SNAP_MIN): number {
-  const raw = from * 60 + (y / HOUR_PX) * 60;
+export function minutesAt(y: number, from: number, hourPx: number = HOUR_PX, step = SNAP_MIN): number {
+  const raw = from * 60 + (y / hourPx) * 60;
   return Math.max(0, Math.min(DAY_MIN - step, Math.floor(raw / step) * step));
 }
 
@@ -36,6 +38,40 @@ export function slotOf(ymd: Ymd, down: number, up: number, dragged: boolean): Sl
   const start = Math.min(down, up);
   const end = Math.max(down, up) + SNAP_MIN;
   return { ymd, start, end: Math.min(DAY_MIN, end) };
+}
+
+/** The earliest minute of `ymd` a meeting may start at: today — the next quarter, a past day — never (null). */
+export function earliest(ymd: Ymd, now: Date): number | null {
+  const clock = wallOf(now.getTime());
+  if (ymd < clock.ymd) return null;
+  if (ymd > clock.ymd) return 0;
+  return Math.ceil(clock.minutes / SNAP_MIN) * SNAP_MIN;
+}
+
+/** A slot moved to start no earlier than `first`, its length kept within the day; null — nothing of it is ahead. */
+export function ahead(slot: Slot, first: number | null): Slot | null {
+  if (first === null) return null;
+  if (slot.start >= first) return slot;
+  if (first + SNAP_MIN > DAY_MIN) return null;
+  return { ...slot, start: first, end: Math.min(DAY_MIN, first + (slot.end - slot.start)) };
+}
+
+/** How long a meeting lasts, in ms — an hour when it has no end (D-180). */
+export function lengthMs(event: { starts_at: string; ends_at?: string | null }): number {
+  return Math.max(0, endOf(event) - new Date(event.starts_at).getTime());
+}
+
+/**
+ * A meeting dragged to `minutes` of `ymd`, its length kept: the new start and end — or null when
+ * it would start in the past (a meeting is never moved there) or did not move at all.
+ */
+export function movedTo(event: { starts_at: string; ends_at?: string | null }, ymd: Ymd, minutes: number, now: Date): { start: Date; end: Date } | null {
+  const iso = ymdHmToAqtobeIso(ymd, hmAt(Math.max(0, Math.min(DAY_MIN - SNAP_MIN, minutes))));
+  if (!iso) return null;
+  const start = new Date(iso);
+  if (start.getTime() < now.getTime()) return null;
+  if (start.getTime() === new Date(event.starts_at).getTime()) return null;
+  return { start, end: new Date(start.getTime() + lengthMs(event)) };
 }
 
 /** «14:30» of minutes past midnight; 24:00 is said as 23:59, the last minute of the day. */

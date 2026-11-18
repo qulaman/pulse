@@ -8,8 +8,8 @@ import { Popover } from "@/components/desk/ui/Popover";
 import { Select } from "@/components/desk/ui/Toolbar";
 import { Button } from "@/components/ui/Button";
 import { Calendar } from "@/components/ui/datetime/Calendar";
-import { defaultStartHm, endIsBeforeStart } from "@/lib/calendar/agenda";
-import { useCreateEvent, useEditEvent, type EventDraft } from "@/lib/calendar/mutations";
+import { defaultStartHm, endIsBeforeStart, noticeOfEdit } from "@/lib/calendar/agenda";
+import { DESK_WORDS, useCreateEvent, useEditEvent, type EventDraft } from "@/lib/calendar/mutations";
 import type { CalendarEvent } from "@/lib/calendar/queries";
 import { aqtobeIsoToYmdHm, humanYmd, parseYmd, todayYmd, ymdHmToAqtobeIso, type Hm, type Ymd } from "@/lib/datetime/calendar";
 import { EVENT_REPEAT_LABEL, EVENT_REPEATS, type EventRepeat } from "@/lib/recurrence/schedule";
@@ -105,8 +105,8 @@ function FormBody({
   closeList: RefObject<(() => boolean) | null>;
   closeDay: RefObject<(() => boolean) | null>;
 }) {
-  const create = useCreateEvent();
-  const edit = useEditEvent();
+  const create = useCreateEvent(DESK_WORDS);
+  const edit = useEditEvent(DESK_WORDS);
   const [now] = useState(nowProp);
   const startsAt = event ? aqtobeIsoToYmdHm(event.starts_at) : null;
   const endsAt = event?.ends_at ? aqtobeIsoToYmdHm(event.ends_at) : null;
@@ -164,7 +164,10 @@ function FormBody({
       onSaved(draft.starts_at, id);
       onClose();
     };
-    if (event) edit.mutate({ eventId: event.id, draft }, { onSuccess: () => done(event.id) });
+    // a new start or place goes out to the people: the toast says so (principle 8)
+    const notice = event ? noticeOfEdit(event, draft, new Date()) : null;
+    const toast = notice ? `Сохранил. Участникам уйдёт «${notice}»` : undefined;
+    if (event) edit.mutate({ eventId: event.id, draft, toast }, { onSuccess: () => done(event.id) });
     else create.mutate({ requestId, draft }, { onSuccess: (id) => done(id) });
   };
 
@@ -191,6 +194,7 @@ function FormBody({
           maxLength={200}
           placeholder="Название — планёрка, встреча с клиентом…"
           aria-label="Название"
+          aria-invalid={tried && !name ? true : undefined}
           data-testid="desk-event-title"
           className="field h-10 w-full px-0 text-[17px] font-semibold leading-6 outline-none placeholder:font-normal placeholder:text-muted"
         />

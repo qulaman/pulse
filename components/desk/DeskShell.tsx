@@ -17,6 +17,7 @@ import { playChime, playRing, RING_EVERY_MS, unlockAudio, useAudioUnlocked, useD
 import { goPhoneView } from "@/lib/desk/device";
 import { directorSignal, newKeys, secretarySignal, tabTitle, type SignalDot } from "@/lib/desk/signals";
 import { useErrands, useSecretaryActions } from "@/lib/errands/queries";
+import { MeetingRing } from "@/lib/calendar/ring";
 import { useReminderFlag, useReminderRinger } from "@/lib/notes/reminders";
 import { useNow } from "@/lib/pulse/queries";
 import { useVisits } from "@/lib/visits/queries";
@@ -507,6 +508,8 @@ export function DeskShell({ me, role, brand, navFolded = false, children }: { me
         {narrow ? <NarrowHint role={role} /> : null}
         {chord ? <ChordHint role={role} left={navWidth + 12} /> : null}
         <DeskSignals role={role} meId={me.userId} />
+        {/* a meeting of this person rings a quarter of an hour before it (D-180) */}
+        <MeetingRing meId={me.userId} />
         {role === "director" ? (
           <>
             {/* a thought kept on this computer without network lands once it is back, from any section (D-95, D-177) */}

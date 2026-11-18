@@ -3,7 +3,7 @@ import { daysBetween, humanYmd, todayYmd, type Ymd } from "@/lib/datetime/calend
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { Tone } from "@/lib/tasks/tone";
 
-import { hhmm, isOver, myStatus, SOON_MS, ymdOfEvent } from "./agenda";
+import { endMs, hhmm, isOver, myStatus, SOON_MS, ymdOfEvent } from "./agenda";
 import type { CalendarEvent } from "./queries";
 
 /**
@@ -15,7 +15,6 @@ import type { CalendarEvent } from "./queries";
 
 const MINUTE = 60_000;
 /** A meeting with no end still takes room on the day strip — an hour, the usual length. */
-const DEFAULT_LENGTH_MS = 60 * MINUTE;
 /** «Через 40 мин» is still news; further out the clock time says it better. */
 const RELATIVE_MS = 60 * MINUTE;
 
@@ -23,7 +22,7 @@ const at = (iso: string) => new Date(iso).getTime();
 
 /** Where a meeting ends on the strip: its own end, or an hour after it began. */
 export function endOf(event: { starts_at: string; ends_at?: string | null }): number {
-  return event.ends_at ? at(event.ends_at) : at(event.starts_at) + DEFAULT_LENGTH_MS;
+  return endMs(event);
 }
 
 /** Began and not over yet. */

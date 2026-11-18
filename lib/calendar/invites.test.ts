@@ -96,9 +96,10 @@ describe("pendingInvites", () => {
     expect(ids(pendingInvites([running, ended], ME, NOW))).toEqual(["running"]);
   });
 
-  it("gives a meeting without an end half an hour after its start", () => {
-    const justBegun = event({ id: "begun", starts_at: "2026-11-12T10:35:00+05:00" });
-    const longAgo = event({ id: "past", starts_at: "2026-11-12T10:25:00+05:00" });
+  // one rule with the grid and director_busy (D-180): a meeting without an end lasts an hour
+  it("gives a meeting without an end an hour after its start", () => {
+    const justBegun = event({ id: "begun", starts_at: "2026-11-12T10:05:00+05:00" });
+    const longAgo = event({ id: "past", starts_at: "2026-11-12T09:55:00+05:00" });
     expect(ids(pendingInvites([justBegun, longAgo], ME, NOW))).toEqual(["begun"]);
   });
 

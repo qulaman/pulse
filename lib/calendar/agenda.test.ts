@@ -2,18 +2,25 @@ import { describe, expect, it } from "vitest";
 
 import {
   agendaFrom,
+  clashesWith,
   countByDay,
   dayGroups,
   defaultStartHm,
+  draftOf,
   endIsBeforeStart,
+  extendedEnd,
   isOver,
   monthWindow,
   myStatus,
   nextEvent,
+  noticeOfEdit,
   peopleCount,
+  RSVP_DESK,
   rsvpSummary,
+  runningEvent,
   shiftDay,
   shiftEnd,
+  spanOf,
   startsSoon,
   timeRange,
   todayCount,
@@ -125,15 +132,53 @@ describe("agenda", () => {
     });
     expect(peopleCount(row)).toBe(3);
     expect(rsvpSummary(row)).toBe("2 из 4 будут, 1 не сможет");
-    expect(rsvpSummary(event({ people: [{ user_id: "u-dir", status: "going" }] }))).toBe("1 из 1 будут");
+    expect(rsvpSummary(row, RSVP_DESK)).toBe("2 из 4 будут · 1 не сможет");
+    expect(rsvpSummary(event({ people: [{ user_id: "u-dir", status: "going" }] }))).toBe("1 из 1 будет");
   });
 
-  it("calls a meeting over after its end, or half an hour after a start without one", () => {
+  it("makes the verb agree with its number: «1 из 3 будет», «2 не смогут», «21 из 25 будет»", () => {
+    const declined = event({
+      people: [
+        { user_id: "u-dir", status: "going" },
+        { user_id: "u-1", status: "declined" },
+        { user_id: "u-2", status: "declined" },
+      ],
+    });
+    expect(rsvpSummary(declined)).toBe("1 из 3 будет, 2 не смогут");
+    const many = event({
+      people: [
+        { user_id: "u-dir", status: "going" },
+        ...Array.from({ length: 20 }, (_, i) => ({ user_id: `g-${i}`, status: "going" })),
+        ...Array.from({ length: 4 }, (_, i) => ({ user_id: `w-${i}`, status: "invited" })),
+      ],
+    });
+    expect(rsvpSummary(many)).toBe("21 из 25 будет");
+  });
+
+  it("counts the author as coming, whatever their own row says", () => {
+    const row = event({ people: [{ user_id: "u-dir", status: "invited" }, { user_id: "u-1", status: "invited" }] });
+    expect(rsvpSummary(row)).toBe("1 из 2 будет");
+  });
+
+  // one rule with the phone, the grid and director_busy (D-180): no end — an hour
+  it("calls a meeting over after its end, or an hour after a start without one", () => {
     const withEnd = { starts_at: "2026-09-18T08:00:00+05:00", ends_at: "2026-09-18T09:30:00+05:00" };
     expect(isOver(withEnd, NOW)).toBe(false);
     expect(isOver({ ...withEnd, ends_at: "2026-09-18T08:50:00+05:00" }, NOW)).toBe(true);
     expect(isOver({ starts_at: "2026-09-18T08:45:00+05:00" }, NOW)).toBe(false);
-    expect(isOver({ starts_at: "2026-09-18T08:15:00+05:00" }, NOW)).toBe(true);
+    expect(isOver({ starts_at: "2026-09-18T08:15:00+05:00" }, NOW)).toBe(false);
+    expect(isOver({ starts_at: "2026-09-18T07:55:00+05:00" }, NOW)).toBe(true);
+  });
+
+  it("finds the meeting on right now — the one begun last — and nothing between meetings", () => {
+    const long = event({ id: "long", starts_at: "2026-09-18T08:00:00+05:00", ends_at: "2026-09-18T12:00:00+05:00" });
+    const call = event({ id: "call", starts_at: "2026-09-18T08:50:00+05:00", ends_at: "2026-09-18T09:20:00+05:00" });
+    const noEnd = event({ id: "no-end", starts_at: "2026-09-18T08:10:00+05:00" });
+    const later = event({ id: "later", starts_at: "2026-09-18T15:00:00+05:00" });
+    expect(runningEvent([long, call, noEnd, later], NOW)?.id).toBe("call");
+    expect(runningEvent([long, noEnd, later], NOW)?.id).toBe("no-end");
+    expect(runningEvent([later], NOW)).toBeNull();
+    expect(runningEvent([noEnd], new Date("2026-09-18T09:15:00+05:00"))).toBeNull();
   });
 
   it("reads a month and the one after it, on the Aqtobe clock, across the new year", () => {
@@ -187,5 +232,53 @@ describe("agenda", () => {
     expect(shiftDay("2026-09-28", 7)).toBe("2026-10-05");
     expect(shiftDay("2026-01-03", -7)).toBe("2025-12-27");
     expect(shiftDay("2028-02-28", 1)).toBe("2028-02-29");
+  });
+
+  it("says what a saved change sends: a new start «Перенос», a new place «Новое место», else nothing", () => {
+    const row = event({
+      starts_at: "2026-09-18T15:00:00+05:00",
+      ends_at: "2026-09-18T16:00:00+05:00",
+      location: "Переговорная",
+      people: [
+        { user_id: "u-dir", status: "going" },
+        { user_id: "u-1", status: "invited" },
+      ],
+    });
+    const same = { starts_at: "2026-09-18T10:00:00Z", ends_at: "2026-09-18T11:00:00Z", location: "Переговорная" };
+    expect(noticeOfEdit(row, same, NOW)).toBeNull();
+    expect(noticeOfEdit(row, { ...same, ends_at: "2026-09-18T11:30:00Z" }, NOW)).toBeNull();
+    expect(noticeOfEdit(row, { ...same, starts_at: "2026-09-18T11:00:00Z", ends_at: "2026-09-18T12:00:00Z" }, NOW)).toBe("Перенос");
+    expect(noticeOfEdit(row, { ...same, location: "Кабинет" }, NOW)).toBe("Новое место");
+    // nobody to tell: the author alone, or everyone else refused
+    const alone = event({ people: [{ user_id: "u-dir", status: "going" }, { user_id: "u-1", status: "declined" }] });
+    expect(noticeOfEdit(alone, { ...same, starts_at: "2026-09-18T11:00:00Z" }, NOW)).toBeNull();
+    // moved into the past: the trigger wakes nobody
+    expect(noticeOfEdit(row, { starts_at: "2026-09-17T10:00:00Z", ends_at: "2026-09-17T11:00:00Z", location: "Переговорная" }, NOW)).toBeNull();
+  });
+
+  it("drafts a meeting unchanged — the list without the author, «все» without names", () => {
+    const row = event({ people: [{ user_id: "u-dir", status: "going" }, { user_id: "u-1", status: "declined" }, { user_id: "u-2", status: "invited" }] });
+    expect(draftOf(row)).toMatchObject({ title: "Планёрка", starts_at: row.starts_at, ends_at: null, everyone: false, participant_ids: ["u-1", "u-2"] });
+    expect(draftOf({ ...row, everyone: true }).participant_ids).toEqual([]);
+  });
+
+  it("moves the end on from where it stands, or from an hour after a start without one", () => {
+    expect(extendedEnd({ starts_at: "2026-09-18T15:00:00+05:00", ends_at: "2026-09-18T16:00:00+05:00" }, 15)).toBe("2026-09-18T11:15:00.000Z");
+    expect(extendedEnd({ starts_at: "2026-09-18T15:00:00+05:00", ends_at: null }, 30)).toBe("2026-09-18T11:30:00.000Z");
+  });
+
+  it("finds this person's meetings that share the stretch, by real ends, nearest first", () => {
+    const me = "u-dir";
+    const mine = event({ id: "mine", starts_at: "2026-09-18T15:00:00+05:00", ends_at: "2026-09-18T16:00:00+05:00", people: [{ user_id: me, status: "going" }] });
+    const noEnd = event({ id: "no-end", starts_at: "2026-09-18T14:30:00+05:00", ends_at: null, people: [{ user_id: me, status: "going" }] });
+    const refused = event({ id: "refused", author_id: "u-9", starts_at: "2026-09-18T15:00:00+05:00", people: [{ user_id: me, status: "declined" }] });
+    const others = event({ id: "others", author_id: "u-9", starts_at: "2026-09-18T15:00:00+05:00", people: [{ user_id: "u-1", status: "going" }] });
+    const before = event({ id: "before", starts_at: "2026-09-18T13:00:00+05:00", ends_at: "2026-09-18T15:00:00+05:00", people: [{ user_id: me, status: "going" }] });
+    const all = [mine, noEnd, refused, others, before];
+    expect(clashesWith(all, "2026-09-18T15:00:00+05:00", "2026-09-18T15:30:00+05:00", me).map((e) => e.id)).toEqual(["no-end", "mine"]);
+    expect(clashesWith(all, "2026-09-18T15:00:00+05:00", "2026-09-18T15:30:00+05:00", me, "mine").map((e) => e.id)).toEqual(["no-end"]);
+    expect(clashesWith(all, "2026-09-18T16:00:00+05:00", "2026-09-18T17:00:00+05:00", me)).toEqual([]);
+    expect(spanOf(noEnd)).toBe("14:30–15:30");
+    expect(spanOf(mine)).toBe("15:00–16:00");
   });
 });

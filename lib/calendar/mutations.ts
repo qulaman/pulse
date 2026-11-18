@@ -17,7 +17,33 @@ import { calendarKeys, type CalendarEvent } from "./queries";
  * `confirm_voice_batch`, which is idempotent by the id the form was opened with.
  */
 
-const GENERIC_ERROR = "Не получилось. Попробую ещё раз по тапу";
+/**
+ * The words of the toasts. The phone says «мероприятие» (its own screens do); the desk says
+ * «встреча» on every screen (D-158 §5) and has no taps to promise — it passes `DESK_WORDS`.
+ */
+export type CalendarWords = {
+  error: string;
+  created: string;
+  deleted: string;
+  gone: string;
+  saved: string;
+};
+
+export const PHONE_WORDS: CalendarWords = {
+  error: "Не получилось. Попробую ещё раз по тапу",
+  created: "Мероприятие в календаре",
+  deleted: "Удалил мероприятие",
+  gone: "Этого мероприятия уже нет",
+  saved: "Сохранил",
+};
+
+export const DESK_WORDS: CalendarWords = {
+  error: "Не получилось — попробуйте ещё раз",
+  created: "Встреча в календаре",
+  deleted: "Удалил встречу",
+  gone: "Этой встречи уже нет",
+  saved: "Сохранил",
+};
 
 /** Every calendar the screen may hold — Пульс's ribbon, the months of /calendar, one event. */
 type Snapshot = [QueryKey, unknown][];
@@ -46,13 +72,13 @@ function restore(queryClient: QueryClient, snapshot: Snapshot | undefined) {
   for (const [key, data] of snapshot ?? []) queryClient.setQueryData(key, data);
 }
 
-function fail(queryClient: QueryClient, snapshot: Snapshot | undefined) {
+function fail(queryClient: QueryClient, snapshot: Snapshot | undefined, words: CalendarWords) {
   restore(queryClient, snapshot);
-  toast(GENERIC_ERROR);
+  toast(words.error);
 }
 
 /** «Буду» / «Не смогу» — the two buttons of a participant. */
-export function useRespondEvent(meId: string | undefined) {
+export function useRespondEvent(meId: string | undefined, words: CalendarWords = PHONE_WORDS) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -85,7 +111,7 @@ export function useRespondEvent(meId: string | undefined) {
       }));
       return { snapshot };
     },
-    onError: (_error, _vars, context) => fail(queryClient, context?.snapshot),
+    onError: (_error, _vars, context) => fail(queryClient, context?.snapshot, words),
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });
 }
@@ -106,24 +132,25 @@ export type EventDraft = {
 };
 
 /** What the server says no to, in words — the form stays open with the text still in it. */
-function editError(message: string): string {
+function editError(message: string, words: CalendarWords): string {
   if (message.includes("event_end_before_start")) return "Конец раньше начала";
   if (message.includes("event_title_required")) return "Без названия не сохранить";
-  if (message.includes("event_not_found")) return "Этого мероприятия уже нет";
+  if (message.includes("event_not_found")) return words.gone;
   if (message.includes("forbidden")) return "Нет доступа";
-  return GENERIC_ERROR;
+  return words.error;
 }
 
 /**
  * «Сохранить» in the form (D-94): one RPC for the fields and the guest list, so a lost
  * network never leaves a meeting half-edited. The card under the form changes at once;
- * the server's answer settles who got invited.
+ * the server's answer settles who got invited. `toast` — the caller's own words for a
+ * success (a move says who hears «Перенос», «+15 мин» says the new end).
  */
-export function useEditEvent() {
+export function useEditEvent(words: CalendarWords = PHONE_WORDS) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ eventId, draft }: { eventId: string; draft: EventDraft }) => {
+    mutationFn: async ({ eventId, draft }: { eventId: string; draft: EventDraft; toast?: string }) => {
       const supabase = createBrowserSupabase();
       const { error } = await supabase.rpc("edit_event", {
         p_event: eventId,
@@ -151,17 +178,17 @@ export function useEditEvent() {
         everyone: draft.everyone,
       })),
     }),
-    onSuccess: () => toast("Сохранил"),
+    onSuccess: (_data, vars) => toast(vars.toast ?? words.saved),
     onError: (error, _vars, context) => {
       restore(queryClient, context?.snapshot);
-      toast(editError(error.message));
+      toast(editError(error.message, words));
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });
 }
 
 /** «Удалить» (D-94): the row leaves every calendar at once; the server tells the invited. */
-export function useDeleteEvent() {
+export function useDeleteEvent(words: CalendarWords = PHONE_WORDS) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -173,8 +200,8 @@ export function useDeleteEvent() {
     },
     onMutate: ({ eventId }) => ({ snapshot: patchEverywhere(queryClient, eventId, () => null) }),
     // no «Вернуть» on this toast: the notices of the cancellation are already queued
-    onSuccess: () => toast("Удалил мероприятие"),
-    onError: (_error, _vars, context) => fail(queryClient, context?.snapshot),
+    onSuccess: () => toast(words.deleted),
+    onError: (_error, _vars, context) => fail(queryClient, context?.snapshot, words),
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });
 }
@@ -184,7 +211,7 @@ export function useDeleteEvent() {
  * spoken one — one writer of `events`, the same invitations, the same idempotency by the
  * `requestId` the form was opened with, so a double tap or a retry creates one meeting.
  */
-export function useCreateEvent() {
+export function useCreateEvent(words: CalendarWords = PHONE_WORDS) {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -220,10 +247,10 @@ export function useCreateEvent() {
       const ids = response.result.event_ids;
       return Array.isArray(ids) && typeof ids[0] === "string" ? ids[0] : null;
     },
-    onSuccess: () => toast("Мероприятие в календаре"),
+    onSuccess: () => toast(words.created),
     onError: (error) => {
       const body = error instanceof VoiceApiError ? (error.body as { error?: { message_ru?: string } } | null) : null;
-      toast(body?.error?.message_ru ?? GENERIC_ERROR);
+      toast(body?.error?.message_ru ?? words.error);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: calendarKeys.root }),
   });

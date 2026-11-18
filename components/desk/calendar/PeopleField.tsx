@@ -3,6 +3,7 @@
 import { useId, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 
 import { shortName } from "@/lib/people/names";
+import { usePeople, type Person } from "@/lib/people/queries";
 import { foldRu, searchPeople, useRoster } from "@/lib/people/roster";
 
 /** Matches shown under the field at once; the rest — by typing more. */
@@ -14,6 +15,11 @@ const EVERYONE = "__everyone";
  * end — the matches open under it in the flow of the form (never a second dialog), ↑/↓ move, Enter
  * or a click adds, Backspace in the empty search takes the last chip off. «Все сотрудники» is the
  * first match while nothing is typed. `closeRef` — the form's Esc asks the list to close first.
+ *
+ * Who is away says so (D-180) — «сейчас в отпуске», «сейчас на больничном» beside the name in the
+ * matches and on the chip: the profile knows only today, not dates, so nothing more is promised.
+ * A chip of somebody who has left the team keeps their name and says «не в команде» (saving drops
+ * them, `edit_event` takes active people only).
  */
 export function PeopleField({
   ids,
@@ -45,6 +51,9 @@ export function PeopleField({
   // the arrows chose a line: Enter takes it even with nothing typed («Все сотрудники»)
   const [keyed, setKeyed] = useState(false);
 
+  // the whole company, the ones who left too: the availability of each, and the name of a chip the roster no longer has
+  const everybody = usePeople();
+  const profiles = useMemo(() => new Map((everybody.data ?? []).map((person) => [person.id, person])), [everybody.data]);
   const people = useMemo(() => (roster.data ?? []).filter((person) => !hideIds.includes(person.id)), [roster.data, hideIds]);
   const byId = useMemo(() => new Map((roster.data ?? []).map((person) => [person.id, person])), [roster.data]);
   const matches = useMemo(() => {
@@ -91,9 +100,11 @@ export function PeopleField({
         }}
       >
         {everyone ? <PersonChip label="Все сотрудники" onRemove={() => drop(null)} /> : null}
-        {ids.map((id) => (
-          <PersonChip key={id} label={shortName(byId.get(id)?.full_name) || "…"} name={byId.get(id)?.full_name} onRemove={() => drop(id)} />
-        ))}
+        {ids.map((id) => {
+          const profile = profiles.get(id);
+          const name = byId.get(id)?.full_name ?? profile?.full_name;
+          return <PersonChip key={id} label={shortName(name) || "…"} name={name} note={noteOf(profile)} onRemove={() => drop(id)} />;
+        })}
         <input
           ref={input}
           value={query}
@@ -149,7 +160,13 @@ export function PeopleField({
                 className={`flex h-8 w-full items-center gap-2.5 px-1 text-left ${index === at && (keyed || query.trim()) ? "bg-surface-2" : "hover:bg-surface-2/70"}`}
               >
                 <span className="min-w-0 flex-1 truncate text-[13px] leading-[18px]">{person.full_name}</span>
-                {person.position ? <span className="max-w-[45%] shrink-0 truncate text-[12px] leading-4 text-muted">{person.position}</span> : null}
+                {awayOf(profiles.get(person.id)) ? (
+                  <span className="cal-away shrink-0 text-[12px] leading-4" data-testid="desk-people-away">
+                    {awayOf(profiles.get(person.id))}
+                  </span>
+                ) : person.position ? (
+                  <span className="max-w-[45%] shrink-0 truncate text-[12px] leading-4 text-muted">{person.position}</span>
+                ) : null}
               </button>
             </li>
           ))}
@@ -159,16 +176,29 @@ export function PeopleField({
   );
 }
 
-function PersonChip({ label, name, onRemove }: { label: string; name?: string; onRemove: () => void }) {
+/** «сейчас в отпуске» — what the profile says of today; null for somebody at work or unknown. */
+function awayOf(profile: Pick<Person, "availability" | "is_active"> | undefined): string | null {
+  if (!profile || !profile.is_active || profile.availability === "active") return null;
+  return profile.availability === "sick" ? "сейчас на больничном" : "сейчас в отпуске";
+}
+
+/** The quiet word after a chip's name: away today, or no longer in the team. */
+function noteOf(profile: Pick<Person, "availability" | "is_active"> | undefined): string | null {
+  if (profile && !profile.is_active) return "не в команде";
+  return awayOf(profile);
+}
+
+function PersonChip({ label, name, note = null, onRemove }: { label: string; name?: string; note?: string | null; onRemove: () => void }) {
   return (
-    <span className="inline-flex h-6 max-w-full items-center gap-0.5 text-[14px] font-medium leading-5" title={name}>
+    <span className="cal-chip-person inline-flex h-6 max-w-full items-center gap-0.5 text-[14px] font-medium leading-5" data-name={name}>
       <span className="truncate">{label}</span>
+      {note ? <span className="cal-away ml-1 shrink-0 text-[12px] font-normal leading-4">{note}</span> : null}
       <button
         type="button"
         aria-label={`Убрать: ${label}`}
         onMouseDown={(event) => event.preventDefault()}
         onClick={onRemove}
-        className="flex h-5 w-4 items-center justify-center text-[14px] leading-none text-muted transition-colors duration-[120ms] hover:text-danger"
+        className="flex h-6 w-6 items-center justify-center rounded-[6px] text-[15px] leading-none text-muted transition-colors duration-[120ms] hover:bg-surface-2 hover:text-danger"
       >
         ×
       </button>

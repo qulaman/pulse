@@ -1,0 +1,672 @@
+/* ==========================================================================================
+   «Календарь» of the desk (D-180): the week grid — components/desk/calendar/WeekHours.tsx.
+   - A card of hours: the days' heads (a click on a date makes that day wide), a thin row «до 8»,
+     the working hours fitted to the screen (`--hour`), a thin row «после 20». The columns change
+     width by focus and settings only, and glide when they do.
+   - A meeting is a block in the colour of what it is to this person (state.ts): ahead — sky, on
+     now — the accent, waiting for an answer — amber and dashed, refused or over — grey. Its title
+     first; its tiers by height and width are decided in the markup (`data-tier`). A cascade's
+     later block lies over the earlier with a ring of the sheet's colour; a hover raises any.
+   - Now: a line under the blocks with its dot over them. Deadlines: a rail of ◆ on each day's
+     right edge — the meetings give up its width, nothing lies over a block.
+   Light-theme words on a tinted plate use the `--*-deep` inks (D-175); `.desk-move` is desk-wide
+   and not touched here.
+   ========================================================================================== */
+
+/* ---- both looks: the frame, and the meeting's state as a colour of print ------------------ */
+html[data-surface="desk"][data-journal] {
+  .cal-week {
+    border-top: 1px solid var(--text);
+  }
+  .cal-week-head {
+    border-bottom: 1px solid var(--text);
+    background: var(--bg);
+  }
+  /* the days glide to their new widths when the focus moves (the data are already drawn) */
+  .cal-cols {
+    transition: grid-template-columns 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .cal-day-head {
+    border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    cursor: pointer;
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--surface-2);
+    }
+    &[data-past] .desk-figure:not(.desk-today) {
+      color: var(--text-muted);
+    }
+    &[data-focus] {
+      box-shadow: inset 0 -2px 0 var(--text);
+    }
+    /* a day off is narrow: its weekday and date sit closer */
+    &[data-off]:not([data-focus]) {
+      gap: 4px;
+      padding-inline: 5px;
+    }
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -2px;
+    }
+  }
+  .cal-day-words,
+  .cal-day-count {
+    color: var(--text-muted);
+  }
+  .cal-hour {
+    color: var(--text-muted);
+  }
+  .cal-now-time {
+    color: var(--text);
+  }
+  .cal-day,
+  .cal-off-cell {
+    border-left: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  }
+  .cal-off {
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+
+    &[data-band="late"] {
+      border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+      border-bottom: 0;
+    }
+  }
+  .cal-off-label {
+    color: var(--text-muted);
+  }
+
+  .cal-event {
+    --tone: var(--sky);
+    padding: 3px 5px 3px 8px;
+    border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+    border-left: 2px solid var(--tone);
+    background: var(--surface);
+    transition: background-color 120ms linear;
+
+    &:hover {
+      background: var(--surface-2);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+    &[data-tier="line"] {
+      justify-content: center;
+      padding-block: 1px;
+    }
+    /* on now: a wash of the sky and a heavier rule — not a grey a shade off the others */
+    &[data-state="running"] {
+      border-left-width: 4px;
+      background: color-mix(in srgb, var(--sky) 10%, var(--surface));
+    }
+    /* an answer owed: the gold and a dashed edge (in print a «?» too) — never a second blue */
+    &[data-state="owes"] {
+      --tone: var(--gold);
+      border-style: dashed;
+      border-left-style: solid;
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      --tone: var(--border);
+      color: var(--text-muted);
+    }
+    &[data-state="declined"] .cal-event-title {
+      text-decoration: line-through;
+    }
+    &[data-clip-top] {
+      border-top-style: dashed;
+    }
+    &[data-clip-bottom] {
+      border-bottom-style: dashed;
+    }
+  }
+  .cal-event-title {
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+  .cal-event-time,
+  .cal-who {
+    color: var(--text-muted);
+  }
+  .cal-event-chip {
+    padding: 0 6px 0 7px;
+  }
+  .cal-event-refused,
+  .cal-event-ask {
+    color: var(--gold);
+  }
+  .cal-off-more {
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+
+    &:hover {
+      color: var(--text);
+    }
+  }
+
+  /* the meeting being made, and one on its way to another time */
+  .cal-ghost,
+  .cal-move {
+    border: 1px solid var(--accent);
+    border-left-width: 2px;
+    background: var(--surface);
+  }
+  .cal-move[data-past] {
+    border-style: dashed;
+    border-color: var(--border);
+    color: var(--text-muted);
+  }
+  .cal-ghost-time {
+    color: var(--text-muted);
+  }
+  .cal-slot-hint {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    color: var(--accent);
+  }
+  .cal-block[data-moving] {
+    opacity: 0.35;
+  }
+  .cal-week[data-moving],
+  .cal-week[data-moving] * {
+    cursor: grabbing !important;
+  }
+
+  /* deadlines: a rail on each day's right edge, a ◆ and its hour */
+  .cal-rail {
+    border-left: 1px dashed color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .cal-mark {
+    color: var(--text);
+
+    &[data-tone="muted"] .cal-mark-time {
+      color: var(--text-muted);
+    }
+    &:hover {
+      background: var(--surface-2);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: -1px;
+    }
+  }
+}
+
+/* print says it in words: no faces, shades or dots on the journal's sheet */
+html[data-surface="desk"][data-journal]:not([data-graphite]) {
+  .cal-event-faces,
+  .cal-gone,
+  .cal-now-week,
+  .cal-now-dot {
+    display: none;
+  }
+  .cal-event[data-state="owes"]:not([data-tier="bar"]) {
+    padding-right: 14px;
+  }
+  .cal-event[data-state="owes"]:not([data-tier="bar"])::after {
+    content: "?";
+    position: absolute;
+    top: 1px;
+    right: 4px;
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 16px;
+  }
+}
+
+/* ==========================================================================================
+   «Графит»
+   ========================================================================================== */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  /* the quietest words of the grid on its faint plates (a row, the rail, a refused meeting): 4.5:1 and more */
+  --cal-quiet: color-mix(in srgb, var(--ink-3) 60%, var(--ink-2));
+
+  /* ---- the week: a card of hours ------------------------------------------------------- */
+  .cal-week {
+    border-top: 0;
+    border-radius: 14px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+  }
+  .cal-week-head {
+    border-bottom: 1px solid var(--rule);
+    border-radius: 14px 14px 0 0;
+    background: color-mix(in srgb, var(--raise) 86%, transparent);
+    -webkit-backdrop-filter: blur(14px) saturate(1.4);
+    backdrop-filter: blur(14px) saturate(1.4);
+  }
+  .cal-day-head {
+    height: 48px;
+    gap: 8px;
+    padding-inline: 10px;
+    border-left-color: var(--rule-soft);
+    border-radius: 0;
+
+    &:hover {
+      background: var(--hover);
+    }
+    .desk-label {
+      color: var(--ink-3);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .nums.desk-figure {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+    }
+    .desk-today {
+      height: 28px;
+      min-width: 28px;
+      padding: 0 6px;
+      border-radius: 9999px;
+      color: #fff;
+      box-shadow: 0 4px 12px -4px color-mix(in srgb, var(--pen) 70%, transparent);
+    }
+    &[data-today] {
+      background: color-mix(in srgb, var(--pen) 5%, transparent);
+
+      .desk-label {
+        color: var(--pen-deep);
+        font-weight: 600;
+      }
+    }
+    &[data-off]:not([data-focus]) {
+      gap: 4px;
+      padding-inline: 6px;
+    }
+    &[data-off]:not([data-today]) .desk-label {
+      color: var(--cal-quiet);
+    }
+    &[data-past] .desk-figure:not(.desk-today) {
+      color: var(--ink-3);
+    }
+    /* the day looked at: the accent under its head — the one selection of the week */
+    &[data-focus] {
+      box-shadow: inset 0 -2px 0 var(--pen);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--pen);
+      outline-offset: -2px;
+    }
+  }
+  &[data-desk-theme="dark"] .cal-day-head .desk-today {
+    color: #04130f;
+  }
+  .cal-day-words {
+    color: var(--ink-2);
+    font-weight: 500;
+  }
+  .cal-day-head[data-today] .cal-day-words {
+    color: var(--pen-deep);
+  }
+  .cal-day-count {
+    color: var(--ink-3);
+    font-weight: 500;
+  }
+  .cal-gutter .cal-hour {
+    color: var(--ink-3);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .cal-day,
+  .cal-off-cell {
+    border-left-color: var(--rule-soft);
+
+    &[data-off] {
+      background-color: var(--cal-weekend);
+    }
+    &[data-today] {
+      background-color: color-mix(in srgb, var(--pen) 3.5%, transparent);
+    }
+  }
+  .cal-day[data-past]::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--cal-gone);
+    pointer-events: none;
+  }
+  .cal-off-cell[data-past] {
+    background-image: linear-gradient(var(--cal-gone), var(--cal-gone));
+  }
+  .cal-gone {
+    background: var(--cal-gone);
+    transform-origin: top;
+    transition: transform 900ms linear;
+  }
+
+  /* the rows before 08:00 and after 20:00: thin, a touch of shade — the edges of the working day */
+  .cal-off {
+    border-bottom-color: var(--rule);
+    background: color-mix(in srgb, var(--ink) 1.5%, transparent);
+
+    &[data-band="late"] {
+      border-top-color: var(--rule);
+      border-radius: 0 0 14px 14px;
+    }
+  }
+  .cal-off-label {
+    color: var(--cal-quiet);
+    font-weight: 500;
+  }
+  .cal-off-more {
+    border: 0;
+    border-radius: 6px;
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+    color: var(--ink-2);
+
+    &:hover {
+      color: var(--ink);
+      background: color-mix(in srgb, var(--ink) 8%, var(--surface-2));
+    }
+  }
+
+  /* now: a line under the blocks in today's column, its dot over them, faint across the week, its
+     clock a red tag — dark words on the dark face's coral, white on the light face's brick red */
+  .cal-now {
+    transition: transform 900ms linear;
+
+    .desk-now {
+      height: 2px;
+      border-radius: 2px;
+      background: var(--pencil);
+      box-shadow: 0 0 8px color-mix(in srgb, var(--pencil) 45%, transparent);
+    }
+  }
+  .cal-now-dot {
+    position: absolute;
+    left: -5px;
+    top: -5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--pencil);
+    box-shadow: 0 0 0 2px var(--raise);
+    transition: transform 900ms linear;
+  }
+  .cal-now-week {
+    height: 1px;
+    margin-top: -0.5px;
+    background: color-mix(in srgb, var(--pencil) 40%, transparent);
+    transition: transform 900ms linear;
+  }
+  .cal-now-time {
+    height: 18px;
+    margin-top: -1px;
+    padding: 0 5px;
+    border-radius: 5px;
+    background: var(--pencil);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 18px;
+    transition: transform 900ms linear;
+  }
+  &[data-desk-theme="dark"] .cal-now-time {
+    color: #1a0605;
+  }
+
+  /* ---- a meeting: a block in the colour of what it is to this person ------------------------- */
+  .cal-block {
+    &:hover {
+      z-index: 12;
+    }
+    &[data-open] {
+      z-index: 26;
+    }
+    &[data-moving] {
+      opacity: 0.32;
+    }
+  }
+  .cal-event {
+    --tone: var(--sky);
+    padding: 3px 5px 3px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--tone) 14%, var(--raise));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 24%, transparent);
+    color: var(--ink);
+    transition:
+      transform 200ms var(--ease-snap),
+      scale 220ms var(--ease-snap),
+      box-shadow 160ms linear,
+      background-color 140ms linear;
+    animation: cal-event-in 340ms var(--ease-snap) backwards;
+    animation-delay: calc(var(--day, 0) * 24ms);
+
+    /* the rail of its colour on the left edge */
+    &::before {
+      content: "";
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      bottom: 3px;
+      width: 3px;
+      border-radius: 3px;
+      background: var(--tone);
+    }
+    &[data-tier="line"] {
+      padding-block: 1px;
+
+      &::before {
+        top: 2px;
+        bottom: 2px;
+      }
+    }
+    &:hover {
+      background: color-mix(in srgb, var(--tone) 21%, var(--raise));
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--tone) 40%, transparent),
+        0 10px 22px -12px rgb(0 0 0 / 0.6);
+      transform: translateY(-1px);
+    }
+    &:active {
+      scale: 0.98;
+      transition-duration: 70ms;
+    }
+    /* the open one: raised over the grid while the side shows it */
+    &[data-open] {
+      background: color-mix(in srgb, var(--tone) 24%, var(--raise));
+      box-shadow:
+        0 0 0 2px var(--tone),
+        0 14px 30px -12px rgb(0 0 0 / 0.7);
+      transform: translateY(-1px);
+    }
+    &[data-state="running"] {
+      --tone: var(--pen);
+
+      &::before {
+        box-shadow: 0 0 8px color-mix(in srgb, var(--pen) 60%, transparent);
+      }
+    }
+    /* an invitation not answered yet: a dashed edge, a lighter wash — a meeting that is not settled */
+    &[data-state="owes"] {
+      --tone: var(--warn-ink);
+      background: color-mix(in srgb, var(--tone) 8%, var(--raise));
+      box-shadow: none;
+      border: 1px dashed color-mix(in srgb, var(--tone) 80%, transparent);
+      padding: 2px 4px 2px 9px;
+
+      &::before {
+        left: 2px;
+        top: 2px;
+        bottom: 2px;
+      }
+      &:hover,
+      &[data-open] {
+        border-style: solid;
+      }
+    }
+    /* refused: grey ink, struck through — no fading, the words still read */
+    &[data-state="declined"] {
+      --tone: var(--ink-3);
+      background: color-mix(in srgb, var(--ink) 4%, var(--raise));
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+      color: var(--cal-quiet);
+
+      .cal-event-title {
+        text-decoration: line-through;
+        text-decoration-color: color-mix(in srgb, var(--ink-3) 70%, transparent);
+      }
+    }
+    &[data-state="over"] {
+      --tone: var(--ink-3);
+      background: color-mix(in srgb, var(--ink) 4%, var(--raise));
+      box-shadow: inset 0 0 0 1px var(--rule-soft);
+      color: var(--ink-2);
+
+      &::before {
+        opacity: 0.55;
+      }
+    }
+    /* goes on before 08:00 or after 20:00: the cut edge is square */
+    &[data-clip-top] {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    &[data-clip-bottom] {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+  }
+  /* a cascade: the later block lies over the earlier with a ring of the card's own colour */
+  .cal-block[data-depth] .cal-event:not([data-open]) {
+    box-shadow:
+      0 0 0 1.5px var(--raise),
+      inset 0 0 0 1px color-mix(in srgb, var(--tone) 30%, transparent),
+      -6px 6px 14px -8px rgb(0 0 0 / 0.45);
+  }
+  .cal-event-time {
+    color: var(--ink-2);
+
+    .desk-when {
+      color: inherit;
+    }
+  }
+  .cal-event[data-state="declined"] .cal-event-time {
+    color: var(--cal-quiet);
+  }
+  .cal-event .cal-who {
+    display: none;
+  }
+  .cal-event-faces {
+    --face: 18px;
+  }
+  .cal-event .team-face {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tone) 14%, var(--raise));
+  }
+  .cal-event .cal-faces-more {
+    box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--tone) 14%, var(--raise));
+    background: color-mix(in srgb, var(--ink) 12%, var(--raise));
+  }
+  .cal-event-ask {
+    height: 18px;
+    padding: 0 6px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--warn-ink) 18%, transparent);
+    color: var(--warn-deep);
+    line-height: 18px;
+  }
+  .cal-event-refused {
+    color: var(--warn-deep);
+    font-weight: 600;
+  }
+  /* a chip of the thin rows: the block's colours, one line */
+  .cal-event-chip {
+    padding: 0 6px 0 9px;
+    border-radius: 6px;
+
+    &::before {
+      top: 4px;
+      bottom: 4px;
+    }
+  }
+
+  /* the meeting being made: dashed in the accent, its words as they are typed */
+  .cal-ghost {
+    border: 1.5px dashed var(--pen);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--pen) 13%, var(--raise));
+    box-shadow: 0 12px 26px -12px rgb(0 0 0 / 0.6);
+    animation: cal-pop 200ms var(--ease-snap) both;
+  }
+  /* a meeting on its way to another time: where it lands, or that the past is closed to it */
+  .cal-move {
+    border: 1.5px dashed var(--sky);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--sky) 16%, var(--raise));
+    box-shadow: 0 14px 30px -12px rgb(0 0 0 / 0.65);
+
+    &[data-past] {
+      border-color: var(--ink-3);
+      background: color-mix(in srgb, var(--ink) 5%, var(--raise));
+      color: var(--ink-2);
+    }
+  }
+  .cal-ghost-time {
+    color: var(--ink-2);
+  }
+  .cal-slot-hint {
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--pen) 9%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 32%, transparent);
+    color: var(--pen-deep);
+    font-weight: 600;
+  }
+
+  /* deadlines: a quiet strip on each day's right edge, a ◆ on the hour each order is due */
+  .cal-rail {
+    border-left: 1px dashed var(--rule);
+    background: color-mix(in srgb, var(--ink) 2%, transparent);
+  }
+  .cal-mark {
+    border-radius: 5px;
+    color: var(--ink);
+    font-weight: 600;
+    transition:
+      background-color 120ms linear,
+      transform 180ms var(--ease-snap);
+
+    &:hover {
+      background: var(--surface-2);
+      transform: translateY(-1px);
+    }
+    &[data-tone="muted"] .cal-mark-time {
+      color: var(--cal-quiet);
+      font-weight: 500;
+    }
+  }
+  .cal-mark-more {
+    background: var(--surface-2);
+    box-shadow: 0 0 0 1px var(--rule);
+
+    &[data-tone="danger"] {
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pencil) 45%, transparent);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-surface="desk"][data-journal] {
+    .cal-cols,
+    .cal-now,
+    .cal-now-dot,
+    .cal-now-week,
+    .cal-now-time,
+    .cal-gone {
+      transition: none;
+    }
+    .cal-event,
+    .cal-ghost {
+      animation: none !important;
+    }
+    .cal-event:hover,
+    .cal-event[data-open],
+    .cal-mark:hover {
+      transform: none;
+    }
+  }
+}

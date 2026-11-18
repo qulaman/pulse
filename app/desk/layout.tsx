@@ -27,6 +27,10 @@ import "./planning.css";
 // «Заметки» and «Доски» apart (D-177): one file a section, after planning.css so they win a tie
 import "./notes.css";
 import "./boards.css";
+// «Календарь» (D-180): the week grid, the side (day and meeting), the month and «Окна директора»
+import "./cal-grid.css";
+import "./cal-side.css";
+import "./cal-month.css";
 import "./reports.css";
 import "./settings.css";
 

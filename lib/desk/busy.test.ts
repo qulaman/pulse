@@ -1,6 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { busyByDay, busyLine, busyMinutes, dayLineOf, doorHoldOf, doorOf, type BusySpan, type DoorHold } from "./busy";
+import {
+  busyByDay,
+  busyChunks,
+  busyLine,
+  busyMinutes,
+  dayLineOf,
+  dayWindows,
+  daysFromTo,
+  doorHoldOf,
+  doorOf,
+  freeWindows,
+  holdBlock,
+  isoWeekday,
+  lengthWords,
+  mergeSpans,
+  minuteHm,
+  nearestWindows,
+  wallMinutes,
+  windowCopy,
+  windowDayOf,
+  type BusySpan,
+  type DoorHold,
+} from "./busy";
 
 const span = (from: string, to: string): BusySpan => ({ starts_at: `${from}+05:00`, ends_at: `${to}+05:00` });
 const at = (wall: string) => new Date(`${wall}+05:00`);
@@ -157,5 +179,144 @@ describe("dayLineOf", () => {
     const line = dayLineOf([span("2026-11-04T07:30:00", "2026-11-04T08:30:00")], at("2026-11-04T19:40:00"));
     expect(line.from).toBe(420);
     expect(line.to).toBe(1200);
+  });
+});
+
+describe("busyChunks", () => {
+  it("asks a week in one call", () => {
+    expect(busyChunks("2026-11-16", "2026-11-23")).toEqual([["2026-11-16", "2026-11-23"]]);
+  });
+
+  it("splits a month on screen (42 days) at 31 days", () => {
+    expect(busyChunks("2026-10-26", "2026-12-07")).toEqual([
+      ["2026-10-26", "2026-11-26"],
+      ["2026-11-26", "2026-12-07"],
+    ]);
+  });
+
+  it("asks nothing for an empty range", () => {
+    expect(busyChunks("2026-11-16", "2026-11-16")).toEqual([]);
+  });
+
+  it("lists the days of a range, its end not included", () => {
+    expect(daysFromTo("2026-11-29", "2026-12-02")).toEqual(["2026-11-29", "2026-11-30", "2026-12-01"]);
+  });
+});
+
+describe("mergeSpans", () => {
+  it("joins what two reads both returned, and what touches", () => {
+    const merged = mergeSpans([
+      span("2026-11-26T10:00:00", "2026-11-26T11:00:00"),
+      span("2026-11-25T22:00:00", "2026-11-26T01:00:00"),
+      span("2026-11-25T22:00:00", "2026-11-26T01:00:00"),
+      span("2026-11-26T11:00:00", "2026-11-26T12:00:00"),
+    ]);
+    expect(merged).toEqual([span("2026-11-25T22:00:00", "2026-11-26T01:00:00"), span("2026-11-26T10:00:00", "2026-11-26T12:00:00")]);
+  });
+});
+
+describe("freeWindows", () => {
+  const H = 60;
+
+  it("is the gaps between busy blocks inside the hours", () => {
+    expect(freeWindows([{ start: 10 * H, end: 11 * H }, { start: 14 * H, end: 15 * H }], 8 * H, 20 * H)).toEqual([
+      { start: 8 * H, end: 10 * H },
+      { start: 11 * H, end: 14 * H },
+      { start: 15 * H, end: 20 * H },
+    ]);
+  });
+
+  it("takes overlapping blocks in any order and drops a gap under 15 minutes", () => {
+    const blocks = [{ start: 12 * H, end: 13 * H }, { start: 9 * H, end: 11 * H }, { start: 10 * H, end: 11 * H + 50 }];
+    expect(freeWindows(blocks, 8 * H, 13 * H)).toEqual([{ start: 8 * H, end: 9 * H }]);
+  });
+
+  it("a day without blocks is one window; a day busy through is none", () => {
+    expect(freeWindows([], 8 * H, 20 * H)).toEqual([{ start: 8 * H, end: 20 * H }]);
+    expect(freeWindows([{ start: 7 * H, end: 21 * H }], 8 * H, 20 * H)).toEqual([]);
+  });
+});
+
+describe("dayWindows", () => {
+  const H = 60;
+  const from = 8 * H;
+  const to = 20 * H;
+
+  it("today starts at now, and the closed door is no window", () => {
+    const day = dayWindows({ blocks: [{ start: 15 * H, end: 16 * H }], kind: "today", from, to, nowMinute: 13 * H, hold: { start: 13 * H, end: 14 * H } });
+    expect(day.windows).toEqual([
+      { start: 14 * H, end: 15 * H },
+      { start: 16 * H, end: 20 * H },
+    ]);
+    expect(day.free).toBe(5 * H);
+  });
+
+  it("a day gone by or a day off offers no window", () => {
+    expect(dayWindows({ blocks: [], kind: "past", from, to }).windows).toEqual([]);
+    expect(dayWindows({ blocks: [{ start: 11 * H, end: 13 * H }], kind: "off", from, to })).toMatchObject({ windows: [], busy: true });
+  });
+
+  it("a day with no busy time says so — no meetings, not «free all day»", () => {
+    expect(dayWindows({ blocks: [], kind: "work", from, to })).toMatchObject({ busy: false, free: 12 * H });
+  });
+
+  it("says the busy time outside the hours at the row's ends, a night span with its end", () => {
+    const day = dayWindows({
+      blocks: [{ start: 7 * H + 30, end: 9 * H }, { start: 22 * H, end: 24 * H }],
+      kind: "work",
+      from,
+      to,
+      night: [{ start: 0, end: H }],
+    });
+    expect(day.early).toBe("занят с 07:30");
+    expect(day.late).toBe("занят 22:00→01:00");
+    expect(dayWindows({ blocks: [{ start: 0, end: H }, { start: 19 * H, end: 21 * H }], kind: "work", from, to })).toMatchObject({ early: "занят до 01:00", late: "занят до 21:00" });
+    expect(dayWindows({ blocks: [{ start: 6 * H, end: 7 * H }], kind: "work", from, to }).early).toBe("занят 06:00–07:00");
+  });
+});
+
+describe("nearestWindows", () => {
+  it("lists the windows from now on, working days only, the door taken out of today", () => {
+    const now = at("2026-11-20T16:00:00"); // a Friday
+    const blocks = new Map([["2026-11-20", [{ start: 17 * 60, end: 19 * 60 }]]]);
+    const list = nearestWindows({
+      blocks,
+      days: ["2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22", "2026-11-23"],
+      now,
+      workdays: [1, 2, 3, 4, 5],
+      from: 8 * 60,
+      to: 20 * 60,
+      hold: holdBlock({ errandId: "e", until: "2026-11-20T16:30:00+05:00", holder: null }, now),
+    });
+    expect(list).toEqual([
+      { ymd: "2026-11-20", start: 16 * 60 + 30, end: 17 * 60 },
+      { ymd: "2026-11-20", start: 19 * 60, end: 20 * 60 },
+      { ymd: "2026-11-23", start: 8 * 60, end: 20 * 60 },
+    ]);
+    expect(windowCopy(list[2], now)).toBe("Свободен пн, 23 ноября, 08:00–20:00");
+    expect(windowCopy(list[0], now)).toBe("Свободен сегодня, 16:30–17:00");
+  });
+
+  it("a closed door without an end takes the rest of today", () => {
+    const now = at("2026-11-20T16:00:00");
+    expect(holdBlock({ errandId: "e", until: null, holder: null }, now)).toEqual({ start: 960, end: 1440 });
+    expect(holdBlock({ errandId: "e", until: "2026-11-20T15:00:00+05:00", holder: null }, now)).toBeNull();
+  });
+});
+
+describe("words", () => {
+  it("says lengths and hours", () => {
+    expect(lengthWords(45)).toBe("45 мин");
+    expect(lengthWords(60)).toBe("1 ч");
+    expect(lengthWords(90)).toBe("1 ч 30 мин");
+    expect(minuteHm(495)).toBe("08:15");
+    expect(wallMinutes(at("2026-11-20T09:05:00"))).toBe(545);
+  });
+
+  it("counts the weekday as the settings do", () => {
+    expect(isoWeekday("2026-11-16")).toBe(1);
+    expect(isoWeekday("2026-11-22")).toBe(7);
+    expect(windowDayOf("2026-11-22", "2026-11-20", [1, 2, 3, 4, 5])).toBe("off");
+    expect(windowDayOf("2026-11-19", "2026-11-20", [1, 2, 3, 4, 5])).toBe("past");
   });
 });

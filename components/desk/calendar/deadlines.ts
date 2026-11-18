@@ -2,7 +2,7 @@ import type { Ymd } from "@/lib/datetime/calendar";
 import type { TaskWithPeople } from "@/lib/tasks/queries";
 import { isOverdue, type TaskStatus } from "@/lib/tasks/status-text";
 
-import { wallOf } from "./week";
+import { DAY_FROM, DAY_TO, wallOf, type Band } from "./week";
 
 /**
  * «Сроки задач» — the director's open orders laid over the calendar (D-154): the planning is
@@ -84,4 +84,20 @@ export function loudest(marks: readonly DeadlineMark[]): DeadlineTone {
   if (marks.some((mark) => mark.tone === "danger")) return "danger";
   if (marks.some((mark) => mark.tone === "warn")) return "warn";
   return "muted";
+}
+
+/**
+ * Where a mark is drawn on the week (D-180): on the rail of the grid's hours — a deadline at 20:00
+ * sits on its foot — or in the thin row before or after them.
+ */
+export function markBand(mark: { minutes: number }, from = DAY_FROM, to = DAY_TO): Band {
+  if (mark.minutes < from * 60) return "early";
+  if (mark.minutes > to * 60) return "late";
+  return "day";
+}
+
+/** «срок сегодня 18:00 · Ерлан Байжанов · Смета по объекту» — a mark in words, for its hint and a screen reader. */
+export function markWords(mark: DeadlineMark): string {
+  const state = mark.tone === "danger" ? "просрочено" : mark.tone === "warn" ? "срок сегодня" : "срок";
+  return `${state} ${mark.time} · ${mark.who ?? `${mark.count} человек`} · ${mark.title}`;
 }

@@ -88,6 +88,9 @@ describe("sentNotice", () => {
   it("one thought kept: «Открыть» opens that note; several — the list", () => {
     expect(sentNotice([{ kind: "note", title: "Банк", who: null }], { note_ids: ["n1"] })).toEqual({ text: "Отправил заметку в Заметки", href: "/desk/notes?n=n1" });
     expect(sentNotice([{ kind: "reminder", title: "Позвонить", who: null }], { note_ids: ["n2"] }).href).toBe("/desk/notes?n=n2");
+    // one meeting opens itself in the calendar (D-180), two — the week
+    expect(sentNotice([{ kind: "event", title: "Планёрка", who: null }], { event_ids: ["e1"] }).href).toBe("/desk/calendar?e=e1");
+    expect(sentNotice([{ kind: "event", title: "А", who: null }, { kind: "event", title: "Б", who: null }], { event_ids: ["e1", "e2"] }).href).toBe("/desk/calendar");
     expect(sentNotice([{ kind: "note", title: "А", who: null }, { kind: "reminder", title: "Б", who: null }], { note_ids: ["n1", "n2"] }).href).toBe("/desk/notes");
     // the answer did not name the note: the list, never a broken address
     expect(sentNotice([{ kind: "note", title: "Банк", who: null }], {}).href).toBe("/desk/notes");

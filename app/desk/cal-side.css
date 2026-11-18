@@ -1,0 +1,622 @@
+/* «Календарь» of the desk (D-180): cal-side. One builder a file.
+   The column beside the week — the day, or the meeting opened on it (CalendarSide.tsx) — and the
+   quick card of a new meeting (QuickCreate.tsx), the people field of both forms (PeopleField.tsx).
+   Base rules lay it out in both looks; «Журнал» says it in words, «Графит» gives it a sheet,
+   colour and motion. Words on a tinted plate use the `--*-deep` inks (D-175): 4.5:1 on the light. */
+
+/* ---- both looks ------------------------------------------------------------------------------ */
+html[data-surface="desk"][data-journal] {
+  .cal-side {
+    position: sticky;
+    top: 12px;
+    /* the top of the column on the page: the head over the week (the lead's layout may say it exactly) */
+    max-height: calc(100dvh - var(--cal-side-top, 204px));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  /* the shell's right panel stands where the column was */
+  &[data-desk-panel] .cal-side {
+    display: none;
+  }
+
+  .cal-side-row,
+  .cal-side-reply,
+  .cal-side-deadline {
+    border-radius: 6px;
+    transition: background-color 100ms linear;
+
+    &:hover {
+      background: var(--surface-2);
+    }
+  }
+  .cal-side-row {
+    --tone: var(--sky);
+
+    &[data-state="running"] {
+      --tone: var(--accent);
+    }
+    &[data-state="owes"] {
+      --tone: var(--warn);
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      --tone: var(--border);
+      color: var(--text-muted);
+    }
+  }
+  .cal-side-dot {
+    width: 6px;
+    height: 6px;
+    flex-shrink: 0;
+    border-radius: 9999px;
+    background: var(--tone);
+  }
+  .cal-side-no {
+    color: var(--danger);
+  }
+  .cal-side-deadline {
+    &[data-tone="danger"] {
+      color: var(--danger);
+    }
+  }
+
+  /* the day as a strip: a block a meeting, the hand of now in the red pencil */
+  .cal-side-track {
+    position: relative;
+    height: 6px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+
+    i {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      border-radius: 3px;
+      background: var(--sky);
+      opacity: 0.55;
+
+      &[data-mine] {
+        opacity: 1;
+      }
+      &[data-state="over"] {
+        background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+      }
+      &[data-state="running"] {
+        background: var(--accent);
+      }
+    }
+    b {
+      position: absolute;
+      top: -3px;
+      bottom: -3px;
+      width: 2px;
+      margin-left: -1px;
+      border-radius: 1px;
+      background: var(--danger);
+    }
+  }
+  .cal-side-ticks {
+    position: relative;
+    height: 16px;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 16px;
+
+    span {
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+    }
+    span:first-child {
+      transform: none;
+    }
+    span:last-child {
+      transform: translateX(-100%);
+    }
+  }
+
+  .cal-side-running {
+    padding: 10px 0;
+    border-top: 2px solid var(--accent);
+  }
+  .cal-side-live {
+    color: var(--accent);
+  }
+  .cal-side-progress {
+    display: block;
+    height: 3px;
+    margin-top: 6px;
+    overflow: hidden;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+
+    i {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+  }
+
+  .cal-side-ask {
+    padding: 10px 0 10px 12px;
+    border-left: 3px solid var(--warn);
+  }
+
+  /* the open meeting */
+  .cal-side-chip {
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 16px;
+
+    &[data-state="owes"] {
+      color: var(--warn);
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      color: var(--text-muted);
+    }
+  }
+  .cal-side-fact {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+  .cal-side-fact-icon {
+    display: none;
+  }
+  .cal-side-name:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .cal-side-answer {
+    color: var(--text-muted);
+
+    &[data-tone="ok"] {
+      color: var(--ok);
+    }
+    &[data-tone="danger"] {
+      color: var(--danger);
+    }
+    &[data-tone="warn"] {
+      color: var(--warn);
+    }
+  }
+  .cal-side-receipt {
+    color: var(--text-muted);
+
+    &[data-tone="warn"] {
+      color: var(--warn);
+    }
+    &[data-tone="ok"] {
+      color: var(--ok);
+    }
+  }
+  .cal-side-foot {
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .cal-side-confirm {
+    padding: 12px 0 0;
+    border-top: 2px solid var(--danger);
+  }
+
+  /* the quick card and the form: the journal's ruled fields keep no padding, Graphite's boxes need it */
+  .cal-clash {
+    color: var(--warn);
+  }
+  .cal-away {
+    color: var(--warn);
+  }
+  .cal-quick input[aria-invalid="true"],
+  .cal-form input[aria-invalid="true"] {
+    border-color: var(--danger);
+  }
+}
+
+/* «Журнал»: print — a hairline beside the week, no faces, bars or icons */
+html[data-surface="desk"][data-journal]:not([data-graphite]) {
+  .cal-side {
+    padding-left: 20px;
+    border-left: 1px solid var(--border);
+  }
+  .cal-side-icon,
+  .cal-side-faces,
+  .cal-side-answers,
+  .cal-side-dot,
+  .cal-side-diamond,
+  .cal-side-person .cal-face {
+    display: none;
+  }
+}
+
+/* ---- «Графит» --------------------------------------------------------------------------------- */
+:root[data-surface="desk"][data-journal][data-graphite] {
+  .cal-side {
+    padding: 16px 18px 14px;
+    border-radius: 16px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card), var(--lift);
+    animation: cal-side-in 260ms var(--ease-snap) both;
+  }
+  .cal-side[data-mode="meeting"] .cal-side-meeting {
+    animation: cal-side-in 240ms var(--ease-snap) both;
+  }
+  .cal-quick .field:not(textarea),
+  .cal-form .field:not(textarea) {
+    padding-left: 10px;
+  }
+
+  .cal-side-icon {
+    color: var(--ink-3);
+  }
+  .cal-side-eyebrow {
+    color: var(--ink-2);
+  }
+  .cal-side-figure {
+    letter-spacing: -0.02em;
+  }
+
+  .cal-side-row,
+  .cal-side-reply,
+  .cal-side-deadline {
+    border-radius: 8px;
+
+    &:hover {
+      background: var(--hover);
+    }
+  }
+  .cal-side-row {
+    &[data-state="running"] {
+      --tone: var(--pen);
+    }
+    &[data-state="owes"] {
+      --tone: var(--warn-ink);
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      --tone: var(--ink-3);
+      color: var(--ink-2);
+    }
+  }
+  .cal-side-no {
+    color: var(--pencil-deep);
+  }
+  .cal-side-deadline {
+    .cal-side-diamond {
+      color: var(--ink-3);
+    }
+    &[data-tone="danger"] {
+      color: var(--pencil-deep);
+
+      .cal-side-diamond {
+        color: var(--pencil);
+        fill: currentColor;
+      }
+    }
+    &[data-tone="warn"] .cal-side-diamond {
+      color: var(--warn-ink);
+      fill: currentColor;
+    }
+  }
+
+  .cal-side-track {
+    background: color-mix(in srgb, var(--ink-3) 18%, transparent);
+
+    i {
+      opacity: 0.4;
+
+      &[data-mine] {
+        opacity: 1;
+      }
+      &[data-state="over"] {
+        background: color-mix(in srgb, var(--ink-3) 55%, transparent);
+      }
+      &[data-state="running"] {
+        background: var(--pen);
+      }
+    }
+    b {
+      background: var(--pencil);
+      box-shadow: 0 0 0 2px var(--raise);
+    }
+  }
+  .cal-side-ticks {
+    color: var(--ink-3);
+  }
+
+  /* on now: a card lit by the accent from its corner, the time gone drawn under it */
+  .cal-side-running {
+    padding: 12px 14px;
+    border-top: 0;
+    border-radius: 12px;
+    background:
+      radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--pen) 13%, transparent), transparent 62%),
+      var(--raise);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 34%, transparent);
+    transition:
+      transform 200ms var(--ease-snap),
+      box-shadow 160ms linear;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow:
+        inset 0 0 0 1px color-mix(in srgb, var(--pen) 50%, transparent),
+        0 12px 26px -16px rgb(0 0 0 / 0.55);
+    }
+  }
+  .cal-side-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--pen-deep);
+
+    &::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--pen);
+      animation: cal-side-breathe 1.8s ease-in-out infinite;
+    }
+  }
+  .cal-side-progress {
+    height: 3px;
+    margin-top: 8px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--pen) 16%, transparent);
+
+    i {
+      border-radius: 3px;
+      background: var(--pen);
+      transform-origin: left;
+      animation: cal-side-bar 640ms var(--ease-snap) 80ms both;
+    }
+  }
+  .cal-side-faces {
+    --face: 20px;
+
+    .team-face,
+    .cal-faces-more {
+      box-shadow: 0 0 0 1.5px var(--raise);
+    }
+  }
+
+  /* an answer owed: a card with amber on its edge */
+  .cal-side-ask {
+    position: relative;
+    padding: 11px 12px 11px 15px;
+    border-left: 0;
+    border-radius: 12px;
+    background: var(--raise);
+    box-shadow: var(--shadow-card);
+    animation: cal-side-in 300ms var(--ease-snap) backwards;
+    animation-delay: calc(var(--i, 0) * 50ms + 60ms);
+
+    &::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 11px;
+      bottom: 11px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--warn-ink);
+    }
+  }
+  .cal-side-going {
+    background: color-mix(in srgb, var(--pen) 14%, transparent) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pen) 30%, transparent) !important;
+    color: var(--pen-deep) !important;
+  }
+  .cal-side-picked {
+    background: color-mix(in srgb, var(--ok-ink) 14%, transparent) !important;
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok-ink) 30%, transparent) !important;
+    color: var(--ok-deep) !important;
+  }
+
+  /* the open meeting: its state as a chip in its colour, the facts by icons, people with rings */
+  .cal-side-chip {
+    --tone: var(--sky);
+    --ink-on: var(--sky);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--tone) 14%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 28%, transparent);
+    color: var(--ink-on);
+    line-height: 22px;
+    animation: cal-side-pop 220ms var(--ease-snap) both;
+
+    &::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: var(--tone);
+    }
+    &[data-state="running"] {
+      --tone: var(--pen);
+      --ink-on: var(--pen-deep);
+
+      &::before {
+        animation: cal-side-breathe 1.8s ease-in-out infinite;
+      }
+    }
+    &[data-state="owes"] {
+      --tone: var(--warn-ink);
+      --ink-on: var(--warn-deep);
+    }
+    &[data-state="over"],
+    &[data-state="declined"] {
+      --tone: var(--ink-3);
+      --ink-on: var(--ink-2);
+    }
+  }
+  &[data-desk-theme="light"] .cal-side-chip:not([data-state="running"]):not([data-state="owes"]):not([data-state="over"]):not([data-state="declined"]) {
+    --ink-on: #0b5aa8;
+  }
+  .cal-side-when {
+    color: var(--ink-2);
+  }
+  .cal-side-fact {
+    grid-template-columns: 14px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+  }
+  .cal-side-fact-word {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .cal-side-fact-icon {
+    display: flex;
+    padding-top: 2px;
+  }
+
+  .cal-side-answers {
+    display: flex;
+    gap: 2px;
+    height: 4px;
+    margin: 6px 0 6px;
+    overflow: hidden;
+    border-radius: 4px;
+    transform-origin: left;
+    animation: cal-side-bar 640ms var(--ease-snap) 80ms both;
+
+    i {
+      min-width: 4px;
+      border-radius: 2px;
+      background: color-mix(in srgb, var(--ink-3) 40%, transparent);
+
+      &[data-part="going"] {
+        background: var(--ok-ink);
+      }
+      &[data-part="declined"] {
+        background: var(--pencil);
+      }
+    }
+  }
+  .cal-side-person {
+    margin: 0 -6px;
+    padding: 4px 6px;
+    border-radius: 8px;
+    animation: cal-side-in 240ms var(--ease-snap) backwards;
+
+    &:hover {
+      background: var(--hover);
+    }
+    .team-face {
+      box-shadow:
+        0 0 0 2px var(--raise),
+        0 0 0 3.5px var(--ring, transparent);
+    }
+  }
+  .cal-side-answer {
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--ink-3) 13%, transparent);
+    color: var(--ink-2);
+    line-height: 20px;
+
+    &[data-tone="ok"] {
+      background: color-mix(in srgb, var(--ok-ink) 13%, transparent);
+      color: var(--ok-deep);
+    }
+    &[data-tone="danger"] {
+      background: color-mix(in srgb, var(--pencil) 13%, transparent);
+      color: var(--pencil-deep);
+    }
+    &[data-tone="warn"] {
+      background: color-mix(in srgb, var(--warn-ink) 15%, transparent);
+      color: var(--warn-deep);
+    }
+  }
+  .cal-side-receipt {
+    color: var(--ink-2);
+
+    &[data-tone="warn"] {
+      color: var(--warn-deep);
+    }
+    &[data-tone="ok"] {
+      color: var(--ok-deep);
+    }
+  }
+  .cal-side-foot {
+    border-top-color: var(--rule-soft);
+  }
+  .cal-side-confirm {
+    padding: 12px 14px;
+    border-top: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--pencil) 7%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pencil) 24%, transparent);
+    animation: cal-side-pop 200ms var(--ease-snap) both;
+  }
+
+  /* the quick card: a clash said on an amber plate; who is away said in amber */
+  .cal-clash {
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--warn-ink) 12%, transparent);
+    color: var(--warn-deep);
+  }
+  .cal-away {
+    color: var(--warn-deep);
+  }
+}
+
+/* ---- motion --------------------------------------------------------------------------------- */
+@keyframes cal-side-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes cal-side-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes cal-side-bar {
+  from {
+    transform: scaleX(0);
+  }
+}
+/* a live dot breathes: what is on now, never a blink */
+@keyframes cal-side-breathe {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-surface="desk"][data-journal][data-graphite] {
+    .cal-side,
+    .cal-side-meeting,
+    .cal-side-ask,
+    .cal-side-chip,
+    .cal-side-chip::before,
+    .cal-side-live::before,
+    .cal-side-progress i,
+    .cal-side-answers,
+    .cal-side-person,
+    .cal-side-confirm {
+      animation: none !important;
+    }
+    .cal-side-running,
+    .cal-side-running:hover {
+      transition: none;
+      transform: none;
+    }
+  }
+}
