@@ -150,18 +150,19 @@ export function wallView(board: Pick<TvBoardData, "view" | "items">): BoardView 
 }
 
 /**
- * Поле доски на стене, vh. Сцена высотой 74 vh садится между бегущей строкой и подписью
- * (там ~80 vh) с воздухом; сверху строка «ДОСКА · 5 пунктов», под ней — список или карта.
- * Ширина — по пропорции экрана: 16:9 даёт 164 vh, ноутбук 16:10 — уже.
+ * The board's field on the wall, in vh. A scene 79 vh tall fits the scene box above the bottom band
+ * (D-185: 89 vh minus the top and bottom margins); on top, the «Доска · 5 пунктов» line at the height of a
+ * scene head, under it the list or the map. The width is the screen minus the wall's side margins
+ * (`--tv-x` = 8 vh each side): 16:9 gives 161.8 vh, a 16:10 laptop less, never wider than 164.
  */
-export const BOARD_HEIGHT = 74;
-export const BOARD_TOP_ROW = 4.4;
+export const BOARD_HEIGHT = 79;
+export const BOARD_TOP_ROW = 6;
 export const BOARD_TOP_GAP = 1.4;
 /** Между названием и пунктами в списке. */
 export const BOARD_TITLE_GAP = 2.6;
 
 export function boardFrame(aspect: number): { width: number; height: number } {
-  const width = Math.min(Math.max(aspect, 1) * 100 * 0.92, 164);
+  const width = Math.min(Math.max(aspect, 1) * 100 - 16, 164);
   return { width: Math.round(width * 10) / 10, height: BOARD_HEIGHT - BOARD_TOP_ROW - BOARD_TOP_GAP };
 }
 

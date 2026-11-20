@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EVENT_SOON_MIN, overlayOf, waited } from "./overlay";
+import { EVENT_SOON_MIN, meetingOf, overlayOf, waited } from "./overlay";
 import type { TvEventRow, TvOverlay } from "./queries";
 
 const NOW = new Date("2026-09-25T09:00:00Z");
@@ -55,7 +55,7 @@ describe("overlayOf — посетитель", () => {
   it("«Подождёт» — тихая плашка вместо надписи", () => {
     const view = overlayOf(visit({ status: "wait", answered_at: minutesAgo(1), created_at: minutesAgo(7) }), [], NOW);
     expect(view.banner).toBeNull();
-    expect(view.pill).toEqual({ kind: "visit-wait", id: "v1", text: "Посетитель ждёт · 7 мин" });
+    expect(view.pill).toEqual({ kind: "visit-wait", id: "v1", text: "Посетитель ждёт 7 мин" });
   });
 
   it("ждут двое — надпись говорит «ещё 1»", () => {
@@ -105,19 +105,51 @@ describe("overlayOf — мероприятие", () => {
     expect(view.banner).toEqual({
       kind: "event",
       id: "e1",
-      title: "Через 15 минут",
-      detail: "Планёрка · Переговорная · 6 чел.",
+      minutes: 15,
+      title: "Планёрка",
+      place: "Переговорная, 6 человек",
     });
     expect(overlayOf(null, [meeting(minutesAhead(EVENT_SOON_MIN - 2))], NOW).banner).toBeNull();
   });
 
-  it("на старте — «Начинается», минуту", () => {
-    expect(overlayOf(null, [meeting(NOW.toISOString())], NOW).banner?.title).toBe("Начинается");
+  it("на старте — минут нет, минуту", () => {
+    expect(overlayOf(null, [meeting(NOW.toISOString())], NOW).banner).toMatchObject({ kind: "event", minutes: null });
     expect(overlayOf(null, [meeting(minutesAgo(2))], NOW).banner).toBeNull();
+  });
+
+  it("гостю — без названия и места: «Встреча» и сколько людей", () => {
+    const guest: TvEventRow = { id: "e2", title: null, starts_at: minutesAhead(EVENT_SOON_MIN), location: null, people: 1 };
+    expect(overlayOf(null, [guest], NOW).banner).toMatchObject({ title: "Встреча", place: "1 человек" });
+    expect(overlayOf(null, [{ ...guest, people: 0 }], NOW).banner).toMatchObject({ place: null });
   });
 
   it("посетитель важнее мероприятия", () => {
     expect(overlayOf(visit(), [meeting(NOW.toISOString())], NOW).banner?.kind).toBe("visit");
+  });
+});
+
+describe("meetingOf", () => {
+  it("в пределах часа — отсчёт минут", () => {
+    expect(meetingOf(meeting(minutesAhead(25)), NOW)).toEqual({ time: "14:25", when: "через 25 мин", title: "Планёрка", place: "Переговорная" });
+  });
+
+  it("позже сегодня — только время", () => {
+    expect(meetingOf(meeting(minutesAhead(150)), NOW)).toMatchObject({ time: "16:30", when: null });
+  });
+
+  it("уже началась — «идёт»", () => {
+    expect(meetingOf(meeting(minutesAgo(10)), NOW).when).toBe("идёт");
+  });
+
+  it("завтрашняя — «завтра», по календарю Актобе", () => {
+    // 09:00 UTC = 14:00 in Aqtobe; tomorrow 09:00 there is 19 hours ahead
+    expect(meetingOf(meeting(minutesAhead(19 * 60)), NOW)).toMatchObject({ time: "09:00", when: "завтра" });
+    // 23:30 the same day is not tomorrow
+    expect(meetingOf(meeting(minutesAhead(9 * 60 + 30)), NOW).when).toBeNull();
+  });
+
+  it("гостю — «Встреча» без места", () => {
+    expect(meetingOf({ ...meeting(minutesAhead(90)), title: null, location: null }, NOW)).toMatchObject({ title: "Встреча", place: null });
   });
 });
 

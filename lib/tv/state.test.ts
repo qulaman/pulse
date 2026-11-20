@@ -281,34 +281,42 @@ describe("заставка «Рейтинг» и круг заставок (D-12
     expect(ratingViewOf(state({ rating_view: "year" }))).toBe("week");
   });
 
-  it("круг: лицо, рейтинг, календарь, команда; без очков — без рейтинга", () => {
-    expect(carouselScenes(true)).toEqual(["face", "rating", "calendar", "team"]);
-    expect(carouselScenes(false)).toEqual(["face", "calendar", "team"]);
+  it("круг: «Сегодня» между рейтингом, календарём, командой и фото; без очков — без рейтинга; гостю — только приветствие", () => {
+    expect(carouselScenes(true)).toEqual(["face", "rating", "face", "calendar", "face", "team", "face", "photos"]);
+    expect(carouselScenes(false)).toEqual(["face", "calendar", "face", "team", "face", "photos"]);
+    expect(carouselScenes(true, true, true)).toEqual(["face"]);
   });
 
   it("заставка круга — по часам, раз в три минуты, по кругу", () => {
     const at = (step: number) => new Date(step * CAROUSEL_MS + 1000);
-    expect([0, 1, 2, 3, 4].map((step) => carouselScene(at(step), true))).toEqual(["face", "rating", "calendar", "team", "face"]);
-    expect([0, 1, 2, 3].map((step) => carouselScene(at(step), false))).toEqual(["face", "calendar", "team", "face"]);
+    expect([0, 1, 2, 3, 4, 5, 6, 7, 8].map((step) => carouselScene(at(step), true))).toEqual([
+      "face", "rating", "face", "calendar", "face", "team", "face", "photos", "face",
+    ]);
+    expect([0, 1, 2, 3, 4, 5, 6].map((step) => carouselScene(at(step), false))).toEqual(["face", "calendar", "face", "team", "face", "photos", "face"]);
   });
 
   it("включённый круг перебивает выбранную заставку и доску", () => {
     const round = state({ carousel: true, scene: "clock" });
     expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5))).toBe("rating");
     expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5), false)).toBe("calendar");
+    expect(sceneOf(round, new Date(2 * CAROUSEL_MS + 5))).toBe("face");
   });
 
-  it("гость в кабинете убирает рейтинг из круга", () => {
+  it("гость в кабинете видит в круге только приветствие", () => {
     const round = state({ carousel: true });
-    expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5), true, true)).toBe("calendar");
+    expect(sceneOf(round, new Date(1 * CAROUSEL_MS + 5), true, true)).toBe("face");
+    expect(sceneOf(round, new Date(3 * CAROUSEL_MS + 5), true, true)).toBe("face");
     // поставленный руками рейтинг остаётся: стена честно скажет «скрыт»
     expect(sceneOf(state({ scene: "rating" }), NOW, true, true)).toBe("rating");
   });
 
   it("пульт знает, что дальше и когда", () => {
-    const next = carouselNext(new Date(2 * CAROUSEL_MS + 7_000), true);
+    const next = carouselNext(new Date(4 * CAROUSEL_MS + 7_000), true);
     expect(next.scene).toBe("team");
-    expect(next.at.getTime()).toBe(3 * CAROUSEL_MS);
+    expect(next.at.getTime()).toBe(5 * CAROUSEL_MS);
+    const back = carouselNext(new Date(3 * CAROUSEL_MS + 7_000), true);
+    expect(back.scene).toBe("face");
+    expect(back.at.getTime()).toBe(4 * CAROUSEL_MS);
   });
 
   it("одно дело на стене будит ночь", () => {
@@ -339,7 +347,7 @@ describe("доска недели в круге заставок (D-144)", () =>
   });
 
   it("takes its turn last in the round, by day only, and never with a guest in", () => {
-    expect(carouselScenes(true, true)).toEqual(["face", "rating", "calendar", "team", "board"]);
+    expect(carouselScenes(true, true)).toEqual(["face", "rating", "face", "calendar", "face", "team", "face", "photos", "face", "board"]);
     expect(weekInRound(state(week), DAY, false)).toBe(true);
     expect(weekInRound(state(week), new Date("2026-09-18T17:00:00Z"), false)).toBe(false);
     expect(weekInRound(state(week), DAY, true)).toBe(false);
@@ -349,8 +357,8 @@ describe("доска недели в круге заставок (D-144)", () =>
 
   it("is the scene at its step of the round", () => {
     const round = state({ ...week, carousel: true });
-    // the fifth step of the round with points: face, rating, calendar, team, board
-    const at = new Date(Math.ceil(DAY.getTime() / (5 * CAROUSEL_MS)) * 5 * CAROUSEL_MS + 4 * CAROUSEL_MS + 1000);
+    // the tenth step of the round with points: face, rating, face, calendar, face, team, face, photos, face, board
+    const at = new Date(Math.ceil(DAY.getTime() / (10 * CAROUSEL_MS)) * 10 * CAROUSEL_MS + 9 * CAROUSEL_MS + 1000);
     expect(sceneOf(round, at)).toBe("board");
     expect(sceneOf(state({ carousel: true }), at)).not.toBe("board");
   });

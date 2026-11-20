@@ -130,5 +130,5 @@ export function tapeRephase(before: TapeGeometry, offset: number, view: number, 
 
 /** Слепок ленты для сравнения: порядок, слова и тон — всё, что видно на экране. */
 export function tapeKey(items: readonly TickerItem[]): string {
-  return items.map((item) => `${item.id}\u0001${item.tone}\u0001${item.text}`).join("\u0002");
+  return items.map((item) => `${item.id}\u0001${item.tone}\u0001${item.lead ?? ""}\u0001${item.text}`).join("\u0002");
 }

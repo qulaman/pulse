@@ -119,7 +119,7 @@ export function DeskScreen() {
   // a guest takes the rating out of the round (D-33): the panel counts the same round as the wall
   const roundPoints = points && !guest;
   const week = weekInRound(row, now, guest);
-  const next = carouselNext(now, roundPoints, week);
+  const next = carouselNext(now, roundPoints, week, guest);
   const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || points);
   const clock = clockStyleOf(row);
   const calendarView = calendarViewOf(row);
@@ -259,7 +259,7 @@ export function DeskScreen() {
                   {!connected && !loading
                     ? "Войдите на телевизоре под пользователем роли «ТВ-экран» — «Подключить экран» даст код"
                     : round
-                      ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
+                      ? `${carouselScenes(roundPoints, week, guest).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                       : mode !== "ether"
                         ? "Потом стена сама вернётся к заставке · клик по заставке — сразу"
                         : "Заставка не меняется — «По кругу» включит смену"}

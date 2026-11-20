@@ -9,16 +9,26 @@ export type SceneKey = TvScene | "round";
 
 /**
  * A sketch of what each scene puts on the wall (D-174) — the TV's own dark and its pen, so the
- * card is read as a small screen: the face, the clock, the team's circles, today and the week,
- * the podium of the rating, the round of them all. 160 × 90, the wall's 16:9.
+ * card is read as a small screen: «Сегодня» (the day's number and the face, D-185), the clock, the
+ * team's circles, today and the week, the podium of the rating, the photos, the round of them all. 160 × 90, the wall's 16:9.
  */
 const SKETCH: Record<SceneKey, ReactNode> = {
   face: (
     <>
-      <circle cx="80" cy="42" r="21" fill="#2fbf71" />
-      <ellipse cx="73" cy="40" rx="4.2" ry="5.4" fill="#0b0f14" />
-      <ellipse cx="87" cy="40" rx="4.2" ry="5.4" fill="#0b0f14" />
-      <rect x="62" y="72" width="36" height="4" rx="2" fill="#93a2b4" opacity="0.6" />
+      <text x="22" y="56" fontSize="38" fontWeight="700" fill="#eef3f8" fontFamily="sans-serif">9</text>
+      <rect x="22" y="64" width="38" height="4" rx="2" fill="#93a2b4" opacity="0.6" />
+      <circle cx="112" cy="42" r="20" fill="#2fbf71" />
+      <ellipse cx="105" cy="40" rx="4" ry="5.2" fill="#0b0f14" />
+      <ellipse cx="119" cy="40" rx="4" ry="5.2" fill="#0b0f14" />
+    </>
+  ),
+  photos: (
+    <>
+      <rect x="14" y="12" width="132" height="66" rx="3" fill="#3b5468" />
+      <path d="M14 66 L52 38 L80 58 L104 42 L146 70 L146 78 L14 78 Z" fill="#5f7d8f" />
+      <circle cx="118" cy="26" r="7" fill="#f0b24a" opacity="0.85" />
+      <rect x="14" y="66" width="132" height="12" fill="#0b0f14" opacity="0.6" />
+      <rect x="20" y="70" width="44" height="4" rx="2" fill="#eef3f8" opacity="0.8" />
     </>
   ),
   clock: (

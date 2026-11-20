@@ -22,6 +22,7 @@ import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
 import { boardCase, boardDemo, DEMO_STEP_MS, type BoardCase, type BoardDemo } from "./boardFixtures";
+import { bigTeam, momentFixture, photoFixtures, type MomentCase } from "./sceneFixtures";
 
 export type WallCase =
   | "face"
@@ -53,7 +54,10 @@ export type WallCase =
   | "message"
   | "message-long"
   | "event"
-  | "night";
+  | "night"
+  | "photos"
+  | "team-many"
+  | MomentCase;
 
 const MIN = 60_000;
 const at = (base: number, minutes: number) => new Date(base + minutes * MIN).toISOString();
@@ -380,7 +384,7 @@ function useDemoStep(on: boolean, every = DEMO_STEP_MS): number {
  * step's scene data away for a while, the way the kiosk fetches it after `tv_state` flips.
  */
 export const WALKS = {
-  scenes: ["face", "clock", "team", "calendar", "calendar-month", "rating", "rating-month", "focus", "task", "board-branches", "face"],
+  scenes: ["face", "clock", "team", "calendar", "calendar-month", "rating", "rating-month", "photos", "moment-points", "focus", "task", "board-branches", "face"],
   overlay: ["face", "visit", "face", "message", "wait", "message-long", "event", "focus", "visit", "focus"],
   night: ["night", "face", "night", "focus", "night"],
   focus: ["focus", "focus-few", "focus", "focus-done", "task", "task-review", "task-done"],
@@ -460,8 +464,10 @@ export function WallSandbox({
   const scene: TvScene =
     sceneCase === "carousel"
       ? carouselScene(now, true)
-      : sceneCase === "clock" || sceneCase === "team"
+      : sceneCase === "clock" || sceneCase === "team" || sceneCase === "photos"
         ? sceneCase
+        : sceneCase === "team-many"
+          ? "team"
         : sceneCase === "calendar" || sceneCase === "calendar-month" || sceneCase === "calendar-empty"
           ? "calendar"
           : sceneCase.startsWith("board")
@@ -485,6 +491,8 @@ export function WallSandbox({
   // the event notice needs the meeting exactly fifteen minutes out; elsewhere keep it clear
   const shown = current === "event" ? data.summary : { ...data.summary, events: data.summary.events.slice(1) };
   const counted = news > 0 ? { ...shown, today: { ...shown.today, sent: shown.today.sent + news, done: shown.today.done + news } } : shown;
+  const many = current === "team-many" ? bigTeam(counted, guest) : counted;
+  const photos = useMemo(() => photoFixtures(base, guest), [base, guest]);
   const summary = busier
     ? {
         ...counted,
@@ -492,7 +500,7 @@ export function WallSandbox({
           row.name.startsWith("Динара") ? { ...row, active: 6 } : row.name.startsWith("Тимур") ? { ...row, active: 1 } : row,
         ),
       }
-    : counted;
+    : many;
 
   return (
     <div className="h-dvh w-full overflow-hidden bg-bg" style={{ cursor: "default" }} data-demo-step={demo ? step : route ? walkStep : undefined}>
@@ -517,6 +525,9 @@ export function WallSandbox({
         board={board}
         overlay={overlayOf(overlayFor(current, base, guest), summary.events, new Date(base))}
         sound={false}
+        photos={guest ? [] : photos}
+        taskPhotos={guest ? [] : photos.slice(0, 3)}
+        moment={momentFixture(current, base)}
       />
     </div>
   );

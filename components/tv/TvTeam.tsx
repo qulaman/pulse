@@ -1,76 +1,85 @@
 "use client";
 
-import { motion, MotionConfig } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { useMemo } from "react";
 
 import { pluralRu } from "@/lib/tasks/status-text";
 import type { TvSummary } from "@/lib/tv/queries";
 
+import { TvSceneHead } from "./TvSceneHead";
+
 /**
- * Заставка «команда»: кто чем занят прямо сейчас (D-76 §8). Плитки приходят из
- * `tv_summary().load` — уже с маской гостя, посчитанной в БД (D-33).
+ * The «Команда» scene (D-76 §8, look D-185): everyone in the company alphabetically, in a 4 × 4 grid — first name,
+ * surname under it, the number of orders in progress to the right of the name. Rows come from `tv_summary().load`
+ * with the guest mask already applied in the DB (D-33): a guest gets no surnames.
  *
- * Поле `overdue` в этих строках есть, и оно здесь не используется намеренно:
- * просрочка по именам на стену не выносится ни числом, ни цветом (D-45). Точка
- * слева говорит только «есть дела / дел нет» — без рода: имя его не даёт.
+ * Someone with no orders is just a name: no zero, no grey dot, no «дел нет» (D-45). The rows' `overdue` field
+ * is there and unused on purpose: overdue by name never goes on the wall, neither as a number nor as a colour.
+ * The order is alphabetical, not by load: the wall does not show off who has nothing to do right now.
+ *
+ * More than sixteen — pages, every 20 s by the wall's clock (no timer of its own); a page change is
+ * one fade, like the frame's.
  */
 
-/** Шесть в ряд, четыре ряда: на 24 плитках имя ещё читается с двух метров. */
-const TILES = 24;
-/** Плитка переезжает на новое место за время стены (`--t-tv`, 500 мс ease-in-out) — только transform. */
-const MOVE = { layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } } as const;
-const MEDALS = ["1", "2", "3"] as const;
+/** Four columns, four rows: a name at the scene's body size reads from three metres. */
+const COLS = 4;
+const PER_PAGE = COLS * 4;
+const PAGE_MS = 20_000;
 
-export function TvTeam({ summary, guest }: { summary: TvSummary; guest: boolean }) {
-  const rows = [...summary.load]
-    .sort((a, b) => b.active - a.active || a.name.localeCompare(b.name, "ru"))
-    .slice(0, TILES);
+type Person = { key: string; first: string; last: string | null; active: number };
 
-  // очки показываем только когда они включены и в комнате не посетитель (D-33)
-  const medals = new Map<string, string>();
-  if (summary.points_enabled && !guest) {
-    for (const row of summary.rating.slice(0, MEDALS.length)) {
-      medals.set(row.name, MEDALS[row.rank - 1] ?? String(row.rank));
-    }
-  }
-
-  // the order is what moves a tile: the clock's re-renders and the scene's entrance never start a slide
-  const order = rows.map((row) => row.name).join("\u0001");
-
-  if (rows.length === 0) {
-    return <p className="text-[4vh] leading-[5.4vh] text-muted">Команда ещё не заведена</p>;
-  }
+export function TvTeam({ summary, now }: { summary: TvSummary; guest: boolean; now: Date }) {
+  // the scene re-renders every second with the clock: the sort runs when the data changes
+  const people = useMemo(
+    () =>
+      [...summary.load]
+        .sort((a, b) => a.name.localeCompare(b.name, "ru"))
+        .map((row, index): Person => {
+          const [first = "", ...rest] = row.name.trim().split(/\s+/);
+          return { key: `${row.name}\u0001${index}`, first, last: rest.join(" ") || null, active: row.active };
+        }),
+    [summary.load],
+  );
+  const pages = Math.max(1, Math.ceil(people.length / PER_PAGE));
+  const page = Math.floor(now.getTime() / PAGE_MS) % pages;
+  const shown = people.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  const count = `${people.length} ${pluralRu(people.length, ["человек", "человека", "человек"])}`;
 
   return (
-    // «reduce motion»: the tiles take their new cells at once
-    <MotionConfig reducedMotion="user">
-      <div className="grid w-full max-w-[92vw] grid-cols-6 gap-x-[2vh] gap-y-[3.4vh]">
-        {/* a count changed and the tiles re-sort by load: each slides to its new cell instead of jumping (FLIP) */}
-        {rows.map((row) => (
-          <motion.div key={row.name} layout="position" layoutDependency={order} transition={MOVE} className="flex min-w-0 items-start gap-[1.2vh]">
-            <span
-              aria-hidden
-              className="mt-[1.4vh] h-[1.2vh] w-[1.2vh] shrink-0 rounded-full"
-              style={{ background: row.active > 0 ? "var(--ok)" : "var(--text-muted)" }}
-            />
-            <div className="min-w-0">
-              {/* имя переносится, а не режется: «Марат Оспа…» на стене читается как ошибка */}
-              <p className="text-[3vh] leading-[4vh] [overflow-wrap:anywhere]">
-                {row.name}
-                {medals.has(row.name) ? (
-                  <span className="ml-[0.8vh] text-[2vh] font-semibold" style={{ color: "var(--gold)" }}>
-                    {medals.get(row.name)}
+    <div className="tv-box" data-testid="tv-team">
+      <TvSceneHead title="Команда" sub={people.length === 0 ? null : `${count} · цифра — дела в работе${pages > 1 ? ` · ${page + 1} / ${pages}` : ""}`} />
+      {people.length === 0 ? (
+        <p className="tv-lead text-muted">Команда ещё не заведена</p>
+      ) : (
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={page}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1, transition: { duration: 0.5, ease: [0.2, 0, 0, 1] } }}
+            exit={{ opacity: 0, transition: { duration: 0.25 } }}
+            // four rows of a fixed height: a short last page stands where the full one stood
+            className="grid min-h-0 flex-1 grid-rows-4 gap-x-[5vh]"
+            style={{ gridTemplateColumns: `repeat(${COLS}, minmax(0, 1fr))` }}
+            data-page={page}
+          >
+            {shown.map((person) => (
+              <div key={person.key} className="min-w-0">
+                {/* the count stands right after the name, so it never reads as the next column's */}
+                <p className="flex items-baseline gap-[2vh] whitespace-nowrap">
+                  <span className="tv-body font-semibold" style={{ color: "var(--tv-text)" }}>
+                    {person.first}
                   </span>
-                ) : null}
-              </p>
-              <p className="truncate text-[2.2vh] leading-[3vh] text-muted">
-                {row.active > 0
-                  ? `${row.active} ${pluralRu(row.active, ["дело", "дела", "дел"])}`
-                  : "дел нет"}
-              </p>
-            </div>
+                  {/* nobody's zero is drawn; an unseen digit keeps every name on one baseline */}
+                  <span className={`tv-lead tv-num ${person.active > 0 ? "" : "invisible"}`} style={{ color: "var(--accent)" }} aria-hidden={person.active > 0 ? undefined : true}>
+                    {person.active > 0 ? person.active : 0}
+                  </span>
+                </p>
+                {person.last ? <p className="tv-small overflow-hidden whitespace-nowrap text-muted">{person.last}</p> : null}
+              </div>
+            ))}
           </motion.div>
-        ))}
-      </div>
-    </MotionConfig>
+        </AnimatePresence>
+      )}
+    </div>
   );
 }

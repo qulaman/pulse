@@ -71,12 +71,12 @@ describe("wallReceipt", () => {
 
 describe("wallNow", () => {
   it("называет сцену эфира", () => {
-    expect(wallNow(state(), PEOPLE, NOW)).toBe("Эфир · лицо");
+    expect(wallNow(state(), PEOPLE, NOW)).toBe("Эфир · сегодня");
     expect(wallNow(state({ scene: "clock" }), PEOPLE, NOW)).toBe("Эфир · часы");
     expect(wallNow(state({ scene: "team" }), PEOPLE, NOW)).toBe("Эфир · команда");
     expect(wallNow(state({ scene: "calendar" }), PEOPLE, NOW)).toBe("Эфир · календарь");
     expect(wallNow(state({ scene: "calendar", calendar_view: "month" }), PEOPLE, NOW)).toBe("Эфир · календарь · месяц");
-    expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · лицо");
+    expect(wallNow(null, PEOPLE, NOW)).toBe("Эфир · сегодня");
   });
 
   it("называет доску на стене и до скольки она там (D-102)", () => {
@@ -84,7 +84,7 @@ describe("wallNow", () => {
     expect(wallNow(row, PEOPLE, NOW, [{ id: "b-1", title: "Планёрка" }])).toBe("Доска «Планёрка» · до 21:00");
     expect(wallNow(row, PEOPLE, NOW)).toBe("Доска · до 21:00");
     // истёкшая доска — снова лицо
-    expect(wallNow(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T08:00:00Z" }), PEOPLE, NOW)).toBe("Эфир · лицо");
+    expect(wallNow(state({ scene: "board", board_id: "b-1", board_until: "2026-09-18T08:00:00Z" }), PEOPLE, NOW)).toBe("Эфир · сегодня");
   });
 
   describe("доска с ведущим (D-121)", () => {
@@ -141,7 +141,7 @@ describe("wallNow", () => {
 
   it("истёкший фокус — уже эфир", () => {
     const row = state({ mode: "employee", employee_id: "e1", expires_at: "2026-09-18T08:55:00Z" });
-    expect(wallNow(row, PEOPLE, NOW)).toBe("Эфир · лицо");
+    expect(wallNow(row, PEOPLE, NOW)).toBe("Эфир · сегодня");
   });
 
   it("ночью спящая стена — тусклые часы, разбуженная — снова сцена (D-105)", () => {
@@ -156,7 +156,7 @@ describe("wallNow", () => {
 
 describe("SCENE_LABEL", () => {
   it("даёт русское имя каждой сцене", () => {
-    expect(SCENE_LABEL).toEqual({ face: "Лицо", clock: "Часы", team: "Команда", calendar: "Календарь", board: "Доска", rating: "Рейтинг" });
+    expect(SCENE_LABEL).toEqual({ face: "Сегодня", clock: "Часы", team: "Команда", calendar: "Календарь", board: "Доска", rating: "Рейтинг", photos: "Фото" });
   });
 });
 
@@ -180,7 +180,7 @@ describe("wallNow — стена v4 (D-123)", () => {
     expect(wallNow(state({ scene: "rating" }), PEOPLE, NOW)).toBe("Эфир · рейтинг недели");
     expect(wallNow(state({ scene: "rating", rating_view: "month" }), PEOPLE, NOW)).toBe("Эфир · рейтинг месяца");
     // очки выключены — на стене лицо, и пульт говорит то же
-    expect(wallNow(state({ scene: "rating" }), PEOPLE, NOW, [], { points: false })).toBe("Эфир · лицо");
+    expect(wallNow(state({ scene: "rating" }), PEOPLE, NOW, [], { points: false })).toBe("Эфир · сегодня");
   });
 
   it("одно дело — название и сколько осталось", () => {

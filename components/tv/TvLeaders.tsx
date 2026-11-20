@@ -1,244 +1,145 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 
-import { RollingNumber } from "@/components/ui/RollingNumber";
-import { tvTime } from "@/lib/tv/clock";
-import { leadersView, type LeaderCard } from "@/lib/tv/leaders";
+import { leadersView, RATING_TITLE, type LeaderRow } from "@/lib/tv/leaders";
 import type { TvRatingScene } from "@/lib/tv/queries";
 
 import { TvAvatar } from "./TvAvatar";
+import { TvSceneHead } from "./TvSceneHead";
 
 /**
- * Заставка «Рейтинг» (D-123): пьедестал первой тройки, четвёртый и пятый рядом, кто вырос
- * больше всех, последние награды с причиной и итог команды за период. Читается с двух
- * метров: первый — самый крупный, очки — золотом.
+ * The «Рейтинг» scene (D-123, look D-185) — like a standings column in a broadcast: the leader large on the left —
+ * name, points in gold, growth on the previous period; places 2–5 as lines on the right; one line of the team's total below.
  *
- * Чего здесь нет и не будет: шестого места и ниже, падения, штрафов и покупок в магазине —
- * плохое по имени на стену не выносится (D-45). Гость в кабинете — заставка скрыта, как
- * доска (D-33). Правила — `lib/tv/leaders.ts`, здесь только раскладка.
+ * What is not here and never will be: sixth place and below, drops, «в срок», fines and purchases — nothing bad
+ * goes on the wall by name (D-45); awards as lines — an award comes as a full-screen moment.
+ * Faces are real photos only, no initials. With a guest in the office the rating is hidden (D-33), with no note
+ * about the guest. Rules live in `lib/tv/leaders.ts`, only the layout here.
  */
-
-/** Кольца медалей — те же, что у пьедестала «Рейтинга» (components/rating/Podium.tsx). */
-const MEDAL = ["var(--gold)", "#B8C2CC", "#C98A5B"];
-/** Высота ступени пьедестала по месту: первый выше всех. */
-const STEP_VH = [17, 11.5, 8];
 
 const EASE = [0.2, 0, 0, 1] as const;
 
-export function TvLeaders({ data, now }: { data: TvRatingScene | null; now: Date }) {
-  const view = leadersView(data, now);
-  // a full column (two places and the riser) leaves room for two rewards, not three
-  const awards = view.state === "ready" ? view.awards.slice(0, view.rest.length + (view.riser ? 1 : 0) >= 3 ? 2 : 3) : [];
-
-  if (view.state === "hidden") {
-    // no data yet or a guest in the office: the clock, and why there is no rating (D-33)
-    return data?.hidden ? (
-      <div className="flex flex-col items-center gap-[2vh]" data-testid="tv-rating-hidden">
-        <p className="nums text-[18vh] font-bold leading-[20vh] tabular-nums">{tvTime(now)}</p>
-        <p className="text-[3.4vh] leading-[4.4vh] text-muted">Рейтинг скрыт · гость в кабинете</p>
+export function TvLeaders({ data }: { data: TvRatingScene | null; now: Date }) {
+  // the scene re-renders every second with the clock; the places change when the data does
+  const view = useMemo(() => leadersView(data), [data]);
+  if (!data) return null;
+  if (view.state !== "ready") {
+    // a guest in the office or points off: one calm line, no word about the guest (D-33, D-185)
+    return (
+      <div className="tv-box" data-testid={view.state === "hidden" ? "tv-rating-hidden" : "tv-rating-off"}>
+        <TvSceneHead title={RATING_TITLE[data.period]} />
+        <div className="flex min-h-0 flex-1 flex-col justify-center pb-[8vh]">
+          <p className="tv-title" style={{ color: "var(--tv-text)" }}>
+            {view.state === "hidden" ? "Рейтинг покажем позже" : "Рейтинг появится, когда включат очки"}
+          </p>
+        </div>
       </div>
-    ) : null;
+    );
   }
-  if (view.state === "off") {
-    return <p className="text-[4vh] leading-[5.4vh] text-muted">Рейтинг появится, когда включат очки</p>;
+
+  if (!view.leader) {
+    // nobody has points yet: the calm line, and what the team did meanwhile
+    return (
+      <div className="tv-box" data-testid="tv-rating" data-empty>
+        <TvSceneHead title={view.title} sub={view.span} />
+        <div className="flex min-h-0 flex-1 flex-col justify-center gap-[var(--tv-gap)] pb-[8vh]">
+          <p className="tv-title" style={{ color: "var(--tv-text)" }}>
+            {data.period === "month" ? "Первые очки месяца — впереди" : "Первые очки недели — впереди"}
+          </p>
+          {view.team ? <p className="tv-body text-muted">{view.team}</p> : null}
+        </div>
+      </div>
+    );
   }
+
+  // the one number of the scene; ten thousand and more steps down the scale instead of running out of its column
+  const hero = view.leader.points.length > 5 ? "tv-title tv-num" : "tv-hero";
 
   return (
-    <div className="flex h-[74vh] w-full max-w-[94vw] flex-col gap-[3vh]" data-testid="tv-rating">
-      <header className="flex items-end justify-between gap-[4vh]">
-        <div className="min-w-0">
-          <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--gold)" }}>
-            {view.span}
-          </p>
-          <h2 className="mt-[0.6vh] text-[7vh] font-bold leading-[8vh] tracking-[-0.03em]">{view.title}</h2>
-        </div>
-        {view.team.length > 0 ? (
-          <p className="shrink-0 pb-[1vh] text-right text-[2.8vh] leading-[3.6vh]">
-            <span className="text-muted">Команда: </span>
-            <span className="font-semibold tabular-nums">{view.team.join(" · ")}</span>
-          </p>
-        ) : null}
-      </header>
-
-      <div className="grid min-h-0 flex-1 gap-[5vh]" style={{ gridTemplateColumns: "minmax(0, 1.3fr) minmax(0, 1fr)" }}>
-        {/* the podium: second, first, third */}
-        {view.empty ? (
-          <div className="flex flex-col justify-center gap-[1.6vh]">
-            <p className="text-[5vh] font-semibold leading-[6.4vh]">Очков за этот период пока нет</p>
-            <p className="text-[3vh] leading-[4vh] text-muted">Первые награды поставят людей на пьедестал</p>
-          </div>
-        ) : (
-          <section className="flex min-h-0 items-end justify-center gap-[2.4vh]" aria-label="Первая тройка">
-            {/* keyed by place: an award that reorders the five changes who stands on a step, the steps stay */}
-            {view.podium.map((card, index) => (
-              <PodiumColumn key={card.rank} card={card} order={index} />
-            ))}
-          </section>
-        )}
-
-        <aside className="flex min-h-0 flex-col gap-[2.4vh] overflow-hidden">
-          {view.rest.length > 0 ? (
-            <ol className="flex flex-col gap-[1.2vh]">
-              {view.rest.map((card, index) => (
-                <motion.li
-                  key={card.rank}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.45, delay: 0.5 + index * 0.08, ease: EASE }}
-                  className="flex items-center gap-[1.8vh] rounded-[1.8vh] px-[2vh] py-[1vh]"
-                  style={{ background: "color-mix(in srgb, var(--surface) 88%, transparent)" }}
-                >
-                  <span className="w-[3.4vh] shrink-0 text-center text-[3vh] font-bold tabular-nums text-muted">{card.rank}</span>
-                  <Holder id={card.id} className="min-w-0 flex-1">
-                    <div className="flex items-center gap-[1.8vh]">
-                      <TvAvatar name={card.name} src={card.avatar} size={6} />
-                      <span className="min-w-0 flex-1 truncate text-[3vh] font-semibold leading-[3.8vh]">{card.name}</span>
-                      <span className="shrink-0 text-[3.4vh] font-bold tabular-nums" style={{ color: "var(--gold)" }}>
-                        <RollingNumber value={card.points} />
-                      </span>
-                    </div>
-                  </Holder>
-                </motion.li>
-              ))}
-            </ol>
-          ) : null}
-
-          {view.riser ? (
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.7, ease: EASE }}
-              className="flex items-center gap-[2vh] rounded-[1.8vh] px-[2vh] py-[1.2vh]"
-              style={{ background: "color-mix(in srgb, var(--ok) 10%, var(--surface))" }}
-            >
-              <TvAvatar name={view.riser.name} src={view.riser.avatar} size={7} />
-              <div className="min-w-0">
-                <p className="text-[2.2vh] font-semibold leading-[2.8vh]" style={{ color: "var(--ok)" }}>
-                  Рост периода
+    <div className="tv-box" data-testid="tv-rating">
+      <TvSceneHead title={view.title} sub={view.span} />
+      <div className="grid min-h-0 flex-1 gap-x-[7vh]" style={{ gridTemplateColumns: "minmax(0, 0.8fr) minmax(0, 1fr)" }}>
+        {/* the leader: the name, the points in gold, the rise; gold is the points, the number needs no word */}
+        <section className="flex min-w-0 flex-col" aria-label="Первое место">
+          <Swap id={view.leader.id}>
+            <div className="flex flex-col gap-[2vh]">
+              <TvAvatar src={view.leader.avatar} size={16} />
+              <p className="tv-title tv-two-lines" style={{ color: "var(--tv-text)" }}>
+                {view.leader.name}
+              </p>
+              <p className={`${hero} mt-[1vh] whitespace-nowrap`} style={{ color: "var(--gold)" }} aria-label={`${view.leader.points} ${view.leader.pointsWord}`}>
+                {view.leader.points}
+              </p>
+              {view.leaderGrowth ? (
+                <p className="tv-body tv-num font-semibold" style={{ color: "var(--ok)" }}>
+                  {view.leaderGrowth}
                 </p>
-                <p className="truncate text-[3.2vh] font-semibold leading-[4vh]">{view.riser.name}</p>
-                <p className="text-[2.4vh] font-semibold leading-[3vh] tabular-nums" style={{ color: "var(--ok)" }}>
-                  {view.riser.delta}
-                </p>
-              </div>
-            </motion.section>
-          ) : null}
+              ) : null}
+            </div>
+          </Swap>
+        </section>
 
-          {awards.length > 0 ? (
-            <section className="flex min-h-0 flex-col gap-[1.2vh]">
-              {/* the label comes with its first line, not before it */}
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.45, delay: 0.85, ease: EASE }}
-                className="text-[2.2vh] font-semibold leading-[2.8vh]"
-                style={{ color: "var(--gold)" }}
-              >
-                Награды
-              </motion.p>
-              <ul className="flex flex-col gap-[1vh]">
-                {awards.map((award, index) => (
-                  <motion.li
-                    key={award.key}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.45, delay: 0.85 + index * 0.08, ease: EASE }}
-                    className="min-w-0"
-                  >
-                    <p className="flex items-baseline gap-[1.2vh] text-[2.8vh] leading-[3.6vh]">
-                      <span className="shrink-0 font-bold tabular-nums" style={{ color: "var(--gold)" }}>
-                        {award.amount}
-                      </span>
-                      <span className="min-w-0 truncate font-semibold">{award.name}</span>
-                      <span className="ml-auto shrink-0 text-[2.2vh] tabular-nums text-muted">{award.time}</span>
-                    </p>
-                    {award.reason ? <p className="truncate text-[2.4vh] leading-[3vh] text-muted">{award.reason}</p> : null}
-                  </motion.li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </aside>
+        {/* places two to five; keyed by place — an award that reorders them changes who holds a place, not the rows */}
+        <ol className="flex min-w-0 flex-col gap-[3vh]" aria-label="Места 2–5">
+          {view.rest.map((row) => (
+            <li key={row.rank} className="grid items-baseline gap-x-[2.4vh]" style={{ gridTemplateColumns: "5vh minmax(0, 1fr)" }}>
+              <span className="tv-lead tv-num text-muted">{row.rank}</span>
+              <Swap id={row.id}>
+                <Place row={row} />
+              </Swap>
+            </li>
+          ))}
+        </ol>
       </div>
+      {view.team ? <p className="tv-small text-muted">{view.team}</p> : null}
     </div>
   );
 }
 
-/** One column of the podium: the face, the name, the points, and the step with the place under them. */
-function PodiumColumn({ card, order }: { card: LeaderCard; order: number }) {
-  const first = card.rank === 1;
-  const medal = MEDAL[card.rank - 1] ?? "var(--border)";
-  // the first rises last: the second and the third set the stage for it
-  const delay = card.rank === 1 ? 0.35 : 0.1 + order * 0.08;
+/** One place of two to five: the face if there is a photo, the name, the rise under it, the points on the right. */
+function Place({ row }: { row: LeaderRow }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 32 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay, ease: EASE }}
-      className="flex min-w-0 flex-1 flex-col items-center"
-      style={{ maxWidth: first ? "38%" : "31%" }}
-      data-rank={card.rank}
-    >
-      <Holder id={card.id} className="w-full">
-        <div className="flex flex-col items-center">
-          <TvAvatar name={card.name} src={card.avatar} size={first ? 16 : 12} ring={medal} />
-          <p
-            className={`mt-[1.8vh] line-clamp-2 text-center font-bold leading-[1.15] tracking-[-0.01em] [overflow-wrap:anywhere] ${
-              first ? "text-[4vh]" : "text-[3.2vh]"
-            }`}
-          >
-            {card.name}
-          </p>
-          <p className="mt-[0.6vh] flex items-baseline gap-[0.8vh]">
-            <span className={`font-bold tabular-nums ${first ? "text-[7vh] leading-[7.4vh]" : "text-[5vh] leading-[5.6vh]"}`} style={{ color: "var(--gold)" }}>
-              <RollingNumber value={card.points} />
-            </span>
-            <span className="text-[2.2vh] text-muted">{card.pointsWord}</span>
-          </p>
-          <p className="h-[3vh] text-[2.2vh] font-semibold leading-[3vh] tabular-nums" style={{ color: "var(--ok)" }}>
-            {card.delta !== null ? `▲ +${card.delta}` : ""}
-          </p>
-          {card.done ? <p className="text-[2.2vh] leading-[2.8vh] text-muted">{card.done}</p> : <p className="h-[2.8vh]" />}
-        </div>
-      </Holder>
-      {/* the step: its height says the place before the number does */}
-      <div
-        className="mt-[1.4vh] flex w-full items-start justify-center rounded-t-[1.6vh] pt-[1.2vh]"
-        style={{
-          height: `${STEP_VH[card.rank - 1] ?? 6}vh`,
-          background: `linear-gradient(to bottom, color-mix(in srgb, ${medal} 26%, var(--surface)), color-mix(in srgb, var(--surface) 70%, transparent))`,
-          boxShadow: `inset 0 0.5vh 0 ${medal}`,
-        }}
-      >
-        <span className="text-[5vh] font-bold leading-[5.6vh] tabular-nums" style={{ color: medal }}>
-          {card.rank}
+    <div className="flex min-w-0 items-baseline gap-[2.4vh]">
+      {row.avatar ? (
+        <span className="self-center">
+          <TvAvatar src={row.avatar} size={8} />
         </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <p className="tv-body tv-two-lines font-semibold" style={{ color: "var(--tv-text)" }}>
+          {row.name}
+        </p>
+        {/* the rise, or its empty line: the four places stand at an even step */}
+        <p className="tv-small tv-num font-semibold" style={{ color: "var(--ok)" }} aria-hidden={row.growth ? undefined : true}>
+          {row.growth ?? " "}
+        </p>
       </div>
-    </motion.div>
+      <span className="tv-lead tv-num shrink-0 whitespace-nowrap" style={{ color: "var(--gold)" }}>
+        {row.points}
+      </span>
+    </div>
   );
 }
 
 /**
- * Who holds a place. An award that reorders the five changes the holder in place: the one leaving fades out,
- * the new one fades in over the same spot — the place never jumps, never stands empty. Both share one grid
- * cell while they cross; the first render just shows the holder (the scene's own entrance brings it).
+ * Who holds a place. An award that reorders the five changes the holder in place: the one leaving fades
+ * out, then the new one fades in — the place never jumps. The first render just shows the holder (the
+ * scene's own entrance brings it). Opacity only, as the wall's frame does.
  */
-function Holder({ id, className = "", children }: { id: string; className?: string; children: ReactNode }) {
+function Swap({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <div className={`grid [grid-template-areas:'who'] *:[grid-area:who] ${className}`}>
-      <AnimatePresence initial={false}>
-        <motion.div
-          key={id}
-          className="min-w-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1, transition: { duration: 0.5, delay: 0.1, ease: EASE } }}
-          exit={{ opacity: 0, transition: { duration: 0.25, ease: EASE } }}
-        >
-          {children}
-        </motion.div>
-      </AnimatePresence>
-    </div>
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={id}
+        className="min-w-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1, transition: { duration: 0.5, ease: EASE } }}
+        exit={{ opacity: 0, transition: { duration: 0.25 } }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
   );
 }

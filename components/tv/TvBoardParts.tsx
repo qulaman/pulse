@@ -61,8 +61,9 @@ export function LitPlate({ on, radius, still }: { on: boolean; radius: string; s
       className="pointer-events-none absolute inset-0"
       style={{
         borderRadius: radius,
-        background: "color-mix(in srgb, var(--accent) 14%, var(--surface))",
-        boxShadow: "inset 0 0 0 0.22vh color-mix(in srgb, var(--accent) 62%, transparent), 0 1.6vh 4.4vh rgba(0, 0, 0, 0.38)",
+        // seen from across the room (D-185): a solid plate and an accent bar on the left, not a thin ring
+        background: "color-mix(in srgb, var(--accent) 22%, var(--bg))",
+        boxShadow: "inset 0.9vh 0 0 var(--accent)",
       }}
       initial={false}
       animate={{ opacity: on ? 1 : 0 }}

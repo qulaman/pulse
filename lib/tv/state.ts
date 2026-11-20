@@ -10,7 +10,12 @@ import type { TvState } from "./queries";
  */
 
 export type TvMode = "ether" | "employee" | "task";
-export type TvScene = "face" | "clock" | "team" | "calendar" | "board" | "rating";
+/**
+ * `face` is «Сегодня», the wall's home (D-185). `photos` lives only in the round: the remote cannot
+ * put it up by hand (the base's `tv_state.scene` check has no such value) — with no photos its turn
+ * shows «Сегодня».
+ */
+export type TvScene = "face" | "clock" | "team" | "calendar" | "board" | "rating" | "photos";
 export type ClockStyle = "digital" | "analog";
 /** Заставка «Календарь»: «Сегодня» крупно и неделя под ним — или месяц сеткой (D-98). */
 export type CalendarView = "week" | "month";
@@ -72,27 +77,30 @@ export function guestEndsAt(state: TvState | null, now: Date): Date | null {
 export const CAROUSEL_MS = 3 * 60_000;
 
 /**
- * Круг заставок (D-123): лицо, рейтинг (только с очками), календарь, команда. Часы — тихий
- * экран для совещаний: в круг не входят. Доска совещания — тоже; доска недели (`week`, D-144) —
- * последней в круге.
+ * The round of scenes (D-123, D-185): «Сегодня» is the wall's home and stands between every other scene:
+ * the rating (only with points), the calendar, the team, photos, the week board (`week`, D-144) last.
+ * The clock is a quiet screen for meetings and is not in the round. A guest in the office sees only the welcome —
+ * scenes that would have to be hidden behind a mask are not played for them (D-33).
  */
-export function carouselScenes(points: boolean, week = false): TvScene[] {
-  const scenes: TvScene[] = points ? ["face", "rating", "calendar", "team"] : ["face", "calendar", "team"];
-  return week ? [...scenes, "board"] : scenes;
+export function carouselScenes(points: boolean, week = false, guest = false): TvScene[] {
+  if (guest) return ["face"];
+  const inserts: TvScene[] = points ? ["rating", "calendar", "team", "photos"] : ["calendar", "team", "photos"];
+  if (week) inserts.push("board");
+  return inserts.flatMap((scene): TvScene[] => ["face", scene]);
 }
 
 /**
  * Какая заставка сейчас в круге — по часам, без таймера и без обмена с пультом: киоск и
  * пульт считают одно и то же число и сходятся. Граница — ровные три минуты от эпохи.
  */
-export function carouselScene(now: Date, points: boolean, week = false): TvScene {
-  const list = carouselScenes(points, week);
+export function carouselScene(now: Date, points: boolean, week = false, guest = false): TvScene {
+  const list = carouselScenes(points, week, guest);
   return list[Math.floor(now.getTime() / CAROUSEL_MS) % list.length];
 }
 
 /** Когда круг сменит заставку и на какую — для пульта: «дальше — календарь в 14:03». */
-export function carouselNext(now: Date, points: boolean, week = false): { scene: TvScene; at: Date } {
-  const list = carouselScenes(points, week);
+export function carouselNext(now: Date, points: boolean, week = false, guest = false): { scene: TvScene; at: Date } {
+  const list = carouselScenes(points, week, guest);
   const step = Math.floor(now.getTime() / CAROUSEL_MS);
   return { scene: list[(step + 1) % list.length], at: new Date((step + 1) * CAROUSEL_MS) };
 }
@@ -111,7 +119,7 @@ export function carouselOn(state: TvState | null): boolean {
  * руками рейтинг при госте честно говорит, что скрыт (D-33).
  */
 export function sceneOf(state: TvState | null, now: Date = new Date(), points = true, guest = false): TvScene {
-  if (roundOn(state, now)) return carouselScene(now, points && !guest, weekInRound(state, now, guest));
+  if (roundOn(state, now)) return carouselScene(now, points && !guest, weekInRound(state, now, guest), guest);
   const scene = state?.scene;
   if (scene === "board") return boardLive(state, now) ? "board" : "face";
   if (scene === "rating" && !points) return "face";

@@ -14,8 +14,8 @@ const DATE = new Intl.DateTimeFormat("ru-RU", { weekday: "long", day: "numeric",
 
 /**
  * The office wall in miniature (D-140): the board exactly as the wall will draw it — the very
- * `TvBoard` of the kiosk, laid out in vh like the wall (the ticker's row above, the date
- * below, the board in between), in a 16:9 frame and scaled down to the width it is given.
+ * `TvBoard` of the kiosk, laid out in vh like the wall (the scene's box, the bottom band with
+ * the date), in a 16:9 frame and scaled down to the width it is given.
  * Every size on the wall is in vh, so the phone's own vh keeps the wall's proportions: the
  * same columns, the same pages, the same map — what the director sees here is what the
  * office sees. Nothing on it is pressed.
@@ -50,13 +50,13 @@ export function WallPreview({ data, now, rounded = 14 }: { data: TvBoardData; no
         className="pointer-events-none absolute left-0 top-0 flex origin-top-left flex-col"
         style={{ width: `${WALL_VW}vh`, height: "100vh", transform: `scale(${scale})`, visibility: scale > 0 ? "visible" : "hidden" }}
       >
-        {/* the ticker's row of the wall: its height, without its words */}
-        <div className="h-[8.6vh] shrink-0" />
-        <div className="flex min-h-0 flex-1 items-center justify-center px-[4vh]">
+        {/* the scene's box of the wall (D-185): its safe frame, the board on top */}
+        <div className="tv-box min-h-0 flex-1 items-center">
           <TvBoard data={{ board: data, hidden: false }} now={now} aspect={16 / 9} />
         </div>
-        <div className="flex shrink-0 items-center justify-end px-[4vh] pb-[3.4vh]">
-          <span className="text-[2.6vh] leading-[3.4vh] text-muted first-letter:uppercase">{DATE.format(now)}</span>
+        {/* the wall's bottom band: its height and surface, the date without the ticker's words */}
+        <div className="flex h-[var(--tv-band)] shrink-0 items-center justify-end px-[var(--tv-x)]" style={{ background: "var(--tv-band-bg)" }}>
+          <span className="tv-fine text-muted first-letter:uppercase">{DATE.format(now)}</span>
         </div>
         {/* a lit drawing — or a branch lit on the map — over the whole wall, as the kiosk shows it */}
         <TvSketchFull board={data} />

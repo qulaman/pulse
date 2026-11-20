@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { lineOf, type TvEvent } from "./feed";
-import { speechOf } from "./voice";
+import { greetingOf, speechOf } from "./voice";
 
 const TODAY = { sent: 5, done: 2, in_work: 3 };
 
@@ -34,14 +34,14 @@ describe("speechOf", () => {
     );
   });
 
-  it("когда новостей нет — говорит про день", () => {
+  it("когда новостей нет — здоровается, а не повторяет числа дня со сцены", () => {
     const stale = speechOf([line("task_sent", "2026-09-17T05:00:00Z")], TODAY, NOON);
-    expect(stale.text).toBe("Сегодня принято: 2");
+    expect(stale.text).toBe("Добрый день");
     expect(stale.mood).toBe("calm");
   });
 
   it("пустой день не оставляет экран без слов", () => {
-    expect(speechOf([], { sent: 0, done: 0, in_work: 0 }, NOON).text).toBe("Пока тихо");
+    expect(speechOf([], { sent: 0, done: 0, in_work: 0 }, NOON).text).toBe("Добрый день");
   });
 
   it("ночью в тишине засыпает, но днём в тишине — нет", () => {
@@ -74,5 +74,23 @@ describe("speechOf", () => {
     };
     expect(speechOf([lineOf(meeting, false)], TODAY, NOON).text).toBe("Скоро — «Планёрка»");
     expect(speechOf([lineOf(meeting, true)], TODAY, NOON).text).toBe("Скоро — мероприятие");
+  });
+});
+
+describe("greetingOf", () => {
+  // hh:00 in Aqtobe (UTC+5) on 17 September
+  const at = (hh: number) => new Date(Date.UTC(2026, 8, 17) + (hh - 5) * 3_600_000);
+
+  it("по часам Актобе", () => {
+    expect(greetingOf(at(8))).toBe("Доброе утро");
+    expect(greetingOf(at(12))).toBe("Добрый день");
+    expect(greetingOf(at(19))).toBe("Добрый вечер");
+    expect(greetingOf(at(23))).toBe("Доброй ночи");
+    expect(greetingOf(at(3))).toBe("Доброй ночи");
+  });
+
+  it("вечером после сделанного дня — спасибо", () => {
+    expect(greetingOf(at(19), { done: 4 })).toBe("Спасибо за день");
+    expect(greetingOf(at(12), { done: 4 })).toBe("Добрый день");
   });
 });

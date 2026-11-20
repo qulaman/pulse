@@ -32,11 +32,12 @@ const SUMMARY: TvSummary = {
 };
 
 describe("tickerItems", () => {
-  it("день, вердикт, события, топ и неделя — в одной ленте", () => {
-    const items = tickerItems([line("task_accepted")], SUMMARY);
+  it("день, события, топ и неделя — в одной ленте; вердикта «Входящего» на стене нет (D-45)", () => {
+    const items = tickerItems([line("task_accepted")], { ...SUMMARY, counts: { overdue: 2, declined: 1, review: 3, questions: 1 } });
     const ids = items.map((item) => item.id);
     expect(ids[0]).toBe("today");
-    expect(ids[1]).toBe("verdict");
+    expect(ids).not.toContain("verdict");
+    expect(items.map((item) => `${item.lead} ${item.text}`).join(" ")).not.toMatch(/просроч|отказ|приёмк|вопрос/);
     expect(ids.some((id) => id.startsWith("event:"))).toBe(true);
     expect(ids).toContain("rating");
     expect(ids).toContain("week");
@@ -45,7 +46,8 @@ describe("tickerItems", () => {
   it("событие едет со временем и в настоящем времени", () => {
     const items = tickerItems([line("task_accepted")], SUMMARY);
     const event = items.find((item) => item.id.startsWith("event:"))!;
-    expect(event.text).toBe("14:32 · Марат Оспанов берёт в работу");
+    expect(event.lead).toBe("14:32");
+    expect(event.text).toBe("Марат Оспанов берёт в работу");
   });
 
   it("числа дня склоняются по-русски", () => {
@@ -59,6 +61,11 @@ describe("tickerItems", () => {
     const items = tickerItems([], { ...SUMMARY, points_enabled: false });
     expect(items.map((item) => item.id)).not.toContain("rating");
     expect(items.map((item) => item.id)).not.toContain("merch");
+  });
+
+  it("пустой день не пишет «0 поручений»", () => {
+    const items = tickerItems([], { ...SUMMARY, today: { sent: 0, done: 0, in_work: 0 } });
+    expect(items.map((item) => item.id)).not.toContain("today");
   });
 
   it("без сводки строка всё равно едет — на одних событиях", () => {
@@ -77,10 +84,11 @@ describe("tickerItems: мероприятия", () => {
     people: 6,
   };
 
-  it("ставит ближайшие встречи после вердикта, с днём, местом и числом людей", () => {
+  it("ставит ближайшие встречи после чисел дня, со временем, местом и числом людей", () => {
     const items = tickerItems([], { ...SUMMARY, events: [meeting] });
     const row = items.find((item) => item.id === "meeting:e-1");
-    expect(row?.text).toBe("Сегодня 16:00 · Планёрка · в офисе · 6 чел.");
+    expect(row?.lead).toBe("16:00");
+    expect(row?.text).toBe("Планёрка · в офисе · 6 чел.");
     expect(row?.tone).toBe("accent");
   });
 
@@ -98,7 +106,9 @@ describe("tickerItems: мероприятия", () => {
       ...SUMMARY,
       events: [{ ...meeting, id: "e-2", starts_at: "2026-09-18T05:00:00Z", title: null, location: null }],
     });
-    expect(items.find((item) => item.id === "meeting:e-2")?.text).toBe("Завтра 10:00 · Мероприятие · 6 чел.");
+    const row = items.find((item) => item.id === "meeting:e-2");
+    expect(row?.lead).toBe("Завтра 10:00");
+    expect(row?.text).toBe("Мероприятие · 6 чел.");
   });
 
   it("без мероприятий строк не добавляет", () => {

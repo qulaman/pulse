@@ -21,8 +21,8 @@ import {
 import styles from "./tv.module.css";
 
 /**
- * Бегущая строка над лицом: всё, что происходит в компании, едет одной лентой справа
- * налево. Экран смотрят издалека и мельком, поэтому строка одна, крупная и без рамки.
+ * The news line in the wall's bottom band (D-185): everything going on in the company runs as one
+ * tape from right to left. The screen is watched from afar and in passing, so there is one line, and it is large.
  *
  * Строка едет на композиторе (D-45, D-121): CSS-анимация сдвигает дорожку из копий ленты
  * на ширину одной копии и начинает заново — в момент возврата на месте первой копии стоит
@@ -45,7 +45,6 @@ const COLOR: Record<TickerTone, string> = {
   gold: "var(--gold)",
   muted: "var(--text-muted)",
   warn: "var(--warn)",
-  danger: "var(--danger)",
 };
 
 const mod = (value: number, by: number) => (by > 0 ? ((value % by) + by) % by : 0);
@@ -53,13 +52,21 @@ const mod = (value: number, by: number) => (by > 0 ? ((value % by) + by) % by : 
 /** Что стоит на дорожке сейчас: лента, её замер, скорость и ширина окна. */
 type Placed = { tape: Tape; geo: TapeGeometry; speed: number; view: number };
 
+/**
+ * One item of the band (D-185): the lead in its tone and bold — a time, «+50», «Топ недели» — then
+ * the words in quiet white, and a small diamond before the next item. Text at tv-small: the band is
+ * read across the room, not only by whoever stands close.
+ */
 function Item({ item }: { item: TickerItem }) {
   return (
-    <span className="flex shrink-0 items-center" data-tape-id={item.id}>
-      <span aria-hidden className="mx-[2.4vh] h-[1vh] w-[1vh] shrink-0 rounded-full" style={{ background: COLOR[item.tone] }} />
-      <span className="whitespace-nowrap text-[3.2vh] leading-[4.2vh]" style={{ color: item.tone === "muted" ? "var(--text-muted)" : "var(--text)" }}>
-        {item.text}
-      </span>
+    <span className="tv-small flex shrink-0 items-baseline whitespace-nowrap" data-tape-id={item.id}>
+      <span aria-hidden className="mx-[3.2vh] inline-block h-[1vh] w-[1vh] shrink-0 rotate-45 self-center" style={{ background: "var(--text-muted)", opacity: 0.45 }} />
+      {item.lead ? (
+        <span className="mr-[1.4vh] font-semibold tv-num" style={{ color: COLOR[item.tone] }}>
+          {item.lead}
+        </span>
+      ) : null}
+      <span style={{ color: "var(--tv-text)" }}>{item.text}</span>
     </span>
   );
 }
@@ -181,7 +188,7 @@ export function TvTicker({ items, paused = false }: { items: TickerItem[]; pause
   return (
     <div
       ref={boxRef}
-      className="relative w-full overflow-hidden py-[1vh]"
+      className="relative w-full overflow-hidden"
       aria-live="off"
       // края растворяются, а не обрезаются: строка выезжает из ничего и уходит в ничто
       style={{

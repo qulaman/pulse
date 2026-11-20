@@ -87,12 +87,13 @@ import { awaitingDirector, unreadMessages, waitedSince } from "@/lib/visits/text
  */
 
 const SCENE_HINT: Record<TvScene, string> = {
-  face: "Лицо говорит о последних событиях",
+  face: "Сегодня: число дня, Капля и ближайшая встреча",
   clock: "Тихие часы: для совещаний",
   team: "Кто чем занят",
   calendar: "Неделя вперёд: что запланировано",
   board: "Пункты директора — до 21:00",
   rating: "Пятёрка лучших, рост и награды",
+  photos: "Фото из отчётов по сданным делам",
 };
 
 /** The order on the wall has a name on the remote's display (D-123); the director reads tasks. */
@@ -167,7 +168,7 @@ export default function ScreenPage() {
   const roundPoints = points && !guest;
   // the week board takes its turn last in the round (D-144) — the same round as the wall's
   const week = weekInRound(row, now, guest);
-  const next = carouselNext(now, roundPoints, week);
+  const next = carouselNext(now, roundPoints, week, guest);
   const ratingView = ratingViewOf(row);
   const sceneKeys = TV_SCENES.filter((value) => value !== "rating" || pointsEnabled.data === true);
   const clock = clockStyleOf(row);
@@ -402,7 +403,7 @@ export default function ScreenPage() {
                 {covered
                   ? `Поверх заставки — ${mode === "task" ? "дело" : "человек"} · тап по заставке покажет её сразу`
                   : round
-                    ? `${carouselScenes(roundPoints, week).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
+                    ? `${carouselScenes(roundPoints, week, guest).map((value) => SCENE_LABEL[value].toLowerCase()).join(" → ")} · дальше — ${SCENE_LABEL[next.scene].toLowerCase()} в ${tvTime(next.at)}`
                     : SCENE_HINT[scene]}
               </p>
 
@@ -672,6 +673,13 @@ const RoundIcon = () => (
 
 const SCENE_ICON: Record<TvScene, React.ReactNode> = {
   board: <BoardIcon />,
+  photos: (
+    <svg {...icon}>
+      <rect x="3" y="4.4" width="14" height="11.2" rx="2.2" />
+      <circle cx="7.6" cy="8.6" r="1.4" />
+      <path d="M3.4 14.2l4-3.6 3 2.6 2.4-2 3.8 3.2" />
+    </svg>
+  ),
   rating: <PodiumIcon />,
   face: (
     <svg {...icon}>

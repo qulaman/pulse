@@ -24,6 +24,8 @@ import { listLayout, pageOfPoint, titleFit } from "@/lib/tv/boardList";
 import { mapLayout } from "@/lib/tv/boardMap";
 import { tvTime } from "@/lib/tv/clock";
 
+import "./tv-type.css";
+
 import { TvBoardList } from "./TvBoardList";
 import { TvBoardMap } from "./TvBoardMap";
 import { EASE, vh } from "./TvBoardParts";
@@ -106,22 +108,22 @@ export function TvBoard({ data, now, aspect: fixed }: { data: TvBoardData | null
 }
 
 /**
- * Строка над доской: «ДОСКА» слева; справа — счёт пунктов, а пока ведущий ведёт совещание —
- * «3 / 7» и шкала пунктов с отметкой текущего. Обе надписи стоят в одной клетке и
- * сменяются прозрачностью — строка не прыгает.
+ * The line above the board: «Доска» on the left, like the name of any scene (D-185); on the right the item count, and
+ * while the presenter runs a meeting, «3 / 7» and a scale of items with the current one marked. Both labels sit in one
+ * cell and swap by opacity — the line does not jump.
  */
 function TopRow({ board, page, pages }: { board: Board; page: number; pages: number }) {
   const at = board.focus ? board.items.findIndex((item) => item.id === board.focus) : -1;
   const walking = at >= 0;
   return (
     <div className="flex shrink-0 items-center justify-between gap-[4vh]" style={{ height: vh(BOARD_TOP_ROW) }}>
-      <p className="font-display text-[2.4vh] font-semibold uppercase leading-[3vh] tracking-[0.14em]" style={{ color: "var(--accent)" }}>
+      <p className="tv-small font-semibold" style={{ color: "var(--tv-text)" }}>
         {board.week ? "Доска недели" : "Доска"}
       </p>
       <div className="flex items-center gap-[3vh]">
         <div className="grid justify-items-end [grid-template-areas:'cell'] *:[grid-area:cell]">
           <span
-            className="nums self-center text-[3vh] font-semibold leading-[4vh] text-muted"
+            className="tv-small tv-num self-center text-muted"
             style={{ opacity: walking ? 0 : 1, transition: "opacity 450ms var(--ease-in-out)" }}
             aria-hidden={walking}
           >
@@ -177,7 +179,7 @@ function Progress({ board, at, on }: { board: Board; at: number; on: boolean }) 
           data-testid="tv-board-progress-thumb"
         />
       </span>
-      <span className="nums text-[3.4vh] font-bold leading-[4vh] tabular-nums">
+      <span className="tv-small tv-num font-bold">
         <span className="inline-block text-right" style={{ minWidth: `${String(count).length}ch` }}>
           {on ? at + 1 : 1}
         </span>
@@ -206,9 +208,9 @@ function PageDots({ page, pages }: { page: number; pages: number }) {
 /** «Гость в кабинете»: доски нет — тихие часы и честная строка (D-33). */
 function Hidden({ now }: { now: Date }) {
   return (
-    <div className="flex flex-col items-center gap-[2vh]" data-testid="tv-board-hidden">
-      <p className="nums text-[18vh] font-bold leading-[20vh] tabular-nums">{tvTime(now)}</p>
-      <p className="text-[3.4vh] leading-[4.4vh] text-muted">Доска скрыта · гость в кабинете</p>
+    <div className="flex h-full w-full flex-col items-center justify-center gap-[2vh]" data-testid="tv-board-hidden">
+      <p className="tv-num text-[18vh] font-bold leading-[20vh]">{tvTime(now)}</p>
+      <p className="tv-small text-muted">Доска скрыта на время встречи</p>
     </div>
   );
 }

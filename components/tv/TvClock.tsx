@@ -1,26 +1,28 @@
 "use client";
 
-import { PulseMark } from "@/components/brand/PulseMark";
-import { StillLogo } from "@/components/ui/StillLogo";
 import { tvDate, tvTime } from "@/lib/tv/clock";
+import { meetingOf } from "@/lib/tv/overlay";
 import type { TvEventRow } from "@/lib/tv/queries";
 import type { ClockStyle } from "@/lib/tv/state";
 
 import { TvAnalogClock } from "./TvAnalogClock";
+import { TvMeetingLine } from "./TvToday";
 
 /**
- * Заставка «часы»: тихий экран для совещаний (D-76 §8). В комнате идёт разговор —
- * стена не должна тянуть взгляд лентой и лицом, но и чернеть ей нельзя: погашенный
- * телевизор читается как сломанный.
+ * The «часы» scene: a quiet screen for meetings (D-76 §8, D-185). A conversation is going on in the room — the wall
+ * does not pull the eye with the face and news, but does not go black either: a TV switched off reads as broken.
  *
- * Цифры или стрелки — как выбрано на пульте (D-96). Стрелкам нужна ширина, поэтому
- * циферблат стоит слева, а дата, ближайшее мероприятие и марка — справа от него.
+ * Digits nearly the full height, on the left of the grid, the date and the next meeting under them; with hands, a large
+ * dial on the left, the date and the meeting on the right. No clock in the bottom band on this scene (TvFrame), no
+ * company name — it is in the channel mark.
  *
- * Бегущая строка, подпись и пульс дня остаются — их рисует TvScreen поверх сцены.
+ * The digits are the one size outside the wall's scale (tv-type.css): this scene is the clock.
  */
+
+/** The digits' size: a share of the wall's height, the same picture on 720p and 4K. */
+const DIGITS_VH = 54;
+
 export function TvClock({
-  company,
-  logoUrl,
   now,
   next,
   clock,
@@ -32,36 +34,44 @@ export function TvClock({
   next: TvEventRow | null;
   clock: ClockStyle;
 }) {
-  const nextLine = next ? `Ближайшее: ${tvTime(new Date(next.starts_at))} · ${next.title ?? "Мероприятие"}` : null;
-  const brand = (
-    <div className="flex items-center gap-[2.4vh]">
-      <PulseMark size="tv" />
-      <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
-      {logoUrl ? <StillLogo src={logoUrl} className="h-[8vh] w-auto object-contain" /> : null}
-    </div>
-  );
+  const meeting = next ? meetingOf(next, now) : null;
 
   if (clock === "analog") {
     const [weekday, date] = splitDate(tvDate(now));
     return (
-      <div className="flex items-center gap-[8vh]" data-testid="tv-clock" data-clock="analog">
-        <TvAnalogClock now={now} size="58vh" />
-        <div className="flex min-w-0 max-w-[46vw] flex-col gap-[1.6vh]">
-          <p className="text-[8vh] font-bold leading-[9vh] tracking-[-0.02em] first-letter:uppercase">{weekday}</p>
-          {date ? <p className="text-[4.4vh] leading-[5.4vh] text-muted">{date}</p> : null}
-          {nextLine ? <p className="mt-[2vh] text-[3.2vh] leading-[4.2vh] text-muted">{nextLine}</p> : null}
-          <div className="mt-[4vh]">{brand}</div>
+      <div
+        className="flex h-full w-full items-center gap-[9vh] px-[var(--tv-x)] pb-[var(--tv-gap)] pt-[var(--tv-y)]"
+        data-testid="tv-clock"
+        data-clock="analog"
+      >
+        <TvAnalogClock now={now} size="74vh" className="shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <p className="tv-title first-letter:uppercase" style={{ color: "var(--tv-text)" }}>
+            {weekday}
+          </p>
+          {date ? <p className="tv-lead mt-[1.6vh] text-muted">{date}</p> : null}
+          {meeting ? <TvMeetingLine meeting={meeting} single className="mt-[7vh]" /> : null}
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-[2vh]" data-testid="tv-clock" data-clock="digital">
-      <p className="text-[22vh] font-bold leading-[24vh] tabular-nums">{tvTime(now)}</p>
-      <p className="text-[4vh] leading-[5vh] text-muted first-letter:uppercase">{tvDate(now)}</p>
-      {nextLine ? <p className="text-[3.2vh] leading-[4vh] text-muted">{nextLine}</p> : null}
-      <div className="mt-[3vh]">{brand}</div>
+    <div
+      className="flex h-full w-full flex-col justify-center px-[var(--tv-x)] pb-[var(--tv-gap)] pt-[var(--tv-y)]"
+      data-testid="tv-clock"
+      data-clock="digital"
+    >
+      <p
+        className="tv-num font-bold"
+        style={{ fontSize: `${DIGITS_VH}vh`, lineHeight: 0.82, letterSpacing: "-0.035em", color: "var(--tv-text)", marginLeft: "-0.04em" }}
+      >
+        {tvTime(now)}
+      </p>
+      <p className="tv-lead mt-[5vh] first-letter:uppercase" style={{ color: "var(--tv-text)" }}>
+        {tvDate(now)}
+      </p>
+      {meeting ? <TvMeetingLine meeting={meeting} single className="mt-[3vh]" /> : null}
     </div>
   );
 }

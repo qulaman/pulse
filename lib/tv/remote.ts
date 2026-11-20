@@ -39,12 +39,13 @@ export type WallReceipt = { tone: ReceiptTone; text: string };
 const STALE_MS = 3 * 60_000;
 
 export const SCENE_LABEL: Record<TvScene, string> = {
-  face: "Лицо",
+  face: "Сегодня",
   clock: "Часы",
   team: "Команда",
   calendar: "Календарь",
   board: "Доска",
   rating: "Рейтинг",
+  photos: "Фото",
 };
 
 /** Переключатель часов на пульте (D-96): как на стене, так и на клавише. */
@@ -66,12 +67,13 @@ export const RATING_LABEL: Record<RatingView, string> = {
 };
 
 const SCENE_NOW: Record<TvScene, string> = {
-  face: "Эфир · лицо",
+  face: "Эфир · сегодня",
   clock: "Эфир · часы",
   team: "Эфир · команда",
   calendar: "Эфир · календарь",
   board: "Эфир · доска",
   rating: "Эфир · рейтинг недели",
+  photos: "Эфир · фото",
 };
 
 export function wallReceipt(state: TvState | null, now: Date): WallReceipt {

@@ -67,12 +67,17 @@ export function phraseOf(line: TvLine): string {
   }
 }
 
-/** Когда новостей нет — лицо говорит про день в целом, а не молчит впустую. */
-function idlePhrase(today: { sent: number; done: number; in_work: number }): string {
-  if (today.done > 0) return `Сегодня принято: ${today.done}`;
-  if (today.in_work > 0) return `В работе: ${today.in_work}`;
-  if (today.sent > 0) return `Сегодня роздано: ${today.sent}`;
-  return "Пока тихо";
+/**
+ * With no news the face greets the room by the Aqtobe clock (D-185). «Сегодня» shows the day's numbers
+ * itself, large — the face does not repeat them. The same greeting is the home's headline
+ * while the day has no number at all.
+ */
+export function greetingOf(now: Date, today: { done: number } = { done: 0 }): string {
+  const hour = hourOf(now);
+  if (hour >= 5 && hour < 12) return "Доброе утро";
+  if (hour >= 12 && hour < 18) return "Добрый день";
+  if (hour >= 18 && hour < 22) return today.done > 0 ? "Спасибо за день" : "Добрый вечер";
+  return "Доброй ночи";
 }
 
 /**
@@ -87,7 +92,7 @@ export function speechOf(
   const since = newest ? now.getTime() - newest.at.getTime() : Infinity;
 
   if (since > SLEEP_AFTER_MS && isNight(now)) return { text: null, mood: "sleeping" };
-  if (!newest || since > FRESH_MS) return { text: idlePhrase(today), mood: "calm" };
+  if (!newest || since > FRESH_MS) return { text: greetingOf(now, today), mood: "calm" };
 
   // новость лицо именно проговаривает; за хорошую — радуется
   return { text: phraseOf(newest), mood: GLAD.has(newest.kind) ? "happy" : "speaking" };

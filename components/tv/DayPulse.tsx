@@ -1,85 +1,73 @@
 "use client";
 
+import { memo } from "react";
+
 /**
- * Дальний слой всего экрана: пульс дня. Кривая построена по настоящим событиям компании
- * по часам (`tv_summary.pulse`) — к обеду растёт, к вечеру оседает. Это не орнамент:
- * стена показывает ритм дня, и по нему видно, живая компания сегодня или спит.
+ * The day's rhythm on «Сегодня» (D-185): how many company events fell on each working hour
+ * (`tv_summary.pulse`), one bar per hour, labelled 9 · 12 · 15 · 18, with a «сейчас» mark. Past
+ * hours in a muted accent, the current one in full, future ones as empty space: the strip shows where
+ * the day is and whether it has been lively. Not an ornament and not a curve — a labelled scale.
  *
- * Рисуется руками (Recharts на киоск не тащим), статично — ни одного анимированного
- * свойства: движение на экране и так есть, а фон должен держать сутки без работы.
+ * Static: nothing on it animates; a new hour or a new count simply redraws the bars.
  */
 
 const HOURS = 24;
-/** Рисуем рабочий день: ночные нули растянули бы кривую в иглу посреди суток. */
-const FROM_HOUR = 6;
-const TO_HOUR = 22;
-/** Пик занимает нижнюю треть полосы: это земля под людьми, а не график поверх них. */
-const PEAK = 42;
+/** The working day drawn: the night's zeros would squeeze the day into a needle. */
+const FROM_HOUR = 8;
+const TO_HOUR = 20;
+const LABELS: ReadonlySet<number> = new Set([9, 12, 15, 18]);
+/** The tallest bar, a share of the wall's height. */
+const BAR_VH = 11;
 
-/** Плавная кривая по точкам: Катмулл-Ром, переведённый в кубические Безье. */
-function smoothPath(points: { x: number; y: number }[]): string {
-  if (points.length < 2) return "";
-  let d = `M ${points[0]!.x} ${points[0]!.y}`;
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[Math.max(0, i - 1)]!;
-    const p1 = points[i]!;
-    const p2 = points[i + 1]!;
-    const p3 = points[Math.min(points.length - 1, i + 2)]!;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`;
-  }
-  return d;
-}
-
-export function DayPulse({ pulse, hour }: { pulse: number[]; hour: number }) {
-  if (pulse.length !== HOURS || pulse.every((value) => value === 0)) return null;
-
-  const day = pulse.slice(FROM_HOUR, TO_HOUR + 1);
-  const max = Math.max(...day, 1);
-  const points = day.map((value, index) => ({
-    x: (index / (day.length - 1)) * 100,
-    y: 100 - (value / max) * PEAK,
-  }));
-
-  const line = smoothPath(points);
-  const area = `${line} L 100 100 L 0 100 Z`;
-  const nowX = ((Math.min(TO_HOUR, Math.max(FROM_HOUR, hour)) - FROM_HOUR) / (TO_HOUR - FROM_HOUR)) * 100;
+export const DayPulse = memo(function DayPulse({ pulse, hour }: { pulse: readonly number[]; hour: number }) {
+  if (pulse.length !== HOURS) return null;
+  const hours = Array.from({ length: TO_HOUR - FROM_HOUR + 1 }, (_, i) => FROM_HOUR + i);
+  const max = Math.max(...hours.map((h) => pulse[h] ?? 0));
+  if (max === 0) return null;
+  const columns = { gridTemplateColumns: `repeat(${hours.length}, minmax(0, 1fr))` };
+  const nowIn = hour >= FROM_HOUR && hour <= TO_HOUR;
 
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full">
-        <defs>
-          <linearGradient id="tv-day-pulse" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        <path d={area} fill="url(#tv-day-pulse)" />
-        <path
-          d={line}
-          fill="none"
-          stroke="var(--accent)"
-          strokeOpacity="0.32"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-        {/* где день находится прямо сейчас */}
-        <line
-          x1={nowX}
-          y1="0"
-          x2={nowX}
-          y2="100"
-          stroke="var(--accent)"
-          strokeOpacity="0.14"
-          strokeWidth="1"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
+    <div className="w-full" aria-hidden data-testid="tv-day-pulse">
+      <div className="grid items-end" style={{ ...columns, height: `${BAR_VH}vh` }}>
+        {hours.map((h) => {
+          const value = pulse[h] ?? 0;
+          const future = nowIn ? h > hour : hour < FROM_HOUR;
+          const current = h === hour;
+          return (
+            <span
+              key={h}
+              className="justify-self-center rounded-t-[0.6vh]"
+              style={{
+                width: "3vh",
+                // a quiet hour keeps a sliver: the day's line stays whole
+                height: future ? "0.5vh" : `${Math.max(0.5, (value / max) * BAR_VH)}vh`,
+                background: future
+                  ? "var(--surface-2)"
+                  : current
+                    ? "var(--accent)"
+                    : "color-mix(in srgb, var(--accent) 45%, var(--bg))",
+              }}
+            />
+          );
+        })}
+      </div>
+      <div className="mt-[1.2vh] grid" style={columns}>
+        {hours.map((h) => {
+          const current = nowIn && h === hour;
+          // an hour's number beside «сейчас» would run into it
+          const label = current ? "сейчас" : LABELS.has(h) && !(nowIn && Math.abs(h - hour) <= 1) ? String(h) : null;
+          return (
+            <span
+              key={h}
+              className={`tv-fine tv-num justify-self-center whitespace-nowrap ${current ? "font-semibold" : "text-muted"}`}
+              style={current ? { color: "var(--tv-text)" } : undefined}
+            >
+              {label}
+            </span>
+          );
+        })}
+      </div>
     </div>
   );
-}
+});

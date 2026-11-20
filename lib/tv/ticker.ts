@@ -1,23 +1,22 @@
-import { verdict } from "@/lib/tasks/status-text";
-
 import { tvTime, tvWeekday } from "./clock";
 import type { TvLine } from "./feed";
 import type { TvEventRow, TvSummary } from "./queries";
 import { phraseOf } from "./voice";
 
 /**
- * Бегущая строка над лицом: всё, что экран рассказывает о компании, одной лентой —
- * последние события, числа дня, вердикт и топ недели. Чистая функция: порядок и слова
- * проверяются тестом, а не глазами на стене.
+ * The news line at the bottom of the wall (D-185): everything the screen tells about the company, as one tape —
+ * the day's numbers, the next meetings, the latest events, the week's top. A pure function: the order and the words
+ * are checked by a test, not by eye on the wall.
  *
- * Правила те же, что у всего ТВ: никаких имён рядом с негативом (D-45) — вердикт идёт
- * числом («2 просрочки»), без «у кого»; у гостя в строку не попадают ни фамилии, ни
- * очки, потому что их нет уже в данных (D-33).
+ * An item is two words in different voices: `lead` (a time, «+50», «Топ недели») in its tone's colour and
+ * semibold, `text` in calm white. There is nothing negative in the line at all (D-45): no overdue, no
+ * declines, no «на приёмке» — that is the language of the director's «Входящее», not of the wall. For a guest
+ * no surnames and no points get into the line, because the data has none already (D-33).
  */
 
-export type TickerTone = "accent" | "ok" | "gold" | "muted" | "warn" | "danger";
+export type TickerTone = "accent" | "ok" | "gold" | "muted" | "warn";
 
-export type TickerItem = { id: string; text: string; tone: TickerTone };
+export type TickerItem = { id: string; lead: string | null; text: string; tone: TickerTone };
 
 /** Сколько событий едет в строке: дальше уже не новости, а история. */
 const EVENTS = 8;
@@ -26,21 +25,23 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   const items: TickerItem[] = [];
 
   if (summary) {
-    const { today, counts } = summary;
-    items.push({
-      id: "today",
-      text: `Сегодня: ${today.sent} ${pluralOrders(today.sent)} · ${today.done} принято · ${today.in_work} в работе`,
-      tone: "muted",
-    });
-
-    const line = verdict(counts);
-    items.push({ id: "verdict", text: line.text, tone: line.tone === "ok" ? "ok" : line.tone });
+    const { today } = summary;
+    if (today.sent + today.done + today.in_work > 0) {
+      items.push({
+        id: "today",
+        lead: "Сегодня",
+        text: `${today.sent} ${pluralOrders(today.sent)} · ${today.done} сделано · ${today.in_work} в работе`,
+        tone: "accent",
+      });
+    }
 
     // что впереди у всей компании: три ближайшие встречи, гостю — без названий (D-33)
     for (const event of (summary.events ?? []).slice(0, EVENTS_AHEAD)) {
+      const meeting = meetingText(event, new Date(summary.now));
       items.push({
         id: `meeting:${event.id}`,
-        text: meetingText(event, new Date(summary.now)),
+        lead: meeting.lead,
+        text: meeting.text,
         tone: startsWithin(event, new Date(summary.now), SOON_MS) ? "warn" : "accent",
       });
     }
@@ -49,7 +50,8 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
   for (const line of lines.slice(0, EVENTS)) {
     items.push({
       id: `event:${line.id}`,
-      text: `${tvTime(line.at)} · ${phraseOf(line)}`,
+      lead: tvTime(line.at),
+      text: phraseOf(line),
       tone: line.tone,
     });
   }
@@ -59,17 +61,17 @@ export function tickerItems(lines: readonly TvLine[], summary: TvSummary | undef
       .slice(0, 3)
       .map((row) => (row.points === null ? row.name : `${row.name} ${row.points}`))
       .join(" · ");
-    items.push({ id: "rating", text: `Топ недели: ${top}`, tone: "gold" });
+    items.push({ id: "rating", lead: "Топ недели", text: top, tone: "gold" });
   }
 
   const week = summary?.week?.reduce((sum, day) => sum + day.done, 0) ?? 0;
   if (week > 0) {
-    items.push({ id: "week", text: `За неделю закрыто: ${week}`, tone: "muted" });
+    items.push({ id: "week", lead: "За неделю", text: `сделано ${week}`, tone: "ok" });
   }
 
   if (summary?.points_enabled && summary.merch.length > 0) {
     const last = summary.merch[0]!;
-    items.push({ id: "merch", text: `Награда: ${last.name} · ${last.title}`, tone: "gold" });
+    items.push({ id: "merch", lead: "Награда", text: `${last.name} · ${last.title}`, tone: "gold" });
   }
 
   return items;
@@ -93,14 +95,14 @@ function dayIndex(iso: string | Date): number {
   return Math.floor((ms + AQTOBE_OFFSET_MS) / DAY_MS);
 }
 
-function meetingText(event: TvEventRow, now: Date): string {
+function meetingText(event: TvEventRow, now: Date): { lead: string; text: string } {
   const diff = dayIndex(event.starts_at) - dayIndex(now);
-  const day = diff <= 0 ? "Сегодня" : diff === 1 ? "Завтра" : tvWeekday(new Date(event.starts_at));
-  const title = event.title ?? "Мероприятие";
-  const parts = [`${day} ${tvTime(new Date(event.starts_at))}`, title];
+  const time = tvTime(new Date(event.starts_at));
+  const lead = diff <= 0 ? time : `${diff === 1 ? "Завтра" : tvWeekday(new Date(event.starts_at))} ${time}`;
+  const parts = [event.title ?? "Мероприятие"];
   if (event.location) parts.push(event.location);
   parts.push(`${event.people} чел.`);
-  return parts.join(" · ");
+  return { lead, text: parts.join(" · ") };
 }
 
 function pluralOrders(count: number): string {

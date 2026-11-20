@@ -15,7 +15,7 @@ import {
   type TapeGeometry,
 } from "./tickerTape";
 
-const item = (id: string, text = `Пункт ${id}`, tone: TickerItem["tone"] = "accent"): TickerItem => ({ id, text, tone });
+const item = (id: string, text = `Пункт ${id}`, tone: TickerItem["tone"] = "accent"): TickerItem => ({ id, lead: null, text, tone });
 
 /** Замер дорожки: ширина каждого пункта по id (по умолчанию 500), вход и копия ленты подряд, без зазоров. */
 function measure(tape: Tape, widths: Record<string, number> = {}): TapeGeometry {

@@ -4,28 +4,35 @@ import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useState } from "react";
 
 import { PulseMark } from "@/components/brand/PulseMark";
+import { StillLogo } from "@/components/ui/StillLogo";
 import type { TvBoard as TvBoardData } from "@/lib/tv/board";
 import { tvDate, tvTime } from "@/lib/tv/clock";
+import type { TvMoment as TvMomentData } from "@/lib/tv/moment";
 import type { OverlayView } from "@/lib/tv/overlay";
+import type { TvPhoto } from "@/lib/tv/photos";
 import type { TvCalendar as TvCalendarData, TvFocusEmployee, TvRatingScene, TvSummary, TvTaskFocus as TvTaskFocusData } from "@/lib/tv/queries";
 import { burnInShift, type CalendarView, type ClockStyle, type TvScene } from "@/lib/tv/state";
 import type { TickerItem } from "@/lib/tv/ticker";
 import type { TvSpeech } from "@/lib/tv/voice";
 
-import { DayPulse } from "./DayPulse";
-import { TvBoard } from "./TvBoard";
+import "./tv-type.css";
+
 import { TvAnalogClock } from "./TvAnalogClock";
+import { TvBoard } from "./TvBoard";
+import { TvBranchFull } from "./TvBranchFull";
 import { TvCalendar } from "./TvCalendar";
 import { TvClock } from "./TvClock";
 import { TvFocus } from "./TvFocus";
 import { TvLeaders } from "./TvLeaders";
-import { TvMascot } from "./TvMascot";
+import { TvMoment } from "./TvMoment";
 import { TvOverlay } from "./TvOverlay";
-import { TvBranchFull } from "./TvBranchFull";
+import { TvPhotos } from "./TvPhotos";
 import { TvSketchFull } from "./TvSketchFull";
 import { TvTaskFocus } from "./TvTaskFocus";
 import { TvTeam } from "./TvTeam";
 import { TvTicker } from "./TvTicker";
+import { TvToday } from "./TvToday";
+import { TvWelcome } from "./TvWelcome";
 
 /** Сцена «команда» до первой сводки: пустые плитки лучше пустого экрана. */
 export const EMPTY_SUMMARY: TvSummary = {
@@ -72,26 +79,36 @@ export type TvFrameProps = {
   overlay: OverlayView;
   /** The kiosk rings for a visitor; the sandbox and a laptop preview keep quiet. */
   sound: boolean;
+  /** Photos of finished tasks (D-185): the round's «Фото». */
+  photos?: TvPhoto[];
+  /** The reports of the person on the wall; without it — theirs among `photos` (the sandbox). */
+  personPhotos?: TvPhoto[];
+  /** Photos of the one order on the wall (D-185). */
+  taskPhotos?: TvPhoto[];
+  /** Praise, an award or an announcement that takes the wall for a moment (D-185). */
+  moment?: TvMomentData | null;
 };
 
 /**
  * Экран 16:9 в кабинете: только наблюдение, ноль интеракций (CONCEPT §3.5). Раскладка
  * без данных — её рисует и киоск (`TvScreen`), и песочница `/dev/tv` на фикстурах.
  *
- * Композиция владельца (2026-09-17): бегущая строка сверху, сцена посреди экрана и
- * подпись внизу без единой рамки: марка, название компании и часы. Ниже подписи —
- * дальний слой: кривая настоящего дня компании по часам. Поверх всего — слой «важно
- * сейчас» (D-96): посетитель и мероприятие, которое вот-вот начнётся.
+ * The composition (D-185) is a TV channel's: the scene takes the whole screen above the bottom band; in the top
+ * right corner, the channel mark — the client company's logo and name; along the bottom, full width, a band
+ * with the news line, the date and the clock. Margins and the type scale are in `tv-type.css`: everything in fractions
+ * of the height, so the screen sits the same on 720p, 1080p and 4K. Over everything, the «важно сейчас» layer (D-96).
+ *
+ * A scene changes by one transition of one container — opacity and a lift: the old one leaves, then
+ * the new one comes; two scenes are never on screen at once. This transition is smooth on the wall — do not touch it.
  *
  * Вся композиция раз в 10 минут встаёт на несколько пикселей в другое место — против
  * выгорания матрицы; ночью в пустом кабинете стена гаснет до тусклых часов.
- *
- * Размеры в `vh`: экран одинаково садится и на 1080p, и на 4K, и на телевизор 55".
  */
 export function TvFrame(props: TvFrameProps) {
   const { company, logoUrl, now, guest, clock, night, offline, items, speech, summary, focus, overlay, sound } = props;
   const shift = burnInShift(now);
   const task = props.task ?? null;
+  const photos = props.photos ?? [];
   // the scene changes once, when the next one has its data (a calendar without its events would
   // say «Свободный день», a board without its points would show the face in between)
   const stage = useStage(
@@ -103,8 +120,11 @@ export function TvFrame(props: TvFrameProps) {
   const board = scene === "board" && (stage.board?.board || stage.board?.hidden) ? stage.board : null;
   // a person, an order, a board or a notice on the wall wakes the night up: somebody is in the office
   const dim = night && !focus && !task && !overlay.banner && !board;
-  // the ticker, the footer and the day curve leave and come back with the night softly, in place
-  const awake = { opacity: dim ? 0 : 1, transition: "opacity var(--t-tv) var(--ease-in-out)" };
+  // a moment interrupts the round and the screensavers — never a person, an order, a board, the night or
+  // the quiet clock of a meeting (D-185)
+  const moment = !dim && !focus && !task && !board && !guest && scene !== "clock" ? (props.moment ?? null) : null;
+  // the round's «Фото» with nothing to show is «Сегодня» — the same key, so no transition between the two
+  const showPhotos = scene === "photos" && photos.length > 0;
   // an opaque notice over the wall: the scene under it stays mounted but is not drawn (no mascot
   // frames for the minutes a visitor waits); it is drawn again the moment the notice starts to leave
   const [coverShown, setCoverShown] = useState(false);
@@ -117,37 +137,48 @@ export function TvFrame(props: TvFrameProps) {
       ? `focus:${focus.employee.id}`
       : task
         ? `task:${task.task.id}`
-        : scene === "rating"
-          ? `rating:${stage.rating?.period ?? "week"}`
-          : scene === "calendar"
-        ? `calendar:${stage.calendarView}`
-        : scene === "board"
-          ? // no board yet (loading) or no longer (expired): the face is drawn, so the key is the
-            // face's too — otherwise face → board replays the face's entrance (D-121)
-            board
-            ? `board:${board.board?.id ?? "hidden"}`
-            : "face"
-          : scene;
+        : moment
+          ? `moment:${moment.id}`
+          : scene === "rating"
+            ? `rating:${stage.rating?.period ?? "week"}`
+            : scene === "calendar"
+              ? `calendar:${stage.calendarView}`
+              : scene === "board"
+                ? // no board yet (loading) or no longer (expired): home is drawn, so the key is home's
+                  // too — otherwise home → board replays home's entrance (D-121)
+                  board
+                  ? `board:${board.board?.id ?? "hidden"}`
+                  : homeKey(guest)
+                : scene === "photos"
+                  ? showPhotos
+                    ? "photos"
+                    : homeKey(guest)
+                  : scene === "face"
+                    ? homeKey(guest)
+                    : scene;
+  // the band fades with the night softly, in place — and on the welcome: a guest reads the company's
+  // name and the time on the scene itself, not the team's numbers in the band (D-185)
+  const bandOff = dim || sceneKey === "welcome";
+  const awake = { opacity: bandOff ? 0 : 1, transition: "opacity var(--t-tv) var(--ease-in-out)" };
+  // the clock scene is the clock: the band does not repeat it; the welcome carries the company's name itself,
+  // and a meeting's board needs its top row for the presenter's «3 / 7»
+  const bandClock = sceneKey !== "clock";
+  const channelMark = !dim && sceneKey !== "welcome" && !sceneKey.startsWith("board:");
+  const personPhotos = focus ? (props.personPhotos ?? photos.filter((photo) => photo.employee_id === focus.employee.id)) : [];
 
   return (
-    <div className="relative h-full w-full overflow-hidden" data-scene={sceneKey} data-clock={clock} data-guest={guest || undefined}>
+    <div className="tv-wall relative h-full w-full overflow-hidden" data-scene={sceneKey} data-clock={clock} data-guest={guest || undefined}>
+      {/* the band's surface stays put and runs a little past the band: the burn-in shift moves the words, never the edge */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[calc(var(--tv-band)+1vh)]"
+        style={{ ...awake, background: "var(--tv-band-bg)" }}
+      />
       <div
         className="relative flex h-full w-full flex-col"
         style={{ transform: `translate(${shift.x}px, ${shift.y}px)`, transition: "transform 2s var(--ease-in-out)" }}
       >
-        {/* far layer: the company's day by the hour, at the very bottom */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26vh]" style={awake} aria-hidden>
-          <DayPulse pulse={summary?.pulse ?? []} hour={Number(tvTime(now).slice(0, 2))} />
-        </div>
-
-        <header className="shrink-0 pt-[2.4vh]" style={awake} aria-hidden={dim || undefined}>
-          {/* the row keeps the ticker's height at night and on a day without news: the middle never moves */}
-          <div className="h-[6.2vh]">
-            <TvTicker items={items} paused={dim} />
-          </div>
-        </header>
-
-        <main className="flex min-h-0 flex-1 items-center justify-center" style={covered ? { contentVisibility: "hidden" } : undefined}>
+        <main className="relative min-h-0 flex-1" style={covered ? { contentVisibility: "hidden" } : undefined}>
           <AnimatePresence mode="wait">
             <motion.div
               key={sceneKey}
@@ -157,53 +188,81 @@ export function TvFrame(props: TvFrameProps) {
               exit={{ opacity: 0, transition: { duration: 0.25 } }}
               transition={{ duration: 0.5, ease: [0.2, 0, 0, 1] }}
               // transform + opacity и ничего больше — перф-контракт стены (D-45)
-              className="flex w-full items-center justify-center px-[4vh] motion-reduce:transform-none"
+              className="absolute inset-0 motion-reduce:transform-none"
             >
               {dim ? (
                 <Night now={now} clock={clock} />
               ) : focus ? (
-                <TvFocus focus={focus} remainingMs={props.focusRemainingMs} now={now} />
+                <TvFocus focus={focus} remainingMs={props.focusRemainingMs} now={now} photos={personPhotos} />
               ) : task ? (
-                <TvTaskFocus focus={task} remainingMs={props.focusRemainingMs} now={now} />
+                <TvTaskFocus focus={task} remainingMs={props.focusRemainingMs} now={now} photos={props.taskPhotos ?? []} />
+              ) : moment ? (
+                <TvMoment moment={moment} />
               ) : scene === "rating" ? (
                 <TvLeaders data={stage.rating} now={now} />
               ) : scene === "clock" ? (
                 <TvClock company={company} logoUrl={logoUrl} now={now} next={summary?.events[0] ?? null} clock={clock} />
               ) : scene === "team" ? (
-                <TvTeam summary={summary ?? EMPTY_SUMMARY} guest={guest} />
+                <TvTeam summary={summary ?? EMPTY_SUMMARY} guest={guest} now={now} />
               ) : scene === "calendar" ? (
                 <TvCalendar calendar={calendar} now={now} view={stage.calendarView} />
               ) : board ? (
-                <TvBoard data={board} now={now} />
+                <div className="tv-box items-center">
+                  <TvBoard data={board} now={now} />
+                </div>
+              ) : showPhotos ? (
+                <TvPhotos photos={photos} now={now} />
+              ) : guest ? (
+                <TvWelcome company={company} logoUrl={logoUrl} now={now} next={summary?.events[0] ?? null} />
               ) : (
-                <TvMascot speech={speech} />
+                <TvToday speech={speech} summary={summary} now={now} />
               )}
             </motion.div>
           </AnimatePresence>
         </main>
 
-        <footer
-          className="relative z-10 flex shrink-0 items-center justify-between gap-[3vh] px-[4vh] pb-[3.4vh]"
-          style={awake}
-          aria-hidden={dim || undefined}
+        {/* the channel mark: the client's logo and name, top right on every scene but the welcome (D-185) */}
+        <div
+          className="pointer-events-none absolute right-[var(--tv-x)] top-[var(--tv-y)] flex h-[6vh] items-center gap-[1.6vh]"
+          style={{ opacity: channelMark ? 1 : 0, transition: "opacity var(--t-tv) var(--ease-in-out)" }}
+          aria-hidden
+          data-testid="tv-channel"
         >
-          <div className="flex items-baseline gap-[2vh]">
-            <PulseMark size="tv" />
-            <span className="text-[3vh] leading-[3.8vh] text-muted">{company}</span>
-            {guest ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· гость в кабинете</span> : null}
-            {focus ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· на экране: {focus.employee.name}</span> : null}
-            {task?.employee ? <span className="text-[2.2vh] leading-[2.8vh] text-muted">· дело: {task.employee.name}</span> : null}
-          </div>
+          {logoUrl ? <StillLogo src={logoUrl} className="h-[5vh] w-auto object-contain" /> : null}
+          <span className="tv-small font-semibold" style={{ color: "var(--tv-text)" }}>
+            {company}
+          </span>
+        </div>
 
-          <div className="flex items-center gap-[2.4vh]">
-            {offline ? <span className="text-[2.2vh] leading-[2.8vh]" style={{ color: "var(--warn)" }}>нет связи</span> : null}
-            <span className="text-[2.6vh] leading-[3.4vh] text-muted first-letter:uppercase">{tvDate(now)}</span>
-            {clock === "analog" ? (
-              <TvAnalogClock now={now} size="9vh" seconds={false} detailed={false} />
-            ) : (
-              <span className="text-[7vh] font-bold leading-[7.4vh] tabular-nums">{tvTime(now)}</span>
-            )}
+        <footer
+          className="relative z-10 flex h-[var(--tv-band)] shrink-0 items-center gap-[3vh] px-[var(--tv-x)]"
+          style={awake}
+          aria-hidden={bandOff || undefined}
+          data-testid="tv-band"
+        >
+          <span className="shrink-0 opacity-50">
+            <PulseMark size="tv" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <TvTicker items={items} paused={bandOff} />
           </div>
+          {offline ? (
+            <span className="tv-fine shrink-0" style={{ color: "var(--warn)" }}>
+              нет связи
+            </span>
+          ) : null}
+          {bandClock ? (
+            <div className="flex shrink-0 items-center gap-[2.4vh]">
+              <span className="tv-fine text-muted first-letter:uppercase">{tvDate(now)}</span>
+              {clock === "analog" ? (
+                <TvAnalogClock now={now} size="8.4vh" seconds={false} detailed={false} />
+              ) : (
+                <span className="tv-num text-[7vh] font-bold leading-none" style={{ color: "var(--tv-text)" }}>
+                  {tvTime(now)}
+                </span>
+              )}
+            </div>
+          ) : null}
         </footer>
 
         {/* a drawing lit on the board takes the whole wall (D-141), a branch lit on the map too (D-144),
@@ -216,6 +275,11 @@ export function TvFrame(props: TvFrameProps) {
       </div>
     </div>
   );
+}
+
+/** «Сегодня» for the team, the welcome for a guest: one key each, so a guest coming in plays one transition. */
+function homeKey(guest: boolean): string {
+  return guest ? "welcome" : "face";
 }
 
 /** How long the wall keeps its scene while the next one's data is on its way: a query that never answers must not pin it. */
@@ -262,7 +326,7 @@ function sameStage(a: Stage, b: Stage): boolean {
  */
 function Night({ now, clock }: { now: Date; clock: ClockStyle }) {
   return (
-    <div className="flex flex-col items-center gap-[2vh] opacity-[0.32]" data-testid="tv-night">
+    <div className="flex h-full w-full flex-col items-center justify-center gap-[2vh] opacity-[0.32]" data-testid="tv-night">
       {clock === "analog" ? (
         <TvAnalogClock now={now} size="44vh" seconds={false} />
       ) : (

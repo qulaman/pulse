@@ -24,23 +24,6 @@
   }
 }
 
-/* «К вам посетитель»: a soft ring breathing around the door, opacity and scale only */
-.ring {
-  animation: tv-ring 2.4s var(--ease-in-out) infinite;
-}
-
-@keyframes tv-ring {
-  0%,
-  100% {
-    opacity: 0.35;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.9;
-    transform: scale(1.06);
-  }
-}
-
 /* The running meeting in the calendar glows once in a while — slow, not a blinker */
 .live {
   animation: tv-live 3s var(--ease-in-out) infinite;
@@ -54,12 +37,6 @@
   50% {
     opacity: 0.55;
   }
-}
-
-/* How long the focus has left, shrinking from the right: scaleX only */
-.gauge {
-  transform-origin: left center;
-  transition: transform 10s linear;
 }
 
 /* The ticker's tape rides on the compositor: the track slides left by one run and starts over,

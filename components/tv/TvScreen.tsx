@@ -1,7 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
+
 import { lineOf } from "@/lib/tv/feed";
+import { momentOf } from "@/lib/tv/moment";
 import { overlayOf } from "@/lib/tv/overlay";
+import { useTvPhotos } from "@/lib/tv/photos";
 import { useTvBoard, useTvCalendar, useTvFeed, useTvFocus, useTvOverlay, useTvRating, useTvState, useTvSummary } from "@/lib/tv/queries";
 import { MONTH_DAYS, monthGridFrom } from "@/lib/tv/calendar";
 import {
@@ -22,6 +26,7 @@ import { tickerItems } from "@/lib/tv/ticker";
 import { speechOf } from "@/lib/tv/voice";
 
 import { TvFrame } from "./TvFrame";
+import { primeTvPhotos } from "./TvPhotos";
 import { useClock, useHeartbeat, useNightReload, useOffline, useRemoteReload } from "./useKiosk";
 
 /**
@@ -61,7 +66,7 @@ export function TvScreen({
   const points = summary.data?.points_enabled ?? true;
   const scene = sceneOf(row, now, points, guest);
   // the round prefetches its scenes, so a turn never lands on an empty screen (D-123)
-  const round = roundOn(row, now) ? carouselScenes(points && !guest, weekInRound(row, now, guest)) : [];
+  const round = roundOn(row, now) ? carouselScenes(points && !guest, weekInRound(row, now, guest), guest) : [];
   const focus = useTvFocus(mode !== "ether");
   // the week from today, or six weeks from the Monday the month starts in (D-98)
   const calendarView = calendarViewOf(row);
@@ -75,6 +80,17 @@ export function TvScreen({
   const board = useTvBoard(guest, scene === "board" || round.includes("board"), round.length > 0 ? (row?.week_board_id ?? null) : (row?.board_id ?? null));
   // the rating scene: the first five, the riser, the rewards (D-123)
   const rating = useTvRating(guest, scene === "rating" || round.includes("rating"), ratingViewOf(row));
+  // photos of finished tasks for the round's «Фото» (D-185); never for a guest
+  const photos = useTvPhotos({ enabled: scene === "photos" || round.includes("photos"), guest });
+  // the person on the wall shows their own reports, the order its own photos, whatever its stage
+  const employeeId = focus.data?.mode === "employee" ? focus.data.employee.id : null;
+  const personPhotos = useTvPhotos({ enabled: mode === "employee" && employeeId !== null, guest, employeeId });
+  const taskId = focus.data?.mode === "task" ? focus.data.task.id : null;
+  const taskPhotos = useTvPhotos({ enabled: mode === "task" && taskId !== null, guest, taskId });
+  // the round's photos load as soon as their links come: «Фото» opens on a photo, not on a blank (D-185)
+  useEffect(() => {
+    if (photos.data) primeTvPhotos(photos.data);
+  }, [photos.data]);
   const offline = useOffline(summary.dataUpdatedAt);
 
   useNightReload();
@@ -115,6 +131,10 @@ export function TvScreen({
         calendarView={calendarView}
         board={scene === "board" ? (board.data ?? null) : null}
         overlay={overlayOf(overlay.data, data?.events ?? [], now)}
+        photos={photos.data ?? []}
+        personPhotos={personPhotos.data ?? []}
+        taskPhotos={taskPhotos.data ?? []}
+        moment={momentOf(lines, now, guest)}
         // only the kiosk rings: the director peeking at /tv from a laptop is not the wall
         sound={role === "tv"}
       />

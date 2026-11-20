@@ -1,0 +1,96 @@
+/*
+ * The wall's type scale and grid (D-185). Read from 3–5 m in passing, so every size is a share of
+ * the screen's height: the same picture on 720p, 1080p and 4K. Six sizes and nothing between them;
+ * a scene that does not fit at these sizes shows less, it never shrinks the type.
+ *
+ *   tv-fine   3.2vh  units and captions read only standing close («очков», «чел.»)
+ *   tv-small  4.4vh  the smallest text meant to be read across the room
+ *   tv-body   5.6vh  rows, names, list items
+ *   tv-lead   7.4vh  the key line of a scene
+ *   tv-title  10vh   a hero name or headline
+ *   tv-hero   26vh   the one number of a scene
+ *
+ * Weights 400/600/700 only, numbers tabular. Colours come from the theme tokens; red is never
+ * used on the wall (D-45).
+ */
+
+:root {
+  /* the safe frame: 4.5 % of the width at 16:9 on the sides, 5 % of the height top and bottom —
+     a television's overscan eats the edge first */
+  --tv-x: 8vh;
+  --tv-y: 5vh;
+  /* the gap between grid columns and between blocks of one scene */
+  --tv-gap: 3vh;
+  /* the bottom band: the ticker, the date and the clock */
+  --tv-band: 11vh;
+  /* the band's own surface: one step above the wall, no border, it runs to the screen's edges */
+  --tv-band-bg: color-mix(in srgb, var(--surface) 82%, var(--bg));
+  /* text a step quieter than white on the dark wall */
+  --tv-text: color-mix(in srgb, var(--text) 94%, transparent);
+}
+
+.tv-fine {
+  font-size: 3.2vh;
+  line-height: 1.25;
+}
+
+.tv-small {
+  font-size: 4.4vh;
+  line-height: 1.2;
+}
+
+.tv-body {
+  font-size: 5.6vh;
+  line-height: 1.18;
+}
+
+.tv-lead {
+  font-size: 7.4vh;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+.tv-title {
+  font-size: 10vh;
+  line-height: 1.04;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.tv-hero {
+  font-size: 26vh;
+  line-height: 0.92;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* two lines at most and no ellipsis: a long title wraps once, the third line is never drawn —
+   scenes size their slots so real titles fit (D-185 «без многоточий») */
+.tv-two-lines {
+  max-height: 2lh;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+/* the box of a scene with a head: the safe frame on three sides, the band below does the fourth;
+   the head on top, the scene's body fills the rest */
+.tv-box {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--tv-gap);
+  width: 100%;
+  height: 100%;
+  padding: var(--tv-y) var(--tv-x) var(--tv-gap);
+}
+
+/* the app keeps a gutter for a scrollbar on every page; the wall never scrolls, and the gutter
+   would be a dark strip down the screen's right edge */
+html:has(.tv-wall) {
+  scrollbar-gutter: auto;
+}

@@ -55,8 +55,8 @@ describe("wallView и mapFits", () => {
 
 describe("boardFrame", () => {
   it("16:9 — 164 vh в ширину, уже экран — уже поле, высота одна", () => {
-    expect(boardFrame(16 / 9).width).toBe(163.6);
-    expect(boardFrame(16 / 10).width).toBe(147.2);
+    expect(boardFrame(16 / 9).width).toBe(161.8);
+    expect(boardFrame(16 / 10).width).toBe(144);
     expect(boardFrame(21 / 9).width).toBe(164);
     expect(boardFrame(16 / 9).height).toBe(boardFrame(4 / 3).height);
   });
