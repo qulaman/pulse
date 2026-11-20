@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { userSupabase, withAuth } from "@/lib/api/handler";
 import { apiError, apiOk } from "@/lib/api/respond";
+import { inCompanyFolder } from "@/lib/files/folder";
 import { createServiceSupabase } from "@/lib/supabase/service";
 
 const TTL_SECONDS = 600;
@@ -16,7 +17,7 @@ const BUCKET: Record<string, string> = { photo: "photos", voice: "voice" };
  * the service client signs whatever path that row carries. The client never names a
  * storage path, so a path can never be guessed at.
  */
-export const GET = withAuth("any", async ({ req }) => {
+export const GET = withAuth("any", async ({ req, profile }) => {
   const messageId = new URL(req.url).searchParams.get("message_id");
   if (!messageId || !z.uuid().safeParse(messageId).success) {
     return apiError(400, "validation_error", "Неверный запрос");
@@ -33,6 +34,9 @@ export const GET = withAuth("any", async ({ req }) => {
 
   const bucket = BUCKET[message.type];
   if (!bucket) return apiError(403, "forbidden", "Нет доступа");
+  // the service client signs any path: only the caller's company folder ({company_id}/…) is signed,
+  // whatever path a message row carries (principle 6)
+  if (!inCompanyFolder(message.file_path, profile.companyId)) return apiError(403, "forbidden", "Нет доступа");
 
   const signed = await createServiceSupabase().storage.from(bucket).createSignedUrl(message.file_path, TTL_SECONDS);
   if (signed.error || !signed.data) {
